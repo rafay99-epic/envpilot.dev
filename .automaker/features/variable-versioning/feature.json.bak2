@@ -1,0 +1,17 @@
+{
+  "category": "enhancement",
+  "description": "Track changes to environment variables over time. Allow rollback to previous versions and view change history with timestamps and authors.",
+  "id": "variable-versioning",
+  "title": "Environment Variable Versioning",
+  "priority": 3,
+  "status": "in_progress",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Track changes to environment variables over time. Allow rollback to previous versions and view change history with timestamps and authors.",
+      "timestamp": "2026-02-20T16:52:38.832Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:20:55.155Z"
+}

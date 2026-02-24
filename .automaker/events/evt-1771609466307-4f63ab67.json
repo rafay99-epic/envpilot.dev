@@ -1,0 +1,11 @@
+{
+  "id": "evt-1771609466307-4f63ab67",
+  "trigger": "feature_error",
+  "timestamp": "2026-02-20T17:44:26.307Z",
+  "projectPath": "/Users/prometheus/Code/ENV_Connect_2",
+  "projectName": "ENV_Connect_2",
+  "featureId": "project-dev-guide",
+  "featureName": "Developer Setup & Deployment Guide",
+  "error": "Claude Code process exited with code 1",
+  "errorType": "execution"
+}

@@ -1,0 +1,18 @@
+{
+  "category": "feature",
+  "description": "Allow users to link local project directories to cloud projects through the extension. Automatically sync environment variables to .env files based on permissions.",
+  "id": "extension-project-linking",
+  "title": "Extension Project Symlink System",
+  "priority": 2,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Allow users to link local project directories to cloud projects through the extension. Automatically sync environment variables to .env files based on permissions.",
+      "timestamp": "2026-02-20T16:52:38.827Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T19:19:58.454Z",
+  "summary": "<feature_name>Extension Project Linking</feature_name>\n\n<description>\nImplemented multi-directory project linking for the VS Code extension, allowing users to link multiple local directories to cloud projects with automatic environment variable syncing. The feature supports cross-platform path handling, .env file conflict resolution (overwrite/backup/merge/skip), and secure access token storage.\n</description>\n\n<files_changed>\n- vscode-extension/src/utils/paths.ts (NEW) - Cross-platform path normalization utilities\n- vscode-extension/src/types.ts - Added LinkedDirectory, LinkedProjectV2, ConflictStrategy, LinkDirectoryOptions interfaces\n- vscode-extension/src/utils/storage.ts - V2 storage format with migration from V1, immutable state management\n- vscode-extension/src/services/sync.ts - Multi-directory sync, conflict detection, backup/merge capabilities\n- vscode-extension/src/ui/linkProjectDialog.ts (NEW) - Enhanced UI for directory selection and conflict resolution\n- vscode-extension/src/extension.ts - New commands: addDirectory, removeDirectory, selectEnvironments\n- vscode-extension/package.json - Command definitions and configuration settings\n- vscode-extension/src/providers/projectsTreeProvider.ts - Display directories under linked projects with tooltips\n- vscode-extension/src/providers/statusBar.ts - Updated type compatibility for V2 format\n- vscode-extension/src/providers/variablesTreeProvider.ts - Async handling for V2 storage\n</files_changed>\n\n<key_features>\n- Multi-directory linking: Link multiple directories to a single cloud project\n- Cross-platform support: Consistent path handling on Windows, macOS, and Linux\n- Conflict resolution: User-selectable strategies (overwrite, backup, merge, skip)\n- Automatic migration: V1 to V2 storage format migration on extension activation\n- Security: Path traversal protection and secure token storage\n- Enhanced UI: QuickPick dialogs for environment and directory selection\n- Tree view integration: Visual display of linked directories with sync status\n</key_features>\n\n<verification>\n- TypeScript type check: PASSED\n- esbuild compilation: PASSED (515.6kb bundle)\n- Playwright tests: 7/7 PASSED\n- Code review: Critical issues identified and fixed (path traversal, mutations, type assertions)\n</verification>"
+}

@@ -1,0 +1,17 @@
+{
+  "category": "enhancement",
+  "description": "Build command-line interface tool for developers to sync environment variables, switch projects, and manage configurations from terminal. Alternative to the IDE extension.",
+  "id": "cli-tool",
+  "title": "CLI Tool for Environment Management",
+  "priority": 3,
+  "status": "in_progress",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Build command-line interface tool for developers to sync environment variables, switch projects, and manage configurations from terminal. Alternative to the IDE extension.",
+      "timestamp": "2026-02-20T16:52:38.832Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:41:36.307Z"
+}

@@ -1,0 +1,17 @@
+{
+  "category": "feature",
+  "description": "Allow users to link local project directories to cloud projects through the extension. Automatically sync environment variables to .env files based on permissions.",
+  "id": "extension-project-linking",
+  "title": "Extension Project Symlink System",
+  "priority": 2,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Allow users to link local project directories to cloud projects through the extension. Automatically sync environment variables to .env files based on permissions.",
+      "timestamp": "2026-02-20T16:52:38.827Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T19:19:58.449Z"
+}

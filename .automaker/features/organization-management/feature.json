@@ -1,0 +1,18 @@
+{
+  "category": "feature",
+  "description": "Create organization entities with WorkOS, allowing users to create organizations, manage members, and configure organization settings. Support organization switching for users in multiple orgs.",
+  "id": "organization-management",
+  "title": "Organization Management System",
+  "priority": 1,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Create organization entities with WorkOS, allowing users to create organizations, manage members, and configure organization settings. Support organization switching for users in multiple orgs.",
+      "timestamp": "2026-02-20T16:52:38.820Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T17:48:15.682Z",
+  "summary": "## Summary: Organization Management with WorkOS\n\n### Changes Implemented\n- Created complete organization management system with WorkOS integration\n- Implemented organization CRUD operations (create, read, update, delete)\n- Built member management with role-based access control (admin, team_lead, member)\n- Implemented team invitation system with email-based invites\n- Created organization switcher component for multi-org support\n- Added organization settings page with tier management\n- Integrated organization context throughout the dashboard\n\n### Files Modified\n**New API Routes:**\n- `src/app/api/users/sync/route.ts` - Sync WorkOS users to Convex database\n- `src/app/api/organizations/route.ts` - List and create organizations\n- `src/app/api/organizations/[id]/route.ts` - Get, update, delete single organization\n- `src/app/api/organizations/[id]/members/route.ts` - Member management (list, invite, update role, remove)\n- `src/app/api/invitations/[token]/route.ts` - Get, accept, decline invitations\n\n**New UI Pages:**\n- `src/app/(dashboard)/organizations/page.tsx` - Organization list with create button\n- `src/app/(dashboard)/organizations/new/page.tsx` - Create new organization form\n- `src/app/(dashboard)/organizations/[id]/page.tsx` - Organization detail/dashboard\n- `src/app/(dashboard)/organizations/[id]/settings/page.tsx` - Organization settings (admin only)\n- `src/app/(dashboard)/organizations/[id]/members/page.tsx` - Member management with invite modal\n- `src/app/(dashboard)/invitations/[token]/page.tsx` - Invitation acceptance page\n\n**Updated Components:**\n- `src/components/auth/organization-switcher.tsx` - Enhanced with API integration, create/manage links\n\n### Notes for Developer\n- WorkOS authentication is required for all protected routes\n- The Convex backend already has the schema and mutations for organizations, members, and invitations\n- Role-based permissions:\n  - **Admin**: Full access - manage settings, members, roles, delete org\n  - **Team Lead**: Can invite members (not admins), view settings\n  - **Member**: Read-only access to organization data\n- Invitation tokens expire after 7 days by default\n- Organization slugs must be unique and cannot be changed after creation\n- All actions are logged to the audit log table\n\n### Verification Status\n- Build completed successfully with no TypeScript errors\n- 11 Playwright tests passed verifying:\n  - All organization pages exist and respond correctly\n  - All API endpoints return appropriate status codes\n  - Authentication redirects work as expected\n  - Invitation handling works for valid/invalid tokens"
+}

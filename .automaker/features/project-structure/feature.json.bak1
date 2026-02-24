@@ -1,0 +1,17 @@
+{
+  "category": "feature",
+  "description": "Enable organizations to create and manage multiple projects (backend, frontend, packages, etc.). Each project acts as a container for environment variables with its own access controls.",
+  "id": "project-structure",
+  "title": "Project Management within Organizations",
+  "priority": 1,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Enable organizations to create and manage multiple projects (backend, frontend, packages, etc.). Each project acts as a container for environment variables with its own access controls.",
+      "timestamp": "2026-02-20T16:52:38.821Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:04:11.895Z"
+}

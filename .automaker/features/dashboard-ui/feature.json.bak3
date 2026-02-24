@@ -1,0 +1,16 @@
+{
+  "category": "feature",
+  "description": "Design and implement intuitive, clean dashboard showing organization overview, projects, team members, and quick access to environment variables. Focus on UX for admins and team leads.",
+  "id": "dashboard-ui",
+  "title": "Clean Dashboard UI for Organizations",
+  "priority": 2,
+  "status": "backlog",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Design and implement intuitive, clean dashboard showing organization overview, projects, team members, and quick access to environment variables. Focus on UX for admins and team leads.",
+      "timestamp": "2026-02-20T16:52:38.831Z",
+      "source": "initial"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "category": "feature",
+  "description": "Enable organizations to create and manage multiple projects (backend, frontend, packages, etc.). Each project acts as a container for environment variables with its own access controls.",
+  "id": "project-structure",
+  "title": "Project Management within Organizations",
+  "priority": 1,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Enable organizations to create and manage multiple projects (backend, frontend, packages, etc.). Each project acts as a container for environment variables with its own access controls.",
+      "timestamp": "2026-02-20T16:52:38.821Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:04:11.899Z",
+  "summary": "## Summary: Enable organizations to create and manage multiple projects\n\n### Changes Implemented\n- Created complete project management feature with CRUD operations\n- Added API routes with proper authorization checks for project operations\n- Created user-friendly UI for project management including create, view, edit, and delete pages\n- Implemented environment variable management within projects\n- Added proper user ID resolution for variable operations\n- Created shared constants file for project icons/colors\n- Added helper functions for user synchronization and organization membership checks\n\n### Files Modified\n- `src/app/api/projects/route.ts` - New API route for listing and creating projects with authorization\n- `src/app/api/projects/[id]/route.ts` - New API route for get/update/delete single project with authorization\n- `src/app/api/users/me/route.ts` - New API route for getting current user's Convex ID\n- `src/app/(dashboard)/dashboard/projects/new/page.tsx` - New project creation form page\n- `src/app/(dashboard)/dashboard/projects/[slug]/page.tsx` - Project detail page with variable management\n- `src/app/(dashboard)/dashboard/projects/[slug]/settings/page.tsx` - Project settings page with delete functionality\n- `src/lib/convex-helpers.ts` - New helper functions for Convex user sync and membership checks\n- `src/constants/project.ts` - New shared constants file for project icons, colors, and environments\n\n### Notes for Developer\n1. **Authorization**: All project API routes now verify:\n   - User authentication\n   - Organization membership\n   - Role-based permissions (admin/team_lead for create/update, admin only for delete)\n\n2. **Vault Integration**: Variable values currently use placeholder vault references. In production, integrate with WorkOS Vault API to encrypt values before storage.\n\n3. **Organization Selection**: The current implementation uses the first organization. For multi-org support, implement organization context/switcher functionality.\n\n4. **The existing backend in `convex/projects.ts`** was already fully implemented with all CRUD operations, soft delete, restore, and duplicate functionality.\n\n### Verification Status\n- TypeScript compilation passes with no errors\n- Created and ran 11 Playwright tests verifying:\n  - Page navigation and structure work correctly\n  - Authentication redirects function properly\n  - API routes return appropriate status codes for unauthenticated requests\n- All tests passed successfully before cleanup"
+}

@@ -1,0 +1,17 @@
+{
+  "category": "feature",
+  "description": "Build extension for VS Code and Cursor that authenticates users, fetches accessible environment variables, and syncs them to local projects. Prevent copy-paste of variables when permissions are revoked.",
+  "id": "vscode-cursor-extension",
+  "title": "VS Code/Cursor Extension",
+  "priority": 2,
+  "status": "in_progress",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Build extension for VS Code and Cursor that authenticates users, fetches accessible environment variables, and syncs them to local projects. Prevent copy-paste of variables when permissions are revoked.",
+      "timestamp": "2026-02-20T16:52:38.827Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:41:34.279Z"
+}

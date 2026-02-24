@@ -1,0 +1,17 @@
+{
+  "category": "feature",
+  "description": "Implement tier-based feature gating with configurable limits (e.g., number of projects, variables, team members). Start with generous free tier, prepare infrastructure for future Pro tier.",
+  "id": "tier-based-access-control",
+  "title": "Free/Pro Tier Access Control",
+  "priority": 2,
+  "status": "in_progress",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Implement tier-based feature gating with configurable limits (e.g., number of projects, variables, team members). Start with generous free tier, prepare infrastructure for future Pro tier.",
+      "timestamp": "2026-02-20T16:52:38.830Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:04:16.657Z"
+}

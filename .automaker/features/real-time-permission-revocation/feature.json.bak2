@@ -1,0 +1,17 @@
+{
+  "category": "feature",
+  "description": "Implement real-time synchronization that immediately revokes access to environment variables in the extension when permissions are removed. Clear cached variables on revocation.",
+  "id": "real-time-permission-revocation",
+  "title": "Real-time Permission Revocation",
+  "priority": 1,
+  "status": "in_progress",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Implement real-time synchronization that immediately revokes access to environment variables in the extension when permissions are removed. Clear cached variables on revocation.",
+      "timestamp": "2026-02-20T16:52:38.828Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T19:19:58.615Z"
+}

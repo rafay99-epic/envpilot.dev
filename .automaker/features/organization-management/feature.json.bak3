@@ -1,0 +1,16 @@
+{
+  "category": "feature",
+  "description": "Create organization entities with WorkOS, allowing users to create organizations, manage members, and configure organization settings. Support organization switching for users in multiple orgs.",
+  "id": "organization-management",
+  "title": "Organization Management System",
+  "priority": 1,
+  "status": "backlog",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Create organization entities with WorkOS, allowing users to create organizations, manage members, and configure organization settings. Support organization switching for users in multiple orgs.",
+      "timestamp": "2026-02-20T16:52:38.820Z",
+      "source": "initial"
+    }
+  ]
+}

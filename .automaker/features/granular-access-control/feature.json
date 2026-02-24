@@ -1,0 +1,18 @@
+{
+  "category": "feature",
+  "description": "Implement fine-grained permissions system with roles (Admin, Team Lead, Member) and per-variable access control. Team leads can grant/revoke access to specific environment variables for team members.",
+  "id": "granular-access-control",
+  "title": "Granular Role-based Access Control (RBAC)",
+  "priority": 1,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Implement fine-grained permissions system with roles (Admin, Team Lead, Member) and per-variable access control. Team leads can grant/revoke access to specific environment variables for team members.",
+      "timestamp": "2026-02-20T16:52:38.824Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T18:41:31.474Z",
+  "summary": "## Feature Implementation: granular-access-control\n\n### Summary\nImplemented fine-grained per-variable access control system with role-based permission management. Team leads can grant/revoke read/write access to specific environment variables for team members. Admins have full control including admin-level permissions.\n\n### Files Modified\n\n**Core Authorization:**\n- `src/lib/auth.ts:16,25-43` - Added VARIABLE_MANAGE_PERMISSIONS, updated role definitions with descriptions\n- `convex/permissions.ts:1-2,9-64,413-521,524-611,614-705,708-786,789-876,879-938` - Added ROLE_HIERARCHY, checkCanManagePermissions helper, auth checks to all mutations, made cleanupExpired internal\n\n**Database/Tier Configuration:**\n- `convex/tierLimits.ts` - Enabled granularPermissionsEnabled for free tier\n\n**API/Queries:**\n- `convex/variables.ts` - Updated listWithAccess query with role-based filtering\n- `convex/permissions.ts:221-354` - Added getAssignableMembers and canManageVariablePermissions queries\n\n**UI Components:**\n- `src/components/variables/variable-permissions-modal.tsx` (NEW) - Modal for managing variable permissions with loading state\n- `src/components/variables/variable-list-item.tsx` - Added \"Manage Access\" button and permission badges\n\n**Hooks:**\n- `src/hooks/usePermissions.ts` - Added useCanManageVariablePermissions and useAssignableMembers hooks\n- `src/hooks/index.ts` - Exported new hooks\n\n**Documentation:**\n- `src/app/(dashboard)/dashboard/team/page.tsx` - Added \"Granular Access Control\" info section\n\n### Security Fixes Applied\n- Added authorization checks to `bulkGrant` mutation (admin/team_lead only)\n- Added authorization checks to `bulkRevokeForUser` mutation with role hierarchy\n- Added authorization checks to `revokeAllForVariable` mutation (admin only)\n- Made `cleanupExpired` an internal mutation (not client-callable)\n- Fixed loading state showing \"access denied\" during query loading\n\n### Role Hierarchy\n- **Admin**: Full access, can grant read/write/admin permissions to anyone\n- **Team Lead**: Can grant read/write permissions to members only\n- **Member**: Read-only projects, variable access controlled by per-variable permissions"
+}

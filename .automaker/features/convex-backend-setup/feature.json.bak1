@@ -1,0 +1,18 @@
+{
+  "category": "feature",
+  "description": "Set up Convex as the real-time backend for data storage, queries, and mutations. Configure Convex functions for organizations, projects, variables, and permissions.",
+  "id": "convex-backend-setup",
+  "title": "Convex Backend Infrastructure",
+  "dependencies": [],
+  "priority": 1,
+  "status": "verified",
+  "branchName": "main",
+  "descriptionHistory": [
+    {
+      "description": "Set up Convex as the real-time backend for data storage, queries, and mutations. Configure Convex functions for organizations, projects, variables, and permissions.",
+      "timestamp": "2026-02-20T16:52:38.829Z",
+      "source": "initial"
+    }
+  ],
+  "updatedAt": "2026-02-20T17:19:57.405Z"
+}
