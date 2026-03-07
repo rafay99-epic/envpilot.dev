@@ -113,7 +113,6 @@ jobs:
   format:
     name: Format Check (Prettier)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -134,7 +133,6 @@ jobs:
   react-doctor:
     name: React Doctor
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -150,4 +148,4 @@ jobs:
         run: npm ci
 
       - name: Run react-doctor
-        run: npx -y react-doctor@latest . --yes --offline --fail-on none --verbose
+        run: npx -y react-doctor@latest . --yes --offline --fail-on error --verbose
