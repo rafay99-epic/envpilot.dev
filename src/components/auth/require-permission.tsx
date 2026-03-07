@@ -1,25 +1,25 @@
-'use client'
+"use client";
 
-import type { ReactNode } from 'react'
-import { useAuthContext } from './auth-provider'
-import type { Permission } from '@/lib/auth'
+import type { ReactNode } from "react";
+import { useAuthContext } from "./auth-provider";
+import type { Permission } from "@/lib/auth";
 
 interface RequirePermissionProps {
-  permission: Permission
-  children: ReactNode
-  fallback?: ReactNode
+  permission: Permission;
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface RequireAnyPermissionProps {
-  permissions: Permission[]
-  children: ReactNode
-  fallback?: ReactNode
+  permissions: Permission[];
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface RequireAllPermissionsProps {
-  permissions: Permission[]
-  children: ReactNode
-  fallback?: ReactNode
+  permissions: Permission[];
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 /**
@@ -30,17 +30,17 @@ export function RequirePermission({
   children,
   fallback = null,
 }: RequirePermissionProps) {
-  const { hasPermission, isLoading } = useAuthContext()
+  const { hasPermission, isLoading } = useAuthContext();
 
   if (isLoading) {
-    return null
+    return null;
   }
 
   if (!hasPermission(permission)) {
-    return <>{fallback}</>
+    return <>{fallback}</>;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 /**
@@ -51,17 +51,17 @@ export function RequireAnyPermission({
   children,
   fallback = null,
 }: RequireAnyPermissionProps) {
-  const { hasAnyPermission, isLoading } = useAuthContext()
+  const { hasAnyPermission, isLoading } = useAuthContext();
 
   if (isLoading) {
-    return null
+    return null;
   }
 
   if (!hasAnyPermission(permissions)) {
-    return <>{fallback}</>
+    return <>{fallback}</>;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 /**
@@ -72,15 +72,15 @@ export function RequireAllPermissions({
   children,
   fallback = null,
 }: RequireAllPermissionsProps) {
-  const { hasAllPermissions, isLoading } = useAuthContext()
+  const { hasAllPermissions, isLoading } = useAuthContext();
 
   if (isLoading) {
-    return null
+    return null;
   }
 
   if (!hasAllPermissions(permissions)) {
-    return <>{fallback}</>
+    return <>{fallback}</>;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

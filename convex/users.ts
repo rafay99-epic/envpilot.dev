@@ -46,7 +46,7 @@ export const search = query({
     const matches = allUsers.filter(
       (user) =>
         user.email.toLowerCase().includes(searchLower) ||
-        user.name?.toLowerCase().includes(searchLower)
+        user.name?.toLowerCase().includes(searchLower),
     );
 
     return matches.slice(0, limit);
@@ -107,7 +107,8 @@ export const updateProfile = mutation({
 
     const updateData: Record<string, unknown> = {};
     if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.avatarUrl !== undefined) updateData.avatarUrl = updates.avatarUrl;
+    if (updates.avatarUrl !== undefined)
+      updateData.avatarUrl = updates.avatarUrl;
 
     await ctx.db.patch(userId, updateData);
 

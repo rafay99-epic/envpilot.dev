@@ -1,5 +1,5 @@
-import { WorkOS } from '@workos-inc/node'
-import { vaultConfig } from './vault-config'
+import { WorkOS } from "@workos-inc/node";
+import { vaultConfig } from "./vault-config";
 
 /**
  * WorkOS Vault Service
@@ -13,20 +13,22 @@ import { vaultConfig } from './vault-config'
  */
 
 // Initialize WorkOS client for Vault operations
-let workosClient: WorkOS | null = null
+let workosClient: WorkOS | null = null;
 
 function getWorkOSClient(): WorkOS {
   if (!vaultConfig.isConfigured) {
-    throw new Error('WorkOS Vault is not configured. Please set WORKOS_API_KEY and WORKOS_CLIENT_ID.')
+    throw new Error(
+      "WorkOS Vault is not configured. Please set WORKOS_API_KEY and WORKOS_CLIENT_ID.",
+    );
   }
 
   if (!workosClient) {
     workosClient = new WorkOS(vaultConfig.apiKey, {
       clientId: vaultConfig.clientId,
-    })
+    });
   }
 
-  return workosClient
+  return workosClient;
 }
 
 /**
@@ -34,18 +36,18 @@ function getWorkOSClient(): WorkOS {
  * Each secret gets a unique encryption key based on this context
  */
 export interface VaultKeyContext {
-  organizationId: string
-  projectId: string
-  environment?: string
+  organizationId: string;
+  projectId: string;
+  environment?: string;
 }
 
 /**
  * Result from creating/updating a vault object
  */
 export interface VaultObjectResult {
-  id: string
-  versionId: string
-  keyId: string
+  id: string;
+  versionId: string;
+  keyId: string;
 }
 
 /**
@@ -55,22 +57,22 @@ export class VaultError extends Error {
   constructor(
     message: string,
     public readonly code: VaultErrorCode,
-    public readonly cause?: unknown
+    public readonly cause?: unknown,
   ) {
-    super(message)
-    this.name = 'VaultError'
+    super(message);
+    this.name = "VaultError";
   }
 }
 
 export type VaultErrorCode =
-  | 'NOT_CONFIGURED'
-  | 'CREATE_FAILED'
-  | 'READ_FAILED'
-  | 'UPDATE_FAILED'
-  | 'DELETE_FAILED'
-  | 'ENCRYPT_FAILED'
-  | 'DECRYPT_FAILED'
-  | 'NOT_FOUND'
+  | "NOT_CONFIGURED"
+  | "CREATE_FAILED"
+  | "READ_FAILED"
+  | "UPDATE_FAILED"
+  | "DELETE_FAILED"
+  | "ENCRYPT_FAILED"
+  | "DECRYPT_FAILED"
+  | "NOT_FOUND";
 
 /**
  * Creates an encrypted secret in WorkOS Vault
@@ -83,10 +85,10 @@ export type VaultErrorCode =
 export async function createSecret(
   name: string,
   value: string,
-  context: VaultKeyContext
+  context: VaultKeyContext,
 ): Promise<VaultObjectResult> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     const result = await workos.vault.createObject({
       name,
@@ -96,19 +98,19 @@ export async function createSecret(
         projectId: context.projectId,
         environment: context.environment,
       },
-    })
+    });
 
     return {
       id: result.id,
       versionId: result.versionId,
       keyId: result.keyId,
-    }
+    };
   } catch (error) {
     throw new VaultError(
       `Failed to create secret "${name}" in vault`,
-      'CREATE_FAILED',
-      error
-    )
+      "CREATE_FAILED",
+      error,
+    );
   }
 }
 
@@ -120,29 +122,29 @@ export async function createSecret(
  */
 export async function readSecret(vaultRef: string): Promise<string> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     const result = await workos.vault.readObject({
       id: vaultRef,
-    })
+    });
 
     if (!result.value) {
       throw new VaultError(
         `Secret with ID "${vaultRef}" has no value`,
-        'NOT_FOUND'
-      )
+        "NOT_FOUND",
+      );
     }
 
-    return result.value
+    return result.value;
   } catch (error) {
     if (error instanceof VaultError) {
-      throw error
+      throw error;
     }
     throw new VaultError(
       `Failed to read secret "${vaultRef}" from vault`,
-      'READ_FAILED',
-      error
-    )
+      "READ_FAILED",
+      error,
+    );
   }
 }
 
@@ -158,28 +160,28 @@ export async function readSecret(vaultRef: string): Promise<string> {
 export async function updateSecret(
   vaultRef: string,
   newValue: string,
-  versionCheck?: string
+  versionCheck?: string,
 ): Promise<VaultObjectResult> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     const result = await workos.vault.updateObject({
       id: vaultRef,
       value: newValue,
       ...(versionCheck && { versionCheck }),
-    })
+    });
 
     return {
       id: result.id,
       versionId: result.metadata.versionId,
       keyId: result.metadata.keyId,
-    }
+    };
   } catch (error) {
     throw new VaultError(
       `Failed to update secret "${vaultRef}" in vault`,
-      'UPDATE_FAILED',
-      error
-    )
+      "UPDATE_FAILED",
+      error,
+    );
   }
 }
 
@@ -191,17 +193,17 @@ export async function updateSecret(
  */
 export async function deleteSecret(vaultRef: string): Promise<void> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     await workos.vault.deleteObject({
       id: vaultRef,
-    })
+    });
   } catch (error) {
     throw new VaultError(
       `Failed to delete secret "${vaultRef}" from vault`,
-      'DELETE_FAILED',
-      error
-    )
+      "DELETE_FAILED",
+      error,
+    );
   }
 }
 
@@ -217,10 +219,10 @@ export async function deleteSecret(vaultRef: string): Promise<void> {
 export async function encryptData(
   data: string,
   context: VaultKeyContext,
-  associatedData?: string
+  associatedData?: string,
 ): Promise<string> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     return await workos.vault.encrypt(
       data,
@@ -229,14 +231,10 @@ export async function encryptData(
         projectId: context.projectId,
         environment: context.environment,
       },
-      associatedData
-    )
+      associatedData,
+    );
   } catch (error) {
-    throw new VaultError(
-      'Failed to encrypt data',
-      'ENCRYPT_FAILED',
-      error
-    )
+    throw new VaultError("Failed to encrypt data", "ENCRYPT_FAILED", error);
   }
 }
 
@@ -249,18 +247,14 @@ export async function encryptData(
  */
 export async function decryptData(
   encryptedData: string,
-  associatedData?: string
+  associatedData?: string,
 ): Promise<string> {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
-    return await workos.vault.decrypt(encryptedData, associatedData)
+    return await workos.vault.decrypt(encryptedData, associatedData);
   } catch (error) {
-    throw new VaultError(
-      'Failed to decrypt data',
-      'DECRYPT_FAILED',
-      error
-    )
+    throw new VaultError("Failed to decrypt data", "DECRYPT_FAILED", error);
   }
 }
 
@@ -272,17 +266,17 @@ export async function decryptData(
  */
 export async function listSecretVersions(vaultRef: string) {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     return await workos.vault.listObjectVersions({
       id: vaultRef,
-    })
+    });
   } catch (error) {
     throw new VaultError(
       `Failed to list versions for secret "${vaultRef}"`,
-      'READ_FAILED',
-      error
-    )
+      "READ_FAILED",
+      error,
+    );
   }
 }
 
@@ -294,17 +288,17 @@ export async function listSecretVersions(vaultRef: string) {
  */
 export async function describeSecret(vaultRef: string) {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     return await workos.vault.describeObject({
       id: vaultRef,
-    })
+    });
   } catch (error) {
     throw new VaultError(
       `Failed to describe secret "${vaultRef}"`,
-      'READ_FAILED',
-      error
-    )
+      "READ_FAILED",
+      error,
+    );
   }
 }
 
@@ -317,7 +311,7 @@ export async function describeSecret(vaultRef: string) {
  */
 export async function createDataKey(context: VaultKeyContext) {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     return await workos.vault.createDataKey({
       context: {
@@ -325,13 +319,9 @@ export async function createDataKey(context: VaultKeyContext) {
         projectId: context.projectId,
         environment: context.environment,
       },
-    })
+    });
   } catch (error) {
-    throw new VaultError(
-      'Failed to create data key',
-      'CREATE_FAILED',
-      error
-    )
+    throw new VaultError("Failed to create data key", "CREATE_FAILED", error);
   }
 }
 
@@ -343,17 +333,13 @@ export async function createDataKey(context: VaultKeyContext) {
  */
 export async function decryptDataKey(encryptedKeys: string) {
   try {
-    const workos = getWorkOSClient()
+    const workos = getWorkOSClient();
 
     return await workos.vault.decryptDataKey({
       keys: encryptedKeys,
-    })
+    });
   } catch (error) {
-    throw new VaultError(
-      'Failed to decrypt data key',
-      'DECRYPT_FAILED',
-      error
-    )
+    throw new VaultError("Failed to decrypt data key", "DECRYPT_FAILED", error);
   }
 }
 
@@ -361,5 +347,5 @@ export async function decryptDataKey(encryptedKeys: string) {
  * Checks if the Vault service is properly configured
  */
 export function isVaultConfigured(): boolean {
-  return vaultConfig.isConfigured
+  return vaultConfig.isConfigured;
 }

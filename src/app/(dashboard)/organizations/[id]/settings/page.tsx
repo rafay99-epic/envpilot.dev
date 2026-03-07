@@ -1,110 +1,110 @@
-'use client'
+"use client";
 
-import { useState, useEffect, use } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, use } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Organization {
-  _id: string
-  name: string
-  slug: string
-  description?: string
-  logoUrl?: string
-  tier: 'free' | 'pro'
-  role: 'admin' | 'team_lead' | 'member'
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  tier: "free" | "pro";
+  role: "admin" | "team_lead" | "member";
 }
 
 export default function OrganizationSettingsPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params)
-  const router = useRouter()
-  const [organization, setOrganization] = useState<Organization | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const { id } = use(params);
+  const router = useRouter();
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     async function fetchOrganization() {
       try {
-        const response = await fetch(`/api/organizations/${id}`)
+        const response = await fetch(`/api/organizations/${id}`);
         if (!response.ok) {
           if (response.status === 403) {
-            throw new Error('You do not have permission to access this page')
+            throw new Error("You do not have permission to access this page");
           }
-          throw new Error('Failed to fetch organization')
+          throw new Error("Failed to fetch organization");
         }
-        const data = await response.json()
-        setOrganization(data.organization)
-        setName(data.organization.name)
-        setDescription(data.organization.description || '')
+        const data = await response.json();
+        setOrganization(data.organization);
+        setName(data.organization.name);
+        setDescription(data.organization.description || "");
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchOrganization()
-  }, [id])
+    fetchOrganization();
+  }, [id]);
 
   async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
-    setIsSaving(true)
-    setError(null)
-    setSuccessMessage(null)
+    e.preventDefault();
+    setIsSaving(true);
+    setError(null);
+    setSuccessMessage(null);
 
     try {
       const response = await fetch(`/api/organizations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description: description || undefined }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to update organization')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update organization");
       }
 
-      const data = await response.json()
-      setOrganization({ ...organization!, ...data.organization })
-      setSuccessMessage('Organization settings updated successfully')
+      const data = await response.json();
+      setOrganization({ ...organization!, ...data.organization });
+      setSuccessMessage("Organization settings updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (deleteConfirmText !== organization?.name) return
+    if (deleteConfirmText !== organization?.name) return;
 
-    setIsDeleting(true)
-    setError(null)
+    setIsDeleting(true);
+    setError(null);
 
     try {
       const response = await fetch(`/api/organizations/${id}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete organization')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete organization");
       }
 
-      router.push('/organizations')
+      router.push("/organizations");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsDeleting(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsDeleting(false);
     }
   }
 
@@ -116,7 +116,7 @@ export default function OrganizationSettingsPage({
           <div className="h-32 rounded-xl bg-zinc-200 dark:bg-zinc-700" />
         </div>
       </div>
-    )
+    );
   }
 
   if (error && !organization) {
@@ -132,10 +132,10 @@ export default function OrganizationSettingsPage({
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  if (organization?.role !== 'admin') {
+  if (organization?.role !== "admin") {
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-900/20">
@@ -153,7 +153,7 @@ export default function OrganizationSettingsPage({
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -268,7 +268,7 @@ export default function OrganizationSettingsPage({
               disabled={isSaving || !name}
               className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </div>
@@ -285,7 +285,8 @@ export default function OrganizationSettingsPage({
               Pre-alpha Access
             </p>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Billing is currently disabled. All organizations have full feature access.
+              Billing is currently disabled. All organizations have full feature
+              access.
             </p>
           </div>
         </div>
@@ -304,8 +305,10 @@ export default function OrganizationSettingsPage({
         {showDeleteConfirm ? (
           <div className="mt-4 space-y-4">
             <p className="text-sm text-zinc-900 dark:text-zinc-100">
-              Type{' '}
-              <span className="font-mono font-semibold">{organization?.name}</span>{' '}
+              Type{" "}
+              <span className="font-mono font-semibold">
+                {organization?.name}
+              </span>{" "}
               to confirm deletion:
             </p>
             <input
@@ -318,8 +321,8 @@ export default function OrganizationSettingsPage({
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setDeleteConfirmText('')
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText("");
                 }}
                 className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
@@ -327,10 +330,12 @@ export default function OrganizationSettingsPage({
               </button>
               <button
                 onClick={handleDelete}
-                disabled={deleteConfirmText !== organization?.name || isDeleting}
+                disabled={
+                  deleteConfirmText !== organization?.name || isDeleting
+                }
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isDeleting ? 'Deleting...' : 'Delete Organization'}
+                {isDeleting ? "Deleting..." : "Delete Organization"}
               </button>
             </div>
           </div>
@@ -344,5 +349,5 @@ export default function OrganizationSettingsPage({
         )}
       </div>
     </div>
-  )
+  );
 }

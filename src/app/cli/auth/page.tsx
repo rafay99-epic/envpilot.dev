@@ -1,101 +1,103 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useMutation, useQuery } from 'convex/react'
-import { api } from '../../../../convex/_generated/api'
-import { AuthProvider, useAuthContext } from '@/components/auth/auth-provider'
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { AuthProvider, useAuthContext } from "@/components/auth/auth-provider";
 
 export default function CLIAuthPage() {
   return (
     <AuthProvider>
       <CLIAuthPageContent />
     </AuthProvider>
-  )
+  );
 }
 
 function CLIAuthPageContent() {
-  const searchParams = useSearchParams()
-  const code = searchParams.get('code')
+  const searchParams = useSearchParams();
+  const code = searchParams.get("code");
 
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthContext();
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Get Convex user by WorkOS ID
   const convexUser = useQuery(
     api.users.getByWorkosId,
-    user ? { workosId: user.id } : 'skip'
-  )
+    user ? { workosId: user.id } : "skip",
+  );
 
   // Get session by code
   const session = useQuery(
     api.cliSessions.getByCode,
-    code ? { code: code.toUpperCase() } : 'skip'
-  )
+    code ? { code: code.toUpperCase() } : "skip",
+  );
 
   // Authenticate mutation
-  const authenticate = useMutation(api.cliSessions.authenticate)
+  const authenticate = useMutation(api.cliSessions.authenticate);
 
   useEffect(() => {
     if (!code || authLoading) {
-      return
+      return;
     }
 
     if (!isAuthenticated || !user) {
       // Redirect to sign in with return URL
-      const returnUrl = encodeURIComponent(`/cli/auth?code=${code}`)
-      window.location.href = `/sign-in?returnUrl=${returnUrl}`
-      return
+      const returnUrl = encodeURIComponent(`/cli/auth?code=${code}`);
+      window.location.href = `/sign-in?returnUrl=${returnUrl}`;
+      return;
     }
+  }, [code, isAuthenticated, authLoading, user]);
 
-  }, [code, isAuthenticated, authLoading, user])
-
-  const status: 'loading' | 'confirming' | 'success' | 'error' | 'expired' = (() => {
-    if (authLoading || isSubmitting) return 'loading'
-    if (!code) return 'error'
-    if (convexUser === undefined || session === undefined) return 'loading'
-    if (!convexUser) return 'error'
-    if (session === null) return 'error'
-    if (session.status === 'expired') return 'expired'
-    if (session.status === 'authenticated') return 'success'
-    if (submitError) return 'error'
-    return 'confirming'
-  })()
+  const status: "loading" | "confirming" | "success" | "error" | "expired" =
+    (() => {
+      if (authLoading || isSubmitting) return "loading";
+      if (!code) return "error";
+      if (convexUser === undefined || session === undefined) return "loading";
+      if (!convexUser) return "error";
+      if (session === null) return "error";
+      if (session.status === "expired") return "expired";
+      if (session.status === "authenticated") return "success";
+      if (submitError) return "error";
+      return "confirming";
+    })();
 
   const errorMessage =
     submitError ??
     (!code
-      ? 'No authentication code provided'
+      ? "No authentication code provided"
       : !convexUser
-        ? 'User not found in database'
+        ? "User not found in database"
         : session === null
-          ? 'Invalid authentication code'
-          : 'An error occurred during authentication.')
+          ? "Invalid authentication code"
+          : "An error occurred during authentication.");
 
   const handleConfirm = async () => {
-    if (!code || !convexUser) return
+    if (!code || !convexUser) return;
 
     try {
-      setIsSubmitting(true)
-      setSubmitError(null)
+      setIsSubmitting(true);
+      setSubmitError(null);
       await authenticate({
         code: code.toUpperCase(),
         userId: convexUser._id,
-      })
+      });
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Authentication failed')
+      setSubmitError(
+        error instanceof Error ? error.message : "Authentication failed",
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleCancel = () => {
-    window.close()
-  }
+    window.close();
+  };
 
-  if (authLoading || status === 'loading') {
+  if (authLoading || status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -103,7 +105,7 @@ function CLIAuthPageContent() {
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -132,7 +134,7 @@ function CLIAuthPageContent() {
         </div>
 
         {/* Status-specific content */}
-        {status === 'confirming' && (
+        {status === "confirming" && (
           <>
             <div className="mb-6">
               <p className="text-gray-600 dark:text-gray-400 text-center">
@@ -143,19 +145,25 @@ function CLIAuthPageContent() {
             {/* Session info */}
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Device</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Device
+                </span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {session?.deviceName || 'CLI'}
+                  {session?.deviceName || "CLI"}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Code</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Code
+                </span>
                 <span className="text-sm font-mono font-bold text-gray-900 dark:text-white tracking-wider">
                   {code?.toUpperCase()}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Account</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Account
+                </span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {user?.email}
                 </span>
@@ -175,13 +183,13 @@ function CLIAuthPageContent() {
                 disabled={isSubmitting}
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
-                {isSubmitting ? 'Authorizing...' : 'Authorize'}
+                {isSubmitting ? "Authorizing..." : "Authorize"}
               </button>
             </div>
           </>
         )}
 
-        {status === 'success' && (
+        {status === "success" && (
           <div className="text-center">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
@@ -213,7 +221,7 @@ function CLIAuthPageContent() {
           </div>
         )}
 
-        {status === 'expired' && (
+        {status === "expired" && (
           <div className="text-center">
             <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
@@ -234,16 +242,16 @@ function CLIAuthPageContent() {
               Code Expired
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              The authentication code has expired. Please run{' '}
+              The authentication code has expired. Please run{" "}
               <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">
                 env-connect login
-              </code>{' '}
+              </code>{" "}
               again to get a new code.
             </p>
           </div>
         )}
 
-        {status === 'error' && (
+        {status === "error" && (
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
@@ -264,11 +272,11 @@ function CLIAuthPageContent() {
               Authentication Failed
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              {errorMessage || 'An error occurred during authentication.'}
+              {errorMessage || "An error occurred during authentication."}
             </p>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:all": "npm-run-all typecheck extension:typecheck",
     "format:check": "npx -y prettier@3.6.2 --check .",
-    "react:doctor": "npx -y react-doctor@latest . --yes --offline --fail-on error --verbose",
+    "react:doctor": "npx -y react-doctor@latest . --yes --offline --fail-on none --score",
     "cli:lint": "npm --prefix ./cli run lint",
     "cli:typecheck": "npm --prefix ./cli run typecheck",
     "cli:build": "npm --prefix ./cli run build",

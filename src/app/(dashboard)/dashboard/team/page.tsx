@@ -1,19 +1,19 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuthContext } from '@/components/auth'
+import { useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/components/auth";
 
 export default function TeamPage() {
-  const router = useRouter()
-  const { organization } = useAuthContext()
+  const router = useRouter();
+  const { organization } = useAuthContext();
 
   useEffect(() => {
     if (organization?.id) {
-      router.replace(`/organizations/${organization.id}/members`)
+      router.replace(`/organizations/${organization.id}/members`);
     }
-  }, [organization?.id, router])
+  }, [organization?.id, router]);
 
   if (!organization) {
     return (
@@ -31,12 +31,12 @@ export default function TeamPage() {
           Manage Organizations
         </Link>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex items-center justify-center py-12">
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
     </div>
-  )
+  );
 }

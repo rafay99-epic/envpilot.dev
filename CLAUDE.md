@@ -62,6 +62,7 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 ### Roles & Permissions
 
 Three-tier RBAC defined in `src/lib/auth.ts`:
+
 - **Admin** — Full access including variable rollback and permission management
 - **Team Lead** — Manage projects/variables, grant/revoke per-variable access
 - **Member** — Read-only projects; variable access requires explicit per-variable permissions

@@ -1,158 +1,174 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useAuthContext } from '@/components/auth'
-import { PERMISSIONS } from '@/lib/auth'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuthContext } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/auth";
 import {
   PROJECT_ICONS,
   PROJECT_COLORS,
   DEFAULT_PROJECT_ICON,
-  DEFAULT_PROJECT_COLOR
-} from '@/constants/project'
-import { TemplateSelector } from '@/components/templates'
-import type { EnvironmentTemplate } from '@/constants/templates'
+  DEFAULT_PROJECT_COLOR,
+} from "@/constants/project";
+import { TemplateSelector } from "@/components/templates";
+import type { EnvironmentTemplate } from "@/constants/templates";
 
 export default function NewProjectPage() {
-  const router = useRouter()
-  const { hasPermission, organization } = useAuthContext()
-  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE)
+  const router = useRouter();
+  const { hasPermission, organization } = useAuthContext();
+  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
 
-  const [step, setStep] = useState<'template' | 'details'>('template')
-  const [selectedTemplate, setSelectedTemplate] = useState<EnvironmentTemplate | null>(null)
+  const [step, setStep] = useState<"template" | "details">("template");
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<EnvironmentTemplate | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
+    name: "",
+    slug: "",
+    description: "",
     icon: DEFAULT_PROJECT_ICON,
     color: DEFAULT_PROJECT_COLOR,
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .slice(0, 50)
-  }
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 50);
+  };
 
   const handleNameChange = (name: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       name,
       slug: slugManuallyEdited ? prev.slug : generateSlug(name),
-    }))
-  }
+    }));
+  };
 
   const handleSlugChange = (slug: string) => {
-    setSlugManuallyEdited(true)
-    setFormData(prev => ({
+    setSlugManuallyEdited(true);
+    setFormData((prev) => ({
       ...prev,
-      slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ''),
-    }))
-  }
+      slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ""),
+    }));
+  };
 
   const handleTemplateSelect = (template: EnvironmentTemplate | null) => {
-    setSelectedTemplate(template)
+    setSelectedTemplate(template);
     // Auto-populate icon and color from template if selected
     if (template) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         icon: template.icon || prev.icon,
         color: template.color || prev.color,
-      }))
+      }));
     }
-  }
+  };
 
   const handleContinue = () => {
-    setStep('details')
-  }
+    setStep("details");
+  };
 
   const handleBack = () => {
-    setStep('template')
-  }
+    setStep("template");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
 
     try {
       if (!organization?.id) {
-        setError('No organization found. Please create an organization first.')
-        setIsSubmitting(false)
-        return
+        setError("No organization found. Please create an organization first.");
+        setIsSubmitting(false);
+        return;
       }
 
       // Create the project
-      const response = await fetch('/api/projects', {
-        method: 'POST',
+      const response = await fetch("/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...formData,
           organizationId: organization.id,
         }),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create project')
+        throw new Error(data.error || "Failed to create project");
       }
 
-      const projectId = data.project._id
-      const projectSlug = data.project.slug
+      const projectId = data.project._id;
+      const projectSlug = data.project.slug;
 
       // If a template was selected, create the environment variables from it
       if (selectedTemplate) {
-        const variablePromises = selectedTemplate.variables.map(async (variable) => {
-          try {
-            // Create placeholder values for the variables
-            const placeholderValue = variable.defaultValue || variable.placeholder || `<${variable.key}>`
+        const variablePromises = selectedTemplate.variables.map(
+          async (variable) => {
+            try {
+              // Create placeholder values for the variables
+              const placeholderValue =
+                variable.defaultValue ||
+                variable.placeholder ||
+                `<${variable.key}>`;
 
-            await fetch('/api/variables', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                key: variable.key,
-                value: placeholderValue,
-                description: variable.description,
-                environments: variable.environments,
-                projectId,
-                isSensitive: variable.isSensitive,
-              }),
-            })
-          } catch (err) {
-            console.error(`Failed to create variable ${variable.key}:`, err)
-          }
-        })
+              await fetch("/api/variables", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  key: variable.key,
+                  value: placeholderValue,
+                  description: variable.description,
+                  environments: variable.environments,
+                  projectId,
+                  isSensitive: variable.isSensitive,
+                }),
+              });
+            } catch (err) {
+              console.error(`Failed to create variable ${variable.key}:`, err);
+            }
+          },
+        );
 
-        await Promise.all(variablePromises)
+        await Promise.all(variablePromises);
       }
 
-      router.push(`/dashboard/projects/${projectSlug}`)
+      router.push(`/dashboard/projects/${projectSlug}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (!canCreateProject) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="h-6 w-6 text-red-600 dark:text-red-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -168,7 +184,7 @@ export default function NewProjectPage() {
           Back to Projects
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -179,8 +195,18 @@ export default function NewProjectPage() {
           href="/dashboard/projects"
           className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
         </Link>
         <div>
@@ -188,9 +214,9 @@ export default function NewProjectPage() {
             Create New Project
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {step === 'template'
-              ? 'Choose a template to get started quickly'
-              : 'Configure your project details'}
+            {step === "template"
+              ? "Choose a template to get started quickly"
+              : "Configure your project details"}
           </p>
         </div>
       </div>
@@ -199,9 +225,9 @@ export default function NewProjectPage() {
       <div className="flex items-center gap-2">
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-            step === 'template'
-              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-              : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400'
+            step === "template"
+              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
           }`}
         >
           1
@@ -209,15 +235,15 @@ export default function NewProjectPage() {
         <div className="h-0.5 w-8 bg-zinc-200 dark:bg-zinc-700" />
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-            step === 'details'
-              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-              : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400'
+            step === "details"
+              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
           }`}
         >
           2
         </div>
         <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
-          {step === 'template' ? 'Select Template' : 'Project Details'}
+          {step === "template" ? "Select Template" : "Project Details"}
         </span>
       </div>
 
@@ -228,7 +254,7 @@ export default function NewProjectPage() {
       )}
 
       {/* Step 1: Template Selection */}
-      {step === 'template' && (
+      {step === "template" && (
         <div className="space-y-6">
           <TemplateSelector
             selectedTemplateId={selectedTemplate?.id || null}
@@ -248,8 +274,18 @@ export default function NewProjectPage() {
               className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               Continue
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M14 5l7 7m0 0l-7 7m7-7H3"
+                />
               </svg>
             </button>
           </div>
@@ -257,14 +293,14 @@ export default function NewProjectPage() {
       )}
 
       {/* Step 2: Project Details */}
-      {step === 'details' && (
+      {step === "details" && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Template Badge */}
           {selectedTemplate && (
             <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-lg text-lg"
-                style={{ backgroundColor: selectedTemplate.color + '20' }}
+                style={{ backgroundColor: selectedTemplate.color + "20" }}
               >
                 {selectedTemplate.icon}
               </div>
@@ -300,10 +336,10 @@ export default function NewProjectPage() {
               </div>
               <div>
                 <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {formData.name || 'Project Name'}
+                  {formData.name || "Project Name"}
                 </p>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {formData.slug || 'project-slug'}
+                  {formData.slug || "project-slug"}
                 </p>
               </div>
             </div>
@@ -311,7 +347,10 @@ export default function NewProjectPage() {
 
           {/* Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Project Name
             </label>
             <input
@@ -327,7 +366,10 @@ export default function NewProjectPage() {
 
           {/* Slug */}
           <div>
-            <label htmlFor="slug" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="slug"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Slug
             </label>
             <div className="mt-1 flex rounded-lg border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800">
@@ -345,19 +387,28 @@ export default function NewProjectPage() {
               />
             </div>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              URL-friendly identifier. Only lowercase letters, numbers, and hyphens.
+              URL-friendly identifier. Only lowercase letters, numbers, and
+              hyphens.
             </p>
           </div>
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Description <span className="text-zinc-400">(optional)</span>
             </label>
             <textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
               rows={3}
               className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400"
               placeholder="A brief description of your project..."
@@ -374,11 +425,11 @@ export default function NewProjectPage() {
                 <button
                   key={icon}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, icon }))}
+                  onClick={() => setFormData((prev) => ({ ...prev, icon }))}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg text-lg transition-all ${
                     formData.icon === icon
-                      ? 'bg-zinc-900 dark:bg-zinc-100'
-                      : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
+                      ? "bg-zinc-900 dark:bg-zinc-100"
+                      : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                   }`}
                 >
                   {icon}
@@ -397,11 +448,11 @@ export default function NewProjectPage() {
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, color }))}
+                  onClick={() => setFormData((prev) => ({ ...prev, color }))}
                   className={`h-8 w-8 rounded-lg transition-all ${
                     formData.color === color
-                      ? 'ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100'
-                      : ''
+                      ? "ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100"
+                      : ""
                   }`}
                   style={{ backgroundColor: color }}
                 />
@@ -416,8 +467,18 @@ export default function NewProjectPage() {
               onClick={handleBack}
               className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
               </svg>
               Back
             </button>
@@ -440,8 +501,18 @@ export default function NewProjectPage() {
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4v16m8-8H4"
+                      />
                     </svg>
                     Create Project
                   </>
@@ -452,5 +523,5 @@ export default function NewProjectPage() {
         </form>
       )}
     </div>
-  )
+  );
 }

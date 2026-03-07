@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import Link from "next/link";
 
 export default function NotFound() {
   return (
@@ -28,7 +28,8 @@ export default function NotFound() {
             Page Not Found
           </h2>
           <p className="mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            The page you&apos;re looking for doesn&apos;t exist or has been moved.
+            The page you&apos;re looking for doesn&apos;t exist or has been
+            moved.
           </p>
         </div>
 
@@ -48,5 +49,5 @@ export default function NotFound() {
         </div>
       </div>
     </div>
-  )
+  );
 }

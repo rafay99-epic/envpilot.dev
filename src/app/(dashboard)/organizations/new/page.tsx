@@ -1,61 +1,65 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function NewOrganizationPage() {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [description, setDescription] = useState('')
-  const [slugTouched, setSlugTouched] = useState(false)
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
 
   function generateSlug(value: string): string {
     return value
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .slice(0, 50)
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 50);
   }
 
   function handleNameChange(value: string) {
-    setName(value)
+    setName(value);
     if (!slugTouched) {
-      setSlug(generateSlug(value))
+      setSlug(generateSlug(value));
     }
   }
 
   function handleSlugChange(value: string) {
-    setSlugTouched(true)
-    setSlug(generateSlug(value))
+    setSlugTouched(true);
+    setSlug(generateSlug(value));
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
 
     try {
-      const response = await fetch('/api/organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, slug, description: description || undefined }),
-      })
+      const response = await fetch("/api/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          slug,
+          description: description || undefined,
+        }),
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create organization')
+        throw new Error(data.error || "Failed to create organization");
       }
 
-      router.push(`/organizations/${data.organization._id}`)
+      router.push(`/organizations/${data.organization._id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsSubmitting(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsSubmitting(false);
     }
   }
 
@@ -150,7 +154,7 @@ export default function NewOrganizationPage() {
                 htmlFor="description"
                 className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
               >
-                Description{' '}
+                Description{" "}
                 <span className="font-normal text-zinc-500">(optional)</span>
               </label>
               <textarea
@@ -202,11 +206,11 @@ export default function NewOrganizationPage() {
                 Creating...
               </>
             ) : (
-              'Create Organization'
+              "Create Organization"
             )}
           </button>
         </div>
       </form>
     </div>
-  )
+  );
 }

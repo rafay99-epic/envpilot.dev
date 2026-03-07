@@ -147,9 +147,7 @@ export function UpgradePrompt({
                 clipRule="evenodd"
               />
             </svg>
-            <h3 className="text-lg font-semibold text-white">
-              Upgrade to Pro
-            </h3>
+            <h3 className="text-lg font-semibold text-white">Upgrade to Pro</h3>
           </div>
         </div>
         <div className="p-6">
@@ -239,7 +237,9 @@ export function UpgradePrompt({
 
   // Modal variant
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${className}`}>
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center ${className}`}
+    >
       <div className="absolute inset-0 bg-black/50" onClick={onUpgradeClick} />
       <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-8 text-center">

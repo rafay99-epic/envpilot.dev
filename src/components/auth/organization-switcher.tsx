@@ -1,80 +1,81 @@
-'use client'
+"use client";
 
-import { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { setActiveOrganizationCookie } from '@/lib/organization-context'
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { setActiveOrganizationCookie } from "@/lib/organization-context";
 
 interface Organization {
-  _id: string
-  name: string
-  slug: string
-  logoUrl?: string
-  tier: 'free' | 'pro'
-  role: 'admin' | 'team_lead' | 'member'
+  _id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  tier: "free" | "pro";
+  role: "admin" | "team_lead" | "member";
 }
 
 interface OrganizationSwitcherProps {
-  currentOrgId?: string
-  onOrganizationChange?: (orgId: string) => void
+  currentOrgId?: string;
+  onOrganizationChange?: (orgId: string) => void;
 }
 
 export function OrganizationSwitcher({
   currentOrgId,
   onOrganizationChange,
 }: OrganizationSwitcherProps = {}) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const router = useRouter();
+  const pathname = usePathname();
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const currentOrg = organizations.find(org => org._id === currentOrgId) || organizations[0]
+  const currentOrg =
+    organizations.find((org) => org._id === currentOrgId) || organizations[0];
 
   useEffect(() => {
     async function fetchOrganizations() {
       try {
-        const response = await fetch('/api/organizations')
+        const response = await fetch("/api/organizations");
         if (response.ok) {
-          const data = await response.json()
-          setOrganizations(data.organizations || [])
+          const data = await response.json();
+          setOrganizations(data.organizations || []);
         }
       } catch {
         // Silently fail - organizations will be empty
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchOrganizations()
-  }, [])
+    fetchOrganizations();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   function handleSelectOrganization(orgId: string) {
-    setIsOpen(false)
-    setActiveOrganizationCookie(orgId)
+    setIsOpen(false);
+    setActiveOrganizationCookie(orgId);
     if (onOrganizationChange) {
-      onOrganizationChange(orgId)
+      onOrganizationChange(orgId);
     }
 
-    if (pathname.startsWith('/organizations')) {
-      router.push(`/organizations/${orgId}`)
+    if (pathname.startsWith("/organizations")) {
+      router.push(`/organizations/${orgId}`);
     } else {
-      router.push('/dashboard')
+      router.push("/dashboard");
     }
-    router.refresh()
+    router.refresh();
   }
 
   if (isLoading) {
@@ -86,7 +87,7 @@ export function OrganizationSwitcher({
           <div className="mt-1 h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
         </div>
       </div>
-    )
+    );
   }
 
   if (organizations.length === 0) {
@@ -112,7 +113,7 @@ export function OrganizationSwitcher({
         </div>
         <span className="text-sm font-medium">Create Organization</span>
       </Link>
-    )
+    );
   }
 
   return (
@@ -137,19 +138,20 @@ export function OrganizationSwitcher({
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              {currentOrg?.name || 'Select Organization'}
+              {currentOrg?.name || "Select Organization"}
             </p>
             {currentOrg && (
               <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                {currentOrg.role === 'team_lead'
-                  ? 'Team Lead'
-                  : currentOrg.role.charAt(0).toUpperCase() + currentOrg.role.slice(1)}
+                {currentOrg.role === "team_lead"
+                  ? "Team Lead"
+                  : currentOrg.role.charAt(0).toUpperCase() +
+                    currentOrg.role.slice(1)}
               </p>
             )}
           </div>
         </div>
         <svg
-          className={`h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -172,7 +174,9 @@ export function OrganizationSwitcher({
                 key={org._id}
                 onClick={() => handleSelectOrganization(org._id)}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
-                  org._id === currentOrg?._id ? 'bg-zinc-50 dark:bg-zinc-700/50' : ''
+                  org._id === currentOrg?._id
+                    ? "bg-zinc-50 dark:bg-zinc-700/50"
+                    : ""
                 }`}
               >
                 {org.logoUrl ? (
@@ -193,15 +197,15 @@ export function OrganizationSwitcher({
                     <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {org.name}
                     </p>
-                    {org.tier === 'pro' && (
+                    {org.tier === "pro" && (
                       <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                         Pro
                       </span>
                     )}
                   </div>
                   <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {org.role === 'team_lead'
-                      ? 'Team Lead'
+                    {org.role === "team_lead"
+                      ? "Team Lead"
                       : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
                   </p>
                 </div>
@@ -274,5 +278,5 @@ export function OrganizationSwitcher({
         </div>
       )}
     </div>
-  )
+  );
 }

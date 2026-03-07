@@ -1,16 +1,16 @@
-'use client'
+"use client";
 
-import { useEffect, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuthContext } from './auth-provider'
-import type { Permission } from '@/lib/auth'
+import { useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "./auth-provider";
+import type { Permission } from "@/lib/auth";
 
 interface ProtectedRouteProps {
-  children: ReactNode
-  requiredPermissions?: Permission[]
-  requireAll?: boolean
-  fallback?: ReactNode
-  redirectTo?: string
+  children: ReactNode;
+  requiredPermissions?: Permission[];
+  requireAll?: boolean;
+  fallback?: ReactNode;
+  redirectTo?: string;
 }
 
 /**
@@ -22,17 +22,17 @@ export function ProtectedRoute({
   requiredPermissions = [],
   requireAll = true,
   fallback,
-  redirectTo = '/sign-in',
+  redirectTo = "/sign-in",
 }: ProtectedRouteProps) {
-  const router = useRouter()
+  const router = useRouter();
   const { isAuthenticated, isLoading, hasAllPermissions, hasAnyPermission } =
-    useAuthContext()
+    useAuthContext();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(redirectTo)
+      router.push(redirectTo);
     }
-  }, [isLoading, isAuthenticated, router, redirectTo])
+  }, [isLoading, isAuthenticated, router, redirectTo]);
 
   // Show loading state
   if (isLoading) {
@@ -42,19 +42,19 @@ export function ProtectedRoute({
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
         </div>
       )
-    )
+    );
   }
 
   // Not authenticated
   if (!isAuthenticated) {
-    return null
+    return null;
   }
 
   // Check permissions if required
   if (requiredPermissions.length > 0) {
     const hasRequiredPermissions = requireAll
       ? hasAllPermissions(requiredPermissions)
-      : hasAnyPermission(requiredPermissions)
+      : hasAnyPermission(requiredPermissions);
 
     if (!hasRequiredPermissions) {
       return (
@@ -87,9 +87,9 @@ export function ProtectedRoute({
             Go Back
           </button>
         </div>
-      )
+      );
     }
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

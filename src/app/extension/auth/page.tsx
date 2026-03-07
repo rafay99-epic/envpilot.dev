@@ -1,52 +1,59 @@
-'use client'
+"use client";
 
-import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 function ExtensionAuthContent() {
-  const searchParams = useSearchParams()
-  const sessionToken = searchParams.get('session')
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
-  const [message, setMessage] = useState('')
+  const searchParams = useSearchParams();
+  const sessionToken = searchParams.get("session");
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading",
+  );
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function completeAuth() {
       if (!sessionToken) {
-        setStatus('error')
-        setMessage('No session token provided')
-        return
+        setStatus("error");
+        setMessage("No session token provided");
+        return;
       }
 
       try {
         // Call the callback endpoint to complete the auth
-        const response = await fetch(`/api/extension/auth/callback?session=${sessionToken}`, {
-          method: 'POST',
-          credentials: 'include',
-        })
+        const response = await fetch(
+          `/api/extension/auth/callback?session=${sessionToken}`,
+          {
+            method: "POST",
+            credentials: "include",
+          },
+        );
 
         if (response.ok) {
-          setStatus('success')
-          setMessage('Authentication successful! You can now close this window and return to your editor.')
+          setStatus("success");
+          setMessage(
+            "Authentication successful! You can now close this window and return to your editor.",
+          );
         } else {
-          const data = await response.json()
-          setStatus('error')
-          setMessage(data.error || 'Authentication failed')
+          const data = await response.json();
+          setStatus("error");
+          setMessage(data.error || "Authentication failed");
         }
       } catch (err) {
-        setStatus('error')
-        setMessage(err instanceof Error ? err.message : 'An error occurred')
+        setStatus("error");
+        setMessage(err instanceof Error ? err.message : "An error occurred");
       }
     }
 
-    completeAuth()
-  }, [sessionToken])
+    completeAuth();
+  }, [sessionToken]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="mb-6">
           <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-            {status === 'loading' && (
+            {status === "loading" && (
               <svg
                 className="w-8 h-8 text-blue-600 animate-spin"
                 fill="none"
@@ -67,7 +74,7 @@ function ExtensionAuthContent() {
                 />
               </svg>
             )}
-            {status === 'success' && (
+            {status === "success" && (
               <svg
                 className="w-8 h-8 text-green-600"
                 fill="none"
@@ -82,7 +89,7 @@ function ExtensionAuthContent() {
                 />
               </svg>
             )}
-            {status === 'error' && (
+            {status === "error" && (
               <svg
                 className="w-8 h-8 text-red-600"
                 fill="none"
@@ -101,20 +108,21 @@ function ExtensionAuthContent() {
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {status === 'loading' && 'Authenticating...'}
-          {status === 'success' && 'Success!'}
-          {status === 'error' && 'Authentication Failed'}
+          {status === "loading" && "Authenticating..."}
+          {status === "success" && "Success!"}
+          {status === "error" && "Authentication Failed"}
         </h1>
 
         <p className="text-gray-600 mb-6">{message}</p>
 
-        {status === 'success' && (
+        {status === "success" && (
           <p className="text-sm text-gray-500">
-            Return to your editor and click &quot;Check Sign In&quot; to complete the connection.
+            Return to your editor and click &quot;Check Sign In&quot; to
+            complete the connection.
           </p>
         )}
 
-        {status === 'error' && (
+        {status === "error" && (
           <button
             onClick={() => window.close()}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
@@ -124,7 +132,7 @@ function ExtensionAuthContent() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 export default function ExtensionAuthPage() {
@@ -138,5 +146,5 @@ export default function ExtensionAuthPage() {
     >
       <ExtensionAuthContent />
     </Suspense>
-  )
+  );
 }

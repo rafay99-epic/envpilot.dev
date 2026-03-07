@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { withAuth } from '@workos-inc/authkit-nextjs'
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { withAuth } from "@workos-inc/authkit-nextjs";
 import {
   createDataKey,
   decryptDataKey,
   VaultError,
   isVaultConfigured,
-} from '@/lib/vault'
+} from "@/lib/vault";
 
 /**
  * Data Key Management API Routes
@@ -25,11 +25,11 @@ const createKeySchema = z.object({
     projectId: z.string().min(1),
     environment: z.string().optional(),
   }),
-})
+});
 
 const decryptKeySchema = z.object({
   encryptedKeys: z.string().min(1).max(8192),
-})
+});
 
 /**
  * Sanitized error logging
@@ -39,26 +39,23 @@ function logError(operation: string, error: unknown): void {
     console.error(`Vault ${operation} error:`, {
       code: error.code,
       message: error.message,
-    })
+    });
   } else if (error instanceof Error) {
     console.error(`Vault ${operation} error:`, {
       name: error.name,
       message: error.message,
-    })
+    });
   } else {
-    console.error(`Vault ${operation} error: Unknown error type`)
+    console.error(`Vault ${operation} error: Unknown error type`);
   }
 }
 
 function errorResponse(
   message: string,
   status: number,
-  code?: string
+  code?: string,
 ): NextResponse {
-  return NextResponse.json(
-    { error: message, code },
-    { status }
-  )
+  return NextResponse.json({ error: message, code }, { status });
 }
 
 /**
@@ -69,31 +66,33 @@ export async function POST(request: NextRequest) {
   try {
     if (!isVaultConfigured()) {
       return errorResponse(
-        'Vault service is not available',
+        "Vault service is not available",
         503,
-        'VAULT_NOT_CONFIGURED'
-      )
+        "VAULT_NOT_CONFIGURED",
+      );
     }
 
-    const { user, organizationId: sessionOrgId } = await withAuth({ ensureSignedIn: true })
+    const { user, organizationId: sessionOrgId } = await withAuth({
+      ensureSignedIn: true,
+    });
     if (!user) {
-      return errorResponse('Authentication required', 401, 'UNAUTHORIZED')
+      return errorResponse("Authentication required", 401, "UNAUTHORIZED");
     }
 
-    const body = await request.json()
-    const result = createKeySchema.safeParse(body)
+    const body = await request.json();
+    const result = createKeySchema.safeParse(body);
 
     if (!result.success) {
-      return errorResponse('Invalid request', 400, 'VALIDATION_ERROR')
+      return errorResponse("Invalid request", 400, "VALIDATION_ERROR");
     }
 
     // SECURITY: Override organizationId with session org
     const secureContext = {
       ...result.data.context,
       organizationId: sessionOrgId || result.data.context.organizationId,
-    }
+    };
 
-    const keyPair = await createDataKey(secureContext)
+    const keyPair = await createDataKey(secureContext);
 
     return NextResponse.json({
       success: true,
@@ -105,15 +104,15 @@ export async function POST(request: NextRequest) {
         // The context used for key derivation
         context: keyPair.context,
       },
-    })
+    });
   } catch (error) {
-    logError('createDataKey', error)
+    logError("createDataKey", error);
 
     if (error instanceof VaultError) {
-      return errorResponse('Failed to create data key', 500, error.code)
+      return errorResponse("Failed to create data key", 500, error.code);
     }
 
-    return errorResponse('Failed to create data key', 500, 'CREATE_FAILED')
+    return errorResponse("Failed to create data key", 500, "CREATE_FAILED");
   }
 }
 
@@ -124,37 +123,37 @@ export async function PUT(request: NextRequest) {
   try {
     if (!isVaultConfigured()) {
       return errorResponse(
-        'Vault service is not available',
+        "Vault service is not available",
         503,
-        'VAULT_NOT_CONFIGURED'
-      )
+        "VAULT_NOT_CONFIGURED",
+      );
     }
 
-    const { user } = await withAuth({ ensureSignedIn: true })
+    const { user } = await withAuth({ ensureSignedIn: true });
     if (!user) {
-      return errorResponse('Authentication required', 401, 'UNAUTHORIZED')
+      return errorResponse("Authentication required", 401, "UNAUTHORIZED");
     }
 
-    const body = await request.json()
-    const result = decryptKeySchema.safeParse(body)
+    const body = await request.json();
+    const result = decryptKeySchema.safeParse(body);
 
     if (!result.success) {
-      return errorResponse('Invalid request', 400, 'VALIDATION_ERROR')
+      return errorResponse("Invalid request", 400, "VALIDATION_ERROR");
     }
 
-    const dataKey = await decryptDataKey(result.data.encryptedKeys)
+    const dataKey = await decryptDataKey(result.data.encryptedKeys);
 
     return NextResponse.json({
       success: true,
       data: { dataKey },
-    })
+    });
   } catch (error) {
-    logError('decryptDataKey', error)
+    logError("decryptDataKey", error);
 
     if (error instanceof VaultError) {
-      return errorResponse('Failed to decrypt data key', 500, error.code)
+      return errorResponse("Failed to decrypt data key", 500, error.code);
     }
 
-    return errorResponse('Failed to decrypt data key', 500, 'DECRYPT_FAILED')
+    return errorResponse("Failed to decrypt data key", 500, "DECRYPT_FAILED");
   }
 }

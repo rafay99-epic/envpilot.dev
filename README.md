@@ -52,26 +52,26 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 Copy `.env.example` to `.env.local` and configure:
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_CONVEX_URL` | Your Convex deployment URL |
-| `WORKOS_API_KEY` | WorkOS API key |
-| `WORKOS_CLIENT_ID` | WorkOS client ID |
+| Variable                 | Description                       |
+| ------------------------ | --------------------------------- |
+| `NEXT_PUBLIC_CONVEX_URL` | Your Convex deployment URL        |
+| `WORKOS_API_KEY`         | WorkOS API key                    |
+| `WORKOS_CLIENT_ID`       | WorkOS client ID                  |
 | `WORKOS_COOKIE_PASSWORD` | Cookie encryption key (32+ chars) |
-| `NEXT_PUBLIC_APP_URL` | Application URL |
+| `NEXT_PUBLIC_APP_URL`    | Application URL                   |
 
 See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructions.
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Next.js and Convex development servers |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run test:e2e` | Run Playwright E2E tests |
-| `npm run convex:deploy` | Deploy Convex functions |
+| Command                 | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| `npm run dev`           | Start Next.js and Convex development servers |
+| `npm run build`         | Build for production                         |
+| `npm run start`         | Start production server                      |
+| `npm run lint`          | Run ESLint                                   |
+| `npm run test:e2e`      | Run Playwright E2E tests                     |
+| `npm run convex:deploy` | Deploy Convex functions                      |
 
 ## Project Structure
 
@@ -114,6 +114,7 @@ See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructio
 ### Database Schema
 
 Key entities:
+
 - **Users**: Synced from WorkOS
 - **Organizations**: Team containers
 - **Projects**: Logical groupings of variables

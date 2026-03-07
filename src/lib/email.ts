@@ -1,34 +1,35 @@
-import { Resend } from 'resend'
+import { Resend } from "resend";
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'ENV Connect <noreply@envconnect.app>'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const FROM_EMAIL =
+  process.env.FROM_EMAIL || "ENV Connect <noreply@envconnect.app>";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 function getResendClient(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY
+  const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    return null
+    return null;
   }
-  return new Resend(apiKey)
+  return new Resend(apiKey);
 }
 
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }
-  return text.replace(/[&<>"']/g, (char) => map[char])
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return text.replace(/[&<>"']/g, (char) => map[char]);
 }
 
 interface InvitationEmailParams {
-  to: string
-  inviterName: string
-  organizationName: string
-  role: 'admin' | 'team_lead' | 'member'
-  token: string
-  expiresAt: number
+  to: string;
+  inviterName: string;
+  organizationName: string;
+  role: "admin" | "team_lead" | "member";
+  token: string;
+  expiresAt: number;
 }
 
 export async function sendInvitationEmail({
@@ -39,18 +40,21 @@ export async function sendInvitationEmail({
   token,
   expiresAt,
 }: InvitationEmailParams): Promise<{ success: boolean; error?: string }> {
-  const invitationUrl = `${APP_URL}/invitations/${token}`
-  const expirationDate = new Date(expiresAt).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-  const roleDisplay = role === 'team_lead' ? 'Team Lead' : role.charAt(0).toUpperCase() + role.slice(1)
+  const invitationUrl = `${APP_URL}/invitations/${token}`;
+  const expirationDate = new Date(expiresAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const roleDisplay =
+    role === "team_lead"
+      ? "Team Lead"
+      : role.charAt(0).toUpperCase() + role.slice(1);
 
   // Escape user-provided content to prevent XSS
-  const safeInviterName = escapeHtml(inviterName)
-  const safeOrgName = escapeHtml(organizationName)
-  const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase())
+  const safeInviterName = escapeHtml(inviterName);
+  const safeOrgName = escapeHtml(organizationName);
+  const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase());
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -117,7 +121,7 @@ export async function sendInvitationEmail({
   </table>
 </body>
 </html>
-`
+`;
 
   const textContent = `
 Join ${organizationName}
@@ -130,14 +134,14 @@ ${invitationUrl}
 This invitation expires on ${expirationDate}.
 
 If you didn't expect this invitation, you can safely ignore this email.
-`
+`;
 
   try {
-    const resend = getResendClient()
+    const resend = getResendClient();
 
     if (!resend) {
-      console.warn('RESEND_API_KEY not configured - skipping email send')
-      return { success: true }
+      console.warn("RESEND_API_KEY not configured - skipping email send");
+      return { success: true };
     }
 
     const { error } = await resend.emails.send({
@@ -146,19 +150,19 @@ If you didn't expect this invitation, you can safely ignore this email.
       subject: `${inviterName} invited you to join ${organizationName}`,
       html: htmlContent,
       text: textContent,
-    })
+    });
 
     if (error) {
-      console.error('Failed to send invitation email:', error)
-      return { success: false, error: error.message }
+      console.error("Failed to send invitation email:", error);
+      return { success: false, error: error.message };
     }
 
-    return { success: true }
+    return { success: true };
   } catch (err) {
-    console.error('Error sending invitation email:', err)
+    console.error("Error sending invitation email:", err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Failed to send email'
-    }
+      error: err instanceof Error ? err.message : "Failed to send email",
+    };
   }
 }

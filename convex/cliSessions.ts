@@ -24,7 +24,8 @@ function generateCode(length: number): string {
  * Generate a secure token
  */
 function generateToken(prefix: string): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let token = prefix;
   for (let i = 0; i < 48; i++) {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -182,9 +183,7 @@ export const poll = query({
 
     if (session.status === "authenticated") {
       // Get user info
-      const user = session.userId
-        ? await ctx.db.get(session.userId)
-        : null;
+      const user = session.userId ? await ctx.db.get(session.userId) : null;
 
       return {
         status: "authenticated" as const,
@@ -214,7 +213,9 @@ export const validateToken = query({
   handler: async (ctx, args) => {
     const cliToken = await ctx.db
       .query("cliTokens")
-      .withIndex("by_access_token", (q) => q.eq("accessToken", args.accessToken))
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken),
+      )
       .first();
 
     if (!cliToken) {
@@ -257,7 +258,9 @@ export const updateLastUsed = mutation({
   handler: async (ctx, args) => {
     const cliToken = await ctx.db
       .query("cliTokens")
-      .withIndex("by_access_token", (q) => q.eq("accessToken", args.accessToken))
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken),
+      )
       .first();
 
     if (cliToken) {
@@ -278,7 +281,9 @@ export const refreshToken = mutation({
   handler: async (ctx, args) => {
     const cliToken = await ctx.db
       .query("cliTokens")
-      .withIndex("by_refresh_token", (q) => q.eq("refreshToken", args.refreshToken))
+      .withIndex("by_refresh_token", (q) =>
+        q.eq("refreshToken", args.refreshToken),
+      )
       .first();
 
     if (!cliToken) {
@@ -321,7 +326,9 @@ export const revokeToken = mutation({
   handler: async (ctx, args) => {
     const cliToken = await ctx.db
       .query("cliTokens")
-      .withIndex("by_access_token", (q) => q.eq("accessToken", args.accessToken))
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken),
+      )
       .first();
 
     if (cliToken) {
@@ -346,7 +353,7 @@ export const listUserTokens = query({
     const tokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
+        q.eq("userId", args.userId).eq("isActive", true),
       )
       .collect();
 
@@ -373,7 +380,7 @@ export const revokeAllUserTokens = mutation({
     const tokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
+        q.eq("userId", args.userId).eq("isActive", true),
       )
       .collect();
 

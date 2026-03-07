@@ -26,7 +26,7 @@ export const listForUser = query({
       memberships.map(async (membership) => {
         const org = await ctx.db.get(membership.organizationId);
         return org ? { ...org, role: membership.role } : null;
-      })
+      }),
     );
 
     return organizations.filter(Boolean);
@@ -65,7 +65,7 @@ export const getMembers = query({
     const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .collect();
 
@@ -83,7 +83,7 @@ export const getMembers = query({
               },
             }
           : null;
-      })
+      }),
     );
 
     return members.filter(Boolean);
@@ -102,7 +102,7 @@ export const getMembership = query({
     return await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId),
       )
       .first();
   },
@@ -150,7 +150,7 @@ export const create = mutation({
     if (limits.maxOrganizations !== null) {
       if (userMemberships.length >= limits.maxOrganizations) {
         throw new Error(
-          `Organization limit reached (${userMemberships.length}/${limits.maxOrganizations}). Upgrade to Pro for unlimited organizations.`
+          `Organization limit reached (${userMemberships.length}/${limits.maxOrganizations}). Upgrade to Pro for unlimited organizations.`,
         );
       }
     }
@@ -217,7 +217,8 @@ export const update = mutation({
 
     const updateData: Record<string, unknown> = { updatedAt: now };
     if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
     if (updates.logoUrl !== undefined) updateData.logoUrl = updates.logoUrl;
 
     await ctx.db.patch(organizationId, updateData);
@@ -254,7 +255,9 @@ export const updateTier = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.updatedBy)
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.updatedBy),
       )
       .first();
 
@@ -281,7 +284,7 @@ export const updateTier = mutation({
       details: JSON.stringify({
         tier: args.tier,
         previousTier,
-        action: "tier_change"
+        action: "tier_change",
       }),
       createdAt: now,
     });
@@ -311,7 +314,7 @@ export const remove = mutation({
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .collect();
 
@@ -335,7 +338,7 @@ export const addMember = mutation({
     role: v.union(
       v.literal("admin"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("member"),
     ),
     invitedBy: v.id("users"),
   },
@@ -353,13 +356,13 @@ export const addMember = mutation({
       const currentMembers = await ctx.db
         .query("organizationMembers")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
+          q.eq("organizationId", args.organizationId),
         )
         .collect();
 
       if (currentMembers.length >= limits.maxTeamMembers) {
         throw new Error(
-          `Team member limit reached (${currentMembers.length}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`
+          `Team member limit reached (${currentMembers.length}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`,
         );
       }
     }
@@ -367,7 +370,7 @@ export const addMember = mutation({
     const existingMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId),
       )
       .first();
 
@@ -414,7 +417,7 @@ export const removeMember = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId),
       )
       .first();
 
@@ -426,7 +429,9 @@ export const removeMember = mutation({
     // so linked editors lose access and local cleanup can be triggered.
     const projects = await ctx.db
       .query("projects")
-      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
@@ -436,7 +441,7 @@ export const removeMember = mutation({
       const activeTokens = await ctx.db
         .query("projectAccess")
         .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", project._id).eq("userId", args.userId)
+          q.eq("projectId", project._id).eq("userId", args.userId),
         )
         .filter((q) => q.eq(q.field("isActive"), true))
         .collect();
@@ -484,7 +489,7 @@ export const updateMemberRole = mutation({
     newRole: v.union(
       v.literal("admin"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("member"),
     ),
     updatedBy: v.id("users"),
   },
@@ -494,7 +499,7 @@ export const updateMemberRole = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId),
       )
       .first();
 

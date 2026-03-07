@@ -1,42 +1,42 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Organization {
-  _id: string
-  name: string
-  slug: string
-  description?: string
-  logoUrl?: string
-  tier: 'free' | 'pro'
-  role: 'admin' | 'team_lead' | 'member'
-  createdAt: number
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  tier: "free" | "pro";
+  role: "admin" | "team_lead" | "member";
+  createdAt: number;
 }
 
 export default function OrganizationsPage() {
-  const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchOrganizations() {
       try {
-        const response = await fetch('/api/organizations')
+        const response = await fetch("/api/organizations");
         if (!response.ok) {
-          throw new Error('Failed to fetch organizations')
+          throw new Error("Failed to fetch organizations");
         }
-        const data = await response.json()
-        setOrganizations(data.organizations || [])
+        const data = await response.json();
+        setOrganizations(data.organizations || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchOrganizations()
-  }, [])
+    fetchOrganizations();
+  }, []);
 
   if (isLoading) {
     return (
@@ -68,7 +68,7 @@ export default function OrganizationsPage() {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -78,7 +78,7 @@ export default function OrganizationsPage() {
           <p className="text-red-600 dark:text-red-400">{error}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -134,7 +134,8 @@ export default function OrganizationsPage() {
             No organizations yet
           </h3>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Create your first organization to start collaborating with your team.
+            Create your first organization to start collaborating with your
+            team.
           </p>
           <Link
             href="/organizations/new"
@@ -183,7 +184,7 @@ export default function OrganizationsPage() {
                     <h3 className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
                       {org.name}
                     </h3>
-                    {org.tier === 'pro' && (
+                    {org.tier === "pro" && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                         Pro
                       </span>
@@ -202,14 +203,16 @@ export default function OrganizationsPage() {
               <div className="mt-4 flex items-center justify-between">
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    org.role === 'admin'
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                      : org.role === 'team_lead'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
+                    org.role === "admin"
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                      : org.role === "team_lead"
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                   }`}
                 >
-                  {org.role === 'team_lead' ? 'Team Lead' : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
+                  {org.role === "team_lead"
+                    ? "Team Lead"
+                    : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
                 </span>
                 <svg
                   className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
@@ -230,5 +233,5 @@ export default function OrganizationsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

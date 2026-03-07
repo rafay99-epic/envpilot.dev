@@ -15,10 +15,7 @@ type FeatureStatus =
 /**
  * Hook for listing all public feature requests
  */
-export function useFeatureRequests(
-  status?: FeatureStatus,
-  category?: string
-) {
+export function useFeatureRequests(status?: FeatureStatus, category?: string) {
   return useQuery(api.featureRequests.listPublic, {
     status,
     category,
@@ -36,11 +33,11 @@ export function usePlannedFeatures() {
  * Hook for getting a single feature request
  */
 export function useFeatureRequest(
-  featureRequestId: Id<"featureRequests"> | undefined
+  featureRequestId: Id<"featureRequests"> | undefined,
 ) {
   return useQuery(
     api.featureRequests.getById,
-    featureRequestId ? { featureRequestId } : "skip"
+    featureRequestId ? { featureRequestId } : "skip",
   );
 }
 
@@ -57,13 +54,11 @@ export function useFeatureCategories() {
 export function useHasVoted(
   featureRequestId: Id<"featureRequests"> | undefined,
   userId?: Id<"users">,
-  voterEmail?: string
+  voterEmail?: string,
 ) {
   return useQuery(
     api.featureRequests.hasVoted,
-    featureRequestId
-      ? { featureRequestId, userId, voterEmail }
-      : "skip"
+    featureRequestId ? { featureRequestId, userId, voterEmail } : "skip",
   );
 }
 

@@ -1,31 +1,47 @@
-'use client'
+"use client";
 
-import { useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Float, RoundedBox, Text, MeshWobbleMaterial } from '@react-three/drei'
-import * as THREE from 'three'
+import { useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Float, RoundedBox, Text, MeshWobbleMaterial } from "@react-three/drei";
+import * as THREE from "three";
 
 interface UseCaseIconProps {
-  position: [number, number, number]
-  color: string
-  icon: string
-  rotation?: [number, number, number]
+  position: [number, number, number];
+  color: string;
+  icon: string;
+  rotation?: [number, number, number];
 }
 
-function UseCaseIcon({ position, color, icon, rotation = [0, 0, 0] }: UseCaseIconProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+function UseCaseIcon({
+  position,
+  color,
+  icon,
+  rotation = [0, 0, 0],
+}: UseCaseIconProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.elapsedTime * 0.5
+      meshRef.current.rotation.y = state.clock.elapsedTime * 0.5;
     }
-  })
+  });
 
   return (
     <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
       <group position={position} rotation={rotation}>
-        <RoundedBox ref={meshRef} args={[0.6, 0.6, 0.6]} radius={0.08} smoothness={4}>
-          <MeshWobbleMaterial color={color} factor={0.1} speed={2} metalness={0.5} roughness={0.3} />
+        <RoundedBox
+          ref={meshRef}
+          args={[0.6, 0.6, 0.6]}
+          radius={0.08}
+          smoothness={4}
+        >
+          <MeshWobbleMaterial
+            color={color}
+            factor={0.1}
+            speed={2}
+            metalness={0.5}
+            roughness={0.3}
+          />
         </RoundedBox>
         <Text
           position={[0, 0, 0.35]}
@@ -38,27 +54,27 @@ function UseCaseIcon({ position, color, icon, rotation = [0, 0, 0] }: UseCaseIco
         </Text>
       </group>
     </Float>
-  )
+  );
 }
 
 function OrbitingParticles() {
-  const groupRef = useRef<THREE.Group>(null)
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.3
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.3;
     }
-  })
+  });
 
   const particles = Array.from({ length: 20 }, (_, i) => {
-    const angle = (i / 20) * Math.PI * 2
-    const radius = 2
+    const angle = (i / 20) * Math.PI * 2;
+    const radius = 2;
     return {
       x: Math.cos(angle) * radius,
       y: Math.sin((i + 1) * 3.17) * 0.25,
       z: Math.sin(angle) * radius,
-    }
-  })
+    };
+  });
 
   return (
     <group ref={groupRef}>
@@ -69,16 +85,36 @@ function OrbitingParticles() {
         </mesh>
       ))}
     </group>
-  )
+  );
 }
 
 function Scene() {
   const useCases = [
-    { position: [-1.5, 0.8, 0] as [number, number, number], color: '#1e40af', icon: '🚀', rotation: [0, 0, 0.2] as [number, number, number] },
-    { position: [1.5, 0.8, 0] as [number, number, number], color: '#0369a1', icon: '🔧', rotation: [0, 0, -0.2] as [number, number, number] },
-    { position: [-1.5, -0.8, 0] as [number, number, number], color: '#0e7490', icon: '🏢', rotation: [0, 0, -0.2] as [number, number, number] },
-    { position: [1.5, -0.8, 0] as [number, number, number], color: '#0d9488', icon: '🔬', rotation: [0, 0, 0.2] as [number, number, number] },
-  ]
+    {
+      position: [-1.5, 0.8, 0] as [number, number, number],
+      color: "#1e40af",
+      icon: "🚀",
+      rotation: [0, 0, 0.2] as [number, number, number],
+    },
+    {
+      position: [1.5, 0.8, 0] as [number, number, number],
+      color: "#0369a1",
+      icon: "🔧",
+      rotation: [0, 0, -0.2] as [number, number, number],
+    },
+    {
+      position: [-1.5, -0.8, 0] as [number, number, number],
+      color: "#0e7490",
+      icon: "🏢",
+      rotation: [0, 0, -0.2] as [number, number, number],
+    },
+    {
+      position: [1.5, -0.8, 0] as [number, number, number],
+      color: "#0d9488",
+      icon: "🔬",
+      rotation: [0, 0, 0.2] as [number, number, number],
+    },
+  ];
 
   return (
     <>
@@ -102,42 +138,52 @@ function Scene() {
       <Float speed={1} rotationIntensity={0.1} floatIntensity={0.3}>
         <mesh position={[0, 0, 0]}>
           <octahedronGeometry args={[0.3, 0]} />
-          <meshStandardMaterial color="#3b82f6" metalness={0.8} roughness={0.2} emissive="#3b82f6" emissiveIntensity={0.3} />
+          <meshStandardMaterial
+            color="#3b82f6"
+            metalness={0.8}
+            roughness={0.2}
+            emissive="#3b82f6"
+            emissiveIntensity={0.3}
+          />
         </mesh>
       </Float>
     </>
-  )
+  );
 }
 
 const useCases = [
   {
-    icon: '🚀',
-    title: 'Startups & Scale-ups',
-    description: 'Move fast without compromising security. Quick setup, easy onboarding, and scales with your team.',
-    benefits: ['5-minute setup', 'Unlimited projects', 'Free tier available'],
+    icon: "🚀",
+    title: "Startups & Scale-ups",
+    description:
+      "Move fast without compromising security. Quick setup, easy onboarding, and scales with your team.",
+    benefits: ["5-minute setup", "Unlimited projects", "Free tier available"],
   },
   {
-    icon: '🔧',
-    title: 'DevOps Teams',
-    description: 'Integrate with your CI/CD pipeline. Pull secrets directly into your builds and deployments.',
-    benefits: ['CLI tool', 'GitHub Actions', 'Docker support'],
+    icon: "🔧",
+    title: "DevOps Teams",
+    description:
+      "Integrate with your CI/CD pipeline. Pull secrets directly into your builds and deployments.",
+    benefits: ["CLI tool", "GitHub Actions", "Docker support"],
   },
   {
-    icon: '🏢',
-    title: 'Enterprise Organizations',
-    description: 'SOC2 compliant, SAML SSO, and advanced audit logs for enterprise security requirements.',
-    benefits: ['SSO integration', 'Compliance reports', 'Priority support'],
+    icon: "🏢",
+    title: "Enterprise Organizations",
+    description:
+      "SOC2 compliant, SAML SSO, and advanced audit logs for enterprise security requirements.",
+    benefits: ["SSO integration", "Compliance reports", "Priority support"],
   },
   {
-    icon: '🔬',
-    title: 'Open Source Projects',
-    description: 'Manage secrets across contributors without exposing sensitive data in your repository.',
-    benefits: ['Public projects', 'Contributor access', 'Free for OSS'],
+    icon: "🔬",
+    title: "Open Source Projects",
+    description:
+      "Manage secrets across contributors without exposing sensitive data in your repository.",
+    benefits: ["Public projects", "Contributor access", "Free for OSS"],
   },
-]
+];
 
 export default function UseCasesSection() {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   return (
     <section className="py-24">
@@ -146,15 +192,13 @@ export default function UseCasesSection() {
           Built for Every Team
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-center text-zinc-600 dark:text-zinc-400">
-          From solo developers to enterprise organizations, ENV Connect adapts to your workflow
+          From solo developers to enterprise organizations, ENV Connect adapts
+          to your workflow
         </p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">
           <div className="relative h-[400px] rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-zinc-100 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-950">
-            <Canvas
-              camera={{ position: [0, 0, 5], fov: 50 }}
-              dpr={[1, 2]}
-            >
+            <Canvas camera={{ position: [0, 0, 5], fov: 50 }} dpr={[1, 2]}>
               <Scene />
             </Canvas>
           </div>
@@ -176,7 +220,10 @@ export default function UseCasesSection() {
                 </p>
                 <ul className="mt-3 space-y-1">
                   {useCase.benefits.map((benefit, i) => (
-                    <li key={i} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    <li
+                      key={i}
+                      className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-500"
+                    >
                       <span className="text-green-500">✓</span>
                       {benefit}
                     </li>
@@ -188,5 +235,5 @@ export default function UseCasesSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

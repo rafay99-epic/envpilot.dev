@@ -33,10 +33,7 @@ export function useChangelogEntries(limit?: number) {
  * Hook to fetch a single changelog entry by ID
  */
 export function useChangelogEntry(id: Id<"changelog"> | undefined) {
-  const entry = useQuery(
-    api.changelog.getById,
-    id ? { id } : "skip"
-  );
+  const entry = useQuery(api.changelog.getById, id ? { id } : "skip");
   return {
     entry,
     isLoading: entry === undefined,
@@ -49,7 +46,7 @@ export function useChangelogEntry(id: Id<"changelog"> | undefined) {
 export function useChangelogByVersion(version: string | undefined) {
   const entry = useQuery(
     api.changelog.getByVersion,
-    version ? { version } : "skip"
+    version ? { version } : "skip",
   );
   return {
     entry,
@@ -62,11 +59,11 @@ export function useChangelogByVersion(version: string | undefined) {
  */
 export function useChangelogByType(
   type: "feature" | "fix" | "improvement" | "security" | "breaking" | undefined,
-  limit?: number
+  limit?: number,
 ) {
   const entries = useQuery(
     api.changelog.listByType,
-    type ? { type, limit } : "skip"
+    type ? { type, limit } : "skip",
   );
   return {
     entries,

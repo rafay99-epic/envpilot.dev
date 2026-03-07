@@ -9,22 +9,21 @@ import { Id } from "../../convex/_generated/dataModel";
  */
 export function useProjectVariables(
   projectId: Id<"projects"> | undefined,
-  environment?: string
+  environment?: string,
 ) {
   return useQuery(
     api.variables.listByProject,
-    projectId ? { projectId, environment } : "skip"
+    projectId ? { projectId, environment } : "skip",
   );
 }
 
 /**
  * Hook for getting a single variable
  */
-export function useVariable(variableId: Id<"environmentVariables"> | undefined) {
-  return useQuery(
-    api.variables.getById,
-    variableId ? { variableId } : "skip"
-  );
+export function useVariable(
+  variableId: Id<"environmentVariables"> | undefined,
+) {
+  return useQuery(api.variables.getById, variableId ? { variableId } : "skip");
 }
 
 /**
@@ -32,11 +31,11 @@ export function useVariable(variableId: Id<"environmentVariables"> | undefined) 
  */
 export function useVariableHistory(
   variableId: Id<"environmentVariables"> | undefined,
-  limit?: number
+  limit?: number,
 ) {
   return useQuery(
     api.variables.getVersionHistory,
-    variableId ? { variableId, limit } : "skip"
+    variableId ? { variableId, limit } : "skip",
   );
 }
 
@@ -45,11 +44,11 @@ export function useVariableHistory(
  */
 export function useVariablesWithAccess(
   projectId: Id<"projects"> | undefined,
-  userId: Id<"users"> | undefined
+  userId: Id<"users"> | undefined,
 ) {
   return useQuery(
     api.variables.listWithAccess,
-    projectId && userId ? { projectId, userId } : "skip"
+    projectId && userId ? { projectId, userId } : "skip",
   );
 }
 
@@ -58,12 +57,12 @@ export function useVariablesWithAccess(
  */
 export function useVariableSearch(
   organizationId: Id<"organizations"> | undefined,
-  searchTerm: string
+  searchTerm: string,
 ) {
   return useQuery(
     api.variables.search,
     organizationId && searchTerm.length > 0
       ? { organizationId, searchTerm }
-      : "skip"
+      : "skip",
   );
 }

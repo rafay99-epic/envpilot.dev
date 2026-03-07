@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../../../convex/_generated/api'
-import { Id } from '../../../../../convex/_generated/dataModel'
+import { NextRequest, NextResponse } from "next/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../../../convex/_generated/api";
+import { Id } from "../../../../../convex/_generated/dataModel";
 import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
-} from '@/lib/cli-auth'
+} from "@/lib/cli-auth";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/cli/projects
@@ -16,37 +16,37 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
  */
 export async function GET(request: NextRequest) {
   // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex)
+  const authResult = await authenticateCLIRequest(request, convex);
 
   if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error)
+    return unauthorizedResponse(authResult.error);
   }
 
-  const url = new URL(request.url)
-  const organizationId = url.searchParams.get('organizationId')
+  const url = new URL(request.url);
+  const organizationId = url.searchParams.get("organizationId");
 
   if (!organizationId) {
     return NextResponse.json(
-      { error: 'Missing organizationId parameter' },
-      { status: 400 }
-    )
+      { error: "Missing organizationId parameter" },
+      { status: 400 },
+    );
   }
 
   try {
     // Check membership
     const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: organizationId as Id<'organizations'>,
+      organizationId: organizationId as Id<"organizations">,
       userId: authResult.userId,
-    })
+    });
 
     if (!membership) {
-      return forbiddenResponse('You are not a member of this organization')
+      return forbiddenResponse("You are not a member of this organization");
     }
 
     // Get projects
     const projects = await convex.query(api.projects.listByOrganization, {
-      organizationId: organizationId as Id<'organizations'>,
-    })
+      organizationId: organizationId as Id<"organizations">,
+    });
 
     return NextResponse.json({
       success: true,
@@ -61,12 +61,12 @@ export async function GET(request: NextRequest) {
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       })),
-    })
+    });
   } catch (error) {
-    console.error('CLI projects error:', error)
+    console.error("CLI projects error:", error);
     return NextResponse.json(
-      { error: 'Failed to list projects' },
-      { status: 500 }
-    )
+      { error: "Failed to list projects" },
+      { status: 500 },
+    );
   }
 }

@@ -1,12 +1,16 @@
-import { withAuth } from '@workos-inc/authkit-nextjs'
-import { NextResponse } from 'next/server'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../../../convex/_generated/api'
-import type { Id } from '../../../../../convex/_generated/dataModel'
-import { getOrCreateConvexUser, checkOrganizationMembership, getProjectOrganization } from '@/lib/convex-helpers'
-import { readSecret } from '@/lib/vault'
+import { withAuth } from "@workos-inc/authkit-nextjs";
+import { NextResponse } from "next/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../../../convex/_generated/api";
+import type { Id } from "../../../../../convex/_generated/dataModel";
+import {
+  getOrCreateConvexUser,
+  checkOrganizationMembership,
+  getProjectOrganization,
+} from "@/lib/convex-helpers";
+import { readSecret } from "@/lib/vault";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/extension/variables - List variables for a project (with decrypted values)
@@ -17,135 +21,133 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
  */
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('projectId')
-    const environment = searchParams.get('environment') || 'development'
-    const accessToken = request.headers.get('X-Access-Token')
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("projectId");
+    const environment = searchParams.get("environment") || "development";
+    const accessToken = request.headers.get("X-Access-Token");
 
     if (!projectId) {
       return NextResponse.json(
-        { error: 'Project ID is required' },
-        { status: 400 }
-      )
+        { error: "Project ID is required" },
+        { status: 400 },
+      );
     }
 
-    let authorizedUserId: Id<'users'>
+    let authorizedUserId: Id<"users">;
 
     // Validate access token if provided
     if (accessToken) {
       const validation = await convex.query(api.projectAccess.validateToken, {
         accessToken,
-      })
+      });
 
       if (!validation.valid) {
         return NextResponse.json(
-          { error: validation.reason || 'Invalid access token' },
-          { status: 401 }
-        )
+          { error: validation.reason || "Invalid access token" },
+          { status: 401 },
+        );
       }
 
       if (validation.projectId !== projectId) {
         return NextResponse.json(
-          { error: 'Access token does not match project' },
-          { status: 403 }
-        )
+          { error: "Access token does not match project" },
+          { status: 403 },
+        );
       }
 
-      authorizedUserId = validation.userId as Id<'users'>
+      authorizedUserId = validation.userId as Id<"users">;
 
       // Update last used
-      await convex.mutation(api.projectAccess.updateLastUsed, { accessToken })
+      await convex.mutation(api.projectAccess.updateLastUsed, { accessToken });
     } else {
       // Fall back to session authentication
-      const { user } = await withAuth()
+      const { user } = await withAuth();
 
       if (!user) {
         return NextResponse.json(
-          { error: 'Not authenticated' },
-          { status: 401 }
-        )
+          { error: "Not authenticated" },
+          { status: 401 },
+        );
       }
 
-      const convexUser = await getOrCreateConvexUser(convex, user)
+      const convexUser = await getOrCreateConvexUser(convex, user);
 
       // Verify project access
       const { project, organizationId } = await getProjectOrganization(
         convex,
-        projectId as Id<'projects'>
-      )
+        projectId as Id<"projects">,
+      );
 
       if (!project || !organizationId) {
         return NextResponse.json(
-          { error: 'Project not found' },
-          { status: 404 }
-        )
+          { error: "Project not found" },
+          { status: 404 },
+        );
       }
 
       const membership = await checkOrganizationMembership(
         convex,
         convexUser._id,
-        organizationId
-      )
+        organizationId,
+      );
 
       if (!membership) {
-        return NextResponse.json(
-          { error: 'Forbidden' },
-          { status: 403 }
-        )
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
-      authorizedUserId = convexUser._id
+      authorizedUserId = convexUser._id;
     }
 
     // Get only variables this user can access.
-    const variablesWithAccess = await convex.query(api.variables.listWithAccess, {
-      projectId: projectId as Id<'projects'>,
-      userId: authorizedUserId,
-    })
+    const variablesWithAccess = await convex.query(
+      api.variables.listWithAccess,
+      {
+        projectId: projectId as Id<"projects">,
+        userId: authorizedUserId,
+      },
+    );
 
     const variables = variablesWithAccess
       .filter((variable) => variable.hasAccess)
-      .filter((variable) => variable.environments.includes(environment))
+      .filter((variable) => variable.environments.includes(environment));
 
     const variablesWithValues = await Promise.all(
       variables.map(async (variable) => {
         try {
-          const value = await readSecret(variable.vaultRef)
+          const value = await readSecret(variable.vaultRef);
           return {
             _id: variable._id,
             key: variable.key,
-            value: value || '',
+            value: value || "",
             description: variable.description || null,
             environments: variable.environments,
             projectId: variable.projectId,
             isSensitive: variable.isSensitive,
             version: variable.version,
-          }
+          };
         } catch {
           return {
             _id: variable._id,
             key: variable.key,
-            value: '[DECRYPTION_FAILED]',
+            value: "[DECRYPTION_FAILED]",
             description: variable.description || null,
             environments: variable.environments,
             projectId: variable.projectId,
             isSensitive: variable.isSensitive,
             version: variable.version,
-          }
+          };
         }
-      })
-    )
+      }),
+    );
 
     return NextResponse.json({
       data: {
         variables: variablesWithValues,
       },
-    })
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch variables'
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch variables";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
