@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -32,27 +32,4 @@ export function useOrganizationMembers(organizationId: Id<"organizations"> | und
     api.organizations.getMembers,
     organizationId ? { organizationId } : "skip"
   );
-}
-
-/**
- * Hook for organization mutations
- */
-export function useOrganizationMutations() {
-  const createOrganization = useMutation(api.organizations.create);
-  const updateOrganization = useMutation(api.organizations.update);
-  const deleteOrganization = useMutation(api.organizations.remove);
-  const addMember = useMutation(api.organizations.addMember);
-  const removeMember = useMutation(api.organizations.removeMember);
-  const updateMemberRole = useMutation(api.organizations.updateMemberRole);
-  const updateTier = useMutation(api.organizations.updateTier);
-
-  return {
-    createOrganization,
-    updateOrganization,
-    deleteOrganization,
-    addMember,
-    removeMember,
-    updateMemberRole,
-    updateTier,
-  };
 }

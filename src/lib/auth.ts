@@ -21,6 +21,8 @@ export interface Organization {
   id: string
   name: string
   slug: string | null
+  tier?: 'free' | 'pro' | null
+  role?: MembershipRole | null
   createdAt: Date
   updatedAt: Date
 }
@@ -63,6 +65,7 @@ export const PERMISSIONS = {
 } as const
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]
+export type MembershipRole = 'admin' | 'team_lead' | 'member'
 
 // Role definitions with their associated permissions
 export const ROLES = {
@@ -100,6 +103,12 @@ export const ROLES = {
 
 export type Role = keyof typeof ROLES
 
+const MEMBERSHIP_ROLE_TO_ROLE: Record<MembershipRole, Role> = {
+  admin: 'ADMIN',
+  team_lead: 'TEAM_LEAD',
+  member: 'MEMBER',
+}
+
 /**
  * Check if a user has a specific permission
  */
@@ -135,4 +144,17 @@ export function hasAnyPermission(
  */
 export function getPermissionsForRole(role: Role): Permission[] {
   return [...ROLES[role].permissions]
+}
+
+/**
+ * Get permissions from Convex membership role (organization scoped)
+ */
+export function getPermissionsForMembershipRole(
+  membershipRole: MembershipRole | null | undefined
+): Permission[] {
+  if (!membershipRole) {
+    return [...ROLES.MEMBER.permissions]
+  }
+
+  return [...ROLES[MEMBERSHIP_ROLE_TO_ROLE[membershipRole]].permissions]
 }

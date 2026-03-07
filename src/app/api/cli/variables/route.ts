@@ -6,8 +6,6 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
-  checkCLIAccess,
-  tierLimitResponse,
 } from '@/lib/cli-auth'
 import { createSecret, readSecret } from '@/lib/vault'
 
@@ -57,12 +55,6 @@ export async function GET(request: NextRequest) {
 
     if (!membership) {
       return forbiddenResponse('You are not a member of this organization')
-    }
-
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, project.organizationId)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
     }
 
     // Get variables with access info
@@ -179,15 +171,33 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse('You are not a member of this organization')
     }
 
-    // Only admins and team leads can create variables
-    if (membership.role === 'member') {
-      return forbiddenResponse('Members cannot create variables')
-    }
+    const environments = Array.isArray(environment) ? environment : [environment]
 
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, project.organizationId)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
+    // Members create pending requests instead of writing directly.
+    if (membership.role === 'member') {
+      const vaultResult = await createSecret(key, value, {
+        organizationId: project.organizationId,
+        projectId: projectId,
+      })
+      const requestId = await convex.mutation(api.variableRequests.create, {
+        key,
+        vaultRef: vaultResult.id,
+        description,
+        environments,
+        projectId: projectId as Id<'projects'>,
+        isSensitive: isSensitive ?? false,
+        requestedBy: authResult.userId,
+      })
+
+      return NextResponse.json(
+        {
+          success: true,
+          requested: true,
+          data: { requestId },
+          message: 'Variable request submitted for admin approval',
+        },
+        { status: 202 }
+      )
     }
 
     // Store value in vault
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
       key,
       vaultRef,
       description,
-      environments: Array.isArray(environment) ? environment : [environment],
+      environments,
       projectId: projectId as Id<'projects'>,
       isSensitive: isSensitive ?? false,
       createdBy: authResult.userId,
@@ -215,6 +225,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('CLI create variable error:', error)
     const message = error instanceof Error ? error.message : 'Failed to create variable'
+    if (message.includes('pending request') || message.includes('already exists')) {
+      return NextResponse.json(
+        { error: message },
+        { status: 409 }
+      )
+    }
     return NextResponse.json(
       { error: message },
       { status: 500 }

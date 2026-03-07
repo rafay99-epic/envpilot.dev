@@ -179,12 +179,12 @@ export class APIClient {
 
     // Handle authorization errors
     if (response.status === 403) {
-      throw new APIError(message || 'Access denied. You may need Pro tier for this feature.', 403, code || 'FORBIDDEN')
+      throw new APIError(message || 'Access denied.', 403, code || 'FORBIDDEN')
     }
 
     // Handle tier limit errors
     if (response.status === 402) {
-      throw new APIError(message || 'This feature requires Pro tier. Upgrade at env-connect.io/pricing', 402, 'PAYMENT_REQUIRED')
+      throw new APIError(message || 'Payment is currently disabled for this pre-alpha build.', 402, 'PAYMENT_REQUIRED')
     }
 
     throw new APIError(message, response.status, code)

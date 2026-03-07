@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { setActiveOrganizationCookie } from '@/lib/organization-context'
 
 interface Organization {
   _id: string
@@ -23,6 +24,7 @@ export function OrganizationSwitcher({
   onOrganizationChange,
 }: OrganizationSwitcherProps = {}) {
   const router = useRouter()
+  const pathname = usePathname()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
@@ -62,10 +64,17 @@ export function OrganizationSwitcher({
 
   function handleSelectOrganization(orgId: string) {
     setIsOpen(false)
+    setActiveOrganizationCookie(orgId)
     if (onOrganizationChange) {
       onOrganizationChange(orgId)
     }
-    router.push(`/organizations/${orgId}`)
+
+    if (pathname.startsWith('/organizations')) {
+      router.push(`/organizations/${orgId}`)
+    } else {
+      router.push('/dashboard')
+    }
+    router.refresh()
   }
 
   if (isLoading) {

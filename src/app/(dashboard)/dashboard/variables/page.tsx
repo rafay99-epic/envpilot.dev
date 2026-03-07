@@ -4,11 +4,14 @@ import { useState } from 'react'
 import { useVariables, useProjects } from '@/hooks'
 import { useAuthContext } from '@/components/auth'
 import { PERMISSIONS } from '@/lib/auth'
+import Link from 'next/link'
+import type { Id } from '../../../../../convex/_generated/dataModel'
 
 export default function VariablesPage() {
-  const { variables, isLoading } = useVariables()
-  const { projects } = useProjects()
-  const { hasPermission } = useAuthContext()
+  const { hasPermission, organization } = useAuthContext()
+  const activeOrganizationId = organization?.id as Id<'organizations'> | undefined
+  const { variables, isLoading } = useVariables(activeOrganizationId)
+  const { projects } = useProjects(activeOrganizationId)
   const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -36,6 +39,25 @@ export default function VariablesPage() {
 
     return matchesSearch && matchesProject && matchesEnvironment
   })
+
+  if (!organization) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          No active organization
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Select or create an organization to manage variables.
+        </p>
+        <Link
+          href="/organizations"
+          className="mt-6 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Manage Organizations
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -42,23 +42,4 @@ export function useUserProjects(userId: Id<"users"> | undefined) {
     api.projects.listForUser,
     userId ? { userId } : "skip"
   );
-}
-
-/**
- * Hook for project mutations
- */
-export function useProjectMutations() {
-  const createProject = useMutation(api.projects.create);
-  const updateProject = useMutation(api.projects.update);
-  const deleteProject = useMutation(api.projects.remove);
-  const restoreProject = useMutation(api.projects.restore);
-  const duplicateProject = useMutation(api.projects.duplicate);
-
-  return {
-    createProject,
-    updateProject,
-    deleteProject,
-    restoreProject,
-    duplicateProject,
-  };
 }

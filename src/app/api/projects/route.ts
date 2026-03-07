@@ -153,14 +153,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check for tier limit errors
-    if (message.includes('limit reached') || message.includes('Upgrade to Pro')) {
-      return NextResponse.json(
-        { error: message, code: 'TIER_LIMIT_EXCEEDED' },
-        { status: 402 } // Payment Required
-      )
-    }
-
     return NextResponse.json(
       { error: message },
       { status: 500 }

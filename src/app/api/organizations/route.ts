@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../convex/_generated/api'
 import { z } from 'zod'
+import {
+  ACTIVE_ORG_COOKIE_NAME,
+  ACTIVE_ORG_COOKIE_TTL_SECONDS,
+} from '@/lib/organization-context'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -129,7 +133,14 @@ export async function POST(request: Request) {
       organizationId,
     })
 
-    return NextResponse.json({ organization }, { status: 201 })
+    const response = NextResponse.json({ organization }, { status: 201 })
+    response.cookies.set(ACTIVE_ORG_COOKIE_NAME, organizationId, {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: ACTIVE_ORG_COOKIE_TTL_SECONDS,
+    })
+
+    return response
   } catch (error) {
     console.error('Error creating organization:', error)
     const message = error instanceof Error ? error.message : 'Failed to create organization'
@@ -138,14 +149,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Organization slug already exists' },
         { status: 409 }
-      )
-    }
-
-    // Check for tier limit errors
-    if (message.includes('limit reached') || message.includes('Upgrade to Pro')) {
-      return NextResponse.json(
-        { error: message, code: 'TIER_LIMIT_EXCEEDED' },
-        { status: 402 } // Payment Required
       )
     }
 

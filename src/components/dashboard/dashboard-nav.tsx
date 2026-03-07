@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton, OrganizationSwitcher } from '@/components/auth'
+import { useAuthContext } from '@/components/auth'
 
 interface NavItem {
   href: string
@@ -72,6 +73,7 @@ const navItems: NavItem[] = [
 export function DashboardNav() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { organization } = useAuthContext()
 
   return (
     <>
@@ -94,7 +96,7 @@ export function DashboardNav() {
 
           {/* Organization Switcher */}
           <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
-            <OrganizationSwitcher />
+            <OrganizationSwitcher currentOrgId={organization?.id ?? undefined} />
           </div>
 
           {/* Navigation */}
@@ -168,7 +170,7 @@ export function DashboardNav() {
             <div className="flex h-full flex-col pt-16">
               {/* Organization Switcher */}
               <div className="border-b border-zinc-200 p-4 dark:border-zinc-800">
-                <OrganizationSwitcher />
+                <OrganizationSwitcher currentOrgId={organization?.id ?? undefined} />
               </div>
 
               {/* Navigation */}

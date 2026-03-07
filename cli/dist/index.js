@@ -295,10 +295,10 @@ var APIClient = class {
       throw new APIError("Authentication required. Please run `env-connect login`.", 401, "UNAUTHORIZED");
     }
     if (response.status === 403) {
-      throw new APIError(message || "Access denied. You may need Pro tier for this feature.", 403, code || "FORBIDDEN");
+      throw new APIError(message || "Access denied.", 403, code || "FORBIDDEN");
     }
     if (response.status === 402) {
-      throw new APIError(message || "This feature requires Pro tier. Upgrade at env-connect.io/pricing", 402, "PAYMENT_REQUIRED");
+      throw new APIError(message || "Payment is currently disabled for this pre-alpha build.", 402, "PAYMENT_REQUIRED");
     }
     throw new APIError(message, response.status, code);
   }
@@ -497,7 +497,7 @@ import chalk4 from "chalk";
 import inquirer from "inquirer";
 
 // src/lib/project-config.ts
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { join } from "path";
 
 // src/types/index.ts
@@ -701,13 +701,6 @@ var initCommand = new Command2("init").description("Initialize ENV Connect in th
         }
       ]);
       selectedOrg = organizations.find((o) => o._id === orgId);
-    }
-    if (selectedOrg.tier !== "pro") {
-      error("CLI access requires Pro tier.");
-      console.log();
-      console.log(`Upgrade ${chalk4.bold(selectedOrg.name)} to Pro at:`);
-      console.log(chalk4.cyan("https://env-connect.io/pricing"));
-      process.exit(1);
     }
     const projects = await withSpinner(
       "Fetching projects...",
@@ -1134,10 +1127,19 @@ var pushCommand = new Command4("push").description("Upload local .env file to cl
         return response.data;
       }
     );
-    success(`Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk6.bold(environment)}`);
+    if (result?.requested && result.requested > 0) {
+      success(
+        `Submitted ${result.requested} variable request(s) for ${chalk6.bold(environment)}`
+      );
+    } else {
+      success(`Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk6.bold(environment)}`);
+    }
     console.log();
     console.log(chalk6.dim(`  Created: ${result?.created || 0}`));
     console.log(chalk6.dim(`  Updated: ${result?.updated || 0}`));
+    if (result?.requested) {
+      console.log(chalk6.dim(`  Requested: ${result.requested}`));
+    }
     if (mode === "replace") {
       console.log(chalk6.dim(`  Deleted: ${result?.deleted || 0}`));
     }

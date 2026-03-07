@@ -111,9 +111,9 @@ export function organizationNotFound(organizationId: string): CLIError {
 
 export function tierLimitExceeded(feature: string): CLIError {
   return new CLIError(
-    `This feature requires Pro tier: ${feature}`,
+    `This feature is currently unavailable: ${feature}`,
     ErrorCodes.TIER_LIMIT_EXCEEDED,
-    'Upgrade to Pro at env-connect.io/pricing'
+    'Please try again later.'
   )
 }
 

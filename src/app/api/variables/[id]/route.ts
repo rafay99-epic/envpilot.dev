@@ -5,6 +5,7 @@ import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { z } from 'zod'
 import { getOrCreateConvexUser, checkOrganizationMembership, getProjectOrganization } from '@/lib/convex-helpers'
+import { createSecret } from '@/lib/vault'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -73,6 +74,25 @@ export async function GET(request: Request, context: RouteContext) {
         { error: 'Forbidden' },
         { status: 403 }
       )
+    }
+
+    // Members can only view variables they can access.
+    if (membership.role === 'member') {
+      const accessibleVariables = await convex.query(api.variables.listWithAccess, {
+        projectId: variable.projectId,
+        userId: convexUser._id,
+      })
+
+      const canAccessVariable = accessibleVariables.some(
+        (entry) => entry._id === variable._id && entry.hasAccess
+      )
+
+      if (!canAccessVariable) {
+        return NextResponse.json(
+          { error: 'You do not have access to this variable' },
+          { status: 403 }
+        )
+      }
     }
 
     // Get version history
@@ -170,10 +190,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { value, description, environments, isSensitive, changeReason } = validation.data
 
-    // If value is being updated, generate new vault ref
+    // If value is being updated, write a new encrypted value to Vault.
     let vaultRef: string | undefined
     if (value !== undefined) {
-      vaultRef = `vault_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const vaultResult = await createSecret(variable.key, value, {
+        organizationId,
+        projectId: variable.projectId,
+      })
+      vaultRef = vaultResult.id
     }
 
     await convex.mutation(api.variables.update, {

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { projectConfigSchema, type ProjectConfig, type Environment } from '../types/index.js'
 
@@ -95,7 +95,6 @@ export function deleteProjectConfig(directory: string = process.cwd()): boolean 
     return false
   }
 
-  const { unlinkSync } = require('node:fs')
   unlinkSync(configPath)
   return true
 }

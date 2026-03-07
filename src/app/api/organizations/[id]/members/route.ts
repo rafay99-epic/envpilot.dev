@@ -5,6 +5,7 @@ import { api } from '../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../convex/_generated/dataModel'
 import { z } from 'zod'
 import { sendInvitationEmail } from '@/lib/email'
+import { getOrCreateConvexUser } from '@/lib/convex-helpers'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -43,16 +44,7 @@ export async function GET(
     const resolvedParams = await params
     const organizationId = resolvedParams.id as Id<'organizations'>
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check membership
     const membership = await convex.query(api.organizations.getMembership, {
@@ -116,16 +108,7 @@ export async function POST(
       )
     }
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check if user can invite (admin or team_lead)
     const membership = await convex.query(api.organizations.getMembership, {
@@ -208,14 +191,6 @@ export async function POST(
       )
     }
 
-    // Check for tier limit errors
-    if (message.includes('limit reached') || message.includes('Upgrade to Pro')) {
-      return NextResponse.json(
-        { error: message, code: 'TIER_LIMIT_EXCEEDED' },
-        { status: 402 } // Payment Required
-      )
-    }
-
     return NextResponse.json(
       { error: message },
       { status: 500 }
@@ -253,16 +228,7 @@ export async function PATCH(
       )
     }
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Only admins can change roles
     const membership = await convex.query(api.organizations.getMembership, {
@@ -336,16 +302,7 @@ export async function DELETE(
 
     const targetUserId = targetUserIdParam as Id<'users'>
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Users can remove themselves, or admins can remove others
     const isRemovingSelf = targetUserId === convexUser._id

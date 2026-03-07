@@ -1,9 +1,7 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import Link from 'next/link'
-import { useQuery, useMutation } from 'convex/react'
-import { api } from '../../../../../../convex/_generated/api'
 import type { Id } from '../../../../../../convex/_generated/dataModel'
 import { useAuthContext } from '@/components/auth'
 import { PERMISSIONS } from '@/lib/auth'
@@ -42,6 +40,25 @@ interface Variable {
   version: number
   createdAt: number
   updatedAt: number
+  permission?: 'read' | 'write' | 'admin' | null
+}
+
+interface VariableRequest {
+  _id: Id<'environmentVariableRequests'>
+  key: string
+  description?: string
+  environments: string[]
+  isSensitive: boolean
+  status: 'pending' | 'approved' | 'rejected' | 'canceled'
+  reviewReason?: string
+  requestedBy: Id<'users'>
+  reviewedBy?: Id<'users'>
+  reviewedAt?: number
+  createdVariableId?: Id<'environmentVariables'>
+  createdAt: number
+  updatedAt: number
+  requester: { _id: Id<'users'>; email: string; name?: string } | null
+  reviewer: { _id: Id<'users'>; email: string; name?: string } | null
 }
 
 interface VersionRecord {
@@ -56,15 +73,20 @@ interface VersionRecord {
 
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params)
-  const { hasPermission } = useAuthContext()
-  const canUpdateProject = hasPermission(PERMISSIONS.PROJECT_UPDATE)
+  const { hasPermission, organization } = useAuthContext()
   const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE)
   const canUpdateVariable = hasPermission(PERMISSIONS.VARIABLE_UPDATE)
   const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE)
+  const canReviewRequests = hasPermission(PERMISSIONS.VARIABLE_CREATE)
+  const canRequestVariable = organization?.role === 'member'
 
   const [project, setProject] = useState<Project | null>(null)
+  const [variables, setVariables] = useState<Variable[]>([])
+  const [requests, setRequests] = useState<VariableRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingVariables, setIsLoadingVariables] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>('all')
 
   // Modal states
@@ -76,10 +98,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
 
-  // User state
+  // User state (for request cancellation)
   const [convexUserId, setConvexUserId] = useState<Id<'users'> | null>(null)
 
-  // Fetch user data
   useEffect(() => {
     async function fetchUser() {
       try {
@@ -89,30 +110,23 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           setConvexUserId(data.convexUserId)
         }
       } catch {
-        // User fetch failed - will be handled by auth redirect
+        // No-op
       }
     }
     fetchUser()
   }, [])
 
-  // Fetch project data
   useEffect(() => {
     async function fetchProject() {
       try {
-        const orgsResponse = await fetch('/api/organizations')
-        const orgsData = await orgsResponse.json()
-
-        if (!orgsData.organizations || orgsData.organizations.length === 0) {
+        if (!organization?.id) {
           setError('No organization found')
           setIsLoading(false)
           return
         }
 
-        const organizationId = orgsData.organizations[0]._id
-
-        const projectsResponse = await fetch(`/api/projects?organizationId=${organizationId}`)
+        const projectsResponse = await fetch(`/api/projects?organizationId=${organization.id}`)
         const projectsData = await projectsResponse.json()
-
         const foundProject = projectsData.projects?.find((p: Project) => p.slug === slug)
 
         if (!foundProject) {
@@ -128,56 +142,154 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
 
     fetchProject()
-  }, [slug])
+  }, [organization?.id, slug])
 
-  // Query variables for the project
-  const variables = useQuery(
-    api.variables.listByProject,
-    project ? { projectId: project._id, environment: selectedEnvironment === 'all' ? undefined : selectedEnvironment } : 'skip'
-  )
+  const fetchVariables = useCallback(async () => {
+    if (!project) return
 
-  const createVariable = useMutation(api.variables.create)
-  const updateVariable = useMutation(api.variables.update)
-  const deleteVariable = useMutation(api.variables.remove)
-  const rollbackVariable = useMutation(api.variables.rollback)
+    setIsLoadingVariables(true)
+    try {
+      const params = new URLSearchParams({ projectId: project._id })
+      if (selectedEnvironment !== 'all') {
+        params.set('environment', selectedEnvironment)
+      }
 
-  // Handlers
-  const handleCreateVariable = async (data: VariableFormData) => {
-    if (!project || !convexUserId) return
+      const response = await fetch(`/api/variables?${params.toString()}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load variables')
+      }
 
-    await createVariable({
-      key: data.key,
-      vaultRef: `vault_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      description: data.description || undefined,
-      environments: data.environments,
-      projectId: project._id,
-      isSensitive: data.isSensitive,
-      createdBy: convexUserId,
-    })
+      setVariables(data.variables || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load variables')
+    } finally {
+      setIsLoadingVariables(false)
+    }
+  }, [project, selectedEnvironment])
+
+  const fetchRequests = useCallback(async () => {
+    if (!project) return
+
+    try {
+      const response = await fetch(`/api/variable-requests?projectId=${project._id}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load variable requests')
+      }
+      setRequests(data.requests || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load variable requests')
+    }
+  }, [project])
+
+  useEffect(() => {
+    fetchVariables()
+  }, [fetchVariables])
+
+  useEffect(() => {
+    fetchRequests()
+  }, [fetchRequests])
+
+  const refreshProjectData = async () => {
+    await Promise.all([fetchVariables(), fetchRequests()])
   }
 
-  const handleUpdateVariable = async (variableId: Id<'environmentVariables'>, data: VariableFormData) => {
-    if (!convexUserId) return
+  const handleCreateVariable = async (data: VariableFormData) => {
+    if (!project) return
+    setNotice(null)
+    setError(null)
 
-    await updateVariable({
-      variableId,
-      vaultRef: data.value ? `vault_${Date.now()}_${Math.random().toString(36).substring(7)}` : undefined,
-      description: data.description || undefined,
-      environments: data.environments,
-      isSensitive: data.isSensitive,
-      updatedBy: convexUserId,
-      changeReason: 'Updated via dashboard',
-    })
+    try {
+      const response = await fetch('/api/variables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: data.key,
+          value: data.value,
+          description: data.description || undefined,
+          environments: data.environments,
+          projectId: project._id,
+          isSensitive: data.isSensitive,
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok && response.status !== 202) {
+        throw new Error(result.error || 'Failed to create variable')
+      }
+
+      if (response.status === 202 || result.requested) {
+        setNotice('Variable request submitted for admin approval.')
+      } else {
+        setNotice('Variable created successfully.')
+      }
+
+      await refreshProjectData()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create variable'
+      setError(message)
+      throw err
+    }
+  }
+
+  const handleUpdateVariable = async (
+    variableId: Id<'environmentVariables'>,
+    data: VariableFormData
+  ) => {
+    setNotice(null)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/variables/${variableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          value: data.value || undefined,
+          description: data.description || undefined,
+          environments: data.environments,
+          isSensitive: data.isSensitive,
+          changeReason: 'Updated via dashboard',
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update variable')
+      }
+
+      setNotice('Variable updated successfully.')
+      await refreshProjectData()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update variable'
+      setError(message)
+      throw err
+    }
   }
 
   const handleDeleteVariable = async () => {
-    if (!deletingVariable || !convexUserId) return
+    if (!deletingVariable) return
 
-    await deleteVariable({
-      variableId: deletingVariable._id,
-      deletedBy: convexUserId,
-    })
-    setDeletingVariable(null)
+    setNotice(null)
+    setError(null)
+    try {
+      const response = await fetch(`/api/variables/${deletingVariable._id}`, {
+        method: 'DELETE',
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete variable')
+      }
+
+      setDeletingVariable(null)
+      setNotice('Variable deleted successfully.')
+      await refreshProjectData()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete variable'
+      setError(message)
+      throw err
+    }
   }
 
   const handleViewHistory = async (variable: Variable) => {
@@ -201,17 +313,62 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   }
 
   const handleRollback = async (targetVersion: number) => {
-    if (!historyVariable || !convexUserId) return
+    if (!historyVariable) return
 
-    await rollbackVariable({
-      variableId: historyVariable._id,
-      targetVersion,
-      rolledBackBy: convexUserId,
-    })
+    try {
+      const response = await fetch(`/api/variables/${historyVariable._id}/rollback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetVersion }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to rollback variable')
+      }
 
-    // Refresh history
-    await handleViewHistory(historyVariable)
+      setNotice(`Rolled back ${historyVariable.key} to version ${targetVersion}.`)
+      await refreshProjectData()
+      await handleViewHistory(historyVariable)
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : 'Failed to rollback variable')
+    }
   }
+
+  const updateRequestStatus = async (
+    requestId: Id<'environmentVariableRequests'>,
+    action: 'approve' | 'reject' | 'cancel'
+  ) => {
+    setNotice(null)
+    setError(null)
+    try {
+      const response = await fetch(`/api/variable-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to ${action} request`)
+      }
+
+      setNotice(
+        action === 'approve'
+          ? 'Request approved and variable created.'
+          : action === 'reject'
+            ? 'Request rejected.'
+            : 'Request canceled.'
+      )
+      await refreshProjectData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} request`)
+    }
+  }
+
+  const formatDate = (timestamp: number) =>
+    new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(timestamp))
 
   if (isLoading) {
     return (
@@ -221,7 +378,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     )
   }
 
-  if (error || !project) {
+  if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
@@ -242,9 +399,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     )
   }
 
+  if (!project) return null
+
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <Link
@@ -266,29 +424,24 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               {project.name}
             </h1>
             {project.description && (
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                {project.description}
-              </p>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{project.description}</p>
             )}
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {canUpdateProject && (
-            <Link
-              href={`/dashboard/projects/${project.slug}/settings`}
-              className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </Link>
-          )}
-        </div>
       </div>
 
-      {/* Environment Filter */}
+      {notice && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-900/20">
+          <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/40 dark:bg-red-900/20">
+          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
       <div className="flex items-center gap-4">
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Environment:
@@ -320,19 +473,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
       </div>
 
-      {/* Variables */}
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <div>
-            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Environment Variables
-            </h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Environment Variables</h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {variables?.length ?? 0} variable{variables?.length !== 1 ? 's' : ''}
+              {variables.length} variable{variables.length !== 1 ? 's' : ''}
               {selectedEnvironment !== 'all' && ` in ${selectedEnvironment}`}
             </p>
           </div>
-          {canCreateVariable && (
+          {(canCreateVariable || canRequestVariable) && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
@@ -340,14 +490,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
-              Add Variable
+              {canCreateVariable ? 'Add Variable' : 'Request Variable'}
             </button>
           )}
         </div>
 
-        {/* Variables List */}
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {variables === undefined ? (
+          {isLoadingVariables ? (
             <div className="flex items-center justify-center py-8">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
             </div>
@@ -358,26 +507,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                No variables yet
-              </h3>
+              <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">No variables yet</h3>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                Add your first environment variable to get started.
+                {canCreateVariable
+                  ? 'Add your first environment variable to get started.'
+                  : 'No variables available for this environment.'}
               </p>
-              {canCreateVariable && (
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Variable
-                </button>
-              )}
             </div>
           ) : (
-            variables.map((variable: Variable) => (
+            variables.map((variable) => (
               <VariableListItem
                 key={variable._id}
                 variable={variable}
@@ -386,20 +524,109 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 onViewHistory={() => handleViewHistory(variable)}
                 canEdit={canUpdateVariable}
                 canDelete={canDeleteVariable}
+                permissionLevel={variable.permission ?? null}
               />
             ))
           )}
         </div>
       </div>
 
-      {/* Create Variable Modal */}
+      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+            Variable Requests
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Member-submitted variable changes with approval history.
+          </p>
+        </div>
+
+        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {requests.length === 0 ? (
+            <div className="px-6 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              No requests yet.
+            </div>
+          ) : (
+            requests.map((request) => (
+              <div key={request._id} className="px-6 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {request.key}
+                      </code>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          request.status === 'approved'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : request.status === 'rejected'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              : request.status === 'canceled'
+                                ? 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}
+                      >
+                        {request.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Requested by {request.requester?.name ?? request.requester?.email ?? 'Unknown'}
+                      {' · '}
+                      {formatDate(request.createdAt)}
+                    </p>
+                    {request.description && (
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{request.description}</p>
+                    )}
+                    {request.reviewReason && (
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        Review note: {request.reviewReason}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {canReviewRequests && request.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => updateRequestStatus(request._id, 'approve')}
+                          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => updateRequestStatus(request._id, 'reject')}
+                          className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {!canReviewRequests &&
+                      convexUserId &&
+                      request.status === 'pending' &&
+                      request.requestedBy === convexUserId && (
+                        <button
+                          onClick={() => updateRequestStatus(request._id, 'cancel')}
+                          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       <VariableCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateVariable}
+        title={canCreateVariable ? 'Create Variable' : 'Request Variable'}
+        submitLabel={canCreateVariable ? 'Create Variable' : 'Submit Request'}
       />
 
-      {/* Edit Variable Modal */}
       <VariableEditModal
         isOpen={!!editingVariable}
         onClose={() => setEditingVariable(null)}
@@ -407,7 +634,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onSave={handleUpdateVariable}
       />
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={!!deletingVariable}
         onClose={() => setDeletingVariable(null)}
@@ -418,7 +644,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variant="danger"
       />
 
-      {/* Variable History Modal */}
       {historyVariable && (
         <VariableHistory
           isOpen={!!historyVariable}

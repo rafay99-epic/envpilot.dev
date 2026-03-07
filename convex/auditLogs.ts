@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
 /**
@@ -153,8 +153,10 @@ export const listByAction = query({
   handler: async (ctx, args) => {
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_action", (q) => q.eq("action", args.action as any))
-      .filter((q) => q.eq(q.field("organizationId"), args.organizationId))
+      .withIndex("by_org_and_created", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .filter((q) => q.eq(q.field("action"), args.action))
       .order("desc")
       .take(args.limit ?? 50);
 
@@ -262,7 +264,7 @@ export const listSensitiveDataAccess = query({
       "variable.copied",
     ];
 
-    let logsQuery = ctx.db
+    const logsQuery = ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
         q.eq("organizationId", args.organizationId)

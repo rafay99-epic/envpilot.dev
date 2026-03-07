@@ -4,6 +4,7 @@ import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { getOrCreateConvexUser, checkOrganizationMembership, getProjectOrganization } from '@/lib/convex-helpers'
+import { readSecret } from '@/lib/vault'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -28,6 +29,8 @@ export async function GET(request: Request) {
       )
     }
 
+    let authorizedUserId: Id<'users'>
+
     // Validate access token if provided
     if (accessToken) {
       const validation = await convex.query(api.projectAccess.validateToken, {
@@ -47,6 +50,8 @@ export async function GET(request: Request) {
           { status: 403 }
         )
       }
+
+      authorizedUserId = validation.userId as Id<'users'>
 
       // Update last used
       await convex.mutation(api.projectAccess.updateLastUsed, { accessToken })
@@ -88,28 +93,48 @@ export async function GET(request: Request) {
           { status: 403 }
         )
       }
+
+      authorizedUserId = convexUser._id
     }
 
-    // Get variables
-    const variables = await convex.query(api.variables.listByProject, {
+    // Get only variables this user can access.
+    const variablesWithAccess = await convex.query(api.variables.listWithAccess, {
       projectId: projectId as Id<'projects'>,
-      environment,
+      userId: authorizedUserId,
     })
 
-    // Decrypt values (in production, fetch from WorkOS Vault)
-    // For now, we'll return placeholder values since the actual encryption
-    // would require WorkOS Vault integration
-    const variablesWithValues = variables.map((variable) => ({
-      _id: variable._id,
-      key: variable.key,
-      // In production, decrypt from vault using variable.vaultRef
-      value: `[ENCRYPTED:${variable.vaultRef}]`,
-      description: variable.description || null,
-      environments: variable.environments,
-      projectId: variable.projectId,
-      isSensitive: variable.isSensitive,
-      version: variable.version,
-    }))
+    const variables = variablesWithAccess
+      .filter((variable) => variable.hasAccess)
+      .filter((variable) => variable.environments.includes(environment))
+
+    const variablesWithValues = await Promise.all(
+      variables.map(async (variable) => {
+        try {
+          const value = await readSecret(variable.vaultRef)
+          return {
+            _id: variable._id,
+            key: variable.key,
+            value: value || '',
+            description: variable.description || null,
+            environments: variable.environments,
+            projectId: variable.projectId,
+            isSensitive: variable.isSensitive,
+            version: variable.version,
+          }
+        } catch {
+          return {
+            _id: variable._id,
+            key: variable.key,
+            value: '[DECRYPTION_FAILED]',
+            description: variable.description || null,
+            environments: variable.environments,
+            projectId: variable.projectId,
+            isSensitive: variable.isSensitive,
+            version: variable.version,
+          }
+        }
+      })
+    )
 
     return NextResponse.json({
       data: {

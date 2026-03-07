@@ -10,12 +10,17 @@ interface AuditExportProps {
   userId: Id<"users">
 }
 
+const DEFAULT_END_DATE = new Date().toISOString().split('T')[0]
+const DEFAULT_START_DATE = new Date(
+  Date.now() - 30 * 24 * 60 * 60 * 1000
+).toISOString().split('T')[0]
+
 export function AuditExport({ organizationId, userId }: AuditExportProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [format, setFormat] = useState<'csv' | 'json'>('csv')
   const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+    start: DEFAULT_START_DATE,
+    end: DEFAULT_END_DATE,
   })
   const [includeDetails, setIncludeDetails] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
@@ -99,9 +104,8 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
     setIsOpen(false)
   }
 
-  // Auto-download when data is ready
   if (isExporting && exportData?.data) {
-    downloadFile()
+    void downloadFile()
   }
 
   return (

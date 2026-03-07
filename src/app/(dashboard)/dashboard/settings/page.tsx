@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuthContext } from '@/components/auth'
 import { PERMISSIONS } from '@/lib/auth'
 
-type SettingsTab = 'general' | 'organization' | 'integrations' | 'security' | 'billing'
+type SettingsTab = 'general' | 'organization' | 'integrations' | 'security'
 
 export default function SettingsPage() {
   const { user, organization, hasPermission } = useAuthContext()
@@ -16,7 +16,6 @@ export default function SettingsPage() {
     { id: 'organization', label: 'Organization', requiresAdmin: true },
     { id: 'integrations', label: 'Integrations' },
     { id: 'security', label: 'Security' },
-    { id: 'billing', label: 'Billing', requiresAdmin: true },
   ]
 
   const filteredTabs = tabs.filter(tab => !tab.requiresAdmin || canManageOrg)
@@ -58,7 +57,6 @@ export default function SettingsPage() {
         {activeTab === 'organization' && <OrganizationSettings organization={organization} />}
         {activeTab === 'integrations' && <IntegrationsSettings />}
         {activeTab === 'security' && <SecuritySettings />}
-        {activeTab === 'billing' && <BillingSettings />}
       </div>
     </div>
   )
@@ -368,57 +366,12 @@ function BillingSettings() {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Current Plan
-            </h2>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              You are currently on the free tier
-            </p>
-          </div>
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-            Free
-          </span>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
-          <h3 className="font-medium text-zinc-900 dark:text-zinc-100">
-            Free Plan Includes:
-          </h3>
-          <ul className="mt-3 space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Up to 3 projects
-            </li>
-            <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              50 environment variables
-            </li>
-            <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              3 team members
-            </li>
-            <li className="flex items-center gap-2">
-              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              90-day audit log retention
-            </li>
-          </ul>
-        </div>
-
-        <div className="mt-6">
-          <button className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200">
-            Upgrade to Pro
-          </button>
-        </div>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          Billing (Disabled)
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Billing is disabled for pre-alpha. All teams currently have full access.
+        </p>
       </div>
     </div>
   )

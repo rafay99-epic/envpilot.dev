@@ -115,7 +115,7 @@ export function forbiddenResponse(message: string = 'Forbidden') {
 /**
  * Create a tier limit exceeded response
  */
-export function tierLimitResponse(message: string = 'This feature requires Pro tier') {
+export function tierLimitResponse(message: string = 'This feature is currently unavailable') {
   return Response.json(
     { error: message, code: 'PAYMENT_REQUIRED' },
     { status: 402 }
@@ -135,8 +135,9 @@ export async function checkCLIAccess(
     return { allowed: false, tier: 'free' }
   }
 
+  // Pre-alpha mode: CLI access is enabled for all tiers.
   return {
-    allowed: org.tier === 'pro',
+    allowed: true,
     tier: org.tier,
   }
 }

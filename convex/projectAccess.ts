@@ -4,6 +4,7 @@ import { mutation, query } from "./_generated/server";
 /**
  * Project Access Queries and Mutations (for extension linking)
  */
+const REVOCATION_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 function generateAccessToken(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -100,6 +101,17 @@ export const validateToken = query({
     const user = await ctx.db.get(access.userId);
     if (!user) {
       return { valid: false, reason: "User not found" };
+    }
+
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", access.userId)
+      )
+      .first();
+
+    if (!membership) {
+      return { valid: false, reason: "Organization membership no longer active" };
     }
 
     return {
@@ -282,6 +294,7 @@ export const revokeAllForUser = mutation({
 export const updateLastUsed = mutation({
   args: { accessToken: v.string() },
   handler: async (ctx, args) => {
+    const now = Date.now();
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_access_token", (q) => q.eq("accessToken", args.accessToken))
@@ -291,8 +304,46 @@ export const updateLastUsed = mutation({
       return false;
     }
 
+    const project = await ctx.db.get(access.projectId);
+    if (!project || project.deletedAt) {
+      await ctx.db.patch(access._id, { isActive: false });
+      return false;
+    }
+
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", access.userId)
+      )
+      .first();
+
+    if (!membership) {
+      await ctx.db.patch(access._id, { isActive: false });
+
+      const pendingRevocation = await ctx.db
+        .query("permissionRevocationEvents")
+        .withIndex("by_access_token", (q) => q.eq("accessToken", access.accessToken))
+        .filter((q) => q.eq(q.field("acknowledged"), false))
+        .first();
+
+      if (!pendingRevocation) {
+        await ctx.db.insert("permissionRevocationEvents", {
+          accessToken: access.accessToken,
+          projectId: access.projectId,
+          userId: access.userId,
+          reason: "Organization membership removed",
+          revokedBy: access.userId,
+          revokedAt: now,
+          acknowledged: false,
+          expiresAt: now + REVOCATION_EVENT_TTL_MS,
+        });
+      }
+
+      return false;
+    }
+
     await ctx.db.patch(access._id, {
-      lastUsedAt: Date.now(),
+      lastUsedAt: now,
     });
 
     return true;
@@ -324,6 +375,44 @@ export const refresh = mutation({
 
     if (access.expiresAt < now) {
       throw new Error("Access token has expired");
+    }
+
+    const project = await ctx.db.get(access.projectId);
+    if (!project || project.deletedAt) {
+      await ctx.db.patch(access._id, { isActive: false });
+      throw new Error("Project not found");
+    }
+
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", access.userId)
+      )
+      .first();
+
+    if (!membership) {
+      await ctx.db.patch(access._id, { isActive: false });
+
+      const pendingRevocation = await ctx.db
+        .query("permissionRevocationEvents")
+        .withIndex("by_access_token", (q) => q.eq("accessToken", access.accessToken))
+        .filter((q) => q.eq(q.field("acknowledged"), false))
+        .first();
+
+      if (!pendingRevocation) {
+        await ctx.db.insert("permissionRevocationEvents", {
+          accessToken: access.accessToken,
+          projectId: access.projectId,
+          userId: access.userId,
+          reason: "Organization membership removed",
+          revokedBy: access.userId,
+          revokedAt: now,
+          acknowledged: false,
+          expiresAt: now + REVOCATION_EVENT_TTL_MS,
+        });
+      }
+
+      throw new Error("Access token no longer valid for organization membership");
     }
 
     await ctx.db.patch(access._id, {

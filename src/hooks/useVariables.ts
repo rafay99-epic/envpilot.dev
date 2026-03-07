@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -66,27 +66,4 @@ export function useVariableSearch(
       ? { organizationId, searchTerm }
       : "skip"
   );
-}
-
-/**
- * Hook for variable mutations
- */
-export function useVariableMutations() {
-  const createVariable = useMutation(api.variables.create);
-  const updateVariable = useMutation(api.variables.update);
-  const deleteVariable = useMutation(api.variables.remove);
-  const restoreVariable = useMutation(api.variables.restore);
-  const rollbackVariable = useMutation(api.variables.rollback);
-  const logAccess = useMutation(api.variables.logAccess);
-  const bulkCreateVariables = useMutation(api.variables.bulkCreate);
-
-  return {
-    createVariable,
-    updateVariable,
-    deleteVariable,
-    restoreVariable,
-    rollbackVariable,
-    logAccess,
-    bulkCreateVariables,
-  };
 }

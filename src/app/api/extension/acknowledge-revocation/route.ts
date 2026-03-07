@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
       accessToken,
     })
 
-    // Allow acknowledgment even for revoked tokens (since we're acknowledging a revocation)
-    // but reject completely unknown tokens
-    if (!tokenValidation.valid && tokenValidation.reason !== 'Token has been revoked') {
+    // Allow acknowledgment for any known token state (valid, revoked, expired, etc.)
+    // but reject completely unknown tokens.
+    if (!tokenValidation.valid && tokenValidation.reason === 'Token not found') {
       return NextResponse.json(
         { error: 'Invalid access token' },
         { status: 401 }

@@ -4,6 +4,7 @@ import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../../../../convex/_generated/api'
 import { Id } from '../../../../../../../convex/_generated/dataModel'
 import { sendInvitationEmail } from '@/lib/email'
+import { getOrCreateConvexUser } from '@/lib/convex-helpers'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -30,16 +31,7 @@ export async function DELETE(
     const organizationId = resolvedParams.id as Id<'organizations'>
     const invitationId = resolvedParams.invitationId as Id<'invitations'>
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check if user can cancel invitations (admin or team_lead)
     const membership = await convex.query(api.organizations.getMembership, {
@@ -106,16 +98,7 @@ export async function POST(
     const organizationId = resolvedParams.id as Id<'organizations'>
     const invitationId = resolvedParams.invitationId as Id<'invitations'>
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check if user can resend invitations (admin or team_lead)
     const membership = await convex.query(api.organizations.getMembership, {

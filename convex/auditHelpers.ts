@@ -49,6 +49,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "org.created": "info",
   "project.created": "info",
   "variable.created": "info",
+  "variable.requested": "info",
+  "variable.request_approved": "info",
+  "variable.request_rejected": "warning",
+  "variable.request_canceled": "info",
 };
 
 // Resource type mapping for different action types
@@ -76,6 +80,10 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "variable.bulk_imported": "variable",
   "variable.rollback": "variable",
   "variable.restored": "variable",
+  "variable.requested": "variable",
+  "variable.request_approved": "variable",
+  "variable.request_rejected": "variable",
+  "variable.request_canceled": "variable",
 
   // Permission
   "permission.granted": "permission",

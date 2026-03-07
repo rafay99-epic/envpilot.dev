@@ -6,8 +6,6 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
-  checkCLIAccess,
-  tierLimitResponse,
 } from '@/lib/cli-auth'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
@@ -43,12 +41,6 @@ export async function GET(request: NextRequest) {
 
     if (!membership) {
       return forbiddenResponse('You are not a member of this organization')
-    }
-
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, organizationId as Id<'organizations'>)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
     }
 
     // Get projects

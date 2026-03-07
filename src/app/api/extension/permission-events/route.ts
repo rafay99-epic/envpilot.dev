@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
       const validation = await convex.query(api.projectAccess.validateToken, {
         accessToken: token,
       })
-      // Even if a token is revoked, it still "exists" - we just need to verify
-      // the caller has a legitimate token (not just guessing)
-      if (validation.valid || validation.reason === 'Token has been revoked') {
+      // Any known token (valid, revoked, expired, membership removed, etc.) is
+      // acceptable here; only completely unknown tokens should be rejected.
+      if (validation.valid || validation.reason !== 'Token not found') {
         hasValidToken = true
         break
       }

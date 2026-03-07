@@ -4,11 +4,32 @@ import Link from 'next/link'
 import { useProjects } from '@/hooks'
 import { useAuthContext } from '@/components/auth'
 import { PERMISSIONS } from '@/lib/auth'
+import type { Id } from '../../../../../convex/_generated/dataModel'
 
 export default function ProjectsPage() {
-  const { projects, isLoading } = useProjects()
-  const { hasPermission } = useAuthContext()
+  const { hasPermission, organization } = useAuthContext()
+  const activeOrganizationId = organization?.id as Id<'organizations'> | undefined
+  const { projects, isLoading } = useProjects(activeOrganizationId)
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE)
+
+  if (!organization) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          No active organization
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Select or create an organization to manage projects.
+        </p>
+        <Link
+          href="/organizations"
+          className="mt-6 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Manage Organizations
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

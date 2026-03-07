@@ -31,6 +31,37 @@ export const listByProject = query({
   },
 });
 
+export const listByOrganization = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const variablesNested = await Promise.all(
+      projects.map(async (project) => {
+        const variables = await ctx.db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect();
+
+        return variables.map((variable) => ({
+          ...variable,
+          projectName: project.name,
+          projectSlug: project.slug,
+        }));
+      })
+    );
+
+    return variablesNested.flat();
+  },
+});
+
 /**
  * List all variables (for dashboard view)
  * Note: In production, this should be scoped by user's project access
@@ -167,18 +198,25 @@ export const listWithAccess = query({
 
         // Admins and Team Leads have full access by role
         const hasRoleBasedAccess = membership.role === "admin" || membership.role === "team_lead";
+        // Members are read-only by default in pre-alpha.
+        const hasDefaultMemberReadAccess = membership.role === "member";
 
-        // Members need explicit per-variable permissions
+        // Optional explicit per-variable permission (still supported).
         const hasPermissionBasedAccess = isPermissionValid;
 
         return {
           ...variable,
           // hasAccess: true if user can view this variable
-          hasAccess: hasRoleBasedAccess || hasPermissionBasedAccess,
+          hasAccess:
+            hasRoleBasedAccess || hasDefaultMemberReadAccess || hasPermissionBasedAccess,
           // permission: explicit per-variable permission level (null for role-based access)
-          permission: isPermissionValid ? permission.permission : null,
+          permission: isPermissionValid
+            ? permission.permission
+            : hasDefaultMemberReadAccess
+              ? "read"
+              : null,
           // roleAccess: indicates if access is granted via role (not per-variable permission)
-          roleAccess: hasRoleBasedAccess,
+          roleAccess: hasRoleBasedAccess || hasDefaultMemberReadAccess,
           // userRole: the user's role in the organization
           userRole: membership.role,
           // canManagePermissions: true if user can grant/revoke permissions

@@ -22,16 +22,17 @@ export interface TierLimits {
 
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
-    maxProjects: 5,
-    maxVariablesPerProject: 20,
-    maxTeamMembers: 5,
-    maxOrganizations: 2,
-    auditLogRetentionDays: 7,
-    apiAccessEnabled: false,
-    extensionAccessEnabled: false,
+    // Pre-alpha mode: billing is bypassed and all limits/features are unlocked.
+    maxProjects: null,
+    maxVariablesPerProject: null,
+    maxTeamMembers: null,
+    maxOrganizations: null,
+    auditLogRetentionDays: 730,
+    apiAccessEnabled: true,
+    extensionAccessEnabled: true,
     granularPermissionsEnabled: true,
-    variableVersionHistoryEnabled: false,
-    bulkImportEnabled: false,
+    variableVersionHistoryEnabled: true,
+    bulkImportEnabled: true,
   },
   pro: {
     maxProjects: null,
@@ -81,11 +82,11 @@ export function checkTierLimit(
   }
 
   const featureMessages: Record<BooleanLimitKey, string> = {
-    apiAccessEnabled: 'API access requires Pro tier. Upgrade to unlock API access.',
-    extensionAccessEnabled: 'Extension access requires Pro tier. Upgrade to unlock VS Code/IDE extension.',
-    granularPermissionsEnabled: 'Granular permissions require Pro tier.',
-    variableVersionHistoryEnabled: 'Version history requires Pro tier.',
-    bulkImportEnabled: 'Bulk import requires Pro tier.',
+    apiAccessEnabled: 'API access is currently disabled.',
+    extensionAccessEnabled: 'Extension access is currently disabled.',
+    granularPermissionsEnabled: 'Granular permissions are currently disabled.',
+    variableVersionHistoryEnabled: 'Version history is currently disabled.',
+    bulkImportEnabled: 'Bulk import is currently disabled.',
   }
 
   return {

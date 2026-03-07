@@ -55,7 +55,7 @@ function OrbitingParticles() {
     const radius = 2
     return {
       x: Math.cos(angle) * radius,
-      y: (Math.random() - 0.5) * 0.5,
+      y: Math.sin((i + 1) * 3.17) * 0.25,
       z: Math.sin(angle) * radius,
     }
   })

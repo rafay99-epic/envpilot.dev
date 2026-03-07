@@ -16,7 +16,7 @@ import type { EnvironmentTemplate } from '@/constants/templates'
 
 export default function NewProjectPage() {
   const router = useRouter()
-  const { hasPermission } = useAuthContext()
+  const { hasPermission, organization } = useAuthContext()
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE)
 
   const [step, setStep] = useState<'template' | 'details'>('template')
@@ -83,17 +83,11 @@ export default function NewProjectPage() {
     setIsSubmitting(true)
 
     try {
-      // Get the current organization from the API
-      const orgsResponse = await fetch('/api/organizations')
-      const orgsData = await orgsResponse.json()
-
-      if (!orgsData.organizations || orgsData.organizations.length === 0) {
+      if (!organization?.id) {
         setError('No organization found. Please create an organization first.')
         setIsSubmitting(false)
         return
       }
-
-      const organizationId = orgsData.organizations[0]._id
 
       // Create the project
       const response = await fetch('/api/projects', {
@@ -103,7 +97,7 @@ export default function NewProjectPage() {
         },
         body: JSON.stringify({
           ...formData,
-          organizationId,
+          organizationId: organization.id,
         }),
       })
 

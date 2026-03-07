@@ -9,7 +9,12 @@ import { createSecret } from '@/lib/vault'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
-const createVariableSchema = z.object({
+const listSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  status: z.enum(['pending', 'approved', 'rejected', 'canceled']).optional(),
+})
+
+const createRequestSchema = z.object({
   key: z.string()
     .min(1, 'Key is required')
     .max(100, 'Key must be 100 characters or less')
@@ -22,43 +27,38 @@ const createVariableSchema = z.object({
 })
 
 /**
- * GET /api/variables - List variables for a project
+ * GET /api/variable-requests?projectId=...&status=pending
  */
 export async function GET(request: Request) {
   try {
     const { user } = await withAuth()
-
     if (!user) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('projectId')
-    const environment = searchParams.get('environment')
+    const validation = listSchema.safeParse({
+      projectId: searchParams.get('projectId') || '',
+      status: searchParams.get('status') || undefined,
+    })
 
-    if (!projectId) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Project ID is required' },
+        { error: 'Validation failed', details: validation.error.flatten() },
         { status: 400 }
       )
     }
 
+    const { projectId, status } = validation.data
     const convexUser = await getOrCreateConvexUser(convex, user)
 
-    // Get project and verify membership
     const { project, organizationId } = await getProjectOrganization(
       convex,
       projectId as Id<'projects'>
     )
 
     if (!project || !organizationId) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     const membership = await checkOrganizationMembership(
@@ -68,46 +68,34 @@ export async function GET(request: Request) {
     )
 
     if (!membership) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const variablesWithAccess = await convex.query(api.variables.listWithAccess, {
+    const requests = await convex.query(api.variableRequests.listForProject, {
       projectId: projectId as Id<'projects'>,
       userId: convexUser._id,
+      status,
     })
 
-    const variables = variablesWithAccess
-      .filter((variable) => variable.hasAccess)
-      .filter((variable) => !environment || variable.environments.includes(environment))
-
-    return NextResponse.json({ variables })
-  } catch {
-    return NextResponse.json(
-      { error: 'Failed to fetch variables' },
-      { status: 500 }
-    )
+    return NextResponse.json({ requests })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch variable requests'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
 /**
- * POST /api/variables - Create a new environment variable
+ * POST /api/variable-requests
  */
 export async function POST(request: Request) {
   try {
     const { user } = await withAuth()
-
     if (!user) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const body = await request.json()
-    const validation = createVariableSchema.safeParse(body)
+    const validation = createRequestSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -119,18 +107,13 @@ export async function POST(request: Request) {
     const { key, value, description, environments, projectId, isSensitive } = validation.data
 
     const convexUser = await getOrCreateConvexUser(convex, user)
-
-    // Get project and verify membership
     const { project, organizationId } = await getProjectOrganization(
       convex,
       projectId as Id<'projects'>
     )
 
     if (!project || !organizationId) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     const membership = await checkOrganizationMembership(
@@ -140,68 +123,42 @@ export async function POST(request: Request) {
     )
 
     if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (membership.role !== 'member') {
       return NextResponse.json(
-        { error: 'Forbidden' },
+        { error: 'Only members can submit variable requests. Use direct variable creation instead.' },
         { status: 403 }
       )
     }
 
-    // Encrypt value in Vault first. The same encrypted value is used for direct create
-    // or for a pending member request.
     const vaultResult = await createSecret(key, value, {
       organizationId,
       projectId,
     })
-    const vaultRef = vaultResult.id
 
-    // Members cannot write directly; they create approval requests.
-    if (membership.role === 'member') {
-      const requestId = await convex.mutation(api.variableRequests.create, {
-        key,
-        vaultRef,
-        description,
-        environments,
-        projectId: projectId as Id<'projects'>,
-        isSensitive,
-        requestedBy: convexUser._id,
-      })
-
-      return NextResponse.json(
-        {
-          requested: true,
-          requestId,
-          message: 'Variable request submitted for admin approval',
-        },
-        { status: 202 }
-      )
-    }
-
-    const variableId = await convex.mutation(api.variables.create, {
+    const requestId = await convex.mutation(api.variableRequests.create, {
       key,
-      vaultRef,
+      vaultRef: vaultResult.id,
       description,
       environments,
       projectId: projectId as Id<'projects'>,
       isSensitive,
-      createdBy: convexUser._id,
+      requestedBy: convexUser._id,
     })
 
-    const variable = await convex.query(api.variables.getById, { variableId })
+    const createdRequest = await convex.query(api.variableRequests.getById, {
+      requestId,
+      userId: convexUser._id,
+    })
 
-    return NextResponse.json({ variable }, { status: 201 })
+    return NextResponse.json({ request: createdRequest }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create variable'
-
-    if (message.includes('already exists') || message.includes('pending request')) {
-      return NextResponse.json(
-        { error: message },
-        { status: 409 }
-      )
+    const message = error instanceof Error ? error.message : 'Failed to create variable request'
+    if (message.includes('already exists')) {
+      return NextResponse.json({ error: message }, { status: 409 })
     }
-
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

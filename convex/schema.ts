@@ -138,6 +138,53 @@ export default defineSchema({
     .index("by_project_and_environments", ["projectId", "environments"]),
 
   // ==========================================
+  // ENVIRONMENT VARIABLE REQUESTS
+  // ==========================================
+  environmentVariableRequests: defineTable({
+    // The requested variable key (e.g., "DATABASE_URL")
+    key: v.string(),
+    // Encrypted value reference proposed by the requester
+    vaultRef: v.string(),
+    // Optional human-readable description
+    description: v.optional(v.string()),
+    // Environment tags (e.g., ["development", "staging", "production"])
+    environments: v.array(v.string()),
+    // Parent project
+    projectId: v.id("projects"),
+    // Parent organization (denormalized for easier querying)
+    organizationId: v.id("organizations"),
+    // Whether this is sensitive/secret
+    isSensitive: v.boolean(),
+    // User who requested this variable
+    requestedBy: v.id("users"),
+    // Request lifecycle status
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("canceled")
+    ),
+    // Optional reviewer decision note
+    reviewReason: v.optional(v.string()),
+    // Reviewer metadata
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    // If approved, the created variable
+    createdVariableId: v.optional(v.id("environmentVariables")),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_requester", ["requestedBy"])
+    .index("by_status", ["status"])
+    .index("by_project_and_status", ["projectId", "status"])
+    .index("by_organization_and_status", ["organizationId", "status"])
+    .index("by_project_and_requester", ["projectId", "requestedBy"])
+    .index("by_project_and_key", ["projectId", "key"]),
+
+  // ==========================================
   // VARIABLE VERSIONS (History)
   // ==========================================
   variableVersions: defineTable({
@@ -383,6 +430,10 @@ export default defineSchema({
       v.literal("variable.bulk_imported"),
       v.literal("variable.rollback"),
       v.literal("variable.restored"),
+      v.literal("variable.requested"),
+      v.literal("variable.request_approved"),
+      v.literal("variable.request_rejected"),
+      v.literal("variable.request_canceled"),
       // Permission actions
       v.literal("permission.granted"),
       v.literal("permission.revoked"),

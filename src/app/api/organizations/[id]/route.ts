@@ -4,6 +4,7 @@ import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../../convex/_generated/api'
 import { Id } from '../../../../../convex/_generated/dataModel'
 import { z } from 'zod'
+import { getOrCreateConvexUser } from '@/lib/convex-helpers'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -35,17 +36,7 @@ export async function GET(
     const resolvedParams = await params
     const organizationId = resolvedParams.id as Id<'organizations'>
 
-    // Verify user exists
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check membership
     const membership = await convex.query(api.organizations.getMembership, {
@@ -113,16 +104,7 @@ export async function PATCH(
       )
     }
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check if user is an admin
     const membership = await convex.query(api.organizations.getMembership, {
@@ -181,16 +163,7 @@ export async function DELETE(
     const resolvedParams = await params
     const organizationId = resolvedParams.id as Id<'organizations'>
 
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
+    const convexUser = await getOrCreateConvexUser(convex, user)
 
     // Check if user is the creator/owner
     const organization = await convex.query(api.organizations.getById, {

@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { setActiveOrganizationCookie } from '@/lib/organization-context'
 
 interface InvitationDetails {
   email: string
@@ -78,6 +79,9 @@ export default function InvitationAcceptPage({
 
       const data = await response.json()
       setStatus('accepted')
+      if (data.organization?._id) {
+        setActiveOrganizationCookie(data.organization._id)
+      }
 
       // Redirect to the organization after a brief delay
       setTimeout(() => {

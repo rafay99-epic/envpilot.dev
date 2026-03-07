@@ -2,6 +2,10 @@ import { withAuth } from '@workos-inc/authkit-nextjs'
 import { NextResponse } from 'next/server'
 import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../../convex/_generated/api'
+import {
+  ACTIVE_ORG_COOKIE_NAME,
+  ACTIVE_ORG_COOKIE_TTL_SECONDS,
+} from '@/lib/organization-context'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -115,10 +119,17 @@ export async function POST(
       organizationId,
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       accepted: true,
       organization,
     })
+    response.cookies.set(ACTIVE_ORG_COOKIE_NAME, organizationId, {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: ACTIVE_ORG_COOKIE_TTL_SECONDS,
+    })
+
+    return response
   } catch (error) {
     console.error('Error accepting invitation:', error)
     const message = error instanceof Error ? error.message : 'Failed to accept invitation'

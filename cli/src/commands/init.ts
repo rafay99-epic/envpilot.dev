@@ -91,15 +91,6 @@ export const initCommand = new Command('init')
         selectedOrg = organizations.find((o) => o._id === orgId)!
       }
 
-      // Check tier
-      if (selectedOrg.tier !== 'pro') {
-        error('CLI access requires Pro tier.')
-        console.log()
-        console.log(`Upgrade ${chalk.bold(selectedOrg.name)} to Pro at:`)
-        console.log(chalk.cyan('https://env-connect.io/pricing'))
-        process.exit(1)
-      }
-
       // Get projects
       const projects = await withSpinner(
         'Fetching projects...',

@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated/bundled artifacts:
+    "cli/dist/**",
+    "vscode-extension/dist/**",
+    "convex/_generated/**",
   ]),
 ]);
 

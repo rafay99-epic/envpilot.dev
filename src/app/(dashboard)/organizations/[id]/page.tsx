@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { setActiveOrganizationCookie } from '@/lib/organization-context'
 
 interface Organization {
   _id: string
@@ -22,11 +22,14 @@ export default function OrganizationPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const router = useRouter()
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [memberCount, setMemberCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setActiveOrganizationCookie(id)
+  }, [id])
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -264,7 +267,8 @@ export default function OrganizationPage({
         )}
 
         <Link
-          href={`/dashboard?org=${id}`}
+          href="/dashboard/projects"
+          onClick={() => setActiveOrganizationCookie(id)}
           className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">

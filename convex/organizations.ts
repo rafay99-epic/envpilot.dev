@@ -409,6 +409,7 @@ export const removeMember = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
     const membership = await ctx.db
       .query("organizationMembers")
@@ -421,13 +422,51 @@ export const removeMember = mutation({
       throw new Error("User is not a member of this organization");
     }
 
+    // Revoke all active extension/project access tokens for this user in this organization
+    // so linked editors lose access and local cleanup can be triggered.
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    let revokedTokenCount = 0;
+
+    for (const project of projects) {
+      const activeTokens = await ctx.db
+        .query("projectAccess")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", project._id).eq("userId", args.userId)
+        )
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+
+      for (const token of activeTokens) {
+        await ctx.db.patch(token._id, { isActive: false });
+        await ctx.db.insert("permissionRevocationEvents", {
+          accessToken: token.accessToken,
+          projectId: project._id,
+          userId: args.userId,
+          reason: "Organization membership removed",
+          revokedBy: args.removedBy,
+          revokedAt: now,
+          acknowledged: false,
+          expiresAt: revocationExpiresAt,
+        });
+        revokedTokenCount++;
+      }
+    }
+
     await ctx.db.delete(membership._id);
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
       userId: args.removedBy,
       action: "org.member_removed",
-      details: JSON.stringify({ removedUserId: args.userId }),
+      details: JSON.stringify({
+        removedUserId: args.userId,
+        revokedAccessTokens: revokedTokenCount,
+      }),
       createdAt: now,
     });
 

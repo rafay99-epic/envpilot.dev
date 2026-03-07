@@ -10,18 +10,39 @@ import {
 } from '@/hooks'
 import { useAuthContext } from '@/components/auth'
 import { PERMISSIONS } from '@/lib/auth'
+import type { Id } from '../../../../convex/_generated/dataModel'
 
 export default function DashboardPage() {
-  const { user } = useAuthContext()
-  const { stats, isLoading: statsLoading } = useDashboardStats()
-  const { activity, isLoading: activityLoading } = useRecentActivity()
-  const { projects, isLoading: projectsLoading } = useRecentProjects()
-  const { members, isLoading: membersLoading } = useTeamMembersQuickView()
-  const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus()
+  const { user, organization } = useAuthContext()
+  const activeOrganizationId = organization?.id as Id<'organizations'> | undefined
+  const { stats, isLoading: statsLoading } = useDashboardStats(activeOrganizationId)
+  const { activity, isLoading: activityLoading } = useRecentActivity(activeOrganizationId)
+  const { projects, isLoading: projectsLoading } = useRecentProjects(activeOrganizationId)
+  const { members, isLoading: membersLoading } = useTeamMembersQuickView(activeOrganizationId)
+  const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus(activeOrganizationId)
   const { hasPermission } = useAuthContext()
 
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE)
   const canInviteTeam = hasPermission(PERMISSIONS.TEAM_INVITE)
+
+  if (!organization) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          No active organization
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Create or join an organization to access your dashboard.
+        </p>
+        <Link
+          href="/organizations"
+          className="mt-6 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        >
+          Manage Organizations
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

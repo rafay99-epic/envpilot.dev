@@ -107,15 +107,15 @@ export function useTemplates(options: UseTemplatesOptions = {}): UseTemplatesRet
       setError(null)
 
       try {
-        // Get organization ID first
-        const orgsResponse = await fetch('/api/organizations')
-        const orgsData = await orgsResponse.json()
+        // Get active organization first
+        const authResponse = await fetch('/api/auth/me')
+        const authData = await authResponse.json()
 
-        if (!orgsData.organizations || orgsData.organizations.length === 0) {
+        if (!authData.organization?.id) {
           throw new Error('No organization found')
         }
 
-        const organizationId = orgsData.organizations[0]._id
+        const organizationId = authData.organization.id
 
         // Get the source template
         const sourceTemplate = getTemplateById(templateId)

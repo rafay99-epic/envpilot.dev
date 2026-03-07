@@ -160,7 +160,15 @@ export const pushCommand = new Command('push')
         async () => {
           const response = await api.post<{
             success: boolean
-            data: { created: number; updated: number; deleted: number; total: number }
+            requested?: boolean
+            data: {
+              created: number
+              updated: number
+              deleted: number
+              total: number
+              requested?: number
+              skipped?: number
+            }
           }>('/api/cli/variables/bulk', {
             projectId: projectConfig.projectId,
             environment,
@@ -174,12 +182,21 @@ export const pushCommand = new Command('push')
         }
       )
 
-      success(`Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`)
+      if (result?.requested && result.requested > 0) {
+        success(
+          `Submitted ${result.requested} variable request(s) for ${chalk.bold(environment)}`
+        )
+      } else {
+        success(`Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`)
+      }
 
       // Show summary
       console.log()
       console.log(chalk.dim(`  Created: ${result?.created || 0}`))
       console.log(chalk.dim(`  Updated: ${result?.updated || 0}`))
+      if (result?.requested) {
+        console.log(chalk.dim(`  Requested: ${result.requested}`))
+      }
       if (mode === 'replace') {
         console.log(chalk.dim(`  Deleted: ${result?.deleted || 0}`))
       }

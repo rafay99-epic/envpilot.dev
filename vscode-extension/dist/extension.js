@@ -11658,7 +11658,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode9 = __toESM(require("vscode"));
+var vscode10 = __toESM(require("vscode"));
 
 // src/services/auth.ts
 var vscode2 = __toESM(require("vscode"));
@@ -15369,6 +15369,15 @@ function shouldAutoSync() {
 function shouldPreventCopyOnRevoke() {
   return getConfig().preventCopyOnRevoke;
 }
+function getRealTimeSyncInterval() {
+  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  const seconds = config.get("realTimeSyncInterval", 5);
+  return Math.max(2, Math.min(30, seconds)) * 1e3;
+}
+function isRealTimeSyncEnabled() {
+  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  return config.get("enableRealTimeSync", true);
+}
 
 // src/services/auth.ts
 var AUTH_CHECK_PATH = "/api/extension/auth/check";
@@ -15636,6 +15645,28 @@ var ApiService = class {
       `/api/extension/check-access/${organizationId}`
     );
     return response.data.data || { enabled: false, reason: "Unknown error" };
+  }
+  /**
+   * Check for permission revocation events for multiple access tokens
+   * Used for real-time sync to detect immediate revocations
+   */
+  async checkPermissionEvents(accessTokens) {
+    const response = await this.client.post(
+      "/api/extension/permission-events",
+      { accessTokens }
+    );
+    return response.data.data || { events: [], hasRevocations: false };
+  }
+  /**
+   * Acknowledge that revocation events have been processed
+   * Requires an access token to authenticate the acknowledgment
+   */
+  async acknowledgeRevocations(eventIds, accessToken) {
+    const response = await this.client.post(
+      "/api/extension/acknowledge-revocation",
+      { eventIds, accessToken }
+    );
+    return response.data.data || { acknowledgedCount: 0 };
   }
 };
 
@@ -16385,6 +16416,163 @@ var SyncService = class {
   }
 };
 
+// src/services/realTimeSync.ts
+var vscode4 = __toESM(require("vscode"));
+var DEFAULT_REALTIME_INTERVAL = 5e3;
+var MAX_BACKOFF_INTERVAL = 3e4;
+var RealTimeSyncService = class {
+  api;
+  syncService;
+  storage;
+  pollTimer = null;
+  isPolling = false;
+  failureCount = 0;
+  MAX_FAILURES = 5;
+  _onRevocationDetected = new vscode4.EventEmitter();
+  onRevocationDetected = this._onRevocationDetected.event;
+  constructor(api, syncService2, storage) {
+    this.api = api;
+    this.syncService = syncService2;
+    this.storage = storage;
+  }
+  /**
+   * Start real-time sync polling
+   * This should be called when the extension activates and user is authenticated
+   */
+  async startRealTimeSync() {
+    if (this.pollTimer) {
+      return;
+    }
+    console.log("[RealTimeSync] Starting real-time permission sync");
+    this.isPolling = true;
+    this.failureCount = 0;
+    this.scheduleNextPoll();
+  }
+  /**
+   * Stop real-time sync polling
+   */
+  stopRealTimeSync() {
+    console.log("[RealTimeSync] Stopping real-time permission sync");
+    this.isPolling = false;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.failureCount = 0;
+  }
+  /**
+   * Schedule the next poll with exponential backoff on failures
+   */
+  scheduleNextPoll() {
+    if (!this.isPolling) {
+      return;
+    }
+    const baseInterval = getRealTimeSyncInterval() || DEFAULT_REALTIME_INTERVAL;
+    const backoffMultiplier = Math.min(Math.pow(2, this.failureCount), MAX_BACKOFF_INTERVAL / baseInterval);
+    const interval = Math.min(baseInterval * backoffMultiplier, MAX_BACKOFF_INTERVAL);
+    this.pollTimer = setTimeout(async () => {
+      await this.checkForRevocations();
+      this.scheduleNextPoll();
+    }, interval);
+  }
+  /**
+   * Check for permission revocations across all linked projects
+   */
+  async checkForRevocations() {
+    try {
+      const linkedProjects = await this.storage.getLinkedProjectsV2();
+      if (linkedProjects.length === 0) {
+        this.failureCount = 0;
+        return;
+      }
+      const accessTokens = linkedProjects.map((p) => p.accessToken);
+      const response = await this.api.checkPermissionEvents(accessTokens);
+      if (response.hasRevocations && response.events.length > 0) {
+        console.log(`[RealTimeSync] Detected ${response.events.length} revocation event(s)`);
+        const eventsByToken = /* @__PURE__ */ new Map();
+        for (const event of response.events) {
+          await this.handleRevocationEvent(event, linkedProjects);
+          if (!eventsByToken.has(event.accessToken)) {
+            eventsByToken.set(event.accessToken, []);
+          }
+          eventsByToken.get(event.accessToken).push(event.eventId);
+        }
+        for (const [accessToken, eventIds] of eventsByToken) {
+          try {
+            await this.api.acknowledgeRevocations(eventIds, accessToken);
+          } catch (error) {
+            console.debug("[RealTimeSync] Failed to acknowledge events:", error);
+          }
+        }
+      }
+      this.failureCount = 0;
+    } catch (error) {
+      this.failureCount = Math.min(this.failureCount + 1, this.MAX_FAILURES);
+      console.error("[RealTimeSync] Failed to check for revocations:", error);
+    }
+  }
+  /**
+   * Handle a single revocation event
+   */
+  async handleRevocationEvent(event, linkedProjects) {
+    const project = linkedProjects.find((p) => p.accessToken === event.accessToken);
+    if (!project) {
+      console.warn("[RealTimeSync] Revocation event for unknown project:", event.projectId);
+      return;
+    }
+    console.log(`[RealTimeSync] Processing revocation for project: ${project.projectName}`);
+    this._onRevocationDetected.fire({ project, reason: event.reason });
+    await this.triggerRevocationCleanup(project, event.reason);
+  }
+  /**
+   * Trigger the revocation cleanup process
+   * Clears cached variables and removes the linked project
+   */
+  async triggerRevocationCleanup(project, reason) {
+    try {
+      await this.syncService.cleanupAllDirectories(project);
+      await this.storage.removeLinkedProjectV2(project.projectId);
+      vscode4.window.showWarningMessage(
+        `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
+        "OK"
+      );
+      console.log(`[RealTimeSync] Cleanup completed for project: ${project.projectName}`);
+    } catch (error) {
+      console.error("[RealTimeSync] Failed to cleanup after revocation:", error);
+      try {
+        await this.storage.removeLinkedProjectV2(project.projectId);
+      } catch {
+      }
+      vscode4.window.showErrorMessage(
+        `Access revoked for "${project.projectName}" but cleanup failed. Please manually remove any .env files.`
+      );
+    }
+  }
+  /**
+   * Force an immediate check for revocations
+   * Useful when the extension wants to verify permissions immediately
+   */
+  async checkNow() {
+    try {
+      await this.checkForRevocations();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Clear all cached variables for a specific project
+   * This is called when a revocation is detected
+   */
+  async clearCachedVariables(project) {
+    await this.syncService.cleanupAllDirectories(project);
+  }
+  dispose() {
+    this.stopRealTimeSync();
+    this._onRevocationDetected.dispose();
+  }
+};
+
 // src/utils/storage.ts
 var AUTH_SESSION_KEY = "envConnect.authSession";
 var LINKED_PROJECTS_KEY = "envConnect.linkedProjects";
@@ -16437,8 +16625,11 @@ var StorageService = class {
       };
       const existingIndex = newProjects.findIndex((p) => p.projectId === old.projectId);
       if (existingIndex !== -1) {
-        newProjects[existingIndex].directories.push(directory);
-        newProjects[existingIndex].updatedAt = Date.now();
+        newProjects[existingIndex] = {
+          ...newProjects[existingIndex],
+          directories: [...newProjects[existingIndex].directories, directory],
+          updatedAt: Date.now()
+        };
       } else {
         const oldToken = await this.getAccessToken(old.projectId, old.workspacePath);
         if (oldToken) {
@@ -16660,11 +16851,14 @@ var StorageService = class {
         (d) => normalizePath(d.directoryPath) === normalizedPath
       );
       if (!existingDir) {
-        metadata[existingIndex].directories.push({
-          ...directory,
-          directoryPath: normalizedPath
-        });
-        metadata[existingIndex].updatedAt = Date.now();
+        metadata[existingIndex] = {
+          ...metadata[existingIndex],
+          directories: [
+            ...metadata[existingIndex].directories,
+            { ...directory, directoryPath: normalizedPath }
+          ],
+          updatedAt: Date.now()
+        };
       }
     } else {
       await this.setAccessTokenForProject(projectId, accessToken);
@@ -16698,11 +16892,14 @@ var StorageService = class {
     if (existingDir) {
       throw new Error("Directory already linked to this project");
     }
-    metadata[projectIndex].directories.push({
-      ...directory,
-      directoryPath: normalizedPath
-    });
-    metadata[projectIndex].updatedAt = Date.now();
+    metadata[projectIndex] = {
+      ...metadata[projectIndex],
+      directories: [
+        ...metadata[projectIndex].directories,
+        { ...directory, directoryPath: normalizedPath }
+      ],
+      updatedAt: Date.now()
+    };
     await this.setLinkedProjectsMetadataV2(metadata);
   }
   /**
@@ -16716,10 +16913,13 @@ var StorageService = class {
       return;
     }
     const normalizedPath = normalizePath(directoryPath);
-    metadata[projectIndex].directories = metadata[projectIndex].directories.filter(
-      (d) => normalizePath(d.directoryPath) !== normalizedPath
-    );
-    metadata[projectIndex].updatedAt = Date.now();
+    metadata[projectIndex] = {
+      ...metadata[projectIndex],
+      directories: metadata[projectIndex].directories.filter(
+        (d) => normalizePath(d.directoryPath) !== normalizedPath
+      ),
+      updatedAt: Date.now()
+    };
     if (metadata[projectIndex].directories.length === 0) {
       await this.deleteAccessTokenForProject(projectId);
       metadata.splice(projectIndex, 1);
@@ -16761,8 +16961,16 @@ var StorageService = class {
       (d) => normalizePath(d.directoryPath) === normalizedPath
     );
     if (dirIndex !== -1) {
-      metadata[projectIndex].directories[dirIndex].lastSyncedAt = Date.now();
-      metadata[projectIndex].updatedAt = Date.now();
+      const updatedDirectories = [...metadata[projectIndex].directories];
+      updatedDirectories[dirIndex] = {
+        ...updatedDirectories[dirIndex],
+        lastSyncedAt: Date.now()
+      };
+      metadata[projectIndex] = {
+        ...metadata[projectIndex],
+        directories: updatedDirectories,
+        updatedAt: Date.now()
+      };
       await this.setLinkedProjectsMetadataV2(metadata);
     }
   }
@@ -16774,8 +16982,11 @@ var StorageService = class {
     const metadata = this.getLinkedProjectsMetadataV2();
     const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
     if (projectIndex !== -1) {
-      metadata[projectIndex].expiresAt = expiresAt;
-      metadata[projectIndex].updatedAt = Date.now();
+      metadata[projectIndex] = {
+        ...metadata[projectIndex],
+        expiresAt,
+        updatedAt: Date.now()
+      };
       await this.setLinkedProjectsMetadataV2(metadata);
     }
   }
@@ -16806,9 +17017,9 @@ var StorageService = class {
 };
 
 // src/providers/projectsTreeProvider.ts
-var vscode4 = __toESM(require("vscode"));
+var vscode5 = __toESM(require("vscode"));
 var ProjectsTreeProvider = class {
-  _onDidChangeTreeData = new vscode4.EventEmitter();
+  _onDidChangeTreeData = new vscode5.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   api;
   storage;
@@ -16834,7 +17045,7 @@ var ProjectsTreeProvider = class {
       return [
         new ProjectTreeItem(
           "Sign in to view projects",
-          vscode4.TreeItemCollapsibleState.None,
+          vscode5.TreeItemCollapsibleState.None,
           "message"
         )
       ];
@@ -16846,7 +17057,7 @@ var ProjectsTreeProvider = class {
           return [
             new ProjectTreeItem(
               "No organizations found",
-              vscode4.TreeItemCollapsibleState.None,
+              vscode5.TreeItemCollapsibleState.None,
               "message"
             )
           ];
@@ -16854,7 +17065,7 @@ var ProjectsTreeProvider = class {
         return this.organizations.map(
           (org) => new ProjectTreeItem(
             org.name,
-            vscode4.TreeItemCollapsibleState.Collapsed,
+            vscode5.TreeItemCollapsibleState.Collapsed,
             "organization",
             org
           )
@@ -16864,7 +17075,7 @@ var ProjectsTreeProvider = class {
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
-            vscode4.TreeItemCollapsibleState.None,
+            vscode5.TreeItemCollapsibleState.None,
             "error"
           )
         ];
@@ -16878,22 +17089,18 @@ var ProjectsTreeProvider = class {
           return [
             new ProjectTreeItem(
               "No projects",
-              vscode4.TreeItemCollapsibleState.None,
+              vscode5.TreeItemCollapsibleState.None,
               "message"
             )
           ];
         }
         const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
-        const workspacePath = this.getCurrentWorkspacePath();
         return projects.map((project) => {
           const linkedV2 = linkedProjectsV2.find((lp) => lp.projectId === project._id);
-          const isLinkedToCurrentWorkspace = linkedV2 && workspacePath && linkedV2.directories.some(
-            (d) => normalizePath(d.directoryPath) === normalizePath(workspacePath)
-          );
           if (linkedV2) {
             return new ProjectTreeItem(
               project.name,
-              vscode4.TreeItemCollapsibleState.Expanded,
+              vscode5.TreeItemCollapsibleState.Expanded,
               "linkedProject",
               element.organization,
               project,
@@ -16902,7 +17109,7 @@ var ProjectsTreeProvider = class {
           }
           return new ProjectTreeItem(
             project.name,
-            vscode4.TreeItemCollapsibleState.None,
+            vscode5.TreeItemCollapsibleState.None,
             "project",
             void 0,
             project,
@@ -16914,7 +17121,7 @@ var ProjectsTreeProvider = class {
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
-            vscode4.TreeItemCollapsibleState.None,
+            vscode5.TreeItemCollapsibleState.None,
             "error"
           )
         ];
@@ -16926,7 +17133,7 @@ var ProjectsTreeProvider = class {
         return [
           new ProjectTreeItem(
             "No directories linked",
-            vscode4.TreeItemCollapsibleState.None,
+            vscode5.TreeItemCollapsibleState.None,
             "message"
           )
         ];
@@ -16934,7 +17141,7 @@ var ProjectsTreeProvider = class {
       return linkedProject.directories.map(
         (dir) => new ProjectTreeItem(
           dir.displayName || getDisplayPath(dir.directoryPath),
-          vscode4.TreeItemCollapsibleState.None,
+          vscode5.TreeItemCollapsibleState.None,
           "linkedDirectory",
           element.organization,
           element.project,
@@ -16946,7 +17153,7 @@ var ProjectsTreeProvider = class {
     return [];
   }
   getCurrentWorkspacePath() {
-    const folders = vscode4.workspace.workspaceFolders;
+    const folders = vscode5.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       return null;
     }
@@ -16956,7 +17163,7 @@ var ProjectsTreeProvider = class {
     this._onDidChangeTreeData.dispose();
   }
 };
-var ProjectTreeItem = class extends vscode4.TreeItem {
+var ProjectTreeItem = class extends vscode5.TreeItem {
   type;
   organization;
   project;
@@ -16972,34 +17179,34 @@ var ProjectTreeItem = class extends vscode4.TreeItem {
     this.contextValue = type;
     switch (type) {
       case "organization":
-        this.iconPath = new vscode4.ThemeIcon("organization");
+        this.iconPath = new vscode5.ThemeIcon("organization");
         this.description = organization?.tier === "pro" ? "Pro" : "Free";
         break;
       case "project":
-        this.iconPath = new vscode4.ThemeIcon("folder");
+        this.iconPath = new vscode5.ThemeIcon("folder");
         this.description = project?.description || void 0;
         break;
       case "linkedProject":
-        this.iconPath = new vscode4.ThemeIcon("link");
+        this.iconPath = new vscode5.ThemeIcon("link");
         this.description = "Linked";
         break;
       case "linkedDirectory":
-        this.iconPath = new vscode4.ThemeIcon("folder-opened");
+        this.iconPath = new vscode5.ThemeIcon("folder-opened");
         this.description = directory?.environments.join(", ");
         this.tooltip = this.createDirectoryTooltip(directory);
         break;
       case "message":
-        this.iconPath = new vscode4.ThemeIcon("info");
+        this.iconPath = new vscode5.ThemeIcon("info");
         break;
       case "error":
-        this.iconPath = new vscode4.ThemeIcon("error");
+        this.iconPath = new vscode5.ThemeIcon("error");
         break;
     }
   }
   createDirectoryTooltip(directory) {
     if (!directory)
       return void 0;
-    const tooltip = new vscode4.MarkdownString();
+    const tooltip = new vscode5.MarkdownString();
     tooltip.appendMarkdown(`**${directory.displayName || "Directory"}**
 
 `);
@@ -17024,9 +17231,9 @@ var ProjectTreeItem = class extends vscode4.TreeItem {
 };
 
 // src/providers/variablesTreeProvider.ts
-var vscode5 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 var VariablesTreeProvider = class {
-  _onDidChangeTreeData = new vscode5.EventEmitter();
+  _onDidChangeTreeData = new vscode6.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   api;
   storage;
@@ -17050,7 +17257,7 @@ var VariablesTreeProvider = class {
       return [
         new VariableTreeItem(
           "No project linked",
-          vscode5.TreeItemCollapsibleState.None,
+          vscode6.TreeItemCollapsibleState.None,
           "message",
           void 0,
           "Link a project to view variables"
@@ -17067,7 +17274,7 @@ var VariablesTreeProvider = class {
         return [
           new VariableTreeItem(
             "No variables",
-            vscode5.TreeItemCollapsibleState.None,
+            vscode6.TreeItemCollapsibleState.None,
             "message",
             void 0,
             `No variables for ${linkedProject.environment} environment`
@@ -17080,7 +17287,7 @@ var VariablesTreeProvider = class {
       items.push(
         new VariableTreeItem(
           `Environment: ${linkedProject.environment}`,
-          vscode5.TreeItemCollapsibleState.None,
+          vscode6.TreeItemCollapsibleState.None,
           "header",
           void 0,
           `${this.variables.length} variables`
@@ -17090,7 +17297,7 @@ var VariablesTreeProvider = class {
         items.push(
           new VariableTreeItem(
             variable.key,
-            vscode5.TreeItemCollapsibleState.None,
+            vscode6.TreeItemCollapsibleState.None,
             "variable",
             variable
           )
@@ -17100,7 +17307,7 @@ var VariablesTreeProvider = class {
         items.push(
           new VariableTreeItem(
             "Sensitive",
-            vscode5.TreeItemCollapsibleState.None,
+            vscode6.TreeItemCollapsibleState.None,
             "separator",
             void 0,
             `${sensitiveVars.length} secrets`
@@ -17110,7 +17317,7 @@ var VariablesTreeProvider = class {
           items.push(
             new VariableTreeItem(
               variable.key,
-              vscode5.TreeItemCollapsibleState.None,
+              vscode6.TreeItemCollapsibleState.None,
               "sensitive",
               variable
             )
@@ -17123,7 +17330,7 @@ var VariablesTreeProvider = class {
       return [
         new VariableTreeItem(
           `Error: ${message}`,
-          vscode5.TreeItemCollapsibleState.None,
+          vscode6.TreeItemCollapsibleState.None,
           "error"
         )
       ];
@@ -17137,7 +17344,7 @@ var VariablesTreeProvider = class {
     return await this.storage.getLinkedProjectForWorkspace(workspacePath);
   }
   getCurrentWorkspacePath() {
-    const folders = vscode5.workspace.workspaceFolders;
+    const folders = vscode6.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       return null;
     }
@@ -17147,7 +17354,7 @@ var VariablesTreeProvider = class {
     this._onDidChangeTreeData.dispose();
   }
 };
-var VariableTreeItem = class extends vscode5.TreeItem {
+var VariableTreeItem = class extends vscode6.TreeItem {
   type;
   variable;
   constructor(label, collapsibleState, type, variable, description) {
@@ -17157,24 +17364,24 @@ var VariableTreeItem = class extends vscode5.TreeItem {
     this.description = description || variable?.description || void 0;
     switch (type) {
       case "variable":
-        this.iconPath = new vscode5.ThemeIcon("symbol-variable");
+        this.iconPath = new vscode6.ThemeIcon("symbol-variable");
         this.tooltip = this.createTooltip(variable);
         break;
       case "sensitive":
-        this.iconPath = new vscode5.ThemeIcon("lock");
+        this.iconPath = new vscode6.ThemeIcon("lock");
         this.tooltip = this.createTooltip(variable, true);
         break;
       case "header":
-        this.iconPath = new vscode5.ThemeIcon("server-environment");
+        this.iconPath = new vscode6.ThemeIcon("server-environment");
         break;
       case "separator":
-        this.iconPath = new vscode5.ThemeIcon("shield");
+        this.iconPath = new vscode6.ThemeIcon("shield");
         break;
       case "message":
-        this.iconPath = new vscode5.ThemeIcon("info");
+        this.iconPath = new vscode6.ThemeIcon("info");
         break;
       case "error":
-        this.iconPath = new vscode5.ThemeIcon("error");
+        this.iconPath = new vscode6.ThemeIcon("error");
         break;
     }
     this.contextValue = type;
@@ -17194,7 +17401,7 @@ var VariableTreeItem = class extends vscode5.TreeItem {
     if (variable.description) {
       lines.push("", variable.description);
     }
-    return new vscode5.MarkdownString(lines.join("\n")).value;
+    return new vscode6.MarkdownString(lines.join("\n")).value;
   }
   truncateValue(value, maxLength = 50) {
     if (value.length <= maxLength) {
@@ -17205,7 +17412,7 @@ var VariableTreeItem = class extends vscode5.TreeItem {
 };
 
 // src/providers/statusBar.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode7 = __toESM(require("vscode"));
 var StatusBarProvider = class {
   statusBarItem;
   authService;
@@ -17214,8 +17421,8 @@ var StatusBarProvider = class {
   constructor(authService2, syncService2) {
     this.authService = authService2;
     this.syncService = syncService2;
-    this.statusBarItem = vscode6.window.createStatusBarItem(
-      vscode6.StatusBarAlignment.Left,
+    this.statusBarItem = vscode7.window.createStatusBarItem(
+      vscode7.StatusBarAlignment.Left,
       100
     );
     this.statusBarItem.command = "envConnect.showStatus";
@@ -17248,7 +17455,7 @@ var StatusBarProvider = class {
     }
     const syncInfo = linkedProject.lastSyncedAt ? `Last sync: ${this.formatTime(linkedProject.lastSyncedAt)}` : "Never synced";
     this.statusBarItem.text = "$(cloud) ENV Connect";
-    this.statusBarItem.tooltip = new vscode6.MarkdownString(
+    this.statusBarItem.tooltip = new vscode7.MarkdownString(
       [
         `**${linkedProject.projectName}**`,
         "",
@@ -17269,20 +17476,20 @@ var StatusBarProvider = class {
     this.isSyncing = false;
     this.update();
     if (result.success) {
-      vscode6.window.showInformationMessage(
+      vscode7.window.showInformationMessage(
         `Synced ${result.variablesCount} variables to ${result.targetFile}`
       );
     } else {
-      this.statusBarItem.backgroundColor = new vscode6.ThemeColor(
+      this.statusBarItem.backgroundColor = new vscode7.ThemeColor(
         "statusBarItem.errorBackground"
       );
-      vscode6.window.showErrorMessage(`Sync failed: ${result.error}`);
+      vscode7.window.showErrorMessage(`Sync failed: ${result.error}`);
     }
   }
   handlePermissionRevoked(project) {
     this.statusBarItem.text = "$(warning) ENV Connect";
     this.statusBarItem.tooltip = `Access revoked for ${project.projectName}`;
-    this.statusBarItem.backgroundColor = new vscode6.ThemeColor(
+    this.statusBarItem.backgroundColor = new vscode7.ThemeColor(
       "statusBarItem.warningBackground"
     );
   }
@@ -17307,7 +17514,7 @@ var StatusBarProvider = class {
 };
 
 // src/ui/linkProjectDialog.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 var AVAILABLE_ENVIRONMENTS = ["development", "staging", "production"];
 var LinkProjectDialog = class {
   syncService;
@@ -17325,11 +17532,11 @@ var LinkProjectDialog = class {
       openLabel: "Select Directory to Link",
       title: "Select Project Directory"
     };
-    const workspaceFolders = vscode7.workspace.workspaceFolders;
+    const workspaceFolders = vscode8.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
       options.defaultUri = workspaceFolders[0].uri;
     }
-    const result = await vscode7.window.showOpenDialog(options);
+    const result = await vscode8.window.showOpenDialog(options);
     if (result && result.length > 0) {
       return result[0].fsPath;
     }
@@ -17345,7 +17552,7 @@ var LinkProjectDialog = class {
       description: env4,
       picked: env4 === defaultEnv
     }));
-    const selected = await vscode7.window.showQuickPick(items, {
+    const selected = await vscode8.window.showQuickPick(items, {
       title: "Select Environments to Sync",
       placeHolder: "Choose which environments to include",
       canPickMany: true
@@ -17360,7 +17567,7 @@ var LinkProjectDialog = class {
    */
   async getTargetFileName() {
     const defaultFile = getTargetFile();
-    const result = await vscode7.window.showInputBox({
+    const result = await vscode8.window.showInputBox({
       title: "Target Environment File",
       prompt: "Enter the filename for synced variables",
       value: defaultFile,
@@ -17406,7 +17613,7 @@ var LinkProjectDialog = class {
         detail: "The existing file will remain unchanged"
       }
     ];
-    const selected = await vscode7.window.showQuickPick(items, {
+    const selected = await vscode8.window.showQuickPick(items, {
       title: "Existing .env File Found",
       placeHolder: `${conflict.existingFile} has ${conflict.existingVariableCount} variables`
     });
@@ -17447,12 +17654,12 @@ var LinkProjectDialog = class {
         return void 0;
       }
       if (strategy === "skip") {
-        vscode7.window.showInformationMessage("Skipped linking directory");
+        vscode8.window.showInformationMessage("Skipped linking directory");
         return void 0;
       }
       conflictStrategy = strategy;
     }
-    const displayName = await vscode7.window.showInputBox({
+    const displayName = await vscode8.window.showInputBox({
       title: "Directory Display Name (Optional)",
       prompt: "Enter a friendly name for this directory",
       placeHolder: "e.g., Frontend, Backend, API Server"
@@ -17469,7 +17676,7 @@ var LinkProjectDialog = class {
    * Show dialog to add another directory to an existing project
    */
   async showAddDirectoryDialog(projectName) {
-    const info = await vscode7.window.showInformationMessage(
+    const info = await vscode8.window.showInformationMessage(
       `Add another directory to "${projectName}"?`,
       "Select Directory",
       "Cancel"
@@ -17498,7 +17705,7 @@ var LinkProjectDialog = class {
       }
       conflictStrategy = strategy;
     }
-    const displayName = await vscode7.window.showInputBox({
+    const displayName = await vscode8.window.showInputBox({
       title: "Directory Display Name (Optional)",
       placeHolder: "e.g., Frontend, Backend"
     });
@@ -17540,7 +17747,7 @@ var LinkProjectDialog = class {
 // src/utils/device.ts
 var os2 = __toESM(require("os"));
 var crypto3 = __toESM(require("crypto"));
-var vscode8 = __toESM(require("vscode"));
+var vscode9 = __toESM(require("vscode"));
 var DEVICE_ID_KEY = "envConnect.deviceId";
 async function getDeviceId(context) {
   let deviceId = context.globalState.get(DEVICE_ID_KEY);
@@ -17578,7 +17785,7 @@ function getPlatformName() {
   }
 }
 function getEditorName() {
-  const appName = vscode8.env.appName;
+  const appName = vscode9.env.appName;
   if (appName.toLowerCase().includes("cursor")) {
     return "Cursor";
   }
@@ -17595,6 +17802,7 @@ async function getDeviceInfo(context) {
 var authService;
 var apiService;
 var syncService;
+var realTimeSyncService;
 var storageService;
 var projectsTreeProvider;
 var variablesTreeProvider;
@@ -17606,27 +17814,28 @@ async function activate(context) {
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
   syncService = new SyncService(apiService, storageService);
+  realTimeSyncService = new RealTimeSyncService(apiService, syncService, storageService);
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
   linkProjectDialog = new LinkProjectDialog(syncService);
   context.subscriptions.push(
-    vscode9.window.registerTreeDataProvider("envConnect.projects", projectsTreeProvider),
-    vscode9.window.registerTreeDataProvider("envConnect.variables", variablesTreeProvider)
+    vscode10.window.registerTreeDataProvider("envConnect.projects", projectsTreeProvider),
+    vscode10.window.registerTreeDataProvider("envConnect.variables", variablesTreeProvider)
   );
   context.subscriptions.push(
-    vscode9.commands.registerCommand("envConnect.signIn", handleSignIn),
-    vscode9.commands.registerCommand("envConnect.signOut", handleSignOut),
-    vscode9.commands.registerCommand("envConnect.linkProject", handleLinkProject),
-    vscode9.commands.registerCommand("envConnect.unlinkProject", handleUnlinkProject),
-    vscode9.commands.registerCommand("envConnect.pullVariables", handlePullVariables),
-    vscode9.commands.registerCommand("envConnect.refresh", handleRefresh),
-    vscode9.commands.registerCommand("envConnect.openDashboard", handleOpenDashboard),
-    vscode9.commands.registerCommand("envConnect.showStatus", handleShowStatus),
+    vscode10.commands.registerCommand("envConnect.signIn", handleSignIn),
+    vscode10.commands.registerCommand("envConnect.signOut", handleSignOut),
+    vscode10.commands.registerCommand("envConnect.linkProject", handleLinkProject),
+    vscode10.commands.registerCommand("envConnect.unlinkProject", handleUnlinkProject),
+    vscode10.commands.registerCommand("envConnect.pullVariables", handlePullVariables),
+    vscode10.commands.registerCommand("envConnect.refresh", handleRefresh),
+    vscode10.commands.registerCommand("envConnect.openDashboard", handleOpenDashboard),
+    vscode10.commands.registerCommand("envConnect.showStatus", handleShowStatus),
     // New V2 commands
-    vscode9.commands.registerCommand("envConnect.addDirectory", handleAddDirectory),
-    vscode9.commands.registerCommand("envConnect.removeDirectory", handleRemoveDirectory),
-    vscode9.commands.registerCommand("envConnect.selectEnvironments", handleSelectEnvironments)
+    vscode10.commands.registerCommand("envConnect.addDirectory", handleAddDirectory),
+    vscode10.commands.registerCommand("envConnect.removeDirectory", handleRemoveDirectory),
+    vscode10.commands.registerCommand("envConnect.selectEnvironments", handleSelectEnvironments)
   );
   authService.onAuthStateChanged(async (session) => {
     projectsTreeProvider.setAuthenticated(!!session);
@@ -17637,13 +17846,22 @@ async function activate(context) {
   projectsTreeProvider.setAuthenticated(isAuthenticated);
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
+    if (isRealTimeSyncEnabled()) {
+      realTimeSyncService.startRealTimeSync();
+    }
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       syncService.syncAllDirectories(linkedProject);
     }
   }
+  realTimeSyncService.onRevocationDetected(({ project, reason }) => {
+    projectsTreeProvider.refresh();
+    variablesTreeProvider.refresh();
+    statusBarProvider.update();
+    console.log(`[Extension] Revocation detected for ${project.projectName}: ${reason}`);
+  });
   context.subscriptions.push(
-    vscode9.workspace.onDidChangeWorkspaceFolders(() => {
+    vscode10.workspace.onDidChangeWorkspaceFolders(() => {
       variablesTreeProvider.refresh();
       statusBarProvider.update();
     })
@@ -17652,6 +17870,7 @@ async function activate(context) {
     dispose: () => {
       authService.dispose();
       syncService.dispose();
+      realTimeSyncService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
@@ -17662,18 +17881,22 @@ async function handleSignIn() {
   const success = await authService.signIn();
   if (success && shouldAutoSync()) {
     syncService.startPeriodicSync();
+    if (isRealTimeSyncEnabled()) {
+      realTimeSyncService.startRealTimeSync();
+    }
   }
 }
 async function handleSignOut() {
   await authService.signOut();
   syncService.stopPeriodicSync();
+  realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
 }
 async function handleLinkProject(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const shouldSignIn = await vscode9.window.showWarningMessage(
+    const shouldSignIn = await vscode10.window.showWarningMessage(
       "You need to sign in to link a project.",
       "Sign In"
     );
@@ -17696,10 +17919,10 @@ async function handleLinkProject(item) {
   } else {
     const organizations = await apiService.getOrganizations();
     if (organizations.length === 0) {
-      vscode9.window.showWarningMessage("No organizations found");
+      vscode10.window.showWarningMessage("No organizations found");
       return;
     }
-    const orgPick = await vscode9.window.showQuickPick(
+    const orgPick = await vscode10.window.showQuickPick(
       organizations.map((org) => ({
         label: org.name,
         description: org.tier === "pro" ? "Pro" : "Free",
@@ -17712,15 +17935,15 @@ async function handleLinkProject(item) {
     }
     const accessCheck = await apiService.checkExtensionAccess(orgPick.organization._id);
     if (!accessCheck.enabled) {
-      vscode9.window.showWarningMessage(accessCheck.reason || "Extension access requires Pro tier");
+      vscode10.window.showWarningMessage(accessCheck.reason || "Extension access requires Pro tier");
       return;
     }
     const projects = await apiService.getProjects(orgPick.organization._id);
     if (projects.length === 0) {
-      vscode9.window.showWarningMessage("No projects found in this organization");
+      vscode10.window.showWarningMessage("No projects found in this organization");
       return;
     }
-    const projectPick = await vscode9.window.showQuickPick(
+    const projectPick = await vscode10.window.showQuickPick(
       projects.map((p) => ({
         label: p.name,
         description: p.description || void 0,
@@ -17739,7 +17962,7 @@ async function handleLinkProject(item) {
   }
   const existingProject = await storageService.getLinkedProjectV2(projectId);
   if (existingProject) {
-    const choice = await vscode9.window.showInformationMessage(
+    const choice = await vscode10.window.showInformationMessage(
       `"${projectName}" is already linked. Add another directory?`,
       "Add Directory",
       "Cancel"
@@ -17750,7 +17973,7 @@ async function handleLinkProject(item) {
         return;
       try {
         await syncService.addDirectoryToProject(existingProject, linkOptions2);
-        vscode9.window.showInformationMessage(
+        vscode10.window.showInformationMessage(
           `Added ${getDisplayPath(linkOptions2.directoryPath)} to ${projectName}`
         );
         projectsTreeProvider.refresh();
@@ -17758,14 +17981,33 @@ async function handleLinkProject(item) {
         statusBarProvider.update();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        vscode9.window.showErrorMessage(`Failed to add directory: ${message}`);
+        vscode10.window.showErrorMessage(`Failed to add directory: ${message}`);
       }
     }
     return;
   }
+  if (!project || !organization) {
+    vscode10.window.showErrorMessage("Project or organization not found");
+    return;
+  }
+  const projectForDialog = {
+    _id: projectId,
+    name: projectName,
+    slug: projectName.toLowerCase().replace(/\s+/g, "-"),
+    description: project.description || null,
+    organizationId: organization._id,
+    icon: null,
+    color: null
+  };
+  const organizationForDialog = {
+    _id: organization._id,
+    name: organizationName,
+    slug: organizationName.toLowerCase().replace(/\s+/g, "-"),
+    tier: organization.tier
+  };
   const linkOptions = await linkProjectDialog.showLinkDialog(
-    project,
-    organization
+    projectForDialog,
+    organizationForDialog
   );
   if (!linkOptions)
     return;
@@ -17780,7 +18022,7 @@ async function handleLinkProject(item) {
       access2.expiresAt,
       linkOptions
     );
-    vscode9.window.showInformationMessage(
+    vscode10.window.showInformationMessage(
       `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
     );
     projectsTreeProvider.refresh();
@@ -17788,13 +18030,13 @@ async function handleLinkProject(item) {
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to link project: ${message}`);
+    vscode10.window.showErrorMessage(`Failed to link project: ${message}`);
   }
 }
 async function handleAddDirectory(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode9.window.showWarningMessage("Please sign in first");
+    vscode10.window.showWarningMessage("Please sign in first");
     return;
   }
   let projectId;
@@ -17805,10 +18047,10 @@ async function handleAddDirectory(item) {
   } else {
     const linkedProjects = await storageService.getLinkedProjectsV2();
     if (linkedProjects.length === 0) {
-      vscode9.window.showWarningMessage("No linked projects. Link a project first.");
+      vscode10.window.showWarningMessage("No linked projects. Link a project first.");
       return;
     }
-    const projectPick = await vscode9.window.showQuickPick(
+    const projectPick = await vscode10.window.showQuickPick(
       linkedProjects.map((p) => ({
         label: p.projectName,
         description: `${p.directories.length} director${p.directories.length === 1 ? "y" : "ies"} linked`,
@@ -17823,7 +18065,7 @@ async function handleAddDirectory(item) {
   }
   const project = await storageService.getLinkedProjectV2(projectId);
   if (!project) {
-    vscode9.window.showWarningMessage("Project not found");
+    vscode10.window.showWarningMessage("Project not found");
     return;
   }
   const linkOptions = await linkProjectDialog.showAddDirectoryDialog(projectName);
@@ -17831,22 +18073,22 @@ async function handleAddDirectory(item) {
     return;
   try {
     await syncService.addDirectoryToProject(project, linkOptions);
-    vscode9.window.showInformationMessage(
+    vscode10.window.showInformationMessage(
       `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
     );
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to add directory: ${message}`);
+    vscode10.window.showErrorMessage(`Failed to add directory: ${message}`);
   }
 }
 async function handleRemoveDirectory(item) {
   if (!item?.directory || !item.project) {
-    vscode9.window.showWarningMessage("Select a directory to remove");
+    vscode10.window.showWarningMessage("Select a directory to remove");
     return;
   }
-  const confirm = await vscode9.window.showWarningMessage(
+  const confirm = await vscode10.window.showWarningMessage(
     `Remove "${getDisplayPath(item.directory.directoryPath)}" from ${item.project.name}?`,
     "Remove",
     "Cancel"
@@ -17856,17 +18098,17 @@ async function handleRemoveDirectory(item) {
   }
   try {
     await syncService.removeDirectoryFromProject(item.project._id, item.directory.directoryPath);
-    vscode9.window.showInformationMessage("Directory removed");
+    vscode10.window.showInformationMessage("Directory removed");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to remove directory: ${message}`);
+    vscode10.window.showErrorMessage(`Failed to remove directory: ${message}`);
   }
 }
 async function handleSelectEnvironments(item) {
-  vscode9.window.showInformationMessage(
+  vscode10.window.showInformationMessage(
     "To change environments, remove and re-add the directory with different environment settings."
   );
 }
@@ -17874,7 +18116,7 @@ async function handleUnlinkProject(item) {
   const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
   if (linkedProjectV2) {
     const projectId2 = item?.project?._id || linkedProjectV2.projectId;
-    const confirm2 = await vscode9.window.showWarningMessage(
+    const confirm2 = await vscode10.window.showWarningMessage(
       `Unlink "${linkedProjectV2.projectName}"? This will remove all synced .env files (${linkedProjectV2.directories.length} director${linkedProjectV2.directories.length === 1 ? "y" : "ies"}).`,
       "Unlink",
       "Cancel"
@@ -17887,23 +18129,23 @@ async function handleUnlinkProject(item) {
       await apiService.unlinkExtension(projectId2, deviceInfo.deviceId);
       await syncService.cleanupAllDirectories(linkedProjectV2);
       await storageService.removeLinkedProjectV2(projectId2);
-      vscode9.window.showInformationMessage("Project unlinked");
+      vscode10.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
       variablesTreeProvider.refresh();
       statusBarProvider.update();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      vscode9.window.showErrorMessage(`Failed to unlink project: ${message}`);
+      vscode10.window.showErrorMessage(`Failed to unlink project: ${message}`);
     }
     return;
   }
   const linkedProject = await syncService.getLinkedProject();
   if (!linkedProject) {
-    vscode9.window.showWarningMessage("No project linked to this workspace");
+    vscode10.window.showWarningMessage("No project linked to this workspace");
     return;
   }
   const projectId = item?.project?._id || linkedProject.projectId;
-  const confirm = await vscode9.window.showWarningMessage(
+  const confirm = await vscode10.window.showWarningMessage(
     `Unlink "${linkedProject.projectName}"? This will remove the synced .env file.`,
     "Unlink",
     "Cancel"
@@ -17915,19 +18157,19 @@ async function handleUnlinkProject(item) {
     const deviceInfo = await getDeviceInfo(storageService.getContext());
     await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
     await syncService.unlinkProject(projectId);
-    vscode9.window.showInformationMessage("Project unlinked");
+    vscode10.window.showInformationMessage("Project unlinked");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to unlink project: ${message}`);
+    vscode10.window.showErrorMessage(`Failed to unlink project: ${message}`);
   }
 }
 async function handlePullVariables() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode9.window.showWarningMessage("Please sign in first");
+    vscode10.window.showWarningMessage("Please sign in first");
     return;
   }
   statusBarProvider.setSyncing(true);
@@ -17939,11 +18181,11 @@ async function handlePullVariables() {
       const successful = results.filter((r) => r.success).length;
       const total = results.length;
       if (successful === total) {
-        vscode9.window.showInformationMessage(
+        vscode10.window.showInformationMessage(
           `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
         );
       } else {
-        vscode9.window.showWarningMessage(
+        vscode10.window.showWarningMessage(
           `Synced ${successful}/${total} directories. Some failed.`
         );
       }
@@ -17964,12 +18206,12 @@ function handleRefresh() {
 }
 function handleOpenDashboard() {
   const serverUrl = getServerUrl();
-  vscode9.env.openExternal(vscode9.Uri.parse(serverUrl));
+  vscode10.env.openExternal(vscode10.Uri.parse(serverUrl));
 }
 async function handleShowStatus() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const action = await vscode9.window.showInformationMessage(
+    const action = await vscode10.window.showInformationMessage(
       "ENV Connect: Not signed in",
       "Sign In"
     );
@@ -17989,7 +18231,7 @@ async function handleShowStatus() {
   ];
   if (linkedProjectV2) {
     items.push(
-      { kind: vscode9.QuickPickItemKind.Separator, label: "Linked Project" },
+      { kind: vscode10.QuickPickItemKind.Separator, label: "Linked Project" },
       {
         label: "$(folder) Project",
         description: linkedProjectV2.projectName
@@ -18013,7 +18255,7 @@ async function handleShowStatus() {
     const linkedProject = await syncService.getLinkedProject();
     if (linkedProject) {
       items.push(
-        { kind: vscode9.QuickPickItemKind.Separator, label: "Linked Project" },
+        { kind: vscode10.QuickPickItemKind.Separator, label: "Linked Project" },
         {
           label: "$(folder) Project",
           description: linkedProject.projectName
@@ -18038,7 +18280,7 @@ async function handleShowStatus() {
     }
   }
   items.push(
-    { kind: vscode9.QuickPickItemKind.Separator, label: "Actions" },
+    { kind: vscode10.QuickPickItemKind.Separator, label: "Actions" },
     {
       label: "$(sync) Pull Variables",
       description: "Sync variables now"
@@ -18061,7 +18303,7 @@ async function handleShowStatus() {
     }
   );
   const filteredItems = items.filter((i) => i.label);
-  const selected = await vscode9.window.showQuickPick(filteredItems, {
+  const selected = await vscode10.window.showQuickPick(filteredItems, {
     title: "ENV Connect Status",
     placeHolder: "Select an action"
   });

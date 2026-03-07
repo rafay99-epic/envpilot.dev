@@ -13,15 +13,15 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 // Tier limits matching convex/tierLimits.ts
 const TIER_LIMITS = {
   free: {
-    maxProjects: 5,
-    maxVariablesPerProject: 20,
-    maxTeamMembers: 5,
-    maxOrganizations: 2,
-    auditLogRetentionDays: 7,
-    apiAccessEnabled: false,
-    extensionAccessEnabled: false,
-    versionHistoryEnabled: false,
-    bulkImportEnabled: false,
+    maxProjects: null,
+    maxVariablesPerProject: null,
+    maxTeamMembers: null,
+    maxOrganizations: null,
+    auditLogRetentionDays: 730,
+    apiAccessEnabled: true,
+    extensionAccessEnabled: true,
+    versionHistoryEnabled: true,
+    bulkImportEnabled: true,
   },
   pro: {
     maxProjects: null,

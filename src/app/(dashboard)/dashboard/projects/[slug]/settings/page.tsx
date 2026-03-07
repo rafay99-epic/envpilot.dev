@@ -31,7 +31,7 @@ interface Project {
 export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps) {
   const { slug } = use(params)
   const router = useRouter()
-  const { hasPermission } = useAuthContext()
+  const { hasPermission, organization } = useAuthContext()
   const canUpdateProject = hasPermission(PERMISSIONS.PROJECT_UPDATE)
   const canDeleteProject = hasPermission(PERMISSIONS.PROJECT_DELETE)
 
@@ -55,18 +55,13 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
   useEffect(() => {
     async function fetchProject() {
       try {
-        const orgsResponse = await fetch('/api/organizations')
-        const orgsData = await orgsResponse.json()
-
-        if (!orgsData.organizations || orgsData.organizations.length === 0) {
+        if (!organization?.id) {
           setError('No organization found')
           setIsLoading(false)
           return
         }
 
-        const organizationId = orgsData.organizations[0]._id
-
-        const projectsResponse = await fetch(`/api/projects?organizationId=${organizationId}`)
+        const projectsResponse = await fetch(`/api/projects?organizationId=${organization.id}`)
         const projectsData = await projectsResponse.json()
 
         const foundProject = projectsData.projects?.find((p: Project) => p.slug === slug)
@@ -90,7 +85,7 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
     }
 
     fetchProject()
-  }, [slug])
+  }, [organization?.id, slug])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -25,6 +25,7 @@ import type * as subscriptions from "../subscriptions.js";
 import type * as templates from "../templates.js";
 import type * as tierLimits from "../tierLimits.js";
 import type * as users from "../users.js";
+import type * as variableRequests from "../variableRequests.js";
 import type * as variables from "../variables.js";
 
 import type {
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   templates: typeof templates;
   tierLimits: typeof tierLimits;
   users: typeof users;
+  variableRequests: typeof variableRequests;
   variables: typeof variables;
 }>;
 

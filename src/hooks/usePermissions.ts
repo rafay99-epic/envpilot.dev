@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -87,25 +87,4 @@ export function useAssignableMembers(
     api.permissions.getAssignableMembers,
     variableId && requestingUserId ? { variableId, requestingUserId } : "skip"
   );
-}
-
-/**
- * Hook for permission mutations
- */
-export function usePermissionMutations() {
-  const grantPermission = useMutation(api.permissions.grant);
-  const updatePermission = useMutation(api.permissions.update);
-  const revokePermission = useMutation(api.permissions.revoke);
-  const bulkGrantPermissions = useMutation(api.permissions.bulkGrant);
-  const bulkRevokeForUser = useMutation(api.permissions.bulkRevokeForUser);
-  const revokeAllForVariable = useMutation(api.permissions.revokeAllForVariable);
-
-  return {
-    grantPermission,
-    updatePermission,
-    revokePermission,
-    bulkGrantPermissions,
-    bulkRevokeForUser,
-    revokeAllForVariable,
-  };
 }

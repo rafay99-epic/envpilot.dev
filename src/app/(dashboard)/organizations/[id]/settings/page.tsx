@@ -282,19 +282,12 @@ export default function OrganizationSettingsPage({
         <div className="mt-4 flex items-center justify-between">
           <div>
             <p className="font-medium text-zinc-900 dark:text-zinc-100">
-              {organization?.tier === 'pro' ? 'Pro Plan' : 'Free Plan'}
+              Pre-alpha Access
             </p>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {organization?.tier === 'pro'
-                ? 'Unlimited projects and team members'
-                : 'Up to 3 projects and 5 team members'}
+              Billing is currently disabled. All organizations have full feature access.
             </p>
           </div>
-          {organization?.tier !== 'pro' && (
-            <button className="rounded-lg bg-amber-100 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50">
-              Upgrade to Pro
-            </button>
-          )}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { withAuth } from '@workos-inc/authkit-nextjs'
 import { NextResponse } from 'next/server'
 import { ConvexHttpClient } from 'convex/browser'
 import { api } from '../../../../../../convex/_generated/api'
+import { getOrCreateConvexUser } from '@/lib/convex-helpers'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -19,17 +20,7 @@ export async function GET() {
       )
     }
 
-    // Verify user exists in Convex
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    })
-
-    if (!convexUser) {
-      return NextResponse.json(
-        { data: { valid: false, reason: 'User not found' } },
-        { status: 200 }
-      )
-    }
+    await getOrCreateConvexUser(convex, user)
 
     return NextResponse.json({
       data: { valid: true },

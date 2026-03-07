@@ -6,8 +6,6 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
-  checkCLIAccess,
-  tierLimitResponse,
 } from '@/lib/cli-auth'
 import { createSecret, readSecret } from '@/lib/vault'
 
@@ -65,15 +63,54 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse('You are not a member of this organization')
     }
 
-    // Only admins and team leads can modify variables
+    // Members cannot write directly; they submit requests for review.
     if (membership.role === 'member') {
-      return forbiddenResponse('Members cannot modify variables')
-    }
+      let requested = 0
+      let skipped = 0
 
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, project.organizationId)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
+      for (const variable of variables as BulkVariable[]) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(variable.key)) {
+          skipped++
+          continue
+        }
+
+        try {
+          const vaultResult = await createSecret(variable.key, variable.value, {
+            organizationId: project.organizationId,
+            projectId: projectId,
+          })
+
+          await convex.mutation(api.variableRequests.create, {
+            key: variable.key,
+            vaultRef: vaultResult.id,
+            description: variable.description,
+            environments: [environment],
+            projectId: projectId as Id<'projects'>,
+            isSensitive: variable.isSensitive ?? false,
+            requestedBy: authResult.userId,
+          })
+          requested++
+        } catch {
+          skipped++
+        }
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          requested: true,
+          data: {
+            created: 0,
+            updated: 0,
+            deleted: 0,
+            requested,
+            skipped,
+            total: variables.length,
+          },
+          message: 'Variable requests submitted for admin approval',
+        },
+        { status: 202 }
+      )
     }
 
     // Get existing variables for this environment

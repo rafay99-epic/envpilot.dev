@@ -5,7 +5,6 @@ import { api } from '../../../../../convex/_generated/api'
 import type { Id } from '../../../../../convex/_generated/dataModel'
 import { z } from 'zod'
 import { getOrCreateConvexUser, checkOrganizationMembership, getProjectOrganization } from '@/lib/convex-helpers'
-import { checkTierLimit } from '@/lib/tier-limits'
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
@@ -67,26 +66,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
-      )
-    }
-
-    // Check tier limits for extension access
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    })
-
-    if (!organization) {
-      return NextResponse.json(
-        { error: 'Organization not found' },
-        { status: 404 }
-      )
-    }
-
-    const tierCheck = checkTierLimit(organization.tier, 'extensionAccessEnabled')
-    if (!tierCheck.allowed) {
-      return NextResponse.json(
-        { error: tierCheck.message, code: 'TIER_LIMIT_EXCEEDED' },
-        { status: 402 }
       )
     }
 

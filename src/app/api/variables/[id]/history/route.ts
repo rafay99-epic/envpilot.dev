@@ -70,6 +70,24 @@ export async function GET(request: Request, context: RouteContext) {
       )
     }
 
+    if (membership.role === 'member') {
+      const accessibleVariables = await convex.query(api.variables.listWithAccess, {
+        projectId: variable.projectId,
+        userId: convexUser._id,
+      })
+
+      const canAccessVariable = accessibleVariables.some(
+        (entry) => entry._id === variable._id && entry.hasAccess
+      )
+
+      if (!canAccessVariable) {
+        return NextResponse.json(
+          { error: 'You do not have access to this variable' },
+          { status: 403 }
+        )
+      }
+    }
+
     const history = await convex.query(api.variables.getVersionHistory, {
       variableId: id as Id<'environmentVariables'>,
       limit,

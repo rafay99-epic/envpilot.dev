@@ -26,16 +26,17 @@ export interface TierLimits {
 
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
-    maxProjects: 5,
-    maxVariablesPerProject: 20,
-    maxTeamMembers: 5,
-    maxOrganizations: 2,
-    auditLogRetentionDays: 7,
-    apiAccessEnabled: false,
-    extensionAccessEnabled: false,
+    // Pre-alpha mode: billing is bypassed and all limits/features are unlocked.
+    maxProjects: null,
+    maxVariablesPerProject: null,
+    maxTeamMembers: null,
+    maxOrganizations: null,
+    auditLogRetentionDays: 730,
+    apiAccessEnabled: true,
+    extensionAccessEnabled: true,
     granularPermissionsEnabled: true, // Enabled for all tiers - core access control feature
-    variableVersionHistoryEnabled: false,
-    bulkImportEnabled: false,
+    variableVersionHistoryEnabled: true,
+    bulkImportEnabled: true,
   },
   pro: {
     maxProjects: null, // unlimited
