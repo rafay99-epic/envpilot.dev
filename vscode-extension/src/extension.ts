@@ -33,6 +33,20 @@ let statusBarProvider: StatusBarProvider;
 let linkProjectDialog: LinkProjectDialog;
 let requestVariableDialog: RequestVariableDialog;
 
+/** Update context flags used by menu when-clauses and welcome views */
+async function updateContextFlags(): Promise<void> {
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  vscode.commands.executeCommand(
+    "setContext",
+    "envConnect.hasLinkedProject",
+    !!linkedProject,
+  );
+  if (linkedProject) {
+    const role = apiService.getUserRole(linkedProject.projectId);
+    vscode.commands.executeCommand("setContext", "envConnect.userRole", role || "");
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   // Initialize storage
   storageService = new StorageService(context);
@@ -119,6 +133,7 @@ export async function activate(context: vscode.ExtensionContext) {
     projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   });
 
   // Check initial auth state
@@ -130,16 +145,16 @@ export async function activate(context: vscode.ExtensionContext) {
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
 
-    // Start real-time sync for immediate revocation detection
     if (isRealTimeSyncEnabled()) {
       realTimeSyncService.startRealTimeSync();
     }
 
-    // Sync on activation if a project is linked
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       syncService.syncAllDirectories(linkedProject);
     }
+
+    await updateContextFlags();
   }
 
   // Subscribe to real-time revocation events for UI updates
@@ -401,6 +416,7 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     vscode.window.showErrorMessage(`Failed to link project: ${message}`);
@@ -595,6 +611,7 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       projectsTreeProvider.refresh();
       variablesTreeProvider.refresh();
       statusBarProvider.update();
+      await updateContextFlags();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       vscode.window.showErrorMessage(`Failed to unlink project: ${message}`);

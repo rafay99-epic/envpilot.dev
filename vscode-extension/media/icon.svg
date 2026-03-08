@@ -1,7 +1,10 @@
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/>
-  <circle cx="8" cy="9" r="2" fill="currentColor"/>
-  <circle cx="8" cy="15" r="2" fill="currentColor"/>
-  <rect x="12" y="8" width="6" height="2" rx="1" fill="currentColor"/>
-  <rect x="12" y="14" width="6" height="2" rx="1" fill="currentColor"/>
+  <!-- Shield outline -->
+  <path d="M12 2L4 6v5c0 5.25 3.4 10.15 8 11.4C16.6 21.15 20 16.25 20 11V6l-8-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Key dots -->
+  <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
+  <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
+  <!-- Value bars -->
+  <rect x="12" y="9.25" width="4.5" height="1.5" rx="0.75" fill="currentColor"/>
+  <rect x="12" y="13.25" width="3" height="1.5" rx="0.75" fill="currentColor"/>
 </svg>

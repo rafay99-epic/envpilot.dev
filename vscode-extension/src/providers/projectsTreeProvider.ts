@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
-import { getDisplayPath, normalizePath } from "../utils/paths";
+import { getDisplayPath } from "../utils/paths";
 import type {
   Project,
   Organization,
-  LinkedProject,
   LinkedDirectory,
 } from "../types";
 
@@ -16,6 +15,12 @@ export type ProjectTreeItemType =
   | "linkedDirectory"
   | "message"
   | "error";
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  team_lead: "Lead",
+  member: "Member",
+};
 
 export class ProjectsTreeProvider
   implements vscode.TreeDataProvider<ProjectTreeItem>
@@ -51,7 +56,6 @@ export class ProjectsTreeProvider
 
   async getChildren(element?: ProjectTreeItem): Promise<ProjectTreeItem[]> {
     if (!this.isAuthenticated) {
-      // Return empty so the viewsWelcome content shows instead
       return [];
     }
 
@@ -101,18 +105,16 @@ export class ProjectsTreeProvider
         if (projects.length === 0) {
           return [
             new ProjectTreeItem(
-              "No projects",
+              "No projects yet",
               vscode.TreeItemCollapsibleState.None,
               "message",
             ),
           ];
         }
 
-        // Get V2 linked projects
         const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
 
         return projects.map((project) => {
-          // Check if linked via V2
           const linkedV2 = linkedProjectsV2.find(
             (lp) => lp.projectId === project._id,
           );
@@ -183,14 +185,6 @@ export class ProjectsTreeProvider
     return [];
   }
 
-  private getCurrentWorkspacePath(): string | null {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) {
-      return null;
-    }
-    return folders[0].uri.fsPath;
-  }
-
   dispose(): void {
     this._onDidChangeTreeData.dispose();
   }
@@ -218,59 +212,133 @@ export class ProjectTreeItem extends vscode.TreeItem {
     this.project = project;
     this.organizationName = organizationName;
     this.directory = directory;
-
-    // Set context value for menu filtering
     this.contextValue = type;
 
-    // Set icons and descriptions
     switch (type) {
       case "organization":
-        this.iconPath = new vscode.ThemeIcon("organization");
-        this.description = organization?.tier === "pro" ? "Pro" : "Free";
+        this.iconPath = new vscode.ThemeIcon(
+          "organization",
+          organization?.tier === "pro"
+            ? new vscode.ThemeColor("charts.green")
+            : undefined,
+        );
+        this.description = this.buildOrgDescription(organization);
+        this.tooltip = this.createOrgTooltip(organization);
         break;
+
       case "project":
-        this.iconPath = new vscode.ThemeIcon("folder");
+        this.iconPath = new vscode.ThemeIcon("symbol-package");
         this.description = project?.description || undefined;
+        this.tooltip = this.createProjectTooltip(project, false);
         break;
+
       case "linkedProject":
-        this.iconPath = new vscode.ThemeIcon("link");
+        this.iconPath = new vscode.ThemeIcon(
+          "symbol-package",
+          new vscode.ThemeColor("charts.green"),
+        );
         this.description = "Linked";
+        this.tooltip = this.createProjectTooltip(project, true);
         break;
+
       case "linkedDirectory":
         this.iconPath = new vscode.ThemeIcon("folder-opened");
-        this.description = directory?.environments.join(", ");
+        this.description = this.buildDirectoryDescription(directory);
         this.tooltip = this.createDirectoryTooltip(directory);
         break;
+
       case "message":
-        this.iconPath = new vscode.ThemeIcon("info");
+        this.iconPath = new vscode.ThemeIcon(
+          "info",
+          new vscode.ThemeColor("descriptionForeground"),
+        );
         break;
+
       case "error":
-        this.iconPath = new vscode.ThemeIcon("error");
+        this.iconPath = new vscode.ThemeIcon(
+          "error",
+          new vscode.ThemeColor("errorForeground"),
+        );
         break;
     }
+  }
+
+  private buildOrgDescription(org?: Organization): string | undefined {
+    if (!org) return undefined;
+    const parts: string[] = [];
+    parts.push(org.tier === "pro" ? "Pro" : "Free");
+    if (org.role) {
+      parts.push(ROLE_LABELS[org.role] || org.role);
+    }
+    return parts.join(" \u00b7 ");
+  }
+
+  private buildDirectoryDescription(dir?: LinkedDirectory): string | undefined {
+    if (!dir) return undefined;
+    return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
+  }
+
+  private createOrgTooltip(
+    org?: Organization,
+  ): vscode.MarkdownString | undefined {
+    if (!org) return undefined;
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(`### $(organization) ${org.name}\n\n`);
+    md.appendMarkdown(
+      `**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}\n\n`,
+    );
+    if (org.role) {
+      md.appendMarkdown(
+        `**Your Role:** ${ROLE_LABELS[org.role] || org.role}\n\n`,
+      );
+    }
+    md.appendMarkdown(`**Slug:** \`${org.slug}\``);
+    return md;
+  }
+
+  private createProjectTooltip(
+    project?: Project,
+    isLinked?: boolean,
+  ): vscode.MarkdownString | undefined {
+    if (!project) return undefined;
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### ${project.icon || "$(symbol-package)"} ${project.name}\n\n`,
+    );
+    if (isLinked) {
+      md.appendMarkdown("$(check) **Linked to this workspace**\n\n");
+    }
+    if (project.description) {
+      md.appendMarkdown(`${project.description}\n\n`);
+    }
+    md.appendMarkdown(`**Slug:** \`${project.slug}\``);
+    return md;
   }
 
   private createDirectoryTooltip(
     directory?: LinkedDirectory,
   ): vscode.MarkdownString | undefined {
     if (!directory) return undefined;
-
-    const tooltip = new vscode.MarkdownString();
-    tooltip.appendMarkdown(`**${directory.displayName || "Directory"}**\n\n`);
-    tooltip.appendMarkdown(`**Path:** \`${directory.directoryPath}\`\n\n`);
-    tooltip.appendMarkdown(`**Target File:** ${directory.targetFile}\n\n`);
-    tooltip.appendMarkdown(
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### $(folder-opened) ${directory.displayName || "Directory"}\n\n`,
+    );
+    md.appendMarkdown(`**Path:** \`${directory.directoryPath}\`\n\n`);
+    md.appendMarkdown(`**Target:** \`${directory.targetFile}\`\n\n`);
+    md.appendMarkdown(
       `**Environments:** ${directory.environments.join(", ")}\n\n`,
     );
-
+    md.appendMarkdown("---\n\n");
     if (directory.lastSyncedAt) {
-      tooltip.appendMarkdown(
-        `**Last Synced:** ${new Date(directory.lastSyncedAt).toLocaleString()}`,
+      md.appendMarkdown(
+        `$(sync) Last synced ${new Date(directory.lastSyncedAt).toLocaleString()}`,
       );
     } else {
-      tooltip.appendMarkdown("**Last Synced:** Never");
+      md.appendMarkdown("$(sync) Never synced");
     }
-
-    return tooltip;
+    return md;
   }
 }
