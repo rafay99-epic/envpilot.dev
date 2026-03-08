@@ -240,6 +240,18 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
+
+    // Fallback: if organization is missing from the tree item, resolve it from
+    // the project's organizationId via the organizations API
+    if (!organization && item.project.organizationId) {
+      const orgs = await apiService.getOrganizations();
+      organization = orgs.find(
+        (org) => org._id === item.project!.organizationId,
+      );
+      if (organization) {
+        organizationName = organization.name;
+      }
+    }
   } else {
     // Show project picker
     const organizations = await apiService.getOrganizations();
