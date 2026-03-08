@@ -11,6 +11,8 @@ import {
 import { VariablesTreeProvider } from "./providers/variablesTreeProvider";
 import { StatusBarProvider } from "./providers/statusBar";
 import { LinkProjectDialog } from "./ui/linkProjectDialog";
+import { RequestVariableDialog } from "./ui/requestVariableDialog";
+import { FileProtectionService } from "./services/fileProtection";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -24,10 +26,12 @@ let apiService: ApiService;
 let syncService: SyncService;
 let realTimeSyncService: RealTimeSyncService;
 let storageService: StorageService;
+let fileProtectionService: FileProtectionService;
 let projectsTreeProvider: ProjectsTreeProvider;
 let variablesTreeProvider: VariablesTreeProvider;
 let statusBarProvider: StatusBarProvider;
 let linkProjectDialog: LinkProjectDialog;
+let requestVariableDialog: RequestVariableDialog;
 
 export async function activate(context: vscode.ExtensionContext) {
   // Initialize storage
@@ -39,7 +43,9 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize services
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
+  fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
+  syncService.setFileProtection(fileProtectionService);
   realTimeSyncService = new RealTimeSyncService(
     apiService,
     syncService,
@@ -51,6 +57,7 @@ export async function activate(context: vscode.ExtensionContext) {
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
   linkProjectDialog = new LinkProjectDialog(syncService);
+  requestVariableDialog = new RequestVariableDialog();
 
   // Register tree views
   context.subscriptions.push(
@@ -98,6 +105,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envConnect.selectEnvironments",
       handleSelectEnvironments,
+    ),
+    vscode.commands.registerCommand(
+      "envConnect.requestVariable",
+      handleRequestVariable,
     ),
   );
 
@@ -154,6 +165,7 @@ export async function activate(context: vscode.ExtensionContext) {
       authService.dispose();
       syncService.dispose();
       realTimeSyncService.dispose();
+      fileProtectionService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
@@ -467,6 +479,53 @@ async function handleSelectEnvironments(item?: ProjectTreeItem): Promise<void> {
   vscode.window.showInformationMessage(
     "To change environments, remove and re-add the directory with different environment settings.",
   );
+}
+
+async function handleRequestVariable(): Promise<void> {
+  const isAuth = await authService.isAuthenticated();
+  if (!isAuth) {
+    vscode.window.showWarningMessage("Please sign in first");
+    return;
+  }
+
+  // Get the linked project
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  if (!linkedProject) {
+    vscode.window.showWarningMessage(
+      'No project linked. Use "ENV Connect: Link Project" first.',
+    );
+    return;
+  }
+
+  // Check role — only members should use this
+  const role = apiService.getUserRole(linkedProject.projectId);
+  if (role && role !== "member") {
+    vscode.window.showInformationMessage(
+      "As an admin or team lead, you can create variables directly on the dashboard.",
+    );
+    return;
+  }
+
+  // Show the request dialog
+  const input = await requestVariableDialog.showRequestDialog(
+    linkedProject.projectId,
+  );
+  if (!input) {
+    return;
+  }
+
+  try {
+    await apiService.submitVariableRequest(input);
+    vscode.window.showInformationMessage(
+      `Variable request for "${input.key}" submitted for approval.`,
+    );
+    variablesTreeProvider.refresh();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    vscode.window.showErrorMessage(
+      `Failed to submit variable request: ${message}`,
+    );
+  }
 }
 
 async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {

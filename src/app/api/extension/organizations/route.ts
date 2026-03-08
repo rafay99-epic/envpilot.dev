@@ -36,6 +36,7 @@ export async function GET() {
           name: org!.name,
           slug: org!.slug,
           tier: org!.tier,
+          role: org!.role || "member",
         })),
       },
     });

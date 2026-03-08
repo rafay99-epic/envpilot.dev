@@ -34,6 +34,7 @@ export async function GET(request: Request) {
     }
 
     let authorizedUserId: Id<"users">;
+    let userRole: string = "member";
 
     // Validate access token if provided
     if (accessToken) {
@@ -56,6 +57,22 @@ export async function GET(request: Request) {
       }
 
       authorizedUserId = validation.userId as Id<"users">;
+
+      // Resolve user role from project's organization
+      const { organizationId: projOrgId } = await getProjectOrganization(
+        convex,
+        projectId as Id<"projects">,
+      );
+      if (projOrgId) {
+        const tokenMembership = await checkOrganizationMembership(
+          convex,
+          authorizedUserId,
+          projOrgId,
+        );
+        if (tokenMembership) {
+          userRole = tokenMembership.role || "member";
+        }
+      }
 
       // Update last used
       await convex.mutation(api.projectAccess.updateLastUsed, { accessToken });
@@ -95,6 +112,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
+      userRole = membership.role || "member";
       authorizedUserId = convexUser._id;
     }
 
@@ -143,6 +161,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       data: {
         variables: variablesWithValues,
+        role: userRole,
       },
     });
   } catch (error) {

@@ -9993,7 +9993,7 @@ var require_form_data = __commonJS({
     var http3 = require("http");
     var https2 = require("https");
     var parseUrl = require("url").parse;
-    var fs2 = require("fs");
+    var fs3 = require("fs");
     var Stream = require("stream").Stream;
     var crypto4 = require("crypto");
     var mime = require_mime_types();
@@ -10060,7 +10060,7 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs2.stat(value.path, function(err, stat) {
+          fs3.stat(value.path, function(err, stat) {
             if (err) {
               callback(err);
               return;
@@ -11658,7 +11658,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode10 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 
 // src/services/auth.ts
 var vscode2 = __toESM(require("vscode"));
@@ -15533,6 +15533,7 @@ function generateSessionToken() {
 var ApiService = class {
   client;
   storage;
+  roleCache = /* @__PURE__ */ new Map();
   constructor(storage) {
     this.storage = storage;
     this.client = axios_default.create({
@@ -15556,17 +15557,14 @@ var ApiService = class {
   }
   // Organizations
   async getOrganizations() {
-    const response = await this.client.get(
-      "/api/extension/organizations"
-    );
+    const response = await this.client.get("/api/extension/organizations");
     return response.data.data?.organizations || [];
   }
   // Projects
   async getProjects(organizationId) {
-    const response = await this.client.get(
-      "/api/extension/projects",
-      { params: organizationId ? { organizationId } : void 0 }
-    );
+    const response = await this.client.get("/api/extension/projects", {
+      params: organizationId ? { organizationId } : void 0
+    });
     return response.data.data?.projects || [];
   }
   async getProject(projectId) {
@@ -15585,26 +15583,29 @@ var ApiService = class {
     if (accessToken) {
       headers["X-Access-Token"] = accessToken;
     }
-    const response = await this.client.get(
-      "/api/extension/variables",
-      {
-        params: { projectId, environment },
-        headers
-      }
-    );
+    const response = await this.client.get("/api/extension/variables", {
+      params: { projectId, environment },
+      headers
+    });
+    if (response.data.data?.role) {
+      this.roleCache.set(projectId, response.data.data.role);
+    }
     return response.data.data?.variables || [];
+  }
+  /**
+   * Get the cached role for a project (populated after getVariables call)
+   */
+  getUserRole(projectId) {
+    return this.roleCache.get(projectId);
   }
   // Project Access (Extension Linking)
   async linkExtension(projectId, deviceInfo, expiresInDays) {
-    const response = await this.client.post(
-      "/api/extension/link",
-      {
-        projectId,
-        deviceId: deviceInfo.deviceId,
-        deviceName: deviceInfo.deviceName,
-        expiresInDays: expiresInDays || 30
-      }
-    );
+    const response = await this.client.post("/api/extension/link", {
+      projectId,
+      deviceId: deviceInfo.deviceId,
+      deviceName: deviceInfo.deviceName,
+      expiresInDays: expiresInDays || 30
+    });
     if (!response.data.data?.access) {
       throw new Error("Failed to link extension");
     }
@@ -15641,9 +15642,7 @@ var ApiService = class {
   }
   // Check if extension access is enabled for the organization's tier
   async checkExtensionAccess(organizationId) {
-    const response = await this.client.get(
-      `/api/extension/check-access/${organizationId}`
-    );
+    const response = await this.client.get(`/api/extension/check-access/${organizationId}`);
     return response.data.data || { enabled: false, reason: "Unknown error" };
   }
   /**
@@ -15651,10 +15650,7 @@ var ApiService = class {
    * Used for real-time sync to detect immediate revocations
    */
   async checkPermissionEvents(accessTokens) {
-    const response = await this.client.post(
-      "/api/extension/permission-events",
-      { accessTokens }
-    );
+    const response = await this.client.post("/api/extension/permission-events", { accessTokens });
     return response.data.data || { events: [], hasRevocations: false };
   }
   /**
@@ -15662,11 +15658,28 @@ var ApiService = class {
    * Requires an access token to authenticate the acknowledgment
    */
   async acknowledgeRevocations(eventIds, accessToken) {
-    const response = await this.client.post(
-      "/api/extension/acknowledge-revocation",
-      { eventIds, accessToken }
-    );
+    const response = await this.client.post("/api/extension/acknowledge-revocation", { eventIds, accessToken });
     return response.data.data || { acknowledgedCount: 0 };
+  }
+  // Variable Requests
+  /**
+   * Submit a variable request (members only)
+   */
+  async submitVariableRequest(request) {
+    const response = await this.client.post("/api/extension/variable-requests", request);
+    if (!response.data.data?.request) {
+      throw new Error("Failed to submit variable request");
+    }
+    return response.data.data.request;
+  }
+  /**
+   * Get variable requests for a project
+   */
+  async getVariableRequests(projectId, status) {
+    const response = await this.client.get("/api/extension/variable-requests", {
+      params: { projectId, status }
+    });
+    return response.data.data?.requests || [];
   }
 };
 
@@ -15711,6 +15724,7 @@ var ENV_FILE_HEADER = `# ENV Connect - Synced Environment Variables
 var SyncService = class {
   api;
   storage;
+  fileProtection = null;
   syncTimer = null;
   failureCount = 0;
   MAX_BACKOFF_MULTIPLIER = 8;
@@ -15721,6 +15735,12 @@ var SyncService = class {
   constructor(api, storage) {
     this.api = api;
     this.storage = storage;
+  }
+  /**
+   * Set the file protection service for read-only enforcement
+   */
+  setFileProtection(fileProtection) {
+    this.fileProtection = fileProtection;
   }
   /**
    * Start periodic sync checking with exponential backoff on failures
@@ -15736,7 +15756,10 @@ var SyncService = class {
    */
   scheduleNextSync() {
     const baseInterval = getSyncInterval();
-    const backoffMultiplier = Math.min(Math.pow(2, this.failureCount), this.MAX_BACKOFF_MULTIPLIER);
+    const backoffMultiplier = Math.min(
+      Math.pow(2, this.failureCount),
+      this.MAX_BACKOFF_MULTIPLIER
+    );
     const interval = baseInterval * backoffMultiplier;
     this.syncTimer = setTimeout(async () => {
       const success = await this.checkAllLinkedProjectsV2();
@@ -15768,7 +15791,10 @@ var SyncService = class {
       try {
         await this.checkProjectPermissions(project);
       } catch (error) {
-        console.error(`Failed to check permissions for ${project.projectName}:`, error);
+        console.error(
+          `Failed to check permissions for ${project.projectName}:`,
+          error
+        );
         allSuccessful = false;
       }
     }
@@ -15784,7 +15810,10 @@ var SyncService = class {
     }
     const validation = await this.api.validateAccessToken(project.accessToken);
     if (!validation.valid) {
-      await this.handlePermissionRevoked(project, validation.reason || "Unknown");
+      await this.handlePermissionRevoked(
+        project,
+        validation.reason || "Unknown"
+      );
     }
     return validation;
   }
@@ -15796,7 +15825,10 @@ var SyncService = class {
     if (shouldPreventCopyOnRevoke()) {
       await this.deleteEnvFile(project);
     }
-    await this.storage.removeLinkedProject(project.projectId, project.workspacePath);
+    await this.storage.removeLinkedProject(
+      project.projectId,
+      project.workspacePath
+    );
     vscode3.window.showWarningMessage(
       `Access revoked for "${project.projectName}": ${reason}. The synced .env file has been removed.`,
       "OK"
@@ -15816,9 +15848,14 @@ var SyncService = class {
           error: "Access token expired"
         };
       }
-      const validation = await this.api.validateAccessToken(project.accessToken);
+      const validation = await this.api.validateAccessToken(
+        project.accessToken
+      );
       if (!validation.valid) {
-        await this.handlePermissionRevoked(project, validation.reason || "Unknown");
+        await this.handlePermissionRevoked(
+          project,
+          validation.reason || "Unknown"
+        );
         return {
           success: false,
           variablesCount: 0,
@@ -15832,9 +15869,13 @@ var SyncService = class {
         project.accessToken
       );
       await this.writeEnvFile(project, variables);
-      await this.storage.updateLinkedProject(project.projectId, project.workspacePath, {
-        lastSyncedAt: Date.now()
-      });
+      await this.storage.updateLinkedProject(
+        project.projectId,
+        project.workspacePath,
+        {
+          lastSyncedAt: Date.now()
+        }
+      );
       await this.api.updateLastUsed(project.accessToken);
       const result = {
         success: true,
@@ -15909,7 +15950,20 @@ var SyncService = class {
 `;
       }
     }
+    try {
+      await fs.chmod(envFilePath, 420);
+    } catch {
+    }
     await fs.writeFile(envFilePath, content, "utf-8");
+    const role = this.api.getUserRole(project.projectId);
+    if (role === "member") {
+      await fs.chmod(envFilePath, 292);
+      if (this.fileProtection) {
+        this.fileProtection.watchFile(envFilePath, async () => {
+          await this.syncProject(project);
+        });
+      }
+    }
   }
   /**
    * Format a value for .env file (handle quotes and special characters)
@@ -15931,8 +15985,12 @@ var SyncService = class {
     if (!envFilePath.startsWith(normalizedWorkspace + path2.sep) && envFilePath !== normalizedWorkspace) {
       return;
     }
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
+    }
     try {
       await fs.access(envFilePath);
+      await fs.chmod(envFilePath, 420);
       await fs.unlink(envFilePath);
     } catch {
     }
@@ -16010,7 +16068,10 @@ var SyncService = class {
       try {
         await this.checkProjectPermissionsV2(project);
       } catch (error) {
-        console.error(`Failed to check permissions for ${project.projectName}:`, error);
+        console.error(
+          `Failed to check permissions for ${project.projectName}:`,
+          error
+        );
         allSuccessful = false;
       }
     }
@@ -16026,7 +16087,10 @@ var SyncService = class {
     }
     const validation = await this.api.validateAccessToken(project.accessToken);
     if (!validation.valid) {
-      await this.handlePermissionRevokedV2(project, validation.reason || "Unknown");
+      await this.handlePermissionRevokedV2(
+        project,
+        validation.reason || "Unknown"
+      );
     }
     return validation;
   }
@@ -16137,7 +16201,9 @@ var SyncService = class {
    */
   async syncDirectory(project, directory) {
     try {
-      const validation = await this.api.validateAccessToken(project.accessToken);
+      const validation = await this.api.validateAccessToken(
+        project.accessToken
+      );
       if (!validation.valid) {
         return {
           success: false,
@@ -16148,7 +16214,11 @@ var SyncService = class {
       }
       const allVariables = [];
       for (const env4 of directory.environments) {
-        const vars = await this.api.getVariables(project.projectId, env4, project.accessToken);
+        const vars = await this.api.getVariables(
+          project.projectId,
+          env4,
+          project.accessToken
+        );
         if (directory.environments.length > 1) {
           for (const v of vars) {
             allVariables.push({
@@ -16169,9 +16239,13 @@ var SyncService = class {
         directory.targetFile,
         project.projectName,
         directory.environments.join(", "),
-        Array.from(uniqueVars.values())
+        Array.from(uniqueVars.values()),
+        project.projectId
       );
-      await this.storage.updateDirectorySyncTime(project.projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        project.projectId,
+        directory.directoryPath
+      );
       await this.api.updateLastUsed(project.accessToken);
       return {
         success: true,
@@ -16202,7 +16276,7 @@ var SyncService = class {
   /**
    * Write env file to a specific directory
    */
-  async writeEnvFileToDirectory(directoryPath, targetFile, projectName, environments, variables) {
+  async writeEnvFileToDirectory(directoryPath, targetFile, projectName, environments, variables, projectId) {
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path2.resolve(platformPath, targetFile);
     const normalizedDir = path2.resolve(platformPath);
@@ -16235,14 +16309,41 @@ var SyncService = class {
 `;
       }
     }
+    try {
+      await fs.chmod(envFilePath, 420);
+    } catch {
+    }
     await fs.writeFile(envFilePath, content, "utf-8");
+    const role = projectId ? this.api.getUserRole(projectId) : void 0;
+    if (role === "member") {
+      await fs.chmod(envFilePath, 292);
+      if (this.fileProtection) {
+        const syncCallback = async () => {
+          if (projectId) {
+            const project = await this.storage.getLinkedProjectV2(projectId);
+            if (project) {
+              const dir = project.directories.find(
+                (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath)
+              );
+              if (dir) {
+                await this.syncDirectory(project, dir);
+              }
+            }
+          }
+        };
+        this.fileProtection.watchFile(envFilePath, syncCallback);
+      }
+    }
   }
   /**
    * Delete env files from all directories when access is revoked
    */
   async cleanupAllDirectories(project) {
     for (const directory of project.directories) {
-      await this.deleteEnvFileFromDirectory(directory.directoryPath, directory.targetFile);
+      await this.deleteEnvFileFromDirectory(
+        directory.directoryPath,
+        directory.targetFile
+      );
     }
   }
   /**
@@ -16255,8 +16356,12 @@ var SyncService = class {
     if (!envFilePath.startsWith(normalizedDir + path2.sep) && envFilePath !== normalizedDir) {
       return;
     }
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
+    }
     try {
       await fs.access(envFilePath);
+      await fs.chmod(envFilePath, 420);
       await fs.unlink(envFilePath);
     } catch {
     }
@@ -16308,7 +16413,10 @@ var SyncService = class {
         directory.environments.join(", "),
         variables
       );
-      await this.storage.updateDirectorySyncTime(projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        projectId,
+        directory.directoryPath
+      );
     } else if (options.conflictStrategy !== "skip") {
       await this.syncDirectory(project, directory);
     }
@@ -16336,7 +16444,9 @@ var SyncService = class {
       }
     }
     await this.storage.addDirectoryToProject(project.projectId, directory);
-    const updatedProject = await this.storage.getLinkedProjectV2(project.projectId);
+    const updatedProject = await this.storage.getLinkedProjectV2(
+      project.projectId
+    );
     if (!updatedProject) {
       return;
     }
@@ -16353,7 +16463,10 @@ var SyncService = class {
         directory.environments.join(", "),
         variables
       );
-      await this.storage.updateDirectorySyncTime(project.projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        project.projectId,
+        directory.directoryPath
+      );
     } else if (options.conflictStrategy !== "skip") {
       await this.syncDirectory(updatedProject, directory);
     }
@@ -16369,7 +16482,10 @@ var SyncService = class {
           (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath)
         );
         if (directory) {
-          await this.deleteEnvFileFromDirectory(directoryPath, directory.targetFile);
+          await this.deleteEnvFileFromDirectory(
+            directoryPath,
+            directory.targetFile
+          );
         }
       }
     }
@@ -16468,8 +16584,14 @@ var RealTimeSyncService = class {
       return;
     }
     const baseInterval = getRealTimeSyncInterval() || DEFAULT_REALTIME_INTERVAL;
-    const backoffMultiplier = Math.min(Math.pow(2, this.failureCount), MAX_BACKOFF_INTERVAL / baseInterval);
-    const interval = Math.min(baseInterval * backoffMultiplier, MAX_BACKOFF_INTERVAL);
+    const backoffMultiplier = Math.min(
+      Math.pow(2, this.failureCount),
+      MAX_BACKOFF_INTERVAL / baseInterval
+    );
+    const interval = Math.min(
+      baseInterval * backoffMultiplier,
+      MAX_BACKOFF_INTERVAL
+    );
     this.pollTimer = setTimeout(async () => {
       await this.checkForRevocations();
       this.scheduleNextPoll();
@@ -16488,7 +16610,9 @@ var RealTimeSyncService = class {
       const accessTokens = linkedProjects.map((p) => p.accessToken);
       const response = await this.api.checkPermissionEvents(accessTokens);
       if (response.hasRevocations && response.events.length > 0) {
-        console.log(`[RealTimeSync] Detected ${response.events.length} revocation event(s)`);
+        console.log(
+          `[RealTimeSync] Detected ${response.events.length} revocation event(s)`
+        );
         const eventsByToken = /* @__PURE__ */ new Map();
         for (const event of response.events) {
           await this.handleRevocationEvent(event, linkedProjects);
@@ -16501,7 +16625,10 @@ var RealTimeSyncService = class {
           try {
             await this.api.acknowledgeRevocations(eventIds, accessToken);
           } catch (error) {
-            console.debug("[RealTimeSync] Failed to acknowledge events:", error);
+            console.debug(
+              "[RealTimeSync] Failed to acknowledge events:",
+              error
+            );
           }
         }
       }
@@ -16515,12 +16642,19 @@ var RealTimeSyncService = class {
    * Handle a single revocation event
    */
   async handleRevocationEvent(event, linkedProjects) {
-    const project = linkedProjects.find((p) => p.accessToken === event.accessToken);
+    const project = linkedProjects.find(
+      (p) => p.accessToken === event.accessToken
+    );
     if (!project) {
-      console.warn("[RealTimeSync] Revocation event for unknown project:", event.projectId);
+      console.warn(
+        "[RealTimeSync] Revocation event for unknown project:",
+        event.projectId
+      );
       return;
     }
-    console.log(`[RealTimeSync] Processing revocation for project: ${project.projectName}`);
+    console.log(
+      `[RealTimeSync] Processing revocation for project: ${project.projectName}`
+    );
     this._onRevocationDetected.fire({ project, reason: event.reason });
     await this.triggerRevocationCleanup(project, event.reason);
   }
@@ -16536,9 +16670,14 @@ var RealTimeSyncService = class {
         `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
         "OK"
       );
-      console.log(`[RealTimeSync] Cleanup completed for project: ${project.projectName}`);
+      console.log(
+        `[RealTimeSync] Cleanup completed for project: ${project.projectName}`
+      );
     } catch (error) {
-      console.error("[RealTimeSync] Failed to cleanup after revocation:", error);
+      console.error(
+        "[RealTimeSync] Failed to cleanup after revocation:",
+        error
+      );
       try {
         await this.storage.removeLinkedProjectV2(project.projectId);
       } catch {
@@ -16605,7 +16744,10 @@ var StorageService = class {
       if (currentVersion === 1) {
         await this.migrateV1ToV2();
       }
-      await this.context.globalState.update(STORAGE_VERSION_KEY, CURRENT_STORAGE_VERSION);
+      await this.context.globalState.update(
+        STORAGE_VERSION_KEY,
+        CURRENT_STORAGE_VERSION
+      );
     }
     this.migrationComplete = true;
   }
@@ -16623,7 +16765,9 @@ var StorageService = class {
         lastSyncedAt: old.lastSyncedAt,
         createdAt: Date.now()
       };
-      const existingIndex = newProjects.findIndex((p) => p.projectId === old.projectId);
+      const existingIndex = newProjects.findIndex(
+        (p) => p.projectId === old.projectId
+      );
       if (existingIndex !== -1) {
         newProjects[existingIndex] = {
           ...newProjects[existingIndex],
@@ -16631,7 +16775,10 @@ var StorageService = class {
           updatedAt: Date.now()
         };
       } else {
-        const oldToken = await this.getAccessToken(old.projectId, old.workspacePath);
+        const oldToken = await this.getAccessToken(
+          old.projectId,
+          old.workspacePath
+        );
         if (oldToken) {
           await this.setAccessTokenForProject(old.projectId, oldToken);
         }
@@ -16679,7 +16826,9 @@ var StorageService = class {
    * Get linked projects metadata - V1 format (legacy)
    */
   getLinkedProjectsMetadata() {
-    const projects = this.context.globalState.get(LINKED_PROJECTS_KEY);
+    const projects = this.context.globalState.get(
+      LINKED_PROJECTS_KEY
+    );
     return projects || [];
   }
   async setLinkedProjectsMetadata(projects) {
@@ -16713,7 +16862,10 @@ var StorageService = class {
     const metadata = this.getLinkedProjectsMetadata();
     const projects = await Promise.all(
       metadata.map(async (m) => {
-        const accessToken = await this.getAccessToken(m.projectId, m.workspacePath);
+        const accessToken = await this.getAccessToken(
+          m.projectId,
+          m.workspacePath
+        );
         return {
           ...m,
           accessToken: accessToken || ""
@@ -16733,7 +16885,11 @@ var StorageService = class {
     const filtered = metadata.filter(
       (p) => !(p.projectId === project.projectId && p.workspacePath === project.workspacePath)
     );
-    await this.setAccessToken(project.projectId, project.workspacePath, project.accessToken);
+    await this.setAccessToken(
+      project.projectId,
+      project.workspacePath,
+      project.accessToken
+    );
     const { accessToken, ...metadataOnly } = project;
     filtered.push(metadataOnly);
     await this.setLinkedProjectsMetadata(filtered);
@@ -16752,7 +16908,10 @@ var StorageService = class {
     if (!match) {
       return null;
     }
-    const accessToken = await this.getAccessToken(match.projectId, match.workspacePath);
+    const accessToken = await this.getAccessToken(
+      match.projectId,
+      match.workspacePath
+    );
     if (!accessToken) {
       return null;
     }
@@ -16765,7 +16924,11 @@ var StorageService = class {
     );
     if (index !== -1) {
       if (updates.accessToken) {
-        await this.setAccessToken(projectId, workspacePath, updates.accessToken);
+        await this.setAccessToken(
+          projectId,
+          workspacePath,
+          updates.accessToken
+        );
       }
       const { accessToken, ...metadataUpdates } = updates;
       metadata[index] = { ...metadata[index], ...metadataUpdates };
@@ -16800,7 +16963,9 @@ var StorageService = class {
    * Get linked projects metadata - V2 format
    */
   getLinkedProjectsMetadataV2() {
-    return this.context.globalState.get(LINKED_PROJECTS_V2_KEY) || [];
+    return this.context.globalState.get(
+      LINKED_PROJECTS_V2_KEY
+    ) || [];
   }
   /**
    * Set linked projects metadata - V2 format
@@ -16867,7 +17032,12 @@ var StorageService = class {
         projectName,
         organizationName,
         expiresAt,
-        directories: [{ ...directory, directoryPath: normalizePath(directory.directoryPath) }],
+        directories: [
+          {
+            ...directory,
+            directoryPath: normalizePath(directory.directoryPath)
+          }
+        ],
         defaultEnvironment,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -16934,7 +17104,9 @@ var StorageService = class {
     const projects = await this.getLinkedProjectsV2();
     const normalizedPath = normalizePath(directoryPath);
     return projects.find(
-      (p) => p.directories.some((d) => normalizePath(d.directoryPath) === normalizedPath)
+      (p) => p.directories.some(
+        (d) => normalizePath(d.directoryPath) === normalizedPath
+      )
     ) || null;
   }
   /**
@@ -17096,7 +17268,9 @@ var ProjectsTreeProvider = class {
         }
         const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
         return projects.map((project) => {
-          const linkedV2 = linkedProjectsV2.find((lp) => lp.projectId === project._id);
+          const linkedV2 = linkedProjectsV2.find(
+            (lp) => lp.projectId === project._id
+          );
           if (linkedV2) {
             return new ProjectTreeItem(
               project.name,
@@ -17128,7 +17302,9 @@ var ProjectsTreeProvider = class {
       }
     }
     if (element.type === "linkedProject" && element.project) {
-      const linkedProject = await this.storage.getLinkedProjectV2(element.project._id);
+      const linkedProject = await this.storage.getLinkedProjectV2(
+        element.project._id
+      );
       if (!linkedProject || linkedProject.directories.length === 0) {
         return [
           new ProjectTreeItem(
@@ -17216,9 +17392,11 @@ var ProjectTreeItem = class extends vscode5.TreeItem {
     tooltip.appendMarkdown(`**Target File:** ${directory.targetFile}
 
 `);
-    tooltip.appendMarkdown(`**Environments:** ${directory.environments.join(", ")}
+    tooltip.appendMarkdown(
+      `**Environments:** ${directory.environments.join(", ")}
 
-`);
+`
+    );
     if (directory.lastSyncedAt) {
       tooltip.appendMarkdown(
         `**Last Synced:** ${new Date(directory.lastSyncedAt).toLocaleString()}`
@@ -17324,6 +17502,38 @@ var VariablesTreeProvider = class {
           );
         }
       }
+      const role = this.api.getUserRole(linkedProject.projectId);
+      if (role === "member") {
+        try {
+          const pendingRequests = await this.api.getVariableRequests(
+            linkedProject.projectId,
+            "pending"
+          );
+          if (pendingRequests.length > 0) {
+            items.push(
+              new VariableTreeItem(
+                "Pending Requests",
+                vscode6.TreeItemCollapsibleState.None,
+                "separator",
+                void 0,
+                `${pendingRequests.length} pending`
+              )
+            );
+            for (const request of pendingRequests) {
+              items.push(
+                new VariableTreeItem(
+                  request.key,
+                  vscode6.TreeItemCollapsibleState.None,
+                  "request",
+                  void 0,
+                  request.status
+                )
+              );
+            }
+          }
+        } catch {
+        }
+      }
       return items;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -17383,6 +17593,9 @@ var VariableTreeItem = class extends vscode6.TreeItem {
       case "error":
         this.iconPath = new vscode6.ThemeIcon("error");
         break;
+      case "request":
+        this.iconPath = new vscode6.ThemeIcon("git-pull-request");
+        break;
     }
     this.contextValue = type;
   }
@@ -17427,8 +17640,12 @@ var StatusBarProvider = class {
     );
     this.statusBarItem.command = "envConnect.showStatus";
     this.authService.onAuthStateChanged(() => this.update());
-    this.syncService.onSyncComplete((result) => this.handleSyncComplete(result));
-    this.syncService.onPermissionRevoked((project) => this.handlePermissionRevoked(project));
+    this.syncService.onSyncComplete(
+      (result) => this.handleSyncComplete(result)
+    );
+    this.syncService.onPermissionRevoked(
+      (project) => this.handlePermissionRevoked(project)
+    );
     this.update();
     this.statusBarItem.show();
   }
@@ -17646,7 +17863,10 @@ var LinkProjectDialog = class {
     if (!targetFile) {
       return void 0;
     }
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17696,7 +17916,10 @@ var LinkProjectDialog = class {
     if (!targetFile) {
       return void 0;
     }
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17726,7 +17949,10 @@ var LinkProjectDialog = class {
       return void 0;
     }
     const targetFile = getTargetFile();
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17744,10 +17970,222 @@ var LinkProjectDialog = class {
   }
 };
 
+// src/ui/requestVariableDialog.ts
+var vscode9 = __toESM(require("vscode"));
+var RequestVariableDialog = class {
+  /**
+   * Show the variable request dialog and collect all inputs.
+   * Returns undefined if the user cancels at any step.
+   */
+  async showRequestDialog(projectId) {
+    const key = await vscode9.window.showInputBox({
+      title: "Request Variable (1/5) - Key",
+      prompt: "Enter the variable key name",
+      placeHolder: "e.g., API_KEY, DATABASE_URL",
+      validateInput: (value2) => {
+        if (!value2) {
+          return "Key is required";
+        }
+        if (!/^[A-Z][A-Z0-9_]*$/.test(value2)) {
+          return "Must be uppercase, start with a letter, and contain only letters, numbers, and underscores";
+        }
+        if (value2.length > 100) {
+          return "Key must be 100 characters or less";
+        }
+        return void 0;
+      }
+    });
+    if (!key) {
+      return void 0;
+    }
+    const value = await vscode9.window.showInputBox({
+      title: "Request Variable (2/5) - Value",
+      prompt: `Enter the value for ${key}`,
+      placeHolder: "Variable value",
+      validateInput: (v) => {
+        if (!v) {
+          return "Value is required";
+        }
+        return void 0;
+      }
+    });
+    if (!value) {
+      return void 0;
+    }
+    const description = await vscode9.window.showInputBox({
+      title: "Request Variable (3/5) - Description",
+      prompt: "Enter a description (optional, press Enter to skip)",
+      placeHolder: "What is this variable used for?"
+    });
+    if (description === void 0) {
+      return void 0;
+    }
+    const envItems = await vscode9.window.showQuickPick(
+      [
+        { label: "Development", value: "development", picked: true },
+        { label: "Staging", value: "staging" },
+        { label: "Production", value: "production" }
+      ],
+      {
+        title: "Request Variable (4/5) - Environments",
+        placeHolder: "Select environments for this variable",
+        canPickMany: true
+      }
+    );
+    if (!envItems || envItems.length === 0) {
+      return void 0;
+    }
+    const environments = envItems.map((item) => item.value);
+    const sensitiveChoice = await vscode9.window.showQuickPick(
+      [
+        { label: "No", description: "Regular variable", value: false },
+        {
+          label: "Yes",
+          description: "Secret, credential, or API key",
+          value: true
+        }
+      ],
+      {
+        title: "Request Variable (5/5) - Sensitive?",
+        placeHolder: "Is this a sensitive value (secret/credential)?"
+      }
+    );
+    if (!sensitiveChoice) {
+      return void 0;
+    }
+    return {
+      key,
+      value,
+      description: description || void 0,
+      environments,
+      projectId,
+      isSensitive: sensitiveChoice.value
+    };
+  }
+};
+
+// src/services/fileProtection.ts
+var vscode10 = __toESM(require("vscode"));
+var fs2 = __toESM(require("fs/promises"));
+var FileProtectionService = class {
+  watchers = /* @__PURE__ */ new Map();
+  debounceTimers = /* @__PURE__ */ new Map();
+  _isSyncing = false;
+  /**
+   * Set syncing state to suppress revert during our own writes
+   */
+  setSyncing(value) {
+    this._isSyncing = value;
+  }
+  /**
+   * Watch a synced .env file for unauthorized changes.
+   * When a change is detected, shows a warning with a "Request Variable" action
+   * and reverts the file by calling the resync callback.
+   */
+  watchFile(filePath, resyncCallback) {
+    if (this.watchers.has(filePath)) {
+      return;
+    }
+    const watcher = vscode10.workspace.createFileSystemWatcher(
+      new vscode10.RelativePattern(
+        vscode10.Uri.file(filePath).fsPath,
+        "**"
+      )
+    );
+    const fileWatcher = vscode10.workspace.createFileSystemWatcher(filePath);
+    fileWatcher.onDidChange(async () => {
+      if (this._isSyncing) {
+        return;
+      }
+      const existing = this.debounceTimers.get(filePath);
+      if (existing) {
+        clearTimeout(existing);
+      }
+      this.debounceTimers.set(
+        filePath,
+        setTimeout(async () => {
+          this.debounceTimers.delete(filePath);
+          await this.handleUnauthorizedEdit(filePath, resyncCallback);
+        }, 500)
+      );
+    });
+    fileWatcher.onDidDelete(async () => {
+      if (this._isSyncing) {
+        return;
+      }
+      const existing = this.debounceTimers.get(filePath);
+      if (existing) {
+        clearTimeout(existing);
+      }
+      this.debounceTimers.set(
+        filePath,
+        setTimeout(async () => {
+          this.debounceTimers.delete(filePath);
+          await this.handleUnauthorizedEdit(filePath, resyncCallback);
+        }, 500)
+      );
+    });
+    watcher.dispose();
+    this.watchers.set(filePath, fileWatcher);
+  }
+  /**
+   * Stop watching a file
+   */
+  unwatchFile(filePath) {
+    const watcher = this.watchers.get(filePath);
+    if (watcher) {
+      watcher.dispose();
+      this.watchers.delete(filePath);
+    }
+    const timer = this.debounceTimers.get(filePath);
+    if (timer) {
+      clearTimeout(timer);
+      this.debounceTimers.delete(filePath);
+    }
+  }
+  /**
+   * Handle an unauthorized edit by showing a warning and reverting
+   */
+  async handleUnauthorizedEdit(filePath, resyncCallback) {
+    const action = await vscode10.window.showWarningMessage(
+      "This file is managed by ENV Connect. You cannot edit it directly.",
+      "Request Variable",
+      "OK"
+    );
+    try {
+      this._isSyncing = true;
+      try {
+        await fs2.chmod(filePath, 420);
+      } catch {
+      }
+      await resyncCallback();
+      try {
+        await fs2.chmod(filePath, 292);
+      } catch {
+      }
+    } finally {
+      this._isSyncing = false;
+    }
+    if (action === "Request Variable") {
+      await vscode10.commands.executeCommand("envConnect.requestVariable");
+    }
+  }
+  dispose() {
+    for (const watcher of this.watchers.values()) {
+      watcher.dispose();
+    }
+    this.watchers.clear();
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
+  }
+};
+
 // src/utils/device.ts
 var os2 = __toESM(require("os"));
 var crypto3 = __toESM(require("crypto"));
-var vscode9 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var DEVICE_ID_KEY = "envConnect.deviceId";
 async function getDeviceId(context) {
   let deviceId = context.globalState.get(DEVICE_ID_KEY);
@@ -17785,7 +18223,7 @@ function getPlatformName() {
   }
 }
 function getEditorName() {
-  const appName = vscode9.env.appName;
+  const appName = vscode11.env.appName;
   if (appName.toLowerCase().includes("cursor")) {
     return "Cursor";
   }
@@ -17804,38 +18242,78 @@ var apiService;
 var syncService;
 var realTimeSyncService;
 var storageService;
+var fileProtectionService;
 var projectsTreeProvider;
 var variablesTreeProvider;
 var statusBarProvider;
 var linkProjectDialog;
+var requestVariableDialog;
 async function activate(context) {
   storageService = new StorageService(context);
   await storageService.migrateIfNeeded();
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
+  fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
-  realTimeSyncService = new RealTimeSyncService(apiService, syncService, storageService);
+  syncService.setFileProtection(fileProtectionService);
+  realTimeSyncService = new RealTimeSyncService(
+    apiService,
+    syncService,
+    storageService
+  );
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
   linkProjectDialog = new LinkProjectDialog(syncService);
+  requestVariableDialog = new RequestVariableDialog();
   context.subscriptions.push(
-    vscode10.window.registerTreeDataProvider("envConnect.projects", projectsTreeProvider),
-    vscode10.window.registerTreeDataProvider("envConnect.variables", variablesTreeProvider)
+    vscode12.window.registerTreeDataProvider(
+      "envConnect.projects",
+      projectsTreeProvider
+    ),
+    vscode12.window.registerTreeDataProvider(
+      "envConnect.variables",
+      variablesTreeProvider
+    )
   );
   context.subscriptions.push(
-    vscode10.commands.registerCommand("envConnect.signIn", handleSignIn),
-    vscode10.commands.registerCommand("envConnect.signOut", handleSignOut),
-    vscode10.commands.registerCommand("envConnect.linkProject", handleLinkProject),
-    vscode10.commands.registerCommand("envConnect.unlinkProject", handleUnlinkProject),
-    vscode10.commands.registerCommand("envConnect.pullVariables", handlePullVariables),
-    vscode10.commands.registerCommand("envConnect.refresh", handleRefresh),
-    vscode10.commands.registerCommand("envConnect.openDashboard", handleOpenDashboard),
-    vscode10.commands.registerCommand("envConnect.showStatus", handleShowStatus),
+    vscode12.commands.registerCommand("envConnect.signIn", handleSignIn),
+    vscode12.commands.registerCommand("envConnect.signOut", handleSignOut),
+    vscode12.commands.registerCommand(
+      "envConnect.linkProject",
+      handleLinkProject
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.unlinkProject",
+      handleUnlinkProject
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.pullVariables",
+      handlePullVariables
+    ),
+    vscode12.commands.registerCommand("envConnect.refresh", handleRefresh),
+    vscode12.commands.registerCommand(
+      "envConnect.openDashboard",
+      handleOpenDashboard
+    ),
+    vscode12.commands.registerCommand("envConnect.showStatus", handleShowStatus),
     // New V2 commands
-    vscode10.commands.registerCommand("envConnect.addDirectory", handleAddDirectory),
-    vscode10.commands.registerCommand("envConnect.removeDirectory", handleRemoveDirectory),
-    vscode10.commands.registerCommand("envConnect.selectEnvironments", handleSelectEnvironments)
+    vscode12.commands.registerCommand(
+      "envConnect.addDirectory",
+      handleAddDirectory
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.removeDirectory",
+      handleRemoveDirectory
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.selectEnvironments",
+      handleSelectEnvironments
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.requestVariable",
+      handleRequestVariable
+    )
   );
   authService.onAuthStateChanged(async (session) => {
     projectsTreeProvider.setAuthenticated(!!session);
@@ -17858,10 +18336,12 @@ async function activate(context) {
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
-    console.log(`[Extension] Revocation detected for ${project.projectName}: ${reason}`);
+    console.log(
+      `[Extension] Revocation detected for ${project.projectName}: ${reason}`
+    );
   });
   context.subscriptions.push(
-    vscode10.workspace.onDidChangeWorkspaceFolders(() => {
+    vscode12.workspace.onDidChangeWorkspaceFolders(() => {
       variablesTreeProvider.refresh();
       statusBarProvider.update();
     })
@@ -17871,6 +18351,7 @@ async function activate(context) {
       authService.dispose();
       syncService.dispose();
       realTimeSyncService.dispose();
+      fileProtectionService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
@@ -17896,7 +18377,7 @@ async function handleSignOut() {
 async function handleLinkProject(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const shouldSignIn = await vscode10.window.showWarningMessage(
+    const shouldSignIn = await vscode12.window.showWarningMessage(
       "You need to sign in to link a project.",
       "Sign In"
     );
@@ -17919,10 +18400,10 @@ async function handleLinkProject(item) {
   } else {
     const organizations = await apiService.getOrganizations();
     if (organizations.length === 0) {
-      vscode10.window.showWarningMessage("No organizations found");
+      vscode12.window.showWarningMessage("No organizations found");
       return;
     }
-    const orgPick = await vscode10.window.showQuickPick(
+    const orgPick = await vscode12.window.showQuickPick(
       organizations.map((org) => ({
         label: org.name,
         description: org.tier === "pro" ? "Pro" : "Free",
@@ -17933,17 +18414,23 @@ async function handleLinkProject(item) {
     if (!orgPick) {
       return;
     }
-    const accessCheck = await apiService.checkExtensionAccess(orgPick.organization._id);
+    const accessCheck = await apiService.checkExtensionAccess(
+      orgPick.organization._id
+    );
     if (!accessCheck.enabled) {
-      vscode10.window.showWarningMessage(accessCheck.reason || "Extension access requires Pro tier");
+      vscode12.window.showWarningMessage(
+        accessCheck.reason || "Extension access requires Pro tier"
+      );
       return;
     }
     const projects = await apiService.getProjects(orgPick.organization._id);
     if (projects.length === 0) {
-      vscode10.window.showWarningMessage("No projects found in this organization");
+      vscode12.window.showWarningMessage(
+        "No projects found in this organization"
+      );
       return;
     }
-    const projectPick = await vscode10.window.showQuickPick(
+    const projectPick = await vscode12.window.showQuickPick(
       projects.map((p) => ({
         label: p.name,
         description: p.description || void 0,
@@ -17962,7 +18449,7 @@ async function handleLinkProject(item) {
   }
   const existingProject = await storageService.getLinkedProjectV2(projectId);
   if (existingProject) {
-    const choice = await vscode10.window.showInformationMessage(
+    const choice = await vscode12.window.showInformationMessage(
       `"${projectName}" is already linked. Add another directory?`,
       "Add Directory",
       "Cancel"
@@ -17973,7 +18460,7 @@ async function handleLinkProject(item) {
         return;
       try {
         await syncService.addDirectoryToProject(existingProject, linkOptions2);
-        vscode10.window.showInformationMessage(
+        vscode12.window.showInformationMessage(
           `Added ${getDisplayPath(linkOptions2.directoryPath)} to ${projectName}`
         );
         projectsTreeProvider.refresh();
@@ -17981,13 +18468,13 @@ async function handleLinkProject(item) {
         statusBarProvider.update();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        vscode10.window.showErrorMessage(`Failed to add directory: ${message}`);
+        vscode12.window.showErrorMessage(`Failed to add directory: ${message}`);
       }
     }
     return;
   }
   if (!project || !organization) {
-    vscode10.window.showErrorMessage("Project or organization not found");
+    vscode12.window.showErrorMessage("Project or organization not found");
     return;
   }
   const projectForDialog = {
@@ -18022,7 +18509,7 @@ async function handleLinkProject(item) {
       access2.expiresAt,
       linkOptions
     );
-    vscode10.window.showInformationMessage(
+    vscode12.window.showInformationMessage(
       `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
     );
     projectsTreeProvider.refresh();
@@ -18030,13 +18517,13 @@ async function handleLinkProject(item) {
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode10.window.showErrorMessage(`Failed to link project: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to link project: ${message}`);
   }
 }
 async function handleAddDirectory(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode10.window.showWarningMessage("Please sign in first");
+    vscode12.window.showWarningMessage("Please sign in first");
     return;
   }
   let projectId;
@@ -18047,10 +18534,12 @@ async function handleAddDirectory(item) {
   } else {
     const linkedProjects = await storageService.getLinkedProjectsV2();
     if (linkedProjects.length === 0) {
-      vscode10.window.showWarningMessage("No linked projects. Link a project first.");
+      vscode12.window.showWarningMessage(
+        "No linked projects. Link a project first."
+      );
       return;
     }
-    const projectPick = await vscode10.window.showQuickPick(
+    const projectPick = await vscode12.window.showQuickPick(
       linkedProjects.map((p) => ({
         label: p.projectName,
         description: `${p.directories.length} director${p.directories.length === 1 ? "y" : "ies"} linked`,
@@ -18065,30 +18554,32 @@ async function handleAddDirectory(item) {
   }
   const project = await storageService.getLinkedProjectV2(projectId);
   if (!project) {
-    vscode10.window.showWarningMessage("Project not found");
+    vscode12.window.showWarningMessage("Project not found");
     return;
   }
-  const linkOptions = await linkProjectDialog.showAddDirectoryDialog(projectName);
+  const linkOptions = await linkProjectDialog.showAddDirectoryDialog(
+    projectName
+  );
   if (!linkOptions)
     return;
   try {
     await syncService.addDirectoryToProject(project, linkOptions);
-    vscode10.window.showInformationMessage(
+    vscode12.window.showInformationMessage(
       `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
     );
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode10.window.showErrorMessage(`Failed to add directory: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to add directory: ${message}`);
   }
 }
 async function handleRemoveDirectory(item) {
   if (!item?.directory || !item.project) {
-    vscode10.window.showWarningMessage("Select a directory to remove");
+    vscode12.window.showWarningMessage("Select a directory to remove");
     return;
   }
-  const confirm = await vscode10.window.showWarningMessage(
+  const confirm = await vscode12.window.showWarningMessage(
     `Remove "${getDisplayPath(item.directory.directoryPath)}" from ${item.project.name}?`,
     "Remove",
     "Cancel"
@@ -18097,26 +18588,68 @@ async function handleRemoveDirectory(item) {
     return;
   }
   try {
-    await syncService.removeDirectoryFromProject(item.project._id, item.directory.directoryPath);
-    vscode10.window.showInformationMessage("Directory removed");
+    await syncService.removeDirectoryFromProject(
+      item.project._id,
+      item.directory.directoryPath
+    );
+    vscode12.window.showInformationMessage("Directory removed");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode10.window.showErrorMessage(`Failed to remove directory: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to remove directory: ${message}`);
   }
 }
 async function handleSelectEnvironments(item) {
-  vscode10.window.showInformationMessage(
+  vscode12.window.showInformationMessage(
     "To change environments, remove and re-add the directory with different environment settings."
   );
+}
+async function handleRequestVariable() {
+  const isAuth = await authService.isAuthenticated();
+  if (!isAuth) {
+    vscode12.window.showWarningMessage("Please sign in first");
+    return;
+  }
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  if (!linkedProject) {
+    vscode12.window.showWarningMessage(
+      'No project linked. Use "ENV Connect: Link Project" first.'
+    );
+    return;
+  }
+  const role = apiService.getUserRole(linkedProject.projectId);
+  if (role && role !== "member") {
+    vscode12.window.showInformationMessage(
+      "As an admin or team lead, you can create variables directly on the dashboard."
+    );
+    return;
+  }
+  const input = await requestVariableDialog.showRequestDialog(
+    linkedProject.projectId
+  );
+  if (!input) {
+    return;
+  }
+  try {
+    await apiService.submitVariableRequest(input);
+    vscode12.window.showInformationMessage(
+      `Variable request for "${input.key}" submitted for approval.`
+    );
+    variablesTreeProvider.refresh();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    vscode12.window.showErrorMessage(
+      `Failed to submit variable request: ${message}`
+    );
+  }
 }
 async function handleUnlinkProject(item) {
   const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
   if (linkedProjectV2) {
     const projectId2 = item?.project?._id || linkedProjectV2.projectId;
-    const confirm2 = await vscode10.window.showWarningMessage(
+    const confirm2 = await vscode12.window.showWarningMessage(
       `Unlink "${linkedProjectV2.projectName}"? This will remove all synced .env files (${linkedProjectV2.directories.length} director${linkedProjectV2.directories.length === 1 ? "y" : "ies"}).`,
       "Unlink",
       "Cancel"
@@ -18129,23 +18662,23 @@ async function handleUnlinkProject(item) {
       await apiService.unlinkExtension(projectId2, deviceInfo.deviceId);
       await syncService.cleanupAllDirectories(linkedProjectV2);
       await storageService.removeLinkedProjectV2(projectId2);
-      vscode10.window.showInformationMessage("Project unlinked");
+      vscode12.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
       variablesTreeProvider.refresh();
       statusBarProvider.update();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      vscode10.window.showErrorMessage(`Failed to unlink project: ${message}`);
+      vscode12.window.showErrorMessage(`Failed to unlink project: ${message}`);
     }
     return;
   }
   const linkedProject = await syncService.getLinkedProject();
   if (!linkedProject) {
-    vscode10.window.showWarningMessage("No project linked to this workspace");
+    vscode12.window.showWarningMessage("No project linked to this workspace");
     return;
   }
   const projectId = item?.project?._id || linkedProject.projectId;
-  const confirm = await vscode10.window.showWarningMessage(
+  const confirm = await vscode12.window.showWarningMessage(
     `Unlink "${linkedProject.projectName}"? This will remove the synced .env file.`,
     "Unlink",
     "Cancel"
@@ -18157,19 +18690,19 @@ async function handleUnlinkProject(item) {
     const deviceInfo = await getDeviceInfo(storageService.getContext());
     await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
     await syncService.unlinkProject(projectId);
-    vscode10.window.showInformationMessage("Project unlinked");
+    vscode12.window.showInformationMessage("Project unlinked");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode10.window.showErrorMessage(`Failed to unlink project: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to unlink project: ${message}`);
   }
 }
 async function handlePullVariables() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode10.window.showWarningMessage("Please sign in first");
+    vscode12.window.showWarningMessage("Please sign in first");
     return;
   }
   statusBarProvider.setSyncing(true);
@@ -18181,11 +18714,11 @@ async function handlePullVariables() {
       const successful = results.filter((r) => r.success).length;
       const total = results.length;
       if (successful === total) {
-        vscode10.window.showInformationMessage(
+        vscode12.window.showInformationMessage(
           `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
         );
       } else {
-        vscode10.window.showWarningMessage(
+        vscode12.window.showWarningMessage(
           `Synced ${successful}/${total} directories. Some failed.`
         );
       }
@@ -18206,12 +18739,12 @@ function handleRefresh() {
 }
 function handleOpenDashboard() {
   const serverUrl = getServerUrl();
-  vscode10.env.openExternal(vscode10.Uri.parse(serverUrl));
+  vscode12.env.openExternal(vscode12.Uri.parse(serverUrl));
 }
 async function handleShowStatus() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const action = await vscode10.window.showInformationMessage(
+    const action = await vscode12.window.showInformationMessage(
       "ENV Connect: Not signed in",
       "Sign In"
     );
@@ -18231,7 +18764,7 @@ async function handleShowStatus() {
   ];
   if (linkedProjectV2) {
     items.push(
-      { kind: vscode10.QuickPickItemKind.Separator, label: "Linked Project" },
+      { kind: vscode12.QuickPickItemKind.Separator, label: "Linked Project" },
       {
         label: "$(folder) Project",
         description: linkedProjectV2.projectName
@@ -18255,7 +18788,7 @@ async function handleShowStatus() {
     const linkedProject = await syncService.getLinkedProject();
     if (linkedProject) {
       items.push(
-        { kind: vscode10.QuickPickItemKind.Separator, label: "Linked Project" },
+        { kind: vscode12.QuickPickItemKind.Separator, label: "Linked Project" },
         {
           label: "$(folder) Project",
           description: linkedProject.projectName
@@ -18280,7 +18813,7 @@ async function handleShowStatus() {
     }
   }
   items.push(
-    { kind: vscode10.QuickPickItemKind.Separator, label: "Actions" },
+    { kind: vscode12.QuickPickItemKind.Separator, label: "Actions" },
     {
       label: "$(sync) Pull Variables",
       description: "Sync variables now"
@@ -18303,7 +18836,7 @@ async function handleShowStatus() {
     }
   );
   const filteredItems = items.filter((i) => i.label);
-  const selected = await vscode10.window.showQuickPick(filteredItems, {
+  const selected = await vscode12.window.showQuickPick(filteredItems, {
     title: "ENV Connect Status",
     placeHolder: "Select an action"
   });

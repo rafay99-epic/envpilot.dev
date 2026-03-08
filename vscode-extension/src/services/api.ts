@@ -10,6 +10,8 @@ import type {
   ApiResponse,
   DeviceInfo,
   PermissionEventsResponse,
+  MembershipRole,
+  VariableRequest,
 } from "../types";
 
 /**
@@ -18,6 +20,7 @@ import type {
 export class ApiService {
   private client: AxiosInstance;
   private storage: StorageService;
+  private roleCache: Map<string, MembershipRole> = new Map();
 
   constructor(storage: StorageService) {
     this.storage = storage;
@@ -86,12 +89,25 @@ export class ApiService {
     }
 
     const response = await this.client.get<
-      ApiResponse<{ variables: EnvironmentVariable[] }>
+      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
     >("/api/extension/variables", {
       params: { projectId, environment },
       headers,
     });
+
+    // Cache the user's role for this project
+    if (response.data.data?.role) {
+      this.roleCache.set(projectId, response.data.data.role);
+    }
+
     return response.data.data?.variables || [];
+  }
+
+  /**
+   * Get the cached role for a project (populated after getVariables call)
+   */
+  getUserRole(projectId: string): MembershipRole | undefined {
+    return this.roleCache.get(projectId);
   }
 
   // Project Access (Extension Linking)
@@ -192,5 +208,44 @@ export class ApiService {
       ApiResponse<{ acknowledgedCount: number }>
     >("/api/extension/acknowledge-revocation", { eventIds, accessToken });
     return response.data.data || { acknowledgedCount: 0 };
+  }
+
+  // Variable Requests
+
+  /**
+   * Submit a variable request (members only)
+   */
+  async submitVariableRequest(request: {
+    key: string;
+    value: string;
+    description?: string;
+    environments: string[];
+    projectId: string;
+    isSensitive: boolean;
+  }): Promise<VariableRequest> {
+    const response = await this.client.post<
+      ApiResponse<{ request: VariableRequest }>
+    >("/api/extension/variable-requests", request);
+
+    if (!response.data.data?.request) {
+      throw new Error("Failed to submit variable request");
+    }
+
+    return response.data.data.request;
+  }
+
+  /**
+   * Get variable requests for a project
+   */
+  async getVariableRequests(
+    projectId: string,
+    status?: string,
+  ): Promise<VariableRequest[]> {
+    const response = await this.client.get<
+      ApiResponse<{ requests: VariableRequest[] }>
+    >("/api/extension/variable-requests", {
+      params: { projectId, status },
+    });
+    return response.data.data?.requests || [];
   }
 }

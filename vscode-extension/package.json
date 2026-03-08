@@ -85,6 +85,12 @@
         "command": "envConnect.selectEnvironments",
         "title": "Select Environments",
         "category": "ENV Connect"
+      },
+      {
+        "command": "envConnect.requestVariable",
+        "title": "Request Variable",
+        "category": "ENV Connect",
+        "icon": "$(git-pull-request-create)"
       }
     ],
     "viewsContainers": {
@@ -117,6 +123,11 @@
         },
         {
           "command": "envConnect.pullVariables",
+          "when": "view == envConnect.variables",
+          "group": "navigation"
+        },
+        {
+          "command": "envConnect.requestVariable",
           "when": "view == envConnect.variables",
           "group": "navigation"
         }

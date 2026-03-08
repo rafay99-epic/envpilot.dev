@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { ApiService } from "./api";
+import { FileProtectionService } from "./fileProtection";
 import { StorageService } from "../utils/storage";
 import {
   getEnvironment,
@@ -38,6 +39,7 @@ const ENV_FILE_HEADER = `# ENV Connect - Synced Environment Variables
 export class SyncService {
   private api: ApiService;
   private storage: StorageService;
+  private fileProtection: FileProtectionService | null = null;
   private syncTimer: NodeJS.Timeout | null = null;
   private failureCount = 0;
   private readonly MAX_BACKOFF_MULTIPLIER = 8;
@@ -52,6 +54,13 @@ export class SyncService {
   constructor(api: ApiService, storage: StorageService) {
     this.api = api;
     this.storage = storage;
+  }
+
+  /**
+   * Set the file protection service for read-only enforcement
+   */
+  setFileProtection(fileProtection: FileProtectionService): void {
+    this.fileProtection = fileProtection;
   }
 
   /**
@@ -323,8 +332,26 @@ export class SyncService {
       }
     }
 
+    // Make writable before writing (in case it was previously set read-only)
+    try {
+      await fs.chmod(envFilePath, 0o644);
+    } catch {
+      // File may not exist yet
+    }
+
     // Write file
     await fs.writeFile(envFilePath, content, "utf-8");
+
+    // For members: set read-only and watch for changes
+    const role = this.api.getUserRole(project.projectId);
+    if (role === "member") {
+      await fs.chmod(envFilePath, 0o444);
+      if (this.fileProtection) {
+        this.fileProtection.watchFile(envFilePath, async () => {
+          await this.syncProject(project);
+        });
+      }
+    }
   }
 
   /**
@@ -361,8 +388,15 @@ export class SyncService {
       return; // Don't delete files outside workspace
     }
 
+    // Stop watching before deletion
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
+    }
+
     try {
       await fs.access(envFilePath);
+      // Make writable before deleting (read-only files can't be unlinked on some systems)
+      await fs.chmod(envFilePath, 0o644);
       await fs.unlink(envFilePath);
     } catch {
       // File doesn't exist, nothing to delete
@@ -704,6 +738,7 @@ export class SyncService {
         project.projectName,
         directory.environments.join(", "),
         Array.from(uniqueVars.values()),
+        project.projectId,
       );
 
       // Update last synced
@@ -754,6 +789,7 @@ export class SyncService {
     projectName: string,
     environments: string,
     variables: EnvironmentVariable[],
+    projectId?: string,
   ): Promise<void> {
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path.resolve(platformPath, targetFile);
@@ -796,7 +832,37 @@ export class SyncService {
       }
     }
 
+    // Make writable before writing (in case it was previously set read-only)
+    try {
+      await fs.chmod(envFilePath, 0o644);
+    } catch {
+      // File may not exist yet
+    }
+
     await fs.writeFile(envFilePath, content, "utf-8");
+
+    // For members: set read-only and watch for changes
+    const role = projectId ? this.api.getUserRole(projectId) : undefined;
+    if (role === "member") {
+      await fs.chmod(envFilePath, 0o444);
+      if (this.fileProtection) {
+        const syncCallback = async () => {
+          // Re-sync this specific directory
+          if (projectId) {
+            const project = await this.storage.getLinkedProjectV2(projectId);
+            if (project) {
+              const dir = project.directories.find(
+                (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath),
+              );
+              if (dir) {
+                await this.syncDirectory(project, dir);
+              }
+            }
+          }
+        };
+        this.fileProtection.watchFile(envFilePath, syncCallback);
+      }
+    }
   }
 
   /**
@@ -830,8 +896,15 @@ export class SyncService {
       return;
     }
 
+    // Stop watching before deletion
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
+    }
+
     try {
       await fs.access(envFilePath);
+      // Make writable before deleting (read-only files can't be unlinked on some systems)
+      await fs.chmod(envFilePath, 0o644);
       await fs.unlink(envFilePath);
     } catch {
       // File doesn't exist

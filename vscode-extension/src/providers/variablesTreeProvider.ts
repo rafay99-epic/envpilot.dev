@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
-import type { EnvironmentVariable, LinkedProject } from "../types";
+import type { EnvironmentVariable, LinkedProject, VariableRequest } from "../types";
 
 export class VariablesTreeProvider
   implements vscode.TreeDataProvider<VariableTreeItem>
@@ -119,6 +119,43 @@ export class VariablesTreeProvider
         }
       }
 
+      // Show pending requests for members
+      const role = this.api.getUserRole(linkedProject.projectId);
+      if (role === "member") {
+        try {
+          const pendingRequests = await this.api.getVariableRequests(
+            linkedProject.projectId,
+            "pending",
+          );
+
+          if (pendingRequests.length > 0) {
+            items.push(
+              new VariableTreeItem(
+                "Pending Requests",
+                vscode.TreeItemCollapsibleState.None,
+                "separator",
+                undefined,
+                `${pendingRequests.length} pending`,
+              ),
+            );
+
+            for (const request of pendingRequests) {
+              items.push(
+                new VariableTreeItem(
+                  request.key,
+                  vscode.TreeItemCollapsibleState.None,
+                  "request",
+                  undefined,
+                  request.status,
+                ),
+              );
+            }
+          }
+        } catch {
+          // Ignore errors fetching requests — not critical
+        }
+      }
+
       return items;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -153,20 +190,23 @@ export class VariablesTreeProvider
   }
 }
 
+type VariableTreeItemType =
+  | "variable"
+  | "sensitive"
+  | "header"
+  | "separator"
+  | "message"
+  | "error"
+  | "request";
+
 export class VariableTreeItem extends vscode.TreeItem {
-  type: "variable" | "sensitive" | "header" | "separator" | "message" | "error";
+  type: VariableTreeItemType;
   variable?: EnvironmentVariable;
 
   constructor(
     label: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    type:
-      | "variable"
-      | "sensitive"
-      | "header"
-      | "separator"
-      | "message"
-      | "error",
+    type: VariableTreeItemType,
     variable?: EnvironmentVariable,
     description?: string,
   ) {
@@ -196,6 +236,9 @@ export class VariableTreeItem extends vscode.TreeItem {
         break;
       case "error":
         this.iconPath = new vscode.ThemeIcon("error");
+        break;
+      case "request":
+        this.iconPath = new vscode.ThemeIcon("git-pull-request");
         break;
     }
 

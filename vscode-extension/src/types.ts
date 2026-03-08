@@ -2,6 +2,8 @@
  * Types for ENV Connect VS Code Extension
  */
 
+export type MembershipRole = "admin" | "team_lead" | "member";
+
 export interface User {
   id: string;
   email: string;
@@ -14,6 +16,18 @@ export interface Organization {
   name: string;
   slug: string;
   tier: "free" | "pro";
+  role?: MembershipRole;
+}
+
+export interface VariableRequest {
+  _id: string;
+  key: string;
+  description?: string;
+  environments: string[];
+  isSensitive: boolean;
+  status: "pending" | "approved" | "rejected" | "canceled";
+  createdAt: number;
+  reviewReason?: string;
 }
 
 export interface Project {
