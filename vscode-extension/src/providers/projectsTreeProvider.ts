@@ -132,7 +132,7 @@ export class ProjectsTreeProvider
             project.name,
             vscode.TreeItemCollapsibleState.None,
             "project",
-            undefined,
+            element.organization,
             project,
             element.organization!.name,
           );
