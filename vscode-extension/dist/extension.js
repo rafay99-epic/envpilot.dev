@@ -15400,48 +15400,80 @@ var AuthService = class {
     await this.context.globalState.update("pendingAuthSession", sessionToken);
     const authUrl = `${serverUrl}/extension/auth?session=${sessionToken}`;
     await vscode2.env.openExternal(vscode2.Uri.parse(authUrl));
-    const result = await vscode2.window.showInformationMessage(
-      'Complete sign-in in your browser, then click "Check Sign In" to verify.',
-      "Check Sign In",
-      "Cancel"
-    );
-    if (result !== "Check Sign In") {
-      await this.context.globalState.update("pendingAuthSession", void 0);
-      return false;
-    }
-    return this.checkAuthStatus(sessionToken);
+    return this.pollForAuthCompletion(sessionToken);
   }
   /**
-   * Check if the auth session has been completed on the server
+   * Poll the server for auth completion with a progress indicator.
+   * Automatically detects when the user completes sign-in in the browser.
    */
-  async checkAuthStatus(sessionToken) {
+  async pollForAuthCompletion(sessionToken) {
     const serverUrl = getServerUrl();
-    try {
-      const response = await axios_default.get(
-        `${serverUrl}${AUTH_CHECK_PATH}`,
-        {
-          params: { session: sessionToken },
-          timeout: 1e4
+    const POLL_INTERVAL_MS = 2e3;
+    const MAX_POLL_DURATION_MS = 12e4;
+    return vscode2.window.withProgress(
+      {
+        location: vscode2.ProgressLocation.Notification,
+        title: "ENV Connect: Waiting for sign-in...",
+        cancellable: true
+      },
+      async (progress, cancellationToken) => {
+        const startTime = Date.now();
+        let attempts = 0;
+        progress.report({ message: "Complete sign-in in your browser" });
+        while (!cancellationToken.isCancellationRequested) {
+          if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
+            await this.context.globalState.update(
+              "pendingAuthSession",
+              void 0
+            );
+            vscode2.window.showWarningMessage(
+              "Sign-in timed out. Please try again."
+            );
+            return false;
+          }
+          if (attempts > 0) {
+            await new Promise((resolve3) => {
+              const timer = setTimeout(resolve3, POLL_INTERVAL_MS);
+              cancellationToken.onCancellationRequested(() => {
+                clearTimeout(timer);
+                resolve3();
+              });
+            });
+          }
+          if (cancellationToken.isCancellationRequested) {
+            break;
+          }
+          attempts++;
+          progress.report({
+            message: `Waiting for browser sign-in... (${Math.floor((Date.now() - startTime) / 1e3)}s)`
+          });
+          try {
+            const response = await axios_default.get(
+              `${serverUrl}${AUTH_CHECK_PATH}`,
+              {
+                params: { session: sessionToken },
+                timeout: 1e4
+              }
+            );
+            if (response.data.data) {
+              await this.storage.setAuthSession(response.data.data);
+              this._onAuthStateChanged.fire(response.data.data);
+              await this.context.globalState.update(
+                "pendingAuthSession",
+                void 0
+              );
+              vscode2.window.showInformationMessage(
+                `Signed in as ${response.data.data.user.email}`
+              );
+              return true;
+            }
+          } catch {
+          }
         }
-      );
-      if (response.data.data) {
-        await this.storage.setAuthSession(response.data.data);
-        this._onAuthStateChanged.fire(response.data.data);
         await this.context.globalState.update("pendingAuthSession", void 0);
-        vscode2.window.showInformationMessage(
-          `Signed in as ${response.data.data.user.email}`
-        );
-        return true;
+        return false;
       }
-      vscode2.window.showWarningMessage(
-        "Sign-in not completed. Please try again."
-      );
-      return false;
-    } catch (error) {
-      const message = error instanceof AxiosError2 ? error.response?.data?.error || error.message : "Unknown error";
-      vscode2.window.showErrorMessage(`Sign-in failed: ${message}`);
-      return false;
-    }
+    );
   }
   /**
    * Sign out and clear stored credentials
@@ -17214,13 +17246,7 @@ var ProjectsTreeProvider = class {
   }
   async getChildren(element) {
     if (!this.isAuthenticated) {
-      return [
-        new ProjectTreeItem(
-          "Sign in to view projects",
-          vscode5.TreeItemCollapsibleState.None,
-          "message"
-        )
-      ];
+      return [];
     }
     if (!element) {
       try {
@@ -18087,10 +18113,7 @@ var FileProtectionService = class {
       return;
     }
     const watcher = vscode10.workspace.createFileSystemWatcher(
-      new vscode10.RelativePattern(
-        vscode10.Uri.file(filePath).fsPath,
-        "**"
-      )
+      new vscode10.RelativePattern(vscode10.Uri.file(filePath).fsPath, "**")
     );
     const fileWatcher = vscode10.workspace.createFileSystemWatcher(filePath);
     fileWatcher.onDidChange(async () => {
@@ -18316,11 +18339,14 @@ async function activate(context) {
     )
   );
   authService.onAuthStateChanged(async (session) => {
-    projectsTreeProvider.setAuthenticated(!!session);
+    const authenticated = !!session;
+    vscode12.commands.executeCommand("setContext", "envConnect.isAuthenticated", authenticated);
+    projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   });
   const isAuthenticated = await authService.isAuthenticated();
+  vscode12.commands.executeCommand("setContext", "envConnect.isAuthenticated", isAuthenticated);
   projectsTreeProvider.setAuthenticated(isAuthenticated);
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
@@ -18360,11 +18386,25 @@ async function activate(context) {
 }
 async function handleSignIn() {
   const success = await authService.signIn();
-  if (success && shouldAutoSync()) {
-    syncService.startPeriodicSync();
-    if (isRealTimeSyncEnabled()) {
-      realTimeSyncService.startRealTimeSync();
-    }
+  if (success) {
+    await vscode12.window.withProgress(
+      {
+        location: vscode12.ProgressLocation.Notification,
+        title: "ENV Connect: Setting up..."
+      },
+      async (progress) => {
+        progress.report({ message: "Loading projects and variables..." });
+        projectsTreeProvider.refresh();
+        variablesTreeProvider.refresh();
+        if (shouldAutoSync()) {
+          progress.report({ message: "Starting sync..." });
+          syncService.startPeriodicSync();
+          if (isRealTimeSyncEnabled()) {
+            realTimeSyncService.startRealTimeSync();
+          }
+        }
+      }
+    );
   }
 }
 async function handleSignOut() {
@@ -18633,7 +18673,15 @@ async function handleRequestVariable() {
     return;
   }
   try {
-    await apiService.submitVariableRequest(input);
+    await vscode12.window.withProgress(
+      {
+        location: vscode12.ProgressLocation.Notification,
+        title: "ENV Connect: Submitting variable request..."
+      },
+      async () => {
+        await apiService.submitVariableRequest(input);
+      }
+    );
     vscode12.window.showInformationMessage(
       `Variable request for "${input.key}" submitted for approval.`
     );
@@ -18705,32 +18753,40 @@ async function handlePullVariables() {
     vscode12.window.showWarningMessage("Please sign in first");
     return;
   }
-  statusBarProvider.setSyncing(true);
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
-  if (linkedProjectV2) {
-    const results = await syncService.syncAllDirectories(linkedProjectV2);
-    statusBarProvider.setSyncing(false);
-    if (results) {
-      const successful = results.filter((r) => r.success).length;
-      const total = results.length;
-      if (successful === total) {
-        vscode12.window.showInformationMessage(
-          `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
-        );
-      } else {
-        vscode12.window.showWarningMessage(
-          `Synced ${successful}/${total} directories. Some failed.`
-        );
+  await vscode12.window.withProgress(
+    {
+      location: vscode12.ProgressLocation.Notification,
+      title: "ENV Connect: Pulling variables..."
+    },
+    async () => {
+      statusBarProvider.setSyncing(true);
+      const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
+      if (linkedProjectV2) {
+        const results = await syncService.syncAllDirectories(linkedProjectV2);
+        statusBarProvider.setSyncing(false);
+        if (results) {
+          const successful = results.filter((r) => r.success).length;
+          const total = results.length;
+          if (successful === total) {
+            vscode12.window.showInformationMessage(
+              `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
+            );
+          } else {
+            vscode12.window.showWarningMessage(
+              `Synced ${successful}/${total} directories. Some failed.`
+            );
+          }
+          variablesTreeProvider.refresh();
+        }
+        return;
       }
-      variablesTreeProvider.refresh();
+      const result = await syncService.syncCurrentWorkspace();
+      statusBarProvider.setSyncing(false);
+      if (result) {
+        variablesTreeProvider.refresh();
+      }
     }
-    return;
-  }
-  const result = await syncService.syncCurrentWorkspace();
-  statusBarProvider.setSyncing(false);
-  if (result) {
-    variablesTreeProvider.refresh();
-  }
+  );
 }
 function handleRefresh() {
   projectsTreeProvider.refresh();

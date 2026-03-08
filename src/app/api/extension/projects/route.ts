@@ -1,12 +1,9 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
-import {
-  getOrCreateConvexUser,
-  checkOrganizationMembership,
-} from "@/lib/convex-helpers";
+import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { authenticateExtensionRequest } from "@/lib/extension-auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -15,16 +12,16 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const auth = await authenticateExtensionRequest(request);
 
-    if (!user) {
+    if (!auth) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get("organizationId");
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    const convexUser = auth.convexUser;
 
     if (organizationId) {
       // Check membership for specific organization

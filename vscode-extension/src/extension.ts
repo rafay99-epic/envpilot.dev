@@ -114,13 +114,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Subscribe to auth state changes
   authService.onAuthStateChanged(async (session) => {
-    projectsTreeProvider.setAuthenticated(!!session);
+    const authenticated = !!session;
+    vscode.commands.executeCommand("setContext", "envConnect.isAuthenticated", authenticated);
+    projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   });
 
   // Check initial auth state
   const isAuthenticated = await authService.isAuthenticated();
+  vscode.commands.executeCommand("setContext", "envConnect.isAuthenticated", isAuthenticated);
   projectsTreeProvider.setAuthenticated(isAuthenticated);
 
   // Start periodic sync if authenticated and auto-sync enabled
@@ -175,13 +178,28 @@ export async function activate(context: vscode.ExtensionContext) {
 
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
-  if (success && shouldAutoSync()) {
-    syncService.startPeriodicSync();
+  if (success) {
+    // Show progress while loading initial data
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "ENV Connect: Setting up...",
+      },
+      async (progress) => {
+        progress.report({ message: "Loading projects and variables..." });
+        projectsTreeProvider.refresh();
+        variablesTreeProvider.refresh();
 
-    // Start real-time sync for immediate revocation detection
-    if (isRealTimeSyncEnabled()) {
-      realTimeSyncService.startRealTimeSync();
-    }
+        if (shouldAutoSync()) {
+          progress.report({ message: "Starting sync..." });
+          syncService.startPeriodicSync();
+
+          if (isRealTimeSyncEnabled()) {
+            realTimeSyncService.startRealTimeSync();
+          }
+        }
+      },
+    );
   }
 }
 
@@ -515,7 +533,15 @@ async function handleRequestVariable(): Promise<void> {
   }
 
   try {
-    await apiService.submitVariableRequest(input);
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "ENV Connect: Submitting variable request...",
+      },
+      async () => {
+        await apiService.submitVariableRequest(input);
+      },
+    );
     vscode.window.showInformationMessage(
       `Variable request for "${input.key}" submitted for approval.`,
     );
@@ -606,39 +632,49 @@ async function handlePullVariables(): Promise<void> {
     return;
   }
 
-  statusBarProvider.setSyncing(true);
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "ENV Connect: Pulling variables...",
+    },
+    async () => {
+      statusBarProvider.setSyncing(true);
 
-  // Try V2 first
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
-  if (linkedProjectV2) {
-    const results = await syncService.syncAllDirectories(linkedProjectV2);
-    statusBarProvider.setSyncing(false);
+      // Try V2 first
+      const linkedProjectV2 =
+        await syncService.getLinkedProjectV2ForWorkspace();
+      if (linkedProjectV2) {
+        const results =
+          await syncService.syncAllDirectories(linkedProjectV2);
+        statusBarProvider.setSyncing(false);
 
-    if (results) {
-      const successful = results.filter((r) => r.success).length;
-      const total = results.length;
-      if (successful === total) {
-        vscode.window.showInformationMessage(
-          `Synced ${successful} director${successful === 1 ? "y" : "ies"}`,
-        );
-      } else {
-        vscode.window.showWarningMessage(
-          `Synced ${successful}/${total} directories. Some failed.`,
-        );
+        if (results) {
+          const successful = results.filter((r) => r.success).length;
+          const total = results.length;
+          if (successful === total) {
+            vscode.window.showInformationMessage(
+              `Synced ${successful} director${successful === 1 ? "y" : "ies"}`,
+            );
+          } else {
+            vscode.window.showWarningMessage(
+              `Synced ${successful}/${total} directories. Some failed.`,
+            );
+          }
+          variablesTreeProvider.refresh();
+        }
+        return;
       }
-      variablesTreeProvider.refresh();
-    }
-    return;
-  }
 
-  // Fallback to V1
-  const result = await syncService.syncCurrentWorkspace();
+      // Fallback to V1
+      const result = await syncService.syncCurrentWorkspace();
 
-  statusBarProvider.setSyncing(false);
+      statusBarProvider.setSyncing(false);
 
-  if (result) {
-    variablesTreeProvider.refresh();
-  }
+      if (result) {
+        variablesTreeProvider.refresh();
+      }
+    },
+  );
 }
 
 function handleRefresh(): void {

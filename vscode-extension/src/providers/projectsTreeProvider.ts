@@ -51,13 +51,8 @@ export class ProjectsTreeProvider
 
   async getChildren(element?: ProjectTreeItem): Promise<ProjectTreeItem[]> {
     if (!this.isAuthenticated) {
-      return [
-        new ProjectTreeItem(
-          "Sign in to view projects",
-          vscode.TreeItemCollapsibleState.None,
-          "message",
-        ),
-      ];
+      // Return empty so the viewsWelcome content shows instead
+      return [];
     }
 
     // Root level - show organizations

@@ -40,9 +40,19 @@ export async function POST(request: Request) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Generate tokens for the extension
-    const accessToken = generateToken(32);
-    const refreshToken = generateToken(48);
-    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const accessToken = "ext_" + generateToken(32);
+    const refreshToken = "ext_refresh_" + generateToken(48);
+    const now = Date.now();
+    const expiresAt = now + 30 * 24 * 60 * 60 * 1000; // 30 days
+
+    // Persist the token in Convex for later validation
+    await convex.mutation(api.cliSessions.storeExtensionToken, {
+      userId: convexUser._id,
+      accessToken,
+      refreshToken,
+      deviceName: "VS Code Extension",
+      expiresAt,
+    });
 
     // Store the pending session for the extension to retrieve
     pendingSessions.set(sessionToken, {
@@ -52,7 +62,7 @@ export async function POST(request: Request) {
       accessToken,
       refreshToken,
       expiresAt,
-      createdAt: Date.now(),
+      createdAt: now,
     });
 
     return NextResponse.json({

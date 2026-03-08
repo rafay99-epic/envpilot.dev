@@ -1,13 +1,12 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import {
-  getOrCreateConvexUser,
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { readSecret } from "@/lib/vault";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -77,17 +76,17 @@ export async function GET(request: Request) {
       // Update last used
       await convex.mutation(api.projectAccess.updateLastUsed, { accessToken });
     } else {
-      // Fall back to session authentication
-      const { user } = await withAuth();
+      // Fall back to Bearer token or session authentication
+      const auth = await authenticateExtensionRequest(request);
 
-      if (!user) {
+      if (!auth) {
         return NextResponse.json(
           { error: "Not authenticated" },
           { status: 401 },
         );
       }
 
-      const convexUser = await getOrCreateConvexUser(convex, user);
+      const convexUser = auth.convexUser;
 
       // Verify project access
       const { project, organizationId } = await getProjectOrganization(

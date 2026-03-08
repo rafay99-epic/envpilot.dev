@@ -398,6 +398,30 @@ export const revokeAllUserTokens = mutation({
 });
 
 /**
+ * Store a token for the VS Code extension (reuses cliTokens table)
+ */
+export const storeExtensionToken = mutation({
+  args: {
+    userId: v.id("users"),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    deviceName: v.optional(v.string()),
+    expiresAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("cliTokens", {
+      userId: args.userId,
+      accessToken: args.accessToken,
+      refreshToken: args.refreshToken,
+      deviceName: args.deviceName,
+      expiresAt: args.expiresAt,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Clean up expired sessions (can be run periodically)
  */
 export const cleanupExpiredSessions = mutation({

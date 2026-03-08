@@ -42,61 +42,96 @@ export class AuthService {
     // Open in browser
     await vscode.env.openExternal(vscode.Uri.parse(authUrl));
 
-    // Show message to user
-    const result = await vscode.window.showInformationMessage(
-      'Complete sign-in in your browser, then click "Check Sign In" to verify.',
-      "Check Sign In",
-      "Cancel",
-    );
-
-    if (result !== "Check Sign In") {
-      await this.context.globalState.update("pendingAuthSession", undefined);
-      return false;
-    }
-
-    // Poll for auth completion
-    return this.checkAuthStatus(sessionToken);
+    // Auto-poll for auth completion with progress indicator
+    return this.pollForAuthCompletion(sessionToken);
   }
 
   /**
-   * Check if the auth session has been completed on the server
+   * Poll the server for auth completion with a progress indicator.
+   * Automatically detects when the user completes sign-in in the browser.
    */
-  private async checkAuthStatus(sessionToken: string): Promise<boolean> {
+  private async pollForAuthCompletion(sessionToken: string): Promise<boolean> {
     const serverUrl = getServerUrl();
+    const POLL_INTERVAL_MS = 2000;
+    const MAX_POLL_DURATION_MS = 120000; // 2 minutes timeout
 
-    try {
-      const response = await axios.get<ApiResponse<AuthSession>>(
-        `${serverUrl}${AUTH_CHECK_PATH}`,
-        {
-          params: { session: sessionToken },
-          timeout: 10000,
-        },
-      );
+    return vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "ENV Connect: Waiting for sign-in...",
+        cancellable: true,
+      },
+      async (progress, cancellationToken) => {
+        const startTime = Date.now();
+        let attempts = 0;
 
-      if (response.data.data) {
-        await this.storage.setAuthSession(response.data.data);
-        this._onAuthStateChanged.fire(response.data.data);
+        progress.report({ message: "Complete sign-in in your browser" });
+
+        while (!cancellationToken.isCancellationRequested) {
+          // Check timeout
+          if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
+            await this.context.globalState.update(
+              "pendingAuthSession",
+              undefined,
+            );
+            vscode.window.showWarningMessage(
+              "Sign-in timed out. Please try again.",
+            );
+            return false;
+          }
+
+          // Wait before polling (skip first attempt for faster response)
+          if (attempts > 0) {
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, POLL_INTERVAL_MS);
+              cancellationToken.onCancellationRequested(() => {
+                clearTimeout(timer);
+                resolve();
+              });
+            });
+          }
+
+          if (cancellationToken.isCancellationRequested) {
+            break;
+          }
+
+          attempts++;
+          progress.report({
+            message: `Waiting for browser sign-in... (${Math.floor((Date.now() - startTime) / 1000)}s)`,
+          });
+
+          try {
+            const response = await axios.get<ApiResponse<AuthSession>>(
+              `${serverUrl}${AUTH_CHECK_PATH}`,
+              {
+                params: { session: sessionToken },
+                timeout: 10000,
+              },
+            );
+
+            if (response.data.data) {
+              await this.storage.setAuthSession(response.data.data);
+              this._onAuthStateChanged.fire(response.data.data);
+              await this.context.globalState.update(
+                "pendingAuthSession",
+                undefined,
+              );
+
+              vscode.window.showInformationMessage(
+                `Signed in as ${response.data.data.user.email}`,
+              );
+              return true;
+            }
+          } catch {
+            // Ignore poll errors and keep trying
+          }
+        }
+
+        // Cancelled by user
         await this.context.globalState.update("pendingAuthSession", undefined);
-
-        vscode.window.showInformationMessage(
-          `Signed in as ${response.data.data.user.email}`,
-        );
-        return true;
-      }
-
-      vscode.window.showWarningMessage(
-        "Sign-in not completed. Please try again.",
-      );
-      return false;
-    } catch (error) {
-      const message =
-        error instanceof AxiosError
-          ? error.response?.data?.error || error.message
-          : "Unknown error";
-
-      vscode.window.showErrorMessage(`Sign-in failed: ${message}`);
-      return false;
-    }
+        return false;
+      },
+    );
   }
 
   /**
