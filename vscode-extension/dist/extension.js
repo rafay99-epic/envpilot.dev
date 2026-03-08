@@ -17311,7 +17311,7 @@ var ProjectsTreeProvider = class {
             project.name,
             vscode5.TreeItemCollapsibleState.None,
             "project",
-            void 0,
+            element.organization,
             project,
             element.organization.name
           );
@@ -18437,6 +18437,15 @@ async function handleLinkProject(item) {
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
+    if (!organization && item.project.organizationId) {
+      const orgs = await apiService.getOrganizations();
+      organization = orgs.find(
+        (org) => org._id === item.project.organizationId
+      );
+      if (organization) {
+        organizationName = organization.name;
+      }
+    }
   } else {
     const organizations = await apiService.getOrganizations();
     if (organizations.length === 0) {
