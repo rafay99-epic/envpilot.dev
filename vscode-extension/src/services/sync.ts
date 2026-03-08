@@ -852,7 +852,9 @@ export class SyncService {
             const project = await this.storage.getLinkedProjectV2(projectId);
             if (project) {
               const dir = project.directories.find(
-                (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath),
+                (d) =>
+                  normalizePath(d.directoryPath) ===
+                  normalizePath(directoryPath),
               );
               if (dir) {
                 await this.syncDirectory(project, dir);

@@ -29,10 +29,7 @@ export class FileProtectionService {
     }
 
     const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(
-        vscode.Uri.file(filePath).fsPath,
-        "**",
-      ),
+      new vscode.RelativePattern(vscode.Uri.file(filePath).fsPath, "**"),
     );
 
     // Use a broad pattern and filter by path
