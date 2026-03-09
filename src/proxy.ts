@@ -26,11 +26,8 @@ export default authkitMiddleware({
       "/api/cli/variables",
       "/api/cli/variables/bulk",
       "/api/cli/tier",
-      // Extension API endpoints that use token-based auth
-      "/api/extension/validate-token",
-      "/api/extension/refresh-token",
-      "/api/extension/update-last-used",
-      "/api/extension/auth/check",
+      // Extension API endpoints use bearer token auth, not browser session auth
+      "/api/extension/(.*)",
     ],
   },
 });

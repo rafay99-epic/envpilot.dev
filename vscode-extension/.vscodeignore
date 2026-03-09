@@ -1,0 +1,9 @@
+.vscode/**
+src/**
+node_modules/**
+bun.lock
+*.vsix
+tsconfig.json
+eslint.config.mjs
+.eslintrc*
+**/*.map

@@ -11,6 +11,8 @@ import {
 import { VariablesTreeProvider } from "./providers/variablesTreeProvider";
 import { StatusBarProvider } from "./providers/statusBar";
 import { LinkProjectDialog } from "./ui/linkProjectDialog";
+import { RequestVariableDialog } from "./ui/requestVariableDialog";
+import { FileProtectionService } from "./services/fileProtection";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -24,10 +26,30 @@ let apiService: ApiService;
 let syncService: SyncService;
 let realTimeSyncService: RealTimeSyncService;
 let storageService: StorageService;
+let fileProtectionService: FileProtectionService;
 let projectsTreeProvider: ProjectsTreeProvider;
 let variablesTreeProvider: VariablesTreeProvider;
 let statusBarProvider: StatusBarProvider;
 let linkProjectDialog: LinkProjectDialog;
+let requestVariableDialog: RequestVariableDialog;
+
+/** Update context flags used by menu when-clauses and welcome views */
+async function updateContextFlags(): Promise<void> {
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  vscode.commands.executeCommand(
+    "setContext",
+    "envConnect.hasLinkedProject",
+    !!linkedProject,
+  );
+  if (linkedProject) {
+    const role = apiService.getUserRole(linkedProject.projectId);
+    vscode.commands.executeCommand(
+      "setContext",
+      "envConnect.userRole",
+      role || "",
+    );
+  }
+}
 
 export async function activate(context: vscode.ExtensionContext) {
   // Initialize storage
@@ -39,7 +61,9 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize services
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
+  fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
+  syncService.setFileProtection(fileProtectionService);
   realTimeSyncService = new RealTimeSyncService(
     apiService,
     syncService,
@@ -51,6 +75,7 @@ export async function activate(context: vscode.ExtensionContext) {
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
   linkProjectDialog = new LinkProjectDialog(syncService);
+  requestVariableDialog = new RequestVariableDialog();
 
   // Register tree views
   context.subscriptions.push(
@@ -99,33 +124,49 @@ export async function activate(context: vscode.ExtensionContext) {
       "envConnect.selectEnvironments",
       handleSelectEnvironments,
     ),
+    vscode.commands.registerCommand(
+      "envConnect.requestVariable",
+      handleRequestVariable,
+    ),
   );
 
   // Subscribe to auth state changes
   authService.onAuthStateChanged(async (session) => {
-    projectsTreeProvider.setAuthenticated(!!session);
+    const authenticated = !!session;
+    vscode.commands.executeCommand(
+      "setContext",
+      "envConnect.isAuthenticated",
+      authenticated,
+    );
+    projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   });
 
   // Check initial auth state
   const isAuthenticated = await authService.isAuthenticated();
+  vscode.commands.executeCommand(
+    "setContext",
+    "envConnect.isAuthenticated",
+    isAuthenticated,
+  );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
 
   // Start periodic sync if authenticated and auto-sync enabled
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
 
-    // Start real-time sync for immediate revocation detection
     if (isRealTimeSyncEnabled()) {
       realTimeSyncService.startRealTimeSync();
     }
 
-    // Sync on activation if a project is linked
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       syncService.syncAllDirectories(linkedProject);
     }
+
+    await updateContextFlags();
   }
 
   // Subscribe to real-time revocation events for UI updates
@@ -154,6 +195,7 @@ export async function activate(context: vscode.ExtensionContext) {
       authService.dispose();
       syncService.dispose();
       realTimeSyncService.dispose();
+      fileProtectionService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
@@ -163,13 +205,28 @@ export async function activate(context: vscode.ExtensionContext) {
 
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
-  if (success && shouldAutoSync()) {
-    syncService.startPeriodicSync();
+  if (success) {
+    // Show progress while loading initial data
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "ENV Connect: Setting up...",
+      },
+      async (progress) => {
+        progress.report({ message: "Loading projects and variables..." });
+        projectsTreeProvider.refresh();
+        variablesTreeProvider.refresh();
 
-    // Start real-time sync for immediate revocation detection
-    if (isRealTimeSyncEnabled()) {
-      realTimeSyncService.startRealTimeSync();
-    }
+        if (shouldAutoSync()) {
+          progress.report({ message: "Starting sync..." });
+          syncService.startPeriodicSync();
+
+          if (isRealTimeSyncEnabled()) {
+            realTimeSyncService.startRealTimeSync();
+          }
+        }
+      },
+    );
   }
 }
 
@@ -210,6 +267,18 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
+
+    // Fallback: if organization is missing from the tree item, resolve it from
+    // the project's organizationId via the organizations API
+    if (!organization && item.project.organizationId) {
+      const orgs = await apiService.getOrganizations();
+      organization = orgs.find(
+        (org) => org._id === item.project!.organizationId,
+      );
+      if (organization) {
+        organizationName = organization.name;
+      }
+    }
   } else {
     // Show project picker
     const organizations = await apiService.getOrganizations();
@@ -359,6 +428,7 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     vscode.window.showErrorMessage(`Failed to link project: ${message}`);
@@ -469,6 +539,61 @@ async function handleSelectEnvironments(item?: ProjectTreeItem): Promise<void> {
   );
 }
 
+async function handleRequestVariable(): Promise<void> {
+  const isAuth = await authService.isAuthenticated();
+  if (!isAuth) {
+    vscode.window.showWarningMessage("Please sign in first");
+    return;
+  }
+
+  // Get the linked project
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  if (!linkedProject) {
+    vscode.window.showWarningMessage(
+      'No project linked. Use "ENV Connect: Link Project" first.',
+    );
+    return;
+  }
+
+  // Check role — only members should use this
+  const role = apiService.getUserRole(linkedProject.projectId);
+  if (role && role !== "member") {
+    vscode.window.showInformationMessage(
+      "As an admin or team lead, you can create variables directly on the dashboard.",
+    );
+    return;
+  }
+
+  // Show the request dialog
+  const input = await requestVariableDialog.showRequestDialog(
+    linkedProject.projectId,
+  );
+  if (!input) {
+    return;
+  }
+
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "ENV Connect: Submitting variable request...",
+      },
+      async () => {
+        await apiService.submitVariableRequest(input);
+      },
+    );
+    vscode.window.showInformationMessage(
+      `Variable request for "${input.key}" submitted for approval.`,
+    );
+    variablesTreeProvider.refresh();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    vscode.window.showErrorMessage(
+      `Failed to submit variable request: ${message}`,
+    );
+  }
+}
+
 async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
   // Try V2 first
   const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
@@ -498,6 +623,7 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       projectsTreeProvider.refresh();
       variablesTreeProvider.refresh();
       statusBarProvider.update();
+      await updateContextFlags();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       vscode.window.showErrorMessage(`Failed to unlink project: ${message}`);
@@ -547,39 +673,48 @@ async function handlePullVariables(): Promise<void> {
     return;
   }
 
-  statusBarProvider.setSyncing(true);
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "ENV Connect: Pulling variables...",
+    },
+    async () => {
+      statusBarProvider.setSyncing(true);
 
-  // Try V2 first
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
-  if (linkedProjectV2) {
-    const results = await syncService.syncAllDirectories(linkedProjectV2);
-    statusBarProvider.setSyncing(false);
+      // Try V2 first
+      const linkedProjectV2 =
+        await syncService.getLinkedProjectV2ForWorkspace();
+      if (linkedProjectV2) {
+        const results = await syncService.syncAllDirectories(linkedProjectV2);
+        statusBarProvider.setSyncing(false);
 
-    if (results) {
-      const successful = results.filter((r) => r.success).length;
-      const total = results.length;
-      if (successful === total) {
-        vscode.window.showInformationMessage(
-          `Synced ${successful} director${successful === 1 ? "y" : "ies"}`,
-        );
-      } else {
-        vscode.window.showWarningMessage(
-          `Synced ${successful}/${total} directories. Some failed.`,
-        );
+        if (results) {
+          const successful = results.filter((r) => r.success).length;
+          const total = results.length;
+          if (successful === total) {
+            vscode.window.showInformationMessage(
+              `Synced ${successful} director${successful === 1 ? "y" : "ies"}`,
+            );
+          } else {
+            vscode.window.showWarningMessage(
+              `Synced ${successful}/${total} directories. Some failed.`,
+            );
+          }
+          variablesTreeProvider.refresh();
+        }
+        return;
       }
-      variablesTreeProvider.refresh();
-    }
-    return;
-  }
 
-  // Fallback to V1
-  const result = await syncService.syncCurrentWorkspace();
+      // Fallback to V1
+      const result = await syncService.syncCurrentWorkspace();
 
-  statusBarProvider.setSyncing(false);
+      statusBarProvider.setSyncing(false);
 
-  if (result) {
-    variablesTreeProvider.refresh();
-  }
+      if (result) {
+        variablesTreeProvider.refresh();
+      }
+    },
+  );
 }
 
 function handleRefresh(): void {

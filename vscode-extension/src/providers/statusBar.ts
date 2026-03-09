@@ -19,7 +19,6 @@ export class StatusBarProvider {
     );
     this.statusBarItem.command = "envConnect.showStatus";
 
-    // Subscribe to events
     this.authService.onAuthStateChanged(() => this.update());
     this.syncService.onSyncComplete((result) =>
       this.handleSyncComplete(result),
@@ -36,8 +35,8 @@ export class StatusBarProvider {
     const isAuthenticated = await this.authService.isAuthenticated();
 
     if (!isAuthenticated) {
-      this.statusBarItem.text = "$(plug) ENV Connect";
-      this.statusBarItem.tooltip = "Click to sign in";
+      this.statusBarItem.text = "$(shield) ENV Connect";
+      this.statusBarItem.tooltip = "Click to sign in to ENV Connect";
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
@@ -45,35 +44,38 @@ export class StatusBarProvider {
     const linkedProject = await this.syncService.getLinkedProject();
 
     if (!linkedProject) {
-      this.statusBarItem.text = "$(check) ENV Connect";
-      this.statusBarItem.tooltip = "Signed in - No project linked";
+      this.statusBarItem.text = "$(shield) ENV Connect";
+      this.statusBarItem.tooltip =
+        "Signed in \u2014 no project linked\nClick for options";
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
 
     if (this.isSyncing) {
-      this.statusBarItem.text = "$(sync~spin) ENV Connect";
-      this.statusBarItem.tooltip = "Syncing variables...";
+      this.statusBarItem.text = `$(sync~spin) ${linkedProject.projectName}`;
+      this.statusBarItem.tooltip = "Syncing variables\u2026";
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
 
     const syncInfo = linkedProject.lastSyncedAt
-      ? `Last sync: ${this.formatTime(linkedProject.lastSyncedAt)}`
+      ? `Synced ${this.formatTime(linkedProject.lastSyncedAt)}`
       : "Never synced";
 
-    this.statusBarItem.text = "$(cloud) ENV Connect";
+    this.statusBarItem.text = `$(shield) ${linkedProject.projectName}`;
     this.statusBarItem.tooltip = new vscode.MarkdownString(
       [
-        `**${linkedProject.projectName}**`,
+        `### $(shield) ${linkedProject.projectName}`,
         "",
-        `Organization: ${linkedProject.organizationName}`,
-        `Environment: ${linkedProject.environment}`,
-        `Target: ${linkedProject.targetFile}`,
+        `$(organization) ${linkedProject.organizationName}`,
+        `$(server-environment) ${linkedProject.environment}`,
+        `$(file) ${linkedProject.targetFile}`,
         "",
-        syncInfo,
+        `$(sync) ${syncInfo}`,
       ].join("\n"),
     );
+    (this.statusBarItem.tooltip as vscode.MarkdownString).supportThemeIcons =
+      true;
     this.statusBarItem.backgroundColor = undefined;
   }
 
@@ -101,7 +103,7 @@ export class StatusBarProvider {
   private handlePermissionRevoked(
     project: LinkedProject | LinkedProjectV2,
   ): void {
-    this.statusBarItem.text = "$(warning) ENV Connect";
+    this.statusBarItem.text = `$(warning) ${project.projectName}`;
     this.statusBarItem.tooltip = `Access revoked for ${project.projectName}`;
     this.statusBarItem.backgroundColor = new vscode.ThemeColor(
       "statusBarItem.warningBackground",
@@ -113,15 +115,9 @@ export class StatusBarProvider {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
 
-    if (minutes < 1) {
-      return "just now";
-    }
-    if (minutes < 60) {
-      return `${minutes}m ago`;
-    }
-    if (hours < 24) {
-      return `${hours}h ago`;
-    }
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
     return new Date(timestamp).toLocaleDateString();
   }
 

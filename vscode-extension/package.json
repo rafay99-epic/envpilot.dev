@@ -32,48 +32,56 @@
       {
         "command": "envConnect.signIn",
         "title": "Sign In",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(sign-in)"
       },
       {
         "command": "envConnect.signOut",
         "title": "Sign Out",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(sign-out)"
       },
       {
         "command": "envConnect.linkProject",
         "title": "Link Project",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(link)"
       },
       {
         "command": "envConnect.unlinkProject",
         "title": "Unlink Project",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(debug-disconnect)"
       },
       {
         "command": "envConnect.pullVariables",
         "title": "Pull Variables",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "envConnect.refresh",
         "title": "Refresh",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(refresh)"
       },
       {
         "command": "envConnect.openDashboard",
         "title": "Open Dashboard",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(link-external)"
       },
       {
         "command": "envConnect.showStatus",
         "title": "Show Status",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(info)"
       },
       {
         "command": "envConnect.addDirectory",
         "title": "Add Directory",
         "category": "ENV Connect",
-        "icon": "$(add)"
+        "icon": "$(new-folder)"
       },
       {
         "command": "envConnect.removeDirectory",
@@ -84,7 +92,14 @@
       {
         "command": "envConnect.selectEnvironments",
         "title": "Select Environments",
-        "category": "ENV Connect"
+        "category": "ENV Connect",
+        "icon": "$(server-environment)"
+      },
+      {
+        "command": "envConnect.requestVariable",
+        "title": "Request Variable",
+        "category": "ENV Connect",
+        "icon": "$(git-pull-request-create)"
       }
     ],
     "viewsContainers": {
@@ -108,39 +123,81 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "envConnect.projects",
+        "contents": "Welcome to ENV Connect\n\nSecurely sync environment variables to your local projects. No more sharing .env files over Slack.\n\n[$(sign-in) Sign In to Get Started](command:envConnect.signIn)\n\n[$(link-external) Open Dashboard](command:envConnect.openDashboard)",
+        "when": "!envConnect.isAuthenticated"
+      },
+      {
+        "view": "envConnect.variables",
+        "contents": "Sign in to view and sync your environment variables.\n\n[$(sign-in) Sign In](command:envConnect.signIn)",
+        "when": "!envConnect.isAuthenticated"
+      },
+      {
+        "view": "envConnect.variables",
+        "contents": "Link a project to view its environment variables.\n\n[$(link) Link Project](command:envConnect.linkProject)",
+        "when": "envConnect.isAuthenticated && !envConnect.hasLinkedProject"
+      }
+    ],
     "menus": {
       "view/title": [
         {
           "command": "envConnect.refresh",
-          "when": "view == envConnect.projects",
-          "group": "navigation"
+          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "group": "navigation@1"
+        },
+        {
+          "command": "envConnect.linkProject",
+          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "group": "navigation@2"
+        },
+        {
+          "command": "envConnect.openDashboard",
+          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "group": "overflow@1"
+        },
+        {
+          "command": "envConnect.signOut",
+          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "group": "overflow@2"
         },
         {
           "command": "envConnect.pullVariables",
-          "when": "view == envConnect.variables",
-          "group": "navigation"
+          "when": "view == envConnect.variables && envConnect.isAuthenticated",
+          "group": "navigation@1"
+        },
+        {
+          "command": "envConnect.refresh",
+          "when": "view == envConnect.variables && envConnect.isAuthenticated",
+          "group": "navigation@2"
+        },
+        {
+          "command": "envConnect.requestVariable",
+          "when": "view == envConnect.variables && envConnect.isAuthenticated && envConnect.userRole == member",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
           "command": "envConnect.linkProject",
           "when": "view == envConnect.projects && viewItem == project",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "envConnect.unlinkProject",
           "when": "view == envConnect.projects && viewItem == linkedProject",
-          "group": "inline"
+          "group": "inline@3"
         },
         {
           "command": "envConnect.addDirectory",
           "when": "view == envConnect.projects && viewItem == linkedProject",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "envConnect.removeDirectory",
           "when": "view == envConnect.projects && viewItem == linkedDirectory",
-          "group": "inline"
+          "group": "inline@1"
         }
       ]
     },
@@ -245,6 +302,7 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.19.8",
     "eslint": "^8.54.0",
     "npm-run-all": "^4.1.5",

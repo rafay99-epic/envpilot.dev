@@ -1,12 +1,9 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
-import {
-  getOrCreateConvexUser,
-  checkOrganizationMembership,
-} from "@/lib/convex-helpers";
+import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { authenticateExtensionRequest } from "@/lib/extension-auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -21,15 +18,15 @@ interface RouteParams {
  */
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const auth = await authenticateExtensionRequest(request);
 
-    if (!user) {
+    if (!auth) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { id: projectId } = await params;
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    const convexUser = auth.convexUser;
 
     const project = await convex.query(api.projects.getById, {
       projectId: projectId as Id<"projects">,

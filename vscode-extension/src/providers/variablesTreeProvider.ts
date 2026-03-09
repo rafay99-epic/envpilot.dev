@@ -30,21 +30,12 @@ export class VariablesTreeProvider
 
   async getChildren(element?: VariableTreeItem): Promise<VariableTreeItem[]> {
     if (element) {
-      // Variables don't have children
       return [];
     }
 
     const linkedProject = await this.getLinkedProject();
     if (!linkedProject) {
-      return [
-        new VariableTreeItem(
-          "No project linked",
-          vscode.TreeItemCollapsibleState.None,
-          "message",
-          undefined,
-          "Link a project to view variables",
-        ),
-      ];
+      return [];
     }
 
     try {
@@ -61,29 +52,32 @@ export class VariablesTreeProvider
             vscode.TreeItemCollapsibleState.None,
             "message",
             undefined,
-            `No variables for ${linkedProject.environment} environment`,
+            `No variables for ${linkedProject.environment}`,
           ),
         ];
       }
 
-      // Group by sensitivity
       const regularVars = this.variables.filter((v) => !v.isSensitive);
       const sensitiveVars = this.variables.filter((v) => v.isSensitive);
 
       const items: VariableTreeItem[] = [];
 
-      // Add environment header
+      // Environment & count header
+      const role = this.api.getUserRole(linkedProject.projectId);
+      const roleLabel = role
+        ? ` \u00b7 ${role === "admin" ? "Admin" : role === "team_lead" ? "Lead" : "Member"}`
+        : "";
       items.push(
         new VariableTreeItem(
-          `Environment: ${linkedProject.environment}`,
+          linkedProject.environment,
           vscode.TreeItemCollapsibleState.None,
           "header",
           undefined,
-          `${this.variables.length} variables`,
+          `${this.variables.length} variable${this.variables.length !== 1 ? "s" : ""}${roleLabel}`,
         ),
       );
 
-      // Add regular variables
+      // Regular variables
       for (const variable of regularVars) {
         items.push(
           new VariableTreeItem(
@@ -95,15 +89,13 @@ export class VariablesTreeProvider
         );
       }
 
-      // Add sensitive variables with a separator
+      // Sensitive section
       if (sensitiveVars.length > 0) {
         items.push(
           new VariableTreeItem(
-            "Sensitive",
+            `Sensitive (${sensitiveVars.length})`,
             vscode.TreeItemCollapsibleState.None,
             "separator",
-            undefined,
-            `${sensitiveVars.length} secrets`,
           ),
         );
 
@@ -116,6 +108,40 @@ export class VariablesTreeProvider
               variable,
             ),
           );
+        }
+      }
+
+      // Pending requests for members
+      if (role === "member") {
+        try {
+          const pendingRequests = await this.api.getVariableRequests(
+            linkedProject.projectId,
+            "pending",
+          );
+
+          if (pendingRequests.length > 0) {
+            items.push(
+              new VariableTreeItem(
+                `Pending Requests (${pendingRequests.length})`,
+                vscode.TreeItemCollapsibleState.None,
+                "separator",
+              ),
+            );
+
+            for (const request of pendingRequests) {
+              items.push(
+                new VariableTreeItem(
+                  request.key,
+                  vscode.TreeItemCollapsibleState.None,
+                  "request",
+                  undefined,
+                  request.status,
+                ),
+              );
+            }
+          }
+        } catch {
+          // Not critical
         }
       }
 
@@ -153,85 +179,129 @@ export class VariablesTreeProvider
   }
 }
 
+type VariableTreeItemType =
+  | "variable"
+  | "sensitive"
+  | "header"
+  | "separator"
+  | "message"
+  | "error"
+  | "request";
+
 export class VariableTreeItem extends vscode.TreeItem {
-  type: "variable" | "sensitive" | "header" | "separator" | "message" | "error";
+  type: VariableTreeItemType;
   variable?: EnvironmentVariable;
 
   constructor(
     label: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    type:
-      | "variable"
-      | "sensitive"
-      | "header"
-      | "separator"
-      | "message"
-      | "error",
+    type: VariableTreeItemType,
     variable?: EnvironmentVariable,
     description?: string,
   ) {
     super(label, collapsibleState);
     this.type = type;
     this.variable = variable;
-    this.description = description || variable?.description || undefined;
+    this.contextValue = type;
 
-    // Set icons
     switch (type) {
       case "variable":
         this.iconPath = new vscode.ThemeIcon("symbol-variable");
-        this.tooltip = this.createTooltip(variable);
+        this.description = this.truncateValue(variable?.value || "");
+        this.tooltip = this.createVariableTooltip(variable, false);
         break;
+
       case "sensitive":
-        this.iconPath = new vscode.ThemeIcon("lock");
-        this.tooltip = this.createTooltip(variable, true);
+        this.iconPath = new vscode.ThemeIcon(
+          "lock",
+          new vscode.ThemeColor("charts.yellow"),
+        );
+        this.description = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+        this.tooltip = this.createVariableTooltip(variable, true);
         break;
+
       case "header":
-        this.iconPath = new vscode.ThemeIcon("server-environment");
+        this.iconPath = new vscode.ThemeIcon(
+          "server-environment",
+          new vscode.ThemeColor("charts.blue"),
+        );
+        this.description = description;
         break;
+
       case "separator":
-        this.iconPath = new vscode.ThemeIcon("shield");
+        this.iconPath = new vscode.ThemeIcon(
+          "shield",
+          new vscode.ThemeColor("charts.yellow"),
+        );
+        this.description = description;
         break;
+
       case "message":
-        this.iconPath = new vscode.ThemeIcon("info");
+        this.iconPath = new vscode.ThemeIcon(
+          "info",
+          new vscode.ThemeColor("descriptionForeground"),
+        );
+        this.description = description;
         break;
+
       case "error":
-        this.iconPath = new vscode.ThemeIcon("error");
+        this.iconPath = new vscode.ThemeIcon(
+          "error",
+          new vscode.ThemeColor("errorForeground"),
+        );
+        break;
+
+      case "request":
+        this.iconPath = new vscode.ThemeIcon(
+          "git-pull-request",
+          new vscode.ThemeColor("charts.orange"),
+        );
+        this.description = description;
+        this.tooltip = new vscode.MarkdownString(
+          `$(git-pull-request) **${label}**\n\nStatus: *${description}*\n\nSubmitted via extension`,
+        );
+        (this.tooltip as vscode.MarkdownString).supportThemeIcons = true;
         break;
     }
-
-    this.contextValue = type;
   }
 
-  private createTooltip(
+  private createVariableTooltip(
     variable?: EnvironmentVariable,
     isSensitive = false,
-  ): string {
-    if (!variable) {
-      return "";
-    }
+  ): vscode.MarkdownString | undefined {
+    if (!variable) return undefined;
 
-    const lines = [
-      `**${variable.key}**`,
-      "",
-      isSensitive
-        ? "*(Sensitive value hidden)*"
-        : `Value: \`${this.truncateValue(variable.value)}\``,
-      "",
-      `Environments: ${variable.environments.join(", ")}`,
-      `Version: ${variable.version}`,
-    ];
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+
+    md.appendMarkdown(`### $(symbol-variable) ${variable.key}\n\n`);
+
+    if (isSensitive) {
+      md.appendMarkdown("$(lock) *Sensitive \u2014 value hidden*\n\n");
+    } else {
+      md.appendCodeblock(variable.value, "properties");
+      md.appendMarkdown("\n");
+    }
 
     if (variable.description) {
-      lines.push("", variable.description);
+      md.appendMarkdown(`${variable.description}\n\n`);
     }
 
-    return new vscode.MarkdownString(lines.join("\n")).value;
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(
+      `**Environments:** ${variable.environments.join(", ")}  \n`,
+    );
+    md.appendMarkdown(`**Version:** ${variable.version}  \n`);
+    if (isSensitive) {
+      md.appendMarkdown("**Sensitive:** $(lock) Yes");
+    }
+
+    return md;
   }
 
-  private truncateValue(value: string, maxLength = 50): string {
-    if (value.length <= maxLength) {
-      return value;
-    }
-    return value.substring(0, maxLength) + "...";
+  private truncateValue(value: string, maxLength = 40): string {
+    if (!value) return "";
+    if (value.length <= maxLength) return value;
+    return value.substring(0, maxLength) + "\u2026";
   }
 }

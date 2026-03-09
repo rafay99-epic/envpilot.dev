@@ -1,23 +1,22 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
-import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { authenticateExtensionRequest } from "@/lib/extension-auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/extension/organizations - List organizations for the authenticated user
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const auth = await authenticateExtensionRequest(request);
 
-    if (!user) {
+    if (!auth) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    const convexUser = auth.convexUser;
 
     // Get organizations where the user is a member
     const organizations = await convex.query(api.organizations.listForUser, {
@@ -36,6 +35,7 @@ export async function GET() {
           name: org!.name,
           slug: org!.slug,
           tier: org!.tier,
+          role: org!.role || "member",
         })),
       },
     });
