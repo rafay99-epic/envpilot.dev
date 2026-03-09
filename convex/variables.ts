@@ -7,6 +7,7 @@ import {
   logBulkOperation,
   logSecurityEvent,
 } from "./auditHelpers";
+import { rateLimiter } from "./rateLimits";
 
 /**
  * Environment Variable Queries and Mutations
@@ -71,20 +72,6 @@ export const listByOrganization = query({
   },
 });
 
-/**
- * List all variables (for dashboard view)
- * Note: In production, this should be scoped by user's project access
- */
-export const listAll = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("environmentVariables")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .order("desc")
-      .take(100);
-  },
-});
 
 export const getById = query({
   args: { variableId: v.id("environmentVariables") },
@@ -248,6 +235,39 @@ export const listWithAccess = query({
   },
 });
 
+/**
+ * List variable metadata (keys, versions, environments) WITHOUT vault refs.
+ * Used by the VS Code extension via WebSocket subscription to detect changes
+ * reactively, then fetch decrypted values via HTTP only when needed.
+ */
+export const listMetadataByProject = query({
+  args: {
+    projectId: v.id("projects"),
+    environment: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const variables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const filtered = args.environment
+      ? variables.filter((v) => v.environments.includes(args.environment!))
+      : variables;
+
+    return filtered.map((v) => ({
+      _id: v._id,
+      key: v.key,
+      environments: v.environments,
+      isSensitive: v.isSensitive,
+      version: v.version,
+      updatedAt: v.updatedAt,
+      description: v.description,
+    }));
+  },
+});
+
 export const search = query({
   args: {
     organizationId: v.id("organizations"),
@@ -312,6 +332,12 @@ export const create = mutation({
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    // Rate limit: prevent excessive variable creation
+    await rateLimiter.limit(ctx, "variableCreate", {
+      key: project.organizationId,
+      throws: true,
+    });
 
     // Check tier limits for variable creation
     const org = await ctx.db.get(project.organizationId);
@@ -712,6 +738,12 @@ export const bulkCreate = mutation({
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    // Rate limit: bulk import is expensive
+    await rateLimiter.limit(ctx, "bulkImport", {
+      key: project.organizationId,
+      throws: true,
+    });
 
     // Check tier limits for bulk import feature
     const org = await ctx.db.get(project.organizationId);

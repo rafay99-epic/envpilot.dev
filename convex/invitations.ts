@@ -1,6 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { getTierLimits } from "./tierLimits";
+import { rateLimiter } from "./rateLimits";
+import { batchGetUsers } from "./helpers";
 
 /**
  * Invitation Queries and Mutations
@@ -30,19 +32,20 @@ export const listPendingByOrganization = query({
     const now = Date.now();
     const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
 
-    const invitationsWithInviter = await Promise.all(
-      validInvitations.map(async (inv) => {
-        const inviter = await ctx.db.get(inv.invitedBy);
-        return {
-          ...inv,
-          invitedByUser: inviter
-            ? { name: inviter.name, email: inviter.email }
-            : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      validInvitations.map((inv) => inv.invitedBy)
     );
 
-    return invitationsWithInviter;
+    return validInvitations.map((inv) => {
+      const inviter = userMap.get(inv.invitedBy.toString());
+      return {
+        ...inv,
+        invitedByUser: inviter
+          ? { name: inviter.name, email: inviter.email }
+          : null,
+      };
+    });
   },
 });
 
@@ -116,6 +119,12 @@ export const create = mutation({
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: prevent invitation spam
+    await rateLimiter.limit(ctx, "invitationCreate", {
+      key: args.organizationId,
+      throws: true,
+    });
+
     const now = Date.now();
 
     // Validate expiration days
@@ -389,7 +398,7 @@ export const resend = mutation({
   },
 });
 
-export const cleanupExpired = mutation({
+export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

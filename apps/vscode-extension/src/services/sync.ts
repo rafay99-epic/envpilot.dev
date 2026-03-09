@@ -3,6 +3,7 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { ApiService } from "./api";
 import { FileProtectionService } from "./fileProtection";
+import { ConvexService } from "./convex";
 import { StorageService } from "../utils/storage";
 import {
   getEnvironment,
@@ -39,10 +40,11 @@ const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 export class SyncService {
   private api: ApiService;
   private storage: StorageService;
+  private convexService: ConvexService | null = null;
   private fileProtection: FileProtectionService | null = null;
-  private syncTimer: NodeJS.Timeout | null = null;
-  private failureCount = 0;
-  private readonly MAX_BACKOFF_MULTIPLIER = 8;
+  private metadataSubIds: string[] = [];
+  private lastMetadataHash = new Map<string, string>();
+  private syncDebounceTimers = new Map<string, NodeJS.Timeout>();
   private _onSyncComplete = new vscode.EventEmitter<SyncResult>();
   private _onPermissionRevoked = new vscode.EventEmitter<
     LinkedProject | LinkedProjectV2
@@ -57,6 +59,13 @@ export class SyncService {
   }
 
   /**
+   * Set the ConvexService instance for reactive subscriptions.
+   */
+  setConvexService(convexService: ConvexService): void {
+    this.convexService = convexService;
+  }
+
+  /**
    * Set the file protection service for read-only enforcement
    */
   setFileProtection(fileProtection: FileProtectionService): void {
@@ -64,42 +73,109 @@ export class SyncService {
   }
 
   /**
-   * Start periodic sync checking with exponential backoff on failures
+   * Start reactive sync via WebSocket subscriptions.
+   * Subscribes to variable metadata changes — when variables are modified,
+   * triggers an HTTP fetch for decrypted values from WorkOS Vault.
    */
   startPeriodicSync(): void {
-    if (this.syncTimer) {
-      return;
-    }
-    this.scheduleNextSync();
+    this.setupMetadataSubscriptions();
   }
 
   /**
-   * Schedule the next sync with backoff
+   * Set up WebSocket subscriptions for variable metadata changes.
    */
-  private scheduleNextSync(): void {
-    const baseInterval = getSyncInterval();
-    const backoffMultiplier = Math.min(
-      Math.pow(2, this.failureCount),
-      this.MAX_BACKOFF_MULTIPLIER
-    );
-    const interval = baseInterval * backoffMultiplier;
+  private async setupMetadataSubscriptions(): Promise<void> {
+    if (!this.convexService) return;
 
-    this.syncTimer = setTimeout(async () => {
-      const success = await this.checkAllLinkedProjectsV2();
-      this.failureCount = success ? 0 : this.failureCount + 1;
-      this.scheduleNextSync();
-    }, interval);
+    const linkedProjects = await this.storage.getLinkedProjectsV2();
+
+    for (const project of linkedProjects) {
+      for (const directory of project.directories) {
+        const env =
+          directory.environments.length === 1
+            ? directory.environments[0]
+            : undefined;
+
+        const subId = this.convexService.subscribeToVariableMetadata(
+          project.projectId,
+          env,
+          (metadata) => {
+            // Compute a hash to detect actual changes
+            const hash = JSON.stringify(
+              metadata.map((m) => `${m.key}:${m.version}`)
+            );
+            const key = `${project.projectId}:${directory.directoryPath}`;
+            const prevHash = this.lastMetadataHash.get(key);
+
+            if (prevHash !== undefined && prevHash !== hash) {
+              // Variables changed — debounce and trigger HTTP fetch
+              this.debouncedSync(project, directory);
+            }
+            this.lastMetadataHash.set(key, hash);
+          }
+        );
+
+        this.metadataSubIds.push(subId);
+      }
+    }
   }
 
   /**
-   * Stop periodic sync checking
+   * Debounced sync to avoid rapid re-fetches when multiple variables change at once.
+   * Uses syncInterval setting as the minimum interval between vault fetch calls.
+   */
+  private debouncedSync(
+    project: LinkedProjectV2,
+    directory: LinkedDirectory
+  ): void {
+    const key = `${project.projectId}:${directory.directoryPath}`;
+    const existing = this.syncDebounceTimers.get(key);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    // Use a short debounce (2s) — much faster than old 300s polling
+    const timer = setTimeout(async () => {
+      this.syncDebounceTimers.delete(key);
+      console.log(
+        `[Sync] Variable change detected for ${project.projectName}, fetching decrypted values`
+      );
+      await this.syncDirectory(project, directory);
+    }, 2000);
+
+    this.syncDebounceTimers.set(key, timer);
+  }
+
+  /**
+   * Refresh metadata subscriptions when projects are linked/unlinked.
+   */
+  async refreshSubscriptions(): Promise<void> {
+    this.teardownMetadataSubscriptions();
+    await this.setupMetadataSubscriptions();
+  }
+
+  /**
+   * Tear down metadata subscriptions.
+   */
+  private teardownMetadataSubscriptions(): void {
+    if (!this.convexService) return;
+    for (const subId of this.metadataSubIds) {
+      this.convexService.unsubscribe(subId);
+    }
+    this.metadataSubIds = [];
+    this.lastMetadataHash.clear();
+
+    for (const timer of this.syncDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.syncDebounceTimers.clear();
+  }
+
+  /**
+   * Stop reactive sync — tear down subscriptions.
    */
   stopPeriodicSync(): void {
-    if (this.syncTimer) {
-      clearTimeout(this.syncTimer);
-      this.syncTimer = null;
-    }
-    this.failureCount = 0;
+    this.teardownMetadataSubscriptions();
   }
 
   // ============================================

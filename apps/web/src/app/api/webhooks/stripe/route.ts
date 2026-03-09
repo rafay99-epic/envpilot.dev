@@ -150,7 +150,7 @@ async function handleCheckoutSessionCompleted(
     email: customerEmail,
   });
 
-  console.log(`Checkout completed for organization ${organizationId}`);
+  console.log("Stripe: checkout completed");
 }
 
 /**
@@ -224,9 +224,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     });
   }
 
-  console.log(
-    `Subscription created for organization ${stripeCustomer.organizationId}`
-  );
+  console.log("Stripe: subscription created");
 }
 
 /**
@@ -298,7 +296,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
   }
 
-  console.log(`Subscription updated: ${subscription.id}`);
+  console.log("Stripe: subscription updated");
 }
 
 /**
@@ -313,7 +311,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   );
 
   if (!existingSubscription) {
-    console.log("Subscription not found for deletion:", subscription.id);
+    console.log("Stripe: subscription not found for deletion");
     return;
   }
 
@@ -342,7 +340,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     });
   }
 
-  console.log(`Subscription deleted: ${subscription.id}`);
+  console.log("Stripe: subscription deleted");
 }
 
 /**
@@ -376,7 +374,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   );
 
   if (!subscription) {
-    console.log("Subscription not found for payment:", subscriptionId);
+    console.log("Stripe: subscription not found for payment");
     return;
   }
 
@@ -398,7 +396,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     });
   }
 
-  console.log(`Payment succeeded for subscription: ${subscriptionId}`);
+  console.log("Stripe: payment succeeded");
 }
 
 /**
@@ -419,7 +417,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   );
 
   if (!subscription) {
-    console.log("Subscription not found for failed payment:", subscriptionId);
+    console.log("Stripe: subscription not found for failed payment");
     return;
   }
 
@@ -442,5 +440,5 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     });
   }
 
-  console.log(`Payment failed for subscription: ${subscriptionId}`);
+  console.log("Stripe: payment failed");
 }

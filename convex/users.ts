@@ -35,21 +35,35 @@ export const getByEmail = query({
 export const search = query({
   args: {
     searchTerm: v.string(),
+    organizationId: v.id("organizations"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const searchLower = args.searchTerm.toLowerCase();
     const limit = args.limit ?? 10;
 
-    const allUsers = await ctx.db.query("users").take(1000);
+    // Only search users who are members of the specified organization
+    const members = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
 
-    const matches = allUsers.filter(
-      (user) =>
-        user.email.toLowerCase().includes(searchLower) ||
-        user.name?.toLowerCase().includes(searchLower)
+    const users = await Promise.all(
+      members.map((m) => ctx.db.get(m.userId))
     );
 
-    return matches.slice(0, limit);
+    const matches = users
+      .filter(
+        (user): user is NonNullable<typeof user> =>
+          user !== null &&
+          (user.email.toLowerCase().includes(searchLower) ||
+            (user.name?.toLowerCase().includes(searchLower) ?? false))
+      )
+      .slice(0, limit);
+
+    return matches;
   },
 });
 

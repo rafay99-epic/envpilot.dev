@@ -23,21 +23,6 @@ export const listByOrganization = query({
   },
 });
 
-/**
- * List all projects (for dashboard view)
- * Note: In production, this should be scoped by user's organization access
- */
-export const listAll = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("projects")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .order("desc")
-      .take(100);
-  },
-});
-
 export const getById = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {

@@ -41,5 +41,10 @@
     "prettier": "^3.6.2",
     "turbo": "^2"
   },
-  "prettier": "@envpilot/prettier-config"
+  "prettier": "@envpilot/prettier-config",
+  "dependencies": {
+    "@convex-dev/rate-limiter": "^0.3.2",
+    "@convex-dev/workflow": "^0.3.5",
+    "@convex-dev/workpool": "^0.4.1"
+  }
 }

@@ -266,7 +266,8 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_user", ["userId"])
     .index("by_access_token", ["accessToken"])
-    .index("by_project_and_user", ["projectId", "userId"]),
+    .index("by_project_and_user", ["projectId", "userId"])
+    .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
   // INVITATIONS
@@ -518,6 +519,8 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_action", ["action"])
     .index("by_org_and_created", ["organizationId", "createdAt"])
+    .index("by_org_and_action", ["organizationId", "action"])
+    .index("by_org_and_severity", ["organizationId", "severity"])
     .index("by_severity", ["severity"])
     .index("by_resource_type", ["resourceType"])
     .index("by_session", ["sessionId"]),
@@ -608,6 +611,7 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_status", ["status"])
+    .index("by_status_and_expires", ["status", "expiresAt"])
     .index("by_user", ["userId"])
     .index("by_access_token", ["accessToken"])
     .index("by_refresh_token", ["refreshToken"]),

@@ -19,8 +19,7 @@ const searchSchema = z.object({
     .regex(/^[a-zA-Z0-9@._\-\s]+$/, "Invalid search characters"),
   organizationId: z
     .string()
-    .regex(CONVEX_ID_PATTERN, "Invalid organization ID")
-    .optional(),
+    .regex(CONVEX_ID_PATTERN, "Invalid organization ID"),
   limit: z.coerce.number().min(1).max(20).optional().default(10),
 });
 
@@ -38,7 +37,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const queryParams = {
       q: searchParams.get("q") || "",
-      organizationId: searchParams.get("organizationId") || undefined,
+      organizationId: searchParams.get("organizationId") || "",
       limit: searchParams.get("limit") || undefined,
     };
 
@@ -55,54 +54,42 @@ export async function GET(request: Request) {
     }
 
     const { q, organizationId, limit } = validation.data;
+    const orgId = organizationId as Id<"organizations">;
 
-    // Search for users
+    // Search for users scoped to the organization
     const users = await convex.query(api.users.search, {
       searchTerm: q,
+      organizationId: orgId,
       limit,
     });
 
-    // If organizationId is provided, check membership status and pending invitations
-    if (organizationId) {
-      const orgId = organizationId as Id<"organizations">;
+    // Check membership status and pending invitations
+    const [members, invitations] = await Promise.all([
+      convex.query(api.organizations.getMembers, { organizationId: orgId }),
+      convex.query(api.invitations.listPendingByOrganization, {
+        organizationId: orgId,
+      }),
+    ]);
 
-      const [members, invitations] = await Promise.all([
-        convex.query(api.organizations.getMembers, { organizationId: orgId }),
-        convex.query(api.invitations.listPendingByOrganization, {
-          organizationId: orgId,
-        }),
-      ]);
+    const memberIds = new Set(
+      members
+        .filter((m): m is NonNullable<typeof m> => m !== null)
+        .map((m) => m.userId)
+    );
+    const pendingEmails = new Set(
+      invitations.map((i) => i.email.toLowerCase())
+    );
 
-      const memberIds = new Set(
-        members
-          .filter((m): m is NonNullable<typeof m> => m !== null)
-          .map((m) => m.userId)
-      );
-      const pendingEmails = new Set(
-        invitations.map((i) => i.email.toLowerCase())
-      );
-
-      const enrichedUsers = users.map((u) => ({
-        _id: u._id,
-        email: u.email,
-        name: u.name,
-        avatarUrl: u.avatarUrl,
-        isMember: memberIds.has(u._id),
-        hasPendingInvitation: pendingEmails.has(u.email.toLowerCase()),
-      }));
-
-      return NextResponse.json({ users: enrichedUsers });
-    }
-
-    // Return basic user info without membership status
-    const basicUsers = users.map((u) => ({
+    const enrichedUsers = users.map((u) => ({
       _id: u._id,
       email: u.email,
       name: u.name,
       avatarUrl: u.avatarUrl,
+      isMember: memberIds.has(u._id),
+      hasPendingInvitation: pendingEmails.has(u.email.toLowerCase()),
     }));
 
-    return NextResponse.json({ users: basicUsers });
+    return NextResponse.json({ users: enrichedUsers });
   } catch (error) {
     console.error("Error searching users:", error);
     return NextResponse.json(
