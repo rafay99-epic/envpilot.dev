@@ -1,5 +1,5 @@
 /**
- * Types for ENV Connect VS Code Extension
+ * Types for Envpilot VS Code Extension
  */
 
 export type MembershipRole = "admin" | "team_lead" | "member";

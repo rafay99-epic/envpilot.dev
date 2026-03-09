@@ -1,5 +1,5 @@
 {
-  "extends": "@env-connect/tsconfig/next.json",
+  "extends": "@envpilot/tsconfig/next.json",
   "compilerOptions": {
     "plugins": [
       {

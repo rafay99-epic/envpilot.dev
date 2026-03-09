@@ -238,7 +238,7 @@ export default function WorkflowVisualization() {
     <section className="border-t border-zinc-200 bg-zinc-50 py-24 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="container mx-auto px-4 md:px-6">
         <h2 className="text-center text-3xl font-bold text-zinc-900 dark:text-zinc-100 sm:text-4xl">
-          How ENV Connect Works
+          How Envpilot Works
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-center text-zinc-600 dark:text-zinc-400">
           A simple, secure workflow for managing your environment variables

@@ -23,7 +23,7 @@ export class APIError extends Error {
 }
 
 /**
- * API client for communicating with ENV Connect server
+ * API client for communicating with Envpilot server
  */
 export class APIClient {
   private baseUrl: string;
@@ -182,7 +182,7 @@ export class APIClient {
     if (response.status === 401) {
       clearAuth();
       throw new APIError(
-        "Authentication required. Please run `env-connect login`.",
+        "Authentication required. Please run `envpilot login`.",
         401,
         "UNAUTHORIZED"
       );

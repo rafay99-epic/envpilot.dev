@@ -61,7 +61,7 @@ export const configCommand = new Command("config")
 
 async function handleGet(key: string | undefined) {
   if (!key) {
-    error("Missing key. Usage: env-connect config get <key>");
+    error("Missing key. Usage: envpilot config get <key>");
     console.log();
     console.log("Available keys:");
     console.log("  apiUrl              API endpoint URL");
@@ -102,7 +102,7 @@ async function handleGet(key: string | undefined) {
 
 async function handleSet(key: string | undefined, value: string | undefined) {
   if (!key || value === undefined) {
-    error("Missing key or value. Usage: env-connect config set <key> <value>");
+    error("Missing key or value. Usage: envpilot config set <key> <value>");
     console.log();
     console.log("Settable keys:");
     console.log("  apiUrl    API endpoint URL");
@@ -149,7 +149,7 @@ async function handleList() {
   console.log();
 
   if (projectConfig) {
-    header("Project Configuration (.envconnect)");
+    header("Project Configuration (.envpilot)");
     console.log();
 
     keyValue([

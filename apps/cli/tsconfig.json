@@ -1,5 +1,5 @@
 {
-  "extends": "@env-connect/tsconfig/node.json",
+  "extends": "@envpilot/tsconfig/node.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",

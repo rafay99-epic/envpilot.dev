@@ -18,8 +18,8 @@ export const seedChangelog = mutation({
 
     const entries = [
       {
-        title: "Introducing ENV Connect",
-        content: `We're excited to launch ENV Connect, a secure platform for managing environment variables across your team.
+        title: "Introducing Envpilot",
+        content: `We're excited to launch Envpilot, a secure platform for managing environment variables across your team.
 
 ## Key Features
 
@@ -35,7 +35,7 @@ export const seedChangelog = mutation({
 3. Invite your team members
 4. Start managing your secrets securely
 
-We can't wait to see what you build with ENV Connect!`,
+We can't wait to see what you build with Envpilot!`,
         version: "v1.0.0",
         type: "feature" as const,
         isPublished: true,
@@ -45,7 +45,7 @@ We can't wait to see what you build with ENV Connect!`,
       },
       {
         title: "VS Code Extension Released",
-        content: `The ENV Connect VS Code extension is now available! Sync your environment variables directly to your local \`.env\` files.
+        content: `The Envpilot VS Code extension is now available! Sync your environment variables directly to your local \`.env\` files.
 
 ## Features
 
@@ -57,7 +57,7 @@ We can't wait to see what you build with ENV Connect!`,
 
 1. Open VS Code
 2. Go to Extensions (Cmd/Ctrl + Shift + X)
-3. Search for "ENV Connect"
+3. Search for "Envpilot"
 4. Click Install
 
 The extension is also available for Cursor IDE!`,
@@ -136,13 +136,13 @@ For CI/CD integrations, we recommend using our new [service account tokens](/doc
 
 ## Breaking Changes
 
-- The \`env-connect pull\` command now requires a project flag: \`env-connect pull --project=myapp\`
-- Configuration file renamed from \`.envconnect\` to \`.envconnect.json\`
+- The \`envpilot pull\` command now requires a project flag: \`envpilot pull --project=myapp\`
+- Configuration file renamed from \`.envpilot\` to \`.envpilot.json\`
 - Dropped support for Node.js 14 and 16
 
 ## New Features
 
-- **Interactive mode**: Run \`env-connect\` without arguments for a guided experience
+- **Interactive mode**: Run \`envpilot\` without arguments for a guided experience
 - **Diff support**: See what changes before applying with \`--dry-run\`
 - **Multiple environments**: Pull from multiple environments in one command
 
@@ -150,13 +150,13 @@ For CI/CD integrations, we recommend using our new [service account tokens](/doc
 
 \`\`\`bash
 # Old command
-env-connect pull
+envpilot pull
 
 # New command
-env-connect pull --project=myapp
+envpilot pull --project=myapp
 
 # Or set default project in config
-echo '{"defaultProject": "myapp"}' > .envconnect.json
+echo '{"defaultProject": "myapp"}' > .envpilot.json
 \`\`\``,
         version: "v2.0.0",
         type: "breaking" as const,

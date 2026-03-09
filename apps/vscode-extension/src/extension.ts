@@ -38,14 +38,14 @@ async function updateContextFlags(): Promise<void> {
   const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
   vscode.commands.executeCommand(
     "setContext",
-    "envConnect.hasLinkedProject",
+    "envpilot.hasLinkedProject",
     !!linkedProject
   );
   if (linkedProject) {
     const role = apiService.getUserRole(linkedProject.projectId);
     vscode.commands.executeCommand(
       "setContext",
-      "envConnect.userRole",
+      "envpilot.userRole",
       role || ""
     );
   }
@@ -80,52 +80,49 @@ export async function activate(context: vscode.ExtensionContext) {
   // Register tree views
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
-      "envConnect.projects",
+      "envpilot.projects",
       projectsTreeProvider
     ),
     vscode.window.registerTreeDataProvider(
-      "envConnect.variables",
+      "envpilot.variables",
       variablesTreeProvider
     )
   );
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("envConnect.signIn", handleSignIn),
-    vscode.commands.registerCommand("envConnect.signOut", handleSignOut),
+    vscode.commands.registerCommand("envpilot.signIn", handleSignIn),
+    vscode.commands.registerCommand("envpilot.signOut", handleSignOut),
+    vscode.commands.registerCommand("envpilot.linkProject", handleLinkProject),
     vscode.commands.registerCommand(
-      "envConnect.linkProject",
-      handleLinkProject
-    ),
-    vscode.commands.registerCommand(
-      "envConnect.unlinkProject",
+      "envpilot.unlinkProject",
       handleUnlinkProject
     ),
     vscode.commands.registerCommand(
-      "envConnect.pullVariables",
+      "envpilot.pullVariables",
       handlePullVariables
     ),
-    vscode.commands.registerCommand("envConnect.refresh", handleRefresh),
+    vscode.commands.registerCommand("envpilot.refresh", handleRefresh),
     vscode.commands.registerCommand(
-      "envConnect.openDashboard",
+      "envpilot.openDashboard",
       handleOpenDashboard
     ),
-    vscode.commands.registerCommand("envConnect.showStatus", handleShowStatus),
+    vscode.commands.registerCommand("envpilot.showStatus", handleShowStatus),
     // New V2 commands
     vscode.commands.registerCommand(
-      "envConnect.addDirectory",
+      "envpilot.addDirectory",
       handleAddDirectory
     ),
     vscode.commands.registerCommand(
-      "envConnect.removeDirectory",
+      "envpilot.removeDirectory",
       handleRemoveDirectory
     ),
     vscode.commands.registerCommand(
-      "envConnect.selectEnvironments",
+      "envpilot.selectEnvironments",
       handleSelectEnvironments
     ),
     vscode.commands.registerCommand(
-      "envConnect.requestVariable",
+      "envpilot.requestVariable",
       handleRequestVariable
     )
   );
@@ -135,7 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const authenticated = !!session;
     vscode.commands.executeCommand(
       "setContext",
-      "envConnect.isAuthenticated",
+      "envpilot.isAuthenticated",
       authenticated
     );
     projectsTreeProvider.setAuthenticated(authenticated);
@@ -148,7 +145,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const isAuthenticated = await authService.isAuthenticated();
   vscode.commands.executeCommand(
     "setContext",
-    "envConnect.isAuthenticated",
+    "envpilot.isAuthenticated",
     isAuthenticated
   );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
@@ -210,7 +207,7 @@ async function handleSignIn(): Promise<void> {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: "ENV Connect: Setting up...",
+        title: "Envpilot: Setting up...",
       },
       async (progress) => {
         progress.report({ message: "Loading projects and variables..." });
@@ -550,7 +547,7 @@ async function handleRequestVariable(): Promise<void> {
   const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
   if (!linkedProject) {
     vscode.window.showWarningMessage(
-      'No project linked. Use "ENV Connect: Link Project" first.'
+      'No project linked. Use "Envpilot: Link Project" first.'
     );
     return;
   }
@@ -576,7 +573,7 @@ async function handleRequestVariable(): Promise<void> {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: "ENV Connect: Submitting variable request...",
+        title: "Envpilot: Submitting variable request...",
       },
       async () => {
         await apiService.submitVariableRequest(input);
@@ -676,7 +673,7 @@ async function handlePullVariables(): Promise<void> {
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "ENV Connect: Pulling variables...",
+      title: "Envpilot: Pulling variables...",
     },
     async () => {
       statusBarProvider.setSyncing(true);
@@ -733,7 +730,7 @@ async function handleShowStatus(): Promise<void> {
 
   if (!isAuthenticated) {
     const action = await vscode.window.showInformationMessage(
-      "ENV Connect: Not signed in",
+      "Envpilot: Not signed in",
       "Sign In"
     );
     if (action === "Sign In") {
@@ -829,11 +826,11 @@ async function handleShowStatus(): Promise<void> {
     },
     {
       label: "$(globe) Open Dashboard",
-      description: "Open ENV Connect in browser",
+      description: "Open Envpilot in browser",
     },
     {
       label: "$(sign-out) Sign Out",
-      description: "Sign out of ENV Connect",
+      description: "Sign out of Envpilot",
     }
   );
 
@@ -841,7 +838,7 @@ async function handleShowStatus(): Promise<void> {
   const filteredItems = items.filter((i) => i.label);
 
   const selected = await vscode.window.showQuickPick(filteredItems, {
-    title: "ENV Connect Status",
+    title: "Envpilot Status",
     placeHolder: "Select an action",
   });
 

@@ -106,7 +106,7 @@ export class FileProtectionService {
     resyncCallback: () => Promise<void>
   ): Promise<void> {
     const action = await vscode.window.showWarningMessage(
-      "This file is managed by ENV Connect. You cannot edit it directly.",
+      "This file is managed by Envpilot. You cannot edit it directly.",
       "Request Variable",
       "OK"
     );
@@ -135,7 +135,7 @@ export class FileProtectionService {
     }
 
     if (action === "Request Variable") {
-      await vscode.commands.executeCommand("envConnect.requestVariable");
+      await vscode.commands.executeCommand("envpilot.requestVariable");
     }
   }
 

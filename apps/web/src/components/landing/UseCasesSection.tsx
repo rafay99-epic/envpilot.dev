@@ -192,8 +192,8 @@ export default function UseCasesSection() {
           Built for Every Team
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-center text-zinc-600 dark:text-zinc-400">
-          From solo developers to enterprise organizations, ENV Connect adapts
-          to your workflow
+          From solo developers to enterprise organizations, Envpilot adapts to
+          your workflow
         </p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">

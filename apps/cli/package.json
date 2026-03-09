@@ -1,10 +1,10 @@
 {
-  "name": "@env-connect/cli",
+  "name": "@envpilot/cli",
   "version": "0.1.0",
-  "description": "CLI tool for ENV Connect environment variable management",
+  "description": "CLI tool for Envpilot environment variable management",
   "type": "module",
   "bin": {
-    "env-connect": "./dist/index.js"
+    "envpilot": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "files": [
@@ -30,8 +30,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@env-connect/eslint-config": "workspace:*",
-    "@env-connect/tsconfig": "workspace:*",
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
     "@types/node": "^22.10.10",
     "eslint": "^9",
     "tsup": "^8.3.5",

@@ -1,5 +1,5 @@
 {
-  "name": "@env-connect/web",
+  "name": "@envpilot/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -29,8 +29,8 @@
     "convex": "^1.32.0"
   },
   "devDependencies": {
-    "@env-connect/eslint-config": "workspace:*",
-    "@env-connect/tsconfig": "workspace:*",
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

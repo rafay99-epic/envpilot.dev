@@ -1,7 +1,6 @@
 import { Resend } from "resend";
 
-const FROM_EMAIL =
-  process.env.FROM_EMAIL || "ENV Connect <noreply@envconnect.app>";
+const FROM_EMAIL = process.env.FROM_EMAIL || "Envpilot <noreply@envpilot.dev>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 function getResendClient(): Resend | null {

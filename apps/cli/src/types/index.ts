@@ -79,7 +79,7 @@ export const cliConfigSchema = z.object({
 
 export type CLIConfig = z.infer<typeof cliConfigSchema>;
 
-// Project config schema (.envconnect file)
+// Project config schema (.envpilot file)
 export const projectConfigSchema = z.object({
   projectId: z.string(),
   organizationId: z.string(),

@@ -30,14 +30,14 @@ provo/
 │   ├── _generated/           # Auto-generated types (by convex dev)
 │   └── *.ts                  # Backend functions (queries, mutations)
 ├── apps/
-│   ├── web/                  # Next.js 16 web app (@env-connect/web)
+│   ├── web/                  # Next.js 16 web app (@envpilot/web)
 │   │   ├── src/app/          # App Router pages + API routes
 │   │   ├── src/components/   # React components
 │   │   ├── src/hooks/        # Custom hooks (Convex query wrappers)
 │   │   └── src/lib/          # Utilities (auth, vault, stripe, email)
-│   ├── cli/                  # CLI tool (@env-connect/cli)
+│   ├── cli/                  # CLI tool (@envpilot/cli)
 │   │   └── src/              # Commands, lib, types
-│   └── vscode-extension/     # VS Code extension (env-connect)
+│   └── vscode-extension/     # VS Code extension (envpilot)
 │       └── src/              # Extension, services, providers
 ├── packages/
 │   ├── tsconfig/             # Shared TypeScript configs
@@ -73,9 +73,9 @@ provo/
 All commands use Turborepo's `--filter` flag:
 
 ```bash
-bunx turbo build --filter=@env-connect/web     # web app
-bunx turbo build --filter=@env-connect/cli      # CLI
-bunx turbo build --filter=env-connect           # extension
+bunx turbo build --filter=@envpilot/web     # web app
+bunx turbo build --filter=@envpilot/cli      # CLI
+bunx turbo build --filter=envpilot           # extension
 ```
 
 ## Environment Variables
@@ -142,7 +142,7 @@ import type { Id } from "@convex/_generated/dataModel";
 ## ESLint
 
 - **Web app**: Uses `eslint-config-next` with React Compiler rules (exhaustive-deps disabled)
-- **CLI & Extension**: Import `@env-connect/eslint-config/node` (shared TypeScript rules)
+- **CLI & Extension**: Import `@envpilot/eslint-config/node` (shared TypeScript rules)
 - All use ESLint v9 flat config format (`.mjs` files)
 
 ## TypeScript
@@ -215,7 +215,7 @@ Build caching is handled by `turbo.json`. Task outputs (`.next/`, `dist/`) are c
 
 1. Create directory in `apps/` (for apps) or `packages/` (for shared libraries)
 2. Add `package.json` with a unique `name`
-3. Extend shared tsconfig: `"extends": "@env-connect/tsconfig/node.json"`
-4. Import shared eslint: `import { nodeConfig } from "@env-connect/eslint-config/node"`
+3. Extend shared tsconfig: `"extends": "@envpilot/tsconfig/node.json"`
+4. Import shared eslint: `import { nodeConfig } from "@envpilot/eslint-config/node"`
 5. Run `bun install` to link the workspace
 6. Add tasks to `turbo.json` if needed

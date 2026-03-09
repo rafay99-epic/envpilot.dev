@@ -7,7 +7,7 @@ import {
 } from "../types/index.js";
 
 // Project config file name
-const CONFIG_FILE_NAME = ".envconnect";
+const CONFIG_FILE_NAME = ".envpilot";
 
 /**
  * Get the path to the project config file
@@ -68,7 +68,7 @@ export function updateProjectConfig(
   const existing = readProjectConfig(directory);
 
   if (!existing) {
-    throw new Error("No project config found. Run `env-connect init` first.");
+    throw new Error("No project config found. Run `envpilot init` first.");
   }
 
   const updated = { ...existing, ...updates };
@@ -112,7 +112,7 @@ export function deleteProjectConfig(
 }
 
 /**
- * Add .envconnect to .gitignore if it exists
+ * Add .envpilot to .gitignore if it exists
  */
 export function addToGitignore(directory: string = process.cwd()): void {
   const gitignorePath = join(directory, ".gitignore");
@@ -125,14 +125,14 @@ export function addToGitignore(directory: string = process.cwd()): void {
   const lines = content.split("\n");
 
   // Check if already in .gitignore
-  if (lines.some((line) => line.trim() === ".envconnect")) {
+  if (lines.some((line) => line.trim() === ".envpilot")) {
     return;
   }
 
   // Add to .gitignore
   const newContent = content.endsWith("\n")
-    ? content + ".envconnect\n"
-    : content + "\n.envconnect\n";
+    ? content + ".envpilot\n"
+    : content + "\n.envpilot\n";
 
   writeFileSync(gitignorePath, newContent, "utf-8");
 }

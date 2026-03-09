@@ -6,7 +6,7 @@ const DEFAULT_API_URL = "http://localhost:3000";
 
 // Config store using conf package
 const config = new Conf<CLIConfig>({
-  projectName: "env-connect",
+  projectName: "envpilot",
   defaults: {
     apiUrl: DEFAULT_API_URL,
   },

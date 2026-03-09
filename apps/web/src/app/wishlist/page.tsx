@@ -122,7 +122,7 @@ export default function WishlistPage() {
               </svg>
             </div>
             <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              ENV Connect
+              Envpilot
             </span>
           </Link>
 
@@ -275,7 +275,7 @@ export default function WishlistPage() {
       <footer className="border-t border-zinc-200 py-8 dark:border-zinc-800">
         <div className="container mx-auto px-4 text-center md:px-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            &copy; {new Date().getFullYear()} ENV Connect. All rights reserved.
+            &copy; {new Date().getFullYear()} Envpilot. All rights reserved.
           </p>
         </div>
       </footer>
@@ -648,7 +648,7 @@ function SubmitFeatureModal({
           Submit Feature Request
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Share your ideas to help us improve ENV Connect.
+          Share your ideas to help us improve Envpilot.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">

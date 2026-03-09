@@ -1,5 +1,5 @@
 {
-  "name": "@env-connect/eslint-config",
+  "name": "@envpilot/eslint-config",
   "version": "0.0.0",
   "private": true,
   "license": "MIT",

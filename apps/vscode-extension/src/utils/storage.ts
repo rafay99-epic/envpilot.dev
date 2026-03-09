@@ -7,12 +7,12 @@ import type {
 } from "../types";
 import { normalizePath } from "./paths";
 
-const AUTH_SESSION_KEY = "envConnect.authSession";
-const LINKED_PROJECTS_KEY = "envConnect.linkedProjects";
-const LINKED_PROJECTS_V2_KEY = "envConnect.linkedProjectsV2";
-const ACCESS_TOKEN_PREFIX = "envConnect.token.";
-const PROJECT_TOKEN_PREFIX = "envConnect.projectToken.";
-const STORAGE_VERSION_KEY = "envConnect.storageVersion";
+const AUTH_SESSION_KEY = "envpilot.authSession";
+const LINKED_PROJECTS_KEY = "envpilot.linkedProjects";
+const LINKED_PROJECTS_V2_KEY = "envpilot.linkedProjectsV2";
+const ACCESS_TOKEN_PREFIX = "envpilot.token.";
+const PROJECT_TOKEN_PREFIX = "envpilot.projectToken.";
+const STORAGE_VERSION_KEY = "envpilot.storageVersion";
 const CURRENT_STORAGE_VERSION = 2;
 
 /**

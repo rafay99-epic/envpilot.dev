@@ -1,12 +1,12 @@
 {
-  "name": "env-connect",
-  "displayName": "ENV Connect",
-  "description": "Securely sync environment variables from ENV Connect to your local projects",
+  "name": "envpilot",
+  "displayName": "Envpilot",
+  "description": "Securely sync environment variables from Envpilot to your local projects",
   "version": "0.1.0",
-  "publisher": "env-connect",
+  "publisher": "envpilot",
   "repository": {
     "type": "git",
-    "url": "https://github.com/env-connect/env-connect"
+    "url": "https://github.com/envpilot/envpilot"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -30,203 +30,203 @@
   "contributes": {
     "commands": [
       {
-        "command": "envConnect.signIn",
+        "command": "envpilot.signIn",
         "title": "Sign In",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(sign-in)"
       },
       {
-        "command": "envConnect.signOut",
+        "command": "envpilot.signOut",
         "title": "Sign Out",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(sign-out)"
       },
       {
-        "command": "envConnect.linkProject",
+        "command": "envpilot.linkProject",
         "title": "Link Project",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(link)"
       },
       {
-        "command": "envConnect.unlinkProject",
+        "command": "envpilot.unlinkProject",
         "title": "Unlink Project",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(debug-disconnect)"
       },
       {
-        "command": "envConnect.pullVariables",
+        "command": "envpilot.pullVariables",
         "title": "Pull Variables",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(cloud-download)"
       },
       {
-        "command": "envConnect.refresh",
+        "command": "envpilot.refresh",
         "title": "Refresh",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(refresh)"
       },
       {
-        "command": "envConnect.openDashboard",
+        "command": "envpilot.openDashboard",
         "title": "Open Dashboard",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(link-external)"
       },
       {
-        "command": "envConnect.showStatus",
+        "command": "envpilot.showStatus",
         "title": "Show Status",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(info)"
       },
       {
-        "command": "envConnect.addDirectory",
+        "command": "envpilot.addDirectory",
         "title": "Add Directory",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(new-folder)"
       },
       {
-        "command": "envConnect.removeDirectory",
+        "command": "envpilot.removeDirectory",
         "title": "Remove Directory",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(trash)"
       },
       {
-        "command": "envConnect.selectEnvironments",
+        "command": "envpilot.selectEnvironments",
         "title": "Select Environments",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(server-environment)"
       },
       {
-        "command": "envConnect.requestVariable",
+        "command": "envpilot.requestVariable",
         "title": "Request Variable",
-        "category": "ENV Connect",
+        "category": "Envpilot",
         "icon": "$(git-pull-request-create)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "env-connect",
-          "title": "ENV Connect",
+          "id": "envpilot",
+          "title": "Envpilot",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "env-connect": [
+      "envpilot": [
         {
-          "id": "envConnect.projects",
+          "id": "envpilot.projects",
           "name": "Projects"
         },
         {
-          "id": "envConnect.variables",
+          "id": "envpilot.variables",
           "name": "Variables"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "envConnect.projects",
-        "contents": "Welcome to ENV Connect\n\nSecurely sync environment variables to your local projects. No more sharing .env files over Slack.\n\n[$(sign-in) Sign In to Get Started](command:envConnect.signIn)\n\n[$(link-external) Open Dashboard](command:envConnect.openDashboard)",
-        "when": "!envConnect.isAuthenticated"
+        "view": "envpilot.projects",
+        "contents": "Welcome to Envpilot\n\nSecurely sync environment variables to your local projects. No more sharing .env files over Slack.\n\n[$(sign-in) Sign In to Get Started](command:envpilot.signIn)\n\n[$(link-external) Open Dashboard](command:envpilot.openDashboard)",
+        "when": "!envpilot.isAuthenticated"
       },
       {
-        "view": "envConnect.variables",
-        "contents": "Sign in to view and sync your environment variables.\n\n[$(sign-in) Sign In](command:envConnect.signIn)",
-        "when": "!envConnect.isAuthenticated"
+        "view": "envpilot.variables",
+        "contents": "Sign in to view and sync your environment variables.\n\n[$(sign-in) Sign In](command:envpilot.signIn)",
+        "when": "!envpilot.isAuthenticated"
       },
       {
-        "view": "envConnect.variables",
-        "contents": "Link a project to view its environment variables.\n\n[$(link) Link Project](command:envConnect.linkProject)",
-        "when": "envConnect.isAuthenticated && !envConnect.hasLinkedProject"
+        "view": "envpilot.variables",
+        "contents": "Link a project to view its environment variables.\n\n[$(link) Link Project](command:envpilot.linkProject)",
+        "when": "envpilot.isAuthenticated && !envpilot.hasLinkedProject"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "envConnect.refresh",
-          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "command": "envpilot.refresh",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "navigation@1"
         },
         {
-          "command": "envConnect.linkProject",
-          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "command": "envpilot.linkProject",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "navigation@2"
         },
         {
-          "command": "envConnect.openDashboard",
-          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "command": "envpilot.openDashboard",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "overflow@1"
         },
         {
-          "command": "envConnect.signOut",
-          "when": "view == envConnect.projects && envConnect.isAuthenticated",
+          "command": "envpilot.signOut",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "overflow@2"
         },
         {
-          "command": "envConnect.pullVariables",
-          "when": "view == envConnect.variables && envConnect.isAuthenticated",
+          "command": "envpilot.pullVariables",
+          "when": "view == envpilot.variables && envpilot.isAuthenticated",
           "group": "navigation@1"
         },
         {
-          "command": "envConnect.refresh",
-          "when": "view == envConnect.variables && envConnect.isAuthenticated",
+          "command": "envpilot.refresh",
+          "when": "view == envpilot.variables && envpilot.isAuthenticated",
           "group": "navigation@2"
         },
         {
-          "command": "envConnect.requestVariable",
-          "when": "view == envConnect.variables && envConnect.isAuthenticated && envConnect.userRole == member",
+          "command": "envpilot.requestVariable",
+          "when": "view == envpilot.variables && envpilot.isAuthenticated && envpilot.userRole == member",
           "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
-          "command": "envConnect.linkProject",
-          "when": "view == envConnect.projects && viewItem == project",
+          "command": "envpilot.linkProject",
+          "when": "view == envpilot.projects && viewItem == project",
           "group": "inline@1"
         },
         {
-          "command": "envConnect.unlinkProject",
-          "when": "view == envConnect.projects && viewItem == linkedProject",
+          "command": "envpilot.unlinkProject",
+          "when": "view == envpilot.projects && viewItem == linkedProject",
           "group": "inline@3"
         },
         {
-          "command": "envConnect.addDirectory",
-          "when": "view == envConnect.projects && viewItem == linkedProject",
+          "command": "envpilot.addDirectory",
+          "when": "view == envpilot.projects && viewItem == linkedProject",
           "group": "inline@1"
         },
         {
-          "command": "envConnect.removeDirectory",
-          "when": "view == envConnect.projects && viewItem == linkedDirectory",
+          "command": "envpilot.removeDirectory",
+          "when": "view == envpilot.projects && viewItem == linkedDirectory",
           "group": "inline@1"
         }
       ]
     },
     "configuration": {
-      "title": "ENV Connect",
+      "title": "Envpilot",
       "properties": {
-        "envConnect.serverUrl": {
+        "envpilot.serverUrl": {
           "type": "string",
           "default": "http://localhost:3000",
-          "description": "The URL of the ENV Connect server"
+          "description": "The URL of the Envpilot server"
         },
-        "envConnect.autoSync": {
+        "envpilot.autoSync": {
           "type": "boolean",
           "default": true,
           "description": "Automatically sync variables when workspace opens"
         },
-        "envConnect.syncInterval": {
+        "envpilot.syncInterval": {
           "type": "number",
           "default": 300,
           "description": "Interval (in seconds) for checking permission changes",
           "minimum": 60,
           "maximum": 3600
         },
-        "envConnect.targetFile": {
+        "envpilot.targetFile": {
           "type": "string",
           "default": ".env.local",
           "description": "Default target file for synced variables"
         },
-        "envConnect.environment": {
+        "envpilot.environment": {
           "type": "string",
           "default": "development",
           "enum": [
@@ -236,12 +236,12 @@
           ],
           "description": "Default environment for synced variables"
         },
-        "envConnect.preventCopyOnRevoke": {
+        "envpilot.preventCopyOnRevoke": {
           "type": "boolean",
           "default": true,
           "description": "Delete synced .env files when permissions are revoked"
         },
-        "envConnect.defaultConflictResolution": {
+        "envpilot.defaultConflictResolution": {
           "type": "string",
           "default": "prompt",
           "enum": [
@@ -260,22 +260,22 @@
           ],
           "description": "Default action when existing .env files are found"
         },
-        "envConnect.enableMultiDirectorySync": {
+        "envpilot.enableMultiDirectorySync": {
           "type": "boolean",
           "default": true,
           "description": "Allow linking multiple directories to the same project"
         },
-        "envConnect.syncOnDirectoryOpen": {
+        "envpilot.syncOnDirectoryOpen": {
           "type": "boolean",
           "default": true,
           "description": "Automatically sync when opening a linked directory"
         },
-        "envConnect.enableRealTimeSync": {
+        "envpilot.enableRealTimeSync": {
           "type": "boolean",
           "default": true,
           "description": "Enable real-time permission revocation detection (recommended)"
         },
-        "envConnect.realTimeSyncInterval": {
+        "envpilot.realTimeSyncInterval": {
           "type": "number",
           "default": 5,
           "description": "Interval (in seconds) for real-time permission check",
@@ -299,8 +299,8 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@env-connect/eslint-config": "workspace:*",
-    "@env-connect/tsconfig": "workspace:*",
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
     "@types/node": "^20.10.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",

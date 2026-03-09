@@ -1,6 +1,6 @@
 import type { MembershipRole } from "@/lib/auth";
 
-export const ACTIVE_ORG_COOKIE_NAME = "env_connect_active_org";
+export const ACTIVE_ORG_COOKIE_NAME = "envpilot_active_org";
 export const ACTIVE_ORG_COOKIE_TTL_SECONDS = 60 * 60 * 24 * 365;
 
 export interface OrganizationWithMembershipRole {

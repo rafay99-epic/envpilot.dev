@@ -82,7 +82,7 @@ export default function ChangelogPage() {
               </svg>
             </div>
             <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              ENV Connect
+              Envpilot
             </span>
           </Link>
 
@@ -112,7 +112,7 @@ export default function ChangelogPage() {
               Changelog
             </h1>
             <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
-              All the latest updates, improvements, and fixes to ENV Connect.
+              All the latest updates, improvements, and fixes to Envpilot.
             </p>
           </div>
 
@@ -232,7 +232,7 @@ export default function ChangelogPage() {
             </Link>
           </div>
           <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-            &copy; {new Date().getFullYear()} ENV Connect. All rights reserved.
+            &copy; {new Date().getFullYear()} Envpilot. All rights reserved.
           </p>
         </div>
       </footer>

@@ -3,7 +3,7 @@ import * as crypto from "crypto";
 import * as vscode from "vscode";
 import type { DeviceInfo } from "../types";
 
-const DEVICE_ID_KEY = "envConnect.deviceId";
+const DEVICE_ID_KEY = "envpilot.deviceId";
 
 /**
  * Get or generate a unique device ID for this VS Code installation

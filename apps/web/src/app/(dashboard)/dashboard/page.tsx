@@ -442,7 +442,7 @@ function GettingStartedSection({
         Getting Started
       </h2>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Complete these steps to get the most out of ENV Connect.
+        Complete these steps to get the most out of Envpilot.
       </p>
 
       <div className="mt-6 space-y-4">
