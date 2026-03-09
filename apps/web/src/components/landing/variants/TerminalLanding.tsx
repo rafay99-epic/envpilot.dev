@@ -26,7 +26,6 @@ const COMMANDS = [
 ];
 
 function useTypingEffect(texts: string[], typingSpeed = 60, pauseTime = 2000) {
-  const [displayText, setDisplayText] = useState("");
   const [textIndex, setTextIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -42,15 +41,16 @@ function useTypingEffect(texts: string[], typingSpeed = 60, pauseTime = 2000) {
     } else if (isDeleting && charIndex > 0) {
       timeout = setTimeout(() => setCharIndex((c) => c - 1), typingSpeed / 2);
     } else if (isDeleting && charIndex === 0) {
-      setIsDeleting(false);
-      setTextIndex((i) => (i + 1) % texts.length);
+      timeout = setTimeout(() => {
+        setIsDeleting(false);
+        setTextIndex((i) => (i + 1) % texts.length);
+      }, 0);
     }
 
-    setDisplayText(current.substring(0, charIndex));
     return () => clearTimeout(timeout);
   }, [charIndex, isDeleting, textIndex, texts, typingSpeed, pauseTime]);
 
-  return displayText;
+  return texts[textIndex].substring(0, charIndex);
 }
 
 function TerminalWindow({
@@ -72,7 +72,9 @@ function TerminalWindow({
         <div className="h-3 w-3 rounded-full bg-green-500/80" />
         <span className="ml-2 text-xs text-zinc-500">{title}</span>
       </div>
-      <div className="flex-1 p-5 font-mono text-sm leading-relaxed">{children}</div>
+      <div className="flex-1 p-5 font-mono text-sm leading-relaxed">
+        {children}
+      </div>
     </div>
   );
 }
@@ -239,7 +241,10 @@ export default function TerminalLanding() {
               </p>
 
               {/* Interactive terminal */}
-              <TerminalWindow title="bash — envpilot" className="mt-10 max-w-2xl">
+              <TerminalWindow
+                title="bash — envpilot"
+                className="mt-10 max-w-2xl"
+              >
                 <div className="flex items-center">
                   <span className="mr-2 text-green-500">$</span>
                   <span className="text-zinc-300">{typedCommand}</span>
@@ -279,7 +284,7 @@ export default function TerminalLanding() {
               variants={fadeInUp}
             >
               <p className="text-xs uppercase tracking-widest text-green-500">
-                // features
+                {"// features"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
                 Built for the command line
@@ -294,11 +299,17 @@ export default function TerminalLanding() {
               variants={stagger}
             >
               {features.map((feature) => (
-                <motion.div key={feature.title} variants={fadeInUp} className="flex">
+                <motion.div
+                  key={feature.title}
+                  variants={fadeInUp}
+                  className="flex"
+                >
                   <TerminalWindow title={feature.cmd} className="h-full">
                     <div className="mb-3 flex items-center gap-2">
                       {feature.icon}
-                      <span className="text-zinc-300">envpilot {feature.cmd}</span>{" "}
+                      <span className="text-zinc-300">
+                        envpilot {feature.cmd}
+                      </span>{" "}
                       <span className="text-amber-400">{feature.flag}</span>
                     </div>
                     <div className="border-t border-zinc-800 pt-3">
@@ -329,7 +340,7 @@ export default function TerminalLanding() {
               variants={fadeInUp}
             >
               <p className="text-xs uppercase tracking-widest text-green-500">
-                // workflow
+                {"// workflow"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
                 Four commands to production
@@ -381,7 +392,7 @@ export default function TerminalLanding() {
               variants={fadeInUp}
             >
               <p className="text-xs uppercase tracking-widest text-green-500">
-                // demo
+                {"// demo"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
                 Your .env, but secure
@@ -396,10 +407,15 @@ export default function TerminalLanding() {
               variants={stagger}
             >
               <motion.div variants={fadeInUp} className="flex">
-                <TerminalWindow title="before — .env (shared via Slack)" className="h-full">
+                <TerminalWindow
+                  title="before — .env (shared via Slack)"
+                  className="h-full"
+                >
                   <div className="space-y-1 text-xs">
                     <p>
-                      <span className="text-zinc-500"># DON&apos;T COMMIT THIS!</span>
+                      <span className="text-zinc-500">
+                        # DON&apos;T COMMIT THIS!
+                      </span>
                     </p>
                     <p>
                       <span className="text-amber-400">DATABASE_URL</span>
@@ -411,12 +427,16 @@ export default function TerminalLanding() {
                     <p>
                       <span className="text-amber-400">STRIPE_SECRET</span>
                       <span className="text-zinc-600">=</span>
-                      <span className="text-red-400">sk_live_4eC39HqLyjWDarj</span>
+                      <span className="text-red-400">
+                        sk_live_4eC39HqLyjWDarj
+                      </span>
                     </p>
                     <p>
                       <span className="text-amber-400">AWS_SECRET_KEY</span>
                       <span className="text-zinc-600">=</span>
-                      <span className="text-red-400">wJalrXUtnFEMI/K7MDENG</span>
+                      <span className="text-red-400">
+                        wJalrXUtnFEMI/K7MDENG
+                      </span>
                     </p>
                     <p className="mt-2 flex items-center gap-1.5 text-red-400">
                       <Shield className="h-3 w-3" />
@@ -427,7 +447,10 @@ export default function TerminalLanding() {
               </motion.div>
 
               <motion.div variants={fadeInUp} className="flex">
-                <TerminalWindow title="after — envpilot pull" className="h-full">
+                <TerminalWindow
+                  title="after — envpilot pull"
+                  className="h-full"
+                >
                   <div className="space-y-1 text-xs">
                     <p>
                       <span className="text-zinc-500">
@@ -437,7 +460,9 @@ export default function TerminalLanding() {
                     <p>
                       <span className="text-amber-400">DATABASE_URL</span>
                       <span className="text-zinc-600">=</span>
-                      <span className="text-green-400">vault://ref/db_prod_2847</span>
+                      <span className="text-green-400">
+                        vault://ref/db_prod_2847
+                      </span>
                     </p>
                     <p>
                       <span className="text-amber-400">STRIPE_SECRET</span>
@@ -449,7 +474,9 @@ export default function TerminalLanding() {
                     <p>
                       <span className="text-amber-400">AWS_SECRET_KEY</span>
                       <span className="text-zinc-600">=</span>
-                      <span className="text-green-400">vault://ref/aws_key_5521</span>
+                      <span className="text-green-400">
+                        vault://ref/aws_key_5521
+                      </span>
                     </p>
                     <p className="mt-2 flex items-center gap-1.5 text-green-400">
                       <Check className="h-3 w-3" />
@@ -472,13 +499,14 @@ export default function TerminalLanding() {
               variants={fadeInUp}
             >
               <p className="text-xs uppercase tracking-widest text-green-500">
-                // platform
+                {"// platform"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
                 Three surfaces, one vault
               </h2>
               <p className="mt-3 max-w-2xl text-sm text-zinc-500">
-                Terminal, IDE, or browser — your secrets stay encrypted and in sync everywhere.
+                Terminal, IDE, or browser — your secrets stay encrypted and in
+                sync everywhere.
               </p>
             </motion.div>
 
@@ -493,18 +521,37 @@ export default function TerminalLanding() {
                 <TerminalWindow title="cli" className="h-full">
                   <div className="mb-3 flex items-center gap-2">
                     <Terminal className="h-4 w-4 text-green-400" />
-                    <span className="text-xs font-bold text-zinc-300">CLI Tool</span>
+                    <span className="text-xs font-bold text-zinc-300">
+                      CLI Tool
+                    </span>
                   </div>
                   <div className="space-y-1 text-xs text-zinc-500">
-                    <p><span className="text-green-500">$</span> envpilot login</p>
-                    <p><span className="text-green-500">$</span> envpilot init</p>
-                    <p><span className="text-green-500">$</span> envpilot pull --env production</p>
-                    <p><span className="text-green-500">$</span> envpilot push --dry-run</p>
-                    <p><span className="text-green-500">$</span> envpilot list variables --show-values</p>
-                    <p><span className="text-green-500">$</span> envpilot switch staging</p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot login
+                    </p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot init
+                    </p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot pull
+                      --env production
+                    </p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot push
+                      --dry-run
+                    </p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot list
+                      variables --show-values
+                    </p>
+                    <p>
+                      <span className="text-green-500">$</span> envpilot switch
+                      staging
+                    </p>
                   </div>
                   <div className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-600">
-                    8 commands. Browser-based SSO. Dry-run previews. CI/CD ready.
+                    8 commands. Browser-based SSO. Dry-run previews. CI/CD
+                    ready.
                   </div>
                 </TerminalWindow>
               </motion.div>
@@ -513,18 +560,39 @@ export default function TerminalLanding() {
                 <TerminalWindow title="vscode" className="h-full">
                   <div className="mb-3 flex items-center gap-2">
                     <Puzzle className="h-4 w-4 text-blue-400" />
-                    <span className="text-xs font-bold text-zinc-300">VS Code Extension</span>
+                    <span className="text-xs font-bold text-zinc-300">
+                      VS Code Extension
+                    </span>
                   </div>
                   <div className="space-y-1 text-xs text-zinc-500">
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Sign In</p>
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Link Project</p>
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Pull Variables</p>
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Add Directory</p>
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Select Environments</p>
-                    <p><span className="text-blue-400">&gt;</span> Envpilot: Request Variable</p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot: Sign
+                      In
+                    </p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot: Link
+                      Project
+                    </p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot: Pull
+                      Variables
+                    </p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot: Add
+                      Directory
+                    </p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot:
+                      Select Environments
+                    </p>
+                    <p>
+                      <span className="text-blue-400">&gt;</span> Envpilot:
+                      Request Variable
+                    </p>
                   </div>
                   <div className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-600">
-                    Real-time WebSocket sync. Multi-directory. Auto-cleanup on revoke.
+                    Real-time WebSocket sync. Multi-directory. Auto-cleanup on
+                    revoke.
                   </div>
                 </TerminalWindow>
               </motion.div>
@@ -533,15 +601,35 @@ export default function TerminalLanding() {
                 <TerminalWindow title="dashboard" className="h-full">
                   <div className="mb-3 flex items-center gap-2">
                     <Monitor className="h-4 w-4 text-purple-400" />
-                    <span className="text-xs font-bold text-zinc-300">Web Dashboard</span>
+                    <span className="text-xs font-bold text-zinc-300">
+                      Web Dashboard
+                    </span>
                   </div>
                   <div className="space-y-1 text-xs text-zinc-500">
-                    <p><span className="text-purple-400">/</span> Projects &amp; Environments</p>
-                    <p><span className="text-purple-400">/</span> Variables &amp; Secrets</p>
-                    <p><span className="text-purple-400">/</span> Team &amp; Permissions</p>
-                    <p><span className="text-purple-400">/</span> Audit Logs &amp; Exports</p>
-                    <p><span className="text-purple-400">/</span> Version History &amp; Rollback</p>
-                    <p><span className="text-purple-400">/</span> Settings &amp; Integrations</p>
+                    <p>
+                      <span className="text-purple-400">/</span> Projects &amp;
+                      Environments
+                    </p>
+                    <p>
+                      <span className="text-purple-400">/</span> Variables &amp;
+                      Secrets
+                    </p>
+                    <p>
+                      <span className="text-purple-400">/</span> Team &amp;
+                      Permissions
+                    </p>
+                    <p>
+                      <span className="text-purple-400">/</span> Audit Logs
+                      &amp; Exports
+                    </p>
+                    <p>
+                      <span className="text-purple-400">/</span> Version History
+                      &amp; Rollback
+                    </p>
+                    <p>
+                      <span className="text-purple-400">/</span> Settings &amp;
+                      Integrations
+                    </p>
                   </div>
                   <div className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-600">
                     Full management UI. Approve requests. Compliance exports.
@@ -562,7 +650,7 @@ export default function TerminalLanding() {
               variants={fadeInUp}
             >
               <p className="text-xs uppercase tracking-widest text-green-500">
-                // pricing
+                {"// pricing"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
                 Simple, transparent pricing
@@ -580,8 +668,12 @@ export default function TerminalLanding() {
               <motion.div variants={fadeInUp}>
                 <TerminalWindow title="plan — free" className="h-full">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-green-400">$0</span>
-                    <span className="text-xs text-zinc-600">/ month / organization</span>
+                    <span className="text-3xl font-bold text-green-400">
+                      $0
+                    </span>
+                    <span className="text-xs text-zinc-600">
+                      / month / organization
+                    </span>
                   </div>
                   <div className="mt-1 inline-flex items-center gap-1.5 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-0.5 text-[10px] text-amber-400">
                     <span className="h-1 w-1 rounded-full bg-amber-400" />
@@ -598,7 +690,10 @@ export default function TerminalLanding() {
                       "Role-based access control",
                       "Full audit logging",
                     ].map((item) => (
-                      <p key={item} className="flex items-center gap-2 text-zinc-400">
+                      <p
+                        key={item}
+                        className="flex items-center gap-2 text-zinc-400"
+                      >
                         <Check className="h-3 w-3 shrink-0 text-green-400" />
                         {item}
                       </p>
@@ -617,10 +712,17 @@ export default function TerminalLanding() {
 
               {/* Pro Plan */}
               <motion.div variants={fadeInUp}>
-                <TerminalWindow title="plan — pro (coming soon)" className="h-full">
+                <TerminalWindow
+                  title="plan — pro (coming soon)"
+                  className="h-full"
+                >
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-zinc-400">$10</span>
-                    <span className="text-xs text-zinc-600">/ month / organization</span>
+                    <span className="text-3xl font-bold text-zinc-400">
+                      $10
+                    </span>
+                    <span className="text-xs text-zinc-600">
+                      / month / organization
+                    </span>
                   </div>
                   <div className="mt-1 inline-flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-800/50 px-2 py-0.5 text-[10px] text-zinc-500">
                     <span className="h-1 w-1 rounded-full bg-zinc-500" />
@@ -635,7 +737,10 @@ export default function TerminalLanding() {
                       "SSO / SAML support",
                       "SLA guarantees",
                     ].map((item) => (
-                      <p key={item} className="flex items-center gap-2 text-zinc-500">
+                      <p
+                        key={item}
+                        className="flex items-center gap-2 text-zinc-500"
+                      >
                         <Check className="h-3 w-3 shrink-0 text-zinc-600" />
                         {item}
                       </p>
@@ -665,9 +770,7 @@ export default function TerminalLanding() {
                 title="bash — get started"
                 className="mx-auto max-w-lg"
               >
-                <p className="text-zinc-500">
-                  # Ready to secure your secrets?
-                </p>
+                <p className="text-zinc-500"># Ready to secure your secrets?</p>
                 <p className="mt-2">
                   <span className="text-green-500">$</span>{" "}
                   <span className="text-zinc-300">

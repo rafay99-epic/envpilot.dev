@@ -22,12 +22,42 @@ const cardBase = `border-4 border-black ${cardShadow} ${cardShadowHover} hover:-
 
 export default function NeobrutalLanding() {
   const features = [
-    { title: "Encryption", desc: "AES-256 at rest. Your secrets are locked down tight. Zero-knowledge vault.", bg: "bg-blue-300", emoji: "🔐" },
-    { title: "SSO & Multi-Org", desc: "SAML, OIDC, multi-org workspaces. Enterprise-ready from day one.", bg: "bg-pink-300", emoji: "🏢" },
-    { title: "Role-Based Access", desc: "Admin, Lead, Member. Per-variable permissions. You decide who sees what.", bg: "bg-green-300", emoji: "🛡️" },
-    { title: "IDE Extensions", desc: "VS Code & Cursor plugins. Your .env syncs in real-time. No copy-paste.", bg: "bg-orange-300", emoji: "⚡" },
-    { title: "CLI Tool", desc: "Pull, push, diff from terminal. CI/CD pipeline integration built right in.", bg: "bg-purple-300", emoji: "💻" },
-    { title: "Audit Logs", desc: "Full access trail. Who viewed what, when. Export for SOC2 compliance.", bg: "bg-yellow-300", emoji: "📋" },
+    {
+      title: "Encryption",
+      desc: "AES-256 at rest. Your secrets are locked down tight. Zero-knowledge vault.",
+      bg: "bg-blue-300",
+      emoji: "🔐",
+    },
+    {
+      title: "SSO & Multi-Org",
+      desc: "SAML, OIDC, multi-org workspaces. Enterprise-ready from day one.",
+      bg: "bg-pink-300",
+      emoji: "🏢",
+    },
+    {
+      title: "Role-Based Access",
+      desc: "Admin, Lead, Member. Per-variable permissions. You decide who sees what.",
+      bg: "bg-green-300",
+      emoji: "🛡️",
+    },
+    {
+      title: "IDE Extensions",
+      desc: "VS Code & Cursor plugins. Your .env syncs in real-time. No copy-paste.",
+      bg: "bg-orange-300",
+      emoji: "⚡",
+    },
+    {
+      title: "CLI Tool",
+      desc: "Pull, push, diff from terminal. CI/CD pipeline integration built right in.",
+      bg: "bg-purple-300",
+      emoji: "💻",
+    },
+    {
+      title: "Audit Logs",
+      desc: "Full access trail. Who viewed what, when. Export for SOC2 compliance.",
+      bg: "bg-yellow-300",
+      emoji: "📋",
+    },
   ];
 
   const beforeAfter = {
@@ -53,7 +83,9 @@ export default function NeobrutalLanding() {
       <header className="border-b-4 border-black bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-black ${cardShadow.replace("4px", "2px").replace("4px", "2px")}`}>
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-lg bg-black ${cardShadow.replace("4px", "2px").replace("4px", "2px")}`}
+            >
               <span className="text-lg">🔑</span>
             </div>
             <span className="text-xl font-black tracking-tight">envpilot</span>
@@ -89,14 +121,31 @@ export default function NeobrutalLanding() {
         {/* Hero */}
         <section className="relative overflow-hidden bg-lime-300 py-20 md:py-28">
           {/* Decorative elements */}
-          <div className="absolute top-8 right-12 hidden text-6xl md:block" style={{ transform: "rotate(12deg)" }}>🔐</div>
-          <div className="absolute bottom-12 left-8 hidden text-5xl md:block" style={{ transform: "rotate(-8deg)" }}>⚡</div>
-          <div className="absolute top-1/2 right-1/4 hidden text-4xl md:block" style={{ transform: "rotate(5deg)" }}>🚀</div>
+          <div
+            className="absolute top-8 right-12 hidden text-6xl md:block"
+            style={{ transform: "rotate(12deg)" }}
+          >
+            🔐
+          </div>
+          <div
+            className="absolute bottom-12 left-8 hidden text-5xl md:block"
+            style={{ transform: "rotate(-8deg)" }}
+          >
+            ⚡
+          </div>
+          <div
+            className="absolute top-1/2 right-1/4 hidden text-4xl md:block"
+            style={{ transform: "rotate(5deg)" }}
+          >
+            🚀
+          </div>
 
           <div className="mx-auto max-w-5xl px-4">
             <motion.div initial="hidden" animate="visible" variants={stagger}>
               <motion.div variants={fadeInUp}>
-                <div className={`mb-6 inline-block rounded-lg border-2 border-black bg-white px-3 py-1 text-sm font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]`}>
+                <div
+                  className={`mb-6 inline-block rounded-lg border-2 border-black bg-white px-3 py-1 text-sm font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]`}
+                >
                   NEW: WebSocket Real-Time Sync
                 </div>
               </motion.div>
@@ -119,11 +168,14 @@ export default function NeobrutalLanding() {
                 variants={fadeInUp}
                 className="mt-6 max-w-xl text-lg font-medium text-black/70 md:text-xl"
               >
-                Encrypted vault. Role-based access. CLI-first. Stop sharing secrets
-                over Slack and start managing them like a real team.
+                Encrypted vault. Role-based access. CLI-first. Stop sharing
+                secrets over Slack and start managing them like a real team.
               </motion.p>
 
-              <motion.div variants={fadeInUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <motion.div
+                variants={fadeInUp}
+                className="mt-8 flex flex-col gap-3 sm:flex-row"
+              >
                 <Link
                   href="/sign-up"
                   className={`rounded-xl bg-black px-8 py-4 text-center text-lg font-black text-white ${cardShadow.replace("rgba(0,0,0,1)", "rgba(236,72,153,1)")} transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]`}
@@ -148,21 +200,53 @@ export default function NeobrutalLanding() {
                   <div className="h-3 w-3 rounded-full bg-red-500" />
                   <div className="h-3 w-3 rounded-full bg-yellow-500" />
                   <div className="h-3 w-3 rounded-full bg-green-500" />
-                  <span className="ml-2 text-xs font-bold text-black/50">.env.production</span>
+                  <span className="ml-2 text-xs font-bold text-black/50">
+                    .env.production
+                  </span>
                 </div>
-                <p><span className="font-bold text-purple-600">DATABASE_URL</span>=<span className="bg-black px-1 text-black">████████████████</span></p>
-                <p><span className="font-bold text-purple-600">STRIPE_KEY</span>=<span className="bg-black px-1 text-black">████████████████</span></p>
-                <p><span className="font-bold text-purple-600">AWS_SECRET</span>=<span className="bg-black px-1 text-black">████████████████</span></p>
-                <p className="mt-2 text-green-600 font-bold">✓ Encrypted by Envpilot</p>
+                <p>
+                  <span className="font-bold text-purple-600">
+                    DATABASE_URL
+                  </span>
+                  =
+                  <span className="bg-black px-1 text-black">
+                    ████████████████
+                  </span>
+                </p>
+                <p>
+                  <span className="font-bold text-purple-600">STRIPE_KEY</span>=
+                  <span className="bg-black px-1 text-black">
+                    ████████████████
+                  </span>
+                </p>
+                <p>
+                  <span className="font-bold text-purple-600">AWS_SECRET</span>=
+                  <span className="bg-black px-1 text-black">
+                    ████████████████
+                  </span>
+                </p>
+                <p className="mt-2 text-green-600 font-bold">
+                  ✓ Encrypted by Envpilot
+                </p>
               </motion.div>
             </motion.div>
           </div>
         </section>
 
         {/* Features */}
-        <section id="features" className="py-24" style={{ backgroundColor: "#FFFEF5" }}>
+        <section
+          id="features"
+          className="py-24"
+          style={{ backgroundColor: "#FFFEF5" }}
+        >
           <div className="mx-auto max-w-6xl px-4">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+              className="text-center"
+            >
               <h2 className="text-4xl font-black md:text-5xl">
                 Everything You Need
               </h2>
@@ -194,9 +278,18 @@ export default function NeobrutalLanding() {
         </section>
 
         {/* How It Works */}
-        <section id="how-it-works" className="border-t-4 border-black bg-blue-200 py-24">
+        <section
+          id="how-it-works"
+          className="border-t-4 border-black bg-blue-200 py-24"
+        >
           <div className="mx-auto max-w-5xl px-4">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+              className="text-center"
+            >
               <h2 className="text-4xl font-black md:text-5xl">How It Works</h2>
             </motion.div>
 
@@ -208,12 +301,36 @@ export default function NeobrutalLanding() {
               variants={stagger}
             >
               {[
-                { num: "1", title: "Install", desc: "One npm install and you're ready.", color: "bg-pink-400" },
-                { num: "2", title: "Login", desc: "Authenticate with your org.", color: "bg-yellow-400" },
-                { num: "3", title: "Pull", desc: "Sync variables to your .env.", color: "bg-green-400" },
-                { num: "4", title: "Ship", desc: "Push changes to any environment.", color: "bg-purple-400" },
+                {
+                  num: "1",
+                  title: "Install",
+                  desc: "One npm install and you're ready.",
+                  color: "bg-pink-400",
+                },
+                {
+                  num: "2",
+                  title: "Login",
+                  desc: "Authenticate with your org.",
+                  color: "bg-yellow-400",
+                },
+                {
+                  num: "3",
+                  title: "Pull",
+                  desc: "Sync variables to your .env.",
+                  color: "bg-green-400",
+                },
+                {
+                  num: "4",
+                  title: "Ship",
+                  desc: "Push changes to any environment.",
+                  color: "bg-purple-400",
+                },
               ].map((step) => (
-                <motion.div key={step.num} variants={fadeInUp} className="text-center">
+                <motion.div
+                  key={step.num}
+                  variants={fadeInUp}
+                  className="text-center"
+                >
                   <div
                     className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-black ${step.color} text-3xl font-black ${cardShadow}`}
                   >
@@ -228,9 +345,19 @@ export default function NeobrutalLanding() {
         </section>
 
         {/* Before vs After */}
-        <section id="compare" className="border-t-4 border-black py-24" style={{ backgroundColor: "#FFFEF5" }}>
+        <section
+          id="compare"
+          className="border-t-4 border-black py-24"
+          style={{ backgroundColor: "#FFFEF5" }}
+        >
           <div className="mx-auto max-w-5xl px-4">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+              className="text-center"
+            >
               <h2 className="text-4xl font-black md:text-5xl">
                 Before vs After
               </h2>
@@ -246,13 +373,19 @@ export default function NeobrutalLanding() {
               viewport={{ once: true }}
               variants={stagger}
             >
-              <motion.div variants={fadeInUp} className={`rounded-xl bg-red-200 ${cardBase} p-6`}>
+              <motion.div
+                variants={fadeInUp}
+                className={`rounded-xl bg-red-200 ${cardBase} p-6`}
+              >
                 <h3 className="mb-4 text-xl font-black text-red-700">
                   Without Envpilot 😰
                 </h3>
                 <ul className="space-y-3">
                   {beforeAfter.before.map((item) => (
-                    <li key={item} className="flex items-start gap-2 font-medium">
+                    <li
+                      key={item}
+                      className="flex items-start gap-2 font-medium"
+                    >
                       <span className="mt-0.5 text-red-600">✗</span>
                       {item}
                     </li>
@@ -260,13 +393,19 @@ export default function NeobrutalLanding() {
                 </ul>
               </motion.div>
 
-              <motion.div variants={fadeInUp} className={`rounded-xl bg-green-200 ${cardBase} p-6`}>
+              <motion.div
+                variants={fadeInUp}
+                className={`rounded-xl bg-green-200 ${cardBase} p-6`}
+              >
                 <h3 className="mb-4 text-xl font-black text-green-700">
                   With Envpilot 🎉
                 </h3>
                 <ul className="space-y-3">
                   {beforeAfter.after.map((item) => (
-                    <li key={item} className="flex items-start gap-2 font-medium">
+                    <li
+                      key={item}
+                      className="flex items-start gap-2 font-medium"
+                    >
                       <span className="mt-0.5 text-green-600">✓</span>
                       {item}
                     </li>
@@ -279,11 +418,26 @@ export default function NeobrutalLanding() {
 
         {/* Marquee */}
         <section className="overflow-hidden border-t-4 border-b-4 border-black bg-yellow-300 py-4">
-          <div className="flex whitespace-nowrap" style={{ animation: "marquee 20s linear infinite" }}>
+          <div
+            className="flex whitespace-nowrap"
+            style={{ animation: "marquee 20s linear infinite" }}
+          >
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-8 px-4">
-                {["Vercel", "Stripe", "Linear", "Notion", "Figma", "Supabase", "Planetscale", "Railway"].map((co) => (
-                  <span key={`${co}-${i}`} className="text-lg font-black text-black/30">
+                {[
+                  "Vercel",
+                  "Stripe",
+                  "Linear",
+                  "Notion",
+                  "Figma",
+                  "Supabase",
+                  "Planetscale",
+                  "Railway",
+                ].map((co) => (
+                  <span
+                    key={`${co}-${i}`}
+                    className="text-lg font-black text-black/30"
+                  >
                     {co}
                   </span>
                 ))}
@@ -314,7 +468,9 @@ export default function NeobrutalLanding() {
                   className={`rounded-xl ${s.bg} ${cardBase} p-4 text-center`}
                 >
                   <p className="text-3xl font-black">{s.val}</p>
-                  <p className="mt-1 text-sm font-bold text-black/60">{s.label}</p>
+                  <p className="mt-1 text-sm font-bold text-black/60">
+                    {s.label}
+                  </p>
                 </motion.div>
               ))}
             </motion.div>
@@ -324,7 +480,12 @@ export default function NeobrutalLanding() {
         {/* CTA */}
         <section className="border-t-4 border-black bg-pink-400 py-24">
           <div className="mx-auto max-w-3xl px-4 text-center">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={fadeInUp}
+            >
               <h2 className="text-4xl font-black md:text-5xl">
                 Ready to Stop the Chaos?
               </h2>
@@ -370,7 +531,10 @@ export default function NeobrutalLanding() {
                 <ul className="mt-4 space-y-2">
                   {col.links.map((link) => (
                     <li key={link}>
-                      <Link href={`/${link.toLowerCase()}`} className="text-sm text-white/60 hover:text-white">
+                      <Link
+                        href={`/${link.toLowerCase()}`}
+                        className="text-sm text-white/60 hover:text-white"
+                      >
                         {link}
                       </Link>
                     </li>
@@ -380,7 +544,8 @@ export default function NeobrutalLanding() {
             ))}
           </div>
           <div className="mt-12 border-t border-white/20 pt-8 text-center text-sm text-white/40">
-            &copy; {new Date().getFullYear()} Envpilot. All rights reserved. Built with vibes.
+            &copy; {new Date().getFullYear()} Envpilot. All rights reserved.
+            Built with vibes.
           </div>
         </div>
       </footer>

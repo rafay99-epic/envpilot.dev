@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ENABLED_VARIANTS } from "./feature-flags";
 
@@ -101,11 +101,11 @@ export default function VariantSwitcher({
   onChange,
 }: VariantSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   if (!isMounted) return null;
 
@@ -197,9 +197,7 @@ export default function VariantSwitcher({
                         setIsOpen(false);
                       }}
                       className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all ${
-                        isActive
-                          ? "bg-white/10"
-                          : "hover:bg-white/5"
+                        isActive ? "bg-white/10" : "hover:bg-white/5"
                       }`}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}

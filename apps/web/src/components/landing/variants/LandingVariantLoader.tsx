@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useSyncExternalStore, Suspense } from "react";
 import dynamic from "next/dynamic";
 import VariantSwitcher, { type VariantId } from "./VariantSwitcher";
 import { ENABLED_VARIANTS } from "./feature-flags";
@@ -81,17 +81,36 @@ function VariantSkeleton() {
   );
 }
 
-export default function LandingVariantLoader() {
-  const [variant, setVariant] = useState<VariantId>("terminal");
-  const [isHydrated, setIsHydrated] = useState(false);
+function getStoredVariant(): VariantId {
+  if (typeof window === "undefined") return "terminal";
+  const saved = localStorage.getItem(STORAGE_KEY) as VariantId | null;
+  if (saved && saved in VARIANT_COMPONENTS && ENABLED_VARIANTS[saved]) {
+    return saved;
+  }
+  return "terminal";
+}
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as VariantId | null;
-    if (saved && saved in VARIANT_COMPONENTS && ENABLED_VARIANTS[saved]) {
-      setVariant(saved);
-    }
-    setIsHydrated(true);
-  }, []);
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getServerSnapshot(): VariantId {
+  return "terminal";
+}
+
+export default function LandingVariantLoader() {
+  const storedVariant = useSyncExternalStore(
+    subscribeToStorage,
+    getStoredVariant,
+    getServerSnapshot
+  );
+  const [variant, setVariant] = useState<VariantId>(storedVariant);
+  const isHydrated = useSyncExternalStore(
+    subscribeToStorage,
+    () => true,
+    () => false
+  );
 
   const handleChange = (id: VariantId) => {
     setVariant(id);

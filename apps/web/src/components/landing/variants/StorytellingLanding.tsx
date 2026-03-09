@@ -24,7 +24,11 @@ import {
 
 const fadeIn = {
   hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: "easeOut" as const } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: "easeOut" as const },
+  },
 };
 
 const stagger = {
@@ -45,7 +49,12 @@ function Chapter({
   return (
     <section className={`relative min-h-screen ${bg} py-24 md:py-32`}>
       <div className="mx-auto max-w-4xl px-6">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={stagger}>
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={stagger}
+        >
           <motion.div variants={fadeIn} className="mb-8">
             <span className="text-xs font-medium uppercase tracking-[0.3em] text-rose-500">
               Chapter {number}
@@ -75,15 +84,40 @@ export default function StorytellingLanding() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
-          <Link href="/" className="text-sm font-semibold text-white">envpilot</Link>
+          <Link href="/" className="text-sm font-semibold text-white">
+            envpilot
+          </Link>
           <nav className="hidden items-center gap-6 md:flex">
-            <Link href="#chapter-1" className="text-xs text-zinc-500 hover:text-white transition-colors">Story</Link>
-            <Link href="#pricing" className="text-xs text-zinc-500 hover:text-white transition-colors">Pricing</Link>
-            <Link href="/docs" className="text-xs text-zinc-500 hover:text-white transition-colors">Docs</Link>
+            <Link
+              href="#chapter-1"
+              className="text-xs text-zinc-500 hover:text-white transition-colors"
+            >
+              Story
+            </Link>
+            <Link
+              href="#pricing"
+              className="text-xs text-zinc-500 hover:text-white transition-colors"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/docs"
+              className="text-xs text-zinc-500 hover:text-white transition-colors"
+            >
+              Docs
+            </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/sign-in" className="text-xs text-zinc-500 hover:text-white transition-colors">Sign In</Link>
-            <Link href="/sign-up" className="rounded-full bg-rose-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-rose-600 transition-colors">
+            <Link
+              href="/sign-in"
+              className="text-xs text-zinc-500 hover:text-white transition-colors"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/sign-up"
+              className="rounded-full bg-rose-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-rose-600 transition-colors"
+            >
               Start Free
             </Link>
           </div>
@@ -91,7 +125,10 @@ export default function StorytellingLanding() {
       </header>
 
       {/* Prologue / Hero */}
-      <section ref={heroRef} className="relative flex min-h-screen items-center overflow-hidden">
+      <section
+        ref={heroRef}
+        className="relative flex min-h-screen items-center overflow-hidden"
+      >
         <motion.div
           className="relative z-10 mx-auto max-w-4xl px-6 text-center"
           style={{ opacity: heroOpacity, y: heroY }}
@@ -111,7 +148,8 @@ export default function StorytellingLanding() {
             transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }}
             className="mt-6 text-4xl font-semibold tracking-tight text-white md:text-6xl lg:text-7xl"
           >
-            It&apos;s 3 AM.<br />
+            It&apos;s 3 AM.
+            <br />
             Your <span className="text-rose-400">.env</span> just leaked.
           </motion.h1>
 
@@ -121,9 +159,9 @@ export default function StorytellingLanding() {
             transition={{ delay: 1, duration: 0.8 }}
             className="mx-auto mt-6 max-w-xl text-lg text-zinc-500"
           >
-            Someone pushed production credentials to a public repo.
-            Your Slack is blowing up. Your CTO is calling. This is the story of
-            how it never has to happen again.
+            Someone pushed production credentials to a public repo. Your Slack
+            is blowing up. Your CTO is calling. This is the story of how it
+            never has to happen again.
           </motion.p>
 
           <motion.div
@@ -132,7 +170,10 @@ export default function StorytellingLanding() {
             transition={{ delay: 1.5 }}
             className="mt-10"
           >
-            <Link href="#chapter-1" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors">
+            <Link
+              href="#chapter-1"
+              className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
+            >
               Scroll to begin
               <ArrowDown className="h-4 w-4 animate-bounce" />
             </Link>
@@ -146,23 +187,43 @@ export default function StorytellingLanding() {
       {/* Chapter 1: The Problem */}
       <div id="chapter-1">
         <Chapter number="01" title="The chaos before">
-          <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+          <motion.div
+            variants={fadeIn}
+            className="space-y-6 text-lg leading-relaxed text-zinc-400"
+          >
             <p>
               Every team starts the same way. A new developer joins and asks:
-              <span className="italic text-zinc-300"> &ldquo;Can someone send me the env vars?&rdquo;</span>
+              <span className="italic text-zinc-300">
+                {" "}
+                &ldquo;Can someone send me the env vars?&rdquo;
+              </span>
             </p>
             <p>
-              What follows is a Slack DM with a .env file. Unencrypted. Unsanitized. Sitting in
-              a message history that anyone with access can search.
+              What follows is a Slack DM with a .env file. Unencrypted.
+              Unsanitized. Sitting in a message history that anyone with access
+              can search.
             </p>
           </motion.div>
 
           <motion.div variants={fadeIn} className="mt-12 space-y-3">
             {[
-              { who: "Alice (new dev)", msg: "Hey, can someone send me the production env vars?", time: "9:14 AM" },
+              {
+                who: "Alice (new dev)",
+                msg: "Hey, can someone send me the production env vars?",
+                time: "9:14 AM",
+              },
               { who: "Bob (lead)", msg: "Sure, here you go:", time: "9:16 AM" },
-              { who: "Bob (lead)", msg: "DATABASE_URL=postgres://admin:realpassword@prod-db.aws.com:5432/app\nSTRIPE_KEY=sk_live_4eC39HqLyjWDarjtT1zdp7dc\nAWS_SECRET=wJalrXUtnFEMI/K7MDENG/bPxRfiCY", time: "9:16 AM", danger: true },
-              { who: "Alice (new dev)", msg: "Got it, thanks!", time: "9:17 AM" },
+              {
+                who: "Bob (lead)",
+                msg: "DATABASE_URL=postgres://admin:realpassword@prod-db.aws.com:5432/app\nSTRIPE_KEY=sk_live_4eC39HqLyjWDarjtT1zdp7dc\nAWS_SECRET=wJalrXUtnFEMI/K7MDENG/bPxRfiCY",
+                time: "9:16 AM",
+                danger: true,
+              },
+              {
+                who: "Alice (new dev)",
+                msg: "Got it, thanks!",
+                time: "9:17 AM",
+              },
             ].map((msg, i) => (
               <motion.div
                 key={i}
@@ -174,16 +235,21 @@ export default function StorytellingLanding() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-zinc-400">{msg.who}</span>
+                  <span className="text-xs font-medium text-zinc-400">
+                    {msg.who}
+                  </span>
                   <span className="text-[10px] text-zinc-600">{msg.time}</span>
                 </div>
-                <p className={`mt-1 whitespace-pre-line font-mono text-xs ${msg.danger ? "text-red-400" : "text-zinc-500"}`}>
+                <p
+                  className={`mt-1 whitespace-pre-line font-mono text-xs ${msg.danger ? "text-red-400" : "text-zinc-500"}`}
+                >
                   {msg.msg}
                 </p>
                 {msg.danger && (
                   <p className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-red-400">
                     <AlertTriangle className="h-3 w-3" />
-                    These credentials are now in Slack&apos;s message history forever.
+                    These credentials are now in Slack&apos;s message history
+                    forever.
                   </p>
                 )}
               </motion.div>
@@ -193,25 +259,52 @@ export default function StorytellingLanding() {
       </div>
 
       {/* Chapter 2: The Turning Point */}
-      <Chapter number="02" title="What if there was a better way?" bg="bg-black">
-        <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+      <Chapter
+        number="02"
+        title="What if there was a better way?"
+        bg="bg-black"
+      >
+        <motion.div
+          variants={fadeIn}
+          className="space-y-6 text-lg leading-relaxed text-zinc-400"
+        >
           <p>
-            Imagine a world where secrets never leave an encrypted vault.
-            Where access is granted per-variable, per-person, with an expiration date.
+            Imagine a world where secrets never leave an encrypted vault. Where
+            access is granted per-variable, per-person, with an expiration date.
             Where every read, write, and share is logged.
           </p>
           <p>
-            That world is <span className="font-semibold text-white">Envpilot</span>.
+            That world is{" "}
+            <span className="font-semibold text-white">Envpilot</span>.
           </p>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="mt-12 grid gap-6 md:grid-cols-3">
+        <motion.div
+          variants={fadeIn}
+          className="mt-12 grid gap-6 md:grid-cols-3"
+        >
           {[
-            { icon: <Lock className="h-5 w-5 text-emerald-400" />, title: "Encrypted Vault", desc: "AES-256 encryption via WorkOS Vault. Zero-knowledge — we can't read your secrets either." },
-            { icon: <ShieldCheck className="h-5 w-5 text-blue-400" />, title: "Per-Variable Access", desc: "Grant read or write access to specific variables. Set expiration dates. Revoke instantly." },
-            { icon: <Eye className="h-5 w-5 text-amber-400" />, title: "Full Audit Trail", desc: "40+ action types. IP tracking. Geographic location. SOC 2-ready exports." },
+            {
+              icon: <Lock className="h-5 w-5 text-emerald-400" />,
+              title: "Encrypted Vault",
+              desc: "AES-256 encryption via WorkOS Vault. Zero-knowledge — we can't read your secrets either.",
+            },
+            {
+              icon: <ShieldCheck className="h-5 w-5 text-blue-400" />,
+              title: "Per-Variable Access",
+              desc: "Grant read or write access to specific variables. Set expiration dates. Revoke instantly.",
+            },
+            {
+              icon: <Eye className="h-5 w-5 text-amber-400" />,
+              title: "Full Audit Trail",
+              desc: "40+ action types. IP tracking. Geographic location. SOC 2-ready exports.",
+            },
           ].map((item) => (
-            <motion.div key={item.title} variants={fadeIn} className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+            <motion.div
+              key={item.title}
+              variants={fadeIn}
+              className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5"
+            >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800">
                 {item.icon}
               </div>
@@ -224,19 +317,42 @@ export default function StorytellingLanding() {
 
       {/* Chapter 3: The Solution */}
       <Chapter number="03" title="One command. Every secret.">
-        <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+        <motion.div
+          variants={fadeIn}
+          className="space-y-6 text-lg leading-relaxed text-zinc-400"
+        >
           <p>
-            Your new developer&apos;s first day now looks very different. No Slack DMs.
-            No shared documents. No secrets in plain text.
+            Your new developer&apos;s first day now looks very different. No
+            Slack DMs. No shared documents. No secrets in plain text.
           </p>
         </motion.div>
 
         <motion.div variants={fadeIn} className="mt-10 space-y-4">
           {[
-            { step: "1", cmd: "npm install -g @envpilot/cli", output: "added 1 package in 2.1s", note: "Install the CLI" },
-            { step: "2", cmd: "envpilot login", output: "✓ Authenticated as alice@company.com", note: "Browser-based SSO login" },
-            { step: "3", cmd: "envpilot init", output: "✓ Linked to project: backend-api (development)", note: "Pick your project and environment" },
-            { step: "4", cmd: "envpilot pull", output: "✓ Synced 23 variables to .env", note: "Done. All variables synced securely." },
+            {
+              step: "1",
+              cmd: "npm install -g @envpilot/cli",
+              output: "added 1 package in 2.1s",
+              note: "Install the CLI",
+            },
+            {
+              step: "2",
+              cmd: "envpilot login",
+              output: "✓ Authenticated as alice@company.com",
+              note: "Browser-based SSO login",
+            },
+            {
+              step: "3",
+              cmd: "envpilot init",
+              output: "✓ Linked to project: backend-api (development)",
+              note: "Pick your project and environment",
+            },
+            {
+              step: "4",
+              cmd: "envpilot pull",
+              output: "✓ Synced 23 variables to .env",
+              note: "Done. All variables synced securely.",
+            },
           ].map((s) => (
             <motion.div key={s.step} variants={fadeIn} className="flex gap-4">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-sm font-bold text-rose-400">
@@ -259,14 +375,20 @@ export default function StorytellingLanding() {
 
       {/* Chapter 4: The Tools */}
       <Chapter number="04" title="Wherever you work" bg="bg-black">
-        <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+        <motion.div
+          variants={fadeIn}
+          className="space-y-6 text-lg leading-relaxed text-zinc-400"
+        >
           <p>
             Envpilot meets you where you are. Terminal, IDE, or browser — your
             secrets stay encrypted and in sync.
           </p>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="mt-12 grid gap-6 md:grid-cols-2">
+        <motion.div
+          variants={fadeIn}
+          className="mt-12 grid gap-6 md:grid-cols-2"
+        >
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
             <div className="flex items-center gap-2">
               <Terminal className="h-5 w-5 text-emerald-400" />
@@ -274,14 +396,29 @@ export default function StorytellingLanding() {
             </div>
             <p className="mt-3 text-sm text-zinc-500">
               Pull, push, list, init, and switch from your terminal. Preview
-              changes with <code className="rounded bg-zinc-800 px-1 text-xs text-zinc-400">--dry-run</code>.
-              Members auto-submit requests instead of creating directly.
+              changes with{" "}
+              <code className="rounded bg-zinc-800 px-1 text-xs text-zinc-400">
+                --dry-run
+              </code>
+              . Members auto-submit requests instead of creating directly.
             </p>
             <div className="mt-4 space-y-1 font-mono text-xs text-zinc-600">
-              <p><span className="text-emerald-400">$</span> envpilot pull --env production</p>
-              <p><span className="text-emerald-400">$</span> envpilot push --dry-run</p>
-              <p><span className="text-emerald-400">$</span> envpilot list variables --show-values</p>
-              <p><span className="text-emerald-400">$</span> envpilot switch staging</p>
+              <p>
+                <span className="text-emerald-400">$</span> envpilot pull --env
+                production
+              </p>
+              <p>
+                <span className="text-emerald-400">$</span> envpilot push
+                --dry-run
+              </p>
+              <p>
+                <span className="text-emerald-400">$</span> envpilot list
+                variables --show-values
+              </p>
+              <p>
+                <span className="text-emerald-400">$</span> envpilot switch
+                staging
+              </p>
             </div>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
@@ -290,8 +427,9 @@ export default function StorytellingLanding() {
               <h3 className="font-semibold text-white">VS Code Extension</h3>
             </div>
             <p className="mt-3 text-sm text-zinc-500">
-              Real-time sync via WebSocket. Link multiple directories to different
-              environments. Automatic file cleanup when access is revoked.
+              Real-time sync via WebSocket. Link multiple directories to
+              different environments. Automatic file cleanup when access is
+              revoked.
             </p>
             <div className="mt-4 space-y-1 text-xs text-zinc-600">
               <p className="flex items-center gap-1.5">
@@ -314,8 +452,9 @@ export default function StorytellingLanding() {
               <h3 className="font-semibold text-white">Web Dashboard</h3>
             </div>
             <p className="mt-3 text-sm text-zinc-500">
-              Manage everything from the browser: projects, variables, team members, and audit logs.
-              Approve member requests. Export compliance reports. Track version history and rollback.
+              Manage everything from the browser: projects, variables, team
+              members, and audit logs. Approve member requests. Export
+              compliance reports. Track version history and rollback.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
@@ -326,7 +465,10 @@ export default function StorytellingLanding() {
                 "Version History",
                 "Settings & Integrations",
               ].map((item) => (
-                <p key={item} className="flex items-center gap-1.5 text-xs text-zinc-600">
+                <p
+                  key={item}
+                  className="flex items-center gap-1.5 text-xs text-zinc-600"
+                >
                   <ChevronRight className="h-3 w-3 shrink-0 text-purple-400" />
                   {item}
                 </p>
@@ -338,39 +480,67 @@ export default function StorytellingLanding() {
 
       {/* Chapter 5: The Governance */}
       <Chapter number="05" title="Trust, but verify">
-        <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+        <motion.div
+          variants={fadeIn}
+          className="space-y-6 text-lg leading-relaxed text-zinc-400"
+        >
           <p>
-            The real power isn&apos;t just encryption — it&apos;s control. Know exactly who has
-            access to what. Set it. Audit it. Revoke it.
+            The real power isn&apos;t just encryption — it&apos;s control. Know
+            exactly who has access to what. Set it. Audit it. Revoke it.
           </p>
         </motion.div>
 
-        <motion.div variants={fadeIn} className="mt-12 grid gap-4 md:grid-cols-3">
+        <motion.div
+          variants={fadeIn}
+          className="mt-12 grid gap-4 md:grid-cols-3"
+        >
           {[
             {
               icon: <UserCog className="h-5 w-5 text-rose-400" />,
               title: "Admin",
-              items: ["Full access to everything", "Rollback variable versions", "Manage all permissions", "Export audit logs"],
+              items: [
+                "Full access to everything",
+                "Rollback variable versions",
+                "Manage all permissions",
+                "Export audit logs",
+              ],
             },
             {
               icon: <UserCheck className="h-5 w-5 text-amber-400" />,
               title: "Team Lead",
-              items: ["Create and manage projects", "Grant per-variable access", "Approve member requests", "View audit logs"],
+              items: [
+                "Create and manage projects",
+                "Grant per-variable access",
+                "Approve member requests",
+                "View audit logs",
+              ],
             },
             {
               icon: <User className="h-5 w-5 text-blue-400" />,
               title: "Member",
-              items: ["Read-only project view", "Request variable access", "Submit new variables for approval", "Pull approved secrets"],
+              items: [
+                "Read-only project view",
+                "Request variable access",
+                "Submit new variables for approval",
+                "Pull approved secrets",
+              ],
             },
           ].map((role) => (
-            <motion.div key={role.title} variants={fadeIn} className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+            <motion.div
+              key={role.title}
+              variants={fadeIn}
+              className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5"
+            >
               <div className="flex items-center gap-2">
                 {role.icon}
                 <h4 className="font-semibold text-white">{role.title}</h4>
               </div>
               <ul className="mt-3 space-y-2">
                 {role.items.map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-zinc-500">
+                  <li
+                    key={item}
+                    className="flex items-start gap-2 text-sm text-zinc-500"
+                  >
                     <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
                     {item}
                   </li>
@@ -384,14 +554,21 @@ export default function StorytellingLanding() {
       {/* Chapter 6: Pricing */}
       <div id="pricing">
         <Chapter number="06" title="Fair, simple pricing" bg="bg-black">
-          <motion.div variants={fadeIn} className="space-y-6 text-lg leading-relaxed text-zinc-400">
+          <motion.div
+            variants={fadeIn}
+            className="space-y-6 text-lg leading-relaxed text-zinc-400"
+          >
             <p>
-              We believe security tooling shouldn&apos;t be gated behind enterprise contracts.
-              Envpilot is free during early access — no credit card, no strings attached.
+              We believe security tooling shouldn&apos;t be gated behind
+              enterprise contracts. Envpilot is free during early access — no
+              credit card, no strings attached.
             </p>
           </motion.div>
 
-          <motion.div variants={fadeIn} className="mt-12 grid gap-6 md:grid-cols-2">
+          <motion.div
+            variants={fadeIn}
+            className="mt-12 grid gap-6 md:grid-cols-2"
+          >
             {/* Free Plan */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
               <div className="flex items-center justify-between">
@@ -419,7 +596,10 @@ export default function StorytellingLanding() {
                   "Role-based access control",
                   "Full audit logging",
                 ].map((item) => (
-                  <p key={item} className="flex items-center gap-2 text-sm text-zinc-400">
+                  <p
+                    key={item}
+                    className="flex items-center gap-2 text-sm text-zinc-400"
+                  >
                     <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                     {item}
                   </p>
@@ -458,7 +638,10 @@ export default function StorytellingLanding() {
                   "SSO / SAML support",
                   "SLA guarantees",
                 ].map((item) => (
-                  <p key={item} className="flex items-center gap-2 text-sm text-zinc-500">
+                  <p
+                    key={item}
+                    className="flex items-center gap-2 text-sm text-zinc-500"
+                  >
                     <Check className="h-3.5 w-3.5 shrink-0 text-zinc-700" />
                     {item}
                   </p>
@@ -475,21 +658,41 @@ export default function StorytellingLanding() {
       {/* Epilogue: CTA */}
       <section className="relative flex min-h-[60vh] items-center bg-gradient-to-b from-zinc-950 to-black py-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger}>
-            <motion.p variants={fadeIn} className="text-xs font-medium uppercase tracking-[0.3em] text-rose-500">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={stagger}
+          >
+            <motion.p
+              variants={fadeIn}
+              className="text-xs font-medium uppercase tracking-[0.3em] text-rose-500"
+            >
               Epilogue
             </motion.p>
-            <motion.h2 variants={fadeIn} className="mt-4 text-3xl font-semibold text-white md:text-5xl">
+            <motion.h2
+              variants={fadeIn}
+              className="mt-4 text-3xl font-semibold text-white md:text-5xl"
+            >
               Write a different ending.
             </motion.h2>
             <motion.p variants={fadeIn} className="mt-4 text-lg text-zinc-500">
               Free to start. Your secrets deserve better than Slack.
             </motion.p>
-            <motion.div variants={fadeIn} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/sign-up" className="rounded-full bg-rose-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600 transition-colors">
+            <motion.div
+              variants={fadeIn}
+              className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
+            >
+              <Link
+                href="/sign-up"
+                className="rounded-full bg-rose-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600 transition-colors"
+              >
                 Start Free
               </Link>
-              <Link href="/docs" className="flex items-center gap-1.5 rounded-full border border-zinc-800 px-6 py-2.5 text-sm text-zinc-400 hover:border-zinc-700 transition-colors">
+              <Link
+                href="/docs"
+                className="flex items-center gap-1.5 rounded-full border border-zinc-800 px-6 py-2.5 text-sm text-zinc-400 hover:border-zinc-700 transition-colors"
+              >
                 <FileText className="h-3.5 w-3.5" />
                 Read the Docs
               </Link>
@@ -502,7 +705,9 @@ export default function StorytellingLanding() {
       <footer className="border-t border-zinc-800/50 bg-black py-8">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <span className="text-xs text-zinc-600">&copy; {new Date().getFullYear()} Envpilot</span>
+            <span className="text-xs text-zinc-600">
+              &copy; {new Date().getFullYear()} Envpilot
+            </span>
             <div className="flex gap-6">
               {[
                 { label: "Docs", href: "/docs" },
@@ -510,7 +715,13 @@ export default function StorytellingLanding() {
                 { label: "Privacy", href: "/privacy" },
                 { label: "Terms", href: "/terms" },
               ].map((l) => (
-                <Link key={l.label} href={l.href} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">{l.label}</Link>
+                <Link
+                  key={l.label}
+                  href={l.href}
+                  className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+                >
+                  {l.label}
+                </Link>
               ))}
             </div>
           </div>
