@@ -8,7 +8,7 @@ type MembershipRole = "admin" | "team_lead" | "member";
 async function getProjectAndMembership(
   ctx: MutationCtx | QueryCtx,
   projectId: Id<"projects">,
-  userId: Id<"users">,
+  userId: Id<"users">
 ) {
   const project = await ctx.db.get(projectId);
   if (!project || project.deletedAt) {
@@ -18,7 +18,7 @@ async function getProjectAndMembership(
   const membership = await ctx.db
     .query("organizationMembers")
     .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId),
+      q.eq("organizationId", project.organizationId).eq("userId", userId)
     )
     .first();
 
@@ -41,22 +41,22 @@ export const listForProject = query({
         v.literal("pending"),
         v.literal("approved"),
         v.literal("rejected"),
-        v.literal("canceled"),
-      ),
+        v.literal("canceled")
+      )
     ),
   },
   handler: async (ctx, args) => {
     const { project, membership } = await getProjectAndMembership(
       ctx,
       args.projectId,
-      args.userId,
+      args.userId
     );
 
     const requests = args.status
       ? await ctx.db
           .query("environmentVariableRequests")
           .withIndex("by_project_and_status", (q) =>
-            q.eq("projectId", project._id).eq("status", args.status!),
+            q.eq("projectId", project._id).eq("status", args.status!)
           )
           .collect()
       : await ctx.db
@@ -70,7 +70,7 @@ export const listForProject = query({
         : requests;
 
     const sortedRequests = [...visibleRequests].sort(
-      (a, b) => b.createdAt - a.createdAt,
+      (a, b) => b.createdAt - a.createdAt
     );
 
     const requestsWithUsers = await Promise.all(
@@ -97,7 +97,7 @@ export const listForProject = query({
               }
             : null,
         };
-      }),
+      })
     );
 
     return requestsWithUsers;
@@ -118,7 +118,7 @@ export const getById = query({
     const { membership } = await getProjectAndMembership(
       ctx,
       request.projectId,
-      args.userId,
+      args.userId
     );
 
     if (membership.role === "member" && request.requestedBy !== args.userId) {
@@ -166,7 +166,7 @@ export const create = mutation({
     const { project, membership } = await getProjectAndMembership(
       ctx,
       args.projectId,
-      args.requestedBy,
+      args.requestedBy
     );
 
     if (membership.role !== "member") {
@@ -176,7 +176,7 @@ export const create = mutation({
     const existingVariable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key),
+        q.eq("projectId", args.projectId).eq("key", args.key)
       )
       .first();
 
@@ -187,19 +187,18 @@ export const create = mutation({
     const pendingForKey = await ctx.db
       .query("environmentVariableRequests")
       .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key),
+        q.eq("projectId", args.projectId).eq("key", args.key)
       )
       .collect();
 
     const hasPendingDuplicate = pendingForKey.some(
       (request) =>
-        request.requestedBy === args.requestedBy &&
-        request.status === "pending",
+        request.requestedBy === args.requestedBy && request.status === "pending"
     );
 
     if (hasPendingDuplicate) {
       throw new Error(
-        "You already have a pending request for this variable key",
+        "You already have a pending request for this variable key"
       );
     }
 
@@ -258,12 +257,12 @@ export const review = mutation({
     const { project, membership } = await getProjectAndMembership(
       ctx,
       request.projectId,
-      args.reviewedBy,
+      args.reviewedBy
     );
 
     if (membership.role !== "admin" && membership.role !== "team_lead") {
       throw new Error(
-        "Only admins and team leads can review variable requests",
+        "Only admins and team leads can review variable requests"
       );
     }
 
@@ -300,7 +299,7 @@ export const review = mutation({
     const existingVariable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", request.projectId).eq("key", request.key),
+        q.eq("projectId", request.projectId).eq("key", request.key)
       )
       .first();
 
@@ -397,14 +396,14 @@ export const cancel = mutation({
 
     if (request.status !== "pending") {
       throw new Error(
-        `Only pending requests can be canceled (current: ${request.status})`,
+        `Only pending requests can be canceled (current: ${request.status})`
       );
     }
 
     const { membership } = await getProjectAndMembership(
       ctx,
       request.projectId,
-      args.canceledBy,
+      args.canceledBy
     );
 
     const canCancel =

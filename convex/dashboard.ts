@@ -18,7 +18,7 @@ export const getStats = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -30,8 +30,8 @@ export const getStats = query({
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .collect(),
-      ),
+          .collect()
+      )
     );
     const variables = variablesNested.flat();
 
@@ -42,7 +42,7 @@ export const getStats = query({
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .collect();
 
@@ -53,7 +53,7 @@ export const getStats = query({
       .withIndex("by_org_and_created", (q) =>
         q
           .eq("organizationId", args.organizationId)
-          .gte("createdAt", sevenDaysAgo),
+          .gte("createdAt", sevenDaysAgo)
       )
       .collect();
 
@@ -62,7 +62,7 @@ export const getStats = query({
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
     const projectsThisMonth = projects.filter(
-      (p) => p.createdAt >= startOfMonth.getTime(),
+      (p) => p.createdAt >= startOfMonth.getTime()
     ).length;
 
     return {
@@ -95,7 +95,7 @@ export const getRecentActivity = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .order("desc")
       .take(10);
@@ -123,7 +123,7 @@ export const getRecentActivity = query({
               }
             : null,
         };
-      }),
+      })
     );
 
     return logsWithDetails;
@@ -141,7 +141,7 @@ export const getRecentProjects = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .order("desc")
@@ -165,7 +165,7 @@ export const getRecentProjects = query({
           createdAt: project.createdAt,
           variableCount: variables.length,
         };
-      }),
+      })
     );
 
     return projectsWithStats;
@@ -183,7 +183,7 @@ export const getTeamMembers = query({
     const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .order("desc")
       .take(5);
@@ -204,7 +204,7 @@ export const getTeamMembers = query({
               },
             }
           : null;
-      }),
+      })
     );
 
     return members.filter(Boolean);
@@ -223,7 +223,7 @@ export const getOnboardingStatus = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -250,7 +250,7 @@ export const getOnboardingStatus = query({
     const memberCount = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .take(2);
 

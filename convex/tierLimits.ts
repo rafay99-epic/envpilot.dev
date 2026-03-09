@@ -110,7 +110,7 @@ export const getOrganizationUsage = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -119,7 +119,7 @@ export const getOrganizationUsage = query({
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .collect();
 
@@ -127,7 +127,7 @@ export const getOrganizationUsage = query({
     const pendingInvitations = await ctx.db
       .query("invitations")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("status"), "pending"))
       .collect();
@@ -193,7 +193,7 @@ export const getUserOrganizationCount = query({
       memberships.map(async (membership) => {
         const org = await ctx.db.get(membership.organizationId);
         return org ? { org, role: membership.role } : null;
-      }),
+      })
     );
 
     const validOrgs = orgsWithRoles.filter(Boolean) as {
@@ -233,7 +233,7 @@ export const checkTierLimit = query({
       v.literal("use_extension"),
       v.literal("use_granular_permissions"),
       v.literal("view_version_history"),
-      v.literal("bulk_import"),
+      v.literal("bulk_import")
     ),
     projectId: v.optional(v.id("projects")),
   },
@@ -253,7 +253,7 @@ export const checkTierLimit = query({
         const projectCount = await ctx.db
           .query("projects")
           .withIndex("by_organization", (q) =>
-            q.eq("organizationId", args.organizationId),
+            q.eq("organizationId", args.organizationId)
           )
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
@@ -298,13 +298,13 @@ export const checkTierLimit = query({
         const members = await ctx.db
           .query("organizationMembers")
           .withIndex("by_organization", (q) =>
-            q.eq("organizationId", args.organizationId),
+            q.eq("organizationId", args.organizationId)
           )
           .collect();
         const pendingInvitations = await ctx.db
           .query("invitations")
           .withIndex("by_organization", (q) =>
-            q.eq("organizationId", args.organizationId),
+            q.eq("organizationId", args.organizationId)
           )
           .filter((q) => q.eq(q.field("status"), "pending"))
           .collect();
@@ -377,7 +377,7 @@ export const _checkProjectLimit = internalQuery({
   args: { organizationId: v.id("organizations") },
   handler: async (
     ctx,
-    args,
+    args
   ): Promise<{ allowed: boolean; reason?: string }> => {
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
@@ -392,7 +392,7 @@ export const _checkProjectLimit = internalQuery({
     const projectCount = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -415,7 +415,7 @@ export const _checkVariableLimit = internalQuery({
   args: { projectId: v.id("projects") },
   handler: async (
     ctx,
-    args,
+    args
   ): Promise<{ allowed: boolean; reason?: string }> => {
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
@@ -456,7 +456,7 @@ export const _checkTeamMemberLimit = internalQuery({
   args: { organizationId: v.id("organizations") },
   handler: async (
     ctx,
-    args,
+    args
   ): Promise<{ allowed: boolean; reason?: string }> => {
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
@@ -471,14 +471,14 @@ export const _checkTeamMemberLimit = internalQuery({
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .collect();
 
     const pendingInvitations = await ctx.db
       .query("invitations")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("status"), "pending"))
       .collect();
@@ -503,7 +503,7 @@ export const _checkOrganizationLimit = internalQuery({
   args: { userId: v.id("users") },
   handler: async (
     ctx,
-    args,
+    args
   ): Promise<{ allowed: boolean; reason?: string }> => {
     // Get all organizations where user is admin
     const memberships = await ctx.db
@@ -551,12 +551,12 @@ export const _checkFeatureEnabled = internalQuery({
       v.literal("extension"),
       v.literal("granular_permissions"),
       v.literal("version_history"),
-      v.literal("bulk_import"),
+      v.literal("bulk_import")
     ),
   },
   handler: async (
     ctx,
-    args,
+    args
   ): Promise<{ allowed: boolean; reason?: string }> => {
     const org = await ctx.db.get(args.organizationId);
     if (!org) {

@@ -46,7 +46,7 @@ export const search = query({
     const matches = allUsers.filter(
       (user) =>
         user.email.toLowerCase().includes(searchLower) ||
-        user.name?.toLowerCase().includes(searchLower),
+        user.name?.toLowerCase().includes(searchLower)
     );
 
     return matches.slice(0, limit);

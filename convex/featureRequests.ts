@@ -35,8 +35,8 @@ export const listPublic = query({
         v.literal("planned"),
         v.literal("in_progress"),
         v.literal("completed"),
-        v.literal("declined"),
-      ),
+        v.literal("declined")
+      )
     ),
     category: v.optional(v.string()),
   },
@@ -132,7 +132,7 @@ export const hasVoted = query({
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!),
+            .eq("userId", args.userId!)
         )
         .first();
       return !!vote;
@@ -144,7 +144,7 @@ export const hasVoted = query({
         .withIndex("by_feature_and_email", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("voterEmail", args.voterEmail!),
+            .eq("voterEmail", args.voterEmail!)
         )
         .first();
       return !!vote;
@@ -212,7 +212,7 @@ export const submit = mutation({
 
     if (description.length > MAX_DESCRIPTION_LENGTH) {
       throw new Error(
-        `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`,
+        `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`
       );
     }
 
@@ -224,7 +224,7 @@ export const submit = mutation({
     // Validate category length if provided
     if (category && category.length > MAX_CATEGORY_LENGTH) {
       throw new Error(
-        `Category must be ${MAX_CATEGORY_LENGTH} characters or less`,
+        `Category must be ${MAX_CATEGORY_LENGTH} characters or less`
       );
     }
 
@@ -293,7 +293,7 @@ export const vote = mutation({
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!),
+            .eq("userId", args.userId!)
         )
         .first();
 
@@ -315,7 +315,7 @@ export const vote = mutation({
         .withIndex("by_feature_and_email", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("voterEmail", email),
+            .eq("voterEmail", email)
         )
         .first();
 
@@ -369,7 +369,7 @@ export const unvote = mutation({
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!),
+            .eq("userId", args.userId!)
         )
         .first();
     }
@@ -381,7 +381,7 @@ export const unvote = mutation({
         .withIndex("by_feature_and_email", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("voterEmail", args.voterEmail!),
+            .eq("voterEmail", args.voterEmail!)
         )
         .first();
     }
@@ -417,7 +417,7 @@ export const updateStatus = mutation({
       v.literal("planned"),
       v.literal("in_progress"),
       v.literal("completed"),
-      v.literal("declined"),
+      v.literal("declined")
     ),
     adminNotes: v.optional(v.string()),
     userId: v.id("users"),
@@ -512,7 +512,7 @@ export const update = mutation({
       const description = updates.description.trim();
       if (description.length > MAX_DESCRIPTION_LENGTH) {
         throw new Error(
-          `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`,
+          `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`
         );
       }
       updateData.description = description;
@@ -523,7 +523,7 @@ export const update = mutation({
       const category = updates.category.trim();
       if (category.length > MAX_CATEGORY_LENGTH) {
         throw new Error(
-          `Category must be ${MAX_CATEGORY_LENGTH} characters or less`,
+          `Category must be ${MAX_CATEGORY_LENGTH} characters or less`
         );
       }
       updateData.category = category;
@@ -575,7 +575,7 @@ export const remove = mutation({
     const votes = await ctx.db
       .query("featureVotes")
       .withIndex("by_feature_request", (q) =>
-        q.eq("featureRequestId", args.featureRequestId),
+        q.eq("featureRequestId", args.featureRequestId)
       )
       .collect();
 

@@ -1,0 +1,10 @@
+{
+  "name": "@env-connect/prettier-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "main": "index.json",
+  "files": [
+    "index.json"
+  ]
+}

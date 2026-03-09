@@ -30,7 +30,7 @@ export const listByProject = query({
 
     if (args.environment) {
       return variables.filter((v) =>
-        v.environments.includes(args.environment!),
+        v.environments.includes(args.environment!)
       );
     }
 
@@ -46,7 +46,7 @@ export const listByOrganization = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -64,7 +64,7 @@ export const listByOrganization = query({
           projectName: project.name,
           projectSlug: project.slug,
         }));
-      }),
+      })
     );
 
     return variablesNested.flat();
@@ -104,7 +104,7 @@ export const getByKey = query({
     const variable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key),
+        q.eq("projectId", args.projectId).eq("key", args.key)
       )
       .first();
 
@@ -132,7 +132,7 @@ export const getVersionHistory = query({
           ...version,
           changedByUser: user ? { name: user.name, email: user.email } : null,
         };
-      }),
+      })
     );
 
     return versionsWithUsers;
@@ -148,7 +148,7 @@ export const getVersion = query({
     return await ctx.db
       .query("variableVersions")
       .withIndex("by_variable_and_version", (q) =>
-        q.eq("variableId", args.variableId).eq("version", args.version),
+        q.eq("variableId", args.variableId).eq("version", args.version)
       )
       .first();
   },
@@ -177,9 +177,7 @@ export const listWithAccess = query({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.userId),
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -198,7 +196,7 @@ export const listWithAccess = query({
         const permission = await ctx.db
           .query("variablePermissions")
           .withIndex("by_variable_and_user", (q) =>
-            q.eq("variableId", variable._id).eq("userId", args.userId),
+            q.eq("variableId", variable._id).eq("userId", args.userId)
           )
           .filter((q) => q.eq(q.field("isActive"), true))
           .first();
@@ -238,7 +236,7 @@ export const listWithAccess = query({
           canManagePermissions:
             membership.role === "admin" || membership.role === "team_lead",
         };
-      }),
+      })
     );
 
     // For members, filter out variables they don't have access to
@@ -259,7 +257,7 @@ export const search = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -277,7 +275,7 @@ export const search = query({
       const matches = variables.filter(
         (v) =>
           v.key.toLowerCase().includes(searchLower) ||
-          v.description?.toLowerCase().includes(searchLower),
+          v.description?.toLowerCase().includes(searchLower)
       );
 
       results.push(
@@ -285,7 +283,7 @@ export const search = query({
           ...v,
           projectName: project.name,
           projectSlug: project.slug,
-        })),
+        }))
       );
     }
 
@@ -331,7 +329,7 @@ export const create = mutation({
 
       if (variableCount.length >= limits.maxVariablesPerProject) {
         throw new Error(
-          `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade to Pro for unlimited variables.`,
+          `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade to Pro for unlimited variables.`
         );
       }
     }
@@ -339,7 +337,7 @@ export const create = mutation({
     const existingVariable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key),
+        q.eq("projectId", args.projectId).eq("key", args.key)
       )
       .first();
 
@@ -456,7 +454,7 @@ export const update = mutation({
         previousVersion: variable.version,
         changeReason,
         fieldsUpdated: Object.keys(updates).filter(
-          (k) => updates[k as keyof typeof updates] !== undefined,
+          (k) => updates[k as keyof typeof updates] !== undefined
         ),
       },
       involvesSensitiveData: variable.isSensitive,
@@ -588,7 +586,7 @@ export const rollback = mutation({
     const targetVersionRecord = await ctx.db
       .query("variableVersions")
       .withIndex("by_variable_and_version", (q) =>
-        q.eq("variableId", args.variableId).eq("version", args.targetVersion),
+        q.eq("variableId", args.variableId).eq("version", args.targetVersion)
       )
       .first();
 
@@ -650,7 +648,7 @@ export const logAccess = mutation({
     accessType: v.union(
       v.literal("view"),
       v.literal("copy"),
-      v.literal("export"),
+      v.literal("export")
     ),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
@@ -696,7 +694,7 @@ export const bulkCreate = mutation({
         description: v.optional(v.string()),
         environments: v.array(v.string()),
         isSensitive: v.optional(v.boolean()),
-      }),
+      })
     ),
     createdBy: v.id("users"),
   },
@@ -706,7 +704,7 @@ export const bulkCreate = mutation({
     // Enforce maximum bulk import size to prevent DoS
     if (args.variables.length > MAX_BULK_IMPORT_SIZE) {
       throw new Error(
-        `Bulk import is limited to ${MAX_BULK_IMPORT_SIZE} variables at a time. Please split your import into smaller batches.`,
+        `Bulk import is limited to ${MAX_BULK_IMPORT_SIZE} variables at a time. Please split your import into smaller batches.`
       );
     }
 
@@ -726,7 +724,7 @@ export const bulkCreate = mutation({
     // Check if bulk import is enabled for this tier
     if (!limits.bulkImportEnabled) {
       throw new Error(
-        "Bulk import requires Pro tier. Upgrade to import variables in bulk.",
+        "Bulk import requires Pro tier. Upgrade to import variables in bulk."
       );
     }
 
@@ -743,7 +741,7 @@ export const bulkCreate = mutation({
 
       if (totalAfterImport > limits.maxVariablesPerProject) {
         throw new Error(
-          `Cannot import ${newVariablesCount} variables. Limit is ${limits.maxVariablesPerProject}, you have ${existingVariables.length}. Upgrade to Pro for unlimited variables.`,
+          `Cannot import ${newVariablesCount} variables. Limit is ${limits.maxVariablesPerProject}, you have ${existingVariables.length}. Upgrade to Pro for unlimited variables.`
         );
       }
     }
@@ -754,7 +752,7 @@ export const bulkCreate = mutation({
       const existing = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project_and_key", (q) =>
-          q.eq("projectId", args.projectId).eq("key", varData.key),
+          q.eq("projectId", args.projectId).eq("key", varData.key)
         )
         .first();
 
