@@ -1,17 +1,27 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { success, error, info, warning, withSpinner } from "../lib/ui.js";
+import {
+  success,
+  error,
+  info,
+  warning,
+  withSpinner,
+  formatRole,
+  roleNotice,
+} from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,
   setActiveOrganizationId,
   setActiveProjectId,
+  setRole,
 } from "../lib/config.js";
 import {
   hasProjectConfig,
   writeProjectConfig,
   ensureEnvInGitignore,
+  getTrackedEnvFiles,
 } from "../lib/project-config.js";
 import { notAuthenticated } from "../lib/errors.js";
 import type { Organization, Project, Environment } from "../types/index.js";
@@ -186,14 +196,40 @@ export const initCommand = new Command("init")
       // Update global config
       setActiveOrganizationId(selectedOrg._id);
       setActiveProjectId(selectedProject._id);
+      if (selectedOrg.role) {
+        setRole(selectedOrg.role);
+      }
 
       // Ensure .env is in .gitignore
       ensureEnvInGitignore();
+
+      // Warn if .env files are already tracked by git
+      const trackedFiles = getTrackedEnvFiles();
+      if (trackedFiles.length > 0) {
+        console.log();
+        warning("Security risk: .env files are tracked by git!");
+        for (const file of trackedFiles) {
+          console.log(chalk.red(`  tracked: ${file}`));
+        }
+        console.log();
+        console.log(
+          chalk.yellow(
+            "  Run the following to untrack them (without deleting the files):"
+          )
+        );
+        for (const file of trackedFiles) {
+          console.log(chalk.cyan(`    git rm --cached ${file}`));
+        }
+      }
 
       console.log();
       success("Project initialized!");
       console.log();
       console.log(chalk.dim("Configuration saved to .envpilot"));
+      if (selectedOrg.role) {
+        console.log(chalk.dim(`  Role: ${formatRole(selectedOrg.role)}`));
+        roleNotice(selectedOrg.role);
+      }
       console.log();
       console.log("Next steps:");
       console.log(

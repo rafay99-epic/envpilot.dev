@@ -23,6 +23,7 @@ export function getConfig(): CLIConfig {
     activeProjectId: config.get("activeProjectId"),
     activeOrganizationId: config.get("activeOrganizationId"),
     user: config.get("user"),
+    role: config.get("role"),
   };
 }
 
@@ -124,6 +125,20 @@ export function setUser(user: User): void {
 }
 
 /**
+ * Get the current user's role in the active organization
+ */
+export function getRole(): string | undefined {
+  return config.get("role");
+}
+
+/**
+ * Set the current user's role in the active organization
+ */
+export function setRole(role: string): void {
+  config.set("role", role);
+}
+
+/**
  * Check if user is authenticated
  */
 export function isAuthenticated(): boolean {
@@ -137,6 +152,7 @@ export function clearAuth(): void {
   config.delete("accessToken");
   config.delete("refreshToken");
   config.delete("user");
+  config.delete("role");
 }
 
 /**

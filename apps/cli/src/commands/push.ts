@@ -10,8 +10,11 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated } from "../lib/config.js";
-import { readProjectConfig } from "../lib/project-config.js";
+import { isAuthenticated, getRole } from "../lib/config.js";
+import {
+  readProjectConfig,
+  getTrackedEnvFiles,
+} from "../lib/project-config.js";
 import {
   readEnvFile,
   getEnvPathForEnvironment,
@@ -47,6 +50,52 @@ export const pushCommand = new Command("push")
       const projectConfig = readProjectConfig();
       if (!projectConfig) {
         throw notInitialized();
+      }
+
+      // Check for .env files tracked by git
+      const trackedFiles = getTrackedEnvFiles();
+      if (trackedFiles.length > 0) {
+        error("Security risk: .env files are tracked by git!");
+        console.log();
+        for (const file of trackedFiles) {
+          console.log(chalk.red(`  tracked: ${file}`));
+        }
+        console.log();
+        console.log(
+          chalk.yellow(
+            "  Run the following to untrack them (without deleting the files):"
+          )
+        );
+        for (const file of trackedFiles) {
+          console.log(chalk.cyan(`    git rm --cached ${file}`));
+        }
+        console.log();
+        process.exit(1);
+      }
+
+      // Warn members before push
+      const role = getRole();
+      if (role === "member") {
+        warning(
+          "You have Member access. Push will create pending requests that require Admin or Team Lead approval."
+        );
+        console.log();
+
+        if (!options.force) {
+          const { proceed } = await inquirer.prompt([
+            {
+              type: "confirm",
+              name: "proceed",
+              message: "Continue with creating approval requests?",
+              default: true,
+            },
+          ]);
+
+          if (!proceed) {
+            info("Push cancelled.");
+            return;
+          }
+        }
       }
 
       const environment =
@@ -205,23 +254,29 @@ export const pushCommand = new Command("push")
 
       if (result?.requested && result.requested > 0) {
         success(
-          `Submitted ${result.requested} variable request(s) for ${chalk.bold(environment)}`
+          `Created ${result.requested} pending request(s) for ${chalk.bold(environment)}`
         );
+        console.log();
+        console.log(
+          chalk.yellow(
+            "  These changes require approval from an Admin or Team Lead."
+          )
+        );
+        console.log();
+        console.log(chalk.dim(`  Requested: ${result.requested}`));
+        if (result?.skipped && result.skipped > 0) {
+          console.log(chalk.dim(`  Skipped:   ${result.skipped}`));
+        }
       } else {
         success(
           `Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`
         );
-      }
-
-      // Show summary
-      console.log();
-      console.log(chalk.dim(`  Created: ${result?.created || 0}`));
-      console.log(chalk.dim(`  Updated: ${result?.updated || 0}`));
-      if (result?.requested) {
-        console.log(chalk.dim(`  Requested: ${result.requested}`));
-      }
-      if (mode === "replace") {
-        console.log(chalk.dim(`  Deleted: ${result?.deleted || 0}`));
+        console.log();
+        console.log(chalk.dim(`  Created: ${result?.created || 0}`));
+        console.log(chalk.dim(`  Updated: ${result?.updated || 0}`));
+        if (mode === "replace") {
+          console.log(chalk.dim(`  Deleted: ${result?.deleted || 0}`));
+        }
       }
     } catch (err) {
       error(err instanceof Error ? err.message : "Push failed");

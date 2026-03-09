@@ -1,12 +1,13 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { success, error, withSpinner } from "../lib/ui.js";
+import { success, error, withSpinner, formatRole, roleNotice } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,
   setActiveOrganizationId,
   setActiveProjectId,
+  setRole,
 } from "../lib/config.js";
 import {
   readProjectConfig,
@@ -76,6 +77,9 @@ export const switchCommand = new Command("switch")
         }
 
         setActiveOrganizationId(org._id);
+        if (org.role) {
+          setRole(org.role);
+        }
 
         if (projectConfig) {
           // Update project config with new organization
@@ -83,6 +87,10 @@ export const switchCommand = new Command("switch")
         }
 
         success(`Switched to organization: ${chalk.bold(org.name)}`);
+        if (org.role) {
+          console.log(chalk.dim(`  Role: ${formatRole(org.role)}`));
+          roleNotice(org.role);
+        }
         return;
       }
 
@@ -113,6 +121,9 @@ export const switchCommand = new Command("switch")
 
           if (organizations.length === 1) {
             organizationId = organizations[0]._id;
+            if (organizations[0].role) {
+              setRole(organizations[0].role);
+            }
           } else {
             const { orgId } = await inquirer.prompt([
               {
@@ -126,6 +137,10 @@ export const switchCommand = new Command("switch")
               },
             ]);
             organizationId = orgId;
+            const selectedOrg = organizations.find((o) => o._id === orgId);
+            if (selectedOrg?.role) {
+              setRole(selectedOrg.role);
+            }
           }
         }
 
@@ -247,8 +262,21 @@ export const switchCommand = new Command("switch")
           if (switchType === "organization") {
             setActiveOrganizationId(orgId);
             const org = organizations.find((o) => o._id === orgId)!;
+            if (org.role) {
+              setRole(org.role);
+            }
             success(`Switched to organization: ${chalk.bold(org.name)}`);
+            if (org.role) {
+              console.log(chalk.dim(`  Role: ${formatRole(org.role)}`));
+              roleNotice(org.role);
+            }
             return;
+          }
+
+          // Store role for selected org
+          const selectedOrg = organizations.find((o) => o._id === orgId);
+          if (selectedOrg?.role) {
+            setRole(selectedOrg.role);
           }
 
           // Continue with project selection
