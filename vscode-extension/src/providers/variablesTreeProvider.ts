@@ -1,10 +1,7 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
-import type {
-  EnvironmentVariable,
-  LinkedProject,
-} from "../types";
+import type { EnvironmentVariable, LinkedProject } from "../types";
 
 export class VariablesTreeProvider
   implements vscode.TreeDataProvider<VariableTreeItem>

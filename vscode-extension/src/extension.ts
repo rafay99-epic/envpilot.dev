@@ -43,7 +43,11 @@ async function updateContextFlags(): Promise<void> {
   );
   if (linkedProject) {
     const role = apiService.getUserRole(linkedProject.projectId);
-    vscode.commands.executeCommand("setContext", "envConnect.userRole", role || "");
+    vscode.commands.executeCommand(
+      "setContext",
+      "envConnect.userRole",
+      role || "",
+    );
   }
 }
 
@@ -129,7 +133,11 @@ export async function activate(context: vscode.ExtensionContext) {
   // Subscribe to auth state changes
   authService.onAuthStateChanged(async (session) => {
     const authenticated = !!session;
-    vscode.commands.executeCommand("setContext", "envConnect.isAuthenticated", authenticated);
+    vscode.commands.executeCommand(
+      "setContext",
+      "envConnect.isAuthenticated",
+      authenticated,
+    );
     projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
@@ -138,7 +146,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Check initial auth state
   const isAuthenticated = await authService.isAuthenticated();
-  vscode.commands.executeCommand("setContext", "envConnect.isAuthenticated", isAuthenticated);
+  vscode.commands.executeCommand(
+    "setContext",
+    "envConnect.isAuthenticated",
+    isAuthenticated,
+  );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
 
   // Start periodic sync if authenticated and auto-sync enabled
@@ -673,8 +685,7 @@ async function handlePullVariables(): Promise<void> {
       const linkedProjectV2 =
         await syncService.getLinkedProjectV2ForWorkspace();
       if (linkedProjectV2) {
-        const results =
-          await syncService.syncAllDirectories(linkedProjectV2);
+        const results = await syncService.syncAllDirectories(linkedProjectV2);
         statusBarProvider.setSyncing(false);
 
         if (results) {
