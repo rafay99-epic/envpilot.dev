@@ -260,9 +260,7 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarProvider.update();
     dashboardPanelProvider.refresh();
 
-    output.log(
-      `Revocation detected for ${project.projectName}: ${reason}`
-    );
+    output.log(`Revocation detected for ${project.projectName}: ${reason}`);
   });
 
   // Refresh CodeLens and dashboard when sync completes
@@ -971,9 +969,7 @@ async function handleInstallCommitGuard(): Promise<void> {
 
 async function handleRemoveCommitGuard(): Promise<void> {
   await gitCommitGuardService.removeHooks();
-  vscode.window.showInformationMessage(
-    "Envpilot: Commit guard hook removed."
-  );
+  vscode.window.showInformationMessage("Envpilot: Commit guard hook removed.");
 }
 
 export function deactivate() {

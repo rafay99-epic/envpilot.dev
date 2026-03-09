@@ -46,9 +46,7 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
 
       const infoText = [
         "$(shield) Managed by Envpilot",
-        headerInfo.varCount !== null
-          ? `${headerInfo.varCount} vars`
-          : null,
+        headerInfo.varCount !== null ? `${headerInfo.varCount} vars` : null,
         headerInfo.environment,
         headerInfo.syncTime
           ? `Synced ${this.formatTime(headerInfo.syncTime)}`
@@ -133,9 +131,7 @@ export class EnvCodeLensProvider implements vscode.CodeLensProvider {
     return { varCount, environment, syncTime };
   }
 
-  private async findLinkedProjectForDir(
-    dirPath: string
-  ): Promise<boolean> {
+  private async findLinkedProjectForDir(dirPath: string): Promise<boolean> {
     const linkedProjects = await this.storage.getLinkedProjectsV2();
     for (const project of linkedProjects) {
       for (const dir of project.directories) {

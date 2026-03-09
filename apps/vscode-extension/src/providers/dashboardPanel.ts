@@ -4,7 +4,11 @@ import { AuthService } from "../services/auth";
 import { ApiService } from "../services/api";
 import { SyncService } from "../services/sync";
 import { StorageService } from "../utils/storage";
-import { getDashboardCss, getDashboardBody, getDashboardJs } from "./dashboardHtml";
+import {
+  getDashboardCss,
+  getDashboardBody,
+  getDashboardJs,
+} from "./dashboardHtml";
 import type { LinkedProjectV2, User } from "../types";
 import * as output from "../utils/outputChannel";
 
@@ -51,7 +55,11 @@ export class DashboardPanelProvider implements vscode.Disposable {
       }
     );
 
-    this.panel.iconPath = vscode.Uri.joinPath(this.extensionUri, "media", "icon.svg");
+    this.panel.iconPath = vscode.Uri.joinPath(
+      this.extensionUri,
+      "media",
+      "icon.svg"
+    );
     this.panel.webview.html = this.getHtmlContent();
 
     this.panel.webview.onDidReceiveMessage(

@@ -320,9 +320,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
     return md;
   }
 
-  private getSyncStaleness(
-    dir?: LinkedDirectory
-  ): "fresh" | "stale" | "never" {
+  private getSyncStaleness(dir?: LinkedDirectory): "fresh" | "stale" | "never" {
     if (!dir?.lastSyncedAt) return "never";
     const ageMs = Date.now() - dir.lastSyncedAt;
     return ageMs < 3600000 ? "fresh" : "stale";

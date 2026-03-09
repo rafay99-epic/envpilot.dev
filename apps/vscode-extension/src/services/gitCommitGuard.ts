@@ -115,7 +115,10 @@ export class GitCommitGuardService {
 
     // Debounced warning notification
     const now = Date.now();
-    if (now - this.lastWarningTime > GitCommitGuardService.WARNING_DEBOUNCE_MS) {
+    if (
+      now - this.lastWarningTime >
+      GitCommitGuardService.WARNING_DEBOUNCE_MS
+    ) {
       this.lastWarningTime = now;
       const fileNames = envFiles
         .map((f) => path.basename(f.uri.fsPath))
