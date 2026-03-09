@@ -11,6 +11,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "categories": [
     "Other"
   ],
@@ -100,6 +103,24 @@
         "title": "Request Variable",
         "category": "Envpilot",
         "icon": "$(git-pull-request-create)"
+      },
+      {
+        "command": "envpilot.installCommitGuard",
+        "title": "Install Commit Guard Hook",
+        "category": "Envpilot",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "envpilot.removeCommitGuard",
+        "title": "Remove Commit Guard Hook",
+        "category": "Envpilot",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "envpilot.openDashboardPanel",
+        "title": "Open Dashboard Panel",
+        "category": "Envpilot",
+        "icon": "$(dashboard)"
       }
     ],
     "viewsContainers": {
@@ -126,17 +147,17 @@
     "viewsWelcome": [
       {
         "view": "envpilot.projects",
-        "contents": "Welcome to Envpilot\n\nSecurely sync environment variables to your local projects. No more sharing .env files over Slack.\n\n[$(sign-in) Sign In to Get Started](command:envpilot.signIn)\n\n[$(link-external) Open Dashboard](command:envpilot.openDashboard)",
+        "contents": "$(shield) Welcome to Envpilot\n\nSecurely manage and sync environment variables across your team.\nNo more sharing .env files over Slack or email.\n\n[$(sign-in) Sign In to Get Started](command:envpilot.signIn)\n\n$(info) [Learn more on the dashboard](command:envpilot.openDashboard)",
         "when": "!envpilot.isAuthenticated"
       },
       {
         "view": "envpilot.variables",
-        "contents": "Sign in to view and sync your environment variables.\n\n[$(sign-in) Sign In](command:envpilot.signIn)",
+        "contents": "$(lock) Environment Variables\n\nSign in to securely sync variables from your team's vault to your local .env files.\n\n[$(sign-in) Sign In](command:envpilot.signIn)",
         "when": "!envpilot.isAuthenticated"
       },
       {
         "view": "envpilot.variables",
-        "contents": "Link a project to view its environment variables.\n\n[$(link) Link Project](command:envpilot.linkProject)",
+        "contents": "$(symbol-variable) No Variables Yet\n\nLink a project to start syncing environment variables to this workspace.\n\n[$(link) Link Project](command:envpilot.linkProject)\n\n[$(link-external) Open Dashboard](command:envpilot.openDashboard)",
         "when": "envpilot.isAuthenticated && !envpilot.hasLinkedProject"
       }
     ],
@@ -151,6 +172,11 @@
           "command": "envpilot.linkProject",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "navigation@2"
+        },
+        {
+          "command": "envpilot.openDashboardPanel",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "navigation@3"
         },
         {
           "command": "envpilot.openDashboard",
@@ -195,9 +221,14 @@
           "group": "inline@1"
         },
         {
-          "command": "envpilot.removeDirectory",
+          "command": "envpilot.pullVariables",
           "when": "view == envpilot.projects && viewItem == linkedDirectory",
           "group": "inline@1"
+        },
+        {
+          "command": "envpilot.removeDirectory",
+          "when": "view == envpilot.projects && viewItem == linkedDirectory",
+          "group": "inline@2"
         }
       ]
     },
@@ -274,6 +305,21 @@
           "type": "string",
           "default": "",
           "description": "Convex deployment URL for real-time sync (auto-detected from server if empty)"
+        },
+        "envpilot.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens annotations above .env files with sync status and actions"
+        },
+        "envpilot.commitGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable dual-layer .env commit protection (VS Code staging guard + pre-commit hook)"
+        },
+        "envpilot.commitGuard.autoInstallHook": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically install a pre-commit hook to block .env file commits"
         }
       }
     }
@@ -281,11 +327,12 @@
   "scripts": {
     "vscode:prepublish": "npm run package",
     "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
-    "compile": "npm run typecheck && npm run lint && npm run build",
+    "compile": "npm run typecheck && npm run lint && npm run build && vsce package --no-dependencies",
     "dev": "npm-run-all -p dev:*",
     "dev:esbuild": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "dev:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run typecheck && npm run lint && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "package:vsix": "npm run package && vsce package --no-dependencies",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",

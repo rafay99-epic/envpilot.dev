@@ -14,9 +14,18 @@ import { StatusBarProvider } from "./providers/statusBar";
 import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
+import { GitCommitGuardService } from "./services/gitCommitGuard";
+import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
+import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import { getDeviceInfo } from "./utils/device";
-import { getServerUrl, getConvexUrl, shouldAutoSync } from "./utils/config";
+import {
+  getServerUrl,
+  getConvexUrl,
+  shouldAutoSync,
+  isCommitGuardEnabled,
+} from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
+import * as output from "./utils/outputChannel";
 
 let authService: AuthService;
 let apiService: ApiService;
@@ -25,6 +34,9 @@ let realTimeSyncService: RealTimeSyncService;
 let convexService: ConvexService | null = null;
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
+let gitCommitGuardService: GitCommitGuardService;
+let envCodeLensProvider: EnvCodeLensProvider;
+let dashboardPanelProvider: DashboardPanelProvider;
 let projectsTreeProvider: ProjectsTreeProvider;
 let variablesTreeProvider: VariablesTreeProvider;
 let statusBarProvider: StatusBarProvider;
@@ -67,25 +79,23 @@ async function initializeConvexService(): Promise<void> {
         );
         convexUrl = response.data?.convexUrl || "";
       } catch {
-        console.warn(
-          "[Extension] Failed to auto-detect Convex URL from server"
-        );
+        output.warn("Failed to auto-detect Convex URL from server");
       }
     }
 
     if (!convexUrl) {
-      console.warn(
-        "[Extension] No Convex URL available — WebSocket sync disabled"
-      );
+      output.warn("No Convex URL available — WebSocket sync disabled");
       return;
     }
 
     convexService = new ConvexService(convexUrl);
     syncService.setConvexService(convexService);
     realTimeSyncService.setConvexService(convexService);
-    console.log("[Extension] Convex WebSocket connection initialized");
+    output.log("Convex WebSocket connection initialized");
   } catch (error) {
-    console.error("[Extension] Failed to initialize Convex service:", error);
+    output.error(
+      `Failed to initialize Convex service: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 
@@ -100,6 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
   fileProtectionService = new FileProtectionService();
+  gitCommitGuardService = new GitCommitGuardService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
   realTimeSyncService = new RealTimeSyncService(syncService, storageService);
@@ -107,14 +118,38 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize Convex WebSocket connection
   await initializeConvexService();
 
+  // Initialize commit guard if enabled
+  if (isCommitGuardEnabled()) {
+    await gitCommitGuardService.initialize();
+
+    // Show one-time notification about commit guard
+    const guardNotified = context.globalState.get<boolean>(
+      "envpilot.commitGuardNotified"
+    );
+    if (!guardNotified) {
+      vscode.window.showInformationMessage(
+        "Envpilot: .env commit guard is active. A pre-commit hook has been installed to protect your secrets."
+      );
+      context.globalState.update("envpilot.commitGuardNotified", true);
+    }
+  }
+
   // Initialize UI providers
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
+  envCodeLensProvider = new EnvCodeLensProvider(storageService);
+  dashboardPanelProvider = new DashboardPanelProvider(
+    context.extensionUri,
+    authService,
+    apiService,
+    syncService,
+    storageService
+  );
   linkProjectDialog = new LinkProjectDialog(syncService);
   requestVariableDialog = new RequestVariableDialog();
 
-  // Register tree views
+  // Register tree views and CodeLens provider
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
       "envpilot.projects",
@@ -123,6 +158,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.registerTreeDataProvider(
       "envpilot.variables",
       variablesTreeProvider
+    ),
+    vscode.languages.registerCodeLensProvider(
+      { pattern: "**/.env*" },
+      envCodeLensProvider
     )
   );
 
@@ -161,7 +200,20 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.requestVariable",
       handleRequestVariable
-    )
+    ),
+    // Commit guard commands
+    vscode.commands.registerCommand(
+      "envpilot.installCommitGuard",
+      handleInstallCommitGuard
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.removeCommitGuard",
+      handleRemoveCommitGuard
+    ),
+    // Dashboard panel command
+    vscode.commands.registerCommand("envpilot.openDashboardPanel", () => {
+      dashboardPanelProvider.show();
+    })
   );
 
   // Subscribe to auth state changes
@@ -175,6 +227,7 @@ export async function activate(context: vscode.ExtensionContext) {
     projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    dashboardPanelProvider.refresh();
     await updateContextFlags();
   });
 
@@ -202,14 +255,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Subscribe to real-time revocation events for UI updates
   realTimeSyncService.onRevocationDetected(({ project, reason }) => {
-    // Refresh UI when a revocation is detected
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    dashboardPanelProvider.refresh();
 
-    console.log(
-      `[Extension] Revocation detected for ${project.projectName}: ${reason}`
-    );
+    output.log(`Revocation detected for ${project.projectName}: ${reason}`);
+  });
+
+  // Refresh CodeLens and dashboard when sync completes
+  syncService.onSyncComplete(() => {
+    envCodeLensProvider.refresh();
+    dashboardPanelProvider.notifySyncCompleted();
   });
 
   // Listen for workspace changes
@@ -217,6 +274,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       variablesTreeProvider.refresh();
       statusBarProvider.update();
+      dashboardPanelProvider.refresh();
     })
   );
 
@@ -228,9 +286,13 @@ export async function activate(context: vscode.ExtensionContext) {
       realTimeSyncService.dispose();
       convexService?.dispose();
       fileProtectionService.dispose();
+      gitCommitGuardService.dispose();
+      envCodeLensProvider.dispose();
+      dashboardPanelProvider.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
+      output.dispose();
     },
   });
 }
@@ -713,6 +775,7 @@ async function handlePullVariables(): Promise<void> {
     },
     async () => {
       statusBarProvider.setSyncing(true);
+      dashboardPanelProvider.notifySyncStarted();
 
       // Try V2 first
       const linkedProjectV2 =
@@ -895,6 +958,18 @@ async function handleShowStatus(): Promise<void> {
   } else if (selected.label.includes("Sign Out")) {
     await handleSignOut();
   }
+}
+
+async function handleInstallCommitGuard(): Promise<void> {
+  await gitCommitGuardService.initialize();
+  vscode.window.showInformationMessage(
+    "Envpilot: Commit guard hook installed successfully."
+  );
+}
+
+async function handleRemoveCommitGuard(): Promise<void> {
+  await gitCommitGuardService.removeHooks();
+  vscode.window.showInformationMessage("Envpilot: Commit guard hook removed.");
 }
 
 export function deactivate() {

@@ -13,6 +13,11 @@ export function getConfig(): ExtensionConfig {
     targetFile: config.get<string>("targetFile", ".env.local"),
     environment: config.get<string>("environment", "development"),
     preventCopyOnRevoke: config.get<boolean>("preventCopyOnRevoke", true),
+    commitGuardEnabled: config.get<boolean>("commitGuard.enabled", true),
+    commitGuardAutoInstallHook: config.get<boolean>(
+      "commitGuard.autoInstallHook",
+      true
+    ),
   };
 }
 
@@ -47,6 +52,14 @@ export function shouldPreventCopyOnRevoke(): boolean {
 export function getConvexUrl(): string {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
   return config.get<string>("convexUrl", "");
+}
+
+export function isCommitGuardEnabled(): boolean {
+  return getConfig().commitGuardEnabled;
+}
+
+export function shouldAutoInstallHook(): boolean {
+  return getConfig().commitGuardAutoInstallHook;
 }
 
 export async function updateConfig<K extends keyof ExtensionConfig>(

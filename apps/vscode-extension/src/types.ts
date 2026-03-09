@@ -110,6 +110,8 @@ export interface ExtensionConfig {
   targetFile: string;
   environment: string;
   preventCopyOnRevoke: boolean;
+  commitGuardEnabled: boolean;
+  commitGuardAutoInstallHook: boolean;
 }
 
 export interface ApiResponse<T> {
