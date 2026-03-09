@@ -12,6 +12,8 @@ import type * as auditHelpers from "../auditHelpers.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as changelog from "../changelog.js";
 import type * as cliSessions from "../cliSessions.js";
+import type * as convex__generated_api from "../convex/_generated/api.js";
+import type * as convex__generated_server from "../convex/_generated/server.js";
 import type * as dashboard from "../dashboard.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as invitations from "../invitations.js";
@@ -39,6 +41,8 @@ declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   changelog: typeof changelog;
   cliSessions: typeof cliSessions;
+  "convex/_generated/api": typeof convex__generated_api;
+  "convex/_generated/server": typeof convex__generated_server;
   dashboard: typeof dashboard;
   featureRequests: typeof featureRequests;
   invitations: typeof invitations;

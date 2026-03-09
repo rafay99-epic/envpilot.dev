@@ -4,68 +4,91 @@ This guide covers setting up and running ENV Connect locally for development.
 
 ## Prerequisites
 
-Before starting, ensure you have the following installed:
-
-- **Node.js** 18.x or later ([download](https://nodejs.org/))
-- **npm** 9.x or later (comes with Node.js)
-- **Git** for version control
+- **[Bun](https://bun.sh/)** v1.2+ -- package manager and runtime
+- **[Git](https://git-scm.com/)** -- version control
+- **[Convex](https://convex.dev/) account** -- real-time backend
+- **[WorkOS](https://workos.com/) account** -- authentication
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and install
 git clone <repository-url>
-cd ENV_Connect_2
+cd env-connect
+bun install
 
-# 2. Install dependencies
-npm install
+# 2. Set up environment variables
+cp .env.example apps/web/.env.local
+# Edit apps/web/.env.local (see Environment Variables section)
 
-# 3. Set up environment variables
-cp .env.example .env.local
+# 3. Log in to Convex
+bunx convex login
 
-# 4. Configure your .env.local file (see Environment Variables section)
-
-# 5. Start development servers (Next.js + Convex)
-npm run dev
+# 4. Start development (Next.js + Convex in parallel)
+bun run dev
 ```
 
-The application will be available at `http://localhost:3000`.
+The web app will be at `http://localhost:3000`.
 
 ## Project Structure
 
 ```
-ENV_Connect_2/
-├── convex/                 # Convex backend
-│   ├── _generated/         # Auto-generated Convex types
-│   ├── schema.ts           # Database schema
-│   ├── users.ts            # User functions
-│   ├── organizations.ts    # Organization functions
-│   ├── projects.ts         # Project functions
-│   ├── variables.ts        # Environment variable functions
-│   ├── permissions.ts      # Permission functions
-│   ├── invitations.ts      # Invitation functions
-│   ├── projectAccess.ts    # Extension access functions
-│   └── auditLogs.ts        # Audit log functions
-├── src/
-│   ├── app/                # Next.js App Router pages
-│   │   ├── (auth)/         # Authentication routes
-│   │   ├── (dashboard)/    # Dashboard routes
-│   │   └── api/            # API routes
-│   ├── components/         # React components
-│   │   ├── auth/           # Authentication components
-│   │   └── dashboard/      # Dashboard components
-│   ├── hooks/              # Custom React hooks
-│   └── lib/                # Utility libraries
-├── public/                 # Static assets
-├── tests/                  # Playwright E2E tests
-└── docs/                   # Documentation
+env-connect/
+├── apps/
+│   ├── web/                      # Next.js 16 web application
+│   │   ├── src/
+│   │   │   ├── app/              # App Router pages & API routes
+│   │   │   │   ├── (auth)/       # Auth routes (sign-in, sign-up, callback)
+│   │   │   │   ├── (dashboard)/  # Dashboard routes
+│   │   │   │   └── api/          # REST API endpoints
+│   │   │   ├── components/       # React components
+│   │   │   ├── hooks/            # Custom hooks (Convex query wrappers)
+│   │   │   └── lib/              # Utilities (auth, vault, stripe, email)
+│   │   ├── public/               # Static assets
+│   │   ├── tests/                # Playwright E2E tests
+│   │   ├── next.config.ts        # Next.js config (React Compiler, Turbopack)
+│   │   ├── tsconfig.json         # TypeScript config with @/* and @convex/* aliases
+│   │   └── package.json
+│   ├── cli/                      # CLI tool (@env-connect/cli)
+│   │   ├── src/
+│   │   │   ├── commands/         # CLI commands (init, login, pull, push, etc.)
+│   │   │   ├── lib/              # API client, config, env file parsing
+│   │   │   └── types/            # Type definitions
+│   │   ├── tsconfig.json
+│   │   └── package.json
+│   └── vscode-extension/         # VS Code extension
+│       ├── src/
+│       │   ├── extension.ts      # Extension entry point
+│       │   ├── providers/        # Tree view providers
+│       │   ├── services/         # API, auth, sync, real-time
+│       │   ├── ui/               # Dialogs
+│       │   └── utils/            # Storage, config, paths
+│       ├── media/                # Extension icon/assets
+│       ├── tsconfig.json
+│       └── package.json
+├── packages/
+│   ├── shared-types/             # Common TypeScript interfaces
+│   │   └── src/index.ts          # User, Organization, Project, etc.
+│   └── eslint-config/            # Shared ESLint presets
+│       ├── base.mjs              # Common rules
+│       ├── next.mjs              # Next.js preset
+│       └── node.mjs              # CLI/extension preset
+├── convex/                       # Convex backend
+│   ├── schema.ts                 # Database schema (28 tables)
+│   ├── _generated/               # Auto-generated types (gitignored)
+│   ├── *.ts                      # Query/mutation functions
+│   ├── tsconfig.json
+│   └── package.json
+├── docs/                         # Documentation
+├── turbo.json                    # Turborepo config
+└── package.json                  # Workspace root
 ```
 
 ## Environment Variables
 
-### Required Variables
+### Required
 
-Create a `.env.local` file in the project root with the following variables:
+Create `apps/web/.env.local`:
 
 ```bash
 # Convex
@@ -80,235 +103,285 @@ WORKOS_COOKIE_PASSWORD=<32-character-random-string>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### Optional Variables
+### Optional
 
 ```bash
-# Custom WorkOS redirect URI (defaults to NEXT_PUBLIC_APP_URL + /callback)
-WORKOS_REDIRECT_URI=http://localhost:3000/callback
+# Stripe (billing -- only needed if working on billing features)
+STRIPE_SECRET_KEY=<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=<your-stripe-webhook-secret>
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=<your-stripe-publishable-key>
+
+# Resend (email -- only needed if working on invitation emails)
+RESEND_API_KEY=<your-resend-api-key>
 ```
 
-See `.env.example` for a complete template with descriptions.
+Generate a cookie password:
+
+```bash
+openssl rand -base64 32
+```
 
 ## Setting Up Services
 
 ### 1. Convex Backend
 
-[Convex](https://convex.dev) provides the real-time backend database.
-
 ```bash
-# Install Convex CLI globally (optional, included in devDependencies)
-npm install -g convex
+# Log in to Convex
+bunx convex login
 
-# Login to Convex
-npx convex login
-
-# Initialize a new project (first time only)
-npx convex init
+# First time: initialize a new project
+bunx convex init
 
 # Or link to existing project
-npx convex dev --configure
+bunx convex dev --configure
 ```
 
-After setup, Convex will provide your `NEXT_PUBLIC_CONVEX_URL`.
-
-**Running Convex in Development:**
-
-The `npm run dev` command runs both Next.js and Convex dev servers in parallel. If you need to run them separately:
-
-```bash
-# Terminal 1: Next.js only
-npm run dev:next
-
-# Terminal 2: Convex only
-npm run dev:convex
-```
+After setup, Convex provides your `NEXT_PUBLIC_CONVEX_URL`.
 
 ### 2. WorkOS Authentication
 
-[WorkOS](https://workos.com) provides authentication with AuthKit.
+1. Create a [WorkOS](https://workos.com) account
+2. Create a new project in the dashboard
+3. Go to **Authentication** > **AuthKit**
+4. Add redirect URI: `http://localhost:3000/callback`
+5. Copy **API Key** and **Client ID** to `.env.local`
+6. Enable sign-in methods (email, Google, etc.)
 
-1. Create a WorkOS account at [workos.com](https://workos.com)
-2. Create a new project in the WorkOS dashboard
-3. Navigate to **Authentication** → **AuthKit**
-4. Configure your redirect URIs:
-   - Development: `http://localhost:3000/callback`
-   - Production: `https://your-domain.com/callback`
-5. Copy your **API Key** and **Client ID**
-6. Generate a secure cookie password:
-   ```bash
-   openssl rand -base64 32
-   ```
+## Development Commands
 
-**WorkOS Configuration Checklist:**
-
-- [ ] API Key added to `.env.local`
-- [ ] Client ID added to `.env.local`
-- [ ] Cookie password (32+ characters) added to `.env.local`
-- [ ] Redirect URI configured in WorkOS dashboard
-- [ ] Sign-in methods enabled (email, Google, etc.)
-
-## Available Scripts
-
-| Command                 | Description                                       |
-| ----------------------- | ------------------------------------------------- |
-| `npm run dev`           | Start both Next.js and Convex development servers |
-| `npm run dev:next`      | Start only the Next.js development server         |
-| `npm run dev:convex`    | Start only the Convex development server          |
-| `npm run build`         | Build the Next.js application for production      |
-| `npm run start`         | Start the production Next.js server               |
-| `npm run lint`          | Run ESLint                                        |
-| `npm run test:e2e`      | Run Playwright end-to-end tests                   |
-| `npm run convex:deploy` | Deploy Convex functions to production             |
-
-## Development Workflow
-
-### 1. Starting Development
+### Start Everything
 
 ```bash
-npm run dev
+bun run dev
 ```
 
-This runs:
+This uses Turborepo to run all workspace `dev` scripts in parallel:
 
 - Next.js dev server on `http://localhost:3000`
 - Convex dev server syncing functions and schema
 
-### 2. Making Database Changes
+### Run Services Separately
 
-Edit `convex/schema.ts` to modify the database schema. Convex will automatically apply migrations during development.
+```bash
+# In separate terminals:
+cd apps/web && bun run dev:next      # Next.js only
+cd apps/web && bun run dev:convex    # Convex only
+```
 
-### 3. Adding Backend Functions
+### Build
 
-Create or edit files in the `convex/` directory:
+```bash
+# Build all apps
+bun run build
+
+# Build individually
+cd apps/web && bun run build                    # Next.js production build
+cd apps/cli && bun run build                    # CLI (tsup -> dist/index.js)
+cd apps/vscode-extension && bun run compile     # Extension (esbuild -> dist/extension.js)
+```
+
+### Quality Checks
+
+```bash
+bun run lint             # ESLint across all workspaces
+bun run typecheck        # TypeScript checking across all workspaces
+bun run format:check     # Prettier formatting check
+bun run format:fix       # Auto-fix formatting
+```
+
+### Testing
+
+```bash
+# E2E tests (auto-starts dev server)
+bun run test:e2e
+
+# Interactive test UI
+cd apps/web && bunx playwright test --ui
+
+# Run a specific test file
+cd apps/web && bunx playwright test tests/e2e/specific.spec.ts
+
+# CLI unit tests
+cd apps/cli && bun test
+
+# CLI tests in watch mode
+cd apps/cli && bun run test:watch
+```
+
+## Working with the CLI
+
+The CLI is at `apps/cli/`. It's an independent npm package that communicates with the web app via HTTP API.
+
+```bash
+cd apps/cli
+
+# Build
+bun run build
+
+# Watch mode (rebuild on changes)
+bun run dev
+
+# Run locally after building
+./dist/index.js --help
+
+# Run tests
+bun test
+```
+
+**Key files:**
+
+- `src/commands/` -- Each command (init, login, pull, push, etc.)
+- `src/lib/api.ts` -- HTTP client that calls the web app's API routes
+- `src/lib/config.ts` -- User config management (`conf` package)
+- `src/types/index.ts` -- Type definitions with Zod schemas
+
+## Working with the VS Code Extension
+
+The extension is at `apps/vscode-extension/`. It uses OAuth-based auth and real-time sync.
+
+```bash
+cd apps/vscode-extension
+
+# Build (compile + lint + typecheck)
+bun run compile
+
+# Watch mode (rebuild on changes, useful during development)
+bun run watch
+
+# Package as .vsix for installation
+bun run package
+bunx @vscode/vsce package
+```
+
+**To test the extension in VS Code:**
+
+1. Open `apps/vscode-extension/` in VS Code
+2. Press `F5` to launch the Extension Development Host
+3. The extension activates in workspaces containing `.env*` files
+
+**Key files:**
+
+- `src/extension.ts` -- Main entry point, command registration
+- `src/services/sync.ts` -- Variable sync logic
+- `src/services/auth.ts` -- OAuth authentication
+- `src/services/realTimeSync.ts` -- Permission revocation detection
+- `src/providers/` -- Tree view data providers
+
+## Working with the Convex Backend
+
+Convex functions are in `convex/` at the repo root. They auto-deploy during `bun run dev`.
+
+### Modifying the Schema
+
+Edit `convex/schema.ts`. Convex auto-migrates during development.
+
+### Adding Backend Functions
 
 ```typescript
 // convex/example.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-export const myQuery = query({
-  args: { id: v.id("myTable") },
+export const list = query({
+  args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
-  },
-});
-
-export const myMutation = mutation({
-  args: { name: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("myTable", { name: args.name });
+    return await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
   },
 });
 ```
 
-### 4. Using Convex in React
+### Using Convex in the Web App
 
 ```typescript
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "@convex/_generated/api";
 
 function MyComponent() {
-  const data = useQuery(api.example.myQuery, { id: someId });
+  const data = useQuery(api.example.list, { projectId });
   const doSomething = useMutation(api.example.myMutation);
-
-  return (
-    <button onClick={() => doSomething({ name: "test" })}>
-      Do Something
-    </button>
-  );
+  // ...
 }
 ```
 
-### 5. Running Tests
+Note: The web app imports Convex via the `@convex/*` path alias (defined in `apps/web/tsconfig.json`).
+
+### Deploy to Production
 
 ```bash
-# Run all E2E tests
-npm run test:e2e
-
-# Run tests in UI mode
-npx playwright test --ui
-
-# Run specific test file
-npx playwright test tests/example.spec.ts
+cd convex && bun run deploy
 ```
 
-## Code Style
+## Path Aliases
 
-This project uses:
+The web app uses two TypeScript path aliases:
 
-- **TypeScript** for type safety
-- **ESLint** for code linting
-- **Tailwind CSS v4** for styling
-- **React 19** with the React Compiler
+| Alias       | Resolves To            | Example                                        |
+| ----------- | ---------------------- | ---------------------------------------------- |
+| `@/*`       | `apps/web/src/*`       | `import { auth } from "@/lib/auth"`            |
+| `@convex/*` | `convex/*` (repo root) | `import { api } from "@convex/_generated/api"` |
 
-### TypeScript Guidelines
+## Adding Dependencies
 
-- Use strict mode (enabled by default)
-- Define interfaces for all component props
-- Use Zod for runtime validation of external data
+```bash
+# Add to a specific workspace
+cd apps/web && bun add <package>
+cd apps/cli && bun add <package>
 
-### Component Guidelines
-
-```typescript
-interface ButtonProps {
-  label: string;
-  onClick: () => void;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
-}
-
-export function Button({
-  label,
-  onClick,
-  variant = 'primary',
-  disabled
-}: ButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={variant === 'primary' ? 'bg-blue-500' : 'bg-gray-500'}
-    >
-      {label}
-    </button>
-  );
-}
+# Add to root (dev tools shared across all workspaces)
+bun add -d <package> --cwd .
 ```
+
+## Turborepo
+
+The monorepo uses Turborepo for task orchestration. See `turbo.json` for the task pipeline.
+
+- `build` tasks depend on upstream builds (`^build`)
+- `dev` tasks are persistent (long-running) and never cached
+- `lint` and `typecheck` run independently per workspace
+
+Turbo caches build outputs (`.next/`, `dist/`) for faster rebuilds.
 
 ## Troubleshooting
 
 ### Convex Connection Issues
 
 ```bash
-# Clear Convex cache and restart
 rm -rf .convex
-npx convex dev
+cd convex && bun run dev
 ```
 
 ### WorkOS Authentication Errors
 
-1. **"Invalid redirect URI"**: Ensure the redirect URI in your `.env.local` matches exactly what's configured in the WorkOS dashboard.
+- **"Invalid redirect URI"** -- Ensure `http://localhost:3000/callback` is in your WorkOS dashboard
+- **"Cookie password too short"** -- `WORKOS_COOKIE_PASSWORD` must be 32+ characters
+- **"API key invalid"** -- Check you're using the dev (not production) key
 
-2. **"Cookie password too short"**: The `WORKOS_COOKIE_PASSWORD` must be at least 32 characters.
-
-3. **"API key invalid"**: Verify your `WORKOS_API_KEY` is correct and from the same environment (development/production).
-
-### Next.js Build Errors
+### Build Errors
 
 ```bash
-# Clear Next.js cache
-rm -rf .next
-npm run build
+# Clean all build outputs and rebuild
+rm -rf apps/web/.next apps/cli/dist apps/vscode-extension/dist .turbo
+bun run build
 ```
 
 ### Port Already in Use
 
 ```bash
-# Find and kill process using port 3000
 lsof -ti:3000 | xargs kill -9
+```
+
+### Dependency Issues
+
+```bash
+# Clean and reinstall everything
+rm -rf node_modules apps/*/node_modules bun.lock
+bun install
 ```
 
 ## Next Steps
 
 - See [DEPLOYMENT.md](./DEPLOYMENT.md) for production deployment
-- Check the project README for feature overview
+- See the root [README.md](../README.md) for project overview

@@ -4,140 +4,190 @@ Secure environment variable management for teams. ENV Connect provides a central
 
 ## Features
 
-- **Secure Variable Storage**: Environment variables encrypted and stored securely using WorkOS Vault
-- **Real-Time Sync**: Changes propagate instantly across your team via Convex real-time database
-- **Team Management**: Invite team members, assign roles, and control access
-- **Organization Support**: Manage multiple organizations with separate projects
-- **Granular Permissions**: Control who can view, edit, or manage each variable
-- **Audit Logging**: Track all changes and access to environment variables
-- **VS Code Extension Support**: Sync variables directly to your development environment
+- **Secure Variable Storage** -- Environment variables encrypted via WorkOS Vault
+- **Real-Time Sync** -- Changes propagate instantly via Convex real-time database
+- **Team Management** -- Invite members, assign roles, control access
+- **Granular Permissions** -- Per-variable access control with Admin / Team Lead / Member roles
+- **Audit Logging** -- Track all changes and access
+- **CLI Tool** -- Pull/push variables from the terminal
+- **VS Code Extension** -- Sync variables directly into your editor
 
 ## Tech Stack
 
-- **Frontend**: [Next.js 16](https://nextjs.org/) with React 19 and the React Compiler
-- **Backend**: [Convex](https://convex.dev/) real-time database
-- **Authentication**: [WorkOS AuthKit](https://workos.com/docs/user-management)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Testing**: [Playwright](https://playwright.dev/)
-- **Language**: TypeScript with strict mode
+| Layer    | Technology                                                    |
+| -------- | ------------------------------------------------------------- |
+| Web App  | [Next.js 16](https://nextjs.org/) + React 19 + React Compiler |
+| Backend  | [Convex](https://convex.dev/) real-time database              |
+| Auth     | [WorkOS AuthKit](https://workos.com/docs/user-management)     |
+| Secrets  | [WorkOS Vault](https://workos.com/docs/vault)                 |
+| Billing  | [Stripe](https://stripe.com/)                                 |
+| Styling  | [Tailwind CSS v4](https://tailwindcss.com/)                   |
+| Testing  | [Playwright](https://playwright.dev/)                         |
+| Monorepo | [Turborepo](https://turbo.build/) + [Bun](https://bun.sh/)    |
 
-## Getting Started
+## Monorepo Structure
+
+```
+env-connect/
+├── apps/
+│   ├── web/                  # Next.js web application
+│   ├── cli/                  # CLI tool (@env-connect/cli)
+│   └── vscode-extension/     # VS Code extension
+├── packages/
+│   ├── shared-types/         # Common TypeScript interfaces
+│   └── eslint-config/        # Shared ESLint presets
+├── convex/                   # Convex backend functions & schema
+├── docs/                     # Documentation
+├── turbo.json                # Turborepo task pipeline
+└── package.json              # Workspace root
+```
+
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 18.x or later
-- npm 9.x or later
+- [Bun](https://bun.sh/) v1.2+ (package manager and runtime)
+- [Git](https://git-scm.com/)
+- A [Convex](https://convex.dev/) account
+- A [WorkOS](https://workos.com/) account
 
-### Quick Start
+### Setup
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone <repository-url>
-cd ENV_Connect_2
+cd env-connect
 
-# Install dependencies
-npm install
+# 2. Install all dependencies (root + all workspaces)
+bun install
 
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your configuration
+# 3. Set up environment variables
+cp .env.example apps/web/.env.local
+# Edit apps/web/.env.local with your keys (see Environment Variables below)
 
-# Start development servers
-npm run dev
+# 4. Log in to Convex
+bunx convex login
+
+# 5. Start everything (Next.js + Convex dev server)
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Open [http://localhost:3000](http://localhost:3000) to view the web app.
 
 ### Environment Variables
 
-Copy `.env.example` to `.env.local` and configure:
+Create `apps/web/.env.local` with:
 
-| Variable                 | Description                       |
-| ------------------------ | --------------------------------- |
-| `NEXT_PUBLIC_CONVEX_URL` | Your Convex deployment URL        |
-| `WORKOS_API_KEY`         | WorkOS API key                    |
-| `WORKOS_CLIENT_ID`       | WorkOS client ID                  |
-| `WORKOS_COOKIE_PASSWORD` | Cookie encryption key (32+ chars) |
-| `NEXT_PUBLIC_APP_URL`    | Application URL                   |
-
-See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructions.
-
-## Available Scripts
-
-| Command                 | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `npm run dev`           | Start Next.js and Convex development servers |
-| `npm run build`         | Build for production                         |
-| `npm run start`         | Start production server                      |
-| `npm run lint`          | Run ESLint                                   |
-| `npm run test:e2e`      | Run Playwright E2E tests                     |
-| `npm run convex:deploy` | Deploy Convex functions                      |
-
-## Project Structure
-
+```bash
+NEXT_PUBLIC_CONVEX_URL=<your-convex-deployment-url>
+WORKOS_API_KEY=<your-workos-api-key>
+WORKOS_CLIENT_ID=<your-workos-client-id>
+WORKOS_COOKIE_PASSWORD=<32-character-random-string>
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
-├── convex/              # Convex backend functions and schema
-├── src/
-│   ├── app/             # Next.js App Router pages
-│   │   ├── (auth)/      # Authentication routes
-│   │   ├── (dashboard)/ # Dashboard routes
-│   │   └── api/         # API routes
-│   ├── components/      # React components
-│   ├── hooks/           # Custom React hooks
-│   └── lib/             # Utility libraries
-├── docs/                # Documentation
-├── public/              # Static assets
-└── tests/               # E2E tests
+
+Generate a cookie password: `openssl rand -base64 32`
+
+## Commands
+
+All commands are run from the repository root unless noted otherwise.
+
+### Development
+
+```bash
+bun run dev              # Start web app + Convex backend in parallel
+```
+
+To run services separately:
+
+```bash
+cd apps/web && bun run dev:next      # Next.js only (http://localhost:3000)
+cd apps/web && bun run dev:convex    # Convex only
+cd apps/cli && bun run dev           # CLI in watch mode
+cd apps/vscode-extension && bun run watch  # Extension in watch mode
+```
+
+### Build
+
+```bash
+bun run build            # Build all apps (web + CLI + extension)
+bun run build:all        # Same as above (alias)
+```
+
+Build individual apps:
+
+```bash
+cd apps/web && bun run build                    # Next.js production build
+cd apps/cli && bun run build                    # CLI (tsup -> dist/)
+cd apps/vscode-extension && bun run compile     # Extension (esbuild -> dist/)
+```
+
+### Quality
+
+```bash
+bun run lint             # Lint all workspaces
+bun run typecheck        # Typecheck all workspaces
+bun run format:check     # Check formatting (Prettier)
+bun run format:fix       # Fix formatting
+```
+
+### Testing
+
+```bash
+bun run test:e2e                          # Run Playwright E2E tests
+cd apps/web && bunx playwright test --ui  # Interactive test UI
+cd apps/cli && bun test                   # CLI unit tests (vitest)
+```
+
+### Convex
+
+```bash
+cd convex && bun run dev       # Sync functions during development
+cd convex && bun run deploy    # Deploy functions to production
 ```
 
 ## Documentation
 
-- [Development Guide](./docs/DEVELOPMENT.md) - Local development setup and workflow
-- [Deployment Guide](./docs/DEPLOYMENT.md) - Production deployment instructions
+- [Development Guide](./docs/DEVELOPMENT.md) -- Local setup, services configuration, workflows
+- [Deployment Guide](./docs/DEPLOYMENT.md) -- Production deployment instructions
 
 ## Architecture
 
-### Authentication Flow
-
-1. User initiates sign-in via WorkOS AuthKit
-2. WorkOS handles authentication (email, OAuth, SAML)
-3. Callback route creates session and syncs user to Convex
-4. Protected routes verify session via middleware
-
 ### Data Flow
 
-1. Frontend components use Convex React hooks
-2. Convex provides real-time subscriptions
-3. Sensitive values stored in WorkOS Vault
-4. Audit logs track all operations
+```
+Browser / CLI / Extension
+         │
+         ▼
+  Next.js API Routes (apps/web/src/app/api/)
+         │
+    ┌────┴────┐
+    ▼         ▼
+  Convex    WorkOS Vault
+(database)  (encrypted secrets)
+```
 
-### Database Schema
+### Authentication
 
-Key entities:
+1. User signs in via WorkOS AuthKit
+2. Callback route creates session, syncs user to Convex
+3. Protected routes verify session via middleware
 
-- **Users**: Synced from WorkOS
-- **Organizations**: Team containers
-- **Projects**: Logical groupings of variables
-- **Environment Variables**: Key-value pairs with vault references
-- **Permissions**: Granular access control
-- **Audit Logs**: Complete activity history
+### Roles & Permissions
+
+| Role          | Capabilities                                                   |
+| ------------- | -------------------------------------------------------------- |
+| **Admin**     | Full access, variable rollback, permission management          |
+| **Team Lead** | Manage projects/variables, grant/revoke per-variable access    |
+| **Member**    | Read-only projects, requires explicit per-variable permissions |
 
 ## Security
 
-- All sensitive values encrypted via WorkOS Vault
-- Role-based access control (Admin, Team Lead, Member)
-- Variable-level permissions
+- All secret values encrypted via WorkOS Vault (Convex stores only vault reference IDs)
+- Role-based access control with per-variable granularity
 - Session management with secure cookies
-- Comprehensive audit logging
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm run test:e2e`
-5. Submit a pull request
+- Comprehensive audit logging of all operations
 
 ## License
 
-Private - All rights reserved
+Private -- All rights reserved
