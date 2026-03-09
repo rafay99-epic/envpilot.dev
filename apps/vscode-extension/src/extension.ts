@@ -3,6 +3,7 @@ import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
 import { RealTimeSyncService } from "./services/realTimeSync";
+import { ConvexService } from "./services/convex";
 import { StorageService } from "./utils/storage";
 import {
   ProjectsTreeProvider,
@@ -14,17 +15,14 @@ import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
 import { getDeviceInfo } from "./utils/device";
-import {
-  getServerUrl,
-  shouldAutoSync,
-  isRealTimeSyncEnabled,
-} from "./utils/config";
+import { getServerUrl, getConvexUrl, shouldAutoSync } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 
 let authService: AuthService;
 let apiService: ApiService;
 let syncService: SyncService;
 let realTimeSyncService: RealTimeSyncService;
+let convexService: ConvexService | null = null;
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
 let projectsTreeProvider: ProjectsTreeProvider;
@@ -51,6 +49,46 @@ async function updateContextFlags(): Promise<void> {
   }
 }
 
+/**
+ * Initialize the Convex WebSocket service.
+ * Tries: 1) envpilot.convexUrl setting, 2) GET /api/extension/config from server.
+ */
+async function initializeConvexService(): Promise<void> {
+  try {
+    let convexUrl = getConvexUrl();
+
+    // Auto-detect from server if not configured
+    if (!convexUrl) {
+      try {
+        const axios = (await import("axios")).default;
+        const response = await axios.get(
+          `${getServerUrl()}/api/extension/config`,
+          { timeout: 5000 }
+        );
+        convexUrl = response.data?.convexUrl || "";
+      } catch {
+        console.warn(
+          "[Extension] Failed to auto-detect Convex URL from server"
+        );
+      }
+    }
+
+    if (!convexUrl) {
+      console.warn(
+        "[Extension] No Convex URL available — WebSocket sync disabled"
+      );
+      return;
+    }
+
+    convexService = new ConvexService(convexUrl);
+    syncService.setConvexService(convexService);
+    realTimeSyncService.setConvexService(convexService);
+    console.log("[Extension] Convex WebSocket connection initialized");
+  } catch (error) {
+    console.error("[Extension] Failed to initialize Convex service:", error);
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   // Initialize storage
   storageService = new StorageService(context);
@@ -64,11 +102,10 @@ export async function activate(context: vscode.ExtensionContext) {
   fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
-  realTimeSyncService = new RealTimeSyncService(
-    apiService,
-    syncService,
-    storageService
-  );
+  realTimeSyncService = new RealTimeSyncService(syncService, storageService);
+
+  // Initialize Convex WebSocket connection
+  await initializeConvexService();
 
   // Initialize UI providers
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
@@ -150,13 +187,10 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
 
-  // Start periodic sync if authenticated and auto-sync enabled
+  // Start reactive sync if authenticated and auto-sync enabled
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
-
-    if (isRealTimeSyncEnabled()) {
-      realTimeSyncService.startRealTimeSync();
-    }
+    realTimeSyncService.startRealTimeSync();
 
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
@@ -192,6 +226,7 @@ export async function activate(context: vscode.ExtensionContext) {
       authService.dispose();
       syncService.dispose();
       realTimeSyncService.dispose();
+      convexService?.dispose();
       fileProtectionService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
@@ -217,10 +252,7 @@ async function handleSignIn(): Promise<void> {
         if (shouldAutoSync()) {
           progress.report({ message: "Starting sync..." });
           syncService.startPeriodicSync();
-
-          if (isRealTimeSyncEnabled()) {
-            realTimeSyncService.startRealTimeSync();
-          }
+          realTimeSyncService.startRealTimeSync();
         }
       }
     );
@@ -426,6 +458,10 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     variablesTreeProvider.refresh();
     statusBarProvider.update();
     await updateContextFlags();
+
+    // Refresh WebSocket subscriptions to include new project
+    await realTimeSyncService.refreshSubscriptions();
+    await syncService.refreshSubscriptions();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     vscode.window.showErrorMessage(`Failed to link project: ${message}`);

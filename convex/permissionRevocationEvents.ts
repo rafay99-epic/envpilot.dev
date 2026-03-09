@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 /**
  * Permission Revocation Events
@@ -154,7 +154,7 @@ export const acknowledgeMultiple = mutation({
  * Clean up old acknowledged or expired events
  * Should be called periodically (e.g., by a cron job)
  */
-export const cleanup = mutation({
+export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

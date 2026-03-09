@@ -41,23 +41,12 @@ export function shouldPreventCopyOnRevoke(): boolean {
 }
 
 /**
- * Get the real-time sync interval in milliseconds
- * Default is 5 seconds for near-real-time revocation detection
+ * Get the Convex deployment URL.
+ * Checks setting first, then falls back to auto-detection from server.
  */
-export function getRealTimeSyncInterval(): number {
+export function getConvexUrl(): string {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-  // Default to 5 seconds, min 2 seconds, max 30 seconds
-  const seconds = config.get<number>("realTimeSyncInterval", 5);
-  return Math.max(2, Math.min(30, seconds)) * 1000;
-}
-
-/**
- * Check if real-time sync is enabled
- * Default is true for immediate revocation detection
- */
-export function isRealTimeSyncEnabled(): boolean {
-  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-  return config.get<boolean>("enableRealTimeSync", true);
+  return config.get<string>("convexUrl", "");
 }
 
 export async function updateConfig<K extends keyof ExtensionConfig>(

@@ -9,7 +9,6 @@ import type {
   TokenValidation,
   ApiResponse,
   DeviceInfo,
-  PermissionEventsResponse,
   MembershipRole,
   VariableRequest,
 } from "../types";
@@ -181,33 +180,6 @@ export class ApiService {
       ApiResponse<{ enabled: boolean; reason?: string }>
     >(`/api/extension/check-access/${organizationId}`);
     return response.data.data || { enabled: false, reason: "Unknown error" };
-  }
-
-  /**
-   * Check for permission revocation events for multiple access tokens
-   * Used for real-time sync to detect immediate revocations
-   */
-  async checkPermissionEvents(
-    accessTokens: string[]
-  ): Promise<PermissionEventsResponse> {
-    const response = await this.client.post<
-      ApiResponse<PermissionEventsResponse>
-    >("/api/extension/permission-events", { accessTokens });
-    return response.data.data || { events: [], hasRevocations: false };
-  }
-
-  /**
-   * Acknowledge that revocation events have been processed
-   * Requires an access token to authenticate the acknowledgment
-   */
-  async acknowledgeRevocations(
-    eventIds: string[],
-    accessToken: string
-  ): Promise<{ acknowledgedCount: number }> {
-    const response = await this.client.post<
-      ApiResponse<{ acknowledgedCount: number }>
-    >("/api/extension/acknowledge-revocation", { eventIds, accessToken });
-    return response.data.data || { acknowledgedCount: 0 };
   }
 
   // Variable Requests

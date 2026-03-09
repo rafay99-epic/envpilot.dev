@@ -1,10 +1,11 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { rateLimiter } from "./rateLimits";
 
 // Constants
-const SESSION_CODE_LENGTH = 8;
-const SESSION_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes for auth code
+const SESSION_CODE_LENGTH = 12;
+const SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes for auth code
 const ACCESS_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days for access token
 const REFRESH_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days for refresh token
 
@@ -41,6 +42,12 @@ export const initiate = mutation({
     deviceName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: prevent brute-force session generation
+    await rateLimiter.limit(ctx, "cliAuthInitiate", {
+      key: args.deviceName ?? "unknown",
+      throws: true,
+    });
+
     const now = Date.now();
 
     // Generate unique session code
@@ -424,7 +431,7 @@ export const storeExtensionToken = mutation({
 /**
  * Clean up expired sessions (can be run periodically)
  */
-export const cleanupExpiredSessions = mutation({
+export const cleanupExpiredSessions = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
 

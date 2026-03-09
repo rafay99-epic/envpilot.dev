@@ -270,17 +270,10 @@
           "default": true,
           "description": "Automatically sync when opening a linked directory"
         },
-        "envpilot.enableRealTimeSync": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable real-time permission revocation detection (recommended)"
-        },
-        "envpilot.realTimeSyncInterval": {
-          "type": "number",
-          "default": 5,
-          "description": "Interval (in seconds) for real-time permission check",
-          "minimum": 2,
-          "maximum": 30
+        "envpilot.convexUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Convex deployment URL for real-time sync (auto-detected from server if empty)"
         }
       }
     }
@@ -313,6 +306,7 @@
   },
   "dependencies": {
     "axios": "^1.6.2",
+    "convex": "^1.32.0",
     "uuid": "^9.0.1"
   }
 }

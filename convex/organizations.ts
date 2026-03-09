@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getTierLimits, isValidTier, Tier } from "./tierLimits";
+import { rateLimiter } from "./rateLimits";
 
 /**
  * Organization Queries and Mutations
@@ -125,6 +126,12 @@ export const create = mutation({
     workosOrgId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: prevent excessive org creation
+    await rateLimiter.limit(ctx, "orgCreate", {
+      key: args.createdBy,
+      throws: true,
+    });
+
     const now = Date.now();
 
     // Check organization creation limits based on user's tier

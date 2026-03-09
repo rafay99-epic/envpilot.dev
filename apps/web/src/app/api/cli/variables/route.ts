@@ -8,6 +8,23 @@ import {
   forbiddenResponse,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
+import { z } from "zod";
+
+const createVariableSchema = z.object({
+  projectId: z.string().min(1),
+  key: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(
+      /^[A-Za-z_][A-Za-z0-9_]*$/,
+      "Must start with letter/underscore and contain only alphanumeric/underscores"
+    ),
+  value: z.string().max(65536),
+  environment: z.string().min(1),
+  description: z.string().max(500).optional(),
+  isSensitive: z.boolean().optional(),
+});
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -129,28 +146,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const parsed = createVariableSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+
     const { projectId, key, value, environment, description, isSensitive } =
-      body;
-
-    if (!projectId || !key || value === undefined || !environment) {
-      return NextResponse.json(
-        {
-          error: "Missing required fields: projectId, key, value, environment",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate key format
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid key format. Must start with letter/underscore and contain only alphanumeric/underscores.",
-        },
-        { status: 400 }
-      );
-    }
+      parsed.data;
 
     // Get project to find organization
     const project = await convex.query(api.projects.getById, {

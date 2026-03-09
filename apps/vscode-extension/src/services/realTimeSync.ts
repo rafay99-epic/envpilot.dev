@@ -1,36 +1,23 @@
 import * as vscode from "vscode";
-import { ApiService } from "./api";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
-import { getRealTimeSyncInterval } from "../utils/config";
-import type { LinkedProjectV2, PermissionRevocationEvent } from "../types";
-
-/**
- * Default interval for real-time sync polling (in milliseconds)
- * This is much shorter than the regular sync interval to enable near-real-time revocation detection
- */
-const DEFAULT_REALTIME_INTERVAL = 5000; // 5 seconds
-
-/**
- * Maximum backoff interval (30 seconds)
- */
-const MAX_BACKOFF_INTERVAL = 30000;
+import { ConvexService } from "./convex";
+import type { LinkedProjectV2 } from "../types";
 
 /**
  * RealTimeSyncService handles real-time permission revocation detection
+ * via Convex WebSocket subscriptions.
  *
- * This service polls the server frequently for permission revocation events
- * and immediately triggers the revocation handler when detected, ensuring
- * that cached environment variables are cleared promptly.
+ * Before: HTTP polling every 5s → 720 calls/hr/user
+ * After: 1 WebSocket subscription, fires reactively on change → 0 HTTP calls
  */
 export class RealTimeSyncService {
-  private api: ApiService;
+  private convexService: ConvexService | null = null;
   private syncService: SyncService;
   private storage: StorageService;
-  private pollTimer: NodeJS.Timeout | null = null;
-  private isPolling = false;
-  private failureCount = 0;
-  private readonly MAX_FAILURES = 5;
+  private revocationSubId: string | null = null;
+  private tokenSubIds: string[] = [];
+  private isRunning = false;
 
   private _onRevocationDetected = new vscode.EventEmitter<{
     project: LinkedProjectV2;
@@ -39,191 +26,182 @@ export class RealTimeSyncService {
 
   readonly onRevocationDetected = this._onRevocationDetected.event;
 
-  constructor(
-    api: ApiService,
-    syncService: SyncService,
-    storage: StorageService
-  ) {
-    this.api = api;
+  constructor(syncService: SyncService, storage: StorageService) {
     this.syncService = syncService;
     this.storage = storage;
   }
 
   /**
-   * Start real-time sync polling
-   * This should be called when the extension activates and user is authenticated
+   * Set the ConvexService instance (called after Convex URL is resolved).
+   */
+  setConvexService(convexService: ConvexService): void {
+    this.convexService = convexService;
+  }
+
+  /**
+   * Start real-time sync via WebSocket subscriptions.
    */
   async startRealTimeSync(): Promise<void> {
-    if (this.pollTimer) {
-      return; // Already running
-    }
-
-    console.log("[RealTimeSync] Starting real-time permission sync");
-    this.isPolling = true;
-    this.failureCount = 0;
-    this.scheduleNextPoll();
-  }
-
-  /**
-   * Stop real-time sync polling
-   */
-  stopRealTimeSync(): void {
-    console.log("[RealTimeSync] Stopping real-time permission sync");
-    this.isPolling = false;
-
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
-
-    this.failureCount = 0;
-  }
-
-  /**
-   * Schedule the next poll with exponential backoff on failures
-   */
-  private scheduleNextPoll(): void {
-    if (!this.isPolling) {
+    if (this.isRunning || !this.convexService) {
       return;
     }
 
-    const baseInterval = getRealTimeSyncInterval() || DEFAULT_REALTIME_INTERVAL;
-    const backoffMultiplier = Math.min(
-      Math.pow(2, this.failureCount),
-      MAX_BACKOFF_INTERVAL / baseInterval
-    );
-    const interval = Math.min(
-      baseInterval * backoffMultiplier,
-      MAX_BACKOFF_INTERVAL
-    );
-
-    this.pollTimer = setTimeout(async () => {
-      await this.checkForRevocations();
-      this.scheduleNextPoll();
-    }, interval);
+    console.log("[RealTimeSync] Starting WebSocket subscriptions");
+    this.isRunning = true;
+    await this.setupSubscriptions();
   }
 
   /**
-   * Check for permission revocations across all linked projects
+   * Stop real-time sync — unsubscribe from all WebSocket subscriptions.
    */
-  private async checkForRevocations(): Promise<void> {
-    try {
-      const linkedProjects = await this.storage.getLinkedProjectsV2();
+  stopRealTimeSync(): void {
+    console.log("[RealTimeSync] Stopping WebSocket subscriptions");
+    this.isRunning = false;
+    this.teardownSubscriptions();
+  }
 
-      if (linkedProjects.length === 0) {
-        // No linked projects, nothing to check
-        this.failureCount = 0;
-        return;
-      }
+  /**
+   * Set up WebSocket subscriptions for all linked projects.
+   */
+  private async setupSubscriptions(): Promise<void> {
+    if (!this.convexService) return;
 
-      // Collect all access tokens
-      const accessTokens = linkedProjects.map((p) => p.accessToken);
+    const linkedProjects = await this.storage.getLinkedProjectsV2();
+    if (linkedProjects.length === 0) return;
 
-      // Check for revocation events
-      const response = await this.api.checkPermissionEvents(accessTokens);
+    // Subscribe to revocation events for all access tokens
+    const accessTokens = linkedProjects.map((p) => p.accessToken);
 
-      if (response.hasRevocations && response.events.length > 0) {
-        console.log(
-          `[RealTimeSync] Detected ${response.events.length} revocation event(s)`
-        );
+    this.revocationSubId = this.convexService.subscribeToRevocations(
+      accessTokens,
+      (events) => this.handleRevocationEvents(events, linkedProjects)
+    );
 
-        // Group events by access token for acknowledgment
-        const eventsByToken = new Map<string, string[]>();
-
-        // Process each revocation event
-        for (const event of response.events) {
-          await this.handleRevocationEvent(event, linkedProjects);
-
-          // Group event IDs by access token
-          if (!eventsByToken.has(event.accessToken)) {
-            eventsByToken.set(event.accessToken, []);
-          }
-          eventsByToken.get(event.accessToken)!.push(event.eventId);
-        }
-
-        // Acknowledge the events for each token
-        for (const [accessToken, eventIds] of eventsByToken) {
-          try {
-            await this.api.acknowledgeRevocations(eventIds, accessToken);
-          } catch (error) {
-            console.debug(
-              "[RealTimeSync] Failed to acknowledge events:",
-              error
-            );
+    // Subscribe to token validation for each project
+    for (const project of linkedProjects) {
+      const subId = this.convexService.subscribeToTokenValidation(
+        project.accessToken,
+        (result) => {
+          if (result === null) {
+            // Token is invalid/expired — trigger revocation
+            this.handleTokenInvalid(project);
           }
         }
-      }
-
-      // Reset failure count on success
-      this.failureCount = 0;
-    } catch (error) {
-      this.failureCount = Math.min(this.failureCount + 1, this.MAX_FAILURES);
-      console.error("[RealTimeSync] Failed to check for revocations:", error);
+      );
+      this.tokenSubIds.push(subId);
     }
   }
 
   /**
-   * Handle a single revocation event
+   * Tear down all subscriptions.
    */
-  private async handleRevocationEvent(
-    event: {
+  private teardownSubscriptions(): void {
+    if (!this.convexService) return;
+
+    if (this.revocationSubId) {
+      this.convexService.unsubscribe(this.revocationSubId);
+      this.revocationSubId = null;
+    }
+
+    for (const subId of this.tokenSubIds) {
+      this.convexService.unsubscribe(subId);
+    }
+    this.tokenSubIds = [];
+  }
+
+  /**
+   * Refresh subscriptions when projects are linked/unlinked.
+   */
+  async refreshSubscriptions(): Promise<void> {
+    if (!this.isRunning) return;
+    this.teardownSubscriptions();
+    await this.setupSubscriptions();
+  }
+
+  /**
+   * Handle incoming revocation events from WebSocket subscription.
+   */
+  private async handleRevocationEvents(
+    events: Array<{
       accessToken: string;
       eventId: string;
       projectId: string;
       userId: string;
       reason: string;
       revokedAt: number;
-    },
+    }>,
     linkedProjects: LinkedProjectV2[]
   ): Promise<void> {
-    // Find the project that matches this event
-    const project = linkedProjects.find(
-      (p) => p.accessToken === event.accessToken
-    );
+    console.log(`[RealTimeSync] Detected ${events.length} revocation event(s)`);
 
-    if (!project) {
-      console.warn(
-        "[RealTimeSync] Revocation event for unknown project:",
-        event.projectId
+    const eventIds: string[] = [];
+
+    for (const event of events) {
+      const project = linkedProjects.find(
+        (p) => p.accessToken === event.accessToken
       );
-      return;
+
+      if (!project) {
+        console.warn("[RealTimeSync] Revocation event for unknown project");
+        continue;
+      }
+
+      eventIds.push(event.eventId);
+
+      // Emit event for UI updates
+      this._onRevocationDetected.fire({ project, reason: event.reason });
+
+      // Trigger cleanup
+      await this.triggerRevocationCleanup(project, event.reason);
     }
 
-    console.log(
-      `[RealTimeSync] Processing revocation for project: ${project.projectName}`
-    );
+    // Acknowledge events via Convex mutation (no HTTP)
+    if (eventIds.length > 0 && this.convexService) {
+      try {
+        await this.convexService.acknowledgeRevocations(eventIds);
+      } catch (error) {
+        console.debug("[RealTimeSync] Failed to acknowledge events:", error);
+      }
+    }
 
-    // Emit event for UI updates
-    this._onRevocationDetected.fire({ project, reason: event.reason });
-
-    // Trigger the sync service's revocation handler
-    // This will clean up .env files and remove the linked project
-    await this.triggerRevocationCleanup(project, event.reason);
+    // Refresh subscriptions since projects were removed
+    await this.refreshSubscriptions();
   }
 
   /**
-   * Trigger the revocation cleanup process
-   * Clears cached variables and removes the linked project
+   * Handle token becoming invalid (detected via WebSocket subscription).
+   */
+  private async handleTokenInvalid(project: LinkedProjectV2): Promise<void> {
+    console.log(
+      `[RealTimeSync] Token invalid for project: ${project.projectName}`
+    );
+
+    this._onRevocationDetected.fire({
+      project,
+      reason: "Access token expired or revoked",
+    });
+
+    await this.triggerRevocationCleanup(
+      project,
+      "Access token expired or revoked"
+    );
+    await this.refreshSubscriptions();
+  }
+
+  /**
+   * Trigger the revocation cleanup process.
    */
   private async triggerRevocationCleanup(
     project: LinkedProjectV2,
     reason: string
   ): Promise<void> {
     try {
-      // Clean up all .env files for this project
       await this.syncService.cleanupAllDirectories(project);
-
-      // Remove the linked project from storage
       await this.storage.removeLinkedProjectV2(project.projectId);
 
-      // Show notification to user
       vscode.window.showWarningMessage(
         `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
         "OK"
-      );
-
-      console.log(
-        `[RealTimeSync] Cleanup completed for project: ${project.projectName}`
       );
     } catch (error) {
       console.error(
@@ -231,7 +209,6 @@ export class RealTimeSyncService {
         error
       );
 
-      // Still try to remove the project from storage even if cleanup fails
       try {
         await this.storage.removeLinkedProjectV2(project.projectId);
       } catch {
@@ -245,24 +222,15 @@ export class RealTimeSyncService {
   }
 
   /**
-   * Force an immediate check for revocations
-   * Useful when the extension wants to verify permissions immediately
+   * Force an immediate check (triggers subscription refresh).
    */
   async checkNow(): Promise<boolean> {
     try {
-      await this.checkForRevocations();
+      await this.refreshSubscriptions();
       return true;
     } catch {
       return false;
     }
-  }
-
-  /**
-   * Clear all cached variables for a specific project
-   * This is called when a revocation is detected
-   */
-  async clearCachedVariables(project: LinkedProjectV2): Promise<void> {
-    await this.syncService.cleanupAllDirectories(project);
   }
 
   dispose(): void {

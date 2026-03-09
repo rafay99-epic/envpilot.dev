@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { Id, Doc } from "./_generated/dataModel";
+import { batchGetUsers, userDisplay } from "./helpers";
 
 /**
  * Comprehensive Audit Log Queries
@@ -36,19 +37,18 @@ export const listByOrganization = query({
     const offsetLogs = args.offset ? logs.slice(args.offset) : logs;
     const resultLogs = offsetLogs.slice(0, limit);
 
-    const logsWithUsers = await Promise.all(
-      resultLogs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      resultLogs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return resultLogs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -64,19 +64,18 @@ export const listByProject = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const logsWithUsers = await Promise.all(
-      logs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return logs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -92,19 +91,18 @@ export const listByVariable = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const logsWithUsers = await Promise.all(
-      logs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return logs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -160,19 +158,18 @@ export const listByAction = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const logsWithUsers = await Promise.all(
-      logs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return logs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -230,19 +227,18 @@ export const listSecurityEvents = query({
 
     const limitedLogs = securityLogs.slice(0, args.limit ?? 100);
 
-    const logsWithUsers = await Promise.all(
-      limitedLogs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return limitedLogs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -297,26 +293,51 @@ export const listSensitiveDataAccess = query({
 
     const limitedLogs = sensitiveAccessLogs.slice(0, args.limit ?? 100);
 
-    const logsWithDetails = await Promise.all(
-      limitedLogs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        const variable = log.variableId
-          ? await ctx.db.get(log.variableId)
-          : null;
-        const project = log.projectId ? await ctx.db.get(log.projectId) : null;
-
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          variableKey: variable?.key ?? "Unknown",
-          projectName: project?.name ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
+    );
+    const varIds = limitedLogs
+      .map((l) => l.variableId)
+      .filter(Boolean) as Id<"environmentVariables">[];
+    const projIds = limitedLogs
+      .map((l) => l.projectId)
+      .filter(Boolean) as Id<"projects">[];
+    const [vars, projs] = await Promise.all([
+      Promise.all(
+        [...new Set(varIds.map(String))].map((id) =>
+          ctx.db.get(id as Id<"environmentVariables">)
+        )
+      ),
+      Promise.all(
+        [...new Set(projIds.map(String))].map((id) =>
+          ctx.db.get(id as Id<"projects">)
+        )
+      ),
+    ]);
+    const varMap = new Map(
+      vars.filter(Boolean).map((v) => [v!._id.toString(), v!])
+    );
+    const projMap = new Map(
+      projs.filter(Boolean).map((p) => [p!._id.toString(), p!])
     );
 
-    return logsWithDetails;
+    return limitedLogs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        variableKey:
+          (log.variableId
+            ? varMap.get(log.variableId.toString())?.key
+            : null) ?? "Unknown",
+        projectName:
+          (log.projectId
+            ? projMap.get(log.projectId.toString())?.name
+            : null) ?? "Unknown",
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -455,19 +476,18 @@ export const listByTimeRange = query({
       );
     }
 
-    const logsWithUsers = await Promise.all(
-      filteredLogs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      filteredLogs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return filteredLogs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 
@@ -690,37 +710,63 @@ export const getForExport = query({
       .order("desc")
       .take(10000); // Limit for performance
 
-    const exportData = await Promise.all(
-      logs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        const project = log.projectId ? await ctx.db.get(log.projectId) : null;
-        const variable = log.variableId
-          ? await ctx.db.get(log.variableId)
-          : null;
-
-        const baseRecord = {
-          timestamp: new Date(log.createdAt).toISOString(),
-          action: log.action,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          projectName: project?.name ?? null,
-          variableKey: variable?.key ?? null,
-          severity: log.severity ?? "info",
-          resourceType: log.resourceType ?? null,
-          ipAddress: log.ipAddress ?? null,
-          involvesSensitiveData: log.involvesSensitiveData ?? false,
-        };
-
-        if (args.includeDetails && log.details) {
-          return {
-            ...baseRecord,
-            details: JSON.parse(log.details),
-          };
-        }
-
-        return baseRecord;
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
     );
+    const projIds = [
+      ...new Set(
+        logs
+          .map((l) => l.projectId)
+          .filter(Boolean)
+          .map(String)
+      ),
+    ];
+    const varIds = [
+      ...new Set(
+        logs
+          .map((l) => l.variableId)
+          .filter(Boolean)
+          .map(String)
+      ),
+    ];
+    const [projs, vars] = await Promise.all([
+      Promise.all(projIds.map((id) => ctx.db.get(id as Id<"projects">))),
+      Promise.all(
+        varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
+      ),
+    ]);
+    const projMap = new Map(
+      projs.filter(Boolean).map((p) => [p!._id.toString(), p!])
+    );
+    const varMap = new Map(
+      vars.filter(Boolean).map((v) => [v!._id.toString(), v!])
+    );
+
+    const exportData = logs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      const baseRecord = {
+        timestamp: new Date(log.createdAt).toISOString(),
+        action: log.action,
+        ...userDisplay(u),
+        projectName: log.projectId
+          ? (projMap.get(log.projectId.toString())?.name ?? null)
+          : null,
+        variableKey: log.variableId
+          ? (varMap.get(log.variableId.toString())?.key ?? null)
+          : null,
+        severity: log.severity ?? "info",
+        resourceType: log.resourceType ?? null,
+        ipAddress: log.ipAddress ?? null,
+        involvesSensitiveData: log.involvesSensitiveData ?? false,
+      };
+
+      if (args.includeDetails && log.details) {
+        return { ...baseRecord, details: JSON.parse(log.details) };
+      }
+
+      return baseRecord;
+    });
 
     return {
       format: args.format,
@@ -759,19 +805,18 @@ export const getRecentAlerts = query({
 
     const limitedLogs = alertLogs.slice(0, limit);
 
-    const logsWithUsers = await Promise.all(
-      limitedLogs.map(async (log) => {
-        const user = await ctx.db.get(log.userId);
-        return {
-          ...log,
-          userName: user?.name ?? user?.email ?? "Unknown",
-          userEmail: user?.email ?? "Unknown",
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
     );
-
-    return logsWithUsers;
+    return limitedLogs.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
   },
 });
 

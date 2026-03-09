@@ -1,5 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { rateLimiter } from "./rateLimits";
+import { batchGetUsers, userInfo } from "./helpers";
 
 /**
  * Project Access Queries and Mutations (for extension linking)
@@ -25,20 +28,16 @@ export const listByProject = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    const tokensWithUsers = await Promise.all(
-      tokens.map(async (token) => {
-        const user = await ctx.db.get(token.userId);
-        return {
-          ...token,
-          accessToken: token.accessToken.slice(0, 8) + "...",
-          user: user
-            ? { _id: user._id, name: user.name, email: user.email }
-            : null,
-        };
-      })
+    const userMap = await batchGetUsers(
+      ctx,
+      tokens.map((t) => t.userId)
     );
 
-    return tokensWithUsers;
+    return tokens.map((token) => ({
+      ...token,
+      accessToken: token.accessToken.slice(0, 8) + "...",
+      user: userInfo(userMap.get(token.userId.toString())),
+    }));
   },
 });
 
@@ -51,24 +50,44 @@ export const listByUser = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    const tokensWithProjects = await Promise.all(
-      tokens.map(async (token) => {
-        const project = await ctx.db.get(token.projectId);
-        const org = project ? await ctx.db.get(project.organizationId) : null;
-        return {
-          ...token,
-          accessToken: token.accessToken.slice(0, 8) + "...",
-          project: project
-            ? { _id: project._id, name: project.name, slug: project.slug }
-            : null,
-          organization: org
-            ? { _id: org._id, name: org.name, slug: org.slug }
-            : null,
-        };
-      })
+    // Batch fetch projects
+    const projIds = [...new Set(tokens.map((t) => t.projectId.toString()))];
+    const projects = await Promise.all(
+      projIds.map((id) => ctx.db.get(id as Id<"projects">))
+    );
+    const projMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id.toString(), p!])
     );
 
-    return tokensWithProjects;
+    // Batch fetch orgs from projects
+    const orgIds = [
+      ...new Set(
+        projects.filter(Boolean).map((p) => p!.organizationId.toString())
+      ),
+    ];
+    const orgs = await Promise.all(
+      orgIds.map((id) => ctx.db.get(id as Id<"organizations">))
+    );
+    const orgMap = new Map(
+      orgs.filter(Boolean).map((o) => [o!._id.toString(), o!])
+    );
+
+    return tokens.map((token) => {
+      const project = projMap.get(token.projectId.toString());
+      const org = project
+        ? orgMap.get(project.organizationId.toString())
+        : undefined;
+      return {
+        ...token,
+        accessToken: token.accessToken.slice(0, 8) + "...",
+        project: project
+          ? { _id: project._id, name: project.name, slug: project.slug }
+          : null,
+        organization: org
+          ? { _id: org._id, name: org.name, slug: org.slug }
+          : null,
+      };
+    });
   },
 });
 
@@ -124,6 +143,32 @@ export const validateToken = query({
 
     return {
       valid: true,
+      projectId: access.projectId,
+      userId: access.userId,
+      expiresAt: access.expiresAt,
+    };
+  },
+});
+
+/**
+ * Resolve an access token to userId + projectId.
+ * Used by the VS Code extension to get IDs for WebSocket subscriptions.
+ * Returns null if token is invalid, inactive, or expired.
+ */
+export const getByAccessToken = query({
+  args: { accessToken: v.string() },
+  handler: async (ctx, args) => {
+    const access = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken)
+      )
+      .first();
+
+    if (!access || !access.isActive) return null;
+    if (access.expiresAt < Date.now()) return null;
+
+    return {
       projectId: access.projectId,
       userId: access.userId,
       expiresAt: access.expiresAt,
@@ -432,9 +477,7 @@ export const refresh = mutation({
         });
       }
 
-      throw new Error(
-        "Access token no longer valid for organization membership"
-      );
+      throw new Error("Access token is no longer valid");
     }
 
     await ctx.db.patch(access._id, {
@@ -455,6 +498,12 @@ export const linkExtension = mutation({
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Rate limit: prevent excessive extension linking
+    await rateLimiter.limit(ctx, "extensionLink", {
+      key: args.userId,
+      throws: true,
+    });
+
     const now = Date.now();
     const expiresInDays = args.expiresInDays ?? 30;
     const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
@@ -581,7 +630,7 @@ export const unlinkExtension = mutation({
   },
 });
 
-export const cleanupExpired = mutation({
+export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

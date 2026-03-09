@@ -7,6 +7,7 @@ import {
   QueryCtx,
 } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { batchGetUsers, userInfo } from "./helpers";
 
 /**
  * Role hierarchy for permission management
@@ -95,30 +96,30 @@ export const getForVariable = query({
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
       .collect();
 
-    const permissionsWithUsers = await Promise.all(
-      permissions.map(async (perm) => {
-        const user = await ctx.db.get(perm.userId);
-        const grantedBy = await ctx.db.get(perm.grantedBy);
-        const revokedBy = perm.revokedBy
-          ? await ctx.db.get(perm.revokedBy)
-          : null;
+    const allUserIds = permissions.flatMap((p) => [
+      p.userId,
+      p.grantedBy,
+      p.revokedBy,
+    ]);
+    const userMap = await batchGetUsers(ctx, allUserIds);
 
-        return {
-          ...perm,
-          user: user
-            ? { _id: user._id, name: user.name, email: user.email }
-            : null,
-          grantedByUser: grantedBy
-            ? { name: grantedBy.name, email: grantedBy.email }
-            : null,
-          revokedByUser: revokedBy
-            ? { name: revokedBy.name, email: revokedBy.email }
-            : null,
-        };
-      })
-    );
-
-    return permissionsWithUsers;
+    return permissions.map((perm) => {
+      const user = userMap.get(perm.userId.toString());
+      const grantedBy = userMap.get(perm.grantedBy.toString());
+      const revokedBy = perm.revokedBy
+        ? userMap.get(perm.revokedBy.toString())
+        : undefined;
+      return {
+        ...perm,
+        user: userInfo(user),
+        grantedByUser: grantedBy
+          ? { name: grantedBy.name, email: grantedBy.email }
+          : null,
+        revokedByUser: revokedBy
+          ? { name: revokedBy.name, email: revokedBy.email }
+          : null,
+      };
+    });
   },
 });
 
@@ -132,13 +133,38 @@ export const getForUser = query({
       )
       .collect();
 
-    const permissionsWithDetails = await Promise.all(
-      permissions.map(async (perm) => {
-        const variable = await ctx.db.get(perm.variableId);
+    // Batch fetch variables
+    const varIds = [
+      ...new Set(permissions.map((p) => p.variableId.toString())),
+    ];
+    const variables = await Promise.all(
+      varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
+    );
+    const varMap = new Map(
+      variables.filter(Boolean).map((v) => [v!._id.toString(), v!])
+    );
+
+    // Batch fetch projects from variables
+    const projIds = [
+      ...new Set(
+        variables
+          .filter((v) => v && !v.deletedAt)
+          .map((v) => v!.projectId.toString())
+      ),
+    ];
+    const projects = await Promise.all(
+      projIds.map((id) => ctx.db.get(id as Id<"projects">))
+    );
+    const projMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id.toString(), p!])
+    );
+
+    return permissions
+      .map((perm) => {
+        const variable = varMap.get(perm.variableId.toString());
         if (!variable || variable.deletedAt) return null;
 
-        const project = await ctx.db.get(variable.projectId);
-
+        const project = projMap.get(variable.projectId.toString());
         return {
           ...perm,
           variable: {
@@ -151,9 +177,7 @@ export const getForUser = query({
             : null,
         };
       })
-    );
-
-    return permissionsWithDetails.filter(Boolean);
+      .filter(Boolean);
   },
 });
 
