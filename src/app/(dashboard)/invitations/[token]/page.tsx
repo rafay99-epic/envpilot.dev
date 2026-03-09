@@ -1,112 +1,118 @@
-'use client'
+"use client";
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { setActiveOrganizationCookie } from "@/lib/organization-context";
 
 interface InvitationDetails {
-  email: string
-  role: 'admin' | 'team_lead' | 'member'
+  email: string;
+  role: "admin" | "team_lead" | "member";
   organization: {
-    name: string
-    slug: string
-    logoUrl?: string
-  }
+    name: string;
+    slug: string;
+    logoUrl?: string;
+  };
   invitedBy: {
-    name?: string
-    email: string
-  }
-  expiresAt: number
+    name?: string;
+    email: string;
+  };
+  expiresAt: number;
 }
 
 export default function InvitationAcceptPage({
   params,
 }: {
-  params: Promise<{ token: string }>
+  params: Promise<{ token: string }>;
 }) {
-  const { token } = use(params)
-  const router = useRouter()
-  const [invitation, setInvitation] = useState<InvitationDetails | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isAccepting, setIsAccepting] = useState(false)
-  const [isDeclining, setIsDeclining] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<'pending' | 'accepted' | 'declined' | 'expired' | 'error'>('pending')
+  const { token } = use(params);
+  const router = useRouter();
+  const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<
+    "pending" | "accepted" | "declined" | "expired" | "error"
+  >("pending");
 
   useEffect(() => {
     async function fetchInvitation() {
       try {
-        const response = await fetch(`/api/invitations/${token}`)
+        const response = await fetch(`/api/invitations/${token}`);
 
         if (!response.ok) {
-          const data = await response.json()
-          if (data.status === 'expired') {
-            setStatus('expired')
+          const data = await response.json();
+          if (data.status === "expired") {
+            setStatus("expired");
           } else if (data.status) {
-            setStatus(data.status)
+            setStatus(data.status);
           } else {
-            setStatus('error')
+            setStatus("error");
           }
-          throw new Error(data.error || 'Invitation not found')
+          throw new Error(data.error || "Invitation not found");
         }
 
-        const data = await response.json()
-        setInvitation(data.invitation)
+        const data = await response.json();
+        setInvitation(data.invitation);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchInvitation()
-  }, [token])
+    fetchInvitation();
+  }, [token]);
 
   async function handleAccept() {
-    setIsAccepting(true)
-    setError(null)
+    setIsAccepting(true);
+    setError(null);
 
     try {
       const response = await fetch(`/api/invitations/${token}`, {
-        method: 'POST',
-      })
+        method: "POST",
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to accept invitation')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to accept invitation");
       }
 
-      const data = await response.json()
-      setStatus('accepted')
+      const data = await response.json();
+      setStatus("accepted");
+      if (data.organization?._id) {
+        setActiveOrganizationCookie(data.organization._id);
+      }
 
       // Redirect to the organization after a brief delay
       setTimeout(() => {
-        router.push(`/organizations/${data.organization._id}`)
-      }, 2000)
+        router.push(`/organizations/${data.organization._id}`);
+      }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsAccepting(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsAccepting(false);
     }
   }
 
   async function handleDecline() {
-    setIsDeclining(true)
-    setError(null)
+    setIsDeclining(true);
+    setError(null);
 
     try {
       const response = await fetch(`/api/invitations/${token}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to decline invitation')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to decline invitation");
       }
 
-      setStatus('declined')
+      setStatus("declined");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsDeclining(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsDeclining(false);
     }
   }
 
@@ -115,13 +121,15 @@ export default function InvitationAcceptPage({
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
-          <p className="mt-4 text-zinc-600 dark:text-zinc-400">Loading invitation...</p>
+          <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+            Loading invitation...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (status === 'expired') {
+  if (status === "expired") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
@@ -144,7 +152,8 @@ export default function InvitationAcceptPage({
             Invitation Expired
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            This invitation has expired. Please contact the organization admin to request a new invitation.
+            This invitation has expired. Please contact the organization admin
+            to request a new invitation.
           </p>
           <Link
             href="/dashboard"
@@ -154,10 +163,10 @@ export default function InvitationAcceptPage({
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  if (status === 'accepted') {
+  if (status === "accepted") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
@@ -180,14 +189,15 @@ export default function InvitationAcceptPage({
             Welcome to {invitation?.organization.name}!
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            You have successfully joined the organization. Redirecting you to the organization page...
+            You have successfully joined the organization. Redirecting you to
+            the organization page...
           </p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (status === 'declined') {
+  if (status === "declined") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
@@ -210,7 +220,8 @@ export default function InvitationAcceptPage({
             Invitation Declined
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            You have declined the invitation to join {invitation?.organization.name}.
+            You have declined the invitation to join{" "}
+            {invitation?.organization.name}.
           </p>
           <Link
             href="/dashboard"
@@ -220,7 +231,7 @@ export default function InvitationAcceptPage({
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   if (!invitation) {
@@ -246,7 +257,8 @@ export default function InvitationAcceptPage({
             Invalid Invitation
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            {error || 'This invitation link is invalid or has already been used.'}
+            {error ||
+              "This invitation link is invalid or has already been used."}
           </p>
           <Link
             href="/dashboard"
@@ -256,7 +268,7 @@ export default function InvitationAcceptPage({
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -282,16 +294,23 @@ export default function InvitationAcceptPage({
           </h1>
 
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            <span className="font-medium">{invitation.invitedBy.name || invitation.invitedBy.email}</span>{' '}
-            invited you to join as a{' '}
             <span className="font-medium">
-              {invitation.role === 'team_lead' ? 'Team Lead' : invitation.role.charAt(0).toUpperCase() + invitation.role.slice(1)}
+              {invitation.invitedBy.name || invitation.invitedBy.email}
+            </span>{" "}
+            invited you to join as a{" "}
+            <span className="font-medium">
+              {invitation.role === "team_lead"
+                ? "Team Lead"
+                : invitation.role.charAt(0).toUpperCase() +
+                  invitation.role.slice(1)}
             </span>
           </p>
 
           <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-            This invitation was sent to{' '}
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">{invitation.email}</span>
+            This invitation was sent to{" "}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">
+              {invitation.email}
+            </span>
           </p>
 
           {error && (
@@ -306,26 +325,27 @@ export default function InvitationAcceptPage({
               disabled={isDeclining || isAccepting}
               className="flex-1 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
-              {isDeclining ? 'Declining...' : 'Decline'}
+              {isDeclining ? "Declining..." : "Decline"}
             </button>
             <button
               onClick={handleAccept}
               disabled={isAccepting || isDeclining}
               className="flex-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {isAccepting ? 'Accepting...' : 'Accept Invitation'}
+              {isAccepting ? "Accepting..." : "Accept Invitation"}
             </button>
           </div>
 
           <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-            Expires {new Date(invitation.expiresAt).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
+            Expires{" "}
+            {new Date(invitation.expiresAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
             })}
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

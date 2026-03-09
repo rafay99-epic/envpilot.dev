@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -9,22 +9,21 @@ import { Id } from "../../convex/_generated/dataModel";
  */
 export function useProjectVariables(
   projectId: Id<"projects"> | undefined,
-  environment?: string
+  environment?: string,
 ) {
   return useQuery(
     api.variables.listByProject,
-    projectId ? { projectId, environment } : "skip"
+    projectId ? { projectId, environment } : "skip",
   );
 }
 
 /**
  * Hook for getting a single variable
  */
-export function useVariable(variableId: Id<"environmentVariables"> | undefined) {
-  return useQuery(
-    api.variables.getById,
-    variableId ? { variableId } : "skip"
-  );
+export function useVariable(
+  variableId: Id<"environmentVariables"> | undefined,
+) {
+  return useQuery(api.variables.getById, variableId ? { variableId } : "skip");
 }
 
 /**
@@ -32,11 +31,11 @@ export function useVariable(variableId: Id<"environmentVariables"> | undefined) 
  */
 export function useVariableHistory(
   variableId: Id<"environmentVariables"> | undefined,
-  limit?: number
+  limit?: number,
 ) {
   return useQuery(
     api.variables.getVersionHistory,
-    variableId ? { variableId, limit } : "skip"
+    variableId ? { variableId, limit } : "skip",
   );
 }
 
@@ -45,11 +44,11 @@ export function useVariableHistory(
  */
 export function useVariablesWithAccess(
   projectId: Id<"projects"> | undefined,
-  userId: Id<"users"> | undefined
+  userId: Id<"users"> | undefined,
 ) {
   return useQuery(
     api.variables.listWithAccess,
-    projectId && userId ? { projectId, userId } : "skip"
+    projectId && userId ? { projectId, userId } : "skip",
   );
 }
 
@@ -58,35 +57,12 @@ export function useVariablesWithAccess(
  */
 export function useVariableSearch(
   organizationId: Id<"organizations"> | undefined,
-  searchTerm: string
+  searchTerm: string,
 ) {
   return useQuery(
     api.variables.search,
     organizationId && searchTerm.length > 0
       ? { organizationId, searchTerm }
-      : "skip"
+      : "skip",
   );
-}
-
-/**
- * Hook for variable mutations
- */
-export function useVariableMutations() {
-  const createVariable = useMutation(api.variables.create);
-  const updateVariable = useMutation(api.variables.update);
-  const deleteVariable = useMutation(api.variables.remove);
-  const restoreVariable = useMutation(api.variables.restore);
-  const rollbackVariable = useMutation(api.variables.rollback);
-  const logAccess = useMutation(api.variables.logAccess);
-  const bulkCreateVariables = useMutation(api.variables.bulkCreate);
-
-  return {
-    createVariable,
-    updateVariable,
-    deleteVariable,
-    restoreVariable,
-    rollbackVariable,
-    logAccess,
-    bulkCreateVariables,
-  };
 }

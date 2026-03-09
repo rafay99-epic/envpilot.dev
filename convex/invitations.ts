@@ -7,7 +7,8 @@ import { getTierLimits } from "./tierLimits";
  */
 
 function generateToken(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let token = "";
   for (let i = 0; i < 32; i++) {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -21,7 +22,7 @@ export const listPendingByOrganization = query({
     const invitations = await ctx.db
       .query("invitations")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) => q.eq(q.field("status"), "pending"))
       .collect();
@@ -38,7 +39,7 @@ export const listPendingByOrganization = query({
             ? { name: inviter.name, email: inviter.email }
             : null,
         };
-      })
+      }),
     );
 
     return invitationsWithInviter;
@@ -70,7 +71,7 @@ export const getForEmail = query({
             ? { name: inviter.name, email: inviter.email }
             : null,
         };
-      })
+      }),
     );
 
     return invitationsWithOrg;
@@ -109,7 +110,7 @@ export const create = mutation({
     role: v.union(
       v.literal("admin"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("member"),
     ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
@@ -135,27 +136,27 @@ export const create = mutation({
       const members = await ctx.db
         .query("organizationMembers")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
+          q.eq("organizationId", args.organizationId),
         )
         .collect();
 
       const pendingInvitations = await ctx.db
         .query("invitations")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
+          q.eq("organizationId", args.organizationId),
         )
         .filter((q) => q.eq(q.field("status"), "pending"))
         .collect();
 
       const validPendingInvitations = pendingInvitations.filter(
-        (inv) => inv.expiresAt > now
+        (inv) => inv.expiresAt > now,
       );
 
       const totalMembers = members.length + validPendingInvitations.length;
 
       if (totalMembers >= limits.maxTeamMembers) {
         throw new Error(
-          `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`
+          `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`,
         );
       }
     }
@@ -169,7 +170,9 @@ export const create = mutation({
       const existingMembership = await ctx.db
         .query("organizationMembers")
         .withIndex("by_org_and_user", (q) =>
-          q.eq("organizationId", args.organizationId).eq("userId", existingUser._id)
+          q
+            .eq("organizationId", args.organizationId)
+            .eq("userId", existingUser._id),
         )
         .first();
 
@@ -184,8 +187,8 @@ export const create = mutation({
       .filter((q) =>
         q.and(
           q.eq(q.field("status"), "pending"),
-          q.eq(q.field("organizationId"), args.organizationId)
-        )
+          q.eq(q.field("organizationId"), args.organizationId),
+        ),
       )
       .first();
 
@@ -253,7 +256,9 @@ export const accept = mutation({
     const existingMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", invitation.organizationId).eq("userId", args.userId)
+        q
+          .eq("organizationId", invitation.organizationId)
+          .eq("userId", args.userId),
       )
       .first();
 

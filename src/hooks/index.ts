@@ -3,7 +3,6 @@ export {
   useUserOrganizations,
   useOrganization,
   useOrganizationMembers,
-  useOrganizationMutations,
 } from "./useOrganizations";
 
 // Project hooks
@@ -12,7 +11,6 @@ export {
   useOrganizationProjectsWithStats,
   useProject,
   useUserProjects,
-  useProjectMutations,
 } from "./useProjects";
 
 // Variable hooks
@@ -22,7 +20,6 @@ export {
   useVariableHistory,
   useVariablesWithAccess,
   useVariableSearch,
-  useVariableMutations,
 } from "./useVariables";
 
 // Permission hooks
@@ -34,7 +31,6 @@ export {
   useUsersWithProjectAccess,
   useCanManageVariablePermissions,
   useAssignableMembers,
-  usePermissionMutations,
 } from "./usePermissions";
 
 // Dashboard hooks (simplified wrappers)

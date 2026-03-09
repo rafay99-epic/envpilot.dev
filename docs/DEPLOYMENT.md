@@ -25,13 +25,13 @@ Before deploying:
 
 Set these environment variables in your hosting platform:
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_CONVEX_URL` | Convex production deployment URL | `https://your-app.convex.cloud` |
-| `WORKOS_API_KEY` | WorkOS production API key | `sk_live_...` |
-| `WORKOS_CLIENT_ID` | WorkOS client ID | `client_...` |
-| `WORKOS_COOKIE_PASSWORD` | Secure cookie encryption key (32+ chars) | `<random-string>` |
-| `NEXT_PUBLIC_APP_URL` | Production application URL | `https://your-domain.com` |
+| Variable                 | Description                              | Example                         |
+| ------------------------ | ---------------------------------------- | ------------------------------- |
+| `NEXT_PUBLIC_CONVEX_URL` | Convex production deployment URL         | `https://your-app.convex.cloud` |
+| `WORKOS_API_KEY`         | WorkOS production API key                | `sk_live_...`                   |
+| `WORKOS_CLIENT_ID`       | WorkOS client ID                         | `client_...`                    |
+| `WORKOS_COOKIE_PASSWORD` | Secure cookie encryption key (32+ chars) | `<random-string>`               |
+| `NEXT_PUBLIC_APP_URL`    | Production application URL               | `https://your-domain.com`       |
 
 ### Generate Secure Cookie Password
 
@@ -58,6 +58,7 @@ npx convex deploy
 ### 2. Get Production URL
 
 After deployment, Convex provides your production URL:
+
 ```
 Deployed to: https://your-app.convex.cloud
 ```
@@ -154,7 +155,7 @@ Update `next.config.ts` for standalone output:
 
 ```typescript
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: "standalone",
   reactCompiler: true,
 };
 ```
@@ -274,7 +275,7 @@ Add a health check endpoint:
 ```typescript
 // src/app/api/health/route.ts
 export async function GET() {
-  return Response.json({ status: 'healthy', timestamp: Date.now() });
+  return Response.json({ status: "healthy", timestamp: Date.now() });
 }
 ```
 

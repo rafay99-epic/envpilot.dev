@@ -1,0 +1,13 @@
+.automaker
+.vscode
+.next
+out
+build
+node_modules
+cli/dist
+vscode-extension/dist
+convex/_generated
+coverage
+package-lock.json
+cli/package-lock.json
+vscode-extension/package-lock.json

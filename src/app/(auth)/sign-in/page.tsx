@@ -1,17 +1,17 @@
-import { getSignInUrl, withAuth } from '@workos-inc/authkit-nextjs'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function SignInPage() {
   // Check if user is already authenticated
-  const { user } = await withAuth()
+  const { user } = await withAuth();
 
   if (user) {
-    redirect('/dashboard')
+    redirect("/dashboard");
   }
 
   // Get the WorkOS sign-in URL
-  const signInUrl = await getSignInUrl()
+  const signInUrl = await getSignInUrl();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
@@ -63,15 +63,15 @@ export default async function SignInPage() {
               Enterprise SSO
             </h3>
             <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-              Your organization may have single sign-on configured. You&apos;ll be
-              automatically redirected to your identity provider.
+              Your organization may have single sign-on configured. You&apos;ll
+              be automatically redirected to your identity provider.
             </p>
           </div>
         </div>
 
         {/* Sign Up Link */}
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
-          Don&apos;t have an account?{' '}
+          Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"
             className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
@@ -91,5 +91,5 @@ export default async function SignInPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
 /**
@@ -28,7 +28,7 @@ export const listByOrganization = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .order("desc")
       .take(limit + (args.offset ?? 0));
@@ -45,7 +45,7 @@ export const listByOrganization = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -73,7 +73,7 @@ export const listByProject = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -101,7 +101,7 @@ export const listByVariable = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -121,7 +121,7 @@ export const listByUser = query({
 
     if (args.organizationId) {
       logsQuery = logsQuery.filter((q) =>
-        q.eq(q.field("organizationId"), args.organizationId)
+        q.eq(q.field("organizationId"), args.organizationId),
       );
     }
 
@@ -137,7 +137,7 @@ export const listByUser = query({
           projectName: project?.name,
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithDetails;
@@ -153,8 +153,10 @@ export const listByAction = query({
   handler: async (ctx, args) => {
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_action", (q) => q.eq("action", args.action as any))
-      .filter((q) => q.eq(q.field("organizationId"), args.organizationId))
+      .withIndex("by_org_and_created", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .filter((q) => q.eq(q.field("action"), args.action))
       .order("desc")
       .take(args.limit ?? 50);
 
@@ -167,7 +169,7 @@ export const listByAction = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -210,19 +212,19 @@ export const listSecurityEvents = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .order("desc")
       .take(1000);
 
     let securityLogs = logs.filter((log) =>
-      securityActions.includes(log.action)
+      securityActions.includes(log.action),
     );
 
     // Filter by severity if specified
     if (args.includeSeverity && args.includeSeverity.length > 0) {
       securityLogs = securityLogs.filter(
-        (log) => log.severity && args.includeSeverity!.includes(log.severity)
+        (log) => log.severity && args.includeSeverity!.includes(log.severity),
       );
     }
 
@@ -237,7 +239,7 @@ export const listSecurityEvents = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -262,10 +264,10 @@ export const listSensitiveDataAccess = query({
       "variable.copied",
     ];
 
-    let logsQuery = ctx.db
+    const logsQuery = ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .order("desc");
 
@@ -298,7 +300,9 @@ export const listSensitiveDataAccess = query({
     const logsWithDetails = await Promise.all(
       limitedLogs.map(async (log) => {
         const user = await ctx.db.get(log.userId);
-        const variable = log.variableId ? await ctx.db.get(log.variableId) : null;
+        const variable = log.variableId
+          ? await ctx.db.get(log.variableId)
+          : null;
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
 
         return {
@@ -309,7 +313,7 @@ export const listSensitiveDataAccess = query({
           projectName: project?.name ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithDetails;
@@ -339,7 +343,7 @@ export const listPermissionChanges = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .order("desc")
       .take(2000);
@@ -356,7 +360,9 @@ export const listPermissionChanges = query({
     const logsWithDetails = await Promise.all(
       limitedLogs.map(async (log) => {
         const user = await ctx.db.get(log.userId);
-        const variable = log.variableId ? await ctx.db.get(log.variableId) : null;
+        const variable = log.variableId
+          ? await ctx.db.get(log.variableId)
+          : null;
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
 
         // Parse details to get target user info
@@ -364,14 +370,21 @@ export const listPermissionChanges = query({
         if (log.details) {
           try {
             const details = JSON.parse(log.details);
-            if (details.grantedTo || details.revokedFrom || details.targetUser) {
-              const targetUserId = details.grantedTo || details.revokedFrom || details.targetUser;
+            if (
+              details.grantedTo ||
+              details.revokedFrom ||
+              details.targetUser
+            ) {
+              const targetUserId =
+                details.grantedTo || details.revokedFrom || details.targetUser;
               const targetUser = await ctx.db.get(targetUserId as Id<"users">);
-              targetUserInfo = targetUser ? {
-                _id: targetUser._id,
-                name: targetUser.name,
-                email: targetUser.email,
-              } : null;
+              targetUserInfo = targetUser
+                ? {
+                    _id: targetUser._id,
+                    name: targetUser.name,
+                    email: targetUser.email,
+                  }
+                : null;
             }
           } catch {
             // Ignore parse errors
@@ -387,7 +400,7 @@ export const listPermissionChanges = query({
           targetUser: targetUserInfo,
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithDetails;
@@ -408,13 +421,13 @@ export const listByTimeRange = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) =>
         q.and(
           q.gte(q.field("createdAt"), args.startTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
+          q.lte(q.field("createdAt"), args.endTime),
+        ),
       )
       .order("desc")
       .take(args.limit ?? 500);
@@ -424,19 +437,21 @@ export const listByTimeRange = query({
 
     if (args.actionFilter && args.actionFilter.length > 0) {
       filteredLogs = filteredLogs.filter((log) =>
-        args.actionFilter!.includes(log.action)
+        args.actionFilter!.includes(log.action),
       );
     }
 
     if (args.severityFilter && args.severityFilter.length > 0) {
       filteredLogs = filteredLogs.filter(
-        (log) => log.severity && args.severityFilter!.includes(log.severity)
+        (log) => log.severity && args.severityFilter!.includes(log.severity),
       );
     }
 
     if (args.resourceTypeFilter && args.resourceTypeFilter.length > 0) {
       filteredLogs = filteredLogs.filter(
-        (log) => log.resourceType && args.resourceTypeFilter!.includes(log.resourceType)
+        (log) =>
+          log.resourceType &&
+          args.resourceTypeFilter!.includes(log.resourceType),
       );
     }
 
@@ -449,7 +464,7 @@ export const listByTimeRange = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -472,7 +487,7 @@ export const getSummary = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) => q.gte(q.field("createdAt"), startTime))
       .collect();
@@ -501,7 +516,8 @@ export const getSummary = query({
 
       // Resource type counts
       if (log.resourceType) {
-        resourceTypeCounts[log.resourceType] = (resourceTypeCounts[log.resourceType] ?? 0) + 1;
+        resourceTypeCounts[log.resourceType] =
+          (resourceTypeCounts[log.resourceType] ?? 0) + 1;
       }
 
       // Daily counts
@@ -534,7 +550,7 @@ export const getSummary = query({
           email: user?.email ?? "Unknown",
           actionCount: userActivityCounts[id],
         };
-      })
+      }),
     );
 
     return {
@@ -565,38 +581,41 @@ export const getComplianceReport = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) =>
         q.and(
           q.gte(q.field("createdAt"), args.startTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
+          q.lte(q.field("createdAt"), args.endTime),
+        ),
       )
       .collect();
 
     // Calculate metrics
     const variableAccessLogs = logs.filter(
-      (l) => l.action === "variable.accessed" || l.action === "variable.exported" || l.action === "variable.copied"
+      (l) =>
+        l.action === "variable.accessed" ||
+        l.action === "variable.exported" ||
+        l.action === "variable.copied",
     );
-    const permissionChangeLogs = logs.filter(
-      (l) => l.action.startsWith("permission.")
+    const permissionChangeLogs = logs.filter((l) =>
+      l.action.startsWith("permission."),
     );
-    const securityEventLogs = logs.filter(
-      (l) => l.action.startsWith("security.")
+    const securityEventLogs = logs.filter((l) =>
+      l.action.startsWith("security."),
     );
-    const sensitiveAccessLogs = logs.filter(
-      (l) => l.involvesSensitiveData
-    );
+    const sensitiveAccessLogs = logs.filter((l) => l.involvesSensitiveData);
 
     // Unique users who accessed data
     const uniqueAccessUsers = new Set(
-      variableAccessLogs.map((l) => l.userId.toString())
+      variableAccessLogs.map((l) => l.userId.toString()),
     );
 
     // Unique variables accessed
     const uniqueVariablesAccessed = new Set(
-      variableAccessLogs.filter((l) => l.variableId).map((l) => l.variableId!.toString())
+      variableAccessLogs
+        .filter((l) => l.variableId)
+        .map((l) => l.variableId!.toString()),
     );
 
     // Access by IP distribution
@@ -610,7 +629,8 @@ export const getComplianceReport = query({
     // Security events by type
     const securityEventsByType: Record<string, number> = {};
     for (const log of securityEventLogs) {
-      securityEventsByType[log.action] = (securityEventsByType[log.action] ?? 0) + 1;
+      securityEventsByType[log.action] =
+        (securityEventsByType[log.action] ?? 0) + 1;
     }
 
     return {
@@ -631,7 +651,8 @@ export const getComplianceReport = query({
       securityEventsByType,
       complianceStatus: {
         auditTrailComplete: true,
-        sensitiveDataTracked: sensitiveAccessLogs.length > 0 || variableAccessLogs.length === 0,
+        sensitiveDataTracked:
+          sensitiveAccessLogs.length > 0 || variableAccessLogs.length === 0,
         permissionChangesLogged: true,
         securityEventsMonitored: true,
       },
@@ -658,13 +679,13 @@ export const getForExport = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) =>
         q.and(
           q.gte(q.field("createdAt"), args.startTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
+          q.lte(q.field("createdAt"), args.endTime),
+        ),
       )
       .order("desc")
       .take(10000); // Limit for performance
@@ -673,7 +694,9 @@ export const getForExport = query({
       logs.map(async (log) => {
         const user = await ctx.db.get(log.userId);
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
-        const variable = log.variableId ? await ctx.db.get(log.variableId) : null;
+        const variable = log.variableId
+          ? await ctx.db.get(log.variableId)
+          : null;
 
         const baseRecord = {
           timestamp: new Date(log.createdAt).toISOString(),
@@ -696,7 +719,7 @@ export const getForExport = query({
         }
 
         return baseRecord;
-      })
+      }),
     );
 
     return {
@@ -725,13 +748,13 @@ export const getRecentAlerts = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .order("desc")
       .take(500);
 
     const alertLogs = logs.filter(
-      (log) => log.severity === "critical" || log.severity === "warning"
+      (log) => log.severity === "critical" || log.severity === "warning",
     );
 
     const limitedLogs = alertLogs.slice(0, limit);
@@ -745,7 +768,7 @@ export const getRecentAlerts = query({
           userEmail: user?.email ?? "Unknown",
           parsedDetails: log.details ? JSON.parse(log.details) : null,
         };
-      })
+      }),
     );
 
     return logsWithUsers;
@@ -766,14 +789,20 @@ export const getAlertCount = query({
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) => q.gte(q.field("createdAt"), sinceTime))
       .collect();
 
-    const criticalCount = logs.filter((log) => log.severity === "critical").length;
-    const warningCount = logs.filter((log) => log.severity === "warning").length;
-    const securityCount = logs.filter((log) => log.action.startsWith("security.")).length;
+    const criticalCount = logs.filter(
+      (log) => log.severity === "critical",
+    ).length;
+    const warningCount = logs.filter(
+      (log) => log.severity === "warning",
+    ).length;
+    const securityCount = logs.filter((log) =>
+      log.action.startsWith("security."),
+    ).length;
 
     return {
       total: criticalCount + warningCount,

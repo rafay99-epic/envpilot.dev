@@ -1,16 +1,18 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
 /**
  * Hook for getting permissions on a variable
  */
-export function useVariablePermissions(variableId: Id<"environmentVariables"> | undefined) {
+export function useVariablePermissions(
+  variableId: Id<"environmentVariables"> | undefined,
+) {
   return useQuery(
     api.permissions.getForVariable,
-    variableId ? { variableId } : "skip"
+    variableId ? { variableId } : "skip",
   );
 }
 
@@ -18,10 +20,7 @@ export function useVariablePermissions(variableId: Id<"environmentVariables"> | 
  * Hook for getting all active permissions for a user
  */
 export function useUserPermissions(userId: Id<"users"> | undefined) {
-  return useQuery(
-    api.permissions.getForUser,
-    userId ? { userId } : "skip"
-  );
+  return useQuery(api.permissions.getForUser, userId ? { userId } : "skip");
 }
 
 /**
@@ -30,13 +29,11 @@ export function useUserPermissions(userId: Id<"users"> | undefined) {
 export function useCheckPermission(
   variableId: Id<"environmentVariables"> | undefined,
   userId: Id<"users"> | undefined,
-  requiredPermission: "read" | "write" | "admin"
+  requiredPermission: "read" | "write" | "admin",
 ) {
   return useQuery(
     api.permissions.checkPermission,
-    variableId && userId
-      ? { variableId, userId, requiredPermission }
-      : "skip"
+    variableId && userId ? { variableId, userId, requiredPermission } : "skip",
   );
 }
 
@@ -45,21 +42,23 @@ export function useCheckPermission(
  */
 export function usePermissionHistory(
   variableId: Id<"environmentVariables"> | undefined,
-  limit?: number
+  limit?: number,
 ) {
   return useQuery(
     api.permissions.getHistory,
-    variableId ? { variableId, limit } : "skip"
+    variableId ? { variableId, limit } : "skip",
   );
 }
 
 /**
  * Hook for getting users with access to a project
  */
-export function useUsersWithProjectAccess(projectId: Id<"projects"> | undefined) {
+export function useUsersWithProjectAccess(
+  projectId: Id<"projects"> | undefined,
+) {
   return useQuery(
     api.permissions.getUsersWithProjectAccess,
-    projectId ? { projectId } : "skip"
+    projectId ? { projectId } : "skip",
   );
 }
 
@@ -68,11 +67,11 @@ export function useUsersWithProjectAccess(projectId: Id<"projects"> | undefined)
  */
 export function useCanManageVariablePermissions(
   variableId: Id<"environmentVariables"> | undefined,
-  userId: Id<"users"> | undefined
+  userId: Id<"users"> | undefined,
 ) {
   return useQuery(
     api.permissions.canManageVariablePermissions,
-    variableId && userId ? { variableId, userId } : "skip"
+    variableId && userId ? { variableId, userId } : "skip",
   );
 }
 
@@ -81,31 +80,10 @@ export function useCanManageVariablePermissions(
  */
 export function useAssignableMembers(
   variableId: Id<"environmentVariables"> | undefined,
-  requestingUserId: Id<"users"> | undefined
+  requestingUserId: Id<"users"> | undefined,
 ) {
   return useQuery(
     api.permissions.getAssignableMembers,
-    variableId && requestingUserId ? { variableId, requestingUserId } : "skip"
+    variableId && requestingUserId ? { variableId, requestingUserId } : "skip",
   );
-}
-
-/**
- * Hook for permission mutations
- */
-export function usePermissionMutations() {
-  const grantPermission = useMutation(api.permissions.grant);
-  const updatePermission = useMutation(api.permissions.update);
-  const revokePermission = useMutation(api.permissions.revoke);
-  const bulkGrantPermissions = useMutation(api.permissions.bulkGrant);
-  const bulkRevokeForUser = useMutation(api.permissions.bulkRevokeForUser);
-  const revokeAllForVariable = useMutation(api.permissions.revokeAllForVariable);
-
-  return {
-    grantPermission,
-    updatePermission,
-    revokePermission,
-    bulkGrantPermissions,
-    bulkRevokeForUser,
-    revokeAllForVariable,
-  };
 }

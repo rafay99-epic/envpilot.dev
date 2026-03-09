@@ -1,92 +1,104 @@
-'use client'
+"use client";
 
-import { useState, useCallback } from 'react'
-import Link from 'next/link'
+import { useState, useCallback } from "react";
+import Link from "next/link";
 import {
   useFeatureRequests,
   usePlannedFeatures,
   useFeatureCategories,
   useFeatureRequestMutations,
-} from '@/hooks'
-import { Id } from '../../../convex/_generated/dataModel'
+} from "@/hooks";
+import { Id } from "../../../convex/_generated/dataModel";
 
-type TabType = 'requests' | 'roadmap'
-type StatusFilter = 'all' | 'submitted' | 'under_review' | 'planned' | 'in_progress' | 'completed'
+type TabType = "requests" | "roadmap";
+type StatusFilter =
+  | "all"
+  | "submitted"
+  | "under_review"
+  | "planned"
+  | "in_progress"
+  | "completed";
 
 const statusColors: Record<string, string> = {
-  submitted: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  under_review: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  planned: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  in_progress: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  declined: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-}
+  submitted: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  under_review:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  planned: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  in_progress:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  completed:
+    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  declined: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
 
 const statusLabels: Record<string, string> = {
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  planned: 'Planned',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  declined: 'Declined',
-}
+  submitted: "Submitted",
+  under_review: "Under Review",
+  planned: "Planned",
+  in_progress: "In Progress",
+  completed: "Completed",
+  declined: "Declined",
+};
 
 interface FeatureRequestType {
-  _id: Id<"featureRequests">
-  title: string
-  description: string
-  status: string
-  category?: string
-  voteCount: number
-  createdAt: number
+  _id: Id<"featureRequests">;
+  title: string;
+  description: string;
+  status: string;
+  category?: string;
+  voteCount: number;
+  createdAt: number;
 }
 
 export default function WishlistPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('requests')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [showSubmitForm, setShowSubmitForm] = useState(false)
-  const [votedFeatures, setVotedFeatures] = useState<Set<string>>(new Set())
-  const [voterEmail, setVoterEmail] = useState('')
+  const [activeTab, setActiveTab] = useState<TabType>("requests");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [votedFeatures, setVotedFeatures] = useState<Set<string>>(new Set());
+  const [voterEmail, setVoterEmail] = useState("");
 
   const featureRequests = useFeatureRequests(
-    statusFilter === 'all' ? undefined : statusFilter,
-    categoryFilter === 'all' ? undefined : categoryFilter
-  )
-  const plannedFeatures = usePlannedFeatures()
-  const categories = useFeatureCategories()
-  const { submit, vote, unvote } = useFeatureRequestMutations()
+    statusFilter === "all" ? undefined : statusFilter,
+    categoryFilter === "all" ? undefined : categoryFilter,
+  );
+  const plannedFeatures = usePlannedFeatures();
+  const categories = useFeatureCategories();
+  const { submit, vote, unvote } = useFeatureRequestMutations();
 
-  const handleVote = useCallback(async (featureId: Id<"featureRequests">) => {
-    if (!voterEmail) {
-      const email = prompt('Please enter your email to vote:')
-      if (!email) return
-      setVoterEmail(email)
+  const handleVote = useCallback(
+    async (featureId: Id<"featureRequests">) => {
+      if (!voterEmail) {
+        const email = prompt("Please enter your email to vote:");
+        if (!email) return;
+        setVoterEmail(email);
 
-      try {
-        await vote({ featureRequestId: featureId, voterEmail: email })
-        setVotedFeatures(prev => new Set([...prev, featureId]))
-      } catch {
-        alert('Failed to vote. You may have already voted for this feature.')
-      }
-    } else {
-      try {
-        if (votedFeatures.has(featureId)) {
-          await unvote({ featureRequestId: featureId, voterEmail })
-          setVotedFeatures(prev => {
-            const newSet = new Set(prev)
-            newSet.delete(featureId)
-            return newSet
-          })
-        } else {
-          await vote({ featureRequestId: featureId, voterEmail })
-          setVotedFeatures(prev => new Set([...prev, featureId]))
+        try {
+          await vote({ featureRequestId: featureId, voterEmail: email });
+          setVotedFeatures((prev) => new Set([...prev, featureId]));
+        } catch {
+          alert("Failed to vote. You may have already voted for this feature.");
         }
-      } catch {
-        alert('Failed to update vote.')
+      } else {
+        try {
+          if (votedFeatures.has(featureId)) {
+            await unvote({ featureRequestId: featureId, voterEmail });
+            setVotedFeatures((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(featureId);
+              return newSet;
+            });
+          } else {
+            await vote({ featureRequestId: featureId, voterEmail });
+            setVotedFeatures((prev) => new Set([...prev, featureId]));
+          }
+        } catch {
+          alert("Failed to update vote.");
+        }
       }
-    }
-  }, [voterEmail, votedFeatures, vote, unvote])
+    },
+    [voterEmail, votedFeatures, vote, unvote],
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-zinc-950">
@@ -95,8 +107,18 @@ export default function WishlistPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 dark:bg-zinc-100">
-              <svg className="h-4 w-4 text-white dark:text-zinc-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              <svg
+                className="h-4 w-4 text-white dark:text-zinc-900"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
               </svg>
             </div>
             <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -139,39 +161,44 @@ export default function WishlistPage() {
           {/* Tabs */}
           <div className="mb-6 flex border-b border-zinc-200 dark:border-zinc-800">
             <button
-              onClick={() => setActiveTab('requests')}
+              onClick={() => setActiveTab("requests")}
               className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'requests'
-                  ? 'border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                activeTab === "requests"
+                  ? "border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
               }`}
             >
               Feature Requests
             </button>
             <button
-              onClick={() => setActiveTab('roadmap')}
+              onClick={() => setActiveTab("roadmap")}
               className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === 'roadmap'
-                  ? 'border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                activeTab === "roadmap"
+                  ? "border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
               }`}
             >
               Roadmap
             </button>
           </div>
 
-          {activeTab === 'requests' ? (
+          {activeTab === "requests" ? (
             <>
               {/* Filters */}
               <div className="mb-6 flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <label htmlFor="status" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  <label
+                    htmlFor="status"
+                    className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                  >
                     Status:
                   </label>
                   <select
                     id="status"
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                    onChange={(e) =>
+                      setStatusFilter(e.target.value as StatusFilter)
+                    }
                     className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   >
                     <option value="all">All</option>
@@ -185,7 +212,10 @@ export default function WishlistPage() {
 
                 {categories && categories.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <label htmlFor="category" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    <label
+                      htmlFor="category"
+                      className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                    >
                       Category:
                     </label>
                     <select
@@ -196,7 +226,9 @@ export default function WishlistPage() {
                     >
                       <option value="all">All Categories</option>
                       {categories.map((cat: string) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -248,21 +280,21 @@ export default function WishlistPage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
 interface FeatureCardProps {
   feature: {
-    _id: Id<"featureRequests">
-    title: string
-    description: string
-    status: string
-    category?: string
-    voteCount: number
-    createdAt: number
-  }
-  hasVoted: boolean
-  onVote: () => void
+    _id: Id<"featureRequests">;
+    title: string;
+    description: string;
+    status: string;
+    category?: string;
+    voteCount: number;
+    createdAt: number;
+  };
+  hasVoted: boolean;
+  onVote: () => void;
 }
 
 function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
@@ -275,12 +307,22 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
             onClick={onVote}
             className={`flex h-14 w-14 flex-col items-center justify-center rounded-lg border transition-colors ${
               hasVoted
-                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600'
+                ? "border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
             }`}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5 15l7-7 7 7"
+              />
             </svg>
             <span className="text-sm font-semibold">{feature.voteCount}</span>
           </button>
@@ -292,7 +334,9 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               {feature.title}
             </h3>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[feature.status]}`}>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[feature.status]}`}
+            >
               {statusLabels[feature.status]}
             </span>
             {feature.category && (
@@ -310,15 +354,25 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function EmptyState({ onSubmit }: { onSubmit: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <svg className="h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        <svg
+          className="h-6 w-6 text-zinc-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+          />
         </svg>
       </div>
       <h3 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -331,21 +385,49 @@ function EmptyState({ onSubmit }: { onSubmit: () => void }) {
         onClick={onSubmit}
         className="mt-6 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 4v16m8-8H4"
+          />
         </svg>
         Submit Feature
       </button>
     </div>
-  )
+  );
 }
 
 interface RoadmapViewProps {
-  plannedFeatures: {
-    planned: Array<{ _id: Id<"featureRequests">; title: string; description: string; voteCount: number }>
-    inProgress: Array<{ _id: Id<"featureRequests">; title: string; description: string; voteCount: number }>
-    completed: Array<{ _id: Id<"featureRequests">; title: string; description: string; voteCount: number; updatedAt: number }>
-  } | undefined
+  plannedFeatures:
+    | {
+        planned: Array<{
+          _id: Id<"featureRequests">;
+          title: string;
+          description: string;
+          voteCount: number;
+        }>;
+        inProgress: Array<{
+          _id: Id<"featureRequests">;
+          title: string;
+          description: string;
+          voteCount: number;
+        }>;
+        completed: Array<{
+          _id: Id<"featureRequests">;
+          title: string;
+          description: string;
+          voteCount: number;
+          updatedAt: number;
+        }>;
+      }
+    | undefined;
 }
 
 function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
@@ -354,10 +436,10 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
       <div className="flex items-center justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
       </div>
-    )
+    );
   }
 
-  const { planned, inProgress, completed } = plannedFeatures
+  const { planned, inProgress, completed } = plannedFeatures;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -365,12 +447,18 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-3 w-3 rounded-full bg-blue-500" />
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Planned</h3>
-          <span className="ml-auto text-sm text-zinc-500">{planned.length}</span>
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+            Planned
+          </h3>
+          <span className="ml-auto text-sm text-zinc-500">
+            {planned.length}
+          </span>
         </div>
         <div className="space-y-3">
           {planned.length === 0 ? (
-            <p className="py-4 text-center text-sm text-zinc-500">No planned features yet</p>
+            <p className="py-4 text-center text-sm text-zinc-500">
+              No planned features yet
+            </p>
           ) : (
             planned.map((feature) => (
               <RoadmapCard key={feature._id} feature={feature} />
@@ -383,12 +471,18 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-3 w-3 rounded-full bg-purple-500" />
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">In Progress</h3>
-          <span className="ml-auto text-sm text-zinc-500">{inProgress.length}</span>
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+            In Progress
+          </h3>
+          <span className="ml-auto text-sm text-zinc-500">
+            {inProgress.length}
+          </span>
         </div>
         <div className="space-y-3">
           {inProgress.length === 0 ? (
-            <p className="py-4 text-center text-sm text-zinc-500">Nothing in progress</p>
+            <p className="py-4 text-center text-sm text-zinc-500">
+              Nothing in progress
+            </p>
           ) : (
             inProgress.map((feature) => (
               <RoadmapCard key={feature._id} feature={feature} />
@@ -401,12 +495,18 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-4 flex items-center gap-2">
           <div className="h-3 w-3 rounded-full bg-green-500" />
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Completed</h3>
-          <span className="ml-auto text-sm text-zinc-500">{completed.length}</span>
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+            Completed
+          </h3>
+          <span className="ml-auto text-sm text-zinc-500">
+            {completed.length}
+          </span>
         </div>
         <div className="space-y-3">
           {completed.length === 0 ? (
-            <p className="py-4 text-center text-sm text-zinc-500">No completed features yet</p>
+            <p className="py-4 text-center text-sm text-zinc-500">
+              No completed features yet
+            </p>
           ) : (
             completed.map((feature) => (
               <RoadmapCard key={feature._id} feature={feature} showDate />
@@ -415,25 +515,29 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 interface RoadmapCardProps {
   feature: {
-    _id: Id<"featureRequests">
-    title: string
-    description: string
-    voteCount: number
-    updatedAt?: number
-  }
-  showDate?: boolean
+    _id: Id<"featureRequests">;
+    title: string;
+    description: string;
+    voteCount: number;
+    updatedAt?: number;
+  };
+  showDate?: boolean;
 }
 
 function RoadmapCard({ feature, showDate }: RoadmapCardProps) {
   return (
     <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50">
-      <h4 className="font-medium text-zinc-900 dark:text-zinc-100">{feature.title}</h4>
-      <p className="mt-1 text-xs text-zinc-500 line-clamp-2">{feature.description}</p>
+      <h4 className="font-medium text-zinc-900 dark:text-zinc-100">
+        {feature.title}
+      </h4>
+      <p className="mt-1 text-xs text-zinc-500 line-clamp-2">
+        {feature.description}
+      </p>
       <div className="mt-2 flex items-center justify-between text-xs text-zinc-500">
         <span>{feature.voteCount} votes</span>
         {showDate && feature.updatedAt && (
@@ -441,57 +545,62 @@ function RoadmapCard({ feature, showDate }: RoadmapCardProps) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 interface SubmitFeatureModalProps {
-  onClose: () => void
+  onClose: () => void;
   onSubmit: (args: {
-    title: string
-    description: string
-    submitterEmail?: string
-    submitterName?: string
-    category?: string
-  }) => Promise<Id<"featureRequests">>
-  voterEmail: string
-  setVoterEmail: (email: string) => void
+    title: string;
+    description: string;
+    submitterEmail?: string;
+    submitterName?: string;
+    category?: string;
+  }) => Promise<Id<"featureRequests">>;
+  voterEmail: string;
+  setVoterEmail: (email: string) => void;
 }
 
-function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: SubmitFeatureModalProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [email, setEmail] = useState(voterEmail)
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState('')
+function SubmitFeatureModal({
+  onClose,
+  onSubmit,
+  voterEmail,
+  setVoterEmail,
+}: SubmitFeatureModalProps) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [email, setEmail] = useState(voterEmail);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError("");
 
     if (!title.trim()) {
-      setError('Title is required')
-      return
+      setError("Title is required");
+      return;
     }
 
     if (!description.trim()) {
-      setError('Description is required')
-      return
+      setError("Description is required");
+      return;
     }
 
     if (!email.trim()) {
-      setError('Email is required')
-      return
+      setError("Email is required");
+      return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      setError('Please enter a valid email address')
-      return
+      setError("Please enter a valid email address");
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     try {
       await onSubmit({
@@ -500,15 +609,17 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
         submitterEmail: email.trim(),
         submitterName: name.trim() || undefined,
         category: category.trim() || undefined,
-      })
-      setVoterEmail(email)
-      onClose()
+      });
+      setVoterEmail(email);
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit feature request')
+      setError(
+        err instanceof Error ? err.message : "Failed to submit feature request",
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -518,8 +629,18 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
           onClick={onClose}
           className="absolute right-4 top-4 rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
@@ -538,7 +659,10 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
           )}
 
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="title"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Title *
             </label>
             <input
@@ -552,7 +676,10 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
           </div>
 
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Description *
             </label>
             <textarea
@@ -567,7 +694,10 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
                 Your Email *
               </label>
               <input
@@ -581,7 +711,10 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
             </div>
 
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
                 Your Name
               </label>
               <input
@@ -596,7 +729,10 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
           </div>
 
           <div>
-            <label htmlFor="category" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="category"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Category
             </label>
             <input
@@ -622,11 +758,11 @@ function SubmitFeatureModal({ onClose, onSubmit, voterEmail, setVoterEmail }: Su
               disabled={isSubmitting}
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Feature'}
+              {isSubmitting ? "Submitting..." : "Submit Feature"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

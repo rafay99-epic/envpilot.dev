@@ -1,26 +1,26 @@
-'use client'
+"use client";
 
-import { useState, useRef, useEffect } from 'react'
-import Link from 'next/link'
-import { useAuthContext } from './auth-provider'
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useAuthContext } from "./auth-provider";
 
 export function UserButton() {
   const { user, organization, isImpersonating, impersonator, signOut } =
-    useAuthContext()
-  const [isOpen, setIsOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+    useAuthContext();
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (!user) {
     return (
@@ -30,10 +30,12 @@ export function UserButton() {
       >
         Sign In
       </Link>
-    )
+    );
   }
 
-  const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || user.email[0].toUpperCase()
+  const initials =
+    `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
+    user.email[0].toUpperCase();
 
   return (
     <div className="relative" ref={menuRef}>
@@ -53,7 +55,7 @@ export function UserButton() {
         {user.profilePictureUrl ? (
           <img
             src={user.profilePictureUrl}
-            alt={`${user.firstName ?? 'User'}'s avatar`}
+            alt={`${user.firstName ?? "User"}'s avatar`}
             className="h-8 w-8 rounded-full object-cover"
           />
         ) : (
@@ -108,8 +110,8 @@ export function UserButton() {
           <div className="border-t border-zinc-200 pt-1 dark:border-zinc-700">
             <button
               onClick={() => {
-                setIsOpen(false)
-                signOut()
+                setIsOpen(false);
+                signOut();
               }}
               className="block w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
             >
@@ -119,5 +121,5 @@ export function UserButton() {
         </div>
       )}
     </div>
-  )
+  );
 }

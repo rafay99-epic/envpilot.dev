@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { query } from "./_generated/server";
 
 /**
@@ -9,31 +10,51 @@ import { query } from "./_generated/server";
  * Get dashboard statistics - projects, variables, team members, audit events
  */
 export const getStats = query({
-  args: {},
-  handler: async (ctx) => {
-    // Get all projects (not deleted)
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    // Get org projects (not deleted)
     const projects = await ctx.db
       .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
-    // Get all variables (not deleted)
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    // Get variables only for projects in this organization
+    const variablesNested = await Promise.all(
+      projects.map((project) =>
+        ctx.db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect(),
+      ),
+    );
+    const variables = variablesNested.flat();
 
     // Count encrypted (sensitive) variables
     const encryptedCount = variables.filter((v) => v.isSensitive).length;
 
     // Get organization members count
-    const members = await ctx.db.query("organizationMembers").collect();
+    const members = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .collect();
 
     // Get audit logs from last 7 days
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recentAuditLogs = await ctx.db
       .query("auditLogs")
-      .filter((q) => q.gte(q.field("createdAt"), sevenDaysAgo))
+      .withIndex("by_org_and_created", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .gte("createdAt", sevenDaysAgo),
+      )
       .collect();
 
     // Get projects created this month
@@ -41,7 +62,7 @@ export const getStats = query({
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
     const projectsThisMonth = projects.filter(
-      (p) => p.createdAt >= startOfMonth.getTime()
+      (p) => p.createdAt >= startOfMonth.getTime(),
     ).length;
 
     return {
@@ -67,10 +88,15 @@ export const getStats = query({
  * Get recent activity for the dashboard
  */
 export const getRecentActivity = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
     const logs = await ctx.db
       .query("auditLogs")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .order("desc")
       .take(10);
 
@@ -97,7 +123,7 @@ export const getRecentActivity = query({
               }
             : null,
         };
-      })
+      }),
     );
 
     return logsWithDetails;
@@ -108,10 +134,15 @@ export const getRecentActivity = query({
  * Get recent projects for dashboard quick view
  */
 export const getRecentProjects = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
     const projects = await ctx.db
       .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .order("desc")
       .take(5);
@@ -134,7 +165,7 @@ export const getRecentProjects = query({
           createdAt: project.createdAt,
           variableCount: variables.length,
         };
-      })
+      }),
     );
 
     return projectsWithStats;
@@ -145,10 +176,15 @@ export const getRecentProjects = query({
  * Get team members for dashboard quick view
  */
 export const getTeamMembers = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
     const memberships = await ctx.db
       .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .order("desc")
       .take(5);
 
@@ -168,7 +204,7 @@ export const getTeamMembers = query({
               },
             }
           : null;
-      })
+      }),
     );
 
     return members.filter(Boolean);
@@ -179,34 +215,65 @@ export const getTeamMembers = query({
  * Check onboarding completion status
  */
 export const getOnboardingStatus = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
     // Check if any projects exist
-    const projectCount = await ctx.db
+    const projects = await ctx.db
       .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .take(1);
+      .collect();
 
-    // Check if any variables exist
-    const variableCount = await ctx.db
-      .query("environmentVariables")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .take(1);
+    const projectCount = projects.length;
+    const projectIds = new Set(projects.map((project) => project._id));
+
+    // Check if any variables exist in org projects
+    let hasVariables = false;
+    for (const projectId of projectIds) {
+      const vars = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .take(1);
+
+      if (vars.length > 0) {
+        hasVariables = true;
+        break;
+      }
+    }
 
     // Check if any team members have been invited (more than 1 member)
-    const memberCount = await ctx.db.query("organizationMembers").take(2);
+    const memberCount = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .take(2);
 
-    // Check if any project access tokens exist (CLI/IDE integration)
-    const accessTokenCount = await ctx.db
-      .query("projectAccess")
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .take(1);
+    // Check if any project access tokens exist (CLI/IDE integration) for org projects
+    let hasIntegrations = false;
+    for (const projectId of projectIds) {
+      const accessTokenCount = await ctx.db
+        .query("projectAccess")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .take(1);
+
+      if (accessTokenCount.length > 0) {
+        hasIntegrations = true;
+        break;
+      }
+    }
 
     return {
-      hasProjects: projectCount.length > 0,
-      hasVariables: variableCount.length > 0,
+      hasProjects: projectCount > 0,
+      hasVariables,
       hasTeamMembers: memberCount.length > 1,
-      hasIntegrations: accessTokenCount.length > 0,
+      hasIntegrations,
     };
   },
 });

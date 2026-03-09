@@ -1,248 +1,270 @@
-'use client'
+"use client";
 
-import { useState, useEffect, use, useCallback, useRef } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, use, useCallback, useRef } from "react";
+import Link from "next/link";
 
 interface Member {
-  _id: string
-  userId: string
-  role: 'admin' | 'team_lead' | 'member'
-  joinedAt: number
+  _id: string;
+  userId: string;
+  role: "admin" | "team_lead" | "member";
+  joinedAt: number;
   user: {
-    _id: string
-    email: string
-    name?: string
-    avatarUrl?: string
-  }
+    _id: string;
+    email: string;
+    name?: string;
+    avatarUrl?: string;
+  };
 }
 
 interface Invitation {
-  _id: string
-  email: string
-  role: 'admin' | 'team_lead' | 'member'
-  expiresAt: number
-  createdAt: number
+  _id: string;
+  email: string;
+  role: "admin" | "team_lead" | "member";
+  expiresAt: number;
+  createdAt: number;
   invitedByUser?: {
-    name?: string
-    email: string
-  }
+    name?: string;
+    email: string;
+  };
 }
 
 interface Organization {
-  _id: string
-  name: string
-  role: 'admin' | 'team_lead' | 'member'
+  _id: string;
+  name: string;
+  role: "admin" | "team_lead" | "member";
 }
 
 interface SearchUser {
-  _id: string
-  email: string
-  name?: string
-  avatarUrl?: string
-  isMember?: boolean
-  hasPendingInvitation?: boolean
+  _id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  isMember?: boolean;
+  hasPendingInvitation?: boolean;
 }
 
 export default function OrganizationMembersPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params)
-  const [organization, setOrganization] = useState<Organization | null>(null)
-  const [members, setMembers] = useState<Member[]>([])
-  const [invitations, setInvitations] = useState<Invitation[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { id } = use(params);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [showInviteModal, setShowInviteModal] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'team_lead' | 'member'>('member')
-  const [isInviting, setIsInviting] = useState(false)
-  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<
+    "admin" | "team_lead" | "member"
+  >("member");
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const [searchResults, setSearchResults] = useState<SearchUser[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchData()
-  }, [id])
+    fetchData();
+  }, [id]);
 
   async function fetchData() {
     try {
       const [orgRes, membersRes] = await Promise.all([
         fetch(`/api/organizations/${id}`),
         fetch(`/api/organizations/${id}/members`),
-      ])
+      ]);
 
       if (!orgRes.ok) {
-        throw new Error('Failed to fetch organization')
+        throw new Error("Failed to fetch organization");
       }
 
-      const orgData = await orgRes.json()
-      setOrganization(orgData.organization)
+      const orgData = await orgRes.json();
+      setOrganization(orgData.organization);
 
       if (membersRes.ok) {
-        const membersData = await membersRes.json()
-        setMembers(membersData.members || [])
-        setInvitations(membersData.invitations || [])
+        const membersData = await membersRes.json();
+        setMembers(membersData.members || []);
+        setInvitations(membersData.invitations || []);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   async function handleInvite(e: React.FormEvent) {
-    e.preventDefault()
-    setIsInviting(true)
-    setInviteError(null)
+    e.preventDefault();
+    setIsInviting(true);
+    setInviteError(null);
 
     try {
       const response = await fetch(`/api/organizations/${id}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to send invitation')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to send invitation");
       }
 
-      setShowInviteModal(false)
-      setInviteEmail('')
-      setInviteRole('member')
-      fetchData()
+      setShowInviteModal(false);
+      setInviteEmail("");
+      setInviteRole("member");
+      fetchData();
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : 'An error occurred')
+      setInviteError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsInviting(false)
+      setIsInviting(false);
     }
   }
 
-  async function handleRoleChange(userId: string, newRole: 'admin' | 'team_lead' | 'member') {
+  async function handleRoleChange(
+    userId: string,
+    newRole: "admin" | "team_lead" | "member",
+  ) {
     try {
       const response = await fetch(`/api/organizations/${id}/members`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, role: newRole }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to update role')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update role");
       }
 
-      setMembers(members.map(m =>
-        m.user._id === userId ? { ...m, role: newRole } : m
-      ))
+      setMembers(
+        members.map((m) =>
+          m.user._id === userId ? { ...m, role: newRole } : m,
+        ),
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
 
   async function handleRemoveMember(userId: string) {
-    if (!confirm('Are you sure you want to remove this member?')) return
+    if (!confirm("Are you sure you want to remove this member?")) return;
 
     try {
-      const response = await fetch(`/api/organizations/${id}/members?userId=${userId}`, {
-        method: 'DELETE',
-      })
+      const response = await fetch(
+        `/api/organizations/${id}/members?userId=${userId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to remove member')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to remove member");
       }
 
-      setMembers(members.filter(m => m.user._id !== userId))
+      setMembers(members.filter((m) => m.user._id !== userId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
 
-  const searchUsers = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setSearchResults([])
-      setShowSearchResults(false)
-      return
-    }
-
-    setIsSearching(true)
-    try {
-      const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&organizationId=${id}&limit=5`)
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.users || [])
-        setShowSearchResults(true)
+  const searchUsers = useCallback(
+    async (query: string) => {
+      if (query.length < 2) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+        return;
       }
-    } catch (err) {
-      console.error('Search error:', err)
-    } finally {
-      setIsSearching(false)
-    }
-  }, [id])
+
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${id}&limit=5`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data.users || []);
+          setShowSearchResults(true);
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [id],
+  );
 
   function handleEmailChange(value: string) {
-    setInviteEmail(value)
+    setInviteEmail(value);
 
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
+      clearTimeout(searchTimeoutRef.current);
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      searchUsers(value)
-    }, 300)
+      searchUsers(value);
+    }, 300);
   }
 
   function selectUser(user: SearchUser) {
-    setInviteEmail(user.email)
-    setShowSearchResults(false)
-    setSearchResults([])
+    setInviteEmail(user.email);
+    setShowSearchResults(false);
+    setSearchResults([]);
   }
 
   async function handleCancelInvitation(invitationId: string) {
-    if (!confirm('Are you sure you want to cancel this invitation?')) return
+    if (!confirm("Are you sure you want to cancel this invitation?")) return;
 
     try {
-      const response = await fetch(`/api/organizations/${id}/invitations/${invitationId}`, {
-        method: 'DELETE',
-      })
+      const response = await fetch(
+        `/api/organizations/${id}/invitations/${invitationId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to cancel invitation')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to cancel invitation");
       }
 
-      setInvitations(invitations.filter(inv => inv._id !== invitationId))
+      setInvitations(invitations.filter((inv) => inv._id !== invitationId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
 
   async function handleResendInvitation(invitationId: string) {
     try {
-      const response = await fetch(`/api/organizations/${id}/invitations/${invitationId}`, {
-        method: 'POST',
-      })
+      const response = await fetch(
+        `/api/organizations/${id}/invitations/${invitationId}`,
+        {
+          method: "POST",
+        },
+      );
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to resend invitation')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to resend invitation");
       }
 
-      fetchData()
+      fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
 
-  const canInvite = organization?.role === 'admin' || organization?.role === 'team_lead'
-  const isAdmin = organization?.role === 'admin'
+  const canInvite =
+    organization?.role === "admin" || organization?.role === "team_lead";
+  const isAdmin = organization?.role === "admin";
 
   if (isLoading) {
     return (
@@ -250,13 +272,16 @@ export default function OrganizationMembersPage({
         <div className="animate-pulse space-y-6">
           <div className="h-7 w-48 rounded bg-zinc-200 dark:bg-zinc-700" />
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 rounded-xl bg-zinc-200 dark:bg-zinc-700" />
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-16 rounded-xl bg-zinc-200 dark:bg-zinc-700"
+              />
             ))}
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error && !organization) {
@@ -266,7 +291,7 @@ export default function OrganizationMembersPage({
           <p className="text-red-600 dark:text-red-400">{error}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -337,7 +362,10 @@ export default function OrganizationMembersPage({
         </div>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {members.map((member) => (
-            <li key={member._id} className="flex items-center justify-between px-6 py-4">
+            <li
+              key={member._id}
+              className="flex items-center justify-between px-6 py-4"
+            >
               <div className="flex items-center gap-4">
                 {member.user.avatarUrl ? (
                   <img
@@ -348,13 +376,15 @@ export default function OrganizationMembersPage({
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
                     <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-                      {(member.user.name || member.user.email).charAt(0).toUpperCase()}
+                      {(member.user.name || member.user.email)
+                        .charAt(0)
+                        .toUpperCase()}
                     </span>
                   </div>
                 )}
                 <div>
                   <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {member.user.name || 'Unnamed User'}
+                    {member.user.name || "Unnamed User"}
                   </p>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     {member.user.email}
@@ -365,7 +395,12 @@ export default function OrganizationMembersPage({
                 {isAdmin ? (
                   <select
                     value={member.role}
-                    onChange={(e) => handleRoleChange(member.user._id, e.target.value as 'admin' | 'team_lead' | 'member')}
+                    onChange={(e) =>
+                      handleRoleChange(
+                        member.user._id,
+                        e.target.value as "admin" | "team_lead" | "member",
+                      )
+                    }
                     className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                   >
                     <option value="admin">Admin</option>
@@ -375,14 +410,17 @@ export default function OrganizationMembersPage({
                 ) : (
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      member.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                        : member.role === 'team_lead'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
+                      member.role === "admin"
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        : member.role === "team_lead"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {member.role === 'team_lead' ? 'Team Lead' : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                    {member.role === "team_lead"
+                      ? "Team Lead"
+                      : member.role.charAt(0).toUpperCase() +
+                        member.role.slice(1)}
                   </span>
                 )}
                 {isAdmin && (
@@ -421,7 +459,10 @@ export default function OrganizationMembersPage({
           </div>
           <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {invitations.map((invitation) => (
-              <li key={invitation._id} className="flex items-center justify-between px-6 py-4">
+              <li
+                key={invitation._id}
+                className="flex items-center justify-between px-6 py-4"
+              >
                 <div className="flex items-center gap-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
                     <svg
@@ -443,7 +484,9 @@ export default function OrganizationMembersPage({
                       {invitation.email}
                     </p>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      Invited {new Date(invitation.createdAt).toLocaleDateString()} · Expires{' '}
+                      Invited{" "}
+                      {new Date(invitation.createdAt).toLocaleDateString()} ·
+                      Expires{" "}
                       {new Date(invitation.expiresAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -451,14 +494,17 @@ export default function OrganizationMembersPage({
                 <div className="flex items-center gap-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      invitation.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                        : invitation.role === 'team_lead'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                          : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'
+                      invitation.role === "admin"
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        : invitation.role === "team_lead"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {invitation.role === 'team_lead' ? 'Team Lead' : invitation.role.charAt(0).toUpperCase() + invitation.role.slice(1)}
+                    {invitation.role === "team_lead"
+                      ? "Team Lead"
+                      : invitation.role.charAt(0).toUpperCase() +
+                        invitation.role.slice(1)}
                   </span>
                   {canInvite && (
                     <>
@@ -519,7 +565,9 @@ export default function OrganizationMembersPage({
             <form onSubmit={handleInvite} className="mt-4 space-y-4">
               {inviteError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-900/20">
-                  <p className="text-sm text-red-600 dark:text-red-400">{inviteError}</p>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    {inviteError}
+                  </p>
                 </div>
               )}
               <div className="relative">
@@ -536,8 +584,12 @@ export default function OrganizationMembersPage({
                     id="email"
                     value={inviteEmail}
                     onChange={(e) => handleEmailChange(e.target.value)}
-                    onFocus={() => inviteEmail.length >= 2 && setShowSearchResults(true)}
-                    onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                    onFocus={() =>
+                      inviteEmail.length >= 2 && setShowSearchResults(true)
+                    }
+                    onBlur={() =>
+                      setTimeout(() => setShowSearchResults(false), 200)
+                    }
                     placeholder="Search by email or name..."
                     required
                     autoComplete="off"
@@ -557,7 +609,9 @@ export default function OrganizationMembersPage({
                           <button
                             type="button"
                             onClick={() => selectUser(user)}
-                            disabled={user.isMember || user.hasPendingInvitation}
+                            disabled={
+                              user.isMember || user.hasPendingInvitation
+                            }
                             className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-700"
                           >
                             {user.avatarUrl ? (
@@ -569,13 +623,15 @@ export default function OrganizationMembersPage({
                             ) : (
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700">
                                 <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                                  {(user.name || user.email).charAt(0).toUpperCase()}
+                                  {(user.name || user.email)
+                                    .charAt(0)
+                                    .toUpperCase()}
                                 </span>
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {user.name || 'Unnamed User'}
+                                {user.name || "Unnamed User"}
                               </p>
                               <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                                 {user.email}
@@ -608,7 +664,11 @@ export default function OrganizationMembersPage({
                 <select
                   id="role"
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as 'admin' | 'team_lead' | 'member')}
+                  onChange={(e) =>
+                    setInviteRole(
+                      e.target.value as "admin" | "team_lead" | "member",
+                    )
+                  }
                   className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 >
                   {isAdmin && <option value="admin">Admin</option>}
@@ -620,12 +680,12 @@ export default function OrganizationMembersPage({
                 <button
                   type="button"
                   onClick={() => {
-                    setShowInviteModal(false)
-                    setInviteEmail('')
-                    setInviteRole('member')
-                    setInviteError(null)
-                    setSearchResults([])
-                    setShowSearchResults(false)
+                    setShowInviteModal(false);
+                    setInviteEmail("");
+                    setInviteRole("member");
+                    setInviteError(null);
+                    setSearchResults([]);
+                    setShowSearchResults(false);
                   }}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
@@ -636,7 +696,7 @@ export default function OrganizationMembersPage({
                   disabled={isInviting || !inviteEmail}
                   className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 >
-                  {isInviting ? 'Sending...' : 'Send Invitation'}
+                  {isInviting ? "Sending..." : "Send Invitation"}
                 </button>
               </div>
             </form>
@@ -644,5 +704,5 @@ export default function OrganizationMembersPage({
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -32,7 +32,7 @@ export const listAll = query({
       templates = await ctx.db
         .query("environmentTemplates")
         .withIndex("by_project_type", (q) =>
-          q.eq("projectType", args.projectType!)
+          q.eq("projectType", args.projectType!),
         )
         .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .collect();
@@ -50,7 +50,11 @@ export const listAll = query({
     // 3. Other published templates
     const filteredTemplates = templates.filter((template) => {
       if (template.isBuiltIn) return true;
-      if (args.organizationId && template.organizationId === args.organizationId) return true;
+      if (
+        args.organizationId &&
+        template.organizationId === args.organizationId
+      )
+        return true;
       if (template.isPublished) return true;
       return false;
     });
@@ -70,7 +74,7 @@ export const listAll = query({
           ...template,
           variables,
         };
-      })
+      }),
     );
 
     return templatesWithVariables;
@@ -110,7 +114,7 @@ export const listByOrganization = query({
     const templates = await ctx.db
       .query("environmentTemplates")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -128,7 +132,7 @@ export const listByOrganization = query({
           ...template,
           variables,
         };
-      })
+      }),
     );
 
     return templatesWithVariables;
@@ -149,13 +153,13 @@ export const listBuiltIn = query({
       templates = await ctx.db
         .query("environmentTemplates")
         .withIndex("by_project_type", (q) =>
-          q.eq("projectType", args.projectType!)
+          q.eq("projectType", args.projectType!),
         )
         .filter((q) =>
           q.and(
             q.eq(q.field("isBuiltIn"), true),
-            q.eq(q.field("deletedAt"), undefined)
-          )
+            q.eq(q.field("deletedAt"), undefined),
+          ),
         )
         .collect();
     } else {
@@ -179,7 +183,7 @@ export const listBuiltIn = query({
           ...template,
           variables,
         };
-      })
+      }),
     );
 
     return templatesWithVariables;
@@ -209,17 +213,22 @@ export const search = query({
       const hasAccess =
         template.isBuiltIn ||
         template.isPublished ||
-        (args.organizationId && template.organizationId === args.organizationId);
+        (args.organizationId &&
+          template.organizationId === args.organizationId);
 
       if (!hasAccess) return false;
 
       // Check search match
       const nameMatch = template.name.toLowerCase().includes(searchLower);
-      const descMatch = template.description.toLowerCase().includes(searchLower);
+      const descMatch = template.description
+        .toLowerCase()
+        .includes(searchLower);
       const tagMatch = template.tags.some((tag) =>
-        tag.toLowerCase().includes(searchLower)
+        tag.toLowerCase().includes(searchLower),
       );
-      const typeMatch = template.projectType.toLowerCase().includes(searchLower);
+      const typeMatch = template.projectType
+        .toLowerCase()
+        .includes(searchLower);
 
       return nameMatch || descMatch || tagMatch || typeMatch;
     });
@@ -237,7 +246,7 @@ export const search = query({
           ...template,
           variables,
         };
-      })
+      }),
     );
 
     return templatesWithVariables;
@@ -275,7 +284,7 @@ export const create = mutation({
         isSensitive: v.boolean(),
         isRequired: v.boolean(),
         category: v.string(),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -308,7 +317,9 @@ export const create = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.createdBy)
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.createdBy),
       )
       .first();
 
@@ -396,13 +407,16 @@ export const update = mutation({
     const updateData: Record<string, unknown> = { updatedAt: Date.now() };
 
     if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.projectType !== undefined) updateData.projectType = updates.projectType;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
+    if (updates.projectType !== undefined)
+      updateData.projectType = updates.projectType;
     if (updates.icon !== undefined) updateData.icon = updates.icon;
     if (updates.color !== undefined) updateData.color = updates.color;
     if (updates.version !== undefined) updateData.version = updates.version;
     if (updates.tags !== undefined) updateData.tags = updates.tags;
-    if (updates.isPublished !== undefined) updateData.isPublished = updates.isPublished;
+    if (updates.isPublished !== undefined)
+      updateData.isPublished = updates.isPublished;
 
     await ctx.db.patch(templateId, updateData);
 
@@ -439,12 +453,14 @@ export const addVariable = mutation({
     const existing = await ctx.db
       .query("templateVariables")
       .withIndex("by_template_and_key", (q) =>
-        q.eq("templateId", args.templateId).eq("key", args.key)
+        q.eq("templateId", args.templateId).eq("key", args.key),
       )
       .first();
 
     if (existing) {
-      throw new Error(`Variable with key "${args.key}" already exists in this template`);
+      throw new Error(
+        `Variable with key "${args.key}" already exists in this template`,
+      );
     }
 
     // Get current max order
@@ -455,7 +471,7 @@ export const addVariable = mutation({
 
     const maxOrder = existingVariables.reduce(
       (max, v) => Math.max(max, v.order),
-      -1
+      -1,
     );
 
     const variableId = await ctx.db.insert("templateVariables", {
@@ -513,12 +529,18 @@ export const updateVariable = mutation({
     const updateData: Record<string, unknown> = {};
 
     if (updates.key !== undefined) updateData.key = updates.key;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.defaultValue !== undefined) updateData.defaultValue = updates.defaultValue;
-    if (updates.placeholder !== undefined) updateData.placeholder = updates.placeholder;
-    if (updates.environments !== undefined) updateData.environments = updates.environments;
-    if (updates.isSensitive !== undefined) updateData.isSensitive = updates.isSensitive;
-    if (updates.isRequired !== undefined) updateData.isRequired = updates.isRequired;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
+    if (updates.defaultValue !== undefined)
+      updateData.defaultValue = updates.defaultValue;
+    if (updates.placeholder !== undefined)
+      updateData.placeholder = updates.placeholder;
+    if (updates.environments !== undefined)
+      updateData.environments = updates.environments;
+    if (updates.isSensitive !== undefined)
+      updateData.isSensitive = updates.isSensitive;
+    if (updates.isRequired !== undefined)
+      updateData.isRequired = updates.isRequired;
     if (updates.category !== undefined) updateData.category = updates.category;
     if (updates.order !== undefined) updateData.order = updates.order;
 
@@ -675,9 +697,9 @@ export const seedBuiltInTemplates = internalMutation({
             isSensitive: v.boolean(),
             isRequired: v.boolean(),
             category: v.string(),
-          })
+          }),
         ),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -692,8 +714,8 @@ export const seedBuiltInTemplates = internalMutation({
           q.and(
             q.eq(q.field("name"), templateData.name),
             q.eq(q.field("isBuiltIn"), true),
-            q.eq(q.field("deletedAt"), undefined)
-          )
+            q.eq(q.field("deletedAt"), undefined),
+          ),
         )
         .collect();
 

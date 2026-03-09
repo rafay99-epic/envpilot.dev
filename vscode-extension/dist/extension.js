@@ -5,30 +5,44 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-};
+var __commonJS = (cb, mod) =>
+  function __require() {
+    return (
+      mod ||
+        (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod),
+      mod.exports
+    );
+  };
 var __export = (target, all3) => {
   for (var name in all3)
     __defProp(target, name, { get: all3[name], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
+  if ((from && typeof from === "object") || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+        __defProp(to, key, {
+          get: () => from[key],
+          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable,
+        });
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __toESM = (mod, isNodeMode, target) => (
+  (target = mod != null ? __create(__getProtoOf(mod)) : {}),
+  __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule
+      ? __defProp(target, "default", { value: mod, enumerable: true })
+      : target,
+    mod,
+  )
+);
+var __toCommonJS = (mod) =>
+  __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/delayed-stream/lib/delayed_stream.js
 var require_delayed_stream = __commonJS({
@@ -46,7 +60,7 @@ var require_delayed_stream = __commonJS({
       this._bufferedEvents = [];
     }
     util3.inherits(DelayedStream, Stream);
-    DelayedStream.create = function(source, options) {
+    DelayedStream.create = function (source, options) {
       var delayedStream = new this();
       options = options || {};
       for (var option in options) {
@@ -54,12 +68,11 @@ var require_delayed_stream = __commonJS({
       }
       delayedStream.source = source;
       var realEmit = source.emit;
-      source.emit = function() {
+      source.emit = function () {
         delayedStream._handleEmit(arguments);
         return realEmit.apply(source, arguments);
       };
-      source.on("error", function() {
-      });
+      source.on("error", function () {});
       if (delayedStream.pauseStream) {
         source.pause();
       }
@@ -68,35 +81,37 @@ var require_delayed_stream = __commonJS({
     Object.defineProperty(DelayedStream.prototype, "readable", {
       configurable: true,
       enumerable: true,
-      get: function() {
+      get: function () {
         return this.source.readable;
-      }
+      },
     });
-    DelayedStream.prototype.setEncoding = function() {
+    DelayedStream.prototype.setEncoding = function () {
       return this.source.setEncoding.apply(this.source, arguments);
     };
-    DelayedStream.prototype.resume = function() {
+    DelayedStream.prototype.resume = function () {
       if (!this._released) {
         this.release();
       }
       this.source.resume();
     };
-    DelayedStream.prototype.pause = function() {
+    DelayedStream.prototype.pause = function () {
       this.source.pause();
     };
-    DelayedStream.prototype.release = function() {
+    DelayedStream.prototype.release = function () {
       this._released = true;
-      this._bufferedEvents.forEach(function(args) {
-        this.emit.apply(this, args);
-      }.bind(this));
+      this._bufferedEvents.forEach(
+        function (args) {
+          this.emit.apply(this, args);
+        }.bind(this),
+      );
       this._bufferedEvents = [];
     };
-    DelayedStream.prototype.pipe = function() {
+    DelayedStream.prototype.pipe = function () {
       var r = Stream.prototype.pipe.apply(this, arguments);
       this.resume();
       return r;
     };
-    DelayedStream.prototype._handleEmit = function(args) {
+    DelayedStream.prototype._handleEmit = function (args) {
       if (this._released) {
         this.emit.apply(this, args);
         return;
@@ -107,7 +122,7 @@ var require_delayed_stream = __commonJS({
       }
       this._bufferedEvents.push(args);
     };
-    DelayedStream.prototype._checkIfMaxDataSizeExceeded = function() {
+    DelayedStream.prototype._checkIfMaxDataSizeExceeded = function () {
       if (this._maxDataSizeExceeded) {
         return;
       }
@@ -115,10 +130,11 @@ var require_delayed_stream = __commonJS({
         return;
       }
       this._maxDataSizeExceeded = true;
-      var message = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
+      var message =
+        "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
       this.emit("error", new Error(message));
     };
-  }
+  },
 });
 
 // node_modules/combined-stream/lib/combined_stream.js
@@ -141,7 +157,7 @@ var require_combined_stream = __commonJS({
       this._pendingNext = false;
     }
     util3.inherits(CombinedStream, Stream);
-    CombinedStream.create = function(options) {
+    CombinedStream.create = function (options) {
       var combinedStream = new this();
       options = options || {};
       for (var option in options) {
@@ -149,16 +165,22 @@ var require_combined_stream = __commonJS({
       }
       return combinedStream;
     };
-    CombinedStream.isStreamLike = function(stream4) {
-      return typeof stream4 !== "function" && typeof stream4 !== "string" && typeof stream4 !== "boolean" && typeof stream4 !== "number" && !Buffer.isBuffer(stream4);
+    CombinedStream.isStreamLike = function (stream4) {
+      return (
+        typeof stream4 !== "function" &&
+        typeof stream4 !== "string" &&
+        typeof stream4 !== "boolean" &&
+        typeof stream4 !== "number" &&
+        !Buffer.isBuffer(stream4)
+      );
     };
-    CombinedStream.prototype.append = function(stream4) {
+    CombinedStream.prototype.append = function (stream4) {
       var isStreamLike = CombinedStream.isStreamLike(stream4);
       if (isStreamLike) {
         if (!(stream4 instanceof DelayedStream)) {
           var newStream = DelayedStream.create(stream4, {
             maxDataSize: Infinity,
-            pauseStream: this.pauseStreams
+            pauseStream: this.pauseStreams,
           });
           stream4.on("data", this._checkDataSize.bind(this));
           stream4 = newStream;
@@ -171,12 +193,12 @@ var require_combined_stream = __commonJS({
       this._streams.push(stream4);
       return this;
     };
-    CombinedStream.prototype.pipe = function(dest, options) {
+    CombinedStream.prototype.pipe = function (dest, options) {
       Stream.prototype.pipe.call(this, dest, options);
       this.resume();
       return dest;
     };
-    CombinedStream.prototype._getNext = function() {
+    CombinedStream.prototype._getNext = function () {
       this._currentStream = null;
       if (this._insideLoop) {
         this._pendingNext = true;
@@ -192,7 +214,7 @@ var require_combined_stream = __commonJS({
         this._insideLoop = false;
       }
     };
-    CombinedStream.prototype._realGetNext = function() {
+    CombinedStream.prototype._realGetNext = function () {
       var stream4 = this._streams.shift();
       if (typeof stream4 == "undefined") {
         this.end();
@@ -203,16 +225,18 @@ var require_combined_stream = __commonJS({
         return;
       }
       var getStream = stream4;
-      getStream(function(stream5) {
-        var isStreamLike = CombinedStream.isStreamLike(stream5);
-        if (isStreamLike) {
-          stream5.on("data", this._checkDataSize.bind(this));
-          this._handleErrors(stream5);
-        }
-        this._pipeNext(stream5);
-      }.bind(this));
+      getStream(
+        function (stream5) {
+          var isStreamLike = CombinedStream.isStreamLike(stream5);
+          if (isStreamLike) {
+            stream5.on("data", this._checkDataSize.bind(this));
+            this._handleErrors(stream5);
+          }
+          this._pipeNext(stream5);
+        }.bind(this),
+      );
     };
-    CombinedStream.prototype._pipeNext = function(stream4) {
+    CombinedStream.prototype._pipeNext = function (stream4) {
       this._currentStream = stream4;
       var isStreamLike = CombinedStream.isStreamLike(stream4);
       if (isStreamLike) {
@@ -224,58 +248,67 @@ var require_combined_stream = __commonJS({
       this.write(value);
       this._getNext();
     };
-    CombinedStream.prototype._handleErrors = function(stream4) {
+    CombinedStream.prototype._handleErrors = function (stream4) {
       var self2 = this;
-      stream4.on("error", function(err) {
+      stream4.on("error", function (err) {
         self2._emitError(err);
       });
     };
-    CombinedStream.prototype.write = function(data) {
+    CombinedStream.prototype.write = function (data) {
       this.emit("data", data);
     };
-    CombinedStream.prototype.pause = function() {
+    CombinedStream.prototype.pause = function () {
       if (!this.pauseStreams) {
         return;
       }
-      if (this.pauseStreams && this._currentStream && typeof this._currentStream.pause == "function")
+      if (
+        this.pauseStreams &&
+        this._currentStream &&
+        typeof this._currentStream.pause == "function"
+      )
         this._currentStream.pause();
       this.emit("pause");
     };
-    CombinedStream.prototype.resume = function() {
+    CombinedStream.prototype.resume = function () {
       if (!this._released) {
         this._released = true;
         this.writable = true;
         this._getNext();
       }
-      if (this.pauseStreams && this._currentStream && typeof this._currentStream.resume == "function")
+      if (
+        this.pauseStreams &&
+        this._currentStream &&
+        typeof this._currentStream.resume == "function"
+      )
         this._currentStream.resume();
       this.emit("resume");
     };
-    CombinedStream.prototype.end = function() {
+    CombinedStream.prototype.end = function () {
       this._reset();
       this.emit("end");
     };
-    CombinedStream.prototype.destroy = function() {
+    CombinedStream.prototype.destroy = function () {
       this._reset();
       this.emit("close");
     };
-    CombinedStream.prototype._reset = function() {
+    CombinedStream.prototype._reset = function () {
       this.writable = false;
       this._streams = [];
       this._currentStream = null;
     };
-    CombinedStream.prototype._checkDataSize = function() {
+    CombinedStream.prototype._checkDataSize = function () {
       this._updateDataSize();
       if (this.dataSize <= this.maxDataSize) {
         return;
       }
-      var message = "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
+      var message =
+        "DelayedStream#maxDataSize of " + this.maxDataSize + " bytes exceeded.";
       this._emitError(new Error(message));
     };
-    CombinedStream.prototype._updateDataSize = function() {
+    CombinedStream.prototype._updateDataSize = function () {
       this.dataSize = 0;
       var self2 = this;
-      this._streams.forEach(function(stream4) {
+      this._streams.forEach(function (stream4) {
         if (!stream4.dataSize) {
           return;
         }
@@ -285,11 +318,11 @@ var require_combined_stream = __commonJS({
         this.dataSize += this._currentStream.dataSize;
       }
     };
-    CombinedStream.prototype._emitError = function(err) {
+    CombinedStream.prototype._emitError = function (err) {
       this._reset();
       this.emit("error", err);
     };
-  }
+  },
 });
 
 // node_modules/mime-db/db.json
@@ -297,8531 +330,8620 @@ var require_db = __commonJS({
   "node_modules/mime-db/db.json"(exports2, module2) {
     module2.exports = {
       "application/1d-interleaved-parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "application/3gpdash-qoe-report+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/3gpp-ims+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/3gpphal+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/3gpphalforms+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/a2l": {
-        source: "iana"
+        source: "iana",
       },
       "application/ace+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/activemessage": {
-        source: "iana"
+        source: "iana",
       },
       "application/activity+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-costmap+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-costmapfilter+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-directory+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-endpointcost+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-endpointcostparams+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-endpointprop+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-endpointpropparams+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-error+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-networkmap+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-networkmapfilter+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-updatestreamcontrol+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/alto-updatestreamparams+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/aml": {
-        source: "iana"
+        source: "iana",
       },
       "application/andrew-inset": {
         source: "iana",
-        extensions: ["ez"]
+        extensions: ["ez"],
       },
       "application/applefile": {
-        source: "iana"
+        source: "iana",
       },
       "application/applixware": {
         source: "apache",
-        extensions: ["aw"]
+        extensions: ["aw"],
       },
       "application/at+jwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/atf": {
-        source: "iana"
+        source: "iana",
       },
       "application/atfx": {
-        source: "iana"
+        source: "iana",
       },
       "application/atom+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["atom"]
+        extensions: ["atom"],
       },
       "application/atomcat+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["atomcat"]
+        extensions: ["atomcat"],
       },
       "application/atomdeleted+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["atomdeleted"]
+        extensions: ["atomdeleted"],
       },
       "application/atomicmail": {
-        source: "iana"
+        source: "iana",
       },
       "application/atomsvc+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["atomsvc"]
+        extensions: ["atomsvc"],
       },
       "application/atsc-dwd+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["dwd"]
+        extensions: ["dwd"],
       },
       "application/atsc-dynamic-event-message": {
-        source: "iana"
+        source: "iana",
       },
       "application/atsc-held+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["held"]
+        extensions: ["held"],
       },
       "application/atsc-rdt+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/atsc-rsat+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rsat"]
+        extensions: ["rsat"],
       },
       "application/atxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/auth-policy+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/bacnet-xdd+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/batch-smtp": {
-        source: "iana"
+        source: "iana",
       },
       "application/bdoc": {
         compressible: false,
-        extensions: ["bdoc"]
+        extensions: ["bdoc"],
       },
       "application/beep+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/calendar+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/calendar+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xcs"]
+        extensions: ["xcs"],
       },
       "application/call-completion": {
-        source: "iana"
+        source: "iana",
       },
       "application/cals-1840": {
-        source: "iana"
+        source: "iana",
       },
       "application/captive+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/cbor-seq": {
-        source: "iana"
+        source: "iana",
       },
       "application/cccex": {
-        source: "iana"
+        source: "iana",
       },
       "application/ccmp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/ccxml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["ccxml"]
+        extensions: ["ccxml"],
       },
       "application/cdfx+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["cdfx"]
+        extensions: ["cdfx"],
       },
       "application/cdmi-capability": {
         source: "iana",
-        extensions: ["cdmia"]
+        extensions: ["cdmia"],
       },
       "application/cdmi-container": {
         source: "iana",
-        extensions: ["cdmic"]
+        extensions: ["cdmic"],
       },
       "application/cdmi-domain": {
         source: "iana",
-        extensions: ["cdmid"]
+        extensions: ["cdmid"],
       },
       "application/cdmi-object": {
         source: "iana",
-        extensions: ["cdmio"]
+        extensions: ["cdmio"],
       },
       "application/cdmi-queue": {
         source: "iana",
-        extensions: ["cdmiq"]
+        extensions: ["cdmiq"],
       },
       "application/cdni": {
-        source: "iana"
+        source: "iana",
       },
       "application/cea": {
-        source: "iana"
+        source: "iana",
       },
       "application/cea-2018+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cellml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cfw": {
-        source: "iana"
+        source: "iana",
       },
       "application/city+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/clr": {
-        source: "iana"
+        source: "iana",
       },
       "application/clue+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/clue_info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cms": {
-        source: "iana"
+        source: "iana",
       },
       "application/cnrp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/coap-group+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/coap-payload": {
-        source: "iana"
+        source: "iana",
       },
       "application/commonground": {
-        source: "iana"
+        source: "iana",
       },
       "application/conference-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cose": {
-        source: "iana"
+        source: "iana",
       },
       "application/cose-key": {
-        source: "iana"
+        source: "iana",
       },
       "application/cose-key-set": {
-        source: "iana"
+        source: "iana",
       },
       "application/cpl+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["cpl"]
+        extensions: ["cpl"],
       },
       "application/csrattrs": {
-        source: "iana"
+        source: "iana",
       },
       "application/csta+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cstadata+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/csvm+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/cu-seeme": {
         source: "apache",
-        extensions: ["cu"]
+        extensions: ["cu"],
       },
       "application/cwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/cybercash": {
-        source: "iana"
+        source: "iana",
       },
       "application/dart": {
-        compressible: true
+        compressible: true,
       },
       "application/dash+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mpd"]
+        extensions: ["mpd"],
       },
       "application/dash-patch+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mpp"]
+        extensions: ["mpp"],
       },
       "application/dashdelta": {
-        source: "iana"
+        source: "iana",
       },
       "application/davmount+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["davmount"]
+        extensions: ["davmount"],
       },
       "application/dca-rft": {
-        source: "iana"
+        source: "iana",
       },
       "application/dcd": {
-        source: "iana"
+        source: "iana",
       },
       "application/dec-dx": {
-        source: "iana"
+        source: "iana",
       },
       "application/dialog-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/dicom": {
-        source: "iana"
+        source: "iana",
       },
       "application/dicom+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/dicom+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/dii": {
-        source: "iana"
+        source: "iana",
       },
       "application/dit": {
-        source: "iana"
+        source: "iana",
       },
       "application/dns": {
-        source: "iana"
+        source: "iana",
       },
       "application/dns+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/dns-message": {
-        source: "iana"
+        source: "iana",
       },
       "application/docbook+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["dbk"]
+        extensions: ["dbk"],
       },
       "application/dots+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/dskpp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/dssc+der": {
         source: "iana",
-        extensions: ["dssc"]
+        extensions: ["dssc"],
       },
       "application/dssc+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xdssc"]
+        extensions: ["xdssc"],
       },
       "application/dvcs": {
-        source: "iana"
+        source: "iana",
       },
       "application/ecmascript": {
         source: "iana",
         compressible: true,
-        extensions: ["es", "ecma"]
+        extensions: ["es", "ecma"],
       },
       "application/edi-consent": {
-        source: "iana"
+        source: "iana",
       },
       "application/edi-x12": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/edifact": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/efi": {
-        source: "iana"
+        source: "iana",
       },
       "application/elm+json": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/elm+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.cap+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.comment+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.control+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.deviceinfo+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.ecall.msd": {
-        source: "iana"
+        source: "iana",
       },
       "application/emergencycalldata.providerinfo+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.serviceinfo+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.subscriberinfo+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emergencycalldata.veds+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/emma+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["emma"]
+        extensions: ["emma"],
       },
       "application/emotionml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["emotionml"]
+        extensions: ["emotionml"],
       },
       "application/encaprtp": {
-        source: "iana"
+        source: "iana",
       },
       "application/epp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/epub+zip": {
         source: "iana",
         compressible: false,
-        extensions: ["epub"]
+        extensions: ["epub"],
       },
       "application/eshop": {
-        source: "iana"
+        source: "iana",
       },
       "application/exi": {
         source: "iana",
-        extensions: ["exi"]
+        extensions: ["exi"],
       },
       "application/expect-ct-report+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/express": {
         source: "iana",
-        extensions: ["exp"]
+        extensions: ["exp"],
       },
       "application/fastinfoset": {
-        source: "iana"
+        source: "iana",
       },
       "application/fastsoap": {
-        source: "iana"
+        source: "iana",
       },
       "application/fdt+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["fdt"]
+        extensions: ["fdt"],
       },
       "application/fhir+json": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/fhir+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/fido.trusted-apps+json": {
-        compressible: true
+        compressible: true,
       },
       "application/fits": {
-        source: "iana"
+        source: "iana",
       },
       "application/flexfec": {
-        source: "iana"
+        source: "iana",
       },
       "application/font-sfnt": {
-        source: "iana"
+        source: "iana",
       },
       "application/font-tdpfr": {
         source: "iana",
-        extensions: ["pfr"]
+        extensions: ["pfr"],
       },
       "application/font-woff": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/framework-attributes+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/geo+json": {
         source: "iana",
         compressible: true,
-        extensions: ["geojson"]
+        extensions: ["geojson"],
       },
       "application/geo+json-seq": {
-        source: "iana"
+        source: "iana",
       },
       "application/geopackage+sqlite3": {
-        source: "iana"
+        source: "iana",
       },
       "application/geoxacml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/gltf-buffer": {
-        source: "iana"
+        source: "iana",
       },
       "application/gml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["gml"]
+        extensions: ["gml"],
       },
       "application/gpx+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["gpx"]
+        extensions: ["gpx"],
       },
       "application/gxf": {
         source: "apache",
-        extensions: ["gxf"]
+        extensions: ["gxf"],
       },
       "application/gzip": {
         source: "iana",
         compressible: false,
-        extensions: ["gz"]
+        extensions: ["gz"],
       },
       "application/h224": {
-        source: "iana"
+        source: "iana",
       },
       "application/held+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/hjson": {
-        extensions: ["hjson"]
+        extensions: ["hjson"],
       },
       "application/http": {
-        source: "iana"
+        source: "iana",
       },
       "application/hyperstudio": {
         source: "iana",
-        extensions: ["stk"]
+        extensions: ["stk"],
       },
       "application/ibe-key-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/ibe-pkg-reply+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/ibe-pp-data": {
-        source: "iana"
+        source: "iana",
       },
       "application/iges": {
-        source: "iana"
+        source: "iana",
       },
       "application/im-iscomposing+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/index": {
-        source: "iana"
+        source: "iana",
       },
       "application/index.cmd": {
-        source: "iana"
+        source: "iana",
       },
       "application/index.obj": {
-        source: "iana"
+        source: "iana",
       },
       "application/index.response": {
-        source: "iana"
+        source: "iana",
       },
       "application/index.vnd": {
-        source: "iana"
+        source: "iana",
       },
       "application/inkml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["ink", "inkml"]
+        extensions: ["ink", "inkml"],
       },
       "application/iotp": {
-        source: "iana"
+        source: "iana",
       },
       "application/ipfix": {
         source: "iana",
-        extensions: ["ipfix"]
+        extensions: ["ipfix"],
       },
       "application/ipp": {
-        source: "iana"
+        source: "iana",
       },
       "application/isup": {
-        source: "iana"
+        source: "iana",
       },
       "application/its+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["its"]
+        extensions: ["its"],
       },
       "application/java-archive": {
         source: "apache",
         compressible: false,
-        extensions: ["jar", "war", "ear"]
+        extensions: ["jar", "war", "ear"],
       },
       "application/java-serialized-object": {
         source: "apache",
         compressible: false,
-        extensions: ["ser"]
+        extensions: ["ser"],
       },
       "application/java-vm": {
         source: "apache",
         compressible: false,
-        extensions: ["class"]
+        extensions: ["class"],
       },
       "application/javascript": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["js", "mjs"]
+        extensions: ["js", "mjs"],
       },
       "application/jf2feed+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/jose": {
-        source: "iana"
+        source: "iana",
       },
       "application/jose+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/jrd+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/jscalendar+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/json": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["json", "map"]
+        extensions: ["json", "map"],
       },
       "application/json-patch+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/json-seq": {
-        source: "iana"
+        source: "iana",
       },
       "application/json5": {
-        extensions: ["json5"]
+        extensions: ["json5"],
       },
       "application/jsonml+json": {
         source: "apache",
         compressible: true,
-        extensions: ["jsonml"]
+        extensions: ["jsonml"],
       },
       "application/jwk+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/jwk-set+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/jwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/kpml-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/kpml-response+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/ld+json": {
         source: "iana",
         compressible: true,
-        extensions: ["jsonld"]
+        extensions: ["jsonld"],
       },
       "application/lgr+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["lgr"]
+        extensions: ["lgr"],
       },
       "application/link-format": {
-        source: "iana"
+        source: "iana",
       },
       "application/load-control+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/lost+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["lostxml"]
+        extensions: ["lostxml"],
       },
       "application/lostsync+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/lpf+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/lxf": {
-        source: "iana"
+        source: "iana",
       },
       "application/mac-binhex40": {
         source: "iana",
-        extensions: ["hqx"]
+        extensions: ["hqx"],
       },
       "application/mac-compactpro": {
         source: "apache",
-        extensions: ["cpt"]
+        extensions: ["cpt"],
       },
       "application/macwriteii": {
-        source: "iana"
+        source: "iana",
       },
       "application/mads+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mads"]
+        extensions: ["mads"],
       },
       "application/manifest+json": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["webmanifest"]
+        extensions: ["webmanifest"],
       },
       "application/marc": {
         source: "iana",
-        extensions: ["mrc"]
+        extensions: ["mrc"],
       },
       "application/marcxml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mrcx"]
+        extensions: ["mrcx"],
       },
       "application/mathematica": {
         source: "iana",
-        extensions: ["ma", "nb", "mb"]
+        extensions: ["ma", "nb", "mb"],
       },
       "application/mathml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mathml"]
+        extensions: ["mathml"],
       },
       "application/mathml-content+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mathml-presentation+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-associated-procedure-description+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-deregister+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-envelope+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-msk+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-msk-response+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-protection-description+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-reception-report+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-register+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-register-response+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-schedule+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbms-user-service-description+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mbox": {
         source: "iana",
-        extensions: ["mbox"]
+        extensions: ["mbox"],
       },
       "application/media-policy-dataset+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mpf"]
+        extensions: ["mpf"],
       },
       "application/media_control+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mediaservercontrol+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mscml"]
+        extensions: ["mscml"],
       },
       "application/merge-patch+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/metalink+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["metalink"]
+        extensions: ["metalink"],
       },
       "application/metalink4+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["meta4"]
+        extensions: ["meta4"],
       },
       "application/mets+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mets"]
+        extensions: ["mets"],
       },
       "application/mf4": {
-        source: "iana"
+        source: "iana",
       },
       "application/mikey": {
-        source: "iana"
+        source: "iana",
       },
       "application/mipc": {
-        source: "iana"
+        source: "iana",
       },
       "application/missing-blocks+cbor-seq": {
-        source: "iana"
+        source: "iana",
       },
       "application/mmt-aei+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["maei"]
+        extensions: ["maei"],
       },
       "application/mmt-usd+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["musd"]
+        extensions: ["musd"],
       },
       "application/mods+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mods"]
+        extensions: ["mods"],
       },
       "application/moss-keys": {
-        source: "iana"
+        source: "iana",
       },
       "application/moss-signature": {
-        source: "iana"
+        source: "iana",
       },
       "application/mosskey-data": {
-        source: "iana"
+        source: "iana",
       },
       "application/mosskey-request": {
-        source: "iana"
+        source: "iana",
       },
       "application/mp21": {
         source: "iana",
-        extensions: ["m21", "mp21"]
+        extensions: ["m21", "mp21"],
       },
       "application/mp4": {
         source: "iana",
-        extensions: ["mp4s", "m4p"]
+        extensions: ["mp4s", "m4p"],
       },
       "application/mpeg4-generic": {
-        source: "iana"
+        source: "iana",
       },
       "application/mpeg4-iod": {
-        source: "iana"
+        source: "iana",
       },
       "application/mpeg4-iod-xmt": {
-        source: "iana"
+        source: "iana",
       },
       "application/mrb-consumer+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/mrb-publish+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/msc-ivr+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/msc-mixer+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/msword": {
         source: "iana",
         compressible: false,
-        extensions: ["doc", "dot"]
+        extensions: ["doc", "dot"],
       },
       "application/mud+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/multipart-core": {
-        source: "iana"
+        source: "iana",
       },
       "application/mxf": {
         source: "iana",
-        extensions: ["mxf"]
+        extensions: ["mxf"],
       },
       "application/n-quads": {
         source: "iana",
-        extensions: ["nq"]
+        extensions: ["nq"],
       },
       "application/n-triples": {
         source: "iana",
-        extensions: ["nt"]
+        extensions: ["nt"],
       },
       "application/nasdata": {
-        source: "iana"
+        source: "iana",
       },
       "application/news-checkgroups": {
         source: "iana",
-        charset: "US-ASCII"
+        charset: "US-ASCII",
       },
       "application/news-groupinfo": {
         source: "iana",
-        charset: "US-ASCII"
+        charset: "US-ASCII",
       },
       "application/news-transmission": {
-        source: "iana"
+        source: "iana",
       },
       "application/nlsml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/node": {
         source: "iana",
-        extensions: ["cjs"]
+        extensions: ["cjs"],
       },
       "application/nss": {
-        source: "iana"
+        source: "iana",
       },
       "application/oauth-authz-req+jwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/oblivious-dns-message": {
-        source: "iana"
+        source: "iana",
       },
       "application/ocsp-request": {
-        source: "iana"
+        source: "iana",
       },
       "application/ocsp-response": {
-        source: "iana"
+        source: "iana",
       },
       "application/octet-stream": {
         source: "iana",
         compressible: false,
-        extensions: ["bin", "dms", "lrf", "mar", "so", "dist", "distz", "pkg", "bpk", "dump", "elc", "deploy", "exe", "dll", "deb", "dmg", "iso", "img", "msi", "msp", "msm", "buffer"]
+        extensions: [
+          "bin",
+          "dms",
+          "lrf",
+          "mar",
+          "so",
+          "dist",
+          "distz",
+          "pkg",
+          "bpk",
+          "dump",
+          "elc",
+          "deploy",
+          "exe",
+          "dll",
+          "deb",
+          "dmg",
+          "iso",
+          "img",
+          "msi",
+          "msp",
+          "msm",
+          "buffer",
+        ],
       },
       "application/oda": {
         source: "iana",
-        extensions: ["oda"]
+        extensions: ["oda"],
       },
       "application/odm+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/odx": {
-        source: "iana"
+        source: "iana",
       },
       "application/oebps-package+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["opf"]
+        extensions: ["opf"],
       },
       "application/ogg": {
         source: "iana",
         compressible: false,
-        extensions: ["ogx"]
+        extensions: ["ogx"],
       },
       "application/omdoc+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["omdoc"]
+        extensions: ["omdoc"],
       },
       "application/onenote": {
         source: "apache",
-        extensions: ["onetoc", "onetoc2", "onetmp", "onepkg"]
+        extensions: ["onetoc", "onetoc2", "onetmp", "onepkg"],
       },
       "application/opc-nodeset+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/oscore": {
-        source: "iana"
+        source: "iana",
       },
       "application/oxps": {
         source: "iana",
-        extensions: ["oxps"]
+        extensions: ["oxps"],
       },
       "application/p21": {
-        source: "iana"
+        source: "iana",
       },
       "application/p21+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/p2p-overlay+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["relo"]
+        extensions: ["relo"],
       },
       "application/parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "application/passport": {
-        source: "iana"
+        source: "iana",
       },
       "application/patch-ops-error+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xer"]
+        extensions: ["xer"],
       },
       "application/pdf": {
         source: "iana",
         compressible: false,
-        extensions: ["pdf"]
+        extensions: ["pdf"],
       },
       "application/pdx": {
-        source: "iana"
+        source: "iana",
       },
       "application/pem-certificate-chain": {
-        source: "iana"
+        source: "iana",
       },
       "application/pgp-encrypted": {
         source: "iana",
         compressible: false,
-        extensions: ["pgp"]
+        extensions: ["pgp"],
       },
       "application/pgp-keys": {
         source: "iana",
-        extensions: ["asc"]
+        extensions: ["asc"],
       },
       "application/pgp-signature": {
         source: "iana",
-        extensions: ["asc", "sig"]
+        extensions: ["asc", "sig"],
       },
       "application/pics-rules": {
         source: "apache",
-        extensions: ["prf"]
+        extensions: ["prf"],
       },
       "application/pidf+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/pidf-diff+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/pkcs10": {
         source: "iana",
-        extensions: ["p10"]
+        extensions: ["p10"],
       },
       "application/pkcs12": {
-        source: "iana"
+        source: "iana",
       },
       "application/pkcs7-mime": {
         source: "iana",
-        extensions: ["p7m", "p7c"]
+        extensions: ["p7m", "p7c"],
       },
       "application/pkcs7-signature": {
         source: "iana",
-        extensions: ["p7s"]
+        extensions: ["p7s"],
       },
       "application/pkcs8": {
         source: "iana",
-        extensions: ["p8"]
+        extensions: ["p8"],
       },
       "application/pkcs8-encrypted": {
-        source: "iana"
+        source: "iana",
       },
       "application/pkix-attr-cert": {
         source: "iana",
-        extensions: ["ac"]
+        extensions: ["ac"],
       },
       "application/pkix-cert": {
         source: "iana",
-        extensions: ["cer"]
+        extensions: ["cer"],
       },
       "application/pkix-crl": {
         source: "iana",
-        extensions: ["crl"]
+        extensions: ["crl"],
       },
       "application/pkix-pkipath": {
         source: "iana",
-        extensions: ["pkipath"]
+        extensions: ["pkipath"],
       },
       "application/pkixcmp": {
         source: "iana",
-        extensions: ["pki"]
+        extensions: ["pki"],
       },
       "application/pls+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["pls"]
+        extensions: ["pls"],
       },
       "application/poc-settings+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/postscript": {
         source: "iana",
         compressible: true,
-        extensions: ["ai", "eps", "ps"]
+        extensions: ["ai", "eps", "ps"],
       },
       "application/ppsp-tracker+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/problem+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/problem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/provenance+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["provx"]
+        extensions: ["provx"],
       },
       "application/prs.alvestrand.titrax-sheet": {
-        source: "iana"
+        source: "iana",
       },
       "application/prs.cww": {
         source: "iana",
-        extensions: ["cww"]
+        extensions: ["cww"],
       },
       "application/prs.cyn": {
         source: "iana",
-        charset: "7-BIT"
+        charset: "7-BIT",
       },
       "application/prs.hpub+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/prs.nprend": {
-        source: "iana"
+        source: "iana",
       },
       "application/prs.plucker": {
-        source: "iana"
+        source: "iana",
       },
       "application/prs.rdf-xml-crypt": {
-        source: "iana"
+        source: "iana",
       },
       "application/prs.xsf+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/pskc+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["pskcxml"]
+        extensions: ["pskcxml"],
       },
       "application/pvd+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/qsig": {
-        source: "iana"
+        source: "iana",
       },
       "application/raml+yaml": {
         compressible: true,
-        extensions: ["raml"]
+        extensions: ["raml"],
       },
       "application/raptorfec": {
-        source: "iana"
+        source: "iana",
       },
       "application/rdap+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/rdf+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rdf", "owl"]
+        extensions: ["rdf", "owl"],
       },
       "application/reginfo+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rif"]
+        extensions: ["rif"],
       },
       "application/relax-ng-compact-syntax": {
         source: "iana",
-        extensions: ["rnc"]
+        extensions: ["rnc"],
       },
       "application/remote-printing": {
-        source: "iana"
+        source: "iana",
       },
       "application/reputon+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/resource-lists+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rl"]
+        extensions: ["rl"],
       },
       "application/resource-lists-diff+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rld"]
+        extensions: ["rld"],
       },
       "application/rfc+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/riscos": {
-        source: "iana"
+        source: "iana",
       },
       "application/rlmi+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/rls-services+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rs"]
+        extensions: ["rs"],
       },
       "application/route-apd+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rapd"]
+        extensions: ["rapd"],
       },
       "application/route-s-tsid+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["sls"]
+        extensions: ["sls"],
       },
       "application/route-usd+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rusd"]
+        extensions: ["rusd"],
       },
       "application/rpki-ghostbusters": {
         source: "iana",
-        extensions: ["gbr"]
+        extensions: ["gbr"],
       },
       "application/rpki-manifest": {
         source: "iana",
-        extensions: ["mft"]
+        extensions: ["mft"],
       },
       "application/rpki-publication": {
-        source: "iana"
+        source: "iana",
       },
       "application/rpki-roa": {
         source: "iana",
-        extensions: ["roa"]
+        extensions: ["roa"],
       },
       "application/rpki-updown": {
-        source: "iana"
+        source: "iana",
       },
       "application/rsd+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["rsd"]
+        extensions: ["rsd"],
       },
       "application/rss+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["rss"]
+        extensions: ["rss"],
       },
       "application/rtf": {
         source: "iana",
         compressible: true,
-        extensions: ["rtf"]
+        extensions: ["rtf"],
       },
       "application/rtploopback": {
-        source: "iana"
+        source: "iana",
       },
       "application/rtx": {
-        source: "iana"
+        source: "iana",
       },
       "application/samlassertion+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/samlmetadata+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sarif+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sarif-external-properties+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sbe": {
-        source: "iana"
+        source: "iana",
       },
       "application/sbml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["sbml"]
+        extensions: ["sbml"],
       },
       "application/scaip+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/scim+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/scvp-cv-request": {
         source: "iana",
-        extensions: ["scq"]
+        extensions: ["scq"],
       },
       "application/scvp-cv-response": {
         source: "iana",
-        extensions: ["scs"]
+        extensions: ["scs"],
       },
       "application/scvp-vp-request": {
         source: "iana",
-        extensions: ["spq"]
+        extensions: ["spq"],
       },
       "application/scvp-vp-response": {
         source: "iana",
-        extensions: ["spp"]
+        extensions: ["spp"],
       },
       "application/sdp": {
         source: "iana",
-        extensions: ["sdp"]
+        extensions: ["sdp"],
       },
       "application/secevent+jwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/senml+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/senml+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/senml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["senmlx"]
+        extensions: ["senmlx"],
       },
       "application/senml-etch+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/senml-etch+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/senml-exi": {
-        source: "iana"
+        source: "iana",
       },
       "application/sensml+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/sensml+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sensml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["sensmlx"]
+        extensions: ["sensmlx"],
       },
       "application/sensml-exi": {
-        source: "iana"
+        source: "iana",
       },
       "application/sep+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sep-exi": {
-        source: "iana"
+        source: "iana",
       },
       "application/session-info": {
-        source: "iana"
+        source: "iana",
       },
       "application/set-payment": {
-        source: "iana"
+        source: "iana",
       },
       "application/set-payment-initiation": {
         source: "iana",
-        extensions: ["setpay"]
+        extensions: ["setpay"],
       },
       "application/set-registration": {
-        source: "iana"
+        source: "iana",
       },
       "application/set-registration-initiation": {
         source: "iana",
-        extensions: ["setreg"]
+        extensions: ["setreg"],
       },
       "application/sgml": {
-        source: "iana"
+        source: "iana",
       },
       "application/sgml-open-catalog": {
-        source: "iana"
+        source: "iana",
       },
       "application/shf+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["shf"]
+        extensions: ["shf"],
       },
       "application/sieve": {
         source: "iana",
-        extensions: ["siv", "sieve"]
+        extensions: ["siv", "sieve"],
       },
       "application/simple-filter+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/simple-message-summary": {
-        source: "iana"
+        source: "iana",
       },
       "application/simplesymbolcontainer": {
-        source: "iana"
+        source: "iana",
       },
       "application/sipc": {
-        source: "iana"
+        source: "iana",
       },
       "application/slate": {
-        source: "iana"
+        source: "iana",
       },
       "application/smil": {
-        source: "iana"
+        source: "iana",
       },
       "application/smil+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["smi", "smil"]
+        extensions: ["smi", "smil"],
       },
       "application/smpte336m": {
-        source: "iana"
+        source: "iana",
       },
       "application/soap+fastinfoset": {
-        source: "iana"
+        source: "iana",
       },
       "application/soap+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sparql-query": {
         source: "iana",
-        extensions: ["rq"]
+        extensions: ["rq"],
       },
       "application/sparql-results+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["srx"]
+        extensions: ["srx"],
       },
       "application/spdx+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/spirits-event+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/sql": {
-        source: "iana"
+        source: "iana",
       },
       "application/srgs": {
         source: "iana",
-        extensions: ["gram"]
+        extensions: ["gram"],
       },
       "application/srgs+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["grxml"]
+        extensions: ["grxml"],
       },
       "application/sru+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["sru"]
+        extensions: ["sru"],
       },
       "application/ssdl+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["ssdl"]
+        extensions: ["ssdl"],
       },
       "application/ssml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["ssml"]
+        extensions: ["ssml"],
       },
       "application/stix+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/swid+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["swidtag"]
+        extensions: ["swidtag"],
       },
       "application/tamp-apex-update": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-apex-update-confirm": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-community-update": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-community-update-confirm": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-error": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-sequence-adjust": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-sequence-adjust-confirm": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-status-query": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-status-response": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-update": {
-        source: "iana"
+        source: "iana",
       },
       "application/tamp-update-confirm": {
-        source: "iana"
+        source: "iana",
       },
       "application/tar": {
-        compressible: true
+        compressible: true,
       },
       "application/taxii+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/td+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/tei+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["tei", "teicorpus"]
+        extensions: ["tei", "teicorpus"],
       },
       "application/tetra_isi": {
-        source: "iana"
+        source: "iana",
       },
       "application/thraud+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["tfi"]
+        extensions: ["tfi"],
       },
       "application/timestamp-query": {
-        source: "iana"
+        source: "iana",
       },
       "application/timestamp-reply": {
-        source: "iana"
+        source: "iana",
       },
       "application/timestamped-data": {
         source: "iana",
-        extensions: ["tsd"]
+        extensions: ["tsd"],
       },
       "application/tlsrpt+gzip": {
-        source: "iana"
+        source: "iana",
       },
       "application/tlsrpt+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/tnauthlist": {
-        source: "iana"
+        source: "iana",
       },
       "application/token-introspection+jwt": {
-        source: "iana"
+        source: "iana",
       },
       "application/toml": {
         compressible: true,
-        extensions: ["toml"]
+        extensions: ["toml"],
       },
       "application/trickle-ice-sdpfrag": {
-        source: "iana"
+        source: "iana",
       },
       "application/trig": {
         source: "iana",
-        extensions: ["trig"]
+        extensions: ["trig"],
       },
       "application/ttml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["ttml"]
+        extensions: ["ttml"],
       },
       "application/tve-trigger": {
-        source: "iana"
+        source: "iana",
       },
       "application/tzif": {
-        source: "iana"
+        source: "iana",
       },
       "application/tzif-leap": {
-        source: "iana"
+        source: "iana",
       },
       "application/ubjson": {
         compressible: false,
-        extensions: ["ubj"]
+        extensions: ["ubj"],
       },
       "application/ulpfec": {
-        source: "iana"
+        source: "iana",
       },
       "application/urc-grpsheet+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/urc-ressheet+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["rsheet"]
+        extensions: ["rsheet"],
       },
       "application/urc-targetdesc+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["td"]
+        extensions: ["td"],
       },
       "application/urc-uisocketdesc+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vcard+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vcard+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vemmi": {
-        source: "iana"
+        source: "iana",
       },
       "application/vividence.scriptfile": {
-        source: "apache"
+        source: "apache",
       },
       "application/vnd.1000minds.decision-model+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["1km"]
+        extensions: ["1km"],
       },
       "application/vnd.3gpp-prose+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp-prose-pc3ch+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp-v2x-local-service-information": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.5gnas": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.access-transfer-events+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.bsf+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.gmop+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.gtpc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.interworking-data": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.lpp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.mc-signalling-ear": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.mcdata-affiliation-command+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcdata-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcdata-payload": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.mcdata-service-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcdata-signalling": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.mcdata-ue-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcdata-user-profile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-affiliation-command+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-floor-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-location-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-mbms-usage-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-service-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-signed+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-ue-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-ue-init-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcptt-user-profile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-affiliation-command+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-affiliation-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-location-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-mbms-usage-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-service-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-transmission-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-ue-config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mcvideo-user-profile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.mid-call+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.ngap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.pfcp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.pic-bw-large": {
         source: "iana",
-        extensions: ["plb"]
+        extensions: ["plb"],
       },
       "application/vnd.3gpp.pic-bw-small": {
         source: "iana",
-        extensions: ["psb"]
+        extensions: ["psb"],
       },
       "application/vnd.3gpp.pic-bw-var": {
         source: "iana",
-        extensions: ["pvb"]
+        extensions: ["pvb"],
       },
       "application/vnd.3gpp.s1ap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.sms": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp.sms+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.srvcc-ext+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.srvcc-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.state-and-event-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp.ussd+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp2.bcmcsinfo+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.3gpp2.sms": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3gpp2.tcap": {
         source: "iana",
-        extensions: ["tcap"]
+        extensions: ["tcap"],
       },
       "application/vnd.3lightssoftware.imagescal": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.3m.post-it-notes": {
         source: "iana",
-        extensions: ["pwn"]
+        extensions: ["pwn"],
       },
       "application/vnd.accpac.simply.aso": {
         source: "iana",
-        extensions: ["aso"]
+        extensions: ["aso"],
       },
       "application/vnd.accpac.simply.imp": {
         source: "iana",
-        extensions: ["imp"]
+        extensions: ["imp"],
       },
       "application/vnd.acucobol": {
         source: "iana",
-        extensions: ["acu"]
+        extensions: ["acu"],
       },
       "application/vnd.acucorp": {
         source: "iana",
-        extensions: ["atc", "acutc"]
+        extensions: ["atc", "acutc"],
       },
       "application/vnd.adobe.air-application-installer-package+zip": {
         source: "apache",
         compressible: false,
-        extensions: ["air"]
+        extensions: ["air"],
       },
       "application/vnd.adobe.flash.movie": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.adobe.formscentral.fcdt": {
         source: "iana",
-        extensions: ["fcdt"]
+        extensions: ["fcdt"],
       },
       "application/vnd.adobe.fxp": {
         source: "iana",
-        extensions: ["fxp", "fxpl"]
+        extensions: ["fxp", "fxpl"],
       },
       "application/vnd.adobe.partial-upload": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.adobe.xdp+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xdp"]
+        extensions: ["xdp"],
       },
       "application/vnd.adobe.xfdf": {
         source: "iana",
-        extensions: ["xfdf"]
+        extensions: ["xfdf"],
       },
       "application/vnd.aether.imp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.afplinedata": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.afplinedata-pagedef": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.cmoca-cmresource": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.foca-charset": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.foca-codedfont": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.foca-codepage": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-cmtable": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-formdef": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-mediummap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-objectcontainer": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-overlay": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.afpc.modca-pagesegment": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.age": {
         source: "iana",
-        extensions: ["age"]
+        extensions: ["age"],
       },
       "application/vnd.ah-barcode": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ahead.space": {
         source: "iana",
-        extensions: ["ahead"]
+        extensions: ["ahead"],
       },
       "application/vnd.airzip.filesecure.azf": {
         source: "iana",
-        extensions: ["azf"]
+        extensions: ["azf"],
       },
       "application/vnd.airzip.filesecure.azs": {
         source: "iana",
-        extensions: ["azs"]
+        extensions: ["azs"],
       },
       "application/vnd.amadeus+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.amazon.ebook": {
         source: "apache",
-        extensions: ["azw"]
+        extensions: ["azw"],
       },
       "application/vnd.amazon.mobi8-ebook": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.americandynamics.acc": {
         source: "iana",
-        extensions: ["acc"]
+        extensions: ["acc"],
       },
       "application/vnd.amiga.ami": {
         source: "iana",
-        extensions: ["ami"]
+        extensions: ["ami"],
       },
       "application/vnd.amundsen.maze+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.android.ota": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.android.package-archive": {
         source: "apache",
         compressible: false,
-        extensions: ["apk"]
+        extensions: ["apk"],
       },
       "application/vnd.anki": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.anser-web-certificate-issue-initiation": {
         source: "iana",
-        extensions: ["cii"]
+        extensions: ["cii"],
       },
       "application/vnd.anser-web-funds-transfer-initiation": {
         source: "apache",
-        extensions: ["fti"]
+        extensions: ["fti"],
       },
       "application/vnd.antix.game-component": {
         source: "iana",
-        extensions: ["atx"]
+        extensions: ["atx"],
       },
       "application/vnd.apache.arrow.file": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.apache.arrow.stream": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.apache.thrift.binary": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.apache.thrift.compact": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.apache.thrift.json": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.api+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.aplextor.warrp+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.apothekende.reservation+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.apple.installer+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mpkg"]
+        extensions: ["mpkg"],
       },
       "application/vnd.apple.keynote": {
         source: "iana",
-        extensions: ["key"]
+        extensions: ["key"],
       },
       "application/vnd.apple.mpegurl": {
         source: "iana",
-        extensions: ["m3u8"]
+        extensions: ["m3u8"],
       },
       "application/vnd.apple.numbers": {
         source: "iana",
-        extensions: ["numbers"]
+        extensions: ["numbers"],
       },
       "application/vnd.apple.pages": {
         source: "iana",
-        extensions: ["pages"]
+        extensions: ["pages"],
       },
       "application/vnd.apple.pkpass": {
         compressible: false,
-        extensions: ["pkpass"]
+        extensions: ["pkpass"],
       },
       "application/vnd.arastra.swi": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.aristanetworks.swi": {
         source: "iana",
-        extensions: ["swi"]
+        extensions: ["swi"],
       },
       "application/vnd.artisan+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.artsquare": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.astraea-software.iota": {
         source: "iana",
-        extensions: ["iota"]
+        extensions: ["iota"],
       },
       "application/vnd.audiograph": {
         source: "iana",
-        extensions: ["aep"]
+        extensions: ["aep"],
       },
       "application/vnd.autopackage": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.avalon+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.avistar+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.balsamiq.bmml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["bmml"]
+        extensions: ["bmml"],
       },
       "application/vnd.balsamiq.bmpr": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.banana-accounting": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bbf.usp.error": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bbf.usp.msg": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bbf.usp.msg+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.bekitzur-stech+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.bint.med-content": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.biopax.rdf+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.blink-idb-value-wrapper": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.blueice.multipass": {
         source: "iana",
-        extensions: ["mpm"]
+        extensions: ["mpm"],
       },
       "application/vnd.bluetooth.ep.oob": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bluetooth.le.oob": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bmi": {
         source: "iana",
-        extensions: ["bmi"]
+        extensions: ["bmi"],
       },
       "application/vnd.bpf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.bpf3": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.businessobjects": {
         source: "iana",
-        extensions: ["rep"]
+        extensions: ["rep"],
       },
       "application/vnd.byu.uapi+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cab-jscript": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.canon-cpdl": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.canon-lips": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.capasystems-pg+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cendio.thinlinc.clientconf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.century-systems.tcp_stream": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.chemdraw+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["cdxml"]
+        extensions: ["cdxml"],
       },
       "application/vnd.chess-pgn": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.chipnuts.karaoke-mmd": {
         source: "iana",
-        extensions: ["mmd"]
+        extensions: ["mmd"],
       },
       "application/vnd.ciedi": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cinderella": {
         source: "iana",
-        extensions: ["cdy"]
+        extensions: ["cdy"],
       },
       "application/vnd.cirpack.isdn-ext": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.citationstyles.style+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["csl"]
+        extensions: ["csl"],
       },
       "application/vnd.claymore": {
         source: "iana",
-        extensions: ["cla"]
+        extensions: ["cla"],
       },
       "application/vnd.cloanto.rp9": {
         source: "iana",
-        extensions: ["rp9"]
+        extensions: ["rp9"],
       },
       "application/vnd.clonk.c4group": {
         source: "iana",
-        extensions: ["c4g", "c4d", "c4f", "c4p", "c4u"]
+        extensions: ["c4g", "c4d", "c4f", "c4p", "c4u"],
       },
       "application/vnd.cluetrust.cartomobile-config": {
         source: "iana",
-        extensions: ["c11amc"]
+        extensions: ["c11amc"],
       },
       "application/vnd.cluetrust.cartomobile-config-pkg": {
         source: "iana",
-        extensions: ["c11amz"]
+        extensions: ["c11amz"],
       },
       "application/vnd.coffeescript": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.document": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.document-template": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.presentation": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.presentation-template": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.spreadsheet": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collabio.xodocuments.spreadsheet-template": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.collection+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.collection.doc+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.collection.next+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.comicbook+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.comicbook-rar": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.commerce-battelle": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.commonspace": {
         source: "iana",
-        extensions: ["csp"]
+        extensions: ["csp"],
       },
       "application/vnd.contact.cmsg": {
         source: "iana",
-        extensions: ["cdbcmsg"]
+        extensions: ["cdbcmsg"],
       },
       "application/vnd.coreos.ignition+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cosmocaller": {
         source: "iana",
-        extensions: ["cmc"]
+        extensions: ["cmc"],
       },
       "application/vnd.crick.clicker": {
         source: "iana",
-        extensions: ["clkx"]
+        extensions: ["clkx"],
       },
       "application/vnd.crick.clicker.keyboard": {
         source: "iana",
-        extensions: ["clkk"]
+        extensions: ["clkk"],
       },
       "application/vnd.crick.clicker.palette": {
         source: "iana",
-        extensions: ["clkp"]
+        extensions: ["clkp"],
       },
       "application/vnd.crick.clicker.template": {
         source: "iana",
-        extensions: ["clkt"]
+        extensions: ["clkt"],
       },
       "application/vnd.crick.clicker.wordbank": {
         source: "iana",
-        extensions: ["clkw"]
+        extensions: ["clkw"],
       },
       "application/vnd.criticaltools.wbs+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["wbs"]
+        extensions: ["wbs"],
       },
       "application/vnd.cryptii.pipe+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.crypto-shade-file": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cryptomator.encrypted": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cryptomator.vault": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ctc-posml": {
         source: "iana",
-        extensions: ["pml"]
+        extensions: ["pml"],
       },
       "application/vnd.ctct.ws+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cups-pdf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cups-postscript": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cups-ppd": {
         source: "iana",
-        extensions: ["ppd"]
+        extensions: ["ppd"],
       },
       "application/vnd.cups-raster": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cups-raw": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.curl": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.curl.car": {
         source: "apache",
-        extensions: ["car"]
+        extensions: ["car"],
       },
       "application/vnd.curl.pcurl": {
         source: "apache",
-        extensions: ["pcurl"]
+        extensions: ["pcurl"],
       },
       "application/vnd.cyan.dean.root+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cybank": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.cyclonedx+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.cyclonedx+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.d2l.coursepackage1p0+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.d3m-dataset": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.d3m-problem": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dart": {
         source: "iana",
         compressible: true,
-        extensions: ["dart"]
+        extensions: ["dart"],
       },
       "application/vnd.data-vision.rdz": {
         source: "iana",
-        extensions: ["rdz"]
+        extensions: ["rdz"],
       },
       "application/vnd.datapackage+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dataresource+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dbf": {
         source: "iana",
-        extensions: ["dbf"]
+        extensions: ["dbf"],
       },
       "application/vnd.debian.binary-package": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dece.data": {
         source: "iana",
-        extensions: ["uvf", "uvvf", "uvd", "uvvd"]
+        extensions: ["uvf", "uvvf", "uvd", "uvvd"],
       },
       "application/vnd.dece.ttml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["uvt", "uvvt"]
+        extensions: ["uvt", "uvvt"],
       },
       "application/vnd.dece.unspecified": {
         source: "iana",
-        extensions: ["uvx", "uvvx"]
+        extensions: ["uvx", "uvvx"],
       },
       "application/vnd.dece.zip": {
         source: "iana",
-        extensions: ["uvz", "uvvz"]
+        extensions: ["uvz", "uvvz"],
       },
       "application/vnd.denovo.fcselayout-link": {
         source: "iana",
-        extensions: ["fe_launch"]
+        extensions: ["fe_launch"],
       },
       "application/vnd.desmume.movie": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dir-bi.plate-dl-nosuffix": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dm.delegation+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dna": {
         source: "iana",
-        extensions: ["dna"]
+        extensions: ["dna"],
       },
       "application/vnd.document+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dolby.mlp": {
         source: "apache",
-        extensions: ["mlp"]
+        extensions: ["mlp"],
       },
       "application/vnd.dolby.mobile.1": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dolby.mobile.2": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.doremir.scorecloud-binary-document": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dpgraph": {
         source: "iana",
-        extensions: ["dpg"]
+        extensions: ["dpg"],
       },
       "application/vnd.dreamfactory": {
         source: "iana",
-        extensions: ["dfac"]
+        extensions: ["dfac"],
       },
       "application/vnd.drive+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ds-keypoint": {
         source: "apache",
-        extensions: ["kpxx"]
+        extensions: ["kpxx"],
       },
       "application/vnd.dtg.local": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dtg.local.flash": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dtg.local.html": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ait": {
         source: "iana",
-        extensions: ["ait"]
+        extensions: ["ait"],
       },
       "application/vnd.dvb.dvbisl+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.dvbj": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.esgcontainer": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ipdcdftnotifaccess": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ipdcesgaccess": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ipdcesgaccess2": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ipdcesgpdd": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.ipdcroaming": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.iptv.alfec-base": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.iptv.alfec-enhancement": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.notif-aggregate-root+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-container+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-generic+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-ia-msglist+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-ia-registration-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-ia-registration-response+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.notif-init+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.dvb.pfr": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dvb.service": {
         source: "iana",
-        extensions: ["svc"]
+        extensions: ["svc"],
       },
       "application/vnd.dxr": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.dynageo": {
         source: "iana",
-        extensions: ["geo"]
+        extensions: ["geo"],
       },
       "application/vnd.dzr": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.easykaraoke.cdgdownload": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecdis-update": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecip.rlp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.eclipse.ditto+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ecowin.chart": {
         source: "iana",
-        extensions: ["mag"]
+        extensions: ["mag"],
       },
       "application/vnd.ecowin.filerequest": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecowin.fileupdate": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecowin.series": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecowin.seriesrequest": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ecowin.seriesupdate": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.efi.img": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.efi.iso": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.emclient.accessrequest+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.enliven": {
         source: "iana",
-        extensions: ["nml"]
+        extensions: ["nml"],
       },
       "application/vnd.enphase.envoy": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.eprints.data+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.epson.esf": {
         source: "iana",
-        extensions: ["esf"]
+        extensions: ["esf"],
       },
       "application/vnd.epson.msf": {
         source: "iana",
-        extensions: ["msf"]
+        extensions: ["msf"],
       },
       "application/vnd.epson.quickanime": {
         source: "iana",
-        extensions: ["qam"]
+        extensions: ["qam"],
       },
       "application/vnd.epson.salt": {
         source: "iana",
-        extensions: ["slt"]
+        extensions: ["slt"],
       },
       "application/vnd.epson.ssf": {
         source: "iana",
-        extensions: ["ssf"]
+        extensions: ["ssf"],
       },
       "application/vnd.ericsson.quickcall": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.espass-espass+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.eszigno3+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["es3", "et3"]
+        extensions: ["es3", "et3"],
       },
       "application/vnd.etsi.aoc+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.asic-e+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.etsi.asic-s+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.etsi.cug+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvcommand+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvdiscovery+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvprofile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvsad-bc+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvsad-cod+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvsad-npvr+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvservice+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvsync+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.iptvueprofile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.mcid+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.mheg5": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.etsi.overload-control-policy-dataset+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.pstn+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.sci+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.simservs+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.timestamp-token": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.etsi.tsl+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.etsi.tsl.der": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.eu.kasparian.car+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.eudora.data": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.evolv.ecig.profile": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.evolv.ecig.settings": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.evolv.ecig.theme": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.exstream-empower+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.exstream-package": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ezpix-album": {
         source: "iana",
-        extensions: ["ez2"]
+        extensions: ["ez2"],
       },
       "application/vnd.ezpix-package": {
         source: "iana",
-        extensions: ["ez3"]
+        extensions: ["ez3"],
       },
       "application/vnd.f-secure.mobile": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.familysearch.gedcom+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.fastcopy-disk-image": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fdf": {
         source: "iana",
-        extensions: ["fdf"]
+        extensions: ["fdf"],
       },
       "application/vnd.fdsn.mseed": {
         source: "iana",
-        extensions: ["mseed"]
+        extensions: ["mseed"],
       },
       "application/vnd.fdsn.seed": {
         source: "iana",
-        extensions: ["seed", "dataless"]
+        extensions: ["seed", "dataless"],
       },
       "application/vnd.ffsns": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ficlab.flb+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.filmit.zfc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fints": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.firemonkeys.cloudcell": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.flographit": {
         source: "iana",
-        extensions: ["gph"]
+        extensions: ["gph"],
       },
       "application/vnd.fluxtime.clip": {
         source: "iana",
-        extensions: ["ftc"]
+        extensions: ["ftc"],
       },
       "application/vnd.font-fontforge-sfd": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.framemaker": {
         source: "iana",
-        extensions: ["fm", "frame", "maker", "book"]
+        extensions: ["fm", "frame", "maker", "book"],
       },
       "application/vnd.frogans.fnc": {
         source: "iana",
-        extensions: ["fnc"]
+        extensions: ["fnc"],
       },
       "application/vnd.frogans.ltf": {
         source: "iana",
-        extensions: ["ltf"]
+        extensions: ["ltf"],
       },
       "application/vnd.fsc.weblaunch": {
         source: "iana",
-        extensions: ["fsc"]
+        extensions: ["fsc"],
       },
       "application/vnd.fujifilm.fb.docuworks": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujifilm.fb.docuworks.binder": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujifilm.fb.docuworks.container": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujifilm.fb.jfi+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.fujitsu.oasys": {
         source: "iana",
-        extensions: ["oas"]
+        extensions: ["oas"],
       },
       "application/vnd.fujitsu.oasys2": {
         source: "iana",
-        extensions: ["oa2"]
+        extensions: ["oa2"],
       },
       "application/vnd.fujitsu.oasys3": {
         source: "iana",
-        extensions: ["oa3"]
+        extensions: ["oa3"],
       },
       "application/vnd.fujitsu.oasysgp": {
         source: "iana",
-        extensions: ["fg5"]
+        extensions: ["fg5"],
       },
       "application/vnd.fujitsu.oasysprs": {
         source: "iana",
-        extensions: ["bh2"]
+        extensions: ["bh2"],
       },
       "application/vnd.fujixerox.art-ex": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujixerox.art4": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujixerox.ddd": {
         source: "iana",
-        extensions: ["ddd"]
+        extensions: ["ddd"],
       },
       "application/vnd.fujixerox.docuworks": {
         source: "iana",
-        extensions: ["xdw"]
+        extensions: ["xdw"],
       },
       "application/vnd.fujixerox.docuworks.binder": {
         source: "iana",
-        extensions: ["xbd"]
+        extensions: ["xbd"],
       },
       "application/vnd.fujixerox.docuworks.container": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fujixerox.hbpl": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.fut-misnet": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.futoin+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.futoin+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.fuzzysheet": {
         source: "iana",
-        extensions: ["fzs"]
+        extensions: ["fzs"],
       },
       "application/vnd.genomatix.tuxedo": {
         source: "iana",
-        extensions: ["txd"]
+        extensions: ["txd"],
       },
       "application/vnd.gentics.grd+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.geo+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.geocube+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.geogebra.file": {
         source: "iana",
-        extensions: ["ggb"]
+        extensions: ["ggb"],
       },
       "application/vnd.geogebra.slides": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.geogebra.tool": {
         source: "iana",
-        extensions: ["ggt"]
+        extensions: ["ggt"],
       },
       "application/vnd.geometry-explorer": {
         source: "iana",
-        extensions: ["gex", "gre"]
+        extensions: ["gex", "gre"],
       },
       "application/vnd.geonext": {
         source: "iana",
-        extensions: ["gxt"]
+        extensions: ["gxt"],
       },
       "application/vnd.geoplan": {
         source: "iana",
-        extensions: ["g2w"]
+        extensions: ["g2w"],
       },
       "application/vnd.geospace": {
         source: "iana",
-        extensions: ["g3w"]
+        extensions: ["g3w"],
       },
       "application/vnd.gerber": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.globalplatform.card-content-mgt": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.globalplatform.card-content-mgt-response": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.gmx": {
         source: "iana",
-        extensions: ["gmx"]
+        extensions: ["gmx"],
       },
       "application/vnd.google-apps.document": {
         compressible: false,
-        extensions: ["gdoc"]
+        extensions: ["gdoc"],
       },
       "application/vnd.google-apps.presentation": {
         compressible: false,
-        extensions: ["gslides"]
+        extensions: ["gslides"],
       },
       "application/vnd.google-apps.spreadsheet": {
         compressible: false,
-        extensions: ["gsheet"]
+        extensions: ["gsheet"],
       },
       "application/vnd.google-earth.kml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["kml"]
+        extensions: ["kml"],
       },
       "application/vnd.google-earth.kmz": {
         source: "iana",
         compressible: false,
-        extensions: ["kmz"]
+        extensions: ["kmz"],
       },
       "application/vnd.gov.sk.e-form+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.gov.sk.e-form+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.gov.sk.xmldatacontainer+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.grafeq": {
         source: "iana",
-        extensions: ["gqf", "gqs"]
+        extensions: ["gqf", "gqs"],
       },
       "application/vnd.gridmp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.groove-account": {
         source: "iana",
-        extensions: ["gac"]
+        extensions: ["gac"],
       },
       "application/vnd.groove-help": {
         source: "iana",
-        extensions: ["ghf"]
+        extensions: ["ghf"],
       },
       "application/vnd.groove-identity-message": {
         source: "iana",
-        extensions: ["gim"]
+        extensions: ["gim"],
       },
       "application/vnd.groove-injector": {
         source: "iana",
-        extensions: ["grv"]
+        extensions: ["grv"],
       },
       "application/vnd.groove-tool-message": {
         source: "iana",
-        extensions: ["gtm"]
+        extensions: ["gtm"],
       },
       "application/vnd.groove-tool-template": {
         source: "iana",
-        extensions: ["tpl"]
+        extensions: ["tpl"],
       },
       "application/vnd.groove-vcard": {
         source: "iana",
-        extensions: ["vcg"]
+        extensions: ["vcg"],
       },
       "application/vnd.hal+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hal+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["hal"]
+        extensions: ["hal"],
       },
       "application/vnd.handheld-entertainment+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["zmm"]
+        extensions: ["zmm"],
       },
       "application/vnd.hbci": {
         source: "iana",
-        extensions: ["hbci"]
+        extensions: ["hbci"],
       },
       "application/vnd.hc+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hcl-bireports": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.hdt": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.heroku+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hhe.lesson-player": {
         source: "iana",
-        extensions: ["les"]
+        extensions: ["les"],
       },
       "application/vnd.hl7cda+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hl7v2+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hp-hpgl": {
         source: "iana",
-        extensions: ["hpgl"]
+        extensions: ["hpgl"],
       },
       "application/vnd.hp-hpid": {
         source: "iana",
-        extensions: ["hpid"]
+        extensions: ["hpid"],
       },
       "application/vnd.hp-hps": {
         source: "iana",
-        extensions: ["hps"]
+        extensions: ["hps"],
       },
       "application/vnd.hp-jlyt": {
         source: "iana",
-        extensions: ["jlt"]
+        extensions: ["jlt"],
       },
       "application/vnd.hp-pcl": {
         source: "iana",
-        extensions: ["pcl"]
+        extensions: ["pcl"],
       },
       "application/vnd.hp-pclxl": {
         source: "iana",
-        extensions: ["pclxl"]
+        extensions: ["pclxl"],
       },
       "application/vnd.httphone": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.hydrostatix.sof-data": {
         source: "iana",
-        extensions: ["sfd-hdstx"]
+        extensions: ["sfd-hdstx"],
       },
       "application/vnd.hyper+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hyper-item+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hyperdrive+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.hzn-3d-crossword": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ibm.afplinedata": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ibm.electronic-media": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ibm.minipay": {
         source: "iana",
-        extensions: ["mpy"]
+        extensions: ["mpy"],
       },
       "application/vnd.ibm.modcap": {
         source: "iana",
-        extensions: ["afp", "listafp", "list3820"]
+        extensions: ["afp", "listafp", "list3820"],
       },
       "application/vnd.ibm.rights-management": {
         source: "iana",
-        extensions: ["irm"]
+        extensions: ["irm"],
       },
       "application/vnd.ibm.secure-container": {
         source: "iana",
-        extensions: ["sc"]
+        extensions: ["sc"],
       },
       "application/vnd.iccprofile": {
         source: "iana",
-        extensions: ["icc", "icm"]
+        extensions: ["icc", "icm"],
       },
       "application/vnd.ieee.1905": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.igloader": {
         source: "iana",
-        extensions: ["igl"]
+        extensions: ["igl"],
       },
       "application/vnd.imagemeter.folder+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.imagemeter.image+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.immervision-ivp": {
         source: "iana",
-        extensions: ["ivp"]
+        extensions: ["ivp"],
       },
       "application/vnd.immervision-ivu": {
         source: "iana",
-        extensions: ["ivu"]
+        extensions: ["ivu"],
       },
       "application/vnd.ims.imsccv1p1": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ims.imsccv1p2": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ims.imsccv1p3": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ims.lis.v2.result+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ims.lti.v2.toolconsumerprofile+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ims.lti.v2.toolproxy+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ims.lti.v2.toolproxy.id+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ims.lti.v2.toolsettings+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ims.lti.v2.toolsettings.simple+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.informedcontrol.rms+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.informix-visionary": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.infotech.project": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.infotech.project+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.innopath.wamp.notification": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.insors.igm": {
         source: "iana",
-        extensions: ["igm"]
+        extensions: ["igm"],
       },
       "application/vnd.intercon.formnet": {
         source: "iana",
-        extensions: ["xpw", "xpx"]
+        extensions: ["xpw", "xpx"],
       },
       "application/vnd.intergeo": {
         source: "iana",
-        extensions: ["i2g"]
+        extensions: ["i2g"],
       },
       "application/vnd.intertrust.digibox": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.intertrust.nncp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.intu.qbo": {
         source: "iana",
-        extensions: ["qbo"]
+        extensions: ["qbo"],
       },
       "application/vnd.intu.qfx": {
         source: "iana",
-        extensions: ["qfx"]
+        extensions: ["qfx"],
       },
       "application/vnd.iptc.g2.catalogitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.conceptitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.knowledgeitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.newsitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.newsmessage+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.packageitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.iptc.g2.planningitem+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ipunplugged.rcprofile": {
         source: "iana",
-        extensions: ["rcprofile"]
+        extensions: ["rcprofile"],
       },
       "application/vnd.irepository.package+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["irp"]
+        extensions: ["irp"],
       },
       "application/vnd.is-xpr": {
         source: "iana",
-        extensions: ["xpr"]
+        extensions: ["xpr"],
       },
       "application/vnd.isac.fcs": {
         source: "iana",
-        extensions: ["fcs"]
+        extensions: ["fcs"],
       },
       "application/vnd.iso11783-10+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.jam": {
         source: "iana",
-        extensions: ["jam"]
+        extensions: ["jam"],
       },
       "application/vnd.japannet-directory-service": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-jpnstore-wakeup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-payment-wakeup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-registration": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-registration-wakeup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-setstore-wakeup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-verification": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.japannet-verification-wakeup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.jcp.javame.midlet-rms": {
         source: "iana",
-        extensions: ["rms"]
+        extensions: ["rms"],
       },
       "application/vnd.jisp": {
         source: "iana",
-        extensions: ["jisp"]
+        extensions: ["jisp"],
       },
       "application/vnd.joost.joda-archive": {
         source: "iana",
-        extensions: ["joda"]
+        extensions: ["joda"],
       },
       "application/vnd.jsk.isdn-ngn": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.kahootz": {
         source: "iana",
-        extensions: ["ktz", "ktr"]
+        extensions: ["ktz", "ktr"],
       },
       "application/vnd.kde.karbon": {
         source: "iana",
-        extensions: ["karbon"]
+        extensions: ["karbon"],
       },
       "application/vnd.kde.kchart": {
         source: "iana",
-        extensions: ["chrt"]
+        extensions: ["chrt"],
       },
       "application/vnd.kde.kformula": {
         source: "iana",
-        extensions: ["kfo"]
+        extensions: ["kfo"],
       },
       "application/vnd.kde.kivio": {
         source: "iana",
-        extensions: ["flw"]
+        extensions: ["flw"],
       },
       "application/vnd.kde.kontour": {
         source: "iana",
-        extensions: ["kon"]
+        extensions: ["kon"],
       },
       "application/vnd.kde.kpresenter": {
         source: "iana",
-        extensions: ["kpr", "kpt"]
+        extensions: ["kpr", "kpt"],
       },
       "application/vnd.kde.kspread": {
         source: "iana",
-        extensions: ["ksp"]
+        extensions: ["ksp"],
       },
       "application/vnd.kde.kword": {
         source: "iana",
-        extensions: ["kwd", "kwt"]
+        extensions: ["kwd", "kwt"],
       },
       "application/vnd.kenameaapp": {
         source: "iana",
-        extensions: ["htke"]
+        extensions: ["htke"],
       },
       "application/vnd.kidspiration": {
         source: "iana",
-        extensions: ["kia"]
+        extensions: ["kia"],
       },
       "application/vnd.kinar": {
         source: "iana",
-        extensions: ["kne", "knp"]
+        extensions: ["kne", "knp"],
       },
       "application/vnd.koan": {
         source: "iana",
-        extensions: ["skp", "skd", "skt", "skm"]
+        extensions: ["skp", "skd", "skt", "skm"],
       },
       "application/vnd.kodak-descriptor": {
         source: "iana",
-        extensions: ["sse"]
+        extensions: ["sse"],
       },
       "application/vnd.las": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.las.las+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.las.las+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["lasxml"]
+        extensions: ["lasxml"],
       },
       "application/vnd.laszip": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.leap+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.liberty-request+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.llamagraphics.life-balance.desktop": {
         source: "iana",
-        extensions: ["lbd"]
+        extensions: ["lbd"],
       },
       "application/vnd.llamagraphics.life-balance.exchange+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["lbe"]
+        extensions: ["lbe"],
       },
       "application/vnd.logipipe.circuit+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.loom": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.lotus-1-2-3": {
         source: "iana",
-        extensions: ["123"]
+        extensions: ["123"],
       },
       "application/vnd.lotus-approach": {
         source: "iana",
-        extensions: ["apr"]
+        extensions: ["apr"],
       },
       "application/vnd.lotus-freelance": {
         source: "iana",
-        extensions: ["pre"]
+        extensions: ["pre"],
       },
       "application/vnd.lotus-notes": {
         source: "iana",
-        extensions: ["nsf"]
+        extensions: ["nsf"],
       },
       "application/vnd.lotus-organizer": {
         source: "iana",
-        extensions: ["org"]
+        extensions: ["org"],
       },
       "application/vnd.lotus-screencam": {
         source: "iana",
-        extensions: ["scm"]
+        extensions: ["scm"],
       },
       "application/vnd.lotus-wordpro": {
         source: "iana",
-        extensions: ["lwp"]
+        extensions: ["lwp"],
       },
       "application/vnd.macports.portpkg": {
         source: "iana",
-        extensions: ["portpkg"]
+        extensions: ["portpkg"],
       },
       "application/vnd.mapbox-vector-tile": {
         source: "iana",
-        extensions: ["mvt"]
+        extensions: ["mvt"],
       },
       "application/vnd.marlin.drm.actiontoken+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.marlin.drm.conftoken+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.marlin.drm.license+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.marlin.drm.mdcf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mason+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.maxar.archive.3tz+zip": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "application/vnd.maxmind.maxmind-db": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mcd": {
         source: "iana",
-        extensions: ["mcd"]
+        extensions: ["mcd"],
       },
       "application/vnd.medcalcdata": {
         source: "iana",
-        extensions: ["mc1"]
+        extensions: ["mc1"],
       },
       "application/vnd.mediastation.cdkey": {
         source: "iana",
-        extensions: ["cdkey"]
+        extensions: ["cdkey"],
       },
       "application/vnd.meridian-slingshot": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mfer": {
         source: "iana",
-        extensions: ["mwf"]
+        extensions: ["mwf"],
       },
       "application/vnd.mfmp": {
         source: "iana",
-        extensions: ["mfm"]
+        extensions: ["mfm"],
       },
       "application/vnd.micro+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.micrografx.flo": {
         source: "iana",
-        extensions: ["flo"]
+        extensions: ["flo"],
       },
       "application/vnd.micrografx.igx": {
         source: "iana",
-        extensions: ["igx"]
+        extensions: ["igx"],
       },
       "application/vnd.microsoft.portable-executable": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.microsoft.windows.thumbnail-cache": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.miele+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.mif": {
         source: "iana",
-        extensions: ["mif"]
+        extensions: ["mif"],
       },
       "application/vnd.minisoft-hp3000-save": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mitsubishi.misty-guard.trustweb": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mobius.daf": {
         source: "iana",
-        extensions: ["daf"]
+        extensions: ["daf"],
       },
       "application/vnd.mobius.dis": {
         source: "iana",
-        extensions: ["dis"]
+        extensions: ["dis"],
       },
       "application/vnd.mobius.mbk": {
         source: "iana",
-        extensions: ["mbk"]
+        extensions: ["mbk"],
       },
       "application/vnd.mobius.mqy": {
         source: "iana",
-        extensions: ["mqy"]
+        extensions: ["mqy"],
       },
       "application/vnd.mobius.msl": {
         source: "iana",
-        extensions: ["msl"]
+        extensions: ["msl"],
       },
       "application/vnd.mobius.plc": {
         source: "iana",
-        extensions: ["plc"]
+        extensions: ["plc"],
       },
       "application/vnd.mobius.txf": {
         source: "iana",
-        extensions: ["txf"]
+        extensions: ["txf"],
       },
       "application/vnd.mophun.application": {
         source: "iana",
-        extensions: ["mpn"]
+        extensions: ["mpn"],
       },
       "application/vnd.mophun.certificate": {
         source: "iana",
-        extensions: ["mpc"]
+        extensions: ["mpc"],
       },
       "application/vnd.motorola.flexsuite": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.adsi": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.fis": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.gotap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.kmr": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.ttc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.flexsuite.wem": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.motorola.iprm": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mozilla.xul+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xul"]
+        extensions: ["xul"],
       },
       "application/vnd.ms-3mfdocument": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-artgalry": {
         source: "iana",
-        extensions: ["cil"]
+        extensions: ["cil"],
       },
       "application/vnd.ms-asf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-cab-compressed": {
         source: "iana",
-        extensions: ["cab"]
+        extensions: ["cab"],
       },
       "application/vnd.ms-color.iccprofile": {
-        source: "apache"
+        source: "apache",
       },
       "application/vnd.ms-excel": {
         source: "iana",
         compressible: false,
-        extensions: ["xls", "xlm", "xla", "xlc", "xlt", "xlw"]
+        extensions: ["xls", "xlm", "xla", "xlc", "xlt", "xlw"],
       },
       "application/vnd.ms-excel.addin.macroenabled.12": {
         source: "iana",
-        extensions: ["xlam"]
+        extensions: ["xlam"],
       },
       "application/vnd.ms-excel.sheet.binary.macroenabled.12": {
         source: "iana",
-        extensions: ["xlsb"]
+        extensions: ["xlsb"],
       },
       "application/vnd.ms-excel.sheet.macroenabled.12": {
         source: "iana",
-        extensions: ["xlsm"]
+        extensions: ["xlsm"],
       },
       "application/vnd.ms-excel.template.macroenabled.12": {
         source: "iana",
-        extensions: ["xltm"]
+        extensions: ["xltm"],
       },
       "application/vnd.ms-fontobject": {
         source: "iana",
         compressible: true,
-        extensions: ["eot"]
+        extensions: ["eot"],
       },
       "application/vnd.ms-htmlhelp": {
         source: "iana",
-        extensions: ["chm"]
+        extensions: ["chm"],
       },
       "application/vnd.ms-ims": {
         source: "iana",
-        extensions: ["ims"]
+        extensions: ["ims"],
       },
       "application/vnd.ms-lrm": {
         source: "iana",
-        extensions: ["lrm"]
+        extensions: ["lrm"],
       },
       "application/vnd.ms-office.activex+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-officetheme": {
         source: "iana",
-        extensions: ["thmx"]
+        extensions: ["thmx"],
       },
       "application/vnd.ms-opentype": {
         source: "apache",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-outlook": {
         compressible: false,
-        extensions: ["msg"]
+        extensions: ["msg"],
       },
       "application/vnd.ms-package.obfuscated-opentype": {
-        source: "apache"
+        source: "apache",
       },
       "application/vnd.ms-pki.seccat": {
         source: "apache",
-        extensions: ["cat"]
+        extensions: ["cat"],
       },
       "application/vnd.ms-pki.stl": {
         source: "apache",
-        extensions: ["stl"]
+        extensions: ["stl"],
       },
       "application/vnd.ms-playready.initiator+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-powerpoint": {
         source: "iana",
         compressible: false,
-        extensions: ["ppt", "pps", "pot"]
+        extensions: ["ppt", "pps", "pot"],
       },
       "application/vnd.ms-powerpoint.addin.macroenabled.12": {
         source: "iana",
-        extensions: ["ppam"]
+        extensions: ["ppam"],
       },
       "application/vnd.ms-powerpoint.presentation.macroenabled.12": {
         source: "iana",
-        extensions: ["pptm"]
+        extensions: ["pptm"],
       },
       "application/vnd.ms-powerpoint.slide.macroenabled.12": {
         source: "iana",
-        extensions: ["sldm"]
+        extensions: ["sldm"],
       },
       "application/vnd.ms-powerpoint.slideshow.macroenabled.12": {
         source: "iana",
-        extensions: ["ppsm"]
+        extensions: ["ppsm"],
       },
       "application/vnd.ms-powerpoint.template.macroenabled.12": {
         source: "iana",
-        extensions: ["potm"]
+        extensions: ["potm"],
       },
       "application/vnd.ms-printdevicecapabilities+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-printing.printticket+xml": {
         source: "apache",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-printschematicket+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ms-project": {
         source: "iana",
-        extensions: ["mpp", "mpt"]
+        extensions: ["mpp", "mpt"],
       },
       "application/vnd.ms-tnef": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-windows.devicepairing": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-windows.nwprinting.oob": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-windows.printerpairing": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-windows.wsd.oob": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-wmdrm.lic-chlg-req": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-wmdrm.lic-resp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-wmdrm.meter-chlg-req": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-wmdrm.meter-resp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ms-word.document.macroenabled.12": {
         source: "iana",
-        extensions: ["docm"]
+        extensions: ["docm"],
       },
       "application/vnd.ms-word.template.macroenabled.12": {
         source: "iana",
-        extensions: ["dotm"]
+        extensions: ["dotm"],
       },
       "application/vnd.ms-works": {
         source: "iana",
-        extensions: ["wps", "wks", "wcm", "wdb"]
+        extensions: ["wps", "wks", "wcm", "wdb"],
       },
       "application/vnd.ms-wpl": {
         source: "iana",
-        extensions: ["wpl"]
+        extensions: ["wpl"],
       },
       "application/vnd.ms-xpsdocument": {
         source: "iana",
         compressible: false,
-        extensions: ["xps"]
+        extensions: ["xps"],
       },
       "application/vnd.msa-disk-image": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.mseq": {
         source: "iana",
-        extensions: ["mseq"]
+        extensions: ["mseq"],
       },
       "application/vnd.msign": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.multiad.creator": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.multiad.creator.cif": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.music-niff": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.musician": {
         source: "iana",
-        extensions: ["mus"]
+        extensions: ["mus"],
       },
       "application/vnd.muvee.style": {
         source: "iana",
-        extensions: ["msty"]
+        extensions: ["msty"],
       },
       "application/vnd.mynfc": {
         source: "iana",
-        extensions: ["taglet"]
+        extensions: ["taglet"],
       },
       "application/vnd.nacamar.ybrid+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.ncd.control": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ncd.reference": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nearst.inv+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nebumind.line": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nervana": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.netfpx": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.neurolanguage.nlu": {
         source: "iana",
-        extensions: ["nlu"]
+        extensions: ["nlu"],
       },
       "application/vnd.nimn": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nintendo.nitro.rom": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nintendo.snes.rom": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nitf": {
         source: "iana",
-        extensions: ["ntf", "nitf"]
+        extensions: ["ntf", "nitf"],
       },
       "application/vnd.noblenet-directory": {
         source: "iana",
-        extensions: ["nnd"]
+        extensions: ["nnd"],
       },
       "application/vnd.noblenet-sealer": {
         source: "iana",
-        extensions: ["nns"]
+        extensions: ["nns"],
       },
       "application/vnd.noblenet-web": {
         source: "iana",
-        extensions: ["nnw"]
+        extensions: ["nnw"],
       },
       "application/vnd.nokia.catalogs": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.conml+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.conml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nokia.iptv.config+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nokia.isds-radio-presets": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.landmark+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.landmark+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nokia.landmarkcollection+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nokia.n-gage.ac+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["ac"]
+        extensions: ["ac"],
       },
       "application/vnd.nokia.n-gage.data": {
         source: "iana",
-        extensions: ["ngdat"]
+        extensions: ["ngdat"],
       },
       "application/vnd.nokia.n-gage.symbian.install": {
         source: "iana",
-        extensions: ["n-gage"]
+        extensions: ["n-gage"],
       },
       "application/vnd.nokia.ncd": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.pcd+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.nokia.pcd+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.nokia.radio-preset": {
         source: "iana",
-        extensions: ["rpst"]
+        extensions: ["rpst"],
       },
       "application/vnd.nokia.radio-presets": {
         source: "iana",
-        extensions: ["rpss"]
+        extensions: ["rpss"],
       },
       "application/vnd.novadigm.edm": {
         source: "iana",
-        extensions: ["edm"]
+        extensions: ["edm"],
       },
       "application/vnd.novadigm.edx": {
         source: "iana",
-        extensions: ["edx"]
+        extensions: ["edx"],
       },
       "application/vnd.novadigm.ext": {
         source: "iana",
-        extensions: ["ext"]
+        extensions: ["ext"],
       },
       "application/vnd.ntt-local.content-share": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ntt-local.file-transfer": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ntt-local.ogw_remote-access": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ntt-local.sip-ta_remote": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ntt-local.sip-ta_tcp_stream": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oasis.opendocument.chart": {
         source: "iana",
-        extensions: ["odc"]
+        extensions: ["odc"],
       },
       "application/vnd.oasis.opendocument.chart-template": {
         source: "iana",
-        extensions: ["otc"]
+        extensions: ["otc"],
       },
       "application/vnd.oasis.opendocument.database": {
         source: "iana",
-        extensions: ["odb"]
+        extensions: ["odb"],
       },
       "application/vnd.oasis.opendocument.formula": {
         source: "iana",
-        extensions: ["odf"]
+        extensions: ["odf"],
       },
       "application/vnd.oasis.opendocument.formula-template": {
         source: "iana",
-        extensions: ["odft"]
+        extensions: ["odft"],
       },
       "application/vnd.oasis.opendocument.graphics": {
         source: "iana",
         compressible: false,
-        extensions: ["odg"]
+        extensions: ["odg"],
       },
       "application/vnd.oasis.opendocument.graphics-template": {
         source: "iana",
-        extensions: ["otg"]
+        extensions: ["otg"],
       },
       "application/vnd.oasis.opendocument.image": {
         source: "iana",
-        extensions: ["odi"]
+        extensions: ["odi"],
       },
       "application/vnd.oasis.opendocument.image-template": {
         source: "iana",
-        extensions: ["oti"]
+        extensions: ["oti"],
       },
       "application/vnd.oasis.opendocument.presentation": {
         source: "iana",
         compressible: false,
-        extensions: ["odp"]
+        extensions: ["odp"],
       },
       "application/vnd.oasis.opendocument.presentation-template": {
         source: "iana",
-        extensions: ["otp"]
+        extensions: ["otp"],
       },
       "application/vnd.oasis.opendocument.spreadsheet": {
         source: "iana",
         compressible: false,
-        extensions: ["ods"]
+        extensions: ["ods"],
       },
       "application/vnd.oasis.opendocument.spreadsheet-template": {
         source: "iana",
-        extensions: ["ots"]
+        extensions: ["ots"],
       },
       "application/vnd.oasis.opendocument.text": {
         source: "iana",
         compressible: false,
-        extensions: ["odt"]
+        extensions: ["odt"],
       },
       "application/vnd.oasis.opendocument.text-master": {
         source: "iana",
-        extensions: ["odm"]
+        extensions: ["odm"],
       },
       "application/vnd.oasis.opendocument.text-template": {
         source: "iana",
-        extensions: ["ott"]
+        extensions: ["ott"],
       },
       "application/vnd.oasis.opendocument.text-web": {
         source: "iana",
-        extensions: ["oth"]
+        extensions: ["oth"],
       },
       "application/vnd.obn": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ocf+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oci.image.manifest.v1+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oftn.l10n+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.contentaccessdownload+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.contentaccessstreaming+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.cspg-hexbinary": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oipf.dae.svg+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.dae.xhtml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.mippvcontrolmessage+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.pae.gem": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oipf.spdiscovery+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.spdlist+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.ueprofile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oipf.userprofile+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.olpc-sugar": {
         source: "iana",
-        extensions: ["xo"]
+        extensions: ["xo"],
       },
       "application/vnd.oma-scws-config": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma-scws-http-request": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma-scws-http-response": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.associated-procedure-parameter+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.drm-trigger+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.imd+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.ltkm": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.notification+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.provisioningtrigger": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.sgboot": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.sgdd+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.sgdu": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.simple-symbol-container": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.bcast.smartcard-trigger+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.sprov+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.bcast.stkm": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.cab-address-book+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.cab-feature-handler+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.cab-pcc+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.cab-subs-invite+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.cab-user-prefs+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.dcd": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.dcdc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.dd2+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["dd2"]
+        extensions: ["dd2"],
       },
       "application/vnd.oma.drm.risd+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.group-usage-list+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.lwm2m+cbor": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.lwm2m+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.lwm2m+tlv": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.pal+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.poc.detailed-progress-report+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.poc.final-report+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.poc.groups+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.poc.invocation-descriptor+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.poc.optimized-progress-report+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.push": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.oma.scidm.messages+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oma.xcap-directory+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.omads-email+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.omads-file+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.omads-folder+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.omaloc-supl-init": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepager": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepagertamp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepagertamx": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepagertat": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepagertatp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.onepagertatx": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.openblox.game+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["obgx"]
+        extensions: ["obgx"],
       },
       "application/vnd.openblox.game-binary": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.openeye.oeb": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.openofficeorg.extension": {
         source: "apache",
-        extensions: ["oxt"]
+        extensions: ["oxt"],
       },
       "application/vnd.openstreetmap.data+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["osm"]
+        extensions: ["osm"],
       },
       "application/vnd.opentimestamps.ots": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.openxmlformats-officedocument.custom-properties+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.customxmlproperties+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.drawing+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.drawingml.chart+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
-      "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.drawingml.diagramcolors+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.drawingml.diagramdata+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.drawingml.diagramlayout+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.drawingml.diagramstyle+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramcolors+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramdata+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramlayout+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.drawingml.diagramstyle+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.extended-properties+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
-      "application/vnd.openxmlformats-officedocument.presentationml.commentauthors+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.comments+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.handoutmaster+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.notesmaster+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.notesslide+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation": {
-        source: "iana",
-        compressible: false,
-        extensions: ["pptx"]
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.presprops+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.presentationml.commentauthors+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.comments+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.handoutmaster+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.notesmaster+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.notesslide+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        {
+          source: "iana",
+          compressible: false,
+          extensions: ["pptx"],
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.presprops+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.presentationml.slide": {
         source: "iana",
-        extensions: ["sldx"]
+        extensions: ["sldx"],
       },
-      "application/vnd.openxmlformats-officedocument.presentationml.slide+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.slidelayout+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.slidemaster+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.slideshow": {
-        source: "iana",
-        extensions: ["ppsx"]
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.slideupdateinfo+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.tablestyles+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.presentationml.slide+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.slidelayout+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.slidemaster+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.slideshow":
+        {
+          source: "iana",
+          extensions: ["ppsx"],
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.slideupdateinfo+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.tablestyles+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.presentationml.tags+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.presentationml.template": {
         source: "iana",
-        extensions: ["potx"]
+        extensions: ["potx"],
       },
-      "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.presentationml.viewprops+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.calcchain+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.externallink+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotcachedefinition+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotcacherecords+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivottable+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.querytable+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionheaders+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionlog+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedstrings+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.presentationml.viewprops+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.calcchain+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.externallink+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotcachedefinition+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotcacherecords+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.pivottable+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.querytable+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionheaders+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionlog+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedstrings+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
         source: "iana",
         compressible: false,
-        extensions: ["xlsx"]
+        extensions: ["xlsx"],
       },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetmetadata+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetmetadata+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.tablesinglecells+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.tablesinglecells+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.spreadsheetml.template": {
         source: "iana",
-        extensions: ["xltx"]
+        extensions: ["xltx"],
       },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.usernames+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.volatiledependencies+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.usernames+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.volatiledependencies+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-officedocument.theme+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.themeoverride+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.openxmlformats-officedocument.vmldrawing": {
-        source: "iana"
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml": {
         source: "iana",
-        compressible: true
       },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
-        source: "iana",
-        compressible: false,
-        extensions: ["docx"]
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.fonttable+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.template": {
-        source: "iana",
-        extensions: ["dotx"]
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml": {
-        source: "iana",
-        compressible: true
-      },
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.websettings+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        {
+          source: "iana",
+          compressible: false,
+          extensions: ["docx"],
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.fonttable+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template":
+        {
+          source: "iana",
+          extensions: ["dotx"],
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.websettings+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-package.core-properties+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
-      "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml": {
-        source: "iana",
-        compressible: true
-      },
+      "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml":
+        {
+          source: "iana",
+          compressible: true,
+        },
       "application/vnd.openxmlformats-package.relationships+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oracle.resource+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.orange.indata": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.osa.netdeploy": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.osgeo.mapguide.package": {
         source: "iana",
-        extensions: ["mgp"]
+        extensions: ["mgp"],
       },
       "application/vnd.osgi.bundle": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.osgi.dp": {
         source: "iana",
-        extensions: ["dp"]
+        extensions: ["dp"],
       },
       "application/vnd.osgi.subsystem": {
         source: "iana",
-        extensions: ["esa"]
+        extensions: ["esa"],
       },
       "application/vnd.otps.ct-kip+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.oxli.countgraph": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.pagerduty+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.palm": {
         source: "iana",
-        extensions: ["pdb", "pqa", "oprc"]
+        extensions: ["pdb", "pqa", "oprc"],
       },
       "application/vnd.panoply": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.paos.xml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.patentdive": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.patientecommsdoc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.pawaafile": {
         source: "iana",
-        extensions: ["paw"]
+        extensions: ["paw"],
       },
       "application/vnd.pcos": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.pg.format": {
         source: "iana",
-        extensions: ["str"]
+        extensions: ["str"],
       },
       "application/vnd.pg.osasli": {
         source: "iana",
-        extensions: ["ei6"]
+        extensions: ["ei6"],
       },
       "application/vnd.piaccess.application-licence": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.picsel": {
         source: "iana",
-        extensions: ["efif"]
+        extensions: ["efif"],
       },
       "application/vnd.pmi.widget": {
         source: "iana",
-        extensions: ["wg"]
+        extensions: ["wg"],
       },
       "application/vnd.poc.group-advertisement+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.pocketlearn": {
         source: "iana",
-        extensions: ["plf"]
+        extensions: ["plf"],
       },
       "application/vnd.powerbuilder6": {
         source: "iana",
-        extensions: ["pbd"]
+        extensions: ["pbd"],
       },
       "application/vnd.powerbuilder6-s": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.powerbuilder7": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.powerbuilder7-s": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.powerbuilder75": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.powerbuilder75-s": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.preminet": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.previewsystems.box": {
         source: "iana",
-        extensions: ["box"]
+        extensions: ["box"],
       },
       "application/vnd.proteus.magazine": {
         source: "iana",
-        extensions: ["mgz"]
+        extensions: ["mgz"],
       },
       "application/vnd.psfs": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.publishare-delta-tree": {
         source: "iana",
-        extensions: ["qps"]
+        extensions: ["qps"],
       },
       "application/vnd.pvi.ptid1": {
         source: "iana",
-        extensions: ["ptid"]
+        extensions: ["ptid"],
       },
       "application/vnd.pwg-multiplexed": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.pwg-xhtml-print+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.qualcomm.brew-app-res": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.quarantainenet": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.quark.quarkxpress": {
         source: "iana",
-        extensions: ["qxd", "qxt", "qwd", "qwt", "qxl", "qxb"]
+        extensions: ["qxd", "qxt", "qwd", "qwt", "qxl", "qxb"],
       },
       "application/vnd.quobject-quoxdocument": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.radisys.moml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-audit+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-audit-conf+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-audit-conn+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-audit-dialog+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-audit-stream+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-conf+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-base+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-fax-detect+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-fax-sendrecv+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-group+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-speech+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.radisys.msml-dialog-transform+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.rainstor.data": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.rapid": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.rar": {
         source: "iana",
-        extensions: ["rar"]
+        extensions: ["rar"],
       },
       "application/vnd.realvnc.bed": {
         source: "iana",
-        extensions: ["bed"]
+        extensions: ["bed"],
       },
       "application/vnd.recordare.musicxml": {
         source: "iana",
-        extensions: ["mxl"]
+        extensions: ["mxl"],
       },
       "application/vnd.recordare.musicxml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["musicxml"]
+        extensions: ["musicxml"],
       },
       "application/vnd.renlearn.rlprint": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.resilient.logic": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.restful+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.rig.cryptonote": {
         source: "iana",
-        extensions: ["cryptonote"]
+        extensions: ["cryptonote"],
       },
       "application/vnd.rim.cod": {
         source: "apache",
-        extensions: ["cod"]
+        extensions: ["cod"],
       },
       "application/vnd.rn-realmedia": {
         source: "apache",
-        extensions: ["rm"]
+        extensions: ["rm"],
       },
       "application/vnd.rn-realmedia-vbr": {
         source: "apache",
-        extensions: ["rmvb"]
+        extensions: ["rmvb"],
       },
       "application/vnd.route66.link66+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["link66"]
+        extensions: ["link66"],
       },
       "application/vnd.rs-274x": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ruckus.download": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.s3sms": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sailingtracker.track": {
         source: "iana",
-        extensions: ["st"]
+        extensions: ["st"],
       },
       "application/vnd.sar": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sbm.cid": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sbm.mid2": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.scribus": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.3df": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.csf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.doc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.eml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.mht": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.net": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.ppt": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.tiff": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealed.xls": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealedmedia.softseal.html": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sealedmedia.softseal.pdf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.seemail": {
         source: "iana",
-        extensions: ["see"]
+        extensions: ["see"],
       },
       "application/vnd.seis+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.sema": {
         source: "iana",
-        extensions: ["sema"]
+        extensions: ["sema"],
       },
       "application/vnd.semd": {
         source: "iana",
-        extensions: ["semd"]
+        extensions: ["semd"],
       },
       "application/vnd.semf": {
         source: "iana",
-        extensions: ["semf"]
+        extensions: ["semf"],
       },
       "application/vnd.shade-save-file": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.shana.informed.formdata": {
         source: "iana",
-        extensions: ["ifm"]
+        extensions: ["ifm"],
       },
       "application/vnd.shana.informed.formtemplate": {
         source: "iana",
-        extensions: ["itp"]
+        extensions: ["itp"],
       },
       "application/vnd.shana.informed.interchange": {
         source: "iana",
-        extensions: ["iif"]
+        extensions: ["iif"],
       },
       "application/vnd.shana.informed.package": {
         source: "iana",
-        extensions: ["ipk"]
+        extensions: ["ipk"],
       },
       "application/vnd.shootproof+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.shopkick+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.shp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.shx": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sigrok.session": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.simtech-mindmapper": {
         source: "iana",
-        extensions: ["twd", "twds"]
+        extensions: ["twd", "twds"],
       },
       "application/vnd.siren+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.smaf": {
         source: "iana",
-        extensions: ["mmf"]
+        extensions: ["mmf"],
       },
       "application/vnd.smart.notebook": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.smart.teacher": {
         source: "iana",
-        extensions: ["teacher"]
+        extensions: ["teacher"],
       },
       "application/vnd.snesdev-page-table": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.software602.filler.form+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["fo"]
+        extensions: ["fo"],
       },
       "application/vnd.software602.filler.form-xml-zip": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.solent.sdkm+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["sdkm", "sdkd"]
+        extensions: ["sdkm", "sdkd"],
       },
       "application/vnd.spotfire.dxp": {
         source: "iana",
-        extensions: ["dxp"]
+        extensions: ["dxp"],
       },
       "application/vnd.spotfire.sfs": {
         source: "iana",
-        extensions: ["sfs"]
+        extensions: ["sfs"],
       },
       "application/vnd.sqlite3": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sss-cod": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sss-dtf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sss-ntf": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.stardivision.calc": {
         source: "apache",
-        extensions: ["sdc"]
+        extensions: ["sdc"],
       },
       "application/vnd.stardivision.draw": {
         source: "apache",
-        extensions: ["sda"]
+        extensions: ["sda"],
       },
       "application/vnd.stardivision.impress": {
         source: "apache",
-        extensions: ["sdd"]
+        extensions: ["sdd"],
       },
       "application/vnd.stardivision.math": {
         source: "apache",
-        extensions: ["smf"]
+        extensions: ["smf"],
       },
       "application/vnd.stardivision.writer": {
         source: "apache",
-        extensions: ["sdw", "vor"]
+        extensions: ["sdw", "vor"],
       },
       "application/vnd.stardivision.writer-global": {
         source: "apache",
-        extensions: ["sgl"]
+        extensions: ["sgl"],
       },
       "application/vnd.stepmania.package": {
         source: "iana",
-        extensions: ["smzip"]
+        extensions: ["smzip"],
       },
       "application/vnd.stepmania.stepchart": {
         source: "iana",
-        extensions: ["sm"]
+        extensions: ["sm"],
       },
       "application/vnd.street-stream": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sun.wadl+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["wadl"]
+        extensions: ["wadl"],
       },
       "application/vnd.sun.xml.calc": {
         source: "apache",
-        extensions: ["sxc"]
+        extensions: ["sxc"],
       },
       "application/vnd.sun.xml.calc.template": {
         source: "apache",
-        extensions: ["stc"]
+        extensions: ["stc"],
       },
       "application/vnd.sun.xml.draw": {
         source: "apache",
-        extensions: ["sxd"]
+        extensions: ["sxd"],
       },
       "application/vnd.sun.xml.draw.template": {
         source: "apache",
-        extensions: ["std"]
+        extensions: ["std"],
       },
       "application/vnd.sun.xml.impress": {
         source: "apache",
-        extensions: ["sxi"]
+        extensions: ["sxi"],
       },
       "application/vnd.sun.xml.impress.template": {
         source: "apache",
-        extensions: ["sti"]
+        extensions: ["sti"],
       },
       "application/vnd.sun.xml.math": {
         source: "apache",
-        extensions: ["sxm"]
+        extensions: ["sxm"],
       },
       "application/vnd.sun.xml.writer": {
         source: "apache",
-        extensions: ["sxw"]
+        extensions: ["sxw"],
       },
       "application/vnd.sun.xml.writer.global": {
         source: "apache",
-        extensions: ["sxg"]
+        extensions: ["sxg"],
       },
       "application/vnd.sun.xml.writer.template": {
         source: "apache",
-        extensions: ["stw"]
+        extensions: ["stw"],
       },
       "application/vnd.sus-calendar": {
         source: "iana",
-        extensions: ["sus", "susp"]
+        extensions: ["sus", "susp"],
       },
       "application/vnd.svd": {
         source: "iana",
-        extensions: ["svd"]
+        extensions: ["svd"],
       },
       "application/vnd.swiftview-ics": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.sycle+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.syft+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.symbian.install": {
         source: "apache",
-        extensions: ["sis", "sisx"]
+        extensions: ["sis", "sisx"],
       },
       "application/vnd.syncml+xml": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["xsm"]
+        extensions: ["xsm"],
       },
       "application/vnd.syncml.dm+wbxml": {
         source: "iana",
         charset: "UTF-8",
-        extensions: ["bdm"]
+        extensions: ["bdm"],
       },
       "application/vnd.syncml.dm+xml": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["xdm"]
+        extensions: ["xdm"],
       },
       "application/vnd.syncml.dm.notification": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.syncml.dmddf+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.syncml.dmddf+xml": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["ddf"]
+        extensions: ["ddf"],
       },
       "application/vnd.syncml.dmtnds+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.syncml.dmtnds+xml": {
         source: "iana",
         charset: "UTF-8",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.syncml.ds.notification": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.tableschema+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.tao.intent-module-archive": {
         source: "iana",
-        extensions: ["tao"]
+        extensions: ["tao"],
       },
       "application/vnd.tcpdump.pcap": {
         source: "iana",
-        extensions: ["pcap", "cap", "dmp"]
+        extensions: ["pcap", "cap", "dmp"],
       },
       "application/vnd.think-cell.ppttc+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.tmd.mediaflex.api+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.tml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.tmobile-livetv": {
         source: "iana",
-        extensions: ["tmo"]
+        extensions: ["tmo"],
       },
       "application/vnd.tri.onesource": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.trid.tpt": {
         source: "iana",
-        extensions: ["tpt"]
+        extensions: ["tpt"],
       },
       "application/vnd.triscape.mxs": {
         source: "iana",
-        extensions: ["mxs"]
+        extensions: ["mxs"],
       },
       "application/vnd.trueapp": {
         source: "iana",
-        extensions: ["tra"]
+        extensions: ["tra"],
       },
       "application/vnd.truedoc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ubisoft.webplayer": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ufdl": {
         source: "iana",
-        extensions: ["ufd", "ufdl"]
+        extensions: ["ufd", "ufdl"],
       },
       "application/vnd.uiq.theme": {
         source: "iana",
-        extensions: ["utz"]
+        extensions: ["utz"],
       },
       "application/vnd.umajin": {
         source: "iana",
-        extensions: ["umj"]
+        extensions: ["umj"],
       },
       "application/vnd.unity": {
         source: "iana",
-        extensions: ["unityweb"]
+        extensions: ["unityweb"],
       },
       "application/vnd.uoml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["uoml"]
+        extensions: ["uoml"],
       },
       "application/vnd.uplanet.alert": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.alert-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.bearer-choice": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.bearer-choice-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.cacheop": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.cacheop-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.channel": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.channel-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.list": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.list-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.listcmd": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.listcmd-wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uplanet.signal": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.uri-map": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.valve.source.material": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.vcx": {
         source: "iana",
-        extensions: ["vcx"]
+        extensions: ["vcx"],
       },
       "application/vnd.vd-study": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.vectorworks": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.vel+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.verimatrix.vcas": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.veritone.aion+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.veryant.thin": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.ves.encrypted": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.vidsoft.vidconference": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.visio": {
         source: "iana",
-        extensions: ["vsd", "vst", "vss", "vsw"]
+        extensions: ["vsd", "vst", "vss", "vsw"],
       },
       "application/vnd.visionary": {
         source: "iana",
-        extensions: ["vis"]
+        extensions: ["vis"],
       },
       "application/vnd.vividence.scriptfile": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.vsf": {
         source: "iana",
-        extensions: ["vsf"]
+        extensions: ["vsf"],
       },
       "application/vnd.wap.sic": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wap.slc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wap.wbxml": {
         source: "iana",
         charset: "UTF-8",
-        extensions: ["wbxml"]
+        extensions: ["wbxml"],
       },
       "application/vnd.wap.wmlc": {
         source: "iana",
-        extensions: ["wmlc"]
+        extensions: ["wmlc"],
       },
       "application/vnd.wap.wmlscriptc": {
         source: "iana",
-        extensions: ["wmlsc"]
+        extensions: ["wmlsc"],
       },
       "application/vnd.webturbo": {
         source: "iana",
-        extensions: ["wtb"]
+        extensions: ["wtb"],
       },
       "application/vnd.wfa.dpp": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wfa.p2p": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wfa.wsc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.windows.devicepairing": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wmc": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wmf.bootstrap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wolfram.mathematica": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wolfram.mathematica.package": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wolfram.player": {
         source: "iana",
-        extensions: ["nbp"]
+        extensions: ["nbp"],
       },
       "application/vnd.wordperfect": {
         source: "iana",
-        extensions: ["wpd"]
+        extensions: ["wpd"],
       },
       "application/vnd.wqd": {
         source: "iana",
-        extensions: ["wqd"]
+        extensions: ["wqd"],
       },
       "application/vnd.wrq-hp3000-labelled": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wt.stf": {
         source: "iana",
-        extensions: ["stf"]
+        extensions: ["stf"],
       },
       "application/vnd.wv.csp+wbxml": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.wv.csp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.wv.ssp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.xacml+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.xara": {
         source: "iana",
-        extensions: ["xar"]
+        extensions: ["xar"],
       },
       "application/vnd.xfdl": {
         source: "iana",
-        extensions: ["xfdl"]
+        extensions: ["xfdl"],
       },
       "application/vnd.xfdl.webform": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.xmi+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vnd.xmpie.cpkg": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.xmpie.dpkg": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.xmpie.plan": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.xmpie.ppkg": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.xmpie.xlim": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.yamaha.hv-dic": {
         source: "iana",
-        extensions: ["hvd"]
+        extensions: ["hvd"],
       },
       "application/vnd.yamaha.hv-script": {
         source: "iana",
-        extensions: ["hvs"]
+        extensions: ["hvs"],
       },
       "application/vnd.yamaha.hv-voice": {
         source: "iana",
-        extensions: ["hvp"]
+        extensions: ["hvp"],
       },
       "application/vnd.yamaha.openscoreformat": {
         source: "iana",
-        extensions: ["osf"]
+        extensions: ["osf"],
       },
       "application/vnd.yamaha.openscoreformat.osfpvg+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["osfpvg"]
+        extensions: ["osfpvg"],
       },
       "application/vnd.yamaha.remote-setup": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.yamaha.smaf-audio": {
         source: "iana",
-        extensions: ["saf"]
+        extensions: ["saf"],
       },
       "application/vnd.yamaha.smaf-phrase": {
         source: "iana",
-        extensions: ["spf"]
+        extensions: ["spf"],
       },
       "application/vnd.yamaha.through-ngn": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.yamaha.tunnel-udpencap": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.yaoweme": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.yellowriver-custom-menu": {
         source: "iana",
-        extensions: ["cmp"]
+        extensions: ["cmp"],
       },
       "application/vnd.youtube.yt": {
-        source: "iana"
+        source: "iana",
       },
       "application/vnd.zul": {
         source: "iana",
-        extensions: ["zir", "zirz"]
+        extensions: ["zir", "zirz"],
       },
       "application/vnd.zzazz.deck+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["zaz"]
+        extensions: ["zaz"],
       },
       "application/voicexml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["vxml"]
+        extensions: ["vxml"],
       },
       "application/voucher-cms+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/vq-rtcpxr": {
-        source: "iana"
+        source: "iana",
       },
       "application/wasm": {
         source: "iana",
         compressible: true,
-        extensions: ["wasm"]
+        extensions: ["wasm"],
       },
       "application/watcherinfo+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["wif"]
+        extensions: ["wif"],
       },
       "application/webpush-options+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/whoispp-query": {
-        source: "iana"
+        source: "iana",
       },
       "application/whoispp-response": {
-        source: "iana"
+        source: "iana",
       },
       "application/widget": {
         source: "iana",
-        extensions: ["wgt"]
+        extensions: ["wgt"],
       },
       "application/winhlp": {
         source: "apache",
-        extensions: ["hlp"]
+        extensions: ["hlp"],
       },
       "application/wita": {
-        source: "iana"
+        source: "iana",
       },
       "application/wordperfect5.1": {
-        source: "iana"
+        source: "iana",
       },
       "application/wsdl+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["wsdl"]
+        extensions: ["wsdl"],
       },
       "application/wspolicy+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["wspolicy"]
+        extensions: ["wspolicy"],
       },
       "application/x-7z-compressed": {
         source: "apache",
         compressible: false,
-        extensions: ["7z"]
+        extensions: ["7z"],
       },
       "application/x-abiword": {
         source: "apache",
-        extensions: ["abw"]
+        extensions: ["abw"],
       },
       "application/x-ace-compressed": {
         source: "apache",
-        extensions: ["ace"]
+        extensions: ["ace"],
       },
       "application/x-amf": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-apple-diskimage": {
         source: "apache",
-        extensions: ["dmg"]
+        extensions: ["dmg"],
       },
       "application/x-arj": {
         compressible: false,
-        extensions: ["arj"]
+        extensions: ["arj"],
       },
       "application/x-authorware-bin": {
         source: "apache",
-        extensions: ["aab", "x32", "u32", "vox"]
+        extensions: ["aab", "x32", "u32", "vox"],
       },
       "application/x-authorware-map": {
         source: "apache",
-        extensions: ["aam"]
+        extensions: ["aam"],
       },
       "application/x-authorware-seg": {
         source: "apache",
-        extensions: ["aas"]
+        extensions: ["aas"],
       },
       "application/x-bcpio": {
         source: "apache",
-        extensions: ["bcpio"]
+        extensions: ["bcpio"],
       },
       "application/x-bdoc": {
         compressible: false,
-        extensions: ["bdoc"]
+        extensions: ["bdoc"],
       },
       "application/x-bittorrent": {
         source: "apache",
-        extensions: ["torrent"]
+        extensions: ["torrent"],
       },
       "application/x-blorb": {
         source: "apache",
-        extensions: ["blb", "blorb"]
+        extensions: ["blb", "blorb"],
       },
       "application/x-bzip": {
         source: "apache",
         compressible: false,
-        extensions: ["bz"]
+        extensions: ["bz"],
       },
       "application/x-bzip2": {
         source: "apache",
         compressible: false,
-        extensions: ["bz2", "boz"]
+        extensions: ["bz2", "boz"],
       },
       "application/x-cbr": {
         source: "apache",
-        extensions: ["cbr", "cba", "cbt", "cbz", "cb7"]
+        extensions: ["cbr", "cba", "cbt", "cbz", "cb7"],
       },
       "application/x-cdlink": {
         source: "apache",
-        extensions: ["vcd"]
+        extensions: ["vcd"],
       },
       "application/x-cfs-compressed": {
         source: "apache",
-        extensions: ["cfs"]
+        extensions: ["cfs"],
       },
       "application/x-chat": {
         source: "apache",
-        extensions: ["chat"]
+        extensions: ["chat"],
       },
       "application/x-chess-pgn": {
         source: "apache",
-        extensions: ["pgn"]
+        extensions: ["pgn"],
       },
       "application/x-chrome-extension": {
-        extensions: ["crx"]
+        extensions: ["crx"],
       },
       "application/x-cocoa": {
         source: "nginx",
-        extensions: ["cco"]
+        extensions: ["cco"],
       },
       "application/x-compress": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-conference": {
         source: "apache",
-        extensions: ["nsc"]
+        extensions: ["nsc"],
       },
       "application/x-cpio": {
         source: "apache",
-        extensions: ["cpio"]
+        extensions: ["cpio"],
       },
       "application/x-csh": {
         source: "apache",
-        extensions: ["csh"]
+        extensions: ["csh"],
       },
       "application/x-deb": {
-        compressible: false
+        compressible: false,
       },
       "application/x-debian-package": {
         source: "apache",
-        extensions: ["deb", "udeb"]
+        extensions: ["deb", "udeb"],
       },
       "application/x-dgc-compressed": {
         source: "apache",
-        extensions: ["dgc"]
+        extensions: ["dgc"],
       },
       "application/x-director": {
         source: "apache",
-        extensions: ["dir", "dcr", "dxr", "cst", "cct", "cxt", "w3d", "fgd", "swa"]
+        extensions: [
+          "dir",
+          "dcr",
+          "dxr",
+          "cst",
+          "cct",
+          "cxt",
+          "w3d",
+          "fgd",
+          "swa",
+        ],
       },
       "application/x-doom": {
         source: "apache",
-        extensions: ["wad"]
+        extensions: ["wad"],
       },
       "application/x-dtbncx+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["ncx"]
+        extensions: ["ncx"],
       },
       "application/x-dtbook+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["dtb"]
+        extensions: ["dtb"],
       },
       "application/x-dtbresource+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["res"]
+        extensions: ["res"],
       },
       "application/x-dvi": {
         source: "apache",
         compressible: false,
-        extensions: ["dvi"]
+        extensions: ["dvi"],
       },
       "application/x-envoy": {
         source: "apache",
-        extensions: ["evy"]
+        extensions: ["evy"],
       },
       "application/x-eva": {
         source: "apache",
-        extensions: ["eva"]
+        extensions: ["eva"],
       },
       "application/x-font-bdf": {
         source: "apache",
-        extensions: ["bdf"]
+        extensions: ["bdf"],
       },
       "application/x-font-dos": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-font-framemaker": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-font-ghostscript": {
         source: "apache",
-        extensions: ["gsf"]
+        extensions: ["gsf"],
       },
       "application/x-font-libgrx": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-font-linux-psf": {
         source: "apache",
-        extensions: ["psf"]
+        extensions: ["psf"],
       },
       "application/x-font-pcf": {
         source: "apache",
-        extensions: ["pcf"]
+        extensions: ["pcf"],
       },
       "application/x-font-snf": {
         source: "apache",
-        extensions: ["snf"]
+        extensions: ["snf"],
       },
       "application/x-font-speedo": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-font-sunos-news": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-font-type1": {
         source: "apache",
-        extensions: ["pfa", "pfb", "pfm", "afm"]
+        extensions: ["pfa", "pfb", "pfm", "afm"],
       },
       "application/x-font-vfont": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-freearc": {
         source: "apache",
-        extensions: ["arc"]
+        extensions: ["arc"],
       },
       "application/x-futuresplash": {
         source: "apache",
-        extensions: ["spl"]
+        extensions: ["spl"],
       },
       "application/x-gca-compressed": {
         source: "apache",
-        extensions: ["gca"]
+        extensions: ["gca"],
       },
       "application/x-glulx": {
         source: "apache",
-        extensions: ["ulx"]
+        extensions: ["ulx"],
       },
       "application/x-gnumeric": {
         source: "apache",
-        extensions: ["gnumeric"]
+        extensions: ["gnumeric"],
       },
       "application/x-gramps-xml": {
         source: "apache",
-        extensions: ["gramps"]
+        extensions: ["gramps"],
       },
       "application/x-gtar": {
         source: "apache",
-        extensions: ["gtar"]
+        extensions: ["gtar"],
       },
       "application/x-gzip": {
-        source: "apache"
+        source: "apache",
       },
       "application/x-hdf": {
         source: "apache",
-        extensions: ["hdf"]
+        extensions: ["hdf"],
       },
       "application/x-httpd-php": {
         compressible: true,
-        extensions: ["php"]
+        extensions: ["php"],
       },
       "application/x-install-instructions": {
         source: "apache",
-        extensions: ["install"]
+        extensions: ["install"],
       },
       "application/x-iso9660-image": {
         source: "apache",
-        extensions: ["iso"]
+        extensions: ["iso"],
       },
       "application/x-iwork-keynote-sffkey": {
-        extensions: ["key"]
+        extensions: ["key"],
       },
       "application/x-iwork-numbers-sffnumbers": {
-        extensions: ["numbers"]
+        extensions: ["numbers"],
       },
       "application/x-iwork-pages-sffpages": {
-        extensions: ["pages"]
+        extensions: ["pages"],
       },
       "application/x-java-archive-diff": {
         source: "nginx",
-        extensions: ["jardiff"]
+        extensions: ["jardiff"],
       },
       "application/x-java-jnlp-file": {
         source: "apache",
         compressible: false,
-        extensions: ["jnlp"]
+        extensions: ["jnlp"],
       },
       "application/x-javascript": {
-        compressible: true
+        compressible: true,
       },
       "application/x-keepass2": {
-        extensions: ["kdbx"]
+        extensions: ["kdbx"],
       },
       "application/x-latex": {
         source: "apache",
         compressible: false,
-        extensions: ["latex"]
+        extensions: ["latex"],
       },
       "application/x-lua-bytecode": {
-        extensions: ["luac"]
+        extensions: ["luac"],
       },
       "application/x-lzh-compressed": {
         source: "apache",
-        extensions: ["lzh", "lha"]
+        extensions: ["lzh", "lha"],
       },
       "application/x-makeself": {
         source: "nginx",
-        extensions: ["run"]
+        extensions: ["run"],
       },
       "application/x-mie": {
         source: "apache",
-        extensions: ["mie"]
+        extensions: ["mie"],
       },
       "application/x-mobipocket-ebook": {
         source: "apache",
-        extensions: ["prc", "mobi"]
+        extensions: ["prc", "mobi"],
       },
       "application/x-mpegurl": {
-        compressible: false
+        compressible: false,
       },
       "application/x-ms-application": {
         source: "apache",
-        extensions: ["application"]
+        extensions: ["application"],
       },
       "application/x-ms-shortcut": {
         source: "apache",
-        extensions: ["lnk"]
+        extensions: ["lnk"],
       },
       "application/x-ms-wmd": {
         source: "apache",
-        extensions: ["wmd"]
+        extensions: ["wmd"],
       },
       "application/x-ms-wmz": {
         source: "apache",
-        extensions: ["wmz"]
+        extensions: ["wmz"],
       },
       "application/x-ms-xbap": {
         source: "apache",
-        extensions: ["xbap"]
+        extensions: ["xbap"],
       },
       "application/x-msaccess": {
         source: "apache",
-        extensions: ["mdb"]
+        extensions: ["mdb"],
       },
       "application/x-msbinder": {
         source: "apache",
-        extensions: ["obd"]
+        extensions: ["obd"],
       },
       "application/x-mscardfile": {
         source: "apache",
-        extensions: ["crd"]
+        extensions: ["crd"],
       },
       "application/x-msclip": {
         source: "apache",
-        extensions: ["clp"]
+        extensions: ["clp"],
       },
       "application/x-msdos-program": {
-        extensions: ["exe"]
+        extensions: ["exe"],
       },
       "application/x-msdownload": {
         source: "apache",
-        extensions: ["exe", "dll", "com", "bat", "msi"]
+        extensions: ["exe", "dll", "com", "bat", "msi"],
       },
       "application/x-msmediaview": {
         source: "apache",
-        extensions: ["mvb", "m13", "m14"]
+        extensions: ["mvb", "m13", "m14"],
       },
       "application/x-msmetafile": {
         source: "apache",
-        extensions: ["wmf", "wmz", "emf", "emz"]
+        extensions: ["wmf", "wmz", "emf", "emz"],
       },
       "application/x-msmoney": {
         source: "apache",
-        extensions: ["mny"]
+        extensions: ["mny"],
       },
       "application/x-mspublisher": {
         source: "apache",
-        extensions: ["pub"]
+        extensions: ["pub"],
       },
       "application/x-msschedule": {
         source: "apache",
-        extensions: ["scd"]
+        extensions: ["scd"],
       },
       "application/x-msterminal": {
         source: "apache",
-        extensions: ["trm"]
+        extensions: ["trm"],
       },
       "application/x-mswrite": {
         source: "apache",
-        extensions: ["wri"]
+        extensions: ["wri"],
       },
       "application/x-netcdf": {
         source: "apache",
-        extensions: ["nc", "cdf"]
+        extensions: ["nc", "cdf"],
       },
       "application/x-ns-proxy-autoconfig": {
         compressible: true,
-        extensions: ["pac"]
+        extensions: ["pac"],
       },
       "application/x-nzb": {
         source: "apache",
-        extensions: ["nzb"]
+        extensions: ["nzb"],
       },
       "application/x-perl": {
         source: "nginx",
-        extensions: ["pl", "pm"]
+        extensions: ["pl", "pm"],
       },
       "application/x-pilot": {
         source: "nginx",
-        extensions: ["prc", "pdb"]
+        extensions: ["prc", "pdb"],
       },
       "application/x-pkcs12": {
         source: "apache",
         compressible: false,
-        extensions: ["p12", "pfx"]
+        extensions: ["p12", "pfx"],
       },
       "application/x-pkcs7-certificates": {
         source: "apache",
-        extensions: ["p7b", "spc"]
+        extensions: ["p7b", "spc"],
       },
       "application/x-pkcs7-certreqresp": {
         source: "apache",
-        extensions: ["p7r"]
+        extensions: ["p7r"],
       },
       "application/x-pki-message": {
-        source: "iana"
+        source: "iana",
       },
       "application/x-rar-compressed": {
         source: "apache",
         compressible: false,
-        extensions: ["rar"]
+        extensions: ["rar"],
       },
       "application/x-redhat-package-manager": {
         source: "nginx",
-        extensions: ["rpm"]
+        extensions: ["rpm"],
       },
       "application/x-research-info-systems": {
         source: "apache",
-        extensions: ["ris"]
+        extensions: ["ris"],
       },
       "application/x-sea": {
         source: "nginx",
-        extensions: ["sea"]
+        extensions: ["sea"],
       },
       "application/x-sh": {
         source: "apache",
         compressible: true,
-        extensions: ["sh"]
+        extensions: ["sh"],
       },
       "application/x-shar": {
         source: "apache",
-        extensions: ["shar"]
+        extensions: ["shar"],
       },
       "application/x-shockwave-flash": {
         source: "apache",
         compressible: false,
-        extensions: ["swf"]
+        extensions: ["swf"],
       },
       "application/x-silverlight-app": {
         source: "apache",
-        extensions: ["xap"]
+        extensions: ["xap"],
       },
       "application/x-sql": {
         source: "apache",
-        extensions: ["sql"]
+        extensions: ["sql"],
       },
       "application/x-stuffit": {
         source: "apache",
         compressible: false,
-        extensions: ["sit"]
+        extensions: ["sit"],
       },
       "application/x-stuffitx": {
         source: "apache",
-        extensions: ["sitx"]
+        extensions: ["sitx"],
       },
       "application/x-subrip": {
         source: "apache",
-        extensions: ["srt"]
+        extensions: ["srt"],
       },
       "application/x-sv4cpio": {
         source: "apache",
-        extensions: ["sv4cpio"]
+        extensions: ["sv4cpio"],
       },
       "application/x-sv4crc": {
         source: "apache",
-        extensions: ["sv4crc"]
+        extensions: ["sv4crc"],
       },
       "application/x-t3vm-image": {
         source: "apache",
-        extensions: ["t3"]
+        extensions: ["t3"],
       },
       "application/x-tads": {
         source: "apache",
-        extensions: ["gam"]
+        extensions: ["gam"],
       },
       "application/x-tar": {
         source: "apache",
         compressible: true,
-        extensions: ["tar"]
+        extensions: ["tar"],
       },
       "application/x-tcl": {
         source: "apache",
-        extensions: ["tcl", "tk"]
+        extensions: ["tcl", "tk"],
       },
       "application/x-tex": {
         source: "apache",
-        extensions: ["tex"]
+        extensions: ["tex"],
       },
       "application/x-tex-tfm": {
         source: "apache",
-        extensions: ["tfm"]
+        extensions: ["tfm"],
       },
       "application/x-texinfo": {
         source: "apache",
-        extensions: ["texinfo", "texi"]
+        extensions: ["texinfo", "texi"],
       },
       "application/x-tgif": {
         source: "apache",
-        extensions: ["obj"]
+        extensions: ["obj"],
       },
       "application/x-ustar": {
         source: "apache",
-        extensions: ["ustar"]
+        extensions: ["ustar"],
       },
       "application/x-virtualbox-hdd": {
         compressible: true,
-        extensions: ["hdd"]
+        extensions: ["hdd"],
       },
       "application/x-virtualbox-ova": {
         compressible: true,
-        extensions: ["ova"]
+        extensions: ["ova"],
       },
       "application/x-virtualbox-ovf": {
         compressible: true,
-        extensions: ["ovf"]
+        extensions: ["ovf"],
       },
       "application/x-virtualbox-vbox": {
         compressible: true,
-        extensions: ["vbox"]
+        extensions: ["vbox"],
       },
       "application/x-virtualbox-vbox-extpack": {
         compressible: false,
-        extensions: ["vbox-extpack"]
+        extensions: ["vbox-extpack"],
       },
       "application/x-virtualbox-vdi": {
         compressible: true,
-        extensions: ["vdi"]
+        extensions: ["vdi"],
       },
       "application/x-virtualbox-vhd": {
         compressible: true,
-        extensions: ["vhd"]
+        extensions: ["vhd"],
       },
       "application/x-virtualbox-vmdk": {
         compressible: true,
-        extensions: ["vmdk"]
+        extensions: ["vmdk"],
       },
       "application/x-wais-source": {
         source: "apache",
-        extensions: ["src"]
+        extensions: ["src"],
       },
       "application/x-web-app-manifest+json": {
         compressible: true,
-        extensions: ["webapp"]
+        extensions: ["webapp"],
       },
       "application/x-www-form-urlencoded": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/x-x509-ca-cert": {
         source: "iana",
-        extensions: ["der", "crt", "pem"]
+        extensions: ["der", "crt", "pem"],
       },
       "application/x-x509-ca-ra-cert": {
-        source: "iana"
+        source: "iana",
       },
       "application/x-x509-next-ca-cert": {
-        source: "iana"
+        source: "iana",
       },
       "application/x-xfig": {
         source: "apache",
-        extensions: ["fig"]
+        extensions: ["fig"],
       },
       "application/x-xliff+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["xlf"]
+        extensions: ["xlf"],
       },
       "application/x-xpinstall": {
         source: "apache",
         compressible: false,
-        extensions: ["xpi"]
+        extensions: ["xpi"],
       },
       "application/x-xz": {
         source: "apache",
-        extensions: ["xz"]
+        extensions: ["xz"],
       },
       "application/x-zmachine": {
         source: "apache",
-        extensions: ["z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8"]
+        extensions: ["z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8"],
       },
       "application/x400-bp": {
-        source: "iana"
+        source: "iana",
       },
       "application/xacml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xaml+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["xaml"]
+        extensions: ["xaml"],
       },
       "application/xcap-att+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xav"]
+        extensions: ["xav"],
       },
       "application/xcap-caps+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xca"]
+        extensions: ["xca"],
       },
       "application/xcap-diff+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xdf"]
+        extensions: ["xdf"],
       },
       "application/xcap-el+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xel"]
+        extensions: ["xel"],
       },
       "application/xcap-error+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xcap-ns+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xns"]
+        extensions: ["xns"],
       },
       "application/xcon-conference-info+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xcon-conference-info-diff+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xenc+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xenc"]
+        extensions: ["xenc"],
       },
       "application/xhtml+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xhtml", "xht"]
+        extensions: ["xhtml", "xht"],
       },
       "application/xhtml-voice+xml": {
         source: "apache",
-        compressible: true
+        compressible: true,
       },
       "application/xliff+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xlf"]
+        extensions: ["xlf"],
       },
       "application/xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xml", "xsl", "xsd", "rng"]
+        extensions: ["xml", "xsl", "xsd", "rng"],
       },
       "application/xml-dtd": {
         source: "iana",
         compressible: true,
-        extensions: ["dtd"]
+        extensions: ["dtd"],
       },
       "application/xml-external-parsed-entity": {
-        source: "iana"
+        source: "iana",
       },
       "application/xml-patch+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xmpp+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/xop+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xop"]
+        extensions: ["xop"],
       },
       "application/xproc+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["xpl"]
+        extensions: ["xpl"],
       },
       "application/xslt+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xsl", "xslt"]
+        extensions: ["xsl", "xslt"],
       },
       "application/xspf+xml": {
         source: "apache",
         compressible: true,
-        extensions: ["xspf"]
+        extensions: ["xspf"],
       },
       "application/xv+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["mxml", "xhvml", "xvml", "xvm"]
+        extensions: ["mxml", "xhvml", "xvml", "xvm"],
       },
       "application/yang": {
         source: "iana",
-        extensions: ["yang"]
+        extensions: ["yang"],
       },
       "application/yang-data+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/yang-data+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/yang-patch+json": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/yang-patch+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "application/yin+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["yin"]
+        extensions: ["yin"],
       },
       "application/zip": {
         source: "iana",
         compressible: false,
-        extensions: ["zip"]
+        extensions: ["zip"],
       },
       "application/zlib": {
-        source: "iana"
+        source: "iana",
       },
       "application/zstd": {
-        source: "iana"
+        source: "iana",
       },
       "audio/1d-interleaved-parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "audio/32kadpcm": {
-        source: "iana"
+        source: "iana",
       },
       "audio/3gpp": {
         source: "iana",
         compressible: false,
-        extensions: ["3gpp"]
+        extensions: ["3gpp"],
       },
       "audio/3gpp2": {
-        source: "iana"
+        source: "iana",
       },
       "audio/aac": {
-        source: "iana"
+        source: "iana",
       },
       "audio/ac3": {
-        source: "iana"
+        source: "iana",
       },
       "audio/adpcm": {
         source: "apache",
-        extensions: ["adp"]
+        extensions: ["adp"],
       },
       "audio/amr": {
         source: "iana",
-        extensions: ["amr"]
+        extensions: ["amr"],
       },
       "audio/amr-wb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/amr-wb+": {
-        source: "iana"
+        source: "iana",
       },
       "audio/aptx": {
-        source: "iana"
+        source: "iana",
       },
       "audio/asc": {
-        source: "iana"
+        source: "iana",
       },
       "audio/atrac-advanced-lossless": {
-        source: "iana"
+        source: "iana",
       },
       "audio/atrac-x": {
-        source: "iana"
+        source: "iana",
       },
       "audio/atrac3": {
-        source: "iana"
+        source: "iana",
       },
       "audio/basic": {
         source: "iana",
         compressible: false,
-        extensions: ["au", "snd"]
+        extensions: ["au", "snd"],
       },
       "audio/bv16": {
-        source: "iana"
+        source: "iana",
       },
       "audio/bv32": {
-        source: "iana"
+        source: "iana",
       },
       "audio/clearmode": {
-        source: "iana"
+        source: "iana",
       },
       "audio/cn": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dat12": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dls": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dsr-es201108": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dsr-es202050": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dsr-es202211": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dsr-es202212": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dv": {
-        source: "iana"
+        source: "iana",
       },
       "audio/dvi4": {
-        source: "iana"
+        source: "iana",
       },
       "audio/eac3": {
-        source: "iana"
+        source: "iana",
       },
       "audio/encaprtp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrc": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrc-qcp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrc0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrc1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcb0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcb1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcnw": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcnw0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcnw1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcwb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcwb0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evrcwb1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/evs": {
-        source: "iana"
+        source: "iana",
       },
       "audio/flexfec": {
-        source: "iana"
+        source: "iana",
       },
       "audio/fwdred": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g711-0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g719": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g722": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g7221": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g723": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g726-16": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g726-24": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g726-32": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g726-40": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g728": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g729": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g7291": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g729d": {
-        source: "iana"
+        source: "iana",
       },
       "audio/g729e": {
-        source: "iana"
+        source: "iana",
       },
       "audio/gsm": {
-        source: "iana"
+        source: "iana",
       },
       "audio/gsm-efr": {
-        source: "iana"
+        source: "iana",
       },
       "audio/gsm-hr-08": {
-        source: "iana"
+        source: "iana",
       },
       "audio/ilbc": {
-        source: "iana"
+        source: "iana",
       },
       "audio/ip-mr_v2.5": {
-        source: "iana"
+        source: "iana",
       },
       "audio/isac": {
-        source: "apache"
+        source: "apache",
       },
       "audio/l16": {
-        source: "iana"
+        source: "iana",
       },
       "audio/l20": {
-        source: "iana"
+        source: "iana",
       },
       "audio/l24": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "audio/l8": {
-        source: "iana"
+        source: "iana",
       },
       "audio/lpc": {
-        source: "iana"
+        source: "iana",
       },
       "audio/melp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/melp1200": {
-        source: "iana"
+        source: "iana",
       },
       "audio/melp2400": {
-        source: "iana"
+        source: "iana",
       },
       "audio/melp600": {
-        source: "iana"
+        source: "iana",
       },
       "audio/mhas": {
-        source: "iana"
+        source: "iana",
       },
       "audio/midi": {
         source: "apache",
-        extensions: ["mid", "midi", "kar", "rmi"]
+        extensions: ["mid", "midi", "kar", "rmi"],
       },
       "audio/mobile-xmf": {
         source: "iana",
-        extensions: ["mxmf"]
+        extensions: ["mxmf"],
       },
       "audio/mp3": {
         compressible: false,
-        extensions: ["mp3"]
+        extensions: ["mp3"],
       },
       "audio/mp4": {
         source: "iana",
         compressible: false,
-        extensions: ["m4a", "mp4a"]
+        extensions: ["m4a", "mp4a"],
       },
       "audio/mp4a-latm": {
-        source: "iana"
+        source: "iana",
       },
       "audio/mpa": {
-        source: "iana"
+        source: "iana",
       },
       "audio/mpa-robust": {
-        source: "iana"
+        source: "iana",
       },
       "audio/mpeg": {
         source: "iana",
         compressible: false,
-        extensions: ["mpga", "mp2", "mp2a", "mp3", "m2a", "m3a"]
+        extensions: ["mpga", "mp2", "mp2a", "mp3", "m2a", "m3a"],
       },
       "audio/mpeg4-generic": {
-        source: "iana"
+        source: "iana",
       },
       "audio/musepack": {
-        source: "apache"
+        source: "apache",
       },
       "audio/ogg": {
         source: "iana",
         compressible: false,
-        extensions: ["oga", "ogg", "spx", "opus"]
+        extensions: ["oga", "ogg", "spx", "opus"],
       },
       "audio/opus": {
-        source: "iana"
+        source: "iana",
       },
       "audio/parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "audio/pcma": {
-        source: "iana"
+        source: "iana",
       },
       "audio/pcma-wb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/pcmu": {
-        source: "iana"
+        source: "iana",
       },
       "audio/pcmu-wb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/prs.sid": {
-        source: "iana"
+        source: "iana",
       },
       "audio/qcelp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/raptorfec": {
-        source: "iana"
+        source: "iana",
       },
       "audio/red": {
-        source: "iana"
+        source: "iana",
       },
       "audio/rtp-enc-aescm128": {
-        source: "iana"
+        source: "iana",
       },
       "audio/rtp-midi": {
-        source: "iana"
+        source: "iana",
       },
       "audio/rtploopback": {
-        source: "iana"
+        source: "iana",
       },
       "audio/rtx": {
-        source: "iana"
+        source: "iana",
       },
       "audio/s3m": {
         source: "apache",
-        extensions: ["s3m"]
+        extensions: ["s3m"],
       },
       "audio/scip": {
-        source: "iana"
+        source: "iana",
       },
       "audio/silk": {
         source: "apache",
-        extensions: ["sil"]
+        extensions: ["sil"],
       },
       "audio/smv": {
-        source: "iana"
+        source: "iana",
       },
       "audio/smv-qcp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/smv0": {
-        source: "iana"
+        source: "iana",
       },
       "audio/sofa": {
-        source: "iana"
+        source: "iana",
       },
       "audio/sp-midi": {
-        source: "iana"
+        source: "iana",
       },
       "audio/speex": {
-        source: "iana"
+        source: "iana",
       },
       "audio/t140c": {
-        source: "iana"
+        source: "iana",
       },
       "audio/t38": {
-        source: "iana"
+        source: "iana",
       },
       "audio/telephone-event": {
-        source: "iana"
+        source: "iana",
       },
       "audio/tetra_acelp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/tetra_acelp_bb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/tone": {
-        source: "iana"
+        source: "iana",
       },
       "audio/tsvcis": {
-        source: "iana"
+        source: "iana",
       },
       "audio/uemclip": {
-        source: "iana"
+        source: "iana",
       },
       "audio/ulpfec": {
-        source: "iana"
+        source: "iana",
       },
       "audio/usac": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vdvi": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vmr-wb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.3gpp.iufp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.4sb": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.audiokoz": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.celp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.cisco.nse": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.cmles.radio-events": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.cns.anp1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.cns.inf1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dece.audio": {
         source: "iana",
-        extensions: ["uva", "uvva"]
+        extensions: ["uva", "uvva"],
       },
       "audio/vnd.digital-winds": {
         source: "iana",
-        extensions: ["eol"]
+        extensions: ["eol"],
       },
       "audio/vnd.dlna.adts": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.heaac.1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.heaac.2": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.mlp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.mps": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.pl2": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.pl2x": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.pl2z": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dolby.pulse.1": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dra": {
         source: "iana",
-        extensions: ["dra"]
+        extensions: ["dra"],
       },
       "audio/vnd.dts": {
         source: "iana",
-        extensions: ["dts"]
+        extensions: ["dts"],
       },
       "audio/vnd.dts.hd": {
         source: "iana",
-        extensions: ["dtshd"]
+        extensions: ["dtshd"],
       },
       "audio/vnd.dts.uhd": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.dvb.file": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.everad.plj": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.hns.audio": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.lucent.voice": {
         source: "iana",
-        extensions: ["lvp"]
+        extensions: ["lvp"],
       },
       "audio/vnd.ms-playready.media.pya": {
         source: "iana",
-        extensions: ["pya"]
+        extensions: ["pya"],
       },
       "audio/vnd.nokia.mobile-xmf": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.nortel.vbk": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.nuera.ecelp4800": {
         source: "iana",
-        extensions: ["ecelp4800"]
+        extensions: ["ecelp4800"],
       },
       "audio/vnd.nuera.ecelp7470": {
         source: "iana",
-        extensions: ["ecelp7470"]
+        extensions: ["ecelp7470"],
       },
       "audio/vnd.nuera.ecelp9600": {
         source: "iana",
-        extensions: ["ecelp9600"]
+        extensions: ["ecelp9600"],
       },
       "audio/vnd.octel.sbc": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.presonus.multitrack": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.qcelp": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.rhetorex.32kadpcm": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.rip": {
         source: "iana",
-        extensions: ["rip"]
+        extensions: ["rip"],
       },
       "audio/vnd.rn-realaudio": {
-        compressible: false
+        compressible: false,
       },
       "audio/vnd.sealedmedia.softseal.mpeg": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.vmx.cvsd": {
-        source: "iana"
+        source: "iana",
       },
       "audio/vnd.wave": {
-        compressible: false
+        compressible: false,
       },
       "audio/vorbis": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "audio/vorbis-config": {
-        source: "iana"
+        source: "iana",
       },
       "audio/wav": {
         compressible: false,
-        extensions: ["wav"]
+        extensions: ["wav"],
       },
       "audio/wave": {
         compressible: false,
-        extensions: ["wav"]
+        extensions: ["wav"],
       },
       "audio/webm": {
         source: "apache",
         compressible: false,
-        extensions: ["weba"]
+        extensions: ["weba"],
       },
       "audio/x-aac": {
         source: "apache",
         compressible: false,
-        extensions: ["aac"]
+        extensions: ["aac"],
       },
       "audio/x-aiff": {
         source: "apache",
-        extensions: ["aif", "aiff", "aifc"]
+        extensions: ["aif", "aiff", "aifc"],
       },
       "audio/x-caf": {
         source: "apache",
         compressible: false,
-        extensions: ["caf"]
+        extensions: ["caf"],
       },
       "audio/x-flac": {
         source: "apache",
-        extensions: ["flac"]
+        extensions: ["flac"],
       },
       "audio/x-m4a": {
         source: "nginx",
-        extensions: ["m4a"]
+        extensions: ["m4a"],
       },
       "audio/x-matroska": {
         source: "apache",
-        extensions: ["mka"]
+        extensions: ["mka"],
       },
       "audio/x-mpegurl": {
         source: "apache",
-        extensions: ["m3u"]
+        extensions: ["m3u"],
       },
       "audio/x-ms-wax": {
         source: "apache",
-        extensions: ["wax"]
+        extensions: ["wax"],
       },
       "audio/x-ms-wma": {
         source: "apache",
-        extensions: ["wma"]
+        extensions: ["wma"],
       },
       "audio/x-pn-realaudio": {
         source: "apache",
-        extensions: ["ram", "ra"]
+        extensions: ["ram", "ra"],
       },
       "audio/x-pn-realaudio-plugin": {
         source: "apache",
-        extensions: ["rmp"]
+        extensions: ["rmp"],
       },
       "audio/x-realaudio": {
         source: "nginx",
-        extensions: ["ra"]
+        extensions: ["ra"],
       },
       "audio/x-tta": {
-        source: "apache"
+        source: "apache",
       },
       "audio/x-wav": {
         source: "apache",
-        extensions: ["wav"]
+        extensions: ["wav"],
       },
       "audio/xm": {
         source: "apache",
-        extensions: ["xm"]
+        extensions: ["xm"],
       },
       "chemical/x-cdx": {
         source: "apache",
-        extensions: ["cdx"]
+        extensions: ["cdx"],
       },
       "chemical/x-cif": {
         source: "apache",
-        extensions: ["cif"]
+        extensions: ["cif"],
       },
       "chemical/x-cmdf": {
         source: "apache",
-        extensions: ["cmdf"]
+        extensions: ["cmdf"],
       },
       "chemical/x-cml": {
         source: "apache",
-        extensions: ["cml"]
+        extensions: ["cml"],
       },
       "chemical/x-csml": {
         source: "apache",
-        extensions: ["csml"]
+        extensions: ["csml"],
       },
       "chemical/x-pdb": {
-        source: "apache"
+        source: "apache",
       },
       "chemical/x-xyz": {
         source: "apache",
-        extensions: ["xyz"]
+        extensions: ["xyz"],
       },
       "font/collection": {
         source: "iana",
-        extensions: ["ttc"]
+        extensions: ["ttc"],
       },
       "font/otf": {
         source: "iana",
         compressible: true,
-        extensions: ["otf"]
+        extensions: ["otf"],
       },
       "font/sfnt": {
-        source: "iana"
+        source: "iana",
       },
       "font/ttf": {
         source: "iana",
         compressible: true,
-        extensions: ["ttf"]
+        extensions: ["ttf"],
       },
       "font/woff": {
         source: "iana",
-        extensions: ["woff"]
+        extensions: ["woff"],
       },
       "font/woff2": {
         source: "iana",
-        extensions: ["woff2"]
+        extensions: ["woff2"],
       },
       "image/aces": {
         source: "iana",
-        extensions: ["exr"]
+        extensions: ["exr"],
       },
       "image/apng": {
         compressible: false,
-        extensions: ["apng"]
+        extensions: ["apng"],
       },
       "image/avci": {
         source: "iana",
-        extensions: ["avci"]
+        extensions: ["avci"],
       },
       "image/avcs": {
         source: "iana",
-        extensions: ["avcs"]
+        extensions: ["avcs"],
       },
       "image/avif": {
         source: "iana",
         compressible: false,
-        extensions: ["avif"]
+        extensions: ["avif"],
       },
       "image/bmp": {
         source: "iana",
         compressible: true,
-        extensions: ["bmp"]
+        extensions: ["bmp"],
       },
       "image/cgm": {
         source: "iana",
-        extensions: ["cgm"]
+        extensions: ["cgm"],
       },
       "image/dicom-rle": {
         source: "iana",
-        extensions: ["drle"]
+        extensions: ["drle"],
       },
       "image/emf": {
         source: "iana",
-        extensions: ["emf"]
+        extensions: ["emf"],
       },
       "image/fits": {
         source: "iana",
-        extensions: ["fits"]
+        extensions: ["fits"],
       },
       "image/g3fax": {
         source: "iana",
-        extensions: ["g3"]
+        extensions: ["g3"],
       },
       "image/gif": {
         source: "iana",
         compressible: false,
-        extensions: ["gif"]
+        extensions: ["gif"],
       },
       "image/heic": {
         source: "iana",
-        extensions: ["heic"]
+        extensions: ["heic"],
       },
       "image/heic-sequence": {
         source: "iana",
-        extensions: ["heics"]
+        extensions: ["heics"],
       },
       "image/heif": {
         source: "iana",
-        extensions: ["heif"]
+        extensions: ["heif"],
       },
       "image/heif-sequence": {
         source: "iana",
-        extensions: ["heifs"]
+        extensions: ["heifs"],
       },
       "image/hej2k": {
         source: "iana",
-        extensions: ["hej2"]
+        extensions: ["hej2"],
       },
       "image/hsj2": {
         source: "iana",
-        extensions: ["hsj2"]
+        extensions: ["hsj2"],
       },
       "image/ief": {
         source: "iana",
-        extensions: ["ief"]
+        extensions: ["ief"],
       },
       "image/jls": {
         source: "iana",
-        extensions: ["jls"]
+        extensions: ["jls"],
       },
       "image/jp2": {
         source: "iana",
         compressible: false,
-        extensions: ["jp2", "jpg2"]
+        extensions: ["jp2", "jpg2"],
       },
       "image/jpeg": {
         source: "iana",
         compressible: false,
-        extensions: ["jpeg", "jpg", "jpe"]
+        extensions: ["jpeg", "jpg", "jpe"],
       },
       "image/jph": {
         source: "iana",
-        extensions: ["jph"]
+        extensions: ["jph"],
       },
       "image/jphc": {
         source: "iana",
-        extensions: ["jhc"]
+        extensions: ["jhc"],
       },
       "image/jpm": {
         source: "iana",
         compressible: false,
-        extensions: ["jpm"]
+        extensions: ["jpm"],
       },
       "image/jpx": {
         source: "iana",
         compressible: false,
-        extensions: ["jpx", "jpf"]
+        extensions: ["jpx", "jpf"],
       },
       "image/jxr": {
         source: "iana",
-        extensions: ["jxr"]
+        extensions: ["jxr"],
       },
       "image/jxra": {
         source: "iana",
-        extensions: ["jxra"]
+        extensions: ["jxra"],
       },
       "image/jxrs": {
         source: "iana",
-        extensions: ["jxrs"]
+        extensions: ["jxrs"],
       },
       "image/jxs": {
         source: "iana",
-        extensions: ["jxs"]
+        extensions: ["jxs"],
       },
       "image/jxsc": {
         source: "iana",
-        extensions: ["jxsc"]
+        extensions: ["jxsc"],
       },
       "image/jxsi": {
         source: "iana",
-        extensions: ["jxsi"]
+        extensions: ["jxsi"],
       },
       "image/jxss": {
         source: "iana",
-        extensions: ["jxss"]
+        extensions: ["jxss"],
       },
       "image/ktx": {
         source: "iana",
-        extensions: ["ktx"]
+        extensions: ["ktx"],
       },
       "image/ktx2": {
         source: "iana",
-        extensions: ["ktx2"]
+        extensions: ["ktx2"],
       },
       "image/naplps": {
-        source: "iana"
+        source: "iana",
       },
       "image/pjpeg": {
-        compressible: false
+        compressible: false,
       },
       "image/png": {
         source: "iana",
         compressible: false,
-        extensions: ["png"]
+        extensions: ["png"],
       },
       "image/prs.btif": {
         source: "iana",
-        extensions: ["btif"]
+        extensions: ["btif"],
       },
       "image/prs.pti": {
         source: "iana",
-        extensions: ["pti"]
+        extensions: ["pti"],
       },
       "image/pwg-raster": {
-        source: "iana"
+        source: "iana",
       },
       "image/sgi": {
         source: "apache",
-        extensions: ["sgi"]
+        extensions: ["sgi"],
       },
       "image/svg+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["svg", "svgz"]
+        extensions: ["svg", "svgz"],
       },
       "image/t38": {
         source: "iana",
-        extensions: ["t38"]
+        extensions: ["t38"],
       },
       "image/tiff": {
         source: "iana",
         compressible: false,
-        extensions: ["tif", "tiff"]
+        extensions: ["tif", "tiff"],
       },
       "image/tiff-fx": {
         source: "iana",
-        extensions: ["tfx"]
+        extensions: ["tfx"],
       },
       "image/vnd.adobe.photoshop": {
         source: "iana",
         compressible: true,
-        extensions: ["psd"]
+        extensions: ["psd"],
       },
       "image/vnd.airzip.accelerator.azv": {
         source: "iana",
-        extensions: ["azv"]
+        extensions: ["azv"],
       },
       "image/vnd.cns.inf2": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.dece.graphic": {
         source: "iana",
-        extensions: ["uvi", "uvvi", "uvg", "uvvg"]
+        extensions: ["uvi", "uvvi", "uvg", "uvvg"],
       },
       "image/vnd.djvu": {
         source: "iana",
-        extensions: ["djvu", "djv"]
+        extensions: ["djvu", "djv"],
       },
       "image/vnd.dvb.subtitle": {
         source: "iana",
-        extensions: ["sub"]
+        extensions: ["sub"],
       },
       "image/vnd.dwg": {
         source: "iana",
-        extensions: ["dwg"]
+        extensions: ["dwg"],
       },
       "image/vnd.dxf": {
         source: "iana",
-        extensions: ["dxf"]
+        extensions: ["dxf"],
       },
       "image/vnd.fastbidsheet": {
         source: "iana",
-        extensions: ["fbs"]
+        extensions: ["fbs"],
       },
       "image/vnd.fpx": {
         source: "iana",
-        extensions: ["fpx"]
+        extensions: ["fpx"],
       },
       "image/vnd.fst": {
         source: "iana",
-        extensions: ["fst"]
+        extensions: ["fst"],
       },
       "image/vnd.fujixerox.edmics-mmr": {
         source: "iana",
-        extensions: ["mmr"]
+        extensions: ["mmr"],
       },
       "image/vnd.fujixerox.edmics-rlc": {
         source: "iana",
-        extensions: ["rlc"]
+        extensions: ["rlc"],
       },
       "image/vnd.globalgraphics.pgb": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.microsoft.icon": {
         source: "iana",
         compressible: true,
-        extensions: ["ico"]
+        extensions: ["ico"],
       },
       "image/vnd.mix": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.mozilla.apng": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.ms-dds": {
         compressible: true,
-        extensions: ["dds"]
+        extensions: ["dds"],
       },
       "image/vnd.ms-modi": {
         source: "iana",
-        extensions: ["mdi"]
+        extensions: ["mdi"],
       },
       "image/vnd.ms-photo": {
         source: "apache",
-        extensions: ["wdp"]
+        extensions: ["wdp"],
       },
       "image/vnd.net-fpx": {
         source: "iana",
-        extensions: ["npx"]
+        extensions: ["npx"],
       },
       "image/vnd.pco.b16": {
         source: "iana",
-        extensions: ["b16"]
+        extensions: ["b16"],
       },
       "image/vnd.radiance": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.sealed.png": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.sealedmedia.softseal.gif": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.sealedmedia.softseal.jpg": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.svf": {
-        source: "iana"
+        source: "iana",
       },
       "image/vnd.tencent.tap": {
         source: "iana",
-        extensions: ["tap"]
+        extensions: ["tap"],
       },
       "image/vnd.valve.source.texture": {
         source: "iana",
-        extensions: ["vtf"]
+        extensions: ["vtf"],
       },
       "image/vnd.wap.wbmp": {
         source: "iana",
-        extensions: ["wbmp"]
+        extensions: ["wbmp"],
       },
       "image/vnd.xiff": {
         source: "iana",
-        extensions: ["xif"]
+        extensions: ["xif"],
       },
       "image/vnd.zbrush.pcx": {
         source: "iana",
-        extensions: ["pcx"]
+        extensions: ["pcx"],
       },
       "image/webp": {
         source: "apache",
-        extensions: ["webp"]
+        extensions: ["webp"],
       },
       "image/wmf": {
         source: "iana",
-        extensions: ["wmf"]
+        extensions: ["wmf"],
       },
       "image/x-3ds": {
         source: "apache",
-        extensions: ["3ds"]
+        extensions: ["3ds"],
       },
       "image/x-cmu-raster": {
         source: "apache",
-        extensions: ["ras"]
+        extensions: ["ras"],
       },
       "image/x-cmx": {
         source: "apache",
-        extensions: ["cmx"]
+        extensions: ["cmx"],
       },
       "image/x-freehand": {
         source: "apache",
-        extensions: ["fh", "fhc", "fh4", "fh5", "fh7"]
+        extensions: ["fh", "fhc", "fh4", "fh5", "fh7"],
       },
       "image/x-icon": {
         source: "apache",
         compressible: true,
-        extensions: ["ico"]
+        extensions: ["ico"],
       },
       "image/x-jng": {
         source: "nginx",
-        extensions: ["jng"]
+        extensions: ["jng"],
       },
       "image/x-mrsid-image": {
         source: "apache",
-        extensions: ["sid"]
+        extensions: ["sid"],
       },
       "image/x-ms-bmp": {
         source: "nginx",
         compressible: true,
-        extensions: ["bmp"]
+        extensions: ["bmp"],
       },
       "image/x-pcx": {
         source: "apache",
-        extensions: ["pcx"]
+        extensions: ["pcx"],
       },
       "image/x-pict": {
         source: "apache",
-        extensions: ["pic", "pct"]
+        extensions: ["pic", "pct"],
       },
       "image/x-portable-anymap": {
         source: "apache",
-        extensions: ["pnm"]
+        extensions: ["pnm"],
       },
       "image/x-portable-bitmap": {
         source: "apache",
-        extensions: ["pbm"]
+        extensions: ["pbm"],
       },
       "image/x-portable-graymap": {
         source: "apache",
-        extensions: ["pgm"]
+        extensions: ["pgm"],
       },
       "image/x-portable-pixmap": {
         source: "apache",
-        extensions: ["ppm"]
+        extensions: ["ppm"],
       },
       "image/x-rgb": {
         source: "apache",
-        extensions: ["rgb"]
+        extensions: ["rgb"],
       },
       "image/x-tga": {
         source: "apache",
-        extensions: ["tga"]
+        extensions: ["tga"],
       },
       "image/x-xbitmap": {
         source: "apache",
-        extensions: ["xbm"]
+        extensions: ["xbm"],
       },
       "image/x-xcf": {
-        compressible: false
+        compressible: false,
       },
       "image/x-xpixmap": {
         source: "apache",
-        extensions: ["xpm"]
+        extensions: ["xpm"],
       },
       "image/x-xwindowdump": {
         source: "apache",
-        extensions: ["xwd"]
+        extensions: ["xwd"],
       },
       "message/cpim": {
-        source: "iana"
+        source: "iana",
       },
       "message/delivery-status": {
-        source: "iana"
+        source: "iana",
       },
       "message/disposition-notification": {
         source: "iana",
-        extensions: [
-          "disposition-notification"
-        ]
+        extensions: ["disposition-notification"],
       },
       "message/external-body": {
-        source: "iana"
+        source: "iana",
       },
       "message/feedback-report": {
-        source: "iana"
+        source: "iana",
       },
       "message/global": {
         source: "iana",
-        extensions: ["u8msg"]
+        extensions: ["u8msg"],
       },
       "message/global-delivery-status": {
         source: "iana",
-        extensions: ["u8dsn"]
+        extensions: ["u8dsn"],
       },
       "message/global-disposition-notification": {
         source: "iana",
-        extensions: ["u8mdn"]
+        extensions: ["u8mdn"],
       },
       "message/global-headers": {
         source: "iana",
-        extensions: ["u8hdr"]
+        extensions: ["u8hdr"],
       },
       "message/http": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "message/imdn+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "message/news": {
-        source: "iana"
+        source: "iana",
       },
       "message/partial": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "message/rfc822": {
         source: "iana",
         compressible: true,
-        extensions: ["eml", "mime"]
+        extensions: ["eml", "mime"],
       },
       "message/s-http": {
-        source: "iana"
+        source: "iana",
       },
       "message/sip": {
-        source: "iana"
+        source: "iana",
       },
       "message/sipfrag": {
-        source: "iana"
+        source: "iana",
       },
       "message/tracking-status": {
-        source: "iana"
+        source: "iana",
       },
       "message/vnd.si.simp": {
-        source: "iana"
+        source: "iana",
       },
       "message/vnd.wfa.wsc": {
         source: "iana",
-        extensions: ["wsc"]
+        extensions: ["wsc"],
       },
       "model/3mf": {
         source: "iana",
-        extensions: ["3mf"]
+        extensions: ["3mf"],
       },
       "model/e57": {
-        source: "iana"
+        source: "iana",
       },
       "model/gltf+json": {
         source: "iana",
         compressible: true,
-        extensions: ["gltf"]
+        extensions: ["gltf"],
       },
       "model/gltf-binary": {
         source: "iana",
         compressible: true,
-        extensions: ["glb"]
+        extensions: ["glb"],
       },
       "model/iges": {
         source: "iana",
         compressible: false,
-        extensions: ["igs", "iges"]
+        extensions: ["igs", "iges"],
       },
       "model/mesh": {
         source: "iana",
         compressible: false,
-        extensions: ["msh", "mesh", "silo"]
+        extensions: ["msh", "mesh", "silo"],
       },
       "model/mtl": {
         source: "iana",
-        extensions: ["mtl"]
+        extensions: ["mtl"],
       },
       "model/obj": {
         source: "iana",
-        extensions: ["obj"]
+        extensions: ["obj"],
       },
       "model/step": {
-        source: "iana"
+        source: "iana",
       },
       "model/step+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["stpx"]
+        extensions: ["stpx"],
       },
       "model/step+zip": {
         source: "iana",
         compressible: false,
-        extensions: ["stpz"]
+        extensions: ["stpz"],
       },
       "model/step-xml+zip": {
         source: "iana",
         compressible: false,
-        extensions: ["stpxz"]
+        extensions: ["stpxz"],
       },
       "model/stl": {
         source: "iana",
-        extensions: ["stl"]
+        extensions: ["stl"],
       },
       "model/vnd.collada+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["dae"]
+        extensions: ["dae"],
       },
       "model/vnd.dwf": {
         source: "iana",
-        extensions: ["dwf"]
+        extensions: ["dwf"],
       },
       "model/vnd.flatland.3dml": {
-        source: "iana"
+        source: "iana",
       },
       "model/vnd.gdl": {
         source: "iana",
-        extensions: ["gdl"]
+        extensions: ["gdl"],
       },
       "model/vnd.gs-gdl": {
-        source: "apache"
+        source: "apache",
       },
       "model/vnd.gs.gdl": {
-        source: "iana"
+        source: "iana",
       },
       "model/vnd.gtw": {
         source: "iana",
-        extensions: ["gtw"]
+        extensions: ["gtw"],
       },
       "model/vnd.moml+xml": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "model/vnd.mts": {
         source: "iana",
-        extensions: ["mts"]
+        extensions: ["mts"],
       },
       "model/vnd.opengex": {
         source: "iana",
-        extensions: ["ogex"]
+        extensions: ["ogex"],
       },
       "model/vnd.parasolid.transmit.binary": {
         source: "iana",
-        extensions: ["x_b"]
+        extensions: ["x_b"],
       },
       "model/vnd.parasolid.transmit.text": {
         source: "iana",
-        extensions: ["x_t"]
+        extensions: ["x_t"],
       },
       "model/vnd.pytha.pyox": {
-        source: "iana"
+        source: "iana",
       },
       "model/vnd.rosette.annotated-data-model": {
-        source: "iana"
+        source: "iana",
       },
       "model/vnd.sap.vds": {
         source: "iana",
-        extensions: ["vds"]
+        extensions: ["vds"],
       },
       "model/vnd.usdz+zip": {
         source: "iana",
         compressible: false,
-        extensions: ["usdz"]
+        extensions: ["usdz"],
       },
       "model/vnd.valve.source.compiled-map": {
         source: "iana",
-        extensions: ["bsp"]
+        extensions: ["bsp"],
       },
       "model/vnd.vtu": {
         source: "iana",
-        extensions: ["vtu"]
+        extensions: ["vtu"],
       },
       "model/vrml": {
         source: "iana",
         compressible: false,
-        extensions: ["wrl", "vrml"]
+        extensions: ["wrl", "vrml"],
       },
       "model/x3d+binary": {
         source: "apache",
         compressible: false,
-        extensions: ["x3db", "x3dbz"]
+        extensions: ["x3db", "x3dbz"],
       },
       "model/x3d+fastinfoset": {
         source: "iana",
-        extensions: ["x3db"]
+        extensions: ["x3db"],
       },
       "model/x3d+vrml": {
         source: "apache",
         compressible: false,
-        extensions: ["x3dv", "x3dvz"]
+        extensions: ["x3dv", "x3dvz"],
       },
       "model/x3d+xml": {
         source: "iana",
         compressible: true,
-        extensions: ["x3d", "x3dz"]
+        extensions: ["x3d", "x3dz"],
       },
       "model/x3d-vrml": {
         source: "iana",
-        extensions: ["x3dv"]
+        extensions: ["x3dv"],
       },
       "multipart/alternative": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "multipart/appledouble": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/byteranges": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/digest": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/encrypted": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "multipart/form-data": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "multipart/header-set": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/mixed": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/multilingual": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/parallel": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/related": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "multipart/report": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/signed": {
         source: "iana",
-        compressible: false
+        compressible: false,
       },
       "multipart/vnd.bint.med-plus": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/voice-message": {
-        source: "iana"
+        source: "iana",
       },
       "multipart/x-mixed-replace": {
-        source: "iana"
+        source: "iana",
       },
       "text/1d-interleaved-parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "text/cache-manifest": {
         source: "iana",
         compressible: true,
-        extensions: ["appcache", "manifest"]
+        extensions: ["appcache", "manifest"],
       },
       "text/calendar": {
         source: "iana",
-        extensions: ["ics", "ifb"]
+        extensions: ["ics", "ifb"],
       },
       "text/calender": {
-        compressible: true
+        compressible: true,
       },
       "text/cmd": {
-        compressible: true
+        compressible: true,
       },
       "text/coffeescript": {
-        extensions: ["coffee", "litcoffee"]
+        extensions: ["coffee", "litcoffee"],
       },
       "text/cql": {
-        source: "iana"
+        source: "iana",
       },
       "text/cql-expression": {
-        source: "iana"
+        source: "iana",
       },
       "text/cql-identifier": {
-        source: "iana"
+        source: "iana",
       },
       "text/css": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["css"]
+        extensions: ["css"],
       },
       "text/csv": {
         source: "iana",
         compressible: true,
-        extensions: ["csv"]
+        extensions: ["csv"],
       },
       "text/csv-schema": {
-        source: "iana"
+        source: "iana",
       },
       "text/directory": {
-        source: "iana"
+        source: "iana",
       },
       "text/dns": {
-        source: "iana"
+        source: "iana",
       },
       "text/ecmascript": {
-        source: "iana"
+        source: "iana",
       },
       "text/encaprtp": {
-        source: "iana"
+        source: "iana",
       },
       "text/enriched": {
-        source: "iana"
+        source: "iana",
       },
       "text/fhirpath": {
-        source: "iana"
+        source: "iana",
       },
       "text/flexfec": {
-        source: "iana"
+        source: "iana",
       },
       "text/fwdred": {
-        source: "iana"
+        source: "iana",
       },
       "text/gff3": {
-        source: "iana"
+        source: "iana",
       },
       "text/grammar-ref-list": {
-        source: "iana"
+        source: "iana",
       },
       "text/html": {
         source: "iana",
         compressible: true,
-        extensions: ["html", "htm", "shtml"]
+        extensions: ["html", "htm", "shtml"],
       },
       "text/jade": {
-        extensions: ["jade"]
+        extensions: ["jade"],
       },
       "text/javascript": {
         source: "iana",
-        compressible: true
+        compressible: true,
       },
       "text/jcr-cnd": {
-        source: "iana"
+        source: "iana",
       },
       "text/jsx": {
         compressible: true,
-        extensions: ["jsx"]
+        extensions: ["jsx"],
       },
       "text/less": {
         compressible: true,
-        extensions: ["less"]
+        extensions: ["less"],
       },
       "text/markdown": {
         source: "iana",
         compressible: true,
-        extensions: ["markdown", "md"]
+        extensions: ["markdown", "md"],
       },
       "text/mathml": {
         source: "nginx",
-        extensions: ["mml"]
+        extensions: ["mml"],
       },
       "text/mdx": {
         compressible: true,
-        extensions: ["mdx"]
+        extensions: ["mdx"],
       },
       "text/mizar": {
-        source: "iana"
+        source: "iana",
       },
       "text/n3": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["n3"]
+        extensions: ["n3"],
       },
       "text/parameters": {
         source: "iana",
-        charset: "UTF-8"
+        charset: "UTF-8",
       },
       "text/parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "text/plain": {
         source: "iana",
         compressible: true,
-        extensions: ["txt", "text", "conf", "def", "list", "log", "in", "ini"]
+        extensions: ["txt", "text", "conf", "def", "list", "log", "in", "ini"],
       },
       "text/provenance-notation": {
         source: "iana",
-        charset: "UTF-8"
+        charset: "UTF-8",
       },
       "text/prs.fallenstein.rst": {
-        source: "iana"
+        source: "iana",
       },
       "text/prs.lines.tag": {
         source: "iana",
-        extensions: ["dsc"]
+        extensions: ["dsc"],
       },
       "text/prs.prop.logic": {
-        source: "iana"
+        source: "iana",
       },
       "text/raptorfec": {
-        source: "iana"
+        source: "iana",
       },
       "text/red": {
-        source: "iana"
+        source: "iana",
       },
       "text/rfc822-headers": {
-        source: "iana"
+        source: "iana",
       },
       "text/richtext": {
         source: "iana",
         compressible: true,
-        extensions: ["rtx"]
+        extensions: ["rtx"],
       },
       "text/rtf": {
         source: "iana",
         compressible: true,
-        extensions: ["rtf"]
+        extensions: ["rtf"],
       },
       "text/rtp-enc-aescm128": {
-        source: "iana"
+        source: "iana",
       },
       "text/rtploopback": {
-        source: "iana"
+        source: "iana",
       },
       "text/rtx": {
-        source: "iana"
+        source: "iana",
       },
       "text/sgml": {
         source: "iana",
-        extensions: ["sgml", "sgm"]
+        extensions: ["sgml", "sgm"],
       },
       "text/shaclc": {
-        source: "iana"
+        source: "iana",
       },
       "text/shex": {
         source: "iana",
-        extensions: ["shex"]
+        extensions: ["shex"],
       },
       "text/slim": {
-        extensions: ["slim", "slm"]
+        extensions: ["slim", "slm"],
       },
       "text/spdx": {
         source: "iana",
-        extensions: ["spdx"]
+        extensions: ["spdx"],
       },
       "text/strings": {
-        source: "iana"
+        source: "iana",
       },
       "text/stylus": {
-        extensions: ["stylus", "styl"]
+        extensions: ["stylus", "styl"],
       },
       "text/t140": {
-        source: "iana"
+        source: "iana",
       },
       "text/tab-separated-values": {
         source: "iana",
         compressible: true,
-        extensions: ["tsv"]
+        extensions: ["tsv"],
       },
       "text/troff": {
         source: "iana",
-        extensions: ["t", "tr", "roff", "man", "me", "ms"]
+        extensions: ["t", "tr", "roff", "man", "me", "ms"],
       },
       "text/turtle": {
         source: "iana",
         charset: "UTF-8",
-        extensions: ["ttl"]
+        extensions: ["ttl"],
       },
       "text/ulpfec": {
-        source: "iana"
+        source: "iana",
       },
       "text/uri-list": {
         source: "iana",
         compressible: true,
-        extensions: ["uri", "uris", "urls"]
+        extensions: ["uri", "uris", "urls"],
       },
       "text/vcard": {
         source: "iana",
         compressible: true,
-        extensions: ["vcard"]
+        extensions: ["vcard"],
       },
       "text/vnd.a": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.abc": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.ascii-art": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.curl": {
         source: "iana",
-        extensions: ["curl"]
+        extensions: ["curl"],
       },
       "text/vnd.curl.dcurl": {
         source: "apache",
-        extensions: ["dcurl"]
+        extensions: ["dcurl"],
       },
       "text/vnd.curl.mcurl": {
         source: "apache",
-        extensions: ["mcurl"]
+        extensions: ["mcurl"],
       },
       "text/vnd.curl.scurl": {
         source: "apache",
-        extensions: ["scurl"]
+        extensions: ["scurl"],
       },
       "text/vnd.debian.copyright": {
         source: "iana",
-        charset: "UTF-8"
+        charset: "UTF-8",
       },
       "text/vnd.dmclientscript": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.dvb.subtitle": {
         source: "iana",
-        extensions: ["sub"]
+        extensions: ["sub"],
       },
       "text/vnd.esmertec.theme-descriptor": {
         source: "iana",
-        charset: "UTF-8"
+        charset: "UTF-8",
       },
       "text/vnd.familysearch.gedcom": {
         source: "iana",
-        extensions: ["ged"]
+        extensions: ["ged"],
       },
       "text/vnd.ficlab.flt": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.fly": {
         source: "iana",
-        extensions: ["fly"]
+        extensions: ["fly"],
       },
       "text/vnd.fmi.flexstor": {
         source: "iana",
-        extensions: ["flx"]
+        extensions: ["flx"],
       },
       "text/vnd.gml": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.graphviz": {
         source: "iana",
-        extensions: ["gv"]
+        extensions: ["gv"],
       },
       "text/vnd.hans": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.hgl": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.in3d.3dml": {
         source: "iana",
-        extensions: ["3dml"]
+        extensions: ["3dml"],
       },
       "text/vnd.in3d.spot": {
         source: "iana",
-        extensions: ["spot"]
+        extensions: ["spot"],
       },
       "text/vnd.iptc.newsml": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.iptc.nitf": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.latex-z": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.motorola.reflex": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.ms-mediapackage": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.net2phone.commcenter.command": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.radisys.msml-basic-layout": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.senx.warpscript": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.si.uricatalogue": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.sosi": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.sun.j2me.app-descriptor": {
         source: "iana",
         charset: "UTF-8",
-        extensions: ["jad"]
+        extensions: ["jad"],
       },
       "text/vnd.trolltech.linguist": {
         source: "iana",
-        charset: "UTF-8"
+        charset: "UTF-8",
       },
       "text/vnd.wap.si": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.wap.sl": {
-        source: "iana"
+        source: "iana",
       },
       "text/vnd.wap.wml": {
         source: "iana",
-        extensions: ["wml"]
+        extensions: ["wml"],
       },
       "text/vnd.wap.wmlscript": {
         source: "iana",
-        extensions: ["wmls"]
+        extensions: ["wmls"],
       },
       "text/vtt": {
         source: "iana",
         charset: "UTF-8",
         compressible: true,
-        extensions: ["vtt"]
+        extensions: ["vtt"],
       },
       "text/x-asm": {
         source: "apache",
-        extensions: ["s", "asm"]
+        extensions: ["s", "asm"],
       },
       "text/x-c": {
         source: "apache",
-        extensions: ["c", "cc", "cxx", "cpp", "h", "hh", "dic"]
+        extensions: ["c", "cc", "cxx", "cpp", "h", "hh", "dic"],
       },
       "text/x-component": {
         source: "nginx",
-        extensions: ["htc"]
+        extensions: ["htc"],
       },
       "text/x-fortran": {
         source: "apache",
-        extensions: ["f", "for", "f77", "f90"]
+        extensions: ["f", "for", "f77", "f90"],
       },
       "text/x-gwt-rpc": {
-        compressible: true
+        compressible: true,
       },
       "text/x-handlebars-template": {
-        extensions: ["hbs"]
+        extensions: ["hbs"],
       },
       "text/x-java-source": {
         source: "apache",
-        extensions: ["java"]
+        extensions: ["java"],
       },
       "text/x-jquery-tmpl": {
-        compressible: true
+        compressible: true,
       },
       "text/x-lua": {
-        extensions: ["lua"]
+        extensions: ["lua"],
       },
       "text/x-markdown": {
         compressible: true,
-        extensions: ["mkd"]
+        extensions: ["mkd"],
       },
       "text/x-nfo": {
         source: "apache",
-        extensions: ["nfo"]
+        extensions: ["nfo"],
       },
       "text/x-opml": {
         source: "apache",
-        extensions: ["opml"]
+        extensions: ["opml"],
       },
       "text/x-org": {
         compressible: true,
-        extensions: ["org"]
+        extensions: ["org"],
       },
       "text/x-pascal": {
         source: "apache",
-        extensions: ["p", "pas"]
+        extensions: ["p", "pas"],
       },
       "text/x-processing": {
         compressible: true,
-        extensions: ["pde"]
+        extensions: ["pde"],
       },
       "text/x-sass": {
-        extensions: ["sass"]
+        extensions: ["sass"],
       },
       "text/x-scss": {
-        extensions: ["scss"]
+        extensions: ["scss"],
       },
       "text/x-setext": {
         source: "apache",
-        extensions: ["etx"]
+        extensions: ["etx"],
       },
       "text/x-sfv": {
         source: "apache",
-        extensions: ["sfv"]
+        extensions: ["sfv"],
       },
       "text/x-suse-ymp": {
         compressible: true,
-        extensions: ["ymp"]
+        extensions: ["ymp"],
       },
       "text/x-uuencode": {
         source: "apache",
-        extensions: ["uu"]
+        extensions: ["uu"],
       },
       "text/x-vcalendar": {
         source: "apache",
-        extensions: ["vcs"]
+        extensions: ["vcs"],
       },
       "text/x-vcard": {
         source: "apache",
-        extensions: ["vcf"]
+        extensions: ["vcf"],
       },
       "text/xml": {
         source: "iana",
         compressible: true,
-        extensions: ["xml"]
+        extensions: ["xml"],
       },
       "text/xml-external-parsed-entity": {
-        source: "iana"
+        source: "iana",
       },
       "text/yaml": {
         compressible: true,
-        extensions: ["yaml", "yml"]
+        extensions: ["yaml", "yml"],
       },
       "video/1d-interleaved-parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "video/3gpp": {
         source: "iana",
-        extensions: ["3gp", "3gpp"]
+        extensions: ["3gp", "3gpp"],
       },
       "video/3gpp-tt": {
-        source: "iana"
+        source: "iana",
       },
       "video/3gpp2": {
         source: "iana",
-        extensions: ["3g2"]
+        extensions: ["3g2"],
       },
       "video/av1": {
-        source: "iana"
+        source: "iana",
       },
       "video/bmpeg": {
-        source: "iana"
+        source: "iana",
       },
       "video/bt656": {
-        source: "iana"
+        source: "iana",
       },
       "video/celb": {
-        source: "iana"
+        source: "iana",
       },
       "video/dv": {
-        source: "iana"
+        source: "iana",
       },
       "video/encaprtp": {
-        source: "iana"
+        source: "iana",
       },
       "video/ffv1": {
-        source: "iana"
+        source: "iana",
       },
       "video/flexfec": {
-        source: "iana"
+        source: "iana",
       },
       "video/h261": {
         source: "iana",
-        extensions: ["h261"]
+        extensions: ["h261"],
       },
       "video/h263": {
         source: "iana",
-        extensions: ["h263"]
+        extensions: ["h263"],
       },
       "video/h263-1998": {
-        source: "iana"
+        source: "iana",
       },
       "video/h263-2000": {
-        source: "iana"
+        source: "iana",
       },
       "video/h264": {
         source: "iana",
-        extensions: ["h264"]
+        extensions: ["h264"],
       },
       "video/h264-rcdo": {
-        source: "iana"
+        source: "iana",
       },
       "video/h264-svc": {
-        source: "iana"
+        source: "iana",
       },
       "video/h265": {
-        source: "iana"
+        source: "iana",
       },
       "video/iso.segment": {
         source: "iana",
-        extensions: ["m4s"]
+        extensions: ["m4s"],
       },
       "video/jpeg": {
         source: "iana",
-        extensions: ["jpgv"]
+        extensions: ["jpgv"],
       },
       "video/jpeg2000": {
-        source: "iana"
+        source: "iana",
       },
       "video/jpm": {
         source: "apache",
-        extensions: ["jpm", "jpgm"]
+        extensions: ["jpm", "jpgm"],
       },
       "video/jxsv": {
-        source: "iana"
+        source: "iana",
       },
       "video/mj2": {
         source: "iana",
-        extensions: ["mj2", "mjp2"]
+        extensions: ["mj2", "mjp2"],
       },
       "video/mp1s": {
-        source: "iana"
+        source: "iana",
       },
       "video/mp2p": {
-        source: "iana"
+        source: "iana",
       },
       "video/mp2t": {
         source: "iana",
-        extensions: ["ts"]
+        extensions: ["ts"],
       },
       "video/mp4": {
         source: "iana",
         compressible: false,
-        extensions: ["mp4", "mp4v", "mpg4"]
+        extensions: ["mp4", "mp4v", "mpg4"],
       },
       "video/mp4v-es": {
-        source: "iana"
+        source: "iana",
       },
       "video/mpeg": {
         source: "iana",
         compressible: false,
-        extensions: ["mpeg", "mpg", "mpe", "m1v", "m2v"]
+        extensions: ["mpeg", "mpg", "mpe", "m1v", "m2v"],
       },
       "video/mpeg4-generic": {
-        source: "iana"
+        source: "iana",
       },
       "video/mpv": {
-        source: "iana"
+        source: "iana",
       },
       "video/nv": {
-        source: "iana"
+        source: "iana",
       },
       "video/ogg": {
         source: "iana",
         compressible: false,
-        extensions: ["ogv"]
+        extensions: ["ogv"],
       },
       "video/parityfec": {
-        source: "iana"
+        source: "iana",
       },
       "video/pointer": {
-        source: "iana"
+        source: "iana",
       },
       "video/quicktime": {
         source: "iana",
         compressible: false,
-        extensions: ["qt", "mov"]
+        extensions: ["qt", "mov"],
       },
       "video/raptorfec": {
-        source: "iana"
+        source: "iana",
       },
       "video/raw": {
-        source: "iana"
+        source: "iana",
       },
       "video/rtp-enc-aescm128": {
-        source: "iana"
+        source: "iana",
       },
       "video/rtploopback": {
-        source: "iana"
+        source: "iana",
       },
       "video/rtx": {
-        source: "iana"
+        source: "iana",
       },
       "video/scip": {
-        source: "iana"
+        source: "iana",
       },
       "video/smpte291": {
-        source: "iana"
+        source: "iana",
       },
       "video/smpte292m": {
-        source: "iana"
+        source: "iana",
       },
       "video/ulpfec": {
-        source: "iana"
+        source: "iana",
       },
       "video/vc1": {
-        source: "iana"
+        source: "iana",
       },
       "video/vc2": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.cctv": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.dece.hd": {
         source: "iana",
-        extensions: ["uvh", "uvvh"]
+        extensions: ["uvh", "uvvh"],
       },
       "video/vnd.dece.mobile": {
         source: "iana",
-        extensions: ["uvm", "uvvm"]
+        extensions: ["uvm", "uvvm"],
       },
       "video/vnd.dece.mp4": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.dece.pd": {
         source: "iana",
-        extensions: ["uvp", "uvvp"]
+        extensions: ["uvp", "uvvp"],
       },
       "video/vnd.dece.sd": {
         source: "iana",
-        extensions: ["uvs", "uvvs"]
+        extensions: ["uvs", "uvvs"],
       },
       "video/vnd.dece.video": {
         source: "iana",
-        extensions: ["uvv", "uvvv"]
+        extensions: ["uvv", "uvvv"],
       },
       "video/vnd.directv.mpeg": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.directv.mpeg-tts": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.dlna.mpeg-tts": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.dvb.file": {
         source: "iana",
-        extensions: ["dvb"]
+        extensions: ["dvb"],
       },
       "video/vnd.fvt": {
         source: "iana",
-        extensions: ["fvt"]
+        extensions: ["fvt"],
       },
       "video/vnd.hns.video": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.1dparityfec-1010": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.1dparityfec-2005": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.2dparityfec-1010": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.2dparityfec-2005": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.ttsavc": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.iptvforum.ttsmpeg2": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.motorola.video": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.motorola.videop": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.mpegurl": {
         source: "iana",
-        extensions: ["mxu", "m4u"]
+        extensions: ["mxu", "m4u"],
       },
       "video/vnd.ms-playready.media.pyv": {
         source: "iana",
-        extensions: ["pyv"]
+        extensions: ["pyv"],
       },
       "video/vnd.nokia.interleaved-multimedia": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.nokia.mp4vr": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.nokia.videovoip": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.objectvideo": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.radgamettools.bink": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.radgamettools.smacker": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.sealed.mpeg1": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.sealed.mpeg4": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.sealed.swf": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.sealedmedia.softseal.mov": {
-        source: "iana"
+        source: "iana",
       },
       "video/vnd.uvvu.mp4": {
         source: "iana",
-        extensions: ["uvu", "uvvu"]
+        extensions: ["uvu", "uvvu"],
       },
       "video/vnd.vivo": {
         source: "iana",
-        extensions: ["viv"]
+        extensions: ["viv"],
       },
       "video/vnd.youtube.yt": {
-        source: "iana"
+        source: "iana",
       },
       "video/vp8": {
-        source: "iana"
+        source: "iana",
       },
       "video/vp9": {
-        source: "iana"
+        source: "iana",
       },
       "video/webm": {
         source: "apache",
         compressible: false,
-        extensions: ["webm"]
+        extensions: ["webm"],
       },
       "video/x-f4v": {
         source: "apache",
-        extensions: ["f4v"]
+        extensions: ["f4v"],
       },
       "video/x-fli": {
         source: "apache",
-        extensions: ["fli"]
+        extensions: ["fli"],
       },
       "video/x-flv": {
         source: "apache",
         compressible: false,
-        extensions: ["flv"]
+        extensions: ["flv"],
       },
       "video/x-m4v": {
         source: "apache",
-        extensions: ["m4v"]
+        extensions: ["m4v"],
       },
       "video/x-matroska": {
         source: "apache",
         compressible: false,
-        extensions: ["mkv", "mk3d", "mks"]
+        extensions: ["mkv", "mk3d", "mks"],
       },
       "video/x-mng": {
         source: "apache",
-        extensions: ["mng"]
+        extensions: ["mng"],
       },
       "video/x-ms-asf": {
         source: "apache",
-        extensions: ["asf", "asx"]
+        extensions: ["asf", "asx"],
       },
       "video/x-ms-vob": {
         source: "apache",
-        extensions: ["vob"]
+        extensions: ["vob"],
       },
       "video/x-ms-wm": {
         source: "apache",
-        extensions: ["wm"]
+        extensions: ["wm"],
       },
       "video/x-ms-wmv": {
         source: "apache",
         compressible: false,
-        extensions: ["wmv"]
+        extensions: ["wmv"],
       },
       "video/x-ms-wmx": {
         source: "apache",
-        extensions: ["wmx"]
+        extensions: ["wmx"],
       },
       "video/x-ms-wvx": {
         source: "apache",
-        extensions: ["wvx"]
+        extensions: ["wvx"],
       },
       "video/x-msvideo": {
         source: "apache",
-        extensions: ["avi"]
+        extensions: ["avi"],
       },
       "video/x-sgi-movie": {
         source: "apache",
-        extensions: ["movie"]
+        extensions: ["movie"],
       },
       "video/x-smv": {
         source: "apache",
-        extensions: ["smv"]
+        extensions: ["smv"],
       },
       "x-conference/x-cooltalk": {
         source: "apache",
-        extensions: ["ice"]
+        extensions: ["ice"],
       },
       "x-shader/x-fragment": {
-        compressible: true
+        compressible: true,
       },
       "x-shader/x-vertex": {
-        compressible: true
-      }
+        compressible: true,
+      },
     };
-  }
+  },
 });
 
 // node_modules/mime-db/index.js
 var require_mime_db = __commonJS({
   "node_modules/mime-db/index.js"(exports2, module2) {
     module2.exports = require_db();
-  }
+  },
 });
 
 // node_modules/mime-types/index.js
@@ -8864,8 +8986,7 @@ var require_mime_types = __commonJS({
       }
       if (mime.indexOf("charset") === -1) {
         var charset2 = exports2.charset(mime);
-        if (charset2)
-          mime += "; charset=" + charset2.toLowerCase();
+        if (charset2) mime += "; charset=" + charset2.toLowerCase();
       }
       return mime;
     }
@@ -8884,7 +9005,9 @@ var require_mime_types = __commonJS({
       if (!path3 || typeof path3 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path3).toLowerCase().substr(1);
+      var extension2 = extname("x." + path3)
+        .toLowerCase()
+        .substr(1);
       if (!extension2) {
         return false;
       }
@@ -8904,7 +9027,12 @@ var require_mime_types = __commonJS({
           if (types[extension2]) {
             var from = preference.indexOf(db[types[extension2]].source);
             var to = preference.indexOf(mime.source);
-            if (types[extension2] !== "application/octet-stream" && (from > to || from === to && types[extension2].substr(0, 12) === "application/")) {
+            if (
+              types[extension2] !== "application/octet-stream" &&
+              (from > to ||
+                (from === to &&
+                  types[extension2].substr(0, 12) === "application/"))
+            ) {
               continue;
             }
           }
@@ -8912,7 +9040,7 @@ var require_mime_types = __commonJS({
         }
       });
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/defer.js
@@ -8920,14 +9048,19 @@ var require_defer = __commonJS({
   "node_modules/asynckit/lib/defer.js"(exports2, module2) {
     module2.exports = defer;
     function defer(fn) {
-      var nextTick = typeof setImmediate == "function" ? setImmediate : typeof process == "object" && typeof process.nextTick == "function" ? process.nextTick : null;
+      var nextTick =
+        typeof setImmediate == "function"
+          ? setImmediate
+          : typeof process == "object" && typeof process.nextTick == "function"
+            ? process.nextTick
+            : null;
       if (nextTick) {
         nextTick(fn);
       } else {
         setTimeout(fn, 0);
       }
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/async.js
@@ -8937,7 +9070,7 @@ var require_async = __commonJS({
     module2.exports = async;
     function async(callback) {
       var isAsync = false;
-      defer(function() {
+      defer(function () {
         isAsync = true;
       });
       return function async_callback(err, result) {
@@ -8950,7 +9083,7 @@ var require_async = __commonJS({
         }
       };
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/abort.js
@@ -8966,7 +9099,7 @@ var require_abort = __commonJS({
         this.jobs[key]();
       }
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/iterate.js
@@ -8976,19 +9109,26 @@ var require_iterate = __commonJS({
     var abort = require_abort();
     module2.exports = iterate;
     function iterate(list, iterator2, state, callback) {
-      var key = state["keyedList"] ? state["keyedList"][state.index] : state.index;
-      state.jobs[key] = runJob(iterator2, key, list[key], function(error, output) {
-        if (!(key in state.jobs)) {
-          return;
-        }
-        delete state.jobs[key];
-        if (error) {
-          abort(state);
-        } else {
-          state.results[key] = output;
-        }
-        callback(error, state.results);
-      });
+      var key = state["keyedList"]
+        ? state["keyedList"][state.index]
+        : state.index;
+      state.jobs[key] = runJob(
+        iterator2,
+        key,
+        list[key],
+        function (error, output) {
+          if (!(key in state.jobs)) {
+            return;
+          }
+          delete state.jobs[key];
+          if (error) {
+            abort(state);
+          } else {
+            state.results[key] = output;
+          }
+          callback(error, state.results);
+        },
+      );
     }
     function runJob(iterator2, key, item, callback) {
       var aborter;
@@ -8999,7 +9139,7 @@ var require_iterate = __commonJS({
       }
       return aborter;
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/state.js
@@ -9007,21 +9147,26 @@ var require_state = __commonJS({
   "node_modules/asynckit/lib/state.js"(exports2, module2) {
     module2.exports = state;
     function state(list, sortMethod) {
-      var isNamedList = !Array.isArray(list), initState = {
-        index: 0,
-        keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
-        jobs: {},
-        results: isNamedList ? {} : [],
-        size: isNamedList ? Object.keys(list).length : list.length
-      };
+      var isNamedList = !Array.isArray(list),
+        initState = {
+          index: 0,
+          keyedList: isNamedList || sortMethod ? Object.keys(list) : null,
+          jobs: {},
+          results: isNamedList ? {} : [],
+          size: isNamedList ? Object.keys(list).length : list.length,
+        };
       if (sortMethod) {
-        initState.keyedList.sort(isNamedList ? sortMethod : function(a, b) {
-          return sortMethod(list[a], list[b]);
-        });
+        initState.keyedList.sort(
+          isNamedList
+            ? sortMethod
+            : function (a, b) {
+                return sortMethod(list[a], list[b]);
+              },
+        );
       }
       return initState;
     }
-  }
+  },
 });
 
 // node_modules/asynckit/lib/terminator.js
@@ -9038,7 +9183,7 @@ var require_terminator = __commonJS({
       abort(this);
       async(callback)(null, this.results);
     }
-  }
+  },
 });
 
 // node_modules/asynckit/parallel.js
@@ -9051,7 +9196,7 @@ var require_parallel = __commonJS({
     function parallel(list, iterator2, callback) {
       var state = initState(list);
       while (state.index < (state["keyedList"] || list).length) {
-        iterate(list, iterator2, state, function(error, result) {
+        iterate(list, iterator2, state, function (error, result) {
           if (error) {
             callback(error, result);
             return;
@@ -9065,7 +9210,7 @@ var require_parallel = __commonJS({
       }
       return terminator.bind(state, callback);
     }
-  }
+  },
 });
 
 // node_modules/asynckit/serialOrdered.js
@@ -9099,7 +9244,7 @@ var require_serialOrdered = __commonJS({
     function descending(a, b) {
       return -1 * ascending(a, b);
     }
-  }
+  },
 });
 
 // node_modules/asynckit/serial.js
@@ -9110,7 +9255,7 @@ var require_serial = __commonJS({
     function serial(list, iterator2, callback) {
       return serialOrdered(list, iterator2, null, callback);
     }
-  }
+  },
 });
 
 // node_modules/asynckit/index.js
@@ -9119,9 +9264,9 @@ var require_asynckit = __commonJS({
     module2.exports = {
       parallel: require_parallel(),
       serial: require_serial(),
-      serialOrdered: require_serialOrdered()
+      serialOrdered: require_serialOrdered(),
     };
-  }
+  },
 });
 
 // node_modules/es-object-atoms/index.js
@@ -9129,7 +9274,7 @@ var require_es_object_atoms = __commonJS({
   "node_modules/es-object-atoms/index.js"(exports2, module2) {
     "use strict";
     module2.exports = Object;
-  }
+  },
 });
 
 // node_modules/es-errors/index.js
@@ -9137,7 +9282,7 @@ var require_es_errors = __commonJS({
   "node_modules/es-errors/index.js"(exports2, module2) {
     "use strict";
     module2.exports = Error;
-  }
+  },
 });
 
 // node_modules/es-errors/eval.js
@@ -9145,7 +9290,7 @@ var require_eval = __commonJS({
   "node_modules/es-errors/eval.js"(exports2, module2) {
     "use strict";
     module2.exports = EvalError;
-  }
+  },
 });
 
 // node_modules/es-errors/range.js
@@ -9153,7 +9298,7 @@ var require_range = __commonJS({
   "node_modules/es-errors/range.js"(exports2, module2) {
     "use strict";
     module2.exports = RangeError;
-  }
+  },
 });
 
 // node_modules/es-errors/ref.js
@@ -9161,7 +9306,7 @@ var require_ref = __commonJS({
   "node_modules/es-errors/ref.js"(exports2, module2) {
     "use strict";
     module2.exports = ReferenceError;
-  }
+  },
 });
 
 // node_modules/es-errors/syntax.js
@@ -9169,7 +9314,7 @@ var require_syntax = __commonJS({
   "node_modules/es-errors/syntax.js"(exports2, module2) {
     "use strict";
     module2.exports = SyntaxError;
-  }
+  },
 });
 
 // node_modules/es-errors/type.js
@@ -9177,7 +9322,7 @@ var require_type = __commonJS({
   "node_modules/es-errors/type.js"(exports2, module2) {
     "use strict";
     module2.exports = TypeError;
-  }
+  },
 });
 
 // node_modules/es-errors/uri.js
@@ -9185,7 +9330,7 @@ var require_uri = __commonJS({
   "node_modules/es-errors/uri.js"(exports2, module2) {
     "use strict";
     module2.exports = URIError;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/abs.js
@@ -9193,7 +9338,7 @@ var require_abs = __commonJS({
   "node_modules/math-intrinsics/abs.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.abs;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/floor.js
@@ -9201,7 +9346,7 @@ var require_floor = __commonJS({
   "node_modules/math-intrinsics/floor.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.floor;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/max.js
@@ -9209,7 +9354,7 @@ var require_max = __commonJS({
   "node_modules/math-intrinsics/max.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.max;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/min.js
@@ -9217,7 +9362,7 @@ var require_min = __commonJS({
   "node_modules/math-intrinsics/min.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.min;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/pow.js
@@ -9225,7 +9370,7 @@ var require_pow = __commonJS({
   "node_modules/math-intrinsics/pow.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.pow;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/round.js
@@ -9233,17 +9378,19 @@ var require_round = __commonJS({
   "node_modules/math-intrinsics/round.js"(exports2, module2) {
     "use strict";
     module2.exports = Math.round;
-  }
+  },
 });
 
 // node_modules/math-intrinsics/isNaN.js
 var require_isNaN = __commonJS({
   "node_modules/math-intrinsics/isNaN.js"(exports2, module2) {
     "use strict";
-    module2.exports = Number.isNaN || function isNaN2(a) {
-      return a !== a;
-    };
-  }
+    module2.exports =
+      Number.isNaN ||
+      function isNaN2(a) {
+        return a !== a;
+      };
+  },
 });
 
 // node_modules/math-intrinsics/sign.js
@@ -9257,7 +9404,7 @@ var require_sign = __commonJS({
       }
       return number < 0 ? -1 : 1;
     };
-  }
+  },
 });
 
 // node_modules/gopd/gOPD.js
@@ -9265,7 +9412,7 @@ var require_gOPD = __commonJS({
   "node_modules/gopd/gOPD.js"(exports2, module2) {
     "use strict";
     module2.exports = Object.getOwnPropertyDescriptor;
-  }
+  },
 });
 
 // node_modules/gopd/index.js
@@ -9281,7 +9428,7 @@ var require_gopd = __commonJS({
       }
     }
     module2.exports = $gOPD;
-  }
+  },
 });
 
 // node_modules/es-define-property/index.js
@@ -9297,7 +9444,7 @@ var require_es_define_property = __commonJS({
       }
     }
     module2.exports = $defineProperty;
-  }
+  },
 });
 
 // node_modules/has-symbols/shams.js
@@ -9305,7 +9452,10 @@ var require_shams = __commonJS({
   "node_modules/has-symbols/shams.js"(exports2, module2) {
     "use strict";
     module2.exports = function hasSymbols() {
-      if (typeof Symbol !== "function" || typeof Object.getOwnPropertySymbols !== "function") {
+      if (
+        typeof Symbol !== "function" ||
+        typeof Object.getOwnPropertySymbols !== "function"
+      ) {
         return false;
       }
       if (typeof Symbol.iterator === "symbol") {
@@ -9331,7 +9481,10 @@ var require_shams = __commonJS({
       if (typeof Object.keys === "function" && Object.keys(obj).length !== 0) {
         return false;
       }
-      if (typeof Object.getOwnPropertyNames === "function" && Object.getOwnPropertyNames(obj).length !== 0) {
+      if (
+        typeof Object.getOwnPropertyNames === "function" &&
+        Object.getOwnPropertyNames(obj).length !== 0
+      ) {
         return false;
       }
       var syms = Object.getOwnPropertySymbols(obj);
@@ -9342,17 +9495,16 @@ var require_shams = __commonJS({
         return false;
       }
       if (typeof Object.getOwnPropertyDescriptor === "function") {
-        var descriptor = (
+        var descriptor =
           /** @type {PropertyDescriptor} */
-          Object.getOwnPropertyDescriptor(obj, sym)
-        );
+          Object.getOwnPropertyDescriptor(obj, sym);
         if (descriptor.value !== symVal || descriptor.enumerable !== true) {
           return false;
         }
       }
       return true;
     };
-  }
+  },
 });
 
 // node_modules/has-symbols/index.js
@@ -9376,15 +9528,16 @@ var require_has_symbols = __commonJS({
       }
       return hasSymbolSham();
     };
-  }
+  },
 });
 
 // node_modules/get-proto/Reflect.getPrototypeOf.js
 var require_Reflect_getPrototypeOf = __commonJS({
   "node_modules/get-proto/Reflect.getPrototypeOf.js"(exports2, module2) {
     "use strict";
-    module2.exports = typeof Reflect !== "undefined" && Reflect.getPrototypeOf || null;
-  }
+    module2.exports =
+      (typeof Reflect !== "undefined" && Reflect.getPrototypeOf) || null;
+  },
 });
 
 // node_modules/get-proto/Object.getPrototypeOf.js
@@ -9393,7 +9546,7 @@ var require_Object_getPrototypeOf = __commonJS({
     "use strict";
     var $Object = require_es_object_atoms();
     module2.exports = $Object.getPrototypeOf || null;
-  }
+  },
 });
 
 // node_modules/function-bind/implementation.js
@@ -9421,7 +9574,7 @@ var require_implementation = __commonJS({
       }
       return arr;
     };
-    var joiny = function(arr, joiner) {
+    var joiny = function (arr, joiner) {
       var str = "";
       for (var i = 0; i < arr.length; i += 1) {
         str += arr[i];
@@ -9438,38 +9591,36 @@ var require_implementation = __commonJS({
       }
       var args = slicy(arguments, 1);
       var bound;
-      var binder = function() {
+      var binder = function () {
         if (this instanceof bound) {
-          var result = target.apply(
-            this,
-            concatty(args, arguments)
-          );
+          var result = target.apply(this, concatty(args, arguments));
           if (Object(result) === result) {
             return result;
           }
           return this;
         }
-        return target.apply(
-          that,
-          concatty(args, arguments)
-        );
+        return target.apply(that, concatty(args, arguments));
       };
       var boundLength = max(0, target.length - args.length);
       var boundArgs = [];
       for (var i = 0; i < boundLength; i++) {
         boundArgs[i] = "$" + i;
       }
-      bound = Function("binder", "return function (" + joiny(boundArgs, ",") + "){ return binder.apply(this,arguments); }")(binder);
+      bound = Function(
+        "binder",
+        "return function (" +
+          joiny(boundArgs, ",") +
+          "){ return binder.apply(this,arguments); }",
+      )(binder);
       if (target.prototype) {
-        var Empty = function Empty2() {
-        };
+        var Empty = function Empty2() {};
         Empty.prototype = target.prototype;
         bound.prototype = new Empty();
         Empty.prototype = null;
       }
       return bound;
     };
-  }
+  },
 });
 
 // node_modules/function-bind/index.js
@@ -9478,7 +9629,7 @@ var require_function_bind = __commonJS({
     "use strict";
     var implementation = require_implementation();
     module2.exports = Function.prototype.bind || implementation;
-  }
+  },
 });
 
 // node_modules/call-bind-apply-helpers/functionCall.js
@@ -9486,7 +9637,7 @@ var require_functionCall = __commonJS({
   "node_modules/call-bind-apply-helpers/functionCall.js"(exports2, module2) {
     "use strict";
     module2.exports = Function.prototype.call;
-  }
+  },
 });
 
 // node_modules/call-bind-apply-helpers/functionApply.js
@@ -9494,15 +9645,16 @@ var require_functionApply = __commonJS({
   "node_modules/call-bind-apply-helpers/functionApply.js"(exports2, module2) {
     "use strict";
     module2.exports = Function.prototype.apply;
-  }
+  },
 });
 
 // node_modules/call-bind-apply-helpers/reflectApply.js
 var require_reflectApply = __commonJS({
   "node_modules/call-bind-apply-helpers/reflectApply.js"(exports2, module2) {
     "use strict";
-    module2.exports = typeof Reflect !== "undefined" && Reflect && Reflect.apply;
-  }
+    module2.exports =
+      typeof Reflect !== "undefined" && Reflect && Reflect.apply;
+  },
 });
 
 // node_modules/call-bind-apply-helpers/actualApply.js
@@ -9514,7 +9666,7 @@ var require_actualApply = __commonJS({
     var $call = require_functionCall();
     var $reflectApply = require_reflectApply();
     module2.exports = $reflectApply || bind2.call($call, $apply);
-  }
+  },
 });
 
 // node_modules/call-bind-apply-helpers/index.js
@@ -9531,7 +9683,7 @@ var require_call_bind_apply_helpers = __commonJS({
       }
       return $actualApply(bind2, $call, args);
     };
-  }
+  },
 });
 
 // node_modules/dunder-proto/get.js
@@ -9542,27 +9694,39 @@ var require_get = __commonJS({
     var gOPD = require_gopd();
     var hasProtoAccessor;
     try {
-      hasProtoAccessor = /** @type {{ __proto__?: typeof Array.prototype }} */
-      [].__proto__ === Array.prototype;
+      hasProtoAccessor =
+        /** @type {{ __proto__?: typeof Array.prototype }} */
+        [].__proto__ === Array.prototype;
     } catch (e) {
-      if (!e || typeof e !== "object" || !("code" in e) || e.code !== "ERR_PROTO_ACCESS") {
+      if (
+        !e ||
+        typeof e !== "object" ||
+        !("code" in e) ||
+        e.code !== "ERR_PROTO_ACCESS"
+      ) {
         throw e;
       }
     }
-    var desc = !!hasProtoAccessor && gOPD && gOPD(
-      Object.prototype,
-      /** @type {keyof typeof Object.prototype} */
-      "__proto__"
-    );
+    var desc =
+      !!hasProtoAccessor &&
+      gOPD &&
+      gOPD(
+        Object.prototype,
+        /** @type {keyof typeof Object.prototype} */
+        "__proto__",
+      );
     var $Object = Object;
     var $getPrototypeOf = $Object.getPrototypeOf;
-    module2.exports = desc && typeof desc.get === "function" ? callBind([desc.get]) : typeof $getPrototypeOf === "function" ? (
-      /** @type {import('./get')} */
-      function getDunder(value) {
-        return $getPrototypeOf(value == null ? value : $Object(value));
-      }
-    ) : false;
-  }
+    module2.exports =
+      desc && typeof desc.get === "function"
+        ? callBind([desc.get])
+        : typeof $getPrototypeOf === "function"
+          ? /** @type {import('./get')} */
+            function getDunder(value) {
+              return $getPrototypeOf(value == null ? value : $Object(value));
+            }
+          : false;
+  },
 });
 
 // node_modules/get-proto/index.js
@@ -9572,17 +9736,23 @@ var require_get_proto = __commonJS({
     var reflectGetProto = require_Reflect_getPrototypeOf();
     var originalGetProto = require_Object_getPrototypeOf();
     var getDunderProto = require_get();
-    module2.exports = reflectGetProto ? function getProto(O) {
-      return reflectGetProto(O);
-    } : originalGetProto ? function getProto(O) {
-      if (!O || typeof O !== "object" && typeof O !== "function") {
-        throw new TypeError("getProto: not an object");
-      }
-      return originalGetProto(O);
-    } : getDunderProto ? function getProto(O) {
-      return getDunderProto(O);
-    } : null;
-  }
+    module2.exports = reflectGetProto
+      ? function getProto(O) {
+          return reflectGetProto(O);
+        }
+      : originalGetProto
+        ? function getProto(O) {
+            if (!O || (typeof O !== "object" && typeof O !== "function")) {
+              throw new TypeError("getProto: not an object");
+            }
+            return originalGetProto(O);
+          }
+        : getDunderProto
+          ? function getProto(O) {
+              return getDunderProto(O);
+            }
+          : null;
+  },
 });
 
 // node_modules/hasown/index.js
@@ -9593,7 +9763,7 @@ var require_hasown = __commonJS({
     var $hasOwn = Object.prototype.hasOwnProperty;
     var bind2 = require_function_bind();
     module2.exports = bind2.call(call, $hasOwn);
-  }
+  },
 });
 
 // node_modules/get-intrinsic/index.js
@@ -9617,29 +9787,32 @@ var require_get_intrinsic = __commonJS({
     var round = require_round();
     var sign = require_sign();
     var $Function = Function;
-    var getEvalledConstructor = function(expressionSyntax) {
+    var getEvalledConstructor = function (expressionSyntax) {
       try {
-        return $Function('"use strict"; return (' + expressionSyntax + ").constructor;")();
-      } catch (e) {
-      }
+        return $Function(
+          '"use strict"; return (' + expressionSyntax + ").constructor;",
+        )();
+      } catch (e) {}
     };
     var $gOPD = require_gopd();
     var $defineProperty = require_es_define_property();
-    var throwTypeError = function() {
+    var throwTypeError = function () {
       throw new $TypeError();
     };
-    var ThrowTypeError = $gOPD ? function() {
-      try {
-        arguments.callee;
-        return throwTypeError;
-      } catch (calleeThrows) {
-        try {
-          return $gOPD(arguments, "callee").get;
-        } catch (gOPDthrows) {
-          return throwTypeError;
-        }
-      }
-    }() : throwTypeError;
+    var ThrowTypeError = $gOPD
+      ? (function () {
+          try {
+            arguments.callee;
+            return throwTypeError;
+          } catch (calleeThrows) {
+            try {
+              return $gOPD(arguments, "callee").get;
+            } catch (gOPDthrows) {
+              return throwTypeError;
+            }
+          }
+        })()
+      : throwTypeError;
     var hasSymbols = require_has_symbols()();
     var getProto = require_get_proto();
     var $ObjectGPO = require_Object_getPrototypeOf();
@@ -9647,13 +9820,19 @@ var require_get_intrinsic = __commonJS({
     var $apply = require_functionApply();
     var $call = require_functionCall();
     var needsEval = {};
-    var TypedArray = typeof Uint8Array === "undefined" || !getProto ? undefined2 : getProto(Uint8Array);
+    var TypedArray =
+      typeof Uint8Array === "undefined" || !getProto
+        ? undefined2
+        : getProto(Uint8Array);
     var INTRINSICS = {
       __proto__: null,
-      "%AggregateError%": typeof AggregateError === "undefined" ? undefined2 : AggregateError,
+      "%AggregateError%":
+        typeof AggregateError === "undefined" ? undefined2 : AggregateError,
       "%Array%": Array,
-      "%ArrayBuffer%": typeof ArrayBuffer === "undefined" ? undefined2 : ArrayBuffer,
-      "%ArrayIteratorPrototype%": hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined2,
+      "%ArrayBuffer%":
+        typeof ArrayBuffer === "undefined" ? undefined2 : ArrayBuffer,
+      "%ArrayIteratorPrototype%":
+        hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined2,
       "%AsyncFromSyncIteratorPrototype%": undefined2,
       "%AsyncFunction%": needsEval,
       "%AsyncGenerator%": needsEval,
@@ -9661,8 +9840,10 @@ var require_get_intrinsic = __commonJS({
       "%AsyncIteratorPrototype%": needsEval,
       "%Atomics%": typeof Atomics === "undefined" ? undefined2 : Atomics,
       "%BigInt%": typeof BigInt === "undefined" ? undefined2 : BigInt,
-      "%BigInt64Array%": typeof BigInt64Array === "undefined" ? undefined2 : BigInt64Array,
-      "%BigUint64Array%": typeof BigUint64Array === "undefined" ? undefined2 : BigUint64Array,
+      "%BigInt64Array%":
+        typeof BigInt64Array === "undefined" ? undefined2 : BigInt64Array,
+      "%BigUint64Array%":
+        typeof BigUint64Array === "undefined" ? undefined2 : BigUint64Array,
       "%Boolean%": Boolean,
       "%DataView%": typeof DataView === "undefined" ? undefined2 : DataView,
       "%Date%": Date,
@@ -9674,21 +9855,35 @@ var require_get_intrinsic = __commonJS({
       "%eval%": eval,
       // eslint-disable-line no-eval
       "%EvalError%": $EvalError,
-      "%Float16Array%": typeof Float16Array === "undefined" ? undefined2 : Float16Array,
-      "%Float32Array%": typeof Float32Array === "undefined" ? undefined2 : Float32Array,
-      "%Float64Array%": typeof Float64Array === "undefined" ? undefined2 : Float64Array,
-      "%FinalizationRegistry%": typeof FinalizationRegistry === "undefined" ? undefined2 : FinalizationRegistry,
+      "%Float16Array%":
+        typeof Float16Array === "undefined" ? undefined2 : Float16Array,
+      "%Float32Array%":
+        typeof Float32Array === "undefined" ? undefined2 : Float32Array,
+      "%Float64Array%":
+        typeof Float64Array === "undefined" ? undefined2 : Float64Array,
+      "%FinalizationRegistry%":
+        typeof FinalizationRegistry === "undefined"
+          ? undefined2
+          : FinalizationRegistry,
       "%Function%": $Function,
       "%GeneratorFunction%": needsEval,
       "%Int8Array%": typeof Int8Array === "undefined" ? undefined2 : Int8Array,
-      "%Int16Array%": typeof Int16Array === "undefined" ? undefined2 : Int16Array,
-      "%Int32Array%": typeof Int32Array === "undefined" ? undefined2 : Int32Array,
+      "%Int16Array%":
+        typeof Int16Array === "undefined" ? undefined2 : Int16Array,
+      "%Int32Array%":
+        typeof Int32Array === "undefined" ? undefined2 : Int32Array,
       "%isFinite%": isFinite,
       "%isNaN%": isNaN,
-      "%IteratorPrototype%": hasSymbols && getProto ? getProto(getProto([][Symbol.iterator]())) : undefined2,
+      "%IteratorPrototype%":
+        hasSymbols && getProto
+          ? getProto(getProto([][Symbol.iterator]()))
+          : undefined2,
       "%JSON%": typeof JSON === "object" ? JSON : undefined2,
       "%Map%": typeof Map === "undefined" ? undefined2 : Map,
-      "%MapIteratorPrototype%": typeof Map === "undefined" || !hasSymbols || !getProto ? undefined2 : getProto((/* @__PURE__ */ new Map())[Symbol.iterator]()),
+      "%MapIteratorPrototype%":
+        typeof Map === "undefined" || !hasSymbols || !getProto
+          ? undefined2
+          : getProto(/* @__PURE__ */ new Map()[Symbol.iterator]()),
       "%Math%": Math,
       "%Number%": Number,
       "%Object%": $Object,
@@ -9702,19 +9897,32 @@ var require_get_intrinsic = __commonJS({
       "%Reflect%": typeof Reflect === "undefined" ? undefined2 : Reflect,
       "%RegExp%": RegExp,
       "%Set%": typeof Set === "undefined" ? undefined2 : Set,
-      "%SetIteratorPrototype%": typeof Set === "undefined" || !hasSymbols || !getProto ? undefined2 : getProto((/* @__PURE__ */ new Set())[Symbol.iterator]()),
-      "%SharedArrayBuffer%": typeof SharedArrayBuffer === "undefined" ? undefined2 : SharedArrayBuffer,
+      "%SetIteratorPrototype%":
+        typeof Set === "undefined" || !hasSymbols || !getProto
+          ? undefined2
+          : getProto(/* @__PURE__ */ new Set()[Symbol.iterator]()),
+      "%SharedArrayBuffer%":
+        typeof SharedArrayBuffer === "undefined"
+          ? undefined2
+          : SharedArrayBuffer,
       "%String%": String,
-      "%StringIteratorPrototype%": hasSymbols && getProto ? getProto(""[Symbol.iterator]()) : undefined2,
+      "%StringIteratorPrototype%":
+        hasSymbols && getProto ? getProto(""[Symbol.iterator]()) : undefined2,
       "%Symbol%": hasSymbols ? Symbol : undefined2,
       "%SyntaxError%": $SyntaxError,
       "%ThrowTypeError%": ThrowTypeError,
       "%TypedArray%": TypedArray,
       "%TypeError%": $TypeError,
-      "%Uint8Array%": typeof Uint8Array === "undefined" ? undefined2 : Uint8Array,
-      "%Uint8ClampedArray%": typeof Uint8ClampedArray === "undefined" ? undefined2 : Uint8ClampedArray,
-      "%Uint16Array%": typeof Uint16Array === "undefined" ? undefined2 : Uint16Array,
-      "%Uint32Array%": typeof Uint32Array === "undefined" ? undefined2 : Uint32Array,
+      "%Uint8Array%":
+        typeof Uint8Array === "undefined" ? undefined2 : Uint8Array,
+      "%Uint8ClampedArray%":
+        typeof Uint8ClampedArray === "undefined"
+          ? undefined2
+          : Uint8ClampedArray,
+      "%Uint16Array%":
+        typeof Uint16Array === "undefined" ? undefined2 : Uint16Array,
+      "%Uint32Array%":
+        typeof Uint32Array === "undefined" ? undefined2 : Uint32Array,
       "%URIError%": $URIError,
       "%WeakMap%": typeof WeakMap === "undefined" ? undefined2 : WeakMap,
       "%WeakRef%": typeof WeakRef === "undefined" ? undefined2 : WeakRef,
@@ -9730,7 +9938,7 @@ var require_get_intrinsic = __commonJS({
       "%Math.pow%": pow,
       "%Math.round%": round,
       "%Math.sign%": sign,
-      "%Reflect.getPrototypeOf%": $ReflectGPO
+      "%Reflect.getPrototypeOf%": $ReflectGPO,
     };
     if (getProto) {
       try {
@@ -9773,7 +9981,11 @@ var require_get_intrinsic = __commonJS({
       "%ArrayProto_values%": ["Array", "prototype", "values"],
       "%AsyncFunctionPrototype%": ["AsyncFunction", "prototype"],
       "%AsyncGenerator%": ["AsyncGeneratorFunction", "prototype"],
-      "%AsyncGeneratorPrototype%": ["AsyncGeneratorFunction", "prototype", "prototype"],
+      "%AsyncGeneratorPrototype%": [
+        "AsyncGeneratorFunction",
+        "prototype",
+        "prototype",
+      ],
       "%BooleanPrototype%": ["Boolean", "prototype"],
       "%DataViewPrototype%": ["DataView", "prototype"],
       "%DatePrototype%": ["Date", "prototype"],
@@ -9815,7 +10027,7 @@ var require_get_intrinsic = __commonJS({
       "%Uint32ArrayPrototype%": ["Uint32Array", "prototype"],
       "%URIErrorPrototype%": ["URIError", "prototype"],
       "%WeakMapPrototype%": ["WeakMap", "prototype"],
-      "%WeakSetPrototype%": ["WeakSet", "prototype"]
+      "%WeakSetPrototype%": ["WeakSet", "prototype"],
     };
     var bind2 = require_function_bind();
     var hasOwn = require_hasown();
@@ -9824,19 +10036,26 @@ var require_get_intrinsic = __commonJS({
     var $replace = bind2.call($call, String.prototype.replace);
     var $strSlice = bind2.call($call, String.prototype.slice);
     var $exec = bind2.call($call, RegExp.prototype.exec);
-    var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
+    var rePropName =
+      /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
     var reEscapeChar = /\\(\\)?/g;
     var stringToPath = function stringToPath2(string) {
       var first = $strSlice(string, 0, 1);
       var last = $strSlice(string, -1);
       if (first === "%" && last !== "%") {
-        throw new $SyntaxError("invalid intrinsic syntax, expected closing `%`");
+        throw new $SyntaxError(
+          "invalid intrinsic syntax, expected closing `%`",
+        );
       } else if (last === "%" && first !== "%") {
-        throw new $SyntaxError("invalid intrinsic syntax, expected opening `%`");
+        throw new $SyntaxError(
+          "invalid intrinsic syntax, expected opening `%`",
+        );
       }
       var result = [];
-      $replace(string, rePropName, function(match, number, quote, subString) {
-        result[result.length] = quote ? $replace(subString, reEscapeChar, "$1") : number || match;
+      $replace(string, rePropName, function (match, number, quote, subString) {
+        result[result.length] = quote
+          ? $replace(subString, reEscapeChar, "$1")
+          : number || match;
       });
       return result;
     };
@@ -9853,12 +10072,16 @@ var require_get_intrinsic = __commonJS({
           value = doEval(intrinsicName);
         }
         if (typeof value === "undefined" && !allowMissing) {
-          throw new $TypeError("intrinsic " + name + " exists, but is not available. Please file an issue!");
+          throw new $TypeError(
+            "intrinsic " +
+              name +
+              " exists, but is not available. Please file an issue!",
+          );
         }
         return {
           alias,
           name: intrinsicName,
-          value
+          value,
         };
       }
       throw new $SyntaxError("intrinsic " + name + " does not exist!");
@@ -9871,11 +10094,16 @@ var require_get_intrinsic = __commonJS({
         throw new $TypeError('"allowMissing" argument must be a boolean');
       }
       if ($exec(/^%?[^%]*%?$/, name) === null) {
-        throw new $SyntaxError("`%` may not be present anywhere but at the beginning and end of the intrinsic name");
+        throw new $SyntaxError(
+          "`%` may not be present anywhere but at the beginning and end of the intrinsic name",
+        );
       }
       var parts = stringToPath(name);
       var intrinsicBaseName = parts.length > 0 ? parts[0] : "";
-      var intrinsic = getBaseIntrinsic("%" + intrinsicBaseName + "%", allowMissing);
+      var intrinsic = getBaseIntrinsic(
+        "%" + intrinsicBaseName + "%",
+        allowMissing,
+      );
       var intrinsicRealName = intrinsic.name;
       var value = intrinsic.value;
       var skipFurtherCaching = false;
@@ -9888,8 +10116,18 @@ var require_get_intrinsic = __commonJS({
         var part = parts[i];
         var first = $strSlice(part, 0, 1);
         var last = $strSlice(part, -1);
-        if ((first === '"' || first === "'" || first === "`" || (last === '"' || last === "'" || last === "`")) && first !== last) {
-          throw new $SyntaxError("property names with quotes must have matching quotes");
+        if (
+          (first === '"' ||
+            first === "'" ||
+            first === "`" ||
+            last === '"' ||
+            last === "'" ||
+            last === "`") &&
+          first !== last
+        ) {
+          throw new $SyntaxError(
+            "property names with quotes must have matching quotes",
+          );
         }
         if (part === "constructor" || !isOwn) {
           skipFurtherCaching = true;
@@ -9901,7 +10139,11 @@ var require_get_intrinsic = __commonJS({
         } else if (value != null) {
           if (!(part in value)) {
             if (!allowMissing) {
-              throw new $TypeError("base intrinsic for " + name + " exists, but the property is not available.");
+              throw new $TypeError(
+                "base intrinsic for " +
+                  name +
+                  " exists, but the property is not available.",
+              );
             }
             return void 0;
           }
@@ -9924,7 +10166,7 @@ var require_get_intrinsic = __commonJS({
       }
       return value;
     };
-  }
+  },
 });
 
 // node_modules/has-tostringtag/shams.js
@@ -9935,7 +10177,7 @@ var require_shams2 = __commonJS({
     module2.exports = function hasToStringTagShams() {
       return hasSymbols() && !!Symbol.toStringTag;
     };
-  }
+  },
 });
 
 // node_modules/es-set-tostringtag/index.js
@@ -9949,10 +10191,19 @@ var require_es_set_tostringtag = __commonJS({
     var $TypeError = require_type();
     var toStringTag2 = hasToStringTag ? Symbol.toStringTag : null;
     module2.exports = function setToStringTag(object, value) {
-      var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
-      var nonConfigurable = arguments.length > 2 && !!arguments[2] && arguments[2].nonConfigurable;
-      if (typeof overrideIfSet !== "undefined" && typeof overrideIfSet !== "boolean" || typeof nonConfigurable !== "undefined" && typeof nonConfigurable !== "boolean") {
-        throw new $TypeError("if provided, the `overrideIfSet` and `nonConfigurable` options must be booleans");
+      var overrideIfSet =
+        arguments.length > 2 && !!arguments[2] && arguments[2].force;
+      var nonConfigurable =
+        arguments.length > 2 && !!arguments[2] && arguments[2].nonConfigurable;
+      if (
+        (typeof overrideIfSet !== "undefined" &&
+          typeof overrideIfSet !== "boolean") ||
+        (typeof nonConfigurable !== "undefined" &&
+          typeof nonConfigurable !== "boolean")
+      ) {
+        throw new $TypeError(
+          "if provided, the `overrideIfSet` and `nonConfigurable` options must be booleans",
+        );
       }
       if (toStringTag2 && (overrideIfSet || !hasOwn(object, toStringTag2))) {
         if ($defineProperty) {
@@ -9960,27 +10211,27 @@ var require_es_set_tostringtag = __commonJS({
             configurable: !nonConfigurable,
             enumerable: false,
             value,
-            writable: false
+            writable: false,
           });
         } else {
           object[toStringTag2] = value;
         }
       }
     };
-  }
+  },
 });
 
 // node_modules/form-data/lib/populate.js
 var require_populate = __commonJS({
   "node_modules/form-data/lib/populate.js"(exports2, module2) {
     "use strict";
-    module2.exports = function(dst, src) {
-      Object.keys(src).forEach(function(prop) {
+    module2.exports = function (dst, src) {
+      Object.keys(src).forEach(function (prop) {
         dst[prop] = dst[prop] || src[prop];
       });
       return dst;
     };
-  }
+  },
 });
 
 // node_modules/form-data/lib/form_data.js
@@ -9993,7 +10244,7 @@ var require_form_data = __commonJS({
     var http3 = require("http");
     var https2 = require("https");
     var parseUrl = require("url").parse;
-    var fs2 = require("fs");
+    var fs3 = require("fs");
     var Stream = require("stream").Stream;
     var crypto4 = require("crypto");
     var mime = require_mime_types();
@@ -10017,7 +10268,7 @@ var require_form_data = __commonJS({
     util3.inherits(FormData3, CombinedStream);
     FormData3.LINE_BREAK = "\r\n";
     FormData3.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-    FormData3.prototype.append = function(field, value, options) {
+    FormData3.prototype.append = function (field, value, options) {
       options = options || {};
       if (typeof options === "string") {
         options = { filename: options };
@@ -10037,7 +10288,7 @@ var require_form_data = __commonJS({
       append2(footer);
       this._trackLength(header, value, options);
     };
-    FormData3.prototype._trackLength = function(header, value, options) {
+    FormData3.prototype._trackLength = function (header, value, options) {
       var valueLength = 0;
       if (options.knownLength != null) {
         valueLength += Number(options.knownLength);
@@ -10047,20 +10298,30 @@ var require_form_data = __commonJS({
         valueLength = Buffer.byteLength(value);
       }
       this._valueLength += valueLength;
-      this._overheadLength += Buffer.byteLength(header) + FormData3.LINE_BREAK.length;
-      if (!value || !value.path && !(value.readable && hasOwn(value, "httpVersion")) && !(value instanceof Stream)) {
+      this._overheadLength +=
+        Buffer.byteLength(header) + FormData3.LINE_BREAK.length;
+      if (
+        !value ||
+        (!value.path &&
+          !(value.readable && hasOwn(value, "httpVersion")) &&
+          !(value instanceof Stream))
+      ) {
         return;
       }
       if (!options.knownLength) {
         this._valuesToMeasure.push(value);
       }
     };
-    FormData3.prototype._lengthRetriever = function(value, callback) {
+    FormData3.prototype._lengthRetriever = function (value, callback) {
       if (hasOwn(value, "fd")) {
-        if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
+        if (
+          value.end != void 0 &&
+          value.end != Infinity &&
+          value.start != void 0
+        ) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs2.stat(value.path, function(err, stat) {
+          fs3.stat(value.path, function (err, stat) {
             if (err) {
               callback(err);
               return;
@@ -10072,7 +10333,7 @@ var require_form_data = __commonJS({
       } else if (hasOwn(value, "httpVersion")) {
         callback(null, Number(value.headers["content-length"]));
       } else if (hasOwn(value, "httpModule")) {
-        value.on("response", function(response) {
+        value.on("response", function (response) {
           value.pause();
           callback(null, Number(response.headers["content-length"]));
         });
@@ -10081,7 +10342,7 @@ var require_form_data = __commonJS({
         callback("Unknown stream");
       }
     };
-    FormData3.prototype._multiPartHeader = function(field, value, options) {
+    FormData3.prototype._multiPartHeader = function (field, value, options) {
       if (typeof options.header === "string") {
         return options.header;
       }
@@ -10090,9 +10351,11 @@ var require_form_data = __commonJS({
       var contents = "";
       var headers = {
         // add custom disposition as third element or keep it two elements if not
-        "Content-Disposition": ["form-data", 'name="' + field + '"'].concat(contentDisposition || []),
+        "Content-Disposition": ["form-data", 'name="' + field + '"'].concat(
+          contentDisposition || [],
+        ),
         // if no content type. allow it to be empty array
-        "Content-Type": [].concat(contentType || [])
+        "Content-Type": [].concat(contentType || []),
       };
       if (typeof options.header === "object") {
         populate(headers, options.header);
@@ -10112,14 +10375,22 @@ var require_form_data = __commonJS({
           }
         }
       }
-      return "--" + this.getBoundary() + FormData3.LINE_BREAK + contents + FormData3.LINE_BREAK;
+      return (
+        "--" +
+        this.getBoundary() +
+        FormData3.LINE_BREAK +
+        contents +
+        FormData3.LINE_BREAK
+      );
     };
-    FormData3.prototype._getContentDisposition = function(value, options) {
+    FormData3.prototype._getContentDisposition = function (value, options) {
       var filename;
       if (typeof options.filepath === "string") {
         filename = path3.normalize(options.filepath).replace(/\\/g, "/");
-      } else if (options.filename || value && (value.name || value.path)) {
-        filename = path3.basename(options.filename || value && (value.name || value.path));
+      } else if (options.filename || (value && (value.name || value.path))) {
+        filename = path3.basename(
+          options.filename || (value && (value.name || value.path)),
+        );
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
         filename = path3.basename(value.client._httpMessage.path || "");
       }
@@ -10127,7 +10398,7 @@ var require_form_data = __commonJS({
         return 'filename="' + filename + '"';
       }
     };
-    FormData3.prototype._getContentType = function(value, options) {
+    FormData3.prototype._getContentType = function (value, options) {
       var contentType = options.contentType;
       if (!contentType && value && value.name) {
         contentType = mime.lookup(value.name);
@@ -10135,7 +10406,12 @@ var require_form_data = __commonJS({
       if (!contentType && value && value.path) {
         contentType = mime.lookup(value.path);
       }
-      if (!contentType && value && value.readable && hasOwn(value, "httpVersion")) {
+      if (
+        !contentType &&
+        value &&
+        value.readable &&
+        hasOwn(value, "httpVersion")
+      ) {
         contentType = value.headers["content-type"];
       }
       if (!contentType && (options.filepath || options.filename)) {
@@ -10146,8 +10422,8 @@ var require_form_data = __commonJS({
       }
       return contentType;
     };
-    FormData3.prototype._multiPartFooter = function() {
-      return function(next) {
+    FormData3.prototype._multiPartFooter = function () {
+      return function (next) {
         var footer = FormData3.LINE_BREAK;
         var lastPart = this._streams.length === 0;
         if (lastPart) {
@@ -10156,13 +10432,13 @@ var require_form_data = __commonJS({
         next(footer);
       }.bind(this);
     };
-    FormData3.prototype._lastBoundary = function() {
+    FormData3.prototype._lastBoundary = function () {
       return "--" + this.getBoundary() + "--" + FormData3.LINE_BREAK;
     };
-    FormData3.prototype.getHeaders = function(userHeaders) {
+    FormData3.prototype.getHeaders = function (userHeaders) {
       var header;
       var formHeaders = {
-        "content-type": "multipart/form-data; boundary=" + this.getBoundary()
+        "content-type": "multipart/form-data; boundary=" + this.getBoundary(),
       };
       for (header in userHeaders) {
         if (hasOwn(userHeaders, header)) {
@@ -10171,19 +10447,19 @@ var require_form_data = __commonJS({
       }
       return formHeaders;
     };
-    FormData3.prototype.setBoundary = function(boundary) {
+    FormData3.prototype.setBoundary = function (boundary) {
       if (typeof boundary !== "string") {
         throw new TypeError("FormData boundary must be a string");
       }
       this._boundary = boundary;
     };
-    FormData3.prototype.getBoundary = function() {
+    FormData3.prototype.getBoundary = function () {
       if (!this._boundary) {
         this._generateBoundary();
       }
       return this._boundary;
     };
-    FormData3.prototype.getBuffer = function() {
+    FormData3.prototype.getBuffer = function () {
       var dataBuffer = new Buffer.alloc(0);
       var boundary = this.getBoundary();
       for (var i = 0, len = this._streams.length; i < len; i++) {
@@ -10191,36 +10467,48 @@ var require_form_data = __commonJS({
           if (Buffer.isBuffer(this._streams[i])) {
             dataBuffer = Buffer.concat([dataBuffer, this._streams[i]]);
           } else {
-            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
+            dataBuffer = Buffer.concat([
+              dataBuffer,
+              Buffer.from(this._streams[i]),
+            ]);
           }
-          if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-            dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData3.LINE_BREAK)]);
+          if (
+            typeof this._streams[i] !== "string" ||
+            this._streams[i].substring(2, boundary.length + 2) !== boundary
+          ) {
+            dataBuffer = Buffer.concat([
+              dataBuffer,
+              Buffer.from(FormData3.LINE_BREAK),
+            ]);
           }
         }
       }
       return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
     };
-    FormData3.prototype._generateBoundary = function() {
-      this._boundary = "--------------------------" + crypto4.randomBytes(12).toString("hex");
+    FormData3.prototype._generateBoundary = function () {
+      this._boundary =
+        "--------------------------" + crypto4.randomBytes(12).toString("hex");
     };
-    FormData3.prototype.getLengthSync = function() {
+    FormData3.prototype.getLengthSync = function () {
       var knownLength = this._overheadLength + this._valueLength;
       if (this._streams.length) {
         knownLength += this._lastBoundary().length;
       }
       if (!this.hasKnownLength()) {
-        this._error(new Error("Cannot calculate proper length in synchronous way."));
+        this._error(
+          new Error("Cannot calculate proper length in synchronous way."),
+        );
       }
       return knownLength;
     };
-    FormData3.prototype.hasKnownLength = function() {
+    FormData3.prototype.hasKnownLength = function () {
       var hasKnownLength = true;
       if (this._valuesToMeasure.length) {
         hasKnownLength = false;
       }
       return hasKnownLength;
     };
-    FormData3.prototype.getLength = function(cb) {
+    FormData3.prototype.getLength = function (cb) {
       var knownLength = this._overheadLength + this._valueLength;
       if (this._streams.length) {
         knownLength += this._lastBoundary().length;
@@ -10229,29 +10517,36 @@ var require_form_data = __commonJS({
         process.nextTick(cb.bind(this, null, knownLength));
         return;
       }
-      asynckit.parallel(this._valuesToMeasure, this._lengthRetriever, function(err, values) {
-        if (err) {
-          cb(err);
-          return;
-        }
-        values.forEach(function(length) {
-          knownLength += length;
-        });
-        cb(null, knownLength);
-      });
+      asynckit.parallel(
+        this._valuesToMeasure,
+        this._lengthRetriever,
+        function (err, values) {
+          if (err) {
+            cb(err);
+            return;
+          }
+          values.forEach(function (length) {
+            knownLength += length;
+          });
+          cb(null, knownLength);
+        },
+      );
     };
-    FormData3.prototype.submit = function(params, cb) {
+    FormData3.prototype.submit = function (params, cb) {
       var request;
       var options;
       var defaults2 = { method: "post" };
       if (typeof params === "string") {
         params = parseUrl(params);
-        options = populate({
-          port: params.port,
-          path: params.pathname,
-          host: params.hostname,
-          protocol: params.protocol
-        }, defaults2);
+        options = populate(
+          {
+            port: params.port,
+            path: params.pathname,
+            host: params.hostname,
+            protocol: params.protocol,
+          },
+          defaults2,
+        );
       } else {
         options = populate(params, defaults2);
         if (!options.port) {
@@ -10264,42 +10559,44 @@ var require_form_data = __commonJS({
       } else {
         request = http3.request(options);
       }
-      this.getLength(function(err, length) {
-        if (err && err !== "Unknown stream") {
-          this._error(err);
-          return;
-        }
-        if (length) {
-          request.setHeader("Content-Length", length);
-        }
-        this.pipe(request);
-        if (cb) {
-          var onResponse;
-          var callback = function(error, responce) {
-            request.removeListener("error", callback);
-            request.removeListener("response", onResponse);
-            return cb.call(this, error, responce);
-          };
-          onResponse = callback.bind(this, null);
-          request.on("error", callback);
-          request.on("response", onResponse);
-        }
-      }.bind(this));
+      this.getLength(
+        function (err, length) {
+          if (err && err !== "Unknown stream") {
+            this._error(err);
+            return;
+          }
+          if (length) {
+            request.setHeader("Content-Length", length);
+          }
+          this.pipe(request);
+          if (cb) {
+            var onResponse;
+            var callback = function (error, responce) {
+              request.removeListener("error", callback);
+              request.removeListener("response", onResponse);
+              return cb.call(this, error, responce);
+            };
+            onResponse = callback.bind(this, null);
+            request.on("error", callback);
+            request.on("response", onResponse);
+          }
+        }.bind(this),
+      );
       return request;
     };
-    FormData3.prototype._error = function(err) {
+    FormData3.prototype._error = function (err) {
       if (!this.error) {
         this.error = err;
         this.pause();
         this.emit("error", err);
       }
     };
-    FormData3.prototype.toString = function() {
+    FormData3.prototype.toString = function () {
       return "[object FormData]";
     };
     setToStringTag(FormData3.prototype, "FormData");
     module2.exports = FormData3;
-  }
+  },
 });
 
 // node_modules/proxy-from-env/index.js
@@ -10313,17 +10610,26 @@ var require_proxy_from_env = __commonJS({
       http: 80,
       https: 443,
       ws: 80,
-      wss: 443
+      wss: 443,
     };
-    var stringEndsWith = String.prototype.endsWith || function(s) {
-      return s.length <= this.length && this.indexOf(s, this.length - s.length) !== -1;
-    };
+    var stringEndsWith =
+      String.prototype.endsWith ||
+      function (s) {
+        return (
+          s.length <= this.length &&
+          this.indexOf(s, this.length - s.length) !== -1
+        );
+      };
     function getProxyForUrl(url2) {
       var parsedUrl = typeof url2 === "string" ? parseUrl(url2) : url2 || {};
       var proto = parsedUrl.protocol;
       var hostname2 = parsedUrl.host;
       var port = parsedUrl.port;
-      if (typeof hostname2 !== "string" || !hostname2 || typeof proto !== "string") {
+      if (
+        typeof hostname2 !== "string" ||
+        !hostname2 ||
+        typeof proto !== "string"
+      ) {
         return "";
       }
       proto = proto.split(":", 1)[0];
@@ -10332,21 +10638,27 @@ var require_proxy_from_env = __commonJS({
       if (!shouldProxy(hostname2, port)) {
         return "";
       }
-      var proxy = getEnv("npm_config_" + proto + "_proxy") || getEnv(proto + "_proxy") || getEnv("npm_config_proxy") || getEnv("all_proxy");
+      var proxy =
+        getEnv("npm_config_" + proto + "_proxy") ||
+        getEnv(proto + "_proxy") ||
+        getEnv("npm_config_proxy") ||
+        getEnv("all_proxy");
       if (proxy && proxy.indexOf("://") === -1) {
         proxy = proto + "://" + proxy;
       }
       return proxy;
     }
     function shouldProxy(hostname2, port) {
-      var NO_PROXY = (getEnv("npm_config_no_proxy") || getEnv("no_proxy")).toLowerCase();
+      var NO_PROXY = (
+        getEnv("npm_config_no_proxy") || getEnv("no_proxy")
+      ).toLowerCase();
       if (!NO_PROXY) {
         return true;
       }
       if (NO_PROXY === "*") {
         return false;
       }
-      return NO_PROXY.split(/[,\s]/).every(function(proxy) {
+      return NO_PROXY.split(/[,\s]/).every(function (proxy) {
         if (!proxy) {
           return true;
         }
@@ -10366,10 +10678,12 @@ var require_proxy_from_env = __commonJS({
       });
     }
     function getEnv(key) {
-      return process.env[key.toLowerCase()] || process.env[key.toUpperCase()] || "";
+      return (
+        process.env[key.toLowerCase()] || process.env[key.toUpperCase()] || ""
+      );
     }
     exports2.getProxyForUrl = getProxyForUrl;
-  }
+  },
 });
 
 // node_modules/ms/index.js
@@ -10381,7 +10695,7 @@ var require_ms = __commonJS({
     var d = h * 24;
     var w = d * 7;
     var y = d * 365.25;
-    module2.exports = function(val, options) {
+    module2.exports = function (val, options) {
       options = options || {};
       var type = typeof val;
       if (type === "string" && val.length > 0) {
@@ -10390,7 +10704,8 @@ var require_ms = __commonJS({
         return options.long ? fmtLong(val) : fmtShort(val);
       }
       throw new Error(
-        "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
+        "val is not a non-empty string or a valid number. val=" +
+          JSON.stringify(val),
       );
     };
     function parse(str) {
@@ -10398,9 +10713,10 @@ var require_ms = __commonJS({
       if (str.length > 100) {
         return;
       }
-      var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str
-      );
+      var match =
+        /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+          str,
+        );
       if (!match) {
         return;
       }
@@ -10485,7 +10801,7 @@ var require_ms = __commonJS({
       var isPlural = msAbs >= n * 1.5;
       return Math.round(ms / n) + " " + name + (isPlural ? "s" : "");
     }
-  }
+  },
 });
 
 // node_modules/debug/src/common.js
@@ -10574,7 +10890,7 @@ var require_common = __commonJS({
           },
           set: (v) => {
             enableOverride = v;
-          }
+          },
         });
         if (typeof createDebug.init === "function") {
           createDebug.init(debug);
@@ -10582,7 +10898,11 @@ var require_common = __commonJS({
         return debug;
       }
       function extend2(namespace, delimiter) {
-        const newDebug = createDebug(this.namespace + (typeof delimiter === "undefined" ? ":" : delimiter) + namespace);
+        const newDebug = createDebug(
+          this.namespace +
+            (typeof delimiter === "undefined" ? ":" : delimiter) +
+            namespace,
+        );
         newDebug.log = this.log;
         return newDebug;
       }
@@ -10591,7 +10911,11 @@ var require_common = __commonJS({
         createDebug.namespaces = namespaces;
         createDebug.names = [];
         createDebug.skips = [];
-        const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
+        const split = (typeof namespaces === "string" ? namespaces : "")
+          .trim()
+          .replace(/\s+/g, ",")
+          .split(",")
+          .filter(Boolean);
         for (const ns of split) {
           if (ns[0] === "-") {
             createDebug.skips.push(ns.slice(1));
@@ -10606,7 +10930,11 @@ var require_common = __commonJS({
         let starIndex = -1;
         let matchIndex = 0;
         while (searchIndex < search.length) {
-          if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === "*")) {
+          if (
+            templateIndex < template.length &&
+            (template[templateIndex] === search[searchIndex] ||
+              template[templateIndex] === "*")
+          ) {
             if (template[templateIndex] === "*") {
               starIndex = templateIndex;
               matchIndex = searchIndex;
@@ -10623,7 +10951,10 @@ var require_common = __commonJS({
             return false;
           }
         }
-        while (templateIndex < template.length && template[templateIndex] === "*") {
+        while (
+          templateIndex < template.length &&
+          template[templateIndex] === "*"
+        ) {
           templateIndex++;
         }
         return templateIndex === template.length;
@@ -10631,7 +10962,7 @@ var require_common = __commonJS({
       function disable() {
         const namespaces = [
           ...createDebug.names,
-          ...createDebug.skips.map((namespace) => "-" + namespace)
+          ...createDebug.skips.map((namespace) => "-" + namespace),
         ].join(",");
         createDebug.enable("");
         return namespaces;
@@ -10656,13 +10987,15 @@ var require_common = __commonJS({
         return val;
       }
       function destroy() {
-        console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+        console.warn(
+          "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.",
+        );
       }
       createDebug.enable(createDebug.load());
       return createDebug;
     }
     module2.exports = setup;
-  }
+  },
 });
 
 // node_modules/debug/src/browser.js
@@ -10678,7 +11011,9 @@ var require_browser = __commonJS({
       return () => {
         if (!warned) {
           warned = true;
-          console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+          console.warn(
+            "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.",
+          );
         }
       };
     })();
@@ -10758,24 +11093,52 @@ var require_browser = __commonJS({
       "#FF9900",
       "#FF9933",
       "#FFCC00",
-      "#FFCC33"
+      "#FFCC33",
     ];
     function useColors() {
-      if (typeof window !== "undefined" && window.process && (window.process.type === "renderer" || window.process.__nwjs)) {
+      if (
+        typeof window !== "undefined" &&
+        window.process &&
+        (window.process.type === "renderer" || window.process.__nwjs)
+      ) {
         return true;
       }
-      if (typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.userAgent &&
+        navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)
+      ) {
         return false;
       }
       let m;
-      return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // Is firebug? http://stackoverflow.com/a/398120/376773
-      typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // Is firefox >= v31?
-      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-      typeof navigator !== "undefined" && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31 || // Double check webkit in userAgent just in case we are in a worker
-      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+      return (
+        (typeof document !== "undefined" &&
+          document.documentElement &&
+          document.documentElement.style &&
+          document.documentElement.style.WebkitAppearance) || // Is firebug? http://stackoverflow.com/a/398120/376773
+        (typeof window !== "undefined" &&
+          window.console &&
+          (window.console.firebug ||
+            (window.console.exception && window.console.table))) || // Is firefox >= v31?
+        // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+        (typeof navigator !== "undefined" &&
+          navigator.userAgent &&
+          (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) &&
+          parseInt(m[1], 10) >= 31) || // Double check webkit in userAgent just in case we are in a worker
+        (typeof navigator !== "undefined" &&
+          navigator.userAgent &&
+          navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/))
+      );
     }
     function formatArgs(args) {
-      args[0] = (this.useColors ? "%c" : "") + this.namespace + (this.useColors ? " %c" : " ") + args[0] + (this.useColors ? "%c " : " ") + "+" + module2.exports.humanize(this.diff);
+      args[0] =
+        (this.useColors ? "%c" : "") +
+        this.namespace +
+        (this.useColors ? " %c" : " ") +
+        args[0] +
+        (this.useColors ? "%c " : " ") +
+        "+" +
+        module2.exports.humanize(this.diff);
       if (!this.useColors) {
         return;
       }
@@ -10794,8 +11157,7 @@ var require_browser = __commonJS({
       });
       args.splice(lastC, 0, c);
     }
-    exports2.log = console.debug || console.log || (() => {
-    });
+    exports2.log = console.debug || console.log || (() => {});
     function save(namespaces) {
       try {
         if (namespaces) {
@@ -10803,15 +11165,15 @@ var require_browser = __commonJS({
         } else {
           exports2.storage.removeItem("debug");
         }
-      } catch (error) {
-      }
+      } catch (error) {}
     }
     function load() {
       let r;
       try {
-        r = exports2.storage.getItem("debug") || exports2.storage.getItem("DEBUG");
-      } catch (error) {
-      }
+        r =
+          exports2.storage.getItem("debug") ||
+          exports2.storage.getItem("DEBUG");
+      } catch (error) {}
       if (!r && typeof process !== "undefined" && "env" in process) {
         r = process.env.DEBUG;
       }
@@ -10820,19 +11182,18 @@ var require_browser = __commonJS({
     function localstorage() {
       try {
         return localStorage;
-      } catch (error) {
-      }
+      } catch (error) {}
     }
     module2.exports = require_common()(exports2);
     var { formatters } = module2.exports;
-    formatters.j = function(v) {
+    formatters.j = function (v) {
       try {
         return JSON.stringify(v);
       } catch (error) {
         return "[UnexpectedJSONParseError]: " + error.message;
       }
     };
-  }
+  },
 });
 
 // node_modules/has-flag/index.js
@@ -10843,9 +11204,12 @@ var require_has_flag = __commonJS({
       const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
       const position = argv.indexOf(prefix + flag);
       const terminatorPosition = argv.indexOf("--");
-      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+      return (
+        position !== -1 &&
+        (terminatorPosition === -1 || position < terminatorPosition)
+      );
     };
-  }
+  },
 });
 
 // node_modules/supports-color/index.js
@@ -10857,9 +11221,19 @@ var require_supports_color = __commonJS({
     var hasFlag = require_has_flag();
     var { env: env4 } = process;
     var forceColor;
-    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+    if (
+      hasFlag("no-color") ||
+      hasFlag("no-colors") ||
+      hasFlag("color=false") ||
+      hasFlag("color=never")
+    ) {
       forceColor = 0;
-    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+    } else if (
+      hasFlag("color") ||
+      hasFlag("colors") ||
+      hasFlag("color=true") ||
+      hasFlag("color=always")
+    ) {
       forceColor = 1;
     }
     if ("FORCE_COLOR" in env4) {
@@ -10868,7 +11242,10 @@ var require_supports_color = __commonJS({
       } else if (env4.FORCE_COLOR === "false") {
         forceColor = 0;
       } else {
-        forceColor = env4.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env4.FORCE_COLOR, 10), 3);
+        forceColor =
+          env4.FORCE_COLOR.length === 0
+            ? 1
+            : Math.min(parseInt(env4.FORCE_COLOR, 10), 3);
       }
     }
     function translateLevel(level) {
@@ -10879,14 +11256,18 @@ var require_supports_color = __commonJS({
         level,
         hasBasic: true,
         has256: level >= 2,
-        has16m: level >= 3
+        has16m: level >= 3,
       };
     }
     function supportsColor(haveStream, streamIsTTY) {
       if (forceColor === 0) {
         return 0;
       }
-      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+      if (
+        hasFlag("color=16m") ||
+        hasFlag("color=full") ||
+        hasFlag("color=truecolor")
+      ) {
         return 3;
       }
       if (hasFlag("color=256")) {
@@ -10907,19 +11288,34 @@ var require_supports_color = __commonJS({
         return 1;
       }
       if ("CI" in env4) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env4) || env4.CI_NAME === "codeship") {
+        if (
+          [
+            "TRAVIS",
+            "CIRCLECI",
+            "APPVEYOR",
+            "GITLAB_CI",
+            "GITHUB_ACTIONS",
+            "BUILDKITE",
+          ].some((sign) => sign in env4) ||
+          env4.CI_NAME === "codeship"
+        ) {
           return 1;
         }
         return min;
       }
       if ("TEAMCITY_VERSION" in env4) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env4.TEAMCITY_VERSION) ? 1 : 0;
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env4.TEAMCITY_VERSION)
+          ? 1
+          : 0;
       }
       if (env4.COLORTERM === "truecolor") {
         return 3;
       }
       if ("TERM_PROGRAM" in env4) {
-        const version = parseInt((env4.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        const version = parseInt(
+          (env4.TERM_PROGRAM_VERSION || "").split(".")[0],
+          10,
+        );
         switch (env4.TERM_PROGRAM) {
           case "iTerm.app":
             return version >= 3 ? 3 : 2;
@@ -10930,7 +11326,11 @@ var require_supports_color = __commonJS({
       if (/-256(color)?$/i.test(env4.TERM)) {
         return 2;
       }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env4.TERM)) {
+      if (
+        /^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(
+          env4.TERM,
+        )
+      ) {
         return 1;
       }
       if ("COLORTERM" in env4) {
@@ -10945,9 +11345,9 @@ var require_supports_color = __commonJS({
     module2.exports = {
       supportsColor: getSupportLevel,
       stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+      stderr: translateLevel(supportsColor(true, tty.isatty(2))),
     };
-  }
+  },
 });
 
 // node_modules/debug/src/node.js
@@ -10962,116 +11362,50 @@ var require_node = __commonJS({
     exports2.load = load;
     exports2.useColors = useColors;
     exports2.destroy = util3.deprecate(
-      () => {
-      },
-      "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`."
+      () => {},
+      "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.",
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
       const supportsColor = require_supports_color();
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
-          20,
-          21,
-          26,
-          27,
-          32,
-          33,
-          38,
-          39,
-          40,
-          41,
-          42,
-          43,
-          44,
-          45,
-          56,
-          57,
-          62,
-          63,
-          68,
-          69,
-          74,
-          75,
-          76,
-          77,
-          78,
-          79,
-          80,
-          81,
-          92,
-          93,
-          98,
-          99,
-          112,
-          113,
-          128,
-          129,
-          134,
-          135,
-          148,
-          149,
-          160,
-          161,
-          162,
-          163,
-          164,
-          165,
-          166,
-          167,
-          168,
-          169,
-          170,
-          171,
-          172,
-          173,
-          178,
-          179,
-          184,
-          185,
-          196,
-          197,
-          198,
-          199,
-          200,
-          201,
-          202,
-          203,
-          204,
-          205,
-          206,
-          207,
-          208,
-          209,
-          214,
-          215,
-          220,
-          221
+          20, 21, 26, 27, 32, 33, 38, 39, 40, 41, 42, 43, 44, 45, 56, 57, 62,
+          63, 68, 69, 74, 75, 76, 77, 78, 79, 80, 81, 92, 93, 98, 99, 112, 113,
+          128, 129, 134, 135, 148, 149, 160, 161, 162, 163, 164, 165, 166, 167,
+          168, 169, 170, 171, 172, 173, 178, 179, 184, 185, 196, 197, 198, 199,
+          200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 214, 215, 220, 221,
         ];
       }
-    } catch (error) {
-    }
-    exports2.inspectOpts = Object.keys(process.env).filter((key) => {
-      return /^debug_/i.test(key);
-    }).reduce((obj, key) => {
-      const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_, k) => {
-        return k.toUpperCase();
-      });
-      let val = process.env[key];
-      if (/^(yes|on|true|enabled)$/i.test(val)) {
-        val = true;
-      } else if (/^(no|off|false|disabled)$/i.test(val)) {
-        val = false;
-      } else if (val === "null") {
-        val = null;
-      } else {
-        val = Number(val);
-      }
-      obj[prop] = val;
-      return obj;
-    }, {});
+    } catch (error) {}
+    exports2.inspectOpts = Object.keys(process.env)
+      .filter((key) => {
+        return /^debug_/i.test(key);
+      })
+      .reduce((obj, key) => {
+        const prop = key
+          .substring(6)
+          .toLowerCase()
+          .replace(/_([a-z])/g, (_, k) => {
+            return k.toUpperCase();
+          });
+        let val = process.env[key];
+        if (/^(yes|on|true|enabled)$/i.test(val)) {
+          val = true;
+        } else if (/^(no|off|false|disabled)$/i.test(val)) {
+          val = false;
+        } else if (val === "null") {
+          val = null;
+        } else {
+          val = Number(val);
+        }
+        obj[prop] = val;
+        return obj;
+      }, {});
     function useColors() {
-      return "colors" in exports2.inspectOpts ? Boolean(exports2.inspectOpts.colors) : tty.isatty(process.stderr.fd);
+      return "colors" in exports2.inspectOpts
+        ? Boolean(exports2.inspectOpts.colors)
+        : tty.isatty(process.stderr.fd);
     }
     function formatArgs(args) {
       const { namespace: name, useColors: useColors2 } = this;
@@ -11080,7 +11414,9 @@ var require_node = __commonJS({
         const colorCode = "\x1B[3" + (c < 8 ? c : "8;5;" + c);
         const prefix = `  ${colorCode};1m${name} \x1B[0m`;
         args[0] = prefix + args[0].split("\n").join("\n" + prefix);
-        args.push(colorCode + "m+" + module2.exports.humanize(this.diff) + "\x1B[0m");
+        args.push(
+          colorCode + "m+" + module2.exports.humanize(this.diff) + "\x1B[0m",
+        );
       } else {
         args[0] = getDate() + name + " " + args[0];
       }
@@ -11089,10 +11425,12 @@ var require_node = __commonJS({
       if (exports2.inspectOpts.hideDate) {
         return "";
       }
-      return (/* @__PURE__ */ new Date()).toISOString() + " ";
+      return /* @__PURE__ */ new Date().toISOString() + " ";
     }
     function log(...args) {
-      return process.stderr.write(util3.formatWithOptions(exports2.inspectOpts, ...args) + "\n");
+      return process.stderr.write(
+        util3.formatWithOptions(exports2.inspectOpts, ...args) + "\n",
+      );
     }
     function save(namespaces) {
       if (namespaces) {
@@ -11113,46 +11451,53 @@ var require_node = __commonJS({
     }
     module2.exports = require_common()(exports2);
     var { formatters } = module2.exports;
-    formatters.o = function(v) {
+    formatters.o = function (v) {
       this.inspectOpts.colors = this.useColors;
-      return util3.inspect(v, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
+      return util3
+        .inspect(v, this.inspectOpts)
+        .split("\n")
+        .map((str) => str.trim())
+        .join(" ");
     };
-    formatters.O = function(v) {
+    formatters.O = function (v) {
       this.inspectOpts.colors = this.useColors;
       return util3.inspect(v, this.inspectOpts);
     };
-  }
+  },
 });
 
 // node_modules/debug/src/index.js
 var require_src = __commonJS({
   "node_modules/debug/src/index.js"(exports2, module2) {
-    if (typeof process === "undefined" || process.type === "renderer" || process.browser === true || process.__nwjs) {
+    if (
+      typeof process === "undefined" ||
+      process.type === "renderer" ||
+      process.browser === true ||
+      process.__nwjs
+    ) {
       module2.exports = require_browser();
     } else {
       module2.exports = require_node();
     }
-  }
+  },
 });
 
 // node_modules/follow-redirects/debug.js
 var require_debug = __commonJS({
   "node_modules/follow-redirects/debug.js"(exports2, module2) {
     var debug;
-    module2.exports = function() {
+    module2.exports = function () {
       if (!debug) {
         try {
           debug = require_src()("follow-redirects");
-        } catch (error) {
-        }
+        } catch (error) {}
         if (typeof debug !== "function") {
-          debug = function() {
-          };
+          debug = function () {};
         }
       }
       debug.apply(null, arguments);
     };
-  }
+  },
 });
 
 // node_modules/follow-redirects/index.js
@@ -11167,10 +11512,13 @@ var require_follow_redirects = __commonJS({
     var debug = require_debug();
     (function detectUnsupportedEnvironment() {
       var looksLikeNode = typeof process !== "undefined";
-      var looksLikeBrowser = typeof window !== "undefined" && typeof document !== "undefined";
+      var looksLikeBrowser =
+        typeof window !== "undefined" && typeof document !== "undefined";
       var looksLikeV8 = isFunction3(Error.captureStackTrace);
       if (!looksLikeNode && (looksLikeBrowser || !looksLikeV8)) {
-        console.warn("The follow-redirects package should be excluded from browser builds.");
+        console.warn(
+          "The follow-redirects package should be excluded from browser builds.",
+        );
       }
     })();
     var useNativeURL = false;
@@ -11190,36 +11538,36 @@ var require_follow_redirects = __commonJS({
       "protocol",
       "query",
       "search",
-      "hash"
+      "hash",
     ];
     var events = ["abort", "aborted", "connect", "error", "socket", "timeout"];
     var eventHandlers = /* @__PURE__ */ Object.create(null);
-    events.forEach(function(event) {
-      eventHandlers[event] = function(arg1, arg2, arg3) {
+    events.forEach(function (event) {
+      eventHandlers[event] = function (arg1, arg2, arg3) {
         this._redirectable.emit(event, arg1, arg2, arg3);
       };
     });
     var InvalidUrlError = createErrorType(
       "ERR_INVALID_URL",
       "Invalid URL",
-      TypeError
+      TypeError,
     );
     var RedirectionError = createErrorType(
       "ERR_FR_REDIRECTION_FAILURE",
-      "Redirected request failed"
+      "Redirected request failed",
     );
     var TooManyRedirectsError = createErrorType(
       "ERR_FR_TOO_MANY_REDIRECTS",
       "Maximum number of redirects exceeded",
-      RedirectionError
+      RedirectionError,
     );
     var MaxBodyLengthExceededError = createErrorType(
       "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
-      "Request body larger than maxBodyLength limit"
+      "Request body larger than maxBodyLength limit",
     );
     var WriteAfterEndError = createErrorType(
       "ERR_STREAM_WRITE_AFTER_END",
-      "write after end"
+      "write after end",
     );
     var destroy = Writable.prototype.destroy || noop2;
     function RedirectableRequest(options, responseCallback) {
@@ -11236,27 +11584,32 @@ var require_follow_redirects = __commonJS({
         this.on("response", responseCallback);
       }
       var self2 = this;
-      this._onNativeResponse = function(response) {
+      this._onNativeResponse = function (response) {
         try {
           self2._processResponse(response);
         } catch (cause) {
-          self2.emit("error", cause instanceof RedirectionError ? cause : new RedirectionError({ cause }));
+          self2.emit(
+            "error",
+            cause instanceof RedirectionError
+              ? cause
+              : new RedirectionError({ cause }),
+          );
         }
       };
       this._performRequest();
     }
     RedirectableRequest.prototype = Object.create(Writable.prototype);
-    RedirectableRequest.prototype.abort = function() {
+    RedirectableRequest.prototype.abort = function () {
       destroyRequest(this._currentRequest);
       this._currentRequest.abort();
       this.emit("abort");
     };
-    RedirectableRequest.prototype.destroy = function(error) {
+    RedirectableRequest.prototype.destroy = function (error) {
       destroyRequest(this._currentRequest, error);
       destroy.call(this, error);
       return this;
     };
-    RedirectableRequest.prototype.write = function(data, encoding, callback) {
+    RedirectableRequest.prototype.write = function (data, encoding, callback) {
       if (this._ending) {
         throw new WriteAfterEndError();
       }
@@ -11273,7 +11626,10 @@ var require_follow_redirects = __commonJS({
         }
         return;
       }
-      if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
+      if (
+        this._requestBodyLength + data.length <=
+        this._options.maxBodyLength
+      ) {
         this._requestBodyLength += data.length;
         this._requestBodyBuffers.push({ data, encoding });
         this._currentRequest.write(data, encoding, callback);
@@ -11282,7 +11638,7 @@ var require_follow_redirects = __commonJS({
         this.abort();
       }
     };
-    RedirectableRequest.prototype.end = function(data, encoding, callback) {
+    RedirectableRequest.prototype.end = function (data, encoding, callback) {
       if (isFunction3(data)) {
         callback = data;
         data = encoding = null;
@@ -11296,22 +11652,22 @@ var require_follow_redirects = __commonJS({
       } else {
         var self2 = this;
         var currentRequest = this._currentRequest;
-        this.write(data, encoding, function() {
+        this.write(data, encoding, function () {
           self2._ended = true;
           currentRequest.end(null, null, callback);
         });
         this._ending = true;
       }
     };
-    RedirectableRequest.prototype.setHeader = function(name, value) {
+    RedirectableRequest.prototype.setHeader = function (name, value) {
       this._options.headers[name] = value;
       this._currentRequest.setHeader(name, value);
     };
-    RedirectableRequest.prototype.removeHeader = function(name) {
+    RedirectableRequest.prototype.removeHeader = function (name) {
       delete this._options.headers[name];
       this._currentRequest.removeHeader(name);
     };
-    RedirectableRequest.prototype.setTimeout = function(msecs, callback) {
+    RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
       var self2 = this;
       function destroyOnTimeout(socket) {
         socket.setTimeout(msecs);
@@ -11322,7 +11678,7 @@ var require_follow_redirects = __commonJS({
         if (self2._timeout) {
           clearTimeout(self2._timeout);
         }
-        self2._timeout = setTimeout(function() {
+        self2._timeout = setTimeout(function () {
           self2.emit("timeout");
           clearTimer();
         }, msecs);
@@ -11359,24 +11715,21 @@ var require_follow_redirects = __commonJS({
       this.on("close", clearTimer);
       return this;
     };
-    [
-      "flushHeaders",
-      "getHeader",
-      "setNoDelay",
-      "setSocketKeepAlive"
-    ].forEach(function(method) {
-      RedirectableRequest.prototype[method] = function(a, b) {
-        return this._currentRequest[method](a, b);
-      };
-    });
-    ["aborted", "connection", "socket"].forEach(function(property) {
+    ["flushHeaders", "getHeader", "setNoDelay", "setSocketKeepAlive"].forEach(
+      function (method) {
+        RedirectableRequest.prototype[method] = function (a, b) {
+          return this._currentRequest[method](a, b);
+        };
+      },
+    );
+    ["aborted", "connection", "socket"].forEach(function (property) {
       Object.defineProperty(RedirectableRequest.prototype, property, {
-        get: function() {
+        get: function () {
           return this._currentRequest[property];
-        }
+        },
       });
     });
-    RedirectableRequest.prototype._sanitizeOptions = function(options) {
+    RedirectableRequest.prototype._sanitizeOptions = function (options) {
       if (!options.headers) {
         options.headers = {};
       }
@@ -11396,7 +11749,7 @@ var require_follow_redirects = __commonJS({
         }
       }
     };
-    RedirectableRequest.prototype._performRequest = function() {
+    RedirectableRequest.prototype._performRequest = function () {
       var protocol = this._options.protocol;
       var nativeProtocol = this._options.nativeProtocols[protocol];
       if (!nativeProtocol) {
@@ -11406,16 +11759,19 @@ var require_follow_redirects = __commonJS({
         var scheme = protocol.slice(0, -1);
         this._options.agent = this._options.agents[scheme];
       }
-      var request = this._currentRequest = nativeProtocol.request(this._options, this._onNativeResponse);
+      var request = (this._currentRequest = nativeProtocol.request(
+        this._options,
+        this._onNativeResponse,
+      ));
       request._redirectable = this;
       for (var event of events) {
         request.on(event, eventHandlers[event]);
       }
-      this._currentUrl = /^\//.test(this._options.path) ? url2.format(this._options) : (
-        // When making a request to a proxy, […]
-        // a client MUST send the target URI in absolute-form […].
-        this._options.path
-      );
+      this._currentUrl = /^\//.test(this._options.path)
+        ? url2.format(this._options)
+        : // When making a request to a proxy, […]
+          // a client MUST send the target URI in absolute-form […].
+          this._options.path;
       if (this._isRedirect) {
         var i = 0;
         var self2 = this;
@@ -11436,17 +11792,22 @@ var require_follow_redirects = __commonJS({
         })();
       }
     };
-    RedirectableRequest.prototype._processResponse = function(response) {
+    RedirectableRequest.prototype._processResponse = function (response) {
       var statusCode = response.statusCode;
       if (this._options.trackRedirects) {
         this._redirects.push({
           url: this._currentUrl,
           headers: response.headers,
-          statusCode
+          statusCode,
         });
       }
       var location = response.headers.location;
-      if (!location || this._options.followRedirects === false || statusCode < 300 || statusCode >= 400) {
+      if (
+        !location ||
+        this._options.followRedirects === false ||
+        statusCode < 300 ||
+        statusCode >= 400
+      ) {
         response.responseUrl = this._currentUrl;
         response.redirects = this._redirects;
         this.emit("response", response);
@@ -11461,41 +11822,60 @@ var require_follow_redirects = __commonJS({
       var requestHeaders;
       var beforeRedirect = this._options.beforeRedirect;
       if (beforeRedirect) {
-        requestHeaders = Object.assign({
-          // The Host header was set by nativeProtocol.request
-          Host: response.req.getHeader("host")
-        }, this._options.headers);
+        requestHeaders = Object.assign(
+          {
+            // The Host header was set by nativeProtocol.request
+            Host: response.req.getHeader("host"),
+          },
+          this._options.headers,
+        );
       }
       var method = this._options.method;
-      if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" || // RFC7231§6.4.4: The 303 (See Other) status code indicates that
-      // the server is redirecting the user agent to a different resource […]
-      // A user agent can perform a retrieval request targeting that URI
-      // (a GET or HEAD request if using HTTP) […]
-      statusCode === 303 && !/^(?:GET|HEAD)$/.test(this._options.method)) {
+      if (
+        ((statusCode === 301 || statusCode === 302) &&
+          this._options.method === "POST") || // RFC7231§6.4.4: The 303 (See Other) status code indicates that
+        // the server is redirecting the user agent to a different resource […]
+        // A user agent can perform a retrieval request targeting that URI
+        // (a GET or HEAD request if using HTTP) […]
+        (statusCode === 303 && !/^(?:GET|HEAD)$/.test(this._options.method))
+      ) {
         this._options.method = "GET";
         this._requestBodyBuffers = [];
         removeMatchingHeaders(/^content-/i, this._options.headers);
       }
-      var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
+      var currentHostHeader = removeMatchingHeaders(
+        /^host$/i,
+        this._options.headers,
+      );
       var currentUrlParts = parseUrl(this._currentUrl);
       var currentHost = currentHostHeader || currentUrlParts.host;
-      var currentUrl = /^\w+:/.test(location) ? this._currentUrl : url2.format(Object.assign(currentUrlParts, { host: currentHost }));
+      var currentUrl = /^\w+:/.test(location)
+        ? this._currentUrl
+        : url2.format(Object.assign(currentUrlParts, { host: currentHost }));
       var redirectUrl = resolveUrl(location, currentUrl);
       debug("redirecting to", redirectUrl.href);
       this._isRedirect = true;
       spreadUrlObject(redirectUrl, this._options);
-      if (redirectUrl.protocol !== currentUrlParts.protocol && redirectUrl.protocol !== "https:" || redirectUrl.host !== currentHost && !isSubdomain(redirectUrl.host, currentHost)) {
-        removeMatchingHeaders(/^(?:(?:proxy-)?authorization|cookie)$/i, this._options.headers);
+      if (
+        (redirectUrl.protocol !== currentUrlParts.protocol &&
+          redirectUrl.protocol !== "https:") ||
+        (redirectUrl.host !== currentHost &&
+          !isSubdomain(redirectUrl.host, currentHost))
+      ) {
+        removeMatchingHeaders(
+          /^(?:(?:proxy-)?authorization|cookie)$/i,
+          this._options.headers,
+        );
       }
       if (isFunction3(beforeRedirect)) {
         var responseDetails = {
           headers: response.headers,
-          statusCode
+          statusCode,
         };
         var requestDetails = {
           url: currentUrl,
           method,
-          headers: requestHeaders
+          headers: requestHeaders,
         };
         beforeRedirect(this._options, responseDetails, requestDetails);
         this._sanitizeOptions(this._options);
@@ -11505,13 +11885,14 @@ var require_follow_redirects = __commonJS({
     function wrap(protocols) {
       var exports3 = {
         maxRedirects: 21,
-        maxBodyLength: 10 * 1024 * 1024
+        maxBodyLength: 10 * 1024 * 1024,
       };
       var nativeProtocols = {};
-      Object.keys(protocols).forEach(function(scheme) {
+      Object.keys(protocols).forEach(function (scheme) {
         var protocol = scheme + ":";
-        var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
-        var wrappedProtocol = exports3[scheme] = Object.create(nativeProtocol);
+        var nativeProtocol = (nativeProtocols[protocol] = protocols[scheme]);
+        var wrappedProtocol = (exports3[scheme] =
+          Object.create(nativeProtocol));
         function request(input, options, callback) {
           if (isURL(input)) {
             input = spreadUrlObject(input);
@@ -11526,10 +11907,14 @@ var require_follow_redirects = __commonJS({
             callback = options;
             options = null;
           }
-          options = Object.assign({
-            maxRedirects: exports3.maxRedirects,
-            maxBodyLength: exports3.maxBodyLength
-          }, input, options);
+          options = Object.assign(
+            {
+              maxRedirects: exports3.maxRedirects,
+              maxBodyLength: exports3.maxBodyLength,
+            },
+            input,
+            options,
+          );
           options.nativeProtocols = nativeProtocols;
           if (!isString2(options.host) && !isString2(options.hostname)) {
             options.hostname = "::1";
@@ -11539,19 +11924,32 @@ var require_follow_redirects = __commonJS({
           return new RedirectableRequest(options, callback);
         }
         function get(input, options, callback) {
-          var wrappedRequest = wrappedProtocol.request(input, options, callback);
+          var wrappedRequest = wrappedProtocol.request(
+            input,
+            options,
+            callback,
+          );
           wrappedRequest.end();
           return wrappedRequest;
         }
         Object.defineProperties(wrappedProtocol, {
-          request: { value: request, configurable: true, enumerable: true, writable: true },
-          get: { value: get, configurable: true, enumerable: true, writable: true }
+          request: {
+            value: request,
+            configurable: true,
+            enumerable: true,
+            writable: true,
+          },
+          get: {
+            value: get,
+            configurable: true,
+            enumerable: true,
+            writable: true,
+          },
         });
       });
       return exports3;
     }
-    function noop2() {
-    }
+    function noop2() {}
     function parseUrl(input) {
       var parsed;
       if (useNativeURL) {
@@ -11565,13 +11963,21 @@ var require_follow_redirects = __commonJS({
       return parsed;
     }
     function resolveUrl(relative, base) {
-      return useNativeURL ? new URL2(relative, base) : parseUrl(url2.resolve(base, relative));
+      return useNativeURL
+        ? new URL2(relative, base)
+        : parseUrl(url2.resolve(base, relative));
     }
     function validateUrl(input) {
-      if (/^\[/.test(input.hostname) && !/^\[[:0-9a-f]+\]$/i.test(input.hostname)) {
+      if (
+        /^\[/.test(input.hostname) &&
+        !/^\[[:0-9a-f]+\]$/i.test(input.hostname)
+      ) {
         throw new InvalidUrlError({ input: input.href || input });
       }
-      if (/^\[/.test(input.host) && !/^\[[:0-9a-f]+\](:\d+)?$/i.test(input.host)) {
+      if (
+        /^\[/.test(input.host) &&
+        !/^\[[:0-9a-f]+\](:\d+)?$/i.test(input.host)
+      ) {
         throw new InvalidUrlError({ input: input.href || input });
       }
       return input;
@@ -11587,7 +11993,9 @@ var require_follow_redirects = __commonJS({
       if (spread3.port !== "") {
         spread3.port = Number(spread3.port);
       }
-      spread3.path = spread3.search ? spread3.pathname + spread3.search : spread3.pathname;
+      spread3.path = spread3.search
+        ? spread3.pathname + spread3.search
+        : spread3.pathname;
       return spread3;
     }
     function removeMatchingHeaders(regex, headers) {
@@ -11598,7 +12006,9 @@ var require_follow_redirects = __commonJS({
           delete headers[header];
         }
       }
-      return lastValue === null || typeof lastValue === "undefined" ? void 0 : String(lastValue).trim();
+      return lastValue === null || typeof lastValue === "undefined"
+        ? void 0
+        : String(lastValue).trim();
     }
     function createErrorType(code, message, baseClass) {
       function CustomError(properties) {
@@ -11607,18 +12017,20 @@ var require_follow_redirects = __commonJS({
         }
         Object.assign(this, properties || {});
         this.code = code;
-        this.message = this.cause ? message + ": " + this.cause.message : message;
+        this.message = this.cause
+          ? message + ": " + this.cause.message
+          : message;
       }
       CustomError.prototype = new (baseClass || Error)();
       Object.defineProperties(CustomError.prototype, {
         constructor: {
           value: CustomError,
-          enumerable: false
+          enumerable: false,
         },
         name: {
           value: "Error [" + code + "]",
-          enumerable: false
-        }
+          enumerable: false,
+        },
       });
       return CustomError;
     }
@@ -11648,17 +12060,17 @@ var require_follow_redirects = __commonJS({
     }
     module2.exports = wrap({ http: http3, https: https2 });
     module2.exports.wrap = wrap;
-  }
+  },
 });
 
 // src/extension.ts
 var extension_exports = {};
 __export(extension_exports, {
   activate: () => activate,
-  deactivate: () => deactivate
+  deactivate: () => deactivate,
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode9 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 
 // src/services/auth.ts
 var vscode2 = __toESM(require("vscode"));
@@ -11687,7 +12099,14 @@ var typeOfTest = (type) => (thing) => typeof thing === type;
 var { isArray } = Array;
 var isUndefined = typeOfTest("undefined");
 function isBuffer(val) {
-  return val !== null && !isUndefined(val) && val.constructor !== null && !isUndefined(val.constructor) && isFunction(val.constructor.isBuffer) && val.constructor.isBuffer(val);
+  return (
+    val !== null &&
+    !isUndefined(val) &&
+    val.constructor !== null &&
+    !isUndefined(val.constructor) &&
+    isFunction(val.constructor.isBuffer) &&
+    val.constructor.isBuffer(val)
+  );
 }
 var isArrayBuffer = kindOfTest("ArrayBuffer");
 function isArrayBufferView(val) {
@@ -11709,14 +12128,23 @@ var isPlainObject = (val) => {
     return false;
   }
   const prototype2 = getPrototypeOf(val);
-  return (prototype2 === null || prototype2 === Object.prototype || Object.getPrototypeOf(prototype2) === null) && !(toStringTag in val) && !(iterator in val);
+  return (
+    (prototype2 === null ||
+      prototype2 === Object.prototype ||
+      Object.getPrototypeOf(prototype2) === null) &&
+    !(toStringTag in val) &&
+    !(iterator in val)
+  );
 };
 var isEmptyObject = (val) => {
   if (!isObject(val) || isBuffer(val)) {
     return false;
   }
   try {
-    return Object.keys(val).length === 0 && Object.getPrototypeOf(val) === Object.prototype;
+    return (
+      Object.keys(val).length === 0 &&
+      Object.getPrototypeOf(val) === Object.prototype
+    );
   } catch (e) {
     return false;
   }
@@ -11728,17 +12156,25 @@ var isFileList = kindOfTest("FileList");
 var isStream = (val) => isObject(val) && isFunction(val.pipe);
 var isFormData = (thing) => {
   let kind;
-  return thing && (typeof FormData === "function" && thing instanceof FormData || isFunction(thing.append) && ((kind = kindOf(thing)) === "formdata" || // detect form-data instance
-  kind === "object" && isFunction(thing.toString) && thing.toString() === "[object FormData]"));
+  return (
+    thing &&
+    ((typeof FormData === "function" && thing instanceof FormData) ||
+      (isFunction(thing.append) &&
+        ((kind = kindOf(thing)) === "formdata" || // detect form-data instance
+          (kind === "object" &&
+            isFunction(thing.toString) &&
+            thing.toString() === "[object FormData]"))))
+  );
 };
 var isURLSearchParams = kindOfTest("URLSearchParams");
 var [isReadableStream, isRequest, isResponse, isHeaders] = [
   "ReadableStream",
   "Request",
   "Response",
-  "Headers"
+  "Headers",
 ].map(kindOfTest);
-var trim = (str) => str.trim ? str.trim() : str.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
+var trim = (str) =>
+  str.trim ? str.trim() : str.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
 function forEach(obj, fn, { allOwnKeys = false } = {}) {
   if (obj === null || typeof obj === "undefined") {
     return;
@@ -11756,7 +12192,9 @@ function forEach(obj, fn, { allOwnKeys = false } = {}) {
     if (isBuffer(obj)) {
       return;
     }
-    const keys = allOwnKeys ? Object.getOwnPropertyNames(obj) : Object.keys(obj);
+    const keys = allOwnKeys
+      ? Object.getOwnPropertyNames(obj)
+      : Object.keys(obj);
     const len = keys.length;
     let key;
     for (i = 0; i < len; i++) {
@@ -11782,19 +12220,23 @@ function findKey(obj, key) {
   return null;
 }
 var _global = (() => {
-  if (typeof globalThis !== "undefined")
-    return globalThis;
-  return typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : global;
+  if (typeof globalThis !== "undefined") return globalThis;
+  return typeof self !== "undefined"
+    ? self
+    : typeof window !== "undefined"
+      ? window
+      : global;
 })();
-var isContextDefined = (context) => !isUndefined(context) && context !== _global;
+var isContextDefined = (context) =>
+  !isUndefined(context) && context !== _global;
 function merge() {
-  const { caseless, skipUndefined } = isContextDefined(this) && this || {};
+  const { caseless, skipUndefined } = (isContextDefined(this) && this) || {};
   const result = {};
   const assignValue = (val, key) => {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       return;
     }
-    const targetKey = caseless && findKey(result, key) || key;
+    const targetKey = (caseless && findKey(result, key)) || key;
     if (isPlainObject(result[targetKey]) && isPlainObject(val)) {
       result[targetKey] = merge(result[targetKey], val);
     } else if (isPlainObject(val)) {
@@ -11819,18 +12261,18 @@ var extend = (a, b, thisArg, { allOwnKeys } = {}) => {
           value: bind(val, thisArg),
           writable: true,
           enumerable: true,
-          configurable: true
+          configurable: true,
         });
       } else {
         Object.defineProperty(a, key, {
           value: val,
           writable: true,
           enumerable: true,
-          configurable: true
+          configurable: true,
         });
       }
     },
-    { allOwnKeys }
+    { allOwnKeys },
   );
   return a;
 };
@@ -11843,16 +12285,16 @@ var stripBOM = (content) => {
 var inherits = (constructor, superConstructor, props, descriptors) => {
   constructor.prototype = Object.create(
     superConstructor.prototype,
-    descriptors
+    descriptors,
   );
   Object.defineProperty(constructor.prototype, "constructor", {
     value: constructor,
     writable: true,
     enumerable: false,
-    configurable: true
+    configurable: true,
   });
   Object.defineProperty(constructor, "super", {
-    value: superConstructor.prototype
+    value: superConstructor.prototype,
   });
   props && Object.assign(constructor.prototype, props);
 };
@@ -11862,20 +12304,26 @@ var toFlatObject = (sourceObj, destObj, filter2, propFilter) => {
   let prop;
   const merged = {};
   destObj = destObj || {};
-  if (sourceObj == null)
-    return destObj;
+  if (sourceObj == null) return destObj;
   do {
     props = Object.getOwnPropertyNames(sourceObj);
     i = props.length;
     while (i-- > 0) {
       prop = props[i];
-      if ((!propFilter || propFilter(prop, sourceObj, destObj)) && !merged[prop]) {
+      if (
+        (!propFilter || propFilter(prop, sourceObj, destObj)) &&
+        !merged[prop]
+      ) {
         destObj[prop] = sourceObj[prop];
         merged[prop] = true;
       }
     }
     sourceObj = filter2 !== false && getPrototypeOf(sourceObj);
-  } while (sourceObj && (!filter2 || filter2(sourceObj, destObj)) && sourceObj !== Object.prototype);
+  } while (
+    sourceObj &&
+    (!filter2 || filter2(sourceObj, destObj)) &&
+    sourceObj !== Object.prototype
+  );
   return destObj;
 };
 var endsWith = (str, searchString, position) => {
@@ -11888,13 +12336,10 @@ var endsWith = (str, searchString, position) => {
   return lastIndex !== -1 && lastIndex === position;
 };
 var toArray = (thing) => {
-  if (!thing)
-    return null;
-  if (isArray(thing))
-    return thing;
+  if (!thing) return null;
+  if (isArray(thing)) return thing;
   let i = thing.length;
-  if (!isNumber(i))
-    return null;
+  if (!isNumber(i)) return null;
   const arr = new Array(i);
   while (i-- > 0) {
     arr[i] = thing[i];
@@ -11925,11 +12370,17 @@ var matchAll = (regExp, str) => {
 };
 var isHTMLForm = kindOfTest("HTMLFormElement");
 var toCamelCase = (str) => {
-  return str.toLowerCase().replace(/[-_\s]([a-z\d])(\w*)/g, function replacer(m, p1, p2) {
-    return p1.toUpperCase() + p2;
-  });
+  return str
+    .toLowerCase()
+    .replace(/[-_\s]([a-z\d])(\w*)/g, function replacer(m, p1, p2) {
+      return p1.toUpperCase() + p2;
+    });
 };
-var hasOwnProperty = (({ hasOwnProperty: hasOwnProperty2 }) => (obj, prop) => hasOwnProperty2.call(obj, prop))(Object.prototype);
+var hasOwnProperty = (
+  ({ hasOwnProperty: hasOwnProperty2 }) =>
+  (obj, prop) =>
+    hasOwnProperty2.call(obj, prop)
+)(Object.prototype);
 var isRegExp = kindOfTest("RegExp");
 var reduceDescriptors = (obj, reducer) => {
   const descriptors = Object.getOwnPropertyDescriptors(obj);
@@ -11944,12 +12395,14 @@ var reduceDescriptors = (obj, reducer) => {
 };
 var freezeMethods = (obj) => {
   reduceDescriptors(obj, (descriptor, name) => {
-    if (isFunction(obj) && ["arguments", "caller", "callee"].indexOf(name) !== -1) {
+    if (
+      isFunction(obj) &&
+      ["arguments", "caller", "callee"].indexOf(name) !== -1
+    ) {
       return false;
     }
     const value = obj[name];
-    if (!isFunction(value))
-      return;
+    if (!isFunction(value)) return;
     descriptor.enumerable = false;
     if ("writable" in descriptor) {
       descriptor.writable = false;
@@ -11969,16 +12422,24 @@ var toObjectSet = (arrayOrString, delimiter) => {
       obj[value] = true;
     });
   };
-  isArray(arrayOrString) ? define(arrayOrString) : define(String(arrayOrString).split(delimiter));
+  isArray(arrayOrString)
+    ? define(arrayOrString)
+    : define(String(arrayOrString).split(delimiter));
   return obj;
 };
-var noop = () => {
-};
+var noop = () => {};
 var toFiniteNumber = (value, defaultValue) => {
-  return value != null && Number.isFinite(value = +value) ? value : defaultValue;
+  return value != null && Number.isFinite((value = +value))
+    ? value
+    : defaultValue;
 };
 function isSpecCompliantForm(thing) {
-  return !!(thing && isFunction(thing.append) && thing[toStringTag] === "FormData" && thing[iterator]);
+  return !!(
+    thing &&
+    isFunction(thing.append) &&
+    thing[toStringTag] === "FormData" &&
+    thing[iterator]
+  );
 }
 var toJSONObject = (obj) => {
   const stack = new Array(10);
@@ -12006,28 +12467,37 @@ var toJSONObject = (obj) => {
   return visit(obj, 0);
 };
 var isAsyncFn = kindOfTest("AsyncFunction");
-var isThenable = (thing) => thing && (isObject(thing) || isFunction(thing)) && isFunction(thing.then) && isFunction(thing.catch);
+var isThenable = (thing) =>
+  thing &&
+  (isObject(thing) || isFunction(thing)) &&
+  isFunction(thing.then) &&
+  isFunction(thing.catch);
 var _setImmediate = ((setImmediateSupported, postMessageSupported) => {
   if (setImmediateSupported) {
     return setImmediate;
   }
-  return postMessageSupported ? ((token, callbacks) => {
-    _global.addEventListener(
-      "message",
-      ({ source, data }) => {
-        if (source === _global && data === token) {
-          callbacks.length && callbacks.shift()();
-        }
-      },
-      false
-    );
-    return (cb) => {
-      callbacks.push(cb);
-      _global.postMessage(token, "*");
-    };
-  })(`axios@${Math.random()}`, []) : (cb) => setTimeout(cb);
+  return postMessageSupported
+    ? ((token, callbacks) => {
+        _global.addEventListener(
+          "message",
+          ({ source, data }) => {
+            if (source === _global && data === token) {
+              callbacks.length && callbacks.shift()();
+            }
+          },
+          false,
+        );
+        return (cb) => {
+          callbacks.push(cb);
+          _global.postMessage(token, "*");
+        };
+      })(`axios@${Math.random()}`, [])
+    : (cb) => setTimeout(cb);
 })(typeof setImmediate === "function", isFunction(_global.postMessage));
-var asap = typeof queueMicrotask !== "undefined" ? queueMicrotask.bind(_global) : typeof process !== "undefined" && process.nextTick || _setImmediate;
+var asap =
+  typeof queueMicrotask !== "undefined"
+    ? queueMicrotask.bind(_global)
+    : (typeof process !== "undefined" && process.nextTick) || _setImmediate;
 var isIterable = (thing) => thing != null && isFunction(thing[iterator]);
 var utils_default = {
   isArray,
@@ -12087,13 +12557,19 @@ var utils_default = {
   isThenable,
   setImmediate: _setImmediate,
   asap,
-  isIterable
+  isIterable,
 };
 
 // node_modules/axios/lib/core/AxiosError.js
 var AxiosError = class _AxiosError extends Error {
   static from(error, code, config, request, response, customProps) {
-    const axiosError = new _AxiosError(error.message, code || error.code, config, request, response);
+    const axiosError = new _AxiosError(
+      error.message,
+      code || error.code,
+      config,
+      request,
+      response,
+    );
     axiosError.cause = error;
     axiosError.name = error.name;
     customProps && Object.assign(axiosError, customProps);
@@ -12138,7 +12614,7 @@ var AxiosError = class _AxiosError extends Error {
       // Axios
       config: utils_default.toJSONObject(this.config),
       code: this.code,
-      status: this.status
+      status: this.status,
     };
   }
 };
@@ -12168,43 +12644,54 @@ function removeBrackets(key) {
   return utils_default.endsWith(key, "[]") ? key.slice(0, -2) : key;
 }
 function renderKey(path3, key, dots) {
-  if (!path3)
-    return key;
-  return path3.concat(key).map(function each(token, i) {
-    token = removeBrackets(token);
-    return !dots && i ? "[" + token + "]" : token;
-  }).join(dots ? "." : "");
+  if (!path3) return key;
+  return path3
+    .concat(key)
+    .map(function each(token, i) {
+      token = removeBrackets(token);
+      return !dots && i ? "[" + token + "]" : token;
+    })
+    .join(dots ? "." : "");
 }
 function isFlatArray(arr) {
   return utils_default.isArray(arr) && !arr.some(isVisitable);
 }
-var predicates = utils_default.toFlatObject(utils_default, {}, null, function filter(prop) {
-  return /^is[A-Z]/.test(prop);
-});
+var predicates = utils_default.toFlatObject(
+  utils_default,
+  {},
+  null,
+  function filter(prop) {
+    return /^is[A-Z]/.test(prop);
+  },
+);
 function toFormData(obj, formData, options) {
   if (!utils_default.isObject(obj)) {
     throw new TypeError("target must be an object");
   }
   formData = formData || new (FormData_default || FormData)();
-  options = utils_default.toFlatObject(options, {
-    metaTokens: true,
-    dots: false,
-    indexes: false
-  }, false, function defined(option, source) {
-    return !utils_default.isUndefined(source[option]);
-  });
+  options = utils_default.toFlatObject(
+    options,
+    {
+      metaTokens: true,
+      dots: false,
+      indexes: false,
+    },
+    false,
+    function defined(option, source) {
+      return !utils_default.isUndefined(source[option]);
+    },
+  );
   const metaTokens = options.metaTokens;
   const visitor = options.visitor || defaultVisitor;
   const dots = options.dots;
   const indexes = options.indexes;
-  const _Blob = options.Blob || typeof Blob !== "undefined" && Blob;
+  const _Blob = options.Blob || (typeof Blob !== "undefined" && Blob);
   const useBlob = _Blob && utils_default.isSpecCompliantForm(formData);
   if (!utils_default.isFunction(visitor)) {
     throw new TypeError("visitor must be a function");
   }
   function convertValue(value) {
-    if (value === null)
-      return "";
+    if (value === null) return "";
     if (utils_default.isDate(value)) {
       return value.toISOString();
     }
@@ -12212,10 +12699,17 @@ function toFormData(obj, formData, options) {
       return value.toString();
     }
     if (!useBlob && utils_default.isBlob(value)) {
-      throw new AxiosError_default("Blob is not supported. Use a Buffer instead.");
+      throw new AxiosError_default(
+        "Blob is not supported. Use a Buffer instead.",
+      );
     }
-    if (utils_default.isArrayBuffer(value) || utils_default.isTypedArray(value)) {
-      return useBlob && typeof Blob === "function" ? new Blob([value]) : Buffer.from(value);
+    if (
+      utils_default.isArrayBuffer(value) ||
+      utils_default.isTypedArray(value)
+    ) {
+      return useBlob && typeof Blob === "function"
+        ? new Blob([value])
+        : Buffer.from(value);
     }
     return value;
   }
@@ -12225,14 +12719,24 @@ function toFormData(obj, formData, options) {
       if (utils_default.endsWith(key, "{}")) {
         key = metaTokens ? key : key.slice(0, -2);
         value = JSON.stringify(value);
-      } else if (utils_default.isArray(value) && isFlatArray(value) || (utils_default.isFileList(value) || utils_default.endsWith(key, "[]")) && (arr = utils_default.toArray(value))) {
+      } else if (
+        (utils_default.isArray(value) && isFlatArray(value)) ||
+        ((utils_default.isFileList(value) ||
+          utils_default.endsWith(key, "[]")) &&
+          (arr = utils_default.toArray(value)))
+      ) {
         key = removeBrackets(key);
         arr.forEach(function each(el, index) {
-          !(utils_default.isUndefined(el) || el === null) && formData.append(
-            // eslint-disable-next-line no-nested-ternary
-            indexes === true ? renderKey([key], index, dots) : indexes === null ? key : key + "[]",
-            convertValue(el)
-          );
+          !(utils_default.isUndefined(el) || el === null) &&
+            formData.append(
+              // eslint-disable-next-line no-nested-ternary
+              indexes === true
+                ? renderKey([key], index, dots)
+                : indexes === null
+                  ? key
+                  : key + "[]",
+              convertValue(el),
+            );
         });
         return false;
       }
@@ -12247,23 +12751,24 @@ function toFormData(obj, formData, options) {
   const exposedHelpers = Object.assign(predicates, {
     defaultVisitor,
     convertValue,
-    isVisitable
+    isVisitable,
   });
   function build(value, path3) {
-    if (utils_default.isUndefined(value))
-      return;
+    if (utils_default.isUndefined(value)) return;
     if (stack.indexOf(value) !== -1) {
       throw Error("Circular reference detected in " + path3.join("."));
     }
     stack.push(value);
     utils_default.forEach(value, function each(el, key) {
-      const result = !(utils_default.isUndefined(el) || el === null) && visitor.call(
-        formData,
-        el,
-        utils_default.isString(key) ? key.trim() : key,
-        path3,
-        exposedHelpers
-      );
+      const result =
+        !(utils_default.isUndefined(el) || el === null) &&
+        visitor.call(
+          formData,
+          el,
+          utils_default.isString(key) ? key.trim() : key,
+          path3,
+          exposedHelpers,
+        );
       if (result === true) {
         build(el, path3 ? path3.concat(key) : [key]);
       }
@@ -12287,11 +12792,14 @@ function encode(str) {
     ")": "%29",
     "~": "%7E",
     "%20": "+",
-    "%00": "\0"
+    "%00": "\0",
   };
-  return encodeURIComponent(str).replace(/[!'()~]|%20|%00/g, function replacer(match) {
-    return charMap[match];
-  });
+  return encodeURIComponent(str).replace(
+    /[!'()~]|%20|%00/g,
+    function replacer(match) {
+      return charMap[match];
+    },
+  );
 }
 function AxiosURLSearchParams(params, options) {
   this._pairs = [];
@@ -12302,33 +12810,45 @@ prototype.append = function append(name, value) {
   this._pairs.push([name, value]);
 };
 prototype.toString = function toString2(encoder) {
-  const _encode = encoder ? function(value) {
-    return encoder.call(this, value, encode);
-  } : encode;
-  return this._pairs.map(function each(pair) {
-    return _encode(pair[0]) + "=" + _encode(pair[1]);
-  }, "").join("&");
+  const _encode = encoder
+    ? function (value) {
+        return encoder.call(this, value, encode);
+      }
+    : encode;
+  return this._pairs
+    .map(function each(pair) {
+      return _encode(pair[0]) + "=" + _encode(pair[1]);
+    }, "")
+    .join("&");
 };
 var AxiosURLSearchParams_default = AxiosURLSearchParams;
 
 // node_modules/axios/lib/helpers/buildURL.js
 function encode2(val) {
-  return encodeURIComponent(val).replace(/%3A/gi, ":").replace(/%24/g, "$").replace(/%2C/gi, ",").replace(/%20/g, "+");
+  return encodeURIComponent(val)
+    .replace(/%3A/gi, ":")
+    .replace(/%24/g, "$")
+    .replace(/%2C/gi, ",")
+    .replace(/%20/g, "+");
 }
 function buildURL(url2, params, options) {
   if (!params) {
     return url2;
   }
-  const _encode = options && options.encode || encode2;
-  const _options = utils_default.isFunction(options) ? {
-    serialize: options
-  } : options;
+  const _encode = (options && options.encode) || encode2;
+  const _options = utils_default.isFunction(options)
+    ? {
+        serialize: options,
+      }
+    : options;
   const serializeFn = _options && _options.serialize;
   let serializedParams;
   if (serializeFn) {
     serializedParams = serializeFn(params, _options);
   } else {
-    serializedParams = utils_default.isURLSearchParams(params) ? params.toString() : new AxiosURLSearchParams_default(params, _options).toString(_encode);
+    serializedParams = utils_default.isURLSearchParams(params)
+      ? params.toString()
+      : new AxiosURLSearchParams_default(params, _options).toString(_encode);
   }
   if (serializedParams) {
     const hashmarkIndex = url2.indexOf("#");
@@ -12359,7 +12879,7 @@ var InterceptorManager = class {
       fulfilled,
       rejected,
       synchronous: options ? options.synchronous : false,
-      runWhen: options ? options.runWhen : null
+      runWhen: options ? options.runWhen : null,
     });
     return this.handlers.length - 1;
   }
@@ -12410,7 +12930,7 @@ var transitional_default = {
   silentJSONParsing: true,
   forcedJSONParsing: true,
   clarifyTimeoutError: false,
-  legacyInterceptorReqResOrdering: true
+  legacyInterceptorReqResOrdering: true,
 };
 
 // node_modules/axios/lib/platform/node/index.js
@@ -12426,7 +12946,7 @@ var DIGIT = "0123456789";
 var ALPHABET = {
   DIGIT,
   ALPHA,
-  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT
+  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT,
 };
 var generateString = (size = 16, alphabet = ALPHABET.ALPHA_DIGIT) => {
   let str = "";
@@ -12443,11 +12963,11 @@ var node_default = {
   classes: {
     URLSearchParams: URLSearchParams_default,
     FormData: FormData_default,
-    Blob: typeof Blob !== "undefined" && Blob || null
+    Blob: (typeof Blob !== "undefined" && Blob) || null,
   },
   ALPHABET,
   generateString,
-  protocols: ["http", "https", "file", "data"]
+  protocols: ["http", "https", "file", "data"],
 };
 
 // node_modules/axios/lib/platform/common/utils.js
@@ -12457,35 +12977,46 @@ __export(utils_exports, {
   hasStandardBrowserEnv: () => hasStandardBrowserEnv,
   hasStandardBrowserWebWorkerEnv: () => hasStandardBrowserWebWorkerEnv,
   navigator: () => _navigator,
-  origin: () => origin
+  origin: () => origin,
 });
-var hasBrowserEnv = typeof window !== "undefined" && typeof document !== "undefined";
-var _navigator = typeof navigator === "object" && navigator || void 0;
-var hasStandardBrowserEnv = hasBrowserEnv && (!_navigator || ["ReactNative", "NativeScript", "NS"].indexOf(_navigator.product) < 0);
+var hasBrowserEnv =
+  typeof window !== "undefined" && typeof document !== "undefined";
+var _navigator = (typeof navigator === "object" && navigator) || void 0;
+var hasStandardBrowserEnv =
+  hasBrowserEnv &&
+  (!_navigator ||
+    ["ReactNative", "NativeScript", "NS"].indexOf(_navigator.product) < 0);
 var hasStandardBrowserWebWorkerEnv = (() => {
-  return typeof WorkerGlobalScope !== "undefined" && // eslint-disable-next-line no-undef
-  self instanceof WorkerGlobalScope && typeof self.importScripts === "function";
+  return (
+    typeof WorkerGlobalScope !== "undefined" && // eslint-disable-next-line no-undef
+    self instanceof WorkerGlobalScope &&
+    typeof self.importScripts === "function"
+  );
 })();
-var origin = hasBrowserEnv && window.location.href || "http://localhost";
+var origin = (hasBrowserEnv && window.location.href) || "http://localhost";
 
 // node_modules/axios/lib/platform/index.js
 var platform_default = {
   ...utils_exports,
-  ...node_default
+  ...node_default,
 };
 
 // node_modules/axios/lib/helpers/toURLEncodedForm.js
 function toURLEncodedForm(data, options) {
-  return toFormData_default(data, new platform_default.classes.URLSearchParams(), {
-    visitor: function(value, key, path3, helpers) {
-      if (platform_default.isNode && utils_default.isBuffer(value)) {
-        this.append(key, value.toString("base64"));
-        return false;
-      }
-      return helpers.defaultVisitor.apply(this, arguments);
+  return toFormData_default(
+    data,
+    new platform_default.classes.URLSearchParams(),
+    {
+      visitor: function (value, key, path3, helpers) {
+        if (platform_default.isNode && utils_default.isBuffer(value)) {
+          this.append(key, value.toString("base64"));
+          return false;
+        }
+        return helpers.defaultVisitor.apply(this, arguments);
+      },
+      ...options,
     },
-    ...options
-  });
+  );
 }
 
 // node_modules/axios/lib/helpers/formDataToJSON.js
@@ -12509,8 +13040,7 @@ function arrayToObject(arr) {
 function formDataToJSON(formData) {
   function buildPath(path3, value, target, index) {
     let name = path3[index++];
-    if (name === "__proto__")
-      return true;
+    if (name === "__proto__") return true;
     const isNumericKey = Number.isFinite(+name);
     const isLast = index >= path3.length;
     name = !name && utils_default.isArray(target) ? target.length : name;
@@ -12531,7 +13061,10 @@ function formDataToJSON(formData) {
     }
     return !isNumericKey;
   }
-  if (utils_default.isFormData(formData) && utils_default.isFunction(formData.entries)) {
+  if (
+    utils_default.isFormData(formData) &&
+    utils_default.isFunction(formData.entries)
+  ) {
     const obj = {};
     utils_default.forEachEntry(formData, (name, value) => {
       buildPath(parsePropPath(name), value, obj, 0);
@@ -12559,70 +13092,104 @@ function stringifySafely(rawValue, parser, encoder) {
 var defaults = {
   transitional: transitional_default,
   adapter: ["xhr", "http", "fetch"],
-  transformRequest: [function transformRequest(data, headers) {
-    const contentType = headers.getContentType() || "";
-    const hasJSONContentType = contentType.indexOf("application/json") > -1;
-    const isObjectPayload = utils_default.isObject(data);
-    if (isObjectPayload && utils_default.isHTMLForm(data)) {
-      data = new FormData(data);
-    }
-    const isFormData2 = utils_default.isFormData(data);
-    if (isFormData2) {
-      return hasJSONContentType ? JSON.stringify(formDataToJSON_default(data)) : data;
-    }
-    if (utils_default.isArrayBuffer(data) || utils_default.isBuffer(data) || utils_default.isStream(data) || utils_default.isFile(data) || utils_default.isBlob(data) || utils_default.isReadableStream(data)) {
-      return data;
-    }
-    if (utils_default.isArrayBufferView(data)) {
-      return data.buffer;
-    }
-    if (utils_default.isURLSearchParams(data)) {
-      headers.setContentType("application/x-www-form-urlencoded;charset=utf-8", false);
-      return data.toString();
-    }
-    let isFileList2;
-    if (isObjectPayload) {
-      if (contentType.indexOf("application/x-www-form-urlencoded") > -1) {
-        return toURLEncodedForm(data, this.formSerializer).toString();
+  transformRequest: [
+    function transformRequest(data, headers) {
+      const contentType = headers.getContentType() || "";
+      const hasJSONContentType = contentType.indexOf("application/json") > -1;
+      const isObjectPayload = utils_default.isObject(data);
+      if (isObjectPayload && utils_default.isHTMLForm(data)) {
+        data = new FormData(data);
       }
-      if ((isFileList2 = utils_default.isFileList(data)) || contentType.indexOf("multipart/form-data") > -1) {
-        const _FormData = this.env && this.env.FormData;
-        return toFormData_default(
-          isFileList2 ? { "files[]": data } : data,
-          _FormData && new _FormData(),
-          this.formSerializer
+      const isFormData2 = utils_default.isFormData(data);
+      if (isFormData2) {
+        return hasJSONContentType
+          ? JSON.stringify(formDataToJSON_default(data))
+          : data;
+      }
+      if (
+        utils_default.isArrayBuffer(data) ||
+        utils_default.isBuffer(data) ||
+        utils_default.isStream(data) ||
+        utils_default.isFile(data) ||
+        utils_default.isBlob(data) ||
+        utils_default.isReadableStream(data)
+      ) {
+        return data;
+      }
+      if (utils_default.isArrayBufferView(data)) {
+        return data.buffer;
+      }
+      if (utils_default.isURLSearchParams(data)) {
+        headers.setContentType(
+          "application/x-www-form-urlencoded;charset=utf-8",
+          false,
         );
+        return data.toString();
       }
-    }
-    if (isObjectPayload || hasJSONContentType) {
-      headers.setContentType("application/json", false);
-      return stringifySafely(data);
-    }
-    return data;
-  }],
-  transformResponse: [function transformResponse(data) {
-    const transitional2 = this.transitional || defaults.transitional;
-    const forcedJSONParsing = transitional2 && transitional2.forcedJSONParsing;
-    const JSONRequested = this.responseType === "json";
-    if (utils_default.isResponse(data) || utils_default.isReadableStream(data)) {
-      return data;
-    }
-    if (data && utils_default.isString(data) && (forcedJSONParsing && !this.responseType || JSONRequested)) {
-      const silentJSONParsing = transitional2 && transitional2.silentJSONParsing;
-      const strictJSONParsing = !silentJSONParsing && JSONRequested;
-      try {
-        return JSON.parse(data, this.parseReviver);
-      } catch (e) {
-        if (strictJSONParsing) {
-          if (e.name === "SyntaxError") {
-            throw AxiosError_default.from(e, AxiosError_default.ERR_BAD_RESPONSE, this, null, this.response);
-          }
-          throw e;
+      let isFileList2;
+      if (isObjectPayload) {
+        if (contentType.indexOf("application/x-www-form-urlencoded") > -1) {
+          return toURLEncodedForm(data, this.formSerializer).toString();
+        }
+        if (
+          (isFileList2 = utils_default.isFileList(data)) ||
+          contentType.indexOf("multipart/form-data") > -1
+        ) {
+          const _FormData = this.env && this.env.FormData;
+          return toFormData_default(
+            isFileList2 ? { "files[]": data } : data,
+            _FormData && new _FormData(),
+            this.formSerializer,
+          );
         }
       }
-    }
-    return data;
-  }],
+      if (isObjectPayload || hasJSONContentType) {
+        headers.setContentType("application/json", false);
+        return stringifySafely(data);
+      }
+      return data;
+    },
+  ],
+  transformResponse: [
+    function transformResponse(data) {
+      const transitional2 = this.transitional || defaults.transitional;
+      const forcedJSONParsing =
+        transitional2 && transitional2.forcedJSONParsing;
+      const JSONRequested = this.responseType === "json";
+      if (
+        utils_default.isResponse(data) ||
+        utils_default.isReadableStream(data)
+      ) {
+        return data;
+      }
+      if (
+        data &&
+        utils_default.isString(data) &&
+        ((forcedJSONParsing && !this.responseType) || JSONRequested)
+      ) {
+        const silentJSONParsing =
+          transitional2 && transitional2.silentJSONParsing;
+        const strictJSONParsing = !silentJSONParsing && JSONRequested;
+        try {
+          return JSON.parse(data, this.parseReviver);
+        } catch (e) {
+          if (strictJSONParsing) {
+            if (e.name === "SyntaxError") {
+              throw AxiosError_default.from(
+                e,
+                AxiosError_default.ERR_BAD_RESPONSE,
+                this,
+                null,
+                this.response,
+              );
+            }
+            throw e;
+          }
+        }
+      }
+      return data;
+    },
+  ],
   /**
    * A timeout in milliseconds to abort a request. If set to 0 (default) a
    * timeout is not created.
@@ -12634,21 +13201,24 @@ var defaults = {
   maxBodyLength: -1,
   env: {
     FormData: platform_default.classes.FormData,
-    Blob: platform_default.classes.Blob
+    Blob: platform_default.classes.Blob,
   },
   validateStatus: function validateStatus(status) {
     return status >= 200 && status < 300;
   },
   headers: {
     common: {
-      "Accept": "application/json, text/plain, */*",
-      "Content-Type": void 0
-    }
-  }
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": void 0,
+    },
+  },
 };
-utils_default.forEach(["delete", "get", "head", "post", "put", "patch"], (method) => {
-  defaults.headers[method] = {};
-});
+utils_default.forEach(
+  ["delete", "get", "head", "post", "put", "patch"],
+  (method) => {
+    defaults.headers[method] = {};
+  },
+);
 var defaults_default = defaults;
 
 // node_modules/axios/lib/helpers/parseHeaders.js
@@ -12669,30 +13239,31 @@ var ignoreDuplicateOf = utils_default.toObjectSet([
   "proxy-authorization",
   "referer",
   "retry-after",
-  "user-agent"
+  "user-agent",
 ]);
 var parseHeaders_default = (rawHeaders) => {
   const parsed = {};
   let key;
   let val;
   let i;
-  rawHeaders && rawHeaders.split("\n").forEach(function parser(line) {
-    i = line.indexOf(":");
-    key = line.substring(0, i).trim().toLowerCase();
-    val = line.substring(i + 1).trim();
-    if (!key || parsed[key] && ignoreDuplicateOf[key]) {
-      return;
-    }
-    if (key === "set-cookie") {
-      if (parsed[key]) {
-        parsed[key].push(val);
-      } else {
-        parsed[key] = [val];
+  rawHeaders &&
+    rawHeaders.split("\n").forEach(function parser(line) {
+      i = line.indexOf(":");
+      key = line.substring(0, i).trim().toLowerCase();
+      val = line.substring(i + 1).trim();
+      if (!key || (parsed[key] && ignoreDuplicateOf[key])) {
+        return;
       }
-    } else {
-      parsed[key] = parsed[key] ? parsed[key] + ", " + val : val;
-    }
-  });
+      if (key === "set-cookie") {
+        if (parsed[key]) {
+          parsed[key].push(val);
+        } else {
+          parsed[key] = [val];
+        }
+      } else {
+        parsed[key] = parsed[key] ? parsed[key] + ", " + val : val;
+      }
+    });
   return parsed;
 };
 
@@ -12705,18 +13276,21 @@ function normalizeValue(value) {
   if (value === false || value == null) {
     return value;
   }
-  return utils_default.isArray(value) ? value.map(normalizeValue) : String(value);
+  return utils_default.isArray(value)
+    ? value.map(normalizeValue)
+    : String(value);
 }
 function parseTokens(str) {
   const tokens = /* @__PURE__ */ Object.create(null);
   const tokensRE = /([^\s,;=]+)\s*(?:=\s*([^,;]+))?/g;
   let match;
-  while (match = tokensRE.exec(str)) {
+  while ((match = tokensRE.exec(str))) {
     tokens[match[1]] = match[2];
   }
   return tokens;
 }
-var isValidHeaderName = (str) => /^[-_a-zA-Z0-9^`|~,!#$%&'*+.]+$/.test(str.trim());
+var isValidHeaderName = (str) =>
+  /^[-_a-zA-Z0-9^`|~,!#$%&'*+.]+$/.test(str.trim());
 function matchHeaderValue(context, value, header, filter2, isHeaderNameFilter) {
   if (utils_default.isFunction(filter2)) {
     return filter2.call(this, value, header);
@@ -12724,8 +13298,7 @@ function matchHeaderValue(context, value, header, filter2, isHeaderNameFilter) {
   if (isHeaderNameFilter) {
     value = header;
   }
-  if (!utils_default.isString(value))
-    return;
+  if (!utils_default.isString(value)) return;
   if (utils_default.isString(filter2)) {
     return value.indexOf(filter2) !== -1;
   }
@@ -12734,18 +13307,21 @@ function matchHeaderValue(context, value, header, filter2, isHeaderNameFilter) {
   }
 }
 function formatHeader(header) {
-  return header.trim().toLowerCase().replace(/([a-z\d])(\w*)/g, (w, char, str) => {
-    return char.toUpperCase() + str;
-  });
+  return header
+    .trim()
+    .toLowerCase()
+    .replace(/([a-z\d])(\w*)/g, (w, char, str) => {
+      return char.toUpperCase() + str;
+    });
 }
 function buildAccessors(obj, header) {
   const accessorName = utils_default.toCamelCase(" " + header);
   ["get", "set", "has"].forEach((methodName) => {
     Object.defineProperty(obj, methodName + accessorName, {
-      value: function(arg1, arg2, arg3) {
+      value: function (arg1, arg2, arg3) {
         return this[methodName].call(this, header, arg1, arg2, arg3);
       },
-      configurable: true
+      configurable: true,
     });
   });
 }
@@ -12761,22 +13337,46 @@ var AxiosHeaders = class {
         throw new Error("header name must be a non-empty string");
       }
       const key = utils_default.findKey(self2, lHeader);
-      if (!key || self2[key] === void 0 || _rewrite === true || _rewrite === void 0 && self2[key] !== false) {
+      if (
+        !key ||
+        self2[key] === void 0 ||
+        _rewrite === true ||
+        (_rewrite === void 0 && self2[key] !== false)
+      ) {
         self2[key || _header] = normalizeValue(_value);
       }
     }
-    const setHeaders = (headers, _rewrite) => utils_default.forEach(headers, (_value, _header) => setHeader(_value, _header, _rewrite));
-    if (utils_default.isPlainObject(header) || header instanceof this.constructor) {
+    const setHeaders = (headers, _rewrite) =>
+      utils_default.forEach(headers, (_value, _header) =>
+        setHeader(_value, _header, _rewrite),
+      );
+    if (
+      utils_default.isPlainObject(header) ||
+      header instanceof this.constructor
+    ) {
       setHeaders(header, valueOrRewrite);
-    } else if (utils_default.isString(header) && (header = header.trim()) && !isValidHeaderName(header)) {
+    } else if (
+      utils_default.isString(header) &&
+      (header = header.trim()) &&
+      !isValidHeaderName(header)
+    ) {
       setHeaders(parseHeaders_default(header), valueOrRewrite);
-    } else if (utils_default.isObject(header) && utils_default.isIterable(header)) {
-      let obj = {}, dest, key;
+    } else if (
+      utils_default.isObject(header) &&
+      utils_default.isIterable(header)
+    ) {
+      let obj = {},
+        dest,
+        key;
       for (const entry of header) {
         if (!utils_default.isArray(entry)) {
           throw TypeError("Object iterator must return a key-value pair");
         }
-        obj[key = entry[0]] = (dest = obj[key]) ? utils_default.isArray(dest) ? [...dest, entry[1]] : [dest, entry[1]] : entry[1];
+        obj[(key = entry[0])] = (dest = obj[key])
+          ? utils_default.isArray(dest)
+            ? [...dest, entry[1]]
+            : [dest, entry[1]]
+          : entry[1];
       }
       setHeaders(obj, valueOrRewrite);
     } else {
@@ -12810,7 +13410,11 @@ var AxiosHeaders = class {
     header = normalizeHeader(header);
     if (header) {
       const key = utils_default.findKey(this, header);
-      return !!(key && this[key] !== void 0 && (!matcher || matchHeaderValue(this, this[key], key, matcher)));
+      return !!(
+        key &&
+        this[key] !== void 0 &&
+        (!matcher || matchHeaderValue(this, this[key], key, matcher))
+      );
     }
     return false;
   }
@@ -12821,7 +13425,10 @@ var AxiosHeaders = class {
       _header = normalizeHeader(_header);
       if (_header) {
         const key = utils_default.findKey(self2, _header);
-        if (key && (!matcher || matchHeaderValue(self2, self2[key], key, matcher))) {
+        if (
+          key &&
+          (!matcher || matchHeaderValue(self2, self2[key], key, matcher))
+        ) {
           delete self2[key];
           deleted = true;
         }
@@ -12872,7 +13479,10 @@ var AxiosHeaders = class {
   toJSON(asStrings) {
     const obj = /* @__PURE__ */ Object.create(null);
     utils_default.forEach(this, (value, header) => {
-      value != null && value !== false && (obj[header] = asStrings && utils_default.isArray(value) ? value.join(", ") : value);
+      value != null &&
+        value !== false &&
+        (obj[header] =
+          asStrings && utils_default.isArray(value) ? value.join(", ") : value);
     });
     return obj;
   }
@@ -12880,7 +13490,9 @@ var AxiosHeaders = class {
     return Object.entries(this.toJSON())[Symbol.iterator]();
   }
   toString() {
-    return Object.entries(this.toJSON()).map(([header, value]) => header + ": " + value).join("\n");
+    return Object.entries(this.toJSON())
+      .map(([header, value]) => header + ": " + value)
+      .join("\n");
   }
   getSetCookie() {
     return this.get("set-cookie") || [];
@@ -12897,9 +13509,12 @@ var AxiosHeaders = class {
     return computed;
   }
   static accessor(header) {
-    const internals = this[$internals] = this[$internals] = {
-      accessors: {}
-    };
+    const internals =
+      (this[$internals] =
+      this[$internals] =
+        {
+          accessors: {},
+        });
     const accessors = internals.accessors;
     const prototype2 = this.prototype;
     function defineAccessor(_header) {
@@ -12909,18 +13524,27 @@ var AxiosHeaders = class {
         accessors[lHeader] = true;
       }
     }
-    utils_default.isArray(header) ? header.forEach(defineAccessor) : defineAccessor(header);
+    utils_default.isArray(header)
+      ? header.forEach(defineAccessor)
+      : defineAccessor(header);
     return this;
   }
 };
-AxiosHeaders.accessor(["Content-Type", "Content-Length", "Accept", "Accept-Encoding", "User-Agent", "Authorization"]);
+AxiosHeaders.accessor([
+  "Content-Type",
+  "Content-Length",
+  "Accept",
+  "Accept-Encoding",
+  "User-Agent",
+  "Authorization",
+]);
 utils_default.reduceDescriptors(AxiosHeaders.prototype, ({ value }, key) => {
   let mapped = key[0].toUpperCase() + key.slice(1);
   return {
     get: () => value,
     set(headerValue) {
       this[mapped] = headerValue;
-    }
+    },
   };
 });
 utils_default.freezeMethods(AxiosHeaders);
@@ -12933,7 +13557,12 @@ function transformData(fns, response) {
   const headers = AxiosHeaders_default.from(context.headers);
   let data = context.data;
   utils_default.forEach(fns, function transform(fn) {
-    data = fn.call(config, data, headers.normalize(), response ? response.status : void 0);
+    data = fn.call(
+      config,
+      data,
+      headers.normalize(),
+      response ? response.status : void 0,
+    );
   });
   headers.normalize();
   return data;
@@ -12956,7 +13585,12 @@ var CanceledError = class extends AxiosError_default {
    * @returns {CanceledError} The created error.
    */
   constructor(message, config, request) {
-    super(message == null ? "canceled" : message, AxiosError_default.ERR_CANCELED, config, request);
+    super(
+      message == null ? "canceled" : message,
+      AxiosError_default.ERR_CANCELED,
+      config,
+      request,
+    );
     this.name = "CanceledError";
     this.__CANCEL__ = true;
   }
@@ -12966,16 +13600,25 @@ var CanceledError_default = CanceledError;
 // node_modules/axios/lib/core/settle.js
 function settle(resolve3, reject, response) {
   const validateStatus2 = response.config.validateStatus;
-  if (!response.status || !validateStatus2 || validateStatus2(response.status)) {
+  if (
+    !response.status ||
+    !validateStatus2 ||
+    validateStatus2(response.status)
+  ) {
     resolve3(response);
   } else {
-    reject(new AxiosError_default(
-      "Request failed with status code " + response.status,
-      [AxiosError_default.ERR_BAD_REQUEST, AxiosError_default.ERR_BAD_RESPONSE][Math.floor(response.status / 100) - 4],
-      response.config,
-      response.request,
-      response
-    ));
+    reject(
+      new AxiosError_default(
+        "Request failed with status code " + response.status,
+        [
+          AxiosError_default.ERR_BAD_REQUEST,
+          AxiosError_default.ERR_BAD_RESPONSE,
+        ][Math.floor(response.status / 100) - 4],
+        response.config,
+        response.request,
+        response,
+      ),
+    );
   }
 }
 
@@ -12989,7 +13632,9 @@ function isAbsoluteURL(url2) {
 
 // node_modules/axios/lib/helpers/combineURLs.js
 function combineURLs(baseURL, relativeURL) {
-  return relativeURL ? baseURL.replace(/\/?\/$/, "") + "/" + relativeURL.replace(/^\/+/, "") : baseURL;
+  return relativeURL
+    ? baseURL.replace(/\/?\/$/, "") + "/" + relativeURL.replace(/^\/+/, "")
+    : baseURL;
 }
 
 // node_modules/axios/lib/core/buildFullPath.js
@@ -13016,13 +13661,13 @@ var VERSION = "1.13.5";
 // node_modules/axios/lib/helpers/parseProtocol.js
 function parseProtocol(url2) {
   const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url2);
-  return match && match[1] || "";
+  return (match && match[1]) || "";
 }
 
 // node_modules/axios/lib/helpers/fromDataURI.js
 var DATA_URL_PATTERN = /^(?:([^;]+);)?(?:[^;]+;)?(base64|),([\s\S]*)$/;
 function fromDataURI(uri, asBlob, options) {
-  const _Blob = options && options.Blob || platform_default.classes.Blob;
+  const _Blob = (options && options.Blob) || platform_default.classes.Blob;
   const protocol = parseProtocol(uri);
   if (asBlob === void 0 && _Blob) {
     asBlob = true;
@@ -13031,21 +13676,33 @@ function fromDataURI(uri, asBlob, options) {
     uri = protocol.length ? uri.slice(protocol.length + 1) : uri;
     const match = DATA_URL_PATTERN.exec(uri);
     if (!match) {
-      throw new AxiosError_default("Invalid URL", AxiosError_default.ERR_INVALID_URL);
+      throw new AxiosError_default(
+        "Invalid URL",
+        AxiosError_default.ERR_INVALID_URL,
+      );
     }
     const mime = match[1];
     const isBase64 = match[2];
     const body = match[3];
-    const buffer = Buffer.from(decodeURIComponent(body), isBase64 ? "base64" : "utf8");
+    const buffer = Buffer.from(
+      decodeURIComponent(body),
+      isBase64 ? "base64" : "utf8",
+    );
     if (asBlob) {
       if (!_Blob) {
-        throw new AxiosError_default("Blob is not supported", AxiosError_default.ERR_NOT_SUPPORT);
+        throw new AxiosError_default(
+          "Blob is not supported",
+          AxiosError_default.ERR_NOT_SUPPORT,
+        );
       }
       return new _Blob([buffer], { type: mime });
     }
     return buffer;
   }
-  throw new AxiosError_default("Unsupported protocol " + protocol, AxiosError_default.ERR_NOT_SUPPORT);
+  throw new AxiosError_default(
+    "Unsupported protocol " + protocol,
+    AxiosError_default.ERR_NOT_SUPPORT,
+  );
 }
 
 // node_modules/axios/lib/adapters/http.js
@@ -13056,20 +13713,25 @@ var import_stream = __toESM(require("stream"), 1);
 var kInternals = Symbol("internals");
 var AxiosTransformStream = class extends import_stream.default.Transform {
   constructor(options) {
-    options = utils_default.toFlatObject(options, {
-      maxRate: 0,
-      chunkSize: 64 * 1024,
-      minChunkSize: 100,
-      timeWindow: 500,
-      ticksRate: 2,
-      samplesCount: 15
-    }, null, (prop, source) => {
-      return !utils_default.isUndefined(source[prop]);
-    });
+    options = utils_default.toFlatObject(
+      options,
+      {
+        maxRate: 0,
+        chunkSize: 64 * 1024,
+        minChunkSize: 100,
+        timeWindow: 500,
+        ticksRate: 2,
+        samplesCount: 15,
+      },
+      null,
+      (prop, source) => {
+        return !utils_default.isUndefined(source[prop]);
+      },
+    );
     super({
-      readableHighWaterMark: options.chunkSize
+      readableHighWaterMark: options.chunkSize,
     });
-    const internals = this[kInternals] = {
+    const internals = (this[kInternals] = {
       timeWindow: options.timeWindow,
       chunkSize: options.chunkSize,
       maxRate: options.maxRate,
@@ -13079,8 +13741,8 @@ var AxiosTransformStream = class extends import_stream.default.Transform {
       notifiedBytesLoaded: 0,
       ts: Date.now(),
       bytes: 0,
-      onReadCallback: null
-    };
+      onReadCallback: null,
+    });
     this.on("newListener", (event) => {
       if (event === "progress") {
         if (!internals.isCaptured) {
@@ -13103,7 +13765,10 @@ var AxiosTransformStream = class extends import_stream.default.Transform {
     const timeWindow = internals.timeWindow;
     const divider = 1e3 / timeWindow;
     const bytesThreshold = maxRate / divider;
-    const minChunkSize = internals.minChunkSize !== false ? Math.max(internals.minChunkSize, bytesThreshold * 0.01) : 0;
+    const minChunkSize =
+      internals.minChunkSize !== false
+        ? Math.max(internals.minChunkSize, bytesThreshold * 0.01)
+        : 0;
     const pushChunk = (_chunk, _callback) => {
       const bytes = Buffer.byteLength(_chunk);
       internals.bytesSeen += bytes;
@@ -13144,13 +13809,22 @@ var AxiosTransformStream = class extends import_stream.default.Transform {
           maxChunkSize = bytesLeft;
         }
       }
-      if (maxChunkSize && chunkSize > maxChunkSize && chunkSize - maxChunkSize > minChunkSize) {
+      if (
+        maxChunkSize &&
+        chunkSize > maxChunkSize &&
+        chunkSize - maxChunkSize > minChunkSize
+      ) {
         chunkRemainder = _chunk.subarray(maxChunkSize);
         _chunk = _chunk.subarray(0, maxChunkSize);
       }
-      pushChunk(_chunk, chunkRemainder ? () => {
-        process.nextTick(_callback, null, chunkRemainder);
-      } : _callback);
+      pushChunk(
+        _chunk,
+        chunkRemainder
+          ? () => {
+              process.nextTick(_callback, null, chunkRemainder);
+            }
+          : _callback,
+      );
     };
     transformChunk(chunk, function transformNextChunk(err, _chunk) {
       if (err) {
@@ -13190,7 +13864,10 @@ var readBlob_default = readBlob;
 
 // node_modules/axios/lib/helpers/formDataToStream.js
 var BOUNDARY_ALPHABET = platform_default.ALPHABET.ALPHA_DIGIT + "-_";
-var textEncoder = typeof TextEncoder === "function" ? new TextEncoder() : new import_util.default.TextEncoder();
+var textEncoder =
+  typeof TextEncoder === "function"
+    ? new TextEncoder()
+    : new import_util.default.TextEncoder();
 var CRLF = "\r\n";
 var CRLF_BYTES = textEncoder.encode(CRLF);
 var CRLF_BYTES_COUNT = 2;
@@ -13221,18 +13898,24 @@ var FormDataPart = class {
     yield CRLF_BYTES;
   }
   static escapeName(name) {
-    return String(name).replace(/[\r\n"]/g, (match) => ({
-      "\r": "%0D",
-      "\n": "%0A",
-      '"': "%22"
-    })[match]);
+    return String(name).replace(
+      /[\r\n"]/g,
+      (match) =>
+        ({
+          "\r": "%0D",
+          "\n": "%0A",
+          '"': "%22",
+        })[match],
+    );
   }
 };
 var formDataToStream = (form, headersHandler, options) => {
   const {
     tag = "form-data-boundary",
     size = 25,
-    boundary = tag + "-" + platform_default.generateString(size, BOUNDARY_ALPHABET)
+    boundary = tag +
+      "-" +
+      platform_default.generateString(size, BOUNDARY_ALPHABET),
   } = options || {};
   if (!utils_default.isFormData(form)) {
     throw TypeError("FormData instance required");
@@ -13251,19 +13934,21 @@ var formDataToStream = (form, headersHandler, options) => {
   contentLength += boundaryBytes.byteLength * parts.length;
   contentLength = utils_default.toFiniteNumber(contentLength);
   const computedHeaders = {
-    "Content-Type": `multipart/form-data; boundary=${boundary}`
+    "Content-Type": `multipart/form-data; boundary=${boundary}`,
   };
   if (Number.isFinite(contentLength)) {
     computedHeaders["Content-Length"] = contentLength;
   }
   headersHandler && headersHandler(computedHeaders);
-  return import_stream2.Readable.from(async function* () {
-    for (const part of parts) {
-      yield boundaryBytes;
-      yield* part.encode();
-    }
-    yield footerBytes;
-  }());
+  return import_stream2.Readable.from(
+    (async function* () {
+      for (const part of parts) {
+        yield boundaryBytes;
+        yield* part.encode();
+      }
+      yield footerBytes;
+    })(),
+  );
 };
 var formDataToStream_default = formDataToStream;
 
@@ -13291,16 +13976,18 @@ var ZlibHeaderTransformStream_default = ZlibHeaderTransformStream;
 
 // node_modules/axios/lib/helpers/callbackify.js
 var callbackify = (fn, reducer) => {
-  return utils_default.isAsyncFn(fn) ? function(...args) {
-    const cb = args.pop();
-    fn.apply(this, args).then((value) => {
-      try {
-        reducer ? cb(null, ...reducer(value)) : cb(null, value);
-      } catch (err) {
-        cb(err);
+  return utils_default.isAsyncFn(fn)
+    ? function (...args) {
+        const cb = args.pop();
+        fn.apply(this, args).then((value) => {
+          try {
+            reducer ? cb(null, ...reducer(value)) : cb(null, value);
+          } catch (err) {
+            cb(err);
+          }
+        }, cb);
       }
-    }, cb);
-  } : fn;
+    : fn;
 };
 var callbackify_default = callbackify;
 
@@ -13335,7 +14022,7 @@ function speedometer(samplesCount, min) {
       return;
     }
     const passed = startedAt && now - startedAt;
-    return passed ? Math.round(bytesCount * 1e3 / passed) : void 0;
+    return passed ? Math.round((bytesCount * 1e3) / passed) : void 0;
   };
 }
 var speedometer_default = speedometer;
@@ -13395,30 +14082,34 @@ var progressEventReducer = (listener, isDownloadStream, freq = 3) => {
       estimated: rate && total && inRange ? (total - loaded) / rate : void 0,
       event: e,
       lengthComputable: total != null,
-      [isDownloadStream ? "download" : "upload"]: true
+      [isDownloadStream ? "download" : "upload"]: true,
     };
     listener(data);
   }, freq);
 };
 var progressEventDecorator = (total, throttled) => {
   const lengthComputable = total != null;
-  return [(loaded) => throttled[0]({
-    lengthComputable,
-    total,
-    loaded
-  }), throttled[1]];
+  return [
+    (loaded) =>
+      throttled[0]({
+        lengthComputable,
+        total,
+        loaded,
+      }),
+    throttled[1],
+  ];
 };
-var asyncDecorator = (fn) => (...args) => utils_default.asap(() => fn(...args));
+var asyncDecorator =
+  (fn) =>
+  (...args) =>
+    utils_default.asap(() => fn(...args));
 
 // node_modules/axios/lib/helpers/estimateDataURLDecodedBytes.js
 function estimateDataURLDecodedBytes(url2) {
-  if (!url2 || typeof url2 !== "string")
-    return 0;
-  if (!url2.startsWith("data:"))
-    return 0;
+  if (!url2 || typeof url2 !== "string") return 0;
+  if (!url2.startsWith("data:")) return 0;
   const comma = url2.indexOf(",");
-  if (comma < 0)
-    return 0;
+  if (comma < 0) return 0;
   const meta = url2.slice(5, comma);
   const body = url2.slice(comma + 1);
   const isBase64 = /;base64/i.test(meta);
@@ -13429,7 +14120,13 @@ function estimateDataURLDecodedBytes(url2) {
       if (body.charCodeAt(i) === 37 && i + 2 < len) {
         const a = body.charCodeAt(i + 1);
         const b = body.charCodeAt(i + 2);
-        const isHex = (a >= 48 && a <= 57 || a >= 65 && a <= 70 || a >= 97 && a <= 102) && (b >= 48 && b <= 57 || b >= 65 && b <= 70 || b >= 97 && b <= 102);
+        const isHex =
+          ((a >= 48 && a <= 57) ||
+            (a >= 65 && a <= 70) ||
+            (a >= 97 && a <= 102)) &&
+          ((b >= 48 && b <= 57) ||
+            (b >= 65 && b <= 70) ||
+            (b >= 97 && b <= 102));
         if (isHex) {
           effectiveLen -= 2;
           i += 2;
@@ -13438,9 +14135,11 @@ function estimateDataURLDecodedBytes(url2) {
     }
     let pad = 0;
     let idx = len - 1;
-    const tailIsPct3D = (j) => j >= 2 && body.charCodeAt(j - 2) === 37 && // '%'
-    body.charCodeAt(j - 1) === 51 && // '3'
-    (body.charCodeAt(j) === 68 || body.charCodeAt(j) === 100);
+    const tailIsPct3D = (j) =>
+      j >= 2 &&
+      body.charCodeAt(j - 2) === 37 && // '%'
+      body.charCodeAt(j - 1) === 51 && // '3'
+      (body.charCodeAt(j) === 68 || body.charCodeAt(j) === 100);
     if (idx >= 0) {
       if (body.charCodeAt(idx) === 61) {
         pad++;
@@ -13467,13 +14166,15 @@ function estimateDataURLDecodedBytes(url2) {
 // node_modules/axios/lib/adapters/http.js
 var zlibOptions = {
   flush: import_zlib.default.constants.Z_SYNC_FLUSH,
-  finishFlush: import_zlib.default.constants.Z_SYNC_FLUSH
+  finishFlush: import_zlib.default.constants.Z_SYNC_FLUSH,
 };
 var brotliOptions = {
   flush: import_zlib.default.constants.BROTLI_OPERATION_FLUSH,
-  finishFlush: import_zlib.default.constants.BROTLI_OPERATION_FLUSH
+  finishFlush: import_zlib.default.constants.BROTLI_OPERATION_FLUSH,
 };
-var isBrotliSupported = utils_default.isFunction(import_zlib.default.createBrotliDecompress);
+var isBrotliSupported = utils_default.isFunction(
+  import_zlib.default.createBrotliDecompress,
+);
 var { http: httpFollow, https: httpsFollow } = import_follow_redirects.default;
 var isHttps = /https:?/;
 var supportedProtocols = platform_default.protocols.map((protocol) => {
@@ -13488,15 +14189,22 @@ var Http2Sessions = class {
     this.sessions = /* @__PURE__ */ Object.create(null);
   }
   getSession(authority, options) {
-    options = Object.assign({
-      sessionTimeout: 1e3
-    }, options);
+    options = Object.assign(
+      {
+        sessionTimeout: 1e3,
+      },
+      options,
+    );
     let authoritySessions = this.sessions[authority];
     if (authoritySessions) {
       let len = authoritySessions.length;
       for (let i = 0; i < len; i++) {
         const [sessionHandle, sessionOptions] = authoritySessions[i];
-        if (!sessionHandle.destroyed && !sessionHandle.closed && import_util2.default.isDeepStrictEqual(sessionOptions, options)) {
+        if (
+          !sessionHandle.destroyed &&
+          !sessionHandle.closed &&
+          import_util2.default.isDeepStrictEqual(sessionOptions, options)
+        ) {
           return sessionHandle;
         }
       }
@@ -13508,7 +14216,9 @@ var Http2Sessions = class {
         return;
       }
       removed = true;
-      let entries = authoritySessions, len = entries.length, i = len;
+      let entries = authoritySessions,
+        len = entries.length,
+        i = len;
       while (i--) {
         if (entries[i][0] === session) {
           if (len === 1) {
@@ -13525,7 +14235,7 @@ var Http2Sessions = class {
     if (sessionTimeout != null) {
       let timer;
       let streamsCount = 0;
-      session.request = function() {
+      session.request = function () {
         const stream4 = originalRequestFn.apply(this, arguments);
         streamsCount++;
         if (timer) {
@@ -13544,11 +14254,10 @@ var Http2Sessions = class {
       };
     }
     session.once("close", removeSession);
-    let entry = [
-      session,
-      options
-    ];
-    authoritySessions ? authoritySessions.push(entry) : authoritySessions = this.sessions[authority] = [entry];
+    let entry = [session, options];
+    authoritySessions
+      ? authoritySessions.push(entry)
+      : (authoritySessions = this.sessions[authority] = [entry]);
     return session;
   }
 };
@@ -13574,37 +14283,47 @@ function setProxy(options, configProxy, location) {
       proxy.auth = (proxy.username || "") + ":" + (proxy.password || "");
     }
     if (proxy.auth) {
-      const validProxyAuth = Boolean(proxy.auth.username || proxy.auth.password);
+      const validProxyAuth = Boolean(
+        proxy.auth.username || proxy.auth.password,
+      );
       if (validProxyAuth) {
-        proxy.auth = (proxy.auth.username || "") + ":" + (proxy.auth.password || "");
+        proxy.auth =
+          (proxy.auth.username || "") + ":" + (proxy.auth.password || "");
       } else if (typeof proxy.auth === "object") {
-        throw new AxiosError_default("Invalid proxy authorization", AxiosError_default.ERR_BAD_OPTION, { proxy });
+        throw new AxiosError_default(
+          "Invalid proxy authorization",
+          AxiosError_default.ERR_BAD_OPTION,
+          { proxy },
+        );
       }
       const base64 = Buffer.from(proxy.auth, "utf8").toString("base64");
       options.headers["Proxy-Authorization"] = "Basic " + base64;
     }
-    options.headers.host = options.hostname + (options.port ? ":" + options.port : "");
+    options.headers.host =
+      options.hostname + (options.port ? ":" + options.port : "");
     const proxyHost = proxy.hostname || proxy.host;
     options.hostname = proxyHost;
     options.host = proxyHost;
     options.port = proxy.port;
     options.path = location;
     if (proxy.protocol) {
-      options.protocol = proxy.protocol.includes(":") ? proxy.protocol : `${proxy.protocol}:`;
+      options.protocol = proxy.protocol.includes(":")
+        ? proxy.protocol
+        : `${proxy.protocol}:`;
     }
   }
   options.beforeRedirects.proxy = function beforeRedirect(redirectOptions) {
     setProxy(redirectOptions, configProxy, redirectOptions.href);
   };
 }
-var isHttpAdapterSupported = typeof process !== "undefined" && utils_default.kindOf(process) === "process";
+var isHttpAdapterSupported =
+  typeof process !== "undefined" && utils_default.kindOf(process) === "process";
 var wrapAsync = (asyncExecutor) => {
   return new Promise((resolve3, reject) => {
     let onDone;
     let isDone;
     const done = (value, isRejected) => {
-      if (isDone)
-        return;
+      if (isDone) return;
       isDone = true;
       onDone && onDone(value, isRejected);
     };
@@ -13616,7 +14335,11 @@ var wrapAsync = (asyncExecutor) => {
       done(reason, true);
       reject(reason);
     };
-    asyncExecutor(_resolve, _reject, (onDoneHandler) => onDone = onDoneHandler).catch(_reject);
+    asyncExecutor(
+      _resolve,
+      _reject,
+      (onDoneHandler) => (onDone = onDoneHandler),
+    ).catch(_reject);
   });
 };
 var resolveFamily = ({ address, family }) => {
@@ -13625,25 +14348,33 @@ var resolveFamily = ({ address, family }) => {
   }
   return {
     address,
-    family: family || (address.indexOf(".") < 0 ? 6 : 4)
+    family: family || (address.indexOf(".") < 0 ? 6 : 4),
   };
 };
-var buildAddressEntry = (address, family) => resolveFamily(utils_default.isObject(address) ? address : { address, family });
+var buildAddressEntry = (address, family) =>
+  resolveFamily(
+    utils_default.isObject(address) ? address : { address, family },
+  );
 var http2Transport = {
   request(options, cb) {
-    const authority = options.protocol + "//" + options.hostname + ":" + (options.port || (options.protocol === "https:" ? 443 : 80));
+    const authority =
+      options.protocol +
+      "//" +
+      options.hostname +
+      ":" +
+      (options.port || (options.protocol === "https:" ? 443 : 80));
     const { http2Options, headers } = options;
     const session = http2Sessions.getSession(authority, http2Options);
     const {
       HTTP2_HEADER_SCHEME,
       HTTP2_HEADER_METHOD,
       HTTP2_HEADER_PATH,
-      HTTP2_HEADER_STATUS
+      HTTP2_HEADER_STATUS,
     } = import_http2.default.constants;
     const http2Headers = {
       [HTTP2_HEADER_SCHEME]: options.protocol.replace(":", ""),
       [HTTP2_HEADER_METHOD]: options.method,
-      [HTTP2_HEADER_PATH]: options.path
+      [HTTP2_HEADER_PATH]: options.path,
     };
     utils_default.forEach(headers, (header, name) => {
       name.charAt(0) !== ":" && (http2Headers[name] = header);
@@ -13659,523 +14390,660 @@ var http2Transport = {
       cb(response);
     });
     return req;
-  }
+  },
 };
-var http_default = isHttpAdapterSupported && function httpAdapter(config) {
-  return wrapAsync(async function dispatchHttpRequest(resolve3, reject, onDone) {
-    let { data, lookup, family, httpVersion = 1, http2Options } = config;
-    const { responseType, responseEncoding } = config;
-    const method = config.method.toUpperCase();
-    let isDone;
-    let rejected = false;
-    let req;
-    httpVersion = +httpVersion;
-    if (Number.isNaN(httpVersion)) {
-      throw TypeError(`Invalid protocol version: '${config.httpVersion}' is not a number`);
-    }
-    if (httpVersion !== 1 && httpVersion !== 2) {
-      throw TypeError(`Unsupported protocol version '${httpVersion}'`);
-    }
-    const isHttp2 = httpVersion === 2;
-    if (lookup) {
-      const _lookup = callbackify_default(lookup, (value) => utils_default.isArray(value) ? value : [value]);
-      lookup = (hostname2, opt, cb) => {
-        _lookup(hostname2, opt, (err, arg0, arg1) => {
-          if (err) {
-            return cb(err);
+var http_default =
+  isHttpAdapterSupported &&
+  function httpAdapter(config) {
+    return wrapAsync(
+      async function dispatchHttpRequest(resolve3, reject, onDone) {
+        let { data, lookup, family, httpVersion = 1, http2Options } = config;
+        const { responseType, responseEncoding } = config;
+        const method = config.method.toUpperCase();
+        let isDone;
+        let rejected = false;
+        let req;
+        httpVersion = +httpVersion;
+        if (Number.isNaN(httpVersion)) {
+          throw TypeError(
+            `Invalid protocol version: '${config.httpVersion}' is not a number`,
+          );
+        }
+        if (httpVersion !== 1 && httpVersion !== 2) {
+          throw TypeError(`Unsupported protocol version '${httpVersion}'`);
+        }
+        const isHttp2 = httpVersion === 2;
+        if (lookup) {
+          const _lookup = callbackify_default(lookup, (value) =>
+            utils_default.isArray(value) ? value : [value],
+          );
+          lookup = (hostname2, opt, cb) => {
+            _lookup(hostname2, opt, (err, arg0, arg1) => {
+              if (err) {
+                return cb(err);
+              }
+              const addresses = utils_default.isArray(arg0)
+                ? arg0.map((addr) => buildAddressEntry(addr))
+                : [buildAddressEntry(arg0, arg1)];
+              opt.all
+                ? cb(err, addresses)
+                : cb(err, addresses[0].address, addresses[0].family);
+            });
+          };
+        }
+        const abortEmitter = new import_events.EventEmitter();
+        function abort(reason) {
+          try {
+            abortEmitter.emit(
+              "abort",
+              !reason || reason.type
+                ? new CanceledError_default(null, config, req)
+                : reason,
+            );
+          } catch (err) {
+            console.warn("emit error", err);
           }
-          const addresses = utils_default.isArray(arg0) ? arg0.map((addr) => buildAddressEntry(addr)) : [buildAddressEntry(arg0, arg1)];
-          opt.all ? cb(err, addresses) : cb(err, addresses[0].address, addresses[0].family);
-        });
-      };
-    }
-    const abortEmitter = new import_events.EventEmitter();
-    function abort(reason) {
-      try {
-        abortEmitter.emit("abort", !reason || reason.type ? new CanceledError_default(null, config, req) : reason);
-      } catch (err) {
-        console.warn("emit error", err);
-      }
-    }
-    abortEmitter.once("abort", reject);
-    const onFinished = () => {
-      if (config.cancelToken) {
-        config.cancelToken.unsubscribe(abort);
-      }
-      if (config.signal) {
-        config.signal.removeEventListener("abort", abort);
-      }
-      abortEmitter.removeAllListeners();
-    };
-    if (config.cancelToken || config.signal) {
-      config.cancelToken && config.cancelToken.subscribe(abort);
-      if (config.signal) {
-        config.signal.aborted ? abort() : config.signal.addEventListener("abort", abort);
-      }
-    }
-    onDone((response, isRejected) => {
-      isDone = true;
-      if (isRejected) {
-        rejected = true;
-        onFinished();
-        return;
-      }
-      const { data: data2 } = response;
-      if (data2 instanceof import_stream4.default.Readable || data2 instanceof import_stream4.default.Duplex) {
-        const offListeners = import_stream4.default.finished(data2, () => {
-          offListeners();
-          onFinished();
-        });
-      } else {
-        onFinished();
-      }
-    });
-    const fullPath = buildFullPath(config.baseURL, config.url, config.allowAbsoluteUrls);
-    const parsed = new URL(fullPath, platform_default.hasBrowserEnv ? platform_default.origin : void 0);
-    const protocol = parsed.protocol || supportedProtocols[0];
-    if (protocol === "data:") {
-      if (config.maxContentLength > -1) {
-        const dataUrl = String(config.url || fullPath || "");
-        const estimated = estimateDataURLDecodedBytes(dataUrl);
-        if (estimated > config.maxContentLength) {
-          return reject(new AxiosError_default(
-            "maxContentLength size of " + config.maxContentLength + " exceeded",
-            AxiosError_default.ERR_BAD_RESPONSE,
-            config
-          ));
         }
-      }
-      let convertedData;
-      if (method !== "GET") {
-        return settle(resolve3, reject, {
-          status: 405,
-          statusText: "method not allowed",
-          headers: {},
-          config
-        });
-      }
-      try {
-        convertedData = fromDataURI(config.url, responseType === "blob", {
-          Blob: config.env && config.env.Blob
-        });
-      } catch (err) {
-        throw AxiosError_default.from(err, AxiosError_default.ERR_BAD_REQUEST, config);
-      }
-      if (responseType === "text") {
-        convertedData = convertedData.toString(responseEncoding);
-        if (!responseEncoding || responseEncoding === "utf8") {
-          convertedData = utils_default.stripBOM(convertedData);
+        abortEmitter.once("abort", reject);
+        const onFinished = () => {
+          if (config.cancelToken) {
+            config.cancelToken.unsubscribe(abort);
+          }
+          if (config.signal) {
+            config.signal.removeEventListener("abort", abort);
+          }
+          abortEmitter.removeAllListeners();
+        };
+        if (config.cancelToken || config.signal) {
+          config.cancelToken && config.cancelToken.subscribe(abort);
+          if (config.signal) {
+            config.signal.aborted
+              ? abort()
+              : config.signal.addEventListener("abort", abort);
+          }
         }
-      } else if (responseType === "stream") {
-        convertedData = import_stream4.default.Readable.from(convertedData);
-      }
-      return settle(resolve3, reject, {
-        data: convertedData,
-        status: 200,
-        statusText: "OK",
-        headers: new AxiosHeaders_default(),
-        config
-      });
-    }
-    if (supportedProtocols.indexOf(protocol) === -1) {
-      return reject(new AxiosError_default(
-        "Unsupported protocol " + protocol,
-        AxiosError_default.ERR_BAD_REQUEST,
-        config
-      ));
-    }
-    const headers = AxiosHeaders_default.from(config.headers).normalize();
-    headers.set("User-Agent", "axios/" + VERSION, false);
-    const { onUploadProgress, onDownloadProgress } = config;
-    const maxRate = config.maxRate;
-    let maxUploadRate = void 0;
-    let maxDownloadRate = void 0;
-    if (utils_default.isSpecCompliantForm(data)) {
-      const userBoundary = headers.getContentType(/boundary=([-_\w\d]{10,70})/i);
-      data = formDataToStream_default(data, (formHeaders) => {
-        headers.set(formHeaders);
-      }, {
-        tag: `axios-${VERSION}-boundary`,
-        boundary: userBoundary && userBoundary[1] || void 0
-      });
-    } else if (utils_default.isFormData(data) && utils_default.isFunction(data.getHeaders)) {
-      headers.set(data.getHeaders());
-      if (!headers.hasContentLength()) {
+        onDone((response, isRejected) => {
+          isDone = true;
+          if (isRejected) {
+            rejected = true;
+            onFinished();
+            return;
+          }
+          const { data: data2 } = response;
+          if (
+            data2 instanceof import_stream4.default.Readable ||
+            data2 instanceof import_stream4.default.Duplex
+          ) {
+            const offListeners = import_stream4.default.finished(data2, () => {
+              offListeners();
+              onFinished();
+            });
+          } else {
+            onFinished();
+          }
+        });
+        const fullPath = buildFullPath(
+          config.baseURL,
+          config.url,
+          config.allowAbsoluteUrls,
+        );
+        const parsed = new URL(
+          fullPath,
+          platform_default.hasBrowserEnv ? platform_default.origin : void 0,
+        );
+        const protocol = parsed.protocol || supportedProtocols[0];
+        if (protocol === "data:") {
+          if (config.maxContentLength > -1) {
+            const dataUrl = String(config.url || fullPath || "");
+            const estimated = estimateDataURLDecodedBytes(dataUrl);
+            if (estimated > config.maxContentLength) {
+              return reject(
+                new AxiosError_default(
+                  "maxContentLength size of " +
+                    config.maxContentLength +
+                    " exceeded",
+                  AxiosError_default.ERR_BAD_RESPONSE,
+                  config,
+                ),
+              );
+            }
+          }
+          let convertedData;
+          if (method !== "GET") {
+            return settle(resolve3, reject, {
+              status: 405,
+              statusText: "method not allowed",
+              headers: {},
+              config,
+            });
+          }
+          try {
+            convertedData = fromDataURI(config.url, responseType === "blob", {
+              Blob: config.env && config.env.Blob,
+            });
+          } catch (err) {
+            throw AxiosError_default.from(
+              err,
+              AxiosError_default.ERR_BAD_REQUEST,
+              config,
+            );
+          }
+          if (responseType === "text") {
+            convertedData = convertedData.toString(responseEncoding);
+            if (!responseEncoding || responseEncoding === "utf8") {
+              convertedData = utils_default.stripBOM(convertedData);
+            }
+          } else if (responseType === "stream") {
+            convertedData = import_stream4.default.Readable.from(convertedData);
+          }
+          return settle(resolve3, reject, {
+            data: convertedData,
+            status: 200,
+            statusText: "OK",
+            headers: new AxiosHeaders_default(),
+            config,
+          });
+        }
+        if (supportedProtocols.indexOf(protocol) === -1) {
+          return reject(
+            new AxiosError_default(
+              "Unsupported protocol " + protocol,
+              AxiosError_default.ERR_BAD_REQUEST,
+              config,
+            ),
+          );
+        }
+        const headers = AxiosHeaders_default.from(config.headers).normalize();
+        headers.set("User-Agent", "axios/" + VERSION, false);
+        const { onUploadProgress, onDownloadProgress } = config;
+        const maxRate = config.maxRate;
+        let maxUploadRate = void 0;
+        let maxDownloadRate = void 0;
+        if (utils_default.isSpecCompliantForm(data)) {
+          const userBoundary = headers.getContentType(
+            /boundary=([-_\w\d]{10,70})/i,
+          );
+          data = formDataToStream_default(
+            data,
+            (formHeaders) => {
+              headers.set(formHeaders);
+            },
+            {
+              tag: `axios-${VERSION}-boundary`,
+              boundary: (userBoundary && userBoundary[1]) || void 0,
+            },
+          );
+        } else if (
+          utils_default.isFormData(data) &&
+          utils_default.isFunction(data.getHeaders)
+        ) {
+          headers.set(data.getHeaders());
+          if (!headers.hasContentLength()) {
+            try {
+              const knownLength = await import_util2.default
+                .promisify(data.getLength)
+                .call(data);
+              Number.isFinite(knownLength) &&
+                knownLength >= 0 &&
+                headers.setContentLength(knownLength);
+            } catch (e) {}
+          }
+        } else if (utils_default.isBlob(data) || utils_default.isFile(data)) {
+          data.size &&
+            headers.setContentType(data.type || "application/octet-stream");
+          headers.setContentLength(data.size || 0);
+          data = import_stream4.default.Readable.from(readBlob_default(data));
+        } else if (data && !utils_default.isStream(data)) {
+          if (Buffer.isBuffer(data)) {
+          } else if (utils_default.isArrayBuffer(data)) {
+            data = Buffer.from(new Uint8Array(data));
+          } else if (utils_default.isString(data)) {
+            data = Buffer.from(data, "utf-8");
+          } else {
+            return reject(
+              new AxiosError_default(
+                "Data after transformation must be a string, an ArrayBuffer, a Buffer, or a Stream",
+                AxiosError_default.ERR_BAD_REQUEST,
+                config,
+              ),
+            );
+          }
+          headers.setContentLength(data.length, false);
+          if (config.maxBodyLength > -1 && data.length > config.maxBodyLength) {
+            return reject(
+              new AxiosError_default(
+                "Request body larger than maxBodyLength limit",
+                AxiosError_default.ERR_BAD_REQUEST,
+                config,
+              ),
+            );
+          }
+        }
+        const contentLength = utils_default.toFiniteNumber(
+          headers.getContentLength(),
+        );
+        if (utils_default.isArray(maxRate)) {
+          maxUploadRate = maxRate[0];
+          maxDownloadRate = maxRate[1];
+        } else {
+          maxUploadRate = maxDownloadRate = maxRate;
+        }
+        if (data && (onUploadProgress || maxUploadRate)) {
+          if (!utils_default.isStream(data)) {
+            data = import_stream4.default.Readable.from(data, {
+              objectMode: false,
+            });
+          }
+          data = import_stream4.default.pipeline(
+            [
+              data,
+              new AxiosTransformStream_default({
+                maxRate: utils_default.toFiniteNumber(maxUploadRate),
+              }),
+            ],
+            utils_default.noop,
+          );
+          onUploadProgress &&
+            data.on(
+              "progress",
+              flushOnFinish(
+                data,
+                progressEventDecorator(
+                  contentLength,
+                  progressEventReducer(
+                    asyncDecorator(onUploadProgress),
+                    false,
+                    3,
+                  ),
+                ),
+              ),
+            );
+        }
+        let auth = void 0;
+        if (config.auth) {
+          const username = config.auth.username || "";
+          const password = config.auth.password || "";
+          auth = username + ":" + password;
+        }
+        if (!auth && parsed.username) {
+          const urlUsername = parsed.username;
+          const urlPassword = parsed.password;
+          auth = urlUsername + ":" + urlPassword;
+        }
+        auth && headers.delete("authorization");
+        let path3;
         try {
-          const knownLength = await import_util2.default.promisify(data.getLength).call(data);
-          Number.isFinite(knownLength) && knownLength >= 0 && headers.setContentLength(knownLength);
-        } catch (e) {
+          path3 = buildURL(
+            parsed.pathname + parsed.search,
+            config.params,
+            config.paramsSerializer,
+          ).replace(/^\?/, "");
+        } catch (err) {
+          const customErr = new Error(err.message);
+          customErr.config = config;
+          customErr.url = config.url;
+          customErr.exists = true;
+          return reject(customErr);
         }
-      }
-    } else if (utils_default.isBlob(data) || utils_default.isFile(data)) {
-      data.size && headers.setContentType(data.type || "application/octet-stream");
-      headers.setContentLength(data.size || 0);
-      data = import_stream4.default.Readable.from(readBlob_default(data));
-    } else if (data && !utils_default.isStream(data)) {
-      if (Buffer.isBuffer(data)) {
-      } else if (utils_default.isArrayBuffer(data)) {
-        data = Buffer.from(new Uint8Array(data));
-      } else if (utils_default.isString(data)) {
-        data = Buffer.from(data, "utf-8");
-      } else {
-        return reject(new AxiosError_default(
-          "Data after transformation must be a string, an ArrayBuffer, a Buffer, or a Stream",
-          AxiosError_default.ERR_BAD_REQUEST,
-          config
-        ));
-      }
-      headers.setContentLength(data.length, false);
-      if (config.maxBodyLength > -1 && data.length > config.maxBodyLength) {
-        return reject(new AxiosError_default(
-          "Request body larger than maxBodyLength limit",
-          AxiosError_default.ERR_BAD_REQUEST,
-          config
-        ));
-      }
-    }
-    const contentLength = utils_default.toFiniteNumber(headers.getContentLength());
-    if (utils_default.isArray(maxRate)) {
-      maxUploadRate = maxRate[0];
-      maxDownloadRate = maxRate[1];
-    } else {
-      maxUploadRate = maxDownloadRate = maxRate;
-    }
-    if (data && (onUploadProgress || maxUploadRate)) {
-      if (!utils_default.isStream(data)) {
-        data = import_stream4.default.Readable.from(data, { objectMode: false });
-      }
-      data = import_stream4.default.pipeline([data, new AxiosTransformStream_default({
-        maxRate: utils_default.toFiniteNumber(maxUploadRate)
-      })], utils_default.noop);
-      onUploadProgress && data.on("progress", flushOnFinish(
-        data,
-        progressEventDecorator(
-          contentLength,
-          progressEventReducer(asyncDecorator(onUploadProgress), false, 3)
-        )
-      ));
-    }
-    let auth = void 0;
-    if (config.auth) {
-      const username = config.auth.username || "";
-      const password = config.auth.password || "";
-      auth = username + ":" + password;
-    }
-    if (!auth && parsed.username) {
-      const urlUsername = parsed.username;
-      const urlPassword = parsed.password;
-      auth = urlUsername + ":" + urlPassword;
-    }
-    auth && headers.delete("authorization");
-    let path3;
-    try {
-      path3 = buildURL(
-        parsed.pathname + parsed.search,
-        config.params,
-        config.paramsSerializer
-      ).replace(/^\?/, "");
-    } catch (err) {
-      const customErr = new Error(err.message);
-      customErr.config = config;
-      customErr.url = config.url;
-      customErr.exists = true;
-      return reject(customErr);
-    }
-    headers.set(
-      "Accept-Encoding",
-      "gzip, compress, deflate" + (isBrotliSupported ? ", br" : ""),
-      false
-    );
-    const options = {
-      path: path3,
-      method,
-      headers: headers.toJSON(),
-      agents: { http: config.httpAgent, https: config.httpsAgent },
-      auth,
-      protocol,
-      family,
-      beforeRedirect: dispatchBeforeRedirect,
-      beforeRedirects: {},
-      http2Options
-    };
-    !utils_default.isUndefined(lookup) && (options.lookup = lookup);
-    if (config.socketPath) {
-      options.socketPath = config.socketPath;
-    } else {
-      options.hostname = parsed.hostname.startsWith("[") ? parsed.hostname.slice(1, -1) : parsed.hostname;
-      options.port = parsed.port;
-      setProxy(options, config.proxy, protocol + "//" + parsed.hostname + (parsed.port ? ":" + parsed.port : "") + options.path);
-    }
-    let transport;
-    const isHttpsRequest = isHttps.test(options.protocol);
-    options.agent = isHttpsRequest ? config.httpsAgent : config.httpAgent;
-    if (isHttp2) {
-      transport = http2Transport;
-    } else {
-      if (config.transport) {
-        transport = config.transport;
-      } else if (config.maxRedirects === 0) {
-        transport = isHttpsRequest ? import_https.default : import_http.default;
-      } else {
-        if (config.maxRedirects) {
-          options.maxRedirects = config.maxRedirects;
+        headers.set(
+          "Accept-Encoding",
+          "gzip, compress, deflate" + (isBrotliSupported ? ", br" : ""),
+          false,
+        );
+        const options = {
+          path: path3,
+          method,
+          headers: headers.toJSON(),
+          agents: { http: config.httpAgent, https: config.httpsAgent },
+          auth,
+          protocol,
+          family,
+          beforeRedirect: dispatchBeforeRedirect,
+          beforeRedirects: {},
+          http2Options,
+        };
+        !utils_default.isUndefined(lookup) && (options.lookup = lookup);
+        if (config.socketPath) {
+          options.socketPath = config.socketPath;
+        } else {
+          options.hostname = parsed.hostname.startsWith("[")
+            ? parsed.hostname.slice(1, -1)
+            : parsed.hostname;
+          options.port = parsed.port;
+          setProxy(
+            options,
+            config.proxy,
+            protocol +
+              "//" +
+              parsed.hostname +
+              (parsed.port ? ":" + parsed.port : "") +
+              options.path,
+          );
         }
-        if (config.beforeRedirect) {
-          options.beforeRedirects.config = config.beforeRedirect;
+        let transport;
+        const isHttpsRequest = isHttps.test(options.protocol);
+        options.agent = isHttpsRequest ? config.httpsAgent : config.httpAgent;
+        if (isHttp2) {
+          transport = http2Transport;
+        } else {
+          if (config.transport) {
+            transport = config.transport;
+          } else if (config.maxRedirects === 0) {
+            transport = isHttpsRequest
+              ? import_https.default
+              : import_http.default;
+          } else {
+            if (config.maxRedirects) {
+              options.maxRedirects = config.maxRedirects;
+            }
+            if (config.beforeRedirect) {
+              options.beforeRedirects.config = config.beforeRedirect;
+            }
+            transport = isHttpsRequest ? httpsFollow : httpFollow;
+          }
         }
-        transport = isHttpsRequest ? httpsFollow : httpFollow;
-      }
-    }
-    if (config.maxBodyLength > -1) {
-      options.maxBodyLength = config.maxBodyLength;
-    } else {
-      options.maxBodyLength = Infinity;
-    }
-    if (config.insecureHTTPParser) {
-      options.insecureHTTPParser = config.insecureHTTPParser;
-    }
-    req = transport.request(options, function handleResponse(res) {
-      if (req.destroyed)
-        return;
-      const streams = [res];
-      const responseLength = utils_default.toFiniteNumber(res.headers["content-length"]);
-      if (onDownloadProgress || maxDownloadRate) {
-        const transformStream = new AxiosTransformStream_default({
-          maxRate: utils_default.toFiniteNumber(maxDownloadRate)
-        });
-        onDownloadProgress && transformStream.on("progress", flushOnFinish(
-          transformStream,
-          progressEventDecorator(
-            responseLength,
-            progressEventReducer(asyncDecorator(onDownloadProgress), true, 3)
-          )
-        ));
-        streams.push(transformStream);
-      }
-      let responseStream = res;
-      const lastRequest = res.req || req;
-      if (config.decompress !== false && res.headers["content-encoding"]) {
-        if (method === "HEAD" || res.statusCode === 204) {
-          delete res.headers["content-encoding"];
+        if (config.maxBodyLength > -1) {
+          options.maxBodyLength = config.maxBodyLength;
+        } else {
+          options.maxBodyLength = Infinity;
         }
-        switch ((res.headers["content-encoding"] || "").toLowerCase()) {
-          case "gzip":
-          case "x-gzip":
-          case "compress":
-          case "x-compress":
-            streams.push(import_zlib.default.createUnzip(zlibOptions));
-            delete res.headers["content-encoding"];
-            break;
-          case "deflate":
-            streams.push(new ZlibHeaderTransformStream_default());
-            streams.push(import_zlib.default.createUnzip(zlibOptions));
-            delete res.headers["content-encoding"];
-            break;
-          case "br":
-            if (isBrotliSupported) {
-              streams.push(import_zlib.default.createBrotliDecompress(brotliOptions));
+        if (config.insecureHTTPParser) {
+          options.insecureHTTPParser = config.insecureHTTPParser;
+        }
+        req = transport.request(options, function handleResponse(res) {
+          if (req.destroyed) return;
+          const streams = [res];
+          const responseLength = utils_default.toFiniteNumber(
+            res.headers["content-length"],
+          );
+          if (onDownloadProgress || maxDownloadRate) {
+            const transformStream = new AxiosTransformStream_default({
+              maxRate: utils_default.toFiniteNumber(maxDownloadRate),
+            });
+            onDownloadProgress &&
+              transformStream.on(
+                "progress",
+                flushOnFinish(
+                  transformStream,
+                  progressEventDecorator(
+                    responseLength,
+                    progressEventReducer(
+                      asyncDecorator(onDownloadProgress),
+                      true,
+                      3,
+                    ),
+                  ),
+                ),
+              );
+            streams.push(transformStream);
+          }
+          let responseStream = res;
+          const lastRequest = res.req || req;
+          if (config.decompress !== false && res.headers["content-encoding"]) {
+            if (method === "HEAD" || res.statusCode === 204) {
               delete res.headers["content-encoding"];
             }
-        }
-      }
-      responseStream = streams.length > 1 ? import_stream4.default.pipeline(streams, utils_default.noop) : streams[0];
-      const response = {
-        status: res.statusCode,
-        statusText: res.statusMessage,
-        headers: new AxiosHeaders_default(res.headers),
-        config,
-        request: lastRequest
-      };
-      if (responseType === "stream") {
-        response.data = responseStream;
-        settle(resolve3, reject, response);
-      } else {
-        const responseBuffer = [];
-        let totalResponseBytes = 0;
-        responseStream.on("data", function handleStreamData(chunk) {
-          responseBuffer.push(chunk);
-          totalResponseBytes += chunk.length;
-          if (config.maxContentLength > -1 && totalResponseBytes > config.maxContentLength) {
-            rejected = true;
-            responseStream.destroy();
-            abort(new AxiosError_default(
-              "maxContentLength size of " + config.maxContentLength + " exceeded",
-              AxiosError_default.ERR_BAD_RESPONSE,
-              config,
-              lastRequest
-            ));
-          }
-        });
-        responseStream.on("aborted", function handlerStreamAborted() {
-          if (rejected) {
-            return;
-          }
-          const err = new AxiosError_default(
-            "stream has been aborted",
-            AxiosError_default.ERR_BAD_RESPONSE,
-            config,
-            lastRequest
-          );
-          responseStream.destroy(err);
-          reject(err);
-        });
-        responseStream.on("error", function handleStreamError(err) {
-          if (req.destroyed)
-            return;
-          reject(AxiosError_default.from(err, null, config, lastRequest));
-        });
-        responseStream.on("end", function handleStreamEnd() {
-          try {
-            let responseData = responseBuffer.length === 1 ? responseBuffer[0] : Buffer.concat(responseBuffer);
-            if (responseType !== "arraybuffer") {
-              responseData = responseData.toString(responseEncoding);
-              if (!responseEncoding || responseEncoding === "utf8") {
-                responseData = utils_default.stripBOM(responseData);
-              }
+            switch ((res.headers["content-encoding"] || "").toLowerCase()) {
+              case "gzip":
+              case "x-gzip":
+              case "compress":
+              case "x-compress":
+                streams.push(import_zlib.default.createUnzip(zlibOptions));
+                delete res.headers["content-encoding"];
+                break;
+              case "deflate":
+                streams.push(new ZlibHeaderTransformStream_default());
+                streams.push(import_zlib.default.createUnzip(zlibOptions));
+                delete res.headers["content-encoding"];
+                break;
+              case "br":
+                if (isBrotliSupported) {
+                  streams.push(
+                    import_zlib.default.createBrotliDecompress(brotliOptions),
+                  );
+                  delete res.headers["content-encoding"];
+                }
             }
-            response.data = responseData;
-          } catch (err) {
-            return reject(AxiosError_default.from(err, null, config, response.request, response));
           }
-          settle(resolve3, reject, response);
+          responseStream =
+            streams.length > 1
+              ? import_stream4.default.pipeline(streams, utils_default.noop)
+              : streams[0];
+          const response = {
+            status: res.statusCode,
+            statusText: res.statusMessage,
+            headers: new AxiosHeaders_default(res.headers),
+            config,
+            request: lastRequest,
+          };
+          if (responseType === "stream") {
+            response.data = responseStream;
+            settle(resolve3, reject, response);
+          } else {
+            const responseBuffer = [];
+            let totalResponseBytes = 0;
+            responseStream.on("data", function handleStreamData(chunk) {
+              responseBuffer.push(chunk);
+              totalResponseBytes += chunk.length;
+              if (
+                config.maxContentLength > -1 &&
+                totalResponseBytes > config.maxContentLength
+              ) {
+                rejected = true;
+                responseStream.destroy();
+                abort(
+                  new AxiosError_default(
+                    "maxContentLength size of " +
+                      config.maxContentLength +
+                      " exceeded",
+                    AxiosError_default.ERR_BAD_RESPONSE,
+                    config,
+                    lastRequest,
+                  ),
+                );
+              }
+            });
+            responseStream.on("aborted", function handlerStreamAborted() {
+              if (rejected) {
+                return;
+              }
+              const err = new AxiosError_default(
+                "stream has been aborted",
+                AxiosError_default.ERR_BAD_RESPONSE,
+                config,
+                lastRequest,
+              );
+              responseStream.destroy(err);
+              reject(err);
+            });
+            responseStream.on("error", function handleStreamError(err) {
+              if (req.destroyed) return;
+              reject(AxiosError_default.from(err, null, config, lastRequest));
+            });
+            responseStream.on("end", function handleStreamEnd() {
+              try {
+                let responseData =
+                  responseBuffer.length === 1
+                    ? responseBuffer[0]
+                    : Buffer.concat(responseBuffer);
+                if (responseType !== "arraybuffer") {
+                  responseData = responseData.toString(responseEncoding);
+                  if (!responseEncoding || responseEncoding === "utf8") {
+                    responseData = utils_default.stripBOM(responseData);
+                  }
+                }
+                response.data = responseData;
+              } catch (err) {
+                return reject(
+                  AxiosError_default.from(
+                    err,
+                    null,
+                    config,
+                    response.request,
+                    response,
+                  ),
+                );
+              }
+              settle(resolve3, reject, response);
+            });
+          }
+          abortEmitter.once("abort", (err) => {
+            if (!responseStream.destroyed) {
+              responseStream.emit("error", err);
+              responseStream.destroy();
+            }
+          });
         });
-      }
-      abortEmitter.once("abort", (err) => {
-        if (!responseStream.destroyed) {
-          responseStream.emit("error", err);
-          responseStream.destroy();
+        abortEmitter.once("abort", (err) => {
+          if (req.close) {
+            req.close();
+          } else {
+            req.destroy(err);
+          }
+        });
+        req.on("error", function handleRequestError(err) {
+          reject(AxiosError_default.from(err, null, config, req));
+        });
+        req.on("socket", function handleRequestSocket(socket) {
+          socket.setKeepAlive(true, 1e3 * 60);
+        });
+        if (config.timeout) {
+          const timeout = parseInt(config.timeout, 10);
+          if (Number.isNaN(timeout)) {
+            abort(
+              new AxiosError_default(
+                "error trying to parse `config.timeout` to int",
+                AxiosError_default.ERR_BAD_OPTION_VALUE,
+                config,
+                req,
+              ),
+            );
+            return;
+          }
+          req.setTimeout(timeout, function handleRequestTimeout() {
+            if (isDone) return;
+            let timeoutErrorMessage = config.timeout
+              ? "timeout of " + config.timeout + "ms exceeded"
+              : "timeout exceeded";
+            const transitional2 = config.transitional || transitional_default;
+            if (config.timeoutErrorMessage) {
+              timeoutErrorMessage = config.timeoutErrorMessage;
+            }
+            abort(
+              new AxiosError_default(
+                timeoutErrorMessage,
+                transitional2.clarifyTimeoutError
+                  ? AxiosError_default.ETIMEDOUT
+                  : AxiosError_default.ECONNABORTED,
+                config,
+                req,
+              ),
+            );
+          });
+        } else {
+          req.setTimeout(0);
         }
-      });
-    });
-    abortEmitter.once("abort", (err) => {
-      if (req.close) {
-        req.close();
-      } else {
-        req.destroy(err);
-      }
-    });
-    req.on("error", function handleRequestError(err) {
-      reject(AxiosError_default.from(err, null, config, req));
-    });
-    req.on("socket", function handleRequestSocket(socket) {
-      socket.setKeepAlive(true, 1e3 * 60);
-    });
-    if (config.timeout) {
-      const timeout = parseInt(config.timeout, 10);
-      if (Number.isNaN(timeout)) {
-        abort(new AxiosError_default(
-          "error trying to parse `config.timeout` to int",
-          AxiosError_default.ERR_BAD_OPTION_VALUE,
-          config,
-          req
-        ));
-        return;
-      }
-      req.setTimeout(timeout, function handleRequestTimeout() {
-        if (isDone)
-          return;
-        let timeoutErrorMessage = config.timeout ? "timeout of " + config.timeout + "ms exceeded" : "timeout exceeded";
-        const transitional2 = config.transitional || transitional_default;
-        if (config.timeoutErrorMessage) {
-          timeoutErrorMessage = config.timeoutErrorMessage;
+        if (utils_default.isStream(data)) {
+          let ended = false;
+          let errored = false;
+          data.on("end", () => {
+            ended = true;
+          });
+          data.once("error", (err) => {
+            errored = true;
+            req.destroy(err);
+          });
+          data.on("close", () => {
+            if (!ended && !errored) {
+              abort(
+                new CanceledError_default(
+                  "Request stream has been aborted",
+                  config,
+                  req,
+                ),
+              );
+            }
+          });
+          data.pipe(req);
+        } else {
+          data && req.write(data);
+          req.end();
         }
-        abort(new AxiosError_default(
-          timeoutErrorMessage,
-          transitional2.clarifyTimeoutError ? AxiosError_default.ETIMEDOUT : AxiosError_default.ECONNABORTED,
-          config,
-          req
-        ));
-      });
-    } else {
-      req.setTimeout(0);
-    }
-    if (utils_default.isStream(data)) {
-      let ended = false;
-      let errored = false;
-      data.on("end", () => {
-        ended = true;
-      });
-      data.once("error", (err) => {
-        errored = true;
-        req.destroy(err);
-      });
-      data.on("close", () => {
-        if (!ended && !errored) {
-          abort(new CanceledError_default("Request stream has been aborted", config, req));
-        }
-      });
-      data.pipe(req);
-    } else {
-      data && req.write(data);
-      req.end();
-    }
-  });
-};
+      },
+    );
+  };
 
 // node_modules/axios/lib/helpers/isURLSameOrigin.js
-var isURLSameOrigin_default = platform_default.hasStandardBrowserEnv ? /* @__PURE__ */ ((origin2, isMSIE) => (url2) => {
-  url2 = new URL(url2, platform_default.origin);
-  return origin2.protocol === url2.protocol && origin2.host === url2.host && (isMSIE || origin2.port === url2.port);
-})(
-  new URL(platform_default.origin),
-  platform_default.navigator && /(msie|trident)/i.test(platform_default.navigator.userAgent)
-) : () => true;
+var isURLSameOrigin_default = platform_default.hasStandardBrowserEnv
+  ? /* @__PURE__ */ ((origin2, isMSIE) => (url2) => {
+      url2 = new URL(url2, platform_default.origin);
+      return (
+        origin2.protocol === url2.protocol &&
+        origin2.host === url2.host &&
+        (isMSIE || origin2.port === url2.port)
+      );
+    })(
+      new URL(platform_default.origin),
+      platform_default.navigator &&
+        /(msie|trident)/i.test(platform_default.navigator.userAgent),
+    )
+  : () => true;
 
 // node_modules/axios/lib/helpers/cookies.js
-var cookies_default = platform_default.hasStandardBrowserEnv ? (
-  // Standard browser envs support document.cookie
-  {
-    write(name, value, expires, path3, domain, secure, sameSite) {
-      if (typeof document === "undefined")
-        return;
-      const cookie = [`${name}=${encodeURIComponent(value)}`];
-      if (utils_default.isNumber(expires)) {
-        cookie.push(`expires=${new Date(expires).toUTCString()}`);
-      }
-      if (utils_default.isString(path3)) {
-        cookie.push(`path=${path3}`);
-      }
-      if (utils_default.isString(domain)) {
-        cookie.push(`domain=${domain}`);
-      }
-      if (secure === true) {
-        cookie.push("secure");
-      }
-      if (utils_default.isString(sameSite)) {
-        cookie.push(`SameSite=${sameSite}`);
-      }
-      document.cookie = cookie.join("; ");
-    },
-    read(name) {
-      if (typeof document === "undefined")
+var cookies_default = platform_default.hasStandardBrowserEnv
+  ? // Standard browser envs support document.cookie
+    {
+      write(name, value, expires, path3, domain, secure, sameSite) {
+        if (typeof document === "undefined") return;
+        const cookie = [`${name}=${encodeURIComponent(value)}`];
+        if (utils_default.isNumber(expires)) {
+          cookie.push(`expires=${new Date(expires).toUTCString()}`);
+        }
+        if (utils_default.isString(path3)) {
+          cookie.push(`path=${path3}`);
+        }
+        if (utils_default.isString(domain)) {
+          cookie.push(`domain=${domain}`);
+        }
+        if (secure === true) {
+          cookie.push("secure");
+        }
+        if (utils_default.isString(sameSite)) {
+          cookie.push(`SameSite=${sameSite}`);
+        }
+        document.cookie = cookie.join("; ");
+      },
+      read(name) {
+        if (typeof document === "undefined") return null;
+        const match = document.cookie.match(
+          new RegExp("(?:^|; )" + name + "=([^;]*)"),
+        );
+        return match ? decodeURIComponent(match[1]) : null;
+      },
+      remove(name) {
+        this.write(name, "", Date.now() - 864e5, "/");
+      },
+    }
+  : // Non-standard browser env (web workers, react-native) lack needed support.
+    {
+      write() {},
+      read() {
         return null;
-      const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
-      return match ? decodeURIComponent(match[1]) : null;
-    },
-    remove(name) {
-      this.write(name, "", Date.now() - 864e5, "/");
-    }
-  }
-) : (
-  // Non-standard browser env (web workers, react-native) lack needed support.
-  {
-    write() {
-    },
-    read() {
-      return null;
-    },
-    remove() {
-    }
-  }
-);
+      },
+      remove() {},
+    };
 
 // node_modules/axios/lib/core/mergeConfig.js
-var headersToObject = (thing) => thing instanceof AxiosHeaders_default ? { ...thing } : thing;
+var headersToObject = (thing) =>
+  thing instanceof AxiosHeaders_default ? { ...thing } : thing;
 function mergeConfig(config1, config2) {
   config2 = config2 || {};
   const config = {};
   function getMergedValue(target, source, prop, caseless) {
-    if (utils_default.isPlainObject(target) && utils_default.isPlainObject(source)) {
+    if (
+      utils_default.isPlainObject(target) &&
+      utils_default.isPlainObject(source)
+    ) {
       return utils_default.merge.call({ caseless }, target, source);
     } else if (utils_default.isPlainObject(source)) {
       return utils_default.merge({}, source);
@@ -14239,17 +15107,25 @@ function mergeConfig(config1, config2) {
     socketPath: defaultToConfig2,
     responseEncoding: defaultToConfig2,
     validateStatus: mergeDirectKeys,
-    headers: (a, b, prop) => mergeDeepProperties(headersToObject(a), headersToObject(b), prop, true)
+    headers: (a, b, prop) =>
+      mergeDeepProperties(headersToObject(a), headersToObject(b), prop, true),
   };
   utils_default.forEach(
     Object.keys({ ...config1, ...config2 }),
     function computeConfigValue(prop) {
-      if (prop === "__proto__" || prop === "constructor" || prop === "prototype")
+      if (
+        prop === "__proto__" ||
+        prop === "constructor" ||
+        prop === "prototype"
+      )
         return;
-      const merge2 = utils_default.hasOwnProp(mergeMap, prop) ? mergeMap[prop] : mergeDeepProperties;
+      const merge2 = utils_default.hasOwnProp(mergeMap, prop)
+        ? mergeMap[prop]
+        : mergeDeepProperties;
       const configValue = merge2(config1[prop], config2[prop], prop);
-      utils_default.isUndefined(configValue) && merge2 !== mergeDirectKeys || (config[prop] = configValue);
-    }
+      (utils_default.isUndefined(configValue) && merge2 !== mergeDirectKeys) ||
+        (config[prop] = configValue);
+    },
   );
   return config;
 }
@@ -14257,17 +15133,34 @@ function mergeConfig(config1, config2) {
 // node_modules/axios/lib/helpers/resolveConfig.js
 var resolveConfig_default = (config) => {
   const newConfig = mergeConfig({}, config);
-  let { data, withXSRFToken, xsrfHeaderName, xsrfCookieName, headers, auth } = newConfig;
+  let { data, withXSRFToken, xsrfHeaderName, xsrfCookieName, headers, auth } =
+    newConfig;
   newConfig.headers = headers = AxiosHeaders_default.from(headers);
-  newConfig.url = buildURL(buildFullPath(newConfig.baseURL, newConfig.url, newConfig.allowAbsoluteUrls), config.params, config.paramsSerializer);
+  newConfig.url = buildURL(
+    buildFullPath(
+      newConfig.baseURL,
+      newConfig.url,
+      newConfig.allowAbsoluteUrls,
+    ),
+    config.params,
+    config.paramsSerializer,
+  );
   if (auth) {
     headers.set(
       "Authorization",
-      "Basic " + btoa((auth.username || "") + ":" + (auth.password ? unescape(encodeURIComponent(auth.password)) : ""))
+      "Basic " +
+        btoa(
+          (auth.username || "") +
+            ":" +
+            (auth.password ? unescape(encodeURIComponent(auth.password)) : ""),
+        ),
     );
   }
   if (utils_default.isFormData(data)) {
-    if (platform_default.hasStandardBrowserEnv || platform_default.hasStandardBrowserWebWorkerEnv) {
+    if (
+      platform_default.hasStandardBrowserEnv ||
+      platform_default.hasStandardBrowserWebWorkerEnv
+    ) {
       headers.setContentType(void 0);
     } else if (utils_default.isFunction(data.getHeaders)) {
       const formHeaders = data.getHeaders();
@@ -14280,9 +15173,17 @@ var resolveConfig_default = (config) => {
     }
   }
   if (platform_default.hasStandardBrowserEnv) {
-    withXSRFToken && utils_default.isFunction(withXSRFToken) && (withXSRFToken = withXSRFToken(newConfig));
-    if (withXSRFToken || withXSRFToken !== false && isURLSameOrigin_default(newConfig.url)) {
-      const xsrfValue = xsrfHeaderName && xsrfCookieName && cookies_default.read(xsrfCookieName);
+    withXSRFToken &&
+      utils_default.isFunction(withXSRFToken) &&
+      (withXSRFToken = withXSRFToken(newConfig));
+    if (
+      withXSRFToken ||
+      (withXSRFToken !== false && isURLSameOrigin_default(newConfig.url))
+    ) {
+      const xsrfValue =
+        xsrfHeaderName &&
+        xsrfCookieName &&
+        cookies_default.read(xsrfCookieName);
       if (xsrfValue) {
         headers.set(xsrfHeaderName, xsrfValue);
       }
@@ -14293,158 +15194,224 @@ var resolveConfig_default = (config) => {
 
 // node_modules/axios/lib/adapters/xhr.js
 var isXHRAdapterSupported = typeof XMLHttpRequest !== "undefined";
-var xhr_default = isXHRAdapterSupported && function(config) {
-  return new Promise(function dispatchXhrRequest(resolve3, reject) {
-    const _config = resolveConfig_default(config);
-    let requestData = _config.data;
-    const requestHeaders = AxiosHeaders_default.from(_config.headers).normalize();
-    let { responseType, onUploadProgress, onDownloadProgress } = _config;
-    let onCanceled;
-    let uploadThrottled, downloadThrottled;
-    let flushUpload, flushDownload;
-    function done() {
-      flushUpload && flushUpload();
-      flushDownload && flushDownload();
-      _config.cancelToken && _config.cancelToken.unsubscribe(onCanceled);
-      _config.signal && _config.signal.removeEventListener("abort", onCanceled);
-    }
-    let request = new XMLHttpRequest();
-    request.open(_config.method.toUpperCase(), _config.url, true);
-    request.timeout = _config.timeout;
-    function onloadend() {
-      if (!request) {
-        return;
+var xhr_default =
+  isXHRAdapterSupported &&
+  function (config) {
+    return new Promise(function dispatchXhrRequest(resolve3, reject) {
+      const _config = resolveConfig_default(config);
+      let requestData = _config.data;
+      const requestHeaders = AxiosHeaders_default.from(
+        _config.headers,
+      ).normalize();
+      let { responseType, onUploadProgress, onDownloadProgress } = _config;
+      let onCanceled;
+      let uploadThrottled, downloadThrottled;
+      let flushUpload, flushDownload;
+      function done() {
+        flushUpload && flushUpload();
+        flushDownload && flushDownload();
+        _config.cancelToken && _config.cancelToken.unsubscribe(onCanceled);
+        _config.signal &&
+          _config.signal.removeEventListener("abort", onCanceled);
       }
-      const responseHeaders = AxiosHeaders_default.from(
-        "getAllResponseHeaders" in request && request.getAllResponseHeaders()
-      );
-      const responseData = !responseType || responseType === "text" || responseType === "json" ? request.responseText : request.response;
-      const response = {
-        data: responseData,
-        status: request.status,
-        statusText: request.statusText,
-        headers: responseHeaders,
-        config,
-        request
-      };
-      settle(function _resolve(value) {
-        resolve3(value);
-        done();
-      }, function _reject(err) {
-        reject(err);
-        done();
-      }, response);
-      request = null;
-    }
-    if ("onloadend" in request) {
-      request.onloadend = onloadend;
-    } else {
-      request.onreadystatechange = function handleLoad() {
-        if (!request || request.readyState !== 4) {
-          return;
-        }
-        if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf("file:") === 0)) {
-          return;
-        }
-        setTimeout(onloadend);
-      };
-    }
-    request.onabort = function handleAbort() {
-      if (!request) {
-        return;
-      }
-      reject(new AxiosError_default("Request aborted", AxiosError_default.ECONNABORTED, config, request));
-      request = null;
-    };
-    request.onerror = function handleError(event) {
-      const msg = event && event.message ? event.message : "Network Error";
-      const err = new AxiosError_default(msg, AxiosError_default.ERR_NETWORK, config, request);
-      err.event = event || null;
-      reject(err);
-      request = null;
-    };
-    request.ontimeout = function handleTimeout() {
-      let timeoutErrorMessage = _config.timeout ? "timeout of " + _config.timeout + "ms exceeded" : "timeout exceeded";
-      const transitional2 = _config.transitional || transitional_default;
-      if (_config.timeoutErrorMessage) {
-        timeoutErrorMessage = _config.timeoutErrorMessage;
-      }
-      reject(new AxiosError_default(
-        timeoutErrorMessage,
-        transitional2.clarifyTimeoutError ? AxiosError_default.ETIMEDOUT : AxiosError_default.ECONNABORTED,
-        config,
-        request
-      ));
-      request = null;
-    };
-    requestData === void 0 && requestHeaders.setContentType(null);
-    if ("setRequestHeader" in request) {
-      utils_default.forEach(requestHeaders.toJSON(), function setRequestHeader(val, key) {
-        request.setRequestHeader(key, val);
-      });
-    }
-    if (!utils_default.isUndefined(_config.withCredentials)) {
-      request.withCredentials = !!_config.withCredentials;
-    }
-    if (responseType && responseType !== "json") {
-      request.responseType = _config.responseType;
-    }
-    if (onDownloadProgress) {
-      [downloadThrottled, flushDownload] = progressEventReducer(onDownloadProgress, true);
-      request.addEventListener("progress", downloadThrottled);
-    }
-    if (onUploadProgress && request.upload) {
-      [uploadThrottled, flushUpload] = progressEventReducer(onUploadProgress);
-      request.upload.addEventListener("progress", uploadThrottled);
-      request.upload.addEventListener("loadend", flushUpload);
-    }
-    if (_config.cancelToken || _config.signal) {
-      onCanceled = (cancel) => {
+      let request = new XMLHttpRequest();
+      request.open(_config.method.toUpperCase(), _config.url, true);
+      request.timeout = _config.timeout;
+      function onloadend() {
         if (!request) {
           return;
         }
-        reject(!cancel || cancel.type ? new CanceledError_default(null, config, request) : cancel);
-        request.abort();
+        const responseHeaders = AxiosHeaders_default.from(
+          "getAllResponseHeaders" in request && request.getAllResponseHeaders(),
+        );
+        const responseData =
+          !responseType || responseType === "text" || responseType === "json"
+            ? request.responseText
+            : request.response;
+        const response = {
+          data: responseData,
+          status: request.status,
+          statusText: request.statusText,
+          headers: responseHeaders,
+          config,
+          request,
+        };
+        settle(
+          function _resolve(value) {
+            resolve3(value);
+            done();
+          },
+          function _reject(err) {
+            reject(err);
+            done();
+          },
+          response,
+        );
+        request = null;
+      }
+      if ("onloadend" in request) {
+        request.onloadend = onloadend;
+      } else {
+        request.onreadystatechange = function handleLoad() {
+          if (!request || request.readyState !== 4) {
+            return;
+          }
+          if (
+            request.status === 0 &&
+            !(request.responseURL && request.responseURL.indexOf("file:") === 0)
+          ) {
+            return;
+          }
+          setTimeout(onloadend);
+        };
+      }
+      request.onabort = function handleAbort() {
+        if (!request) {
+          return;
+        }
+        reject(
+          new AxiosError_default(
+            "Request aborted",
+            AxiosError_default.ECONNABORTED,
+            config,
+            request,
+          ),
+        );
         request = null;
       };
-      _config.cancelToken && _config.cancelToken.subscribe(onCanceled);
-      if (_config.signal) {
-        _config.signal.aborted ? onCanceled() : _config.signal.addEventListener("abort", onCanceled);
+      request.onerror = function handleError(event) {
+        const msg = event && event.message ? event.message : "Network Error";
+        const err = new AxiosError_default(
+          msg,
+          AxiosError_default.ERR_NETWORK,
+          config,
+          request,
+        );
+        err.event = event || null;
+        reject(err);
+        request = null;
+      };
+      request.ontimeout = function handleTimeout() {
+        let timeoutErrorMessage = _config.timeout
+          ? "timeout of " + _config.timeout + "ms exceeded"
+          : "timeout exceeded";
+        const transitional2 = _config.transitional || transitional_default;
+        if (_config.timeoutErrorMessage) {
+          timeoutErrorMessage = _config.timeoutErrorMessage;
+        }
+        reject(
+          new AxiosError_default(
+            timeoutErrorMessage,
+            transitional2.clarifyTimeoutError
+              ? AxiosError_default.ETIMEDOUT
+              : AxiosError_default.ECONNABORTED,
+            config,
+            request,
+          ),
+        );
+        request = null;
+      };
+      requestData === void 0 && requestHeaders.setContentType(null);
+      if ("setRequestHeader" in request) {
+        utils_default.forEach(
+          requestHeaders.toJSON(),
+          function setRequestHeader(val, key) {
+            request.setRequestHeader(key, val);
+          },
+        );
       }
-    }
-    const protocol = parseProtocol(_config.url);
-    if (protocol && platform_default.protocols.indexOf(protocol) === -1) {
-      reject(new AxiosError_default("Unsupported protocol " + protocol + ":", AxiosError_default.ERR_BAD_REQUEST, config));
-      return;
-    }
-    request.send(requestData || null);
-  });
-};
+      if (!utils_default.isUndefined(_config.withCredentials)) {
+        request.withCredentials = !!_config.withCredentials;
+      }
+      if (responseType && responseType !== "json") {
+        request.responseType = _config.responseType;
+      }
+      if (onDownloadProgress) {
+        [downloadThrottled, flushDownload] = progressEventReducer(
+          onDownloadProgress,
+          true,
+        );
+        request.addEventListener("progress", downloadThrottled);
+      }
+      if (onUploadProgress && request.upload) {
+        [uploadThrottled, flushUpload] = progressEventReducer(onUploadProgress);
+        request.upload.addEventListener("progress", uploadThrottled);
+        request.upload.addEventListener("loadend", flushUpload);
+      }
+      if (_config.cancelToken || _config.signal) {
+        onCanceled = (cancel) => {
+          if (!request) {
+            return;
+          }
+          reject(
+            !cancel || cancel.type
+              ? new CanceledError_default(null, config, request)
+              : cancel,
+          );
+          request.abort();
+          request = null;
+        };
+        _config.cancelToken && _config.cancelToken.subscribe(onCanceled);
+        if (_config.signal) {
+          _config.signal.aborted
+            ? onCanceled()
+            : _config.signal.addEventListener("abort", onCanceled);
+        }
+      }
+      const protocol = parseProtocol(_config.url);
+      if (protocol && platform_default.protocols.indexOf(protocol) === -1) {
+        reject(
+          new AxiosError_default(
+            "Unsupported protocol " + protocol + ":",
+            AxiosError_default.ERR_BAD_REQUEST,
+            config,
+          ),
+        );
+        return;
+      }
+      request.send(requestData || null);
+    });
+  };
 
 // node_modules/axios/lib/helpers/composeSignals.js
 var composeSignals = (signals, timeout) => {
-  const { length } = signals = signals ? signals.filter(Boolean) : [];
+  const { length } = (signals = signals ? signals.filter(Boolean) : []);
   if (timeout || length) {
     let controller = new AbortController();
     let aborted;
-    const onabort = function(reason) {
+    const onabort = function (reason) {
       if (!aborted) {
         aborted = true;
         unsubscribe();
         const err = reason instanceof Error ? reason : this.reason;
-        controller.abort(err instanceof AxiosError_default ? err : new CanceledError_default(err instanceof Error ? err.message : err));
+        controller.abort(
+          err instanceof AxiosError_default
+            ? err
+            : new CanceledError_default(
+                err instanceof Error ? err.message : err,
+              ),
+        );
       }
     };
-    let timer = timeout && setTimeout(() => {
-      timer = null;
-      onabort(new AxiosError_default(`timeout of ${timeout}ms exceeded`, AxiosError_default.ETIMEDOUT));
-    }, timeout);
+    let timer =
+      timeout &&
+      setTimeout(() => {
+        timer = null;
+        onabort(
+          new AxiosError_default(
+            `timeout of ${timeout}ms exceeded`,
+            AxiosError_default.ETIMEDOUT,
+          ),
+        );
+      }, timeout);
     const unsubscribe = () => {
       if (signals) {
         timer && clearTimeout(timer);
         timer = null;
         signals.forEach((signal2) => {
-          signal2.unsubscribe ? signal2.unsubscribe(onabort) : signal2.removeEventListener("abort", onabort);
+          signal2.unsubscribe
+            ? signal2.unsubscribe(onabort)
+            : signal2.removeEventListener("abort", onabort);
         });
         signals = null;
       }
@@ -14484,7 +15451,7 @@ var readStream = async function* (stream4) {
   }
   const reader = stream4.getReader();
   try {
-    for (; ; ) {
+    for (;;) {
       const { done, value } = await reader.read();
       if (done) {
         break;
@@ -14505,33 +15472,36 @@ var trackStream = (stream4, chunkSize, onProgress, onFinish) => {
       onFinish && onFinish(e);
     }
   };
-  return new ReadableStream({
-    async pull(controller) {
-      try {
-        const { done: done2, value } = await iterator2.next();
-        if (done2) {
-          _onFinish();
-          controller.close();
-          return;
+  return new ReadableStream(
+    {
+      async pull(controller) {
+        try {
+          const { done: done2, value } = await iterator2.next();
+          if (done2) {
+            _onFinish();
+            controller.close();
+            return;
+          }
+          let len = value.byteLength;
+          if (onProgress) {
+            let loadedBytes = (bytes += len);
+            onProgress(loadedBytes);
+          }
+          controller.enqueue(new Uint8Array(value));
+        } catch (err) {
+          _onFinish(err);
+          throw err;
         }
-        let len = value.byteLength;
-        if (onProgress) {
-          let loadedBytes = bytes += len;
-          onProgress(loadedBytes);
-        }
-        controller.enqueue(new Uint8Array(value));
-      } catch (err) {
-        _onFinish(err);
-        throw err;
-      }
+      },
+      cancel(reason) {
+        _onFinish(reason);
+        return iterator2.return();
+      },
     },
-    cancel(reason) {
-      _onFinish(reason);
-      return iterator2.return();
-    }
-  }, {
-    highWaterMark: 2
-  });
+    {
+      highWaterMark: 2,
+    },
+  );
 };
 
 // node_modules/axios/lib/adapters/fetch.js
@@ -14539,12 +15509,10 @@ var DEFAULT_CHUNK_SIZE = 64 * 1024;
 var { isFunction: isFunction2 } = utils_default;
 var globalFetchAPI = (({ Request, Response }) => ({
   Request,
-  Response
+  Response,
 }))(utils_default.global);
-var {
-  ReadableStream: ReadableStream2,
-  TextEncoder: TextEncoder2
-} = utils_default.global;
+var { ReadableStream: ReadableStream2, TextEncoder: TextEncoder2 } =
+  utils_default.global;
 var test = (fn, ...args) => {
   try {
     return !!fn(...args);
@@ -14553,45 +15521,71 @@ var test = (fn, ...args) => {
   }
 };
 var factory = (env4) => {
-  env4 = utils_default.merge.call({
-    skipUndefined: true
-  }, globalFetchAPI, env4);
+  env4 = utils_default.merge.call(
+    {
+      skipUndefined: true,
+    },
+    globalFetchAPI,
+    env4,
+  );
   const { fetch: envFetch, Request, Response } = env4;
-  const isFetchSupported = envFetch ? isFunction2(envFetch) : typeof fetch === "function";
+  const isFetchSupported = envFetch
+    ? isFunction2(envFetch)
+    : typeof fetch === "function";
   const isRequestSupported = isFunction2(Request);
   const isResponseSupported = isFunction2(Response);
   if (!isFetchSupported) {
     return false;
   }
-  const isReadableStreamSupported = isFetchSupported && isFunction2(ReadableStream2);
-  const encodeText = isFetchSupported && (typeof TextEncoder2 === "function" ? /* @__PURE__ */ ((encoder) => (str) => encoder.encode(str))(new TextEncoder2()) : async (str) => new Uint8Array(await new Request(str).arrayBuffer()));
-  const supportsRequestStream = isRequestSupported && isReadableStreamSupported && test(() => {
-    let duplexAccessed = false;
-    const hasContentType = new Request(platform_default.origin, {
-      body: new ReadableStream2(),
-      method: "POST",
-      get duplex() {
-        duplexAccessed = true;
-        return "half";
-      }
-    }).headers.has("Content-Type");
-    return duplexAccessed && !hasContentType;
-  });
-  const supportsResponseStream = isResponseSupported && isReadableStreamSupported && test(() => utils_default.isReadableStream(new Response("").body));
-  const resolvers = {
-    stream: supportsResponseStream && ((res) => res.body)
-  };
-  isFetchSupported && (() => {
-    ["text", "arrayBuffer", "blob", "formData", "stream"].forEach((type) => {
-      !resolvers[type] && (resolvers[type] = (res, config) => {
-        let method = res && res[type];
-        if (method) {
-          return method.call(res);
-        }
-        throw new AxiosError_default(`Response type '${type}' is not supported`, AxiosError_default.ERR_NOT_SUPPORT, config);
-      });
+  const isReadableStreamSupported =
+    isFetchSupported && isFunction2(ReadableStream2);
+  const encodeText =
+    isFetchSupported &&
+    (typeof TextEncoder2 === "function"
+      ? /* @__PURE__ */ (
+          (encoder) => (str) =>
+            encoder.encode(str)
+        )(new TextEncoder2())
+      : async (str) => new Uint8Array(await new Request(str).arrayBuffer()));
+  const supportsRequestStream =
+    isRequestSupported &&
+    isReadableStreamSupported &&
+    test(() => {
+      let duplexAccessed = false;
+      const hasContentType = new Request(platform_default.origin, {
+        body: new ReadableStream2(),
+        method: "POST",
+        get duplex() {
+          duplexAccessed = true;
+          return "half";
+        },
+      }).headers.has("Content-Type");
+      return duplexAccessed && !hasContentType;
     });
-  })();
+  const supportsResponseStream =
+    isResponseSupported &&
+    isReadableStreamSupported &&
+    test(() => utils_default.isReadableStream(new Response("").body));
+  const resolvers = {
+    stream: supportsResponseStream && ((res) => res.body),
+  };
+  isFetchSupported &&
+    (() => {
+      ["text", "arrayBuffer", "blob", "formData", "stream"].forEach((type) => {
+        !resolvers[type] &&
+          (resolvers[type] = (res, config) => {
+            let method = res && res[type];
+            if (method) {
+              return method.call(res);
+            }
+            throw new AxiosError_default(
+              `Response type '${type}' is not supported`,
+              AxiosError_default.ERR_NOT_SUPPORT,
+              config,
+            );
+          });
+      });
+    })();
   const getBodyLength = async (body) => {
     if (body == null) {
       return 0;
@@ -14602,11 +15596,14 @@ var factory = (env4) => {
     if (utils_default.isSpecCompliantForm(body)) {
       const _request = new Request(platform_default.origin, {
         method: "POST",
-        body
+        body,
       });
       return (await _request.arrayBuffer()).byteLength;
     }
-    if (utils_default.isArrayBufferView(body) || utils_default.isArrayBuffer(body)) {
+    if (
+      utils_default.isArrayBufferView(body) ||
+      utils_default.isArrayBuffer(body)
+    ) {
       return body.byteLength;
     }
     if (utils_default.isURLSearchParams(body)) {
@@ -14633,39 +15630,60 @@ var factory = (env4) => {
       responseType,
       headers,
       withCredentials = "same-origin",
-      fetchOptions
+      fetchOptions,
     } = resolveConfig_default(config);
     let _fetch = envFetch || fetch;
     responseType = responseType ? (responseType + "").toLowerCase() : "text";
-    let composedSignal = composeSignals_default([signal, cancelToken && cancelToken.toAbortSignal()], timeout);
+    let composedSignal = composeSignals_default(
+      [signal, cancelToken && cancelToken.toAbortSignal()],
+      timeout,
+    );
     let request = null;
-    const unsubscribe = composedSignal && composedSignal.unsubscribe && (() => {
-      composedSignal.unsubscribe();
-    });
+    const unsubscribe =
+      composedSignal &&
+      composedSignal.unsubscribe &&
+      (() => {
+        composedSignal.unsubscribe();
+      });
     let requestContentLength;
     try {
-      if (onUploadProgress && supportsRequestStream && method !== "get" && method !== "head" && (requestContentLength = await resolveBodyLength(headers, data)) !== 0) {
+      if (
+        onUploadProgress &&
+        supportsRequestStream &&
+        method !== "get" &&
+        method !== "head" &&
+        (requestContentLength = await resolveBodyLength(headers, data)) !== 0
+      ) {
         let _request = new Request(url2, {
           method: "POST",
           body: data,
-          duplex: "half"
+          duplex: "half",
         });
         let contentTypeHeader;
-        if (utils_default.isFormData(data) && (contentTypeHeader = _request.headers.get("content-type"))) {
+        if (
+          utils_default.isFormData(data) &&
+          (contentTypeHeader = _request.headers.get("content-type"))
+        ) {
           headers.setContentType(contentTypeHeader);
         }
         if (_request.body) {
           const [onProgress, flush] = progressEventDecorator(
             requestContentLength,
-            progressEventReducer(asyncDecorator(onUploadProgress))
+            progressEventReducer(asyncDecorator(onUploadProgress)),
           );
-          data = trackStream(_request.body, DEFAULT_CHUNK_SIZE, onProgress, flush);
+          data = trackStream(
+            _request.body,
+            DEFAULT_CHUNK_SIZE,
+            onProgress,
+            flush,
+          );
         }
       }
       if (!utils_default.isString(withCredentials)) {
         withCredentials = withCredentials ? "include" : "omit";
       }
-      const isCredentialsSupported = isRequestSupported && "credentials" in Request.prototype;
+      const isCredentialsSupported =
+        isRequestSupported && "credentials" in Request.prototype;
       const resolvedOptions = {
         ...fetchOptions,
         signal: composedSignal,
@@ -14673,31 +15691,45 @@ var factory = (env4) => {
         headers: headers.normalize().toJSON(),
         body: data,
         duplex: "half",
-        credentials: isCredentialsSupported ? withCredentials : void 0
+        credentials: isCredentialsSupported ? withCredentials : void 0,
       };
       request = isRequestSupported && new Request(url2, resolvedOptions);
-      let response = await (isRequestSupported ? _fetch(request, fetchOptions) : _fetch(url2, resolvedOptions));
-      const isStreamResponse = supportsResponseStream && (responseType === "stream" || responseType === "response");
-      if (supportsResponseStream && (onDownloadProgress || isStreamResponse && unsubscribe)) {
+      let response = await (isRequestSupported
+        ? _fetch(request, fetchOptions)
+        : _fetch(url2, resolvedOptions));
+      const isStreamResponse =
+        supportsResponseStream &&
+        (responseType === "stream" || responseType === "response");
+      if (
+        supportsResponseStream &&
+        (onDownloadProgress || (isStreamResponse && unsubscribe))
+      ) {
         const options = {};
         ["status", "statusText", "headers"].forEach((prop) => {
           options[prop] = response[prop];
         });
-        const responseContentLength = utils_default.toFiniteNumber(response.headers.get("content-length"));
-        const [onProgress, flush] = onDownloadProgress && progressEventDecorator(
-          responseContentLength,
-          progressEventReducer(asyncDecorator(onDownloadProgress), true)
-        ) || [];
+        const responseContentLength = utils_default.toFiniteNumber(
+          response.headers.get("content-length"),
+        );
+        const [onProgress, flush] =
+          (onDownloadProgress &&
+            progressEventDecorator(
+              responseContentLength,
+              progressEventReducer(asyncDecorator(onDownloadProgress), true),
+            )) ||
+          [];
         response = new Response(
           trackStream(response.body, DEFAULT_CHUNK_SIZE, onProgress, () => {
             flush && flush();
             unsubscribe && unsubscribe();
           }),
-          options
+          options,
         );
       }
       responseType = responseType || "text";
-      let responseData = await resolvers[utils_default.findKey(resolvers, responseType) || "text"](response, config);
+      let responseData = await resolvers[
+        utils_default.findKey(resolvers, responseType) || "text"
+      ](response, config);
       !isStreamResponse && unsubscribe && unsubscribe();
       return await new Promise((resolve3, reject) => {
         settle(resolve3, reject, {
@@ -14706,37 +15738,54 @@ var factory = (env4) => {
           status: response.status,
           statusText: response.statusText,
           config,
-          request
+          request,
         });
       });
     } catch (err) {
       unsubscribe && unsubscribe();
-      if (err && err.name === "TypeError" && /Load failed|fetch/i.test(err.message)) {
+      if (
+        err &&
+        err.name === "TypeError" &&
+        /Load failed|fetch/i.test(err.message)
+      ) {
         throw Object.assign(
-          new AxiosError_default("Network Error", AxiosError_default.ERR_NETWORK, config, request, err && err.response),
+          new AxiosError_default(
+            "Network Error",
+            AxiosError_default.ERR_NETWORK,
+            config,
+            request,
+            err && err.response,
+          ),
           {
-            cause: err.cause || err
-          }
+            cause: err.cause || err,
+          },
         );
       }
-      throw AxiosError_default.from(err, err && err.code, config, request, err && err.response);
+      throw AxiosError_default.from(
+        err,
+        err && err.code,
+        config,
+        request,
+        err && err.response,
+      );
     }
   };
 };
 var seedCache = /* @__PURE__ */ new Map();
 var getFetch = (config) => {
-  let env4 = config && config.env || {};
+  let env4 = (config && config.env) || {};
   const { fetch: fetch2, Request, Response } = env4;
-  const seeds = [
-    Request,
-    Response,
-    fetch2
-  ];
-  let len = seeds.length, i = len, seed, target, map = seedCache;
+  const seeds = [Request, Response, fetch2];
+  let len = seeds.length,
+    i = len,
+    seed,
+    target,
+    map = seedCache;
   while (i--) {
     seed = seeds[i];
     target = map.get(seed);
-    target === void 0 && map.set(seed, target = i ? /* @__PURE__ */ new Map() : factory(env4));
+    target === void 0 &&
+      map.set(seed, (target = i ? /* @__PURE__ */ new Map() : factory(env4)));
     map = target;
   }
   return target;
@@ -14748,20 +15797,20 @@ var knownAdapters = {
   http: http_default,
   xhr: xhr_default,
   fetch: {
-    get: getFetch
-  }
+    get: getFetch,
+  },
 };
 utils_default.forEach(knownAdapters, (fn, value) => {
   if (fn) {
     try {
       Object.defineProperty(fn, "name", { value });
-    } catch (e) {
-    }
+    } catch (e) {}
     Object.defineProperty(fn, "adapterName", { value });
   }
 });
 var renderReason = (reason) => `- ${reason}`;
-var isResolvedHandle = (adapter2) => utils_default.isFunction(adapter2) || adapter2 === null || adapter2 === false;
+var isResolvedHandle = (adapter2) =>
+  utils_default.isFunction(adapter2) || adapter2 === null || adapter2 === false;
 function getAdapter(adapters, config) {
   adapters = utils_default.isArray(adapters) ? adapters : [adapters];
   const { length } = adapters;
@@ -14778,19 +15827,30 @@ function getAdapter(adapters, config) {
         throw new AxiosError_default(`Unknown adapter '${id}'`);
       }
     }
-    if (adapter2 && (utils_default.isFunction(adapter2) || (adapter2 = adapter2.get(config)))) {
+    if (
+      adapter2 &&
+      (utils_default.isFunction(adapter2) || (adapter2 = adapter2.get(config)))
+    ) {
       break;
     }
     rejectedReasons[id || "#" + i] = adapter2;
   }
   if (!adapter2) {
     const reasons = Object.entries(rejectedReasons).map(
-      ([id, state]) => `adapter ${id} ` + (state === false ? "is not supported by the environment" : "is not available in the build")
+      ([id, state]) =>
+        `adapter ${id} ` +
+        (state === false
+          ? "is not supported by the environment"
+          : "is not available in the build"),
     );
-    let s = length ? reasons.length > 1 ? "since :\n" + reasons.map(renderReason).join("\n") : " " + renderReason(reasons[0]) : "as no adapter specified";
+    let s = length
+      ? reasons.length > 1
+        ? "since :\n" + reasons.map(renderReason).join("\n")
+        : " " + renderReason(reasons[0])
+      : "as no adapter specified";
     throw new AxiosError_default(
       `There is no suitable adapter to dispatch the request ` + s,
-      "ERR_NOT_SUPPORT"
+      "ERR_NOT_SUPPORT",
     );
   }
   return adapter2;
@@ -14805,7 +15865,7 @@ var adapters_default = {
    * Exposes all known adapters
    * @type {Object<string, Function|Object>}
    */
-  adapters: knownAdapters
+  adapters: knownAdapters,
 };
 
 // node_modules/axios/lib/core/dispatchRequest.js
@@ -14820,56 +15880,74 @@ function throwIfCancellationRequested(config) {
 function dispatchRequest(config) {
   throwIfCancellationRequested(config);
   config.headers = AxiosHeaders_default.from(config.headers);
-  config.data = transformData.call(
-    config,
-    config.transformRequest
-  );
+  config.data = transformData.call(config, config.transformRequest);
   if (["post", "put", "patch"].indexOf(config.method) !== -1) {
     config.headers.setContentType("application/x-www-form-urlencoded", false);
   }
-  const adapter2 = adapters_default.getAdapter(config.adapter || defaults_default.adapter, config);
-  return adapter2(config).then(function onAdapterResolution(response) {
-    throwIfCancellationRequested(config);
-    response.data = transformData.call(
-      config,
-      config.transformResponse,
-      response
-    );
-    response.headers = AxiosHeaders_default.from(response.headers);
-    return response;
-  }, function onAdapterRejection(reason) {
-    if (!isCancel(reason)) {
+  const adapter2 = adapters_default.getAdapter(
+    config.adapter || defaults_default.adapter,
+    config,
+  );
+  return adapter2(config).then(
+    function onAdapterResolution(response) {
       throwIfCancellationRequested(config);
-      if (reason && reason.response) {
-        reason.response.data = transformData.call(
-          config,
-          config.transformResponse,
-          reason.response
-        );
-        reason.response.headers = AxiosHeaders_default.from(reason.response.headers);
+      response.data = transformData.call(
+        config,
+        config.transformResponse,
+        response,
+      );
+      response.headers = AxiosHeaders_default.from(response.headers);
+      return response;
+    },
+    function onAdapterRejection(reason) {
+      if (!isCancel(reason)) {
+        throwIfCancellationRequested(config);
+        if (reason && reason.response) {
+          reason.response.data = transformData.call(
+            config,
+            config.transformResponse,
+            reason.response,
+          );
+          reason.response.headers = AxiosHeaders_default.from(
+            reason.response.headers,
+          );
+        }
       }
-    }
-    return Promise.reject(reason);
-  });
+      return Promise.reject(reason);
+    },
+  );
 }
 
 // node_modules/axios/lib/helpers/validator.js
 var validators = {};
-["object", "boolean", "number", "function", "string", "symbol"].forEach((type, i) => {
-  validators[type] = function validator(thing) {
-    return typeof thing === type || "a" + (i < 1 ? "n " : " ") + type;
-  };
-});
+["object", "boolean", "number", "function", "string", "symbol"].forEach(
+  (type, i) => {
+    validators[type] = function validator(thing) {
+      return typeof thing === type || "a" + (i < 1 ? "n " : " ") + type;
+    };
+  },
+);
 var deprecatedWarnings = {};
 validators.transitional = function transitional(validator, version, message) {
   function formatMessage(opt, desc) {
-    return "[Axios v" + VERSION + "] Transitional option '" + opt + "'" + desc + (message ? ". " + message : "");
+    return (
+      "[Axios v" +
+      VERSION +
+      "] Transitional option '" +
+      opt +
+      "'" +
+      desc +
+      (message ? ". " + message : "")
+    );
   }
   return (value, opt, opts) => {
     if (validator === false) {
       throw new AxiosError_default(
-        formatMessage(opt, " has been removed" + (version ? " in " + version : "")),
-        AxiosError_default.ERR_DEPRECATED
+        formatMessage(
+          opt,
+          " has been removed" + (version ? " in " + version : ""),
+        ),
+        AxiosError_default.ERR_DEPRECATED,
       );
     }
     if (version && !deprecatedWarnings[opt]) {
@@ -14877,8 +15955,10 @@ validators.transitional = function transitional(validator, version, message) {
       console.warn(
         formatMessage(
           opt,
-          " has been deprecated since v" + version + " and will be removed in the near future"
-        )
+          " has been deprecated since v" +
+            version +
+            " and will be removed in the near future",
+        ),
       );
     }
     return validator ? validator(value, opt, opts) : true;
@@ -14892,7 +15972,10 @@ validators.spelling = function spelling(correctSpelling) {
 };
 function assertOptions(options, schema, allowUnknown) {
   if (typeof options !== "object") {
-    throw new AxiosError_default("options must be an object", AxiosError_default.ERR_BAD_OPTION_VALUE);
+    throw new AxiosError_default(
+      "options must be an object",
+      AxiosError_default.ERR_BAD_OPTION_VALUE,
+    );
   }
   const keys = Object.keys(options);
   let i = keys.length;
@@ -14903,18 +15986,24 @@ function assertOptions(options, schema, allowUnknown) {
       const value = options[opt];
       const result = value === void 0 || validator(value, opt, options);
       if (result !== true) {
-        throw new AxiosError_default("option " + opt + " must be " + result, AxiosError_default.ERR_BAD_OPTION_VALUE);
+        throw new AxiosError_default(
+          "option " + opt + " must be " + result,
+          AxiosError_default.ERR_BAD_OPTION_VALUE,
+        );
       }
       continue;
     }
     if (allowUnknown !== true) {
-      throw new AxiosError_default("Unknown option " + opt, AxiosError_default.ERR_BAD_OPTION);
+      throw new AxiosError_default(
+        "Unknown option " + opt,
+        AxiosError_default.ERR_BAD_OPTION,
+      );
     }
   }
 }
 var validator_default = {
   assertOptions,
-  validators
+  validators,
 };
 
 // node_modules/axios/lib/core/Axios.js
@@ -14924,7 +16013,7 @@ var Axios = class {
     this.defaults = instanceConfig || {};
     this.interceptors = {
       request: new InterceptorManager_default(),
-      response: new InterceptorManager_default()
+      response: new InterceptorManager_default(),
     };
   }
   /**
@@ -14941,16 +16030,20 @@ var Axios = class {
     } catch (err) {
       if (err instanceof Error) {
         let dummy = {};
-        Error.captureStackTrace ? Error.captureStackTrace(dummy) : dummy = new Error();
+        Error.captureStackTrace
+          ? Error.captureStackTrace(dummy)
+          : (dummy = new Error());
         const stack = dummy.stack ? dummy.stack.replace(/^.+\n/, "") : "";
         try {
           if (!err.stack) {
             err.stack = stack;
-          } else if (stack && !String(err.stack).endsWith(stack.replace(/^.+\n.+\n/, ""))) {
+          } else if (
+            stack &&
+            !String(err.stack).endsWith(stack.replace(/^.+\n.+\n/, ""))
+          ) {
             err.stack += "\n" + stack;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
       throw err;
     }
@@ -14965,23 +16058,33 @@ var Axios = class {
     config = mergeConfig(this.defaults, config);
     const { transitional: transitional2, paramsSerializer, headers } = config;
     if (transitional2 !== void 0) {
-      validator_default.assertOptions(transitional2, {
-        silentJSONParsing: validators2.transitional(validators2.boolean),
-        forcedJSONParsing: validators2.transitional(validators2.boolean),
-        clarifyTimeoutError: validators2.transitional(validators2.boolean),
-        legacyInterceptorReqResOrdering: validators2.transitional(validators2.boolean)
-      }, false);
+      validator_default.assertOptions(
+        transitional2,
+        {
+          silentJSONParsing: validators2.transitional(validators2.boolean),
+          forcedJSONParsing: validators2.transitional(validators2.boolean),
+          clarifyTimeoutError: validators2.transitional(validators2.boolean),
+          legacyInterceptorReqResOrdering: validators2.transitional(
+            validators2.boolean,
+          ),
+        },
+        false,
+      );
     }
     if (paramsSerializer != null) {
       if (utils_default.isFunction(paramsSerializer)) {
         config.paramsSerializer = {
-          serialize: paramsSerializer
+          serialize: paramsSerializer,
         };
       } else {
-        validator_default.assertOptions(paramsSerializer, {
-          encode: validators2.function,
-          serialize: validators2.function
-        }, true);
+        validator_default.assertOptions(
+          paramsSerializer,
+          {
+            encode: validators2.function,
+            serialize: validators2.function,
+          },
+          true,
+        );
       }
     }
     if (config.allowAbsoluteUrls !== void 0) {
@@ -14990,41 +16093,66 @@ var Axios = class {
     } else {
       config.allowAbsoluteUrls = true;
     }
-    validator_default.assertOptions(config, {
-      baseUrl: validators2.spelling("baseURL"),
-      withXsrfToken: validators2.spelling("withXSRFToken")
-    }, true);
-    config.method = (config.method || this.defaults.method || "get").toLowerCase();
-    let contextHeaders = headers && utils_default.merge(
-      headers.common,
-      headers[config.method]
+    validator_default.assertOptions(
+      config,
+      {
+        baseUrl: validators2.spelling("baseURL"),
+        withXsrfToken: validators2.spelling("withXSRFToken"),
+      },
+      true,
     );
-    headers && utils_default.forEach(
-      ["delete", "get", "head", "post", "put", "patch", "common"],
-      (method) => {
-        delete headers[method];
-      }
-    );
+    config.method = (
+      config.method ||
+      this.defaults.method ||
+      "get"
+    ).toLowerCase();
+    let contextHeaders =
+      headers && utils_default.merge(headers.common, headers[config.method]);
+    headers &&
+      utils_default.forEach(
+        ["delete", "get", "head", "post", "put", "patch", "common"],
+        (method) => {
+          delete headers[method];
+        },
+      );
     config.headers = AxiosHeaders_default.concat(contextHeaders, headers);
     const requestInterceptorChain = [];
     let synchronousRequestInterceptors = true;
-    this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
-      if (typeof interceptor.runWhen === "function" && interceptor.runWhen(config) === false) {
-        return;
-      }
-      synchronousRequestInterceptors = synchronousRequestInterceptors && interceptor.synchronous;
-      const transitional3 = config.transitional || transitional_default;
-      const legacyInterceptorReqResOrdering = transitional3 && transitional3.legacyInterceptorReqResOrdering;
-      if (legacyInterceptorReqResOrdering) {
-        requestInterceptorChain.unshift(interceptor.fulfilled, interceptor.rejected);
-      } else {
-        requestInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
-      }
-    });
+    this.interceptors.request.forEach(
+      function unshiftRequestInterceptors(interceptor) {
+        if (
+          typeof interceptor.runWhen === "function" &&
+          interceptor.runWhen(config) === false
+        ) {
+          return;
+        }
+        synchronousRequestInterceptors =
+          synchronousRequestInterceptors && interceptor.synchronous;
+        const transitional3 = config.transitional || transitional_default;
+        const legacyInterceptorReqResOrdering =
+          transitional3 && transitional3.legacyInterceptorReqResOrdering;
+        if (legacyInterceptorReqResOrdering) {
+          requestInterceptorChain.unshift(
+            interceptor.fulfilled,
+            interceptor.rejected,
+          );
+        } else {
+          requestInterceptorChain.push(
+            interceptor.fulfilled,
+            interceptor.rejected,
+          );
+        }
+      },
+    );
     const responseInterceptorChain = [];
-    this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
-      responseInterceptorChain.push(interceptor.fulfilled, interceptor.rejected);
-    });
+    this.interceptors.response.forEach(
+      function pushResponseInterceptors(interceptor) {
+        responseInterceptorChain.push(
+          interceptor.fulfilled,
+          interceptor.rejected,
+        );
+      },
+    );
     let promise;
     let i = 0;
     let len;
@@ -15059,41 +16187,60 @@ var Axios = class {
     i = 0;
     len = responseInterceptorChain.length;
     while (i < len) {
-      promise = promise.then(responseInterceptorChain[i++], responseInterceptorChain[i++]);
+      promise = promise.then(
+        responseInterceptorChain[i++],
+        responseInterceptorChain[i++],
+      );
     }
     return promise;
   }
   getUri(config) {
     config = mergeConfig(this.defaults, config);
-    const fullPath = buildFullPath(config.baseURL, config.url, config.allowAbsoluteUrls);
+    const fullPath = buildFullPath(
+      config.baseURL,
+      config.url,
+      config.allowAbsoluteUrls,
+    );
     return buildURL(fullPath, config.params, config.paramsSerializer);
   }
 };
-utils_default.forEach(["delete", "get", "head", "options"], function forEachMethodNoData(method) {
-  Axios.prototype[method] = function(url2, config) {
-    return this.request(mergeConfig(config || {}, {
-      method,
-      url: url2,
-      data: (config || {}).data
-    }));
-  };
-});
-utils_default.forEach(["post", "put", "patch"], function forEachMethodWithData(method) {
-  function generateHTTPMethod(isForm) {
-    return function httpMethod(url2, data, config) {
-      return this.request(mergeConfig(config || {}, {
-        method,
-        headers: isForm ? {
-          "Content-Type": "multipart/form-data"
-        } : {},
-        url: url2,
-        data
-      }));
+utils_default.forEach(
+  ["delete", "get", "head", "options"],
+  function forEachMethodNoData(method) {
+    Axios.prototype[method] = function (url2, config) {
+      return this.request(
+        mergeConfig(config || {}, {
+          method,
+          url: url2,
+          data: (config || {}).data,
+        }),
+      );
     };
-  }
-  Axios.prototype[method] = generateHTTPMethod();
-  Axios.prototype[method + "Form"] = generateHTTPMethod(true);
-});
+  },
+);
+utils_default.forEach(
+  ["post", "put", "patch"],
+  function forEachMethodWithData(method) {
+    function generateHTTPMethod(isForm) {
+      return function httpMethod(url2, data, config) {
+        return this.request(
+          mergeConfig(config || {}, {
+            method,
+            headers: isForm
+              ? {
+                  "Content-Type": "multipart/form-data",
+                }
+              : {},
+            url: url2,
+            data,
+          }),
+        );
+      };
+    }
+    Axios.prototype[method] = generateHTTPMethod();
+    Axios.prototype[method + "Form"] = generateHTTPMethod(true);
+  },
+);
 var Axios_default = Axios;
 
 // node_modules/axios/lib/cancel/CancelToken.js
@@ -15108,8 +16255,7 @@ var CancelToken = class _CancelToken {
     });
     const token = this;
     this.promise.then((cancel) => {
-      if (!token._listeners)
-        return;
+      if (!token._listeners) return;
       let i = token._listeners.length;
       while (i-- > 0) {
         token._listeners[i](cancel);
@@ -15189,7 +16335,7 @@ var CancelToken = class _CancelToken {
     });
     return {
       token,
-      cancel
+      cancel,
     };
   }
 };
@@ -15277,7 +16423,7 @@ var HttpStatusCode = {
   OriginIsUnreachable: 523,
   TimeoutOccurred: 524,
   SslHandshakeFailed: 525,
-  InvalidSslCertificate: 526
+  InvalidSslCertificate: 526,
 };
 Object.entries(HttpStatusCode).forEach(([key, value]) => {
   HttpStatusCode[value] = key;
@@ -15288,7 +16434,9 @@ var HttpStatusCode_default = HttpStatusCode;
 function createInstance(defaultConfig) {
   const context = new Axios_default(defaultConfig);
   const instance = bind(Axios_default.prototype.request, context);
-  utils_default.extend(instance, Axios_default.prototype, context, { allOwnKeys: true });
+  utils_default.extend(instance, Axios_default.prototype, context, {
+    allOwnKeys: true,
+  });
   utils_default.extend(instance, context, null, { allOwnKeys: true });
   instance.create = function create(instanceConfig) {
     return createInstance(mergeConfig(defaultConfig, instanceConfig));
@@ -15311,7 +16459,10 @@ axios.spread = spread;
 axios.isAxiosError = isAxiosError;
 axios.mergeConfig = mergeConfig;
 axios.AxiosHeaders = AxiosHeaders_default;
-axios.formToJSON = (thing) => formDataToJSON_default(utils_default.isHTMLForm(thing) ? new FormData(thing) : thing);
+axios.formToJSON = (thing) =>
+  formDataToJSON_default(
+    utils_default.isHTMLForm(thing) ? new FormData(thing) : thing,
+  );
 axios.getAdapter = adapters_default.getAdapter;
 axios.HttpStatusCode = HttpStatusCode_default;
 axios.default = axios;
@@ -15334,7 +16485,7 @@ var {
   HttpStatusCode: HttpStatusCode2,
   formToJSON,
   getAdapter: getAdapter2,
-  mergeConfig: mergeConfig2
+  mergeConfig: mergeConfig2,
 } = axios_default;
 
 // src/utils/config.ts
@@ -15348,7 +16499,7 @@ function getConfig() {
     syncInterval: config.get("syncInterval", 300),
     targetFile: config.get("targetFile", ".env.local"),
     environment: config.get("environment", "development"),
-    preventCopyOnRevoke: config.get("preventCopyOnRevoke", true)
+    preventCopyOnRevoke: config.get("preventCopyOnRevoke", true),
   };
 }
 function getServerUrl() {
@@ -15368,6 +16519,15 @@ function shouldAutoSync() {
 }
 function shouldPreventCopyOnRevoke() {
   return getConfig().preventCopyOnRevoke;
+}
+function getRealTimeSyncInterval() {
+  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  const seconds = config.get("realTimeSyncInterval", 5);
+  return Math.max(2, Math.min(30, seconds)) * 1e3;
+}
+function isRealTimeSyncEnabled() {
+  const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  return config.get("enableRealTimeSync", true);
 }
 
 // src/services/auth.ts
@@ -15391,48 +16551,76 @@ var AuthService = class {
     await this.context.globalState.update("pendingAuthSession", sessionToken);
     const authUrl = `${serverUrl}/extension/auth?session=${sessionToken}`;
     await vscode2.env.openExternal(vscode2.Uri.parse(authUrl));
-    const result = await vscode2.window.showInformationMessage(
-      'Complete sign-in in your browser, then click "Check Sign In" to verify.',
-      "Check Sign In",
-      "Cancel"
-    );
-    if (result !== "Check Sign In") {
-      await this.context.globalState.update("pendingAuthSession", void 0);
-      return false;
-    }
-    return this.checkAuthStatus(sessionToken);
+    return this.pollForAuthCompletion(sessionToken);
   }
   /**
-   * Check if the auth session has been completed on the server
+   * Poll the server for auth completion with a progress indicator.
+   * Automatically detects when the user completes sign-in in the browser.
    */
-  async checkAuthStatus(sessionToken) {
+  async pollForAuthCompletion(sessionToken) {
     const serverUrl = getServerUrl();
-    try {
-      const response = await axios_default.get(
-        `${serverUrl}${AUTH_CHECK_PATH}`,
-        {
-          params: { session: sessionToken },
-          timeout: 1e4
+    const POLL_INTERVAL_MS = 2e3;
+    const MAX_POLL_DURATION_MS = 12e4;
+    return vscode2.window.withProgress(
+      {
+        location: vscode2.ProgressLocation.Notification,
+        title: "ENV Connect: Waiting for sign-in...",
+        cancellable: true,
+      },
+      async (progress, cancellationToken) => {
+        const startTime = Date.now();
+        let attempts = 0;
+        progress.report({ message: "Complete sign-in in your browser" });
+        while (!cancellationToken.isCancellationRequested) {
+          if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
+            await this.context.globalState.update("pendingAuthSession", void 0);
+            vscode2.window.showWarningMessage(
+              "Sign-in timed out. Please try again.",
+            );
+            return false;
+          }
+          if (attempts > 0) {
+            await new Promise((resolve3) => {
+              const timer = setTimeout(resolve3, POLL_INTERVAL_MS);
+              cancellationToken.onCancellationRequested(() => {
+                clearTimeout(timer);
+                resolve3();
+              });
+            });
+          }
+          if (cancellationToken.isCancellationRequested) {
+            break;
+          }
+          attempts++;
+          progress.report({
+            message: `Waiting for browser sign-in... (${Math.floor((Date.now() - startTime) / 1e3)}s)`,
+          });
+          try {
+            const response = await axios_default.get(
+              `${serverUrl}${AUTH_CHECK_PATH}`,
+              {
+                params: { session: sessionToken },
+                timeout: 1e4,
+              },
+            );
+            if (response.data.data) {
+              await this.storage.setAuthSession(response.data.data);
+              this._onAuthStateChanged.fire(response.data.data);
+              await this.context.globalState.update(
+                "pendingAuthSession",
+                void 0,
+              );
+              vscode2.window.showInformationMessage(
+                `Signed in as ${response.data.data.user.email}`,
+              );
+              return true;
+            }
+          } catch {}
         }
-      );
-      if (response.data.data) {
-        await this.storage.setAuthSession(response.data.data);
-        this._onAuthStateChanged.fire(response.data.data);
         await this.context.globalState.update("pendingAuthSession", void 0);
-        vscode2.window.showInformationMessage(
-          `Signed in as ${response.data.data.user.email}`
-        );
-        return true;
-      }
-      vscode2.window.showWarningMessage(
-        "Sign-in not completed. Please try again."
-      );
-      return false;
-    } catch (error) {
-      const message = error instanceof AxiosError2 ? error.response?.data?.error || error.message : "Unknown error";
-      vscode2.window.showErrorMessage(`Sign-in failed: ${message}`);
-      return false;
-    }
+        return false;
+      },
+    );
   }
   /**
    * Sign out and clear stored credentials
@@ -15475,7 +16663,7 @@ var AuthService = class {
       const response = await axios_default.post(
         `${serverUrl}/api/extension/auth/refresh`,
         { refreshToken: session.refreshToken },
-        { timeout: 1e4 }
+        { timeout: 1e4 },
       );
       if (response.data.data) {
         await this.storage.setAuthSession(response.data.data);
@@ -15502,10 +16690,10 @@ var AuthService = class {
         `${serverUrl}/api/extension/auth/validate`,
         {
           headers: {
-            Authorization: `Bearer ${session.accessToken}`
+            Authorization: `Bearer ${session.accessToken}`,
           },
-          timeout: 1e4
-        }
+          timeout: 1e4,
+        },
       );
       return response.data.data?.valid === true;
     } catch {
@@ -15524,10 +16712,11 @@ function generateSessionToken() {
 var ApiService = class {
   client;
   storage;
+  roleCache = /* @__PURE__ */ new Map();
   constructor(storage) {
     this.storage = storage;
     this.client = axios_default.create({
-      timeout: 3e4
+      timeout: 3e4,
     });
     this.client.interceptors.request.use(async (config) => {
       config.baseURL = getServerUrl();
@@ -15542,28 +16731,25 @@ var ApiService = class {
       (error) => {
         const message = error.response?.data?.error || error.message;
         throw new Error(message);
-      }
+      },
     );
   }
   // Organizations
   async getOrganizations() {
-    const response = await this.client.get(
-      "/api/extension/organizations"
-    );
+    const response = await this.client.get("/api/extension/organizations");
     return response.data.data?.organizations || [];
   }
   // Projects
   async getProjects(organizationId) {
-    const response = await this.client.get(
-      "/api/extension/projects",
-      { params: organizationId ? { organizationId } : void 0 }
-    );
+    const response = await this.client.get("/api/extension/projects", {
+      params: organizationId ? { organizationId } : void 0,
+    });
     return response.data.data?.projects || [];
   }
   async getProject(projectId) {
     try {
       const response = await this.client.get(
-        `/api/extension/projects/${projectId}`
+        `/api/extension/projects/${projectId}`,
       );
       return response.data.data?.project || null;
     } catch {
@@ -15576,26 +16762,29 @@ var ApiService = class {
     if (accessToken) {
       headers["X-Access-Token"] = accessToken;
     }
-    const response = await this.client.get(
-      "/api/extension/variables",
-      {
-        params: { projectId, environment },
-        headers
-      }
-    );
+    const response = await this.client.get("/api/extension/variables", {
+      params: { projectId, environment },
+      headers,
+    });
+    if (response.data.data?.role) {
+      this.roleCache.set(projectId, response.data.data.role);
+    }
     return response.data.data?.variables || [];
+  }
+  /**
+   * Get the cached role for a project (populated after getVariables call)
+   */
+  getUserRole(projectId) {
+    return this.roleCache.get(projectId);
   }
   // Project Access (Extension Linking)
   async linkExtension(projectId, deviceInfo, expiresInDays) {
-    const response = await this.client.post(
-      "/api/extension/link",
-      {
-        projectId,
-        deviceId: deviceInfo.deviceId,
-        deviceName: deviceInfo.deviceName,
-        expiresInDays: expiresInDays || 30
-      }
-    );
+    const response = await this.client.post("/api/extension/link", {
+      projectId,
+      deviceId: deviceInfo.deviceId,
+      deviceName: deviceInfo.deviceName,
+      expiresInDays: expiresInDays || 30,
+    });
     if (!response.data.data?.access) {
       throw new Error("Failed to link extension");
     }
@@ -15604,24 +16793,25 @@ var ApiService = class {
   async unlinkExtension(projectId, deviceId) {
     await this.client.post("/api/extension/unlink", {
       projectId,
-      deviceId
+      deviceId,
     });
   }
   async validateAccessToken(accessToken) {
-    const response = await this.client.post(
-      "/api/extension/validate-token",
-      { accessToken }
+    const response = await this.client.post("/api/extension/validate-token", {
+      accessToken,
+    });
+    return (
+      response.data.data || {
+        valid: false,
+        reason: "Invalid response from server",
+      }
     );
-    return response.data.data || {
-      valid: false,
-      reason: "Invalid response from server"
-    };
   }
   async refreshAccessToken(accessToken, expiresInDays) {
-    const response = await this.client.post(
-      "/api/extension/refresh-token",
-      { accessToken, expiresInDays: expiresInDays || 30 }
-    );
+    const response = await this.client.post("/api/extension/refresh-token", {
+      accessToken,
+      expiresInDays: expiresInDays || 30,
+    });
     if (!response.data.data?.expiresAt) {
       throw new Error("Failed to refresh access token");
     }
@@ -15633,9 +16823,54 @@ var ApiService = class {
   // Check if extension access is enabled for the organization's tier
   async checkExtensionAccess(organizationId) {
     const response = await this.client.get(
-      `/api/extension/check-access/${organizationId}`
+      `/api/extension/check-access/${organizationId}`,
     );
     return response.data.data || { enabled: false, reason: "Unknown error" };
+  }
+  /**
+   * Check for permission revocation events for multiple access tokens
+   * Used for real-time sync to detect immediate revocations
+   */
+  async checkPermissionEvents(accessTokens) {
+    const response = await this.client.post(
+      "/api/extension/permission-events",
+      { accessTokens },
+    );
+    return response.data.data || { events: [], hasRevocations: false };
+  }
+  /**
+   * Acknowledge that revocation events have been processed
+   * Requires an access token to authenticate the acknowledgment
+   */
+  async acknowledgeRevocations(eventIds, accessToken) {
+    const response = await this.client.post(
+      "/api/extension/acknowledge-revocation",
+      { eventIds, accessToken },
+    );
+    return response.data.data || { acknowledgedCount: 0 };
+  }
+  // Variable Requests
+  /**
+   * Submit a variable request (members only)
+   */
+  async submitVariableRequest(request) {
+    const response = await this.client.post(
+      "/api/extension/variable-requests",
+      request,
+    );
+    if (!response.data.data?.request) {
+      throw new Error("Failed to submit variable request");
+    }
+    return response.data.data.request;
+  }
+  /**
+   * Get variable requests for a project
+   */
+  async getVariableRequests(projectId, status) {
+    const response = await this.client.get("/api/extension/variable-requests", {
+      params: { projectId, status },
+    });
+    return response.data.data?.requests || [];
   }
 };
 
@@ -15680,6 +16915,7 @@ var ENV_FILE_HEADER = `# ENV Connect - Synced Environment Variables
 var SyncService = class {
   api;
   storage;
+  fileProtection = null;
   syncTimer = null;
   failureCount = 0;
   MAX_BACKOFF_MULTIPLIER = 8;
@@ -15690,6 +16926,12 @@ var SyncService = class {
   constructor(api, storage) {
     this.api = api;
     this.storage = storage;
+  }
+  /**
+   * Set the file protection service for read-only enforcement
+   */
+  setFileProtection(fileProtection) {
+    this.fileProtection = fileProtection;
   }
   /**
    * Start periodic sync checking with exponential backoff on failures
@@ -15705,7 +16947,10 @@ var SyncService = class {
    */
   scheduleNextSync() {
     const baseInterval = getSyncInterval();
-    const backoffMultiplier = Math.min(Math.pow(2, this.failureCount), this.MAX_BACKOFF_MULTIPLIER);
+    const backoffMultiplier = Math.min(
+      Math.pow(2, this.failureCount),
+      this.MAX_BACKOFF_MULTIPLIER,
+    );
     const interval = baseInterval * backoffMultiplier;
     this.syncTimer = setTimeout(async () => {
       const success = await this.checkAllLinkedProjectsV2();
@@ -15737,7 +16982,10 @@ var SyncService = class {
       try {
         await this.checkProjectPermissions(project);
       } catch (error) {
-        console.error(`Failed to check permissions for ${project.projectName}:`, error);
+        console.error(
+          `Failed to check permissions for ${project.projectName}:`,
+          error,
+        );
         allSuccessful = false;
       }
     }
@@ -15753,7 +17001,10 @@ var SyncService = class {
     }
     const validation = await this.api.validateAccessToken(project.accessToken);
     if (!validation.valid) {
-      await this.handlePermissionRevoked(project, validation.reason || "Unknown");
+      await this.handlePermissionRevoked(
+        project,
+        validation.reason || "Unknown",
+      );
     }
     return validation;
   }
@@ -15765,10 +17016,13 @@ var SyncService = class {
     if (shouldPreventCopyOnRevoke()) {
       await this.deleteEnvFile(project);
     }
-    await this.storage.removeLinkedProject(project.projectId, project.workspacePath);
+    await this.storage.removeLinkedProject(
+      project.projectId,
+      project.workspacePath,
+    );
     vscode3.window.showWarningMessage(
       `Access revoked for "${project.projectName}": ${reason}. The synced .env file has been removed.`,
-      "OK"
+      "OK",
     );
   }
   /**
@@ -15782,43 +17036,53 @@ var SyncService = class {
           success: false,
           variablesCount: 0,
           targetFile: project.targetFile,
-          error: "Access token expired"
+          error: "Access token expired",
         };
       }
-      const validation = await this.api.validateAccessToken(project.accessToken);
+      const validation = await this.api.validateAccessToken(
+        project.accessToken,
+      );
       if (!validation.valid) {
-        await this.handlePermissionRevoked(project, validation.reason || "Unknown");
+        await this.handlePermissionRevoked(
+          project,
+          validation.reason || "Unknown",
+        );
         return {
           success: false,
           variablesCount: 0,
           targetFile: project.targetFile,
-          error: validation.reason
+          error: validation.reason,
         };
       }
       const variables = await this.api.getVariables(
         project.projectId,
         project.environment,
-        project.accessToken
+        project.accessToken,
       );
       await this.writeEnvFile(project, variables);
-      await this.storage.updateLinkedProject(project.projectId, project.workspacePath, {
-        lastSyncedAt: Date.now()
-      });
+      await this.storage.updateLinkedProject(
+        project.projectId,
+        project.workspacePath,
+        {
+          lastSyncedAt: Date.now(),
+        },
+      );
       await this.api.updateLastUsed(project.accessToken);
       const result = {
         success: true,
         variablesCount: variables.length,
-        targetFile: project.targetFile
+        targetFile: project.targetFile,
       };
       this._onSyncComplete.fire(result);
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       const result = {
         success: false,
         variablesCount: 0,
         targetFile: project.targetFile,
-        error: errorMessage
+        error: errorMessage,
       };
       this._onSyncComplete.fire(result);
       return result;
@@ -15833,10 +17097,11 @@ var SyncService = class {
       vscode3.window.showWarningMessage("No workspace folder open");
       return null;
     }
-    const linkedProject = await this.storage.getLinkedProjectForWorkspace(workspacePath);
+    const linkedProject =
+      await this.storage.getLinkedProjectForWorkspace(workspacePath);
     if (!linkedProject) {
       vscode3.window.showWarningMessage(
-        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.'
+        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.',
       );
       return null;
     }
@@ -15847,12 +17112,20 @@ var SyncService = class {
    * Validates that the target path is within the workspace to prevent path traversal
    */
   async writeEnvFile(project, variables) {
-    const envFilePath = path2.resolve(project.workspacePath, project.targetFile);
+    const envFilePath = path2.resolve(
+      project.workspacePath,
+      project.targetFile,
+    );
     const normalizedWorkspace = path2.resolve(project.workspacePath);
-    if (!envFilePath.startsWith(normalizedWorkspace + path2.sep) && envFilePath !== normalizedWorkspace) {
+    if (
+      !envFilePath.startsWith(normalizedWorkspace + path2.sep) &&
+      envFilePath !== normalizedWorkspace
+    ) {
       throw new Error("Target file path must be within workspace");
     }
-    let content = ENV_FILE_HEADER.replace("{projectName}", project.projectName).replace("{environment}", project.environment).replace("{syncedAt}", (/* @__PURE__ */ new Date()).toISOString());
+    let content = ENV_FILE_HEADER.replace("{projectName}", project.projectName)
+      .replace("{environment}", project.environment)
+      .replace("{syncedAt}", /* @__PURE__ */ new Date().toISOString());
     const regularVars = variables.filter((v) => !v.isSensitive);
     const sensitiveVars = variables.filter((v) => v.isSensitive);
     if (regularVars.length > 0) {
@@ -15878,7 +17151,19 @@ var SyncService = class {
 `;
       }
     }
+    try {
+      await fs.chmod(envFilePath, 420);
+    } catch {}
     await fs.writeFile(envFilePath, content, "utf-8");
+    const role = this.api.getUserRole(project.projectId);
+    if (role === "member") {
+      await fs.chmod(envFilePath, 292);
+      if (this.fileProtection) {
+        this.fileProtection.watchFile(envFilePath, async () => {
+          await this.syncProject(project);
+        });
+      }
+    }
   }
   /**
    * Format a value for .env file (handle quotes and special characters)
@@ -15886,7 +17171,11 @@ var SyncService = class {
   formatValue(value) {
     const needsQuoting = /[\s#"'`$\\]|[\x00-\x1f]/;
     if (needsQuoting.test(value)) {
-      const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+      const escaped = value
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r");
       return `"${escaped}"`;
     }
     return value;
@@ -15895,21 +17184,36 @@ var SyncService = class {
    * Delete the synced .env file
    */
   async deleteEnvFile(project) {
-    const envFilePath = path2.resolve(project.workspacePath, project.targetFile);
+    const envFilePath = path2.resolve(
+      project.workspacePath,
+      project.targetFile,
+    );
     const normalizedWorkspace = path2.resolve(project.workspacePath);
-    if (!envFilePath.startsWith(normalizedWorkspace + path2.sep) && envFilePath !== normalizedWorkspace) {
+    if (
+      !envFilePath.startsWith(normalizedWorkspace + path2.sep) &&
+      envFilePath !== normalizedWorkspace
+    ) {
       return;
+    }
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
     }
     try {
       await fs.access(envFilePath);
+      await fs.chmod(envFilePath, 420);
       await fs.unlink(envFilePath);
-    } catch {
-    }
+    } catch {}
   }
   /**
    * Link a project to the current workspace
    */
-  async linkProject(projectId, projectName, organizationName, accessToken, expiresAt) {
+  async linkProject(
+    projectId,
+    projectName,
+    organizationName,
+    accessToken,
+    expiresAt,
+  ) {
     const workspacePath = this.getCurrentWorkspacePath();
     if (!workspacePath) {
       vscode3.window.showWarningMessage("No workspace folder open");
@@ -15924,7 +17228,7 @@ var SyncService = class {
       environment: getEnvironment(),
       targetFile: getTargetFile(),
       lastSyncedAt: null,
-      workspacePath
+      workspacePath,
     };
     await this.storage.addLinkedProject(linkedProject);
     await this.syncProject(linkedProject);
@@ -15938,7 +17242,8 @@ var SyncService = class {
     if (!workspacePath) {
       return;
     }
-    const linkedProject = await this.storage.getLinkedProjectForWorkspace(workspacePath);
+    const linkedProject =
+      await this.storage.getLinkedProjectForWorkspace(workspacePath);
     if (linkedProject && linkedProject.projectId === projectId) {
       if (shouldPreventCopyOnRevoke()) {
         await this.deleteEnvFile(linkedProject);
@@ -15979,7 +17284,10 @@ var SyncService = class {
       try {
         await this.checkProjectPermissionsV2(project);
       } catch (error) {
-        console.error(`Failed to check permissions for ${project.projectName}:`, error);
+        console.error(
+          `Failed to check permissions for ${project.projectName}:`,
+          error,
+        );
         allSuccessful = false;
       }
     }
@@ -15995,7 +17303,10 @@ var SyncService = class {
     }
     const validation = await this.api.validateAccessToken(project.accessToken);
     if (!validation.valid) {
-      await this.handlePermissionRevokedV2(project, validation.reason || "Unknown");
+      await this.handlePermissionRevokedV2(
+        project,
+        validation.reason || "Unknown",
+      );
     }
     return validation;
   }
@@ -16010,14 +17321,17 @@ var SyncService = class {
     await this.storage.removeLinkedProjectV2(project.projectId);
     vscode3.window.showWarningMessage(
       `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
-      "OK"
+      "OK",
     );
   }
   /**
    * Check for existing .env file conflicts
    */
   async checkForConflicts(directoryPath, targetFile) {
-    const envFilePath = path2.resolve(toPlatformPath(directoryPath), targetFile);
+    const envFilePath = path2.resolve(
+      toPlatformPath(directoryPath),
+      targetFile,
+    );
     try {
       const content = await fs.readFile(envFilePath, "utf-8");
       const keys = this.parseEnvKeys(content);
@@ -16025,7 +17339,7 @@ var SyncService = class {
         hasConflict: true,
         existingFile: envFilePath,
         existingVariableCount: keys.length,
-        existingKeys: keys
+        existingKeys: keys,
       };
     } catch {
       return { hasConflict: false };
@@ -16052,8 +17366,13 @@ var SyncService = class {
    * Create a backup of an existing .env file
    */
   async backupEnvFile(directoryPath, targetFile) {
-    const envFilePath = path2.resolve(toPlatformPath(directoryPath), targetFile);
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const envFilePath = path2.resolve(
+      toPlatformPath(directoryPath),
+      targetFile,
+    );
+    const timestamp = /* @__PURE__ */ new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-");
     const backupPath = `${envFilePath}.backup-${timestamp}`;
     await fs.copyFile(envFilePath, backupPath);
     return backupPath;
@@ -16071,7 +17390,10 @@ var SyncService = class {
         if (eqIndex > 0) {
           const key = trimmed.substring(0, eqIndex);
           let value = trimmed.substring(eqIndex + 1);
-          if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
+          if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+          ) {
             value = value.slice(1, -1);
           }
           vars.set(key, value);
@@ -16083,18 +17405,28 @@ var SyncService = class {
   /**
    * Merge existing .env file with new variables
    */
-  async mergeEnvFiles(directoryPath, targetFile, projectName, environments, newVariables) {
-    const envFilePath = path2.resolve(toPlatformPath(directoryPath), targetFile);
+  async mergeEnvFiles(
+    directoryPath,
+    targetFile,
+    projectName,
+    environments,
+    newVariables,
+  ) {
+    const envFilePath = path2.resolve(
+      toPlatformPath(directoryPath),
+      targetFile,
+    );
     let existingVars = /* @__PURE__ */ new Map();
     try {
       const content = await fs.readFile(envFilePath, "utf-8");
       existingVars = this.parseEnvFile(content);
-    } catch {
-    }
+    } catch {}
     for (const variable of newVariables) {
       existingVars.set(variable.key, variable.value);
     }
-    let mergedContent = ENV_FILE_HEADER.replace("{projectName}", projectName).replace("{environment}", environments).replace("{syncedAt}", (/* @__PURE__ */ new Date()).toISOString());
+    let mergedContent = ENV_FILE_HEADER.replace("{projectName}", projectName)
+      .replace("{environment}", environments)
+      .replace("{syncedAt}", /* @__PURE__ */ new Date().toISOString());
     for (const [key, value] of existingVars) {
       mergedContent += `${key}=${this.formatValue(value)}
 `;
@@ -16106,23 +17438,29 @@ var SyncService = class {
    */
   async syncDirectory(project, directory) {
     try {
-      const validation = await this.api.validateAccessToken(project.accessToken);
+      const validation = await this.api.validateAccessToken(
+        project.accessToken,
+      );
       if (!validation.valid) {
         return {
           success: false,
           variablesCount: 0,
           targetFile: directory.targetFile,
-          error: validation.reason
+          error: validation.reason,
         };
       }
       const allVariables = [];
       for (const env4 of directory.environments) {
-        const vars = await this.api.getVariables(project.projectId, env4, project.accessToken);
+        const vars = await this.api.getVariables(
+          project.projectId,
+          env4,
+          project.accessToken,
+        );
         if (directory.environments.length > 1) {
           for (const v of vars) {
             allVariables.push({
               ...v,
-              key: `${env4.toUpperCase()}_${v.key}`
+              key: `${env4.toUpperCase()}_${v.key}`,
             });
           }
         } else {
@@ -16138,21 +17476,25 @@ var SyncService = class {
         directory.targetFile,
         project.projectName,
         directory.environments.join(", "),
-        Array.from(uniqueVars.values())
+        Array.from(uniqueVars.values()),
+        project.projectId,
       );
-      await this.storage.updateDirectorySyncTime(project.projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        project.projectId,
+        directory.directoryPath,
+      );
       await this.api.updateLastUsed(project.accessToken);
       return {
         success: true,
         variablesCount: uniqueVars.size,
-        targetFile: directory.targetFile
+        targetFile: directory.targetFile,
       };
     } catch (error) {
       return {
         success: false,
         variablesCount: 0,
         targetFile: directory.targetFile,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
@@ -16171,14 +17513,26 @@ var SyncService = class {
   /**
    * Write env file to a specific directory
    */
-  async writeEnvFileToDirectory(directoryPath, targetFile, projectName, environments, variables) {
+  async writeEnvFileToDirectory(
+    directoryPath,
+    targetFile,
+    projectName,
+    environments,
+    variables,
+    projectId,
+  ) {
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path2.resolve(platformPath, targetFile);
     const normalizedDir = path2.resolve(platformPath);
-    if (!envFilePath.startsWith(normalizedDir + path2.sep) && envFilePath !== normalizedDir) {
+    if (
+      !envFilePath.startsWith(normalizedDir + path2.sep) &&
+      envFilePath !== normalizedDir
+    ) {
       throw new Error("Target file path must be within directory");
     }
-    let content = ENV_FILE_HEADER.replace("{projectName}", projectName).replace("{environment}", environments).replace("{syncedAt}", (/* @__PURE__ */ new Date()).toISOString());
+    let content = ENV_FILE_HEADER.replace("{projectName}", projectName)
+      .replace("{environment}", environments)
+      .replace("{syncedAt}", /* @__PURE__ */ new Date().toISOString());
     const regularVars = variables.filter((v) => !v.isSensitive);
     const sensitiveVars = variables.filter((v) => v.isSensitive);
     if (regularVars.length > 0) {
@@ -16204,14 +17558,42 @@ var SyncService = class {
 `;
       }
     }
+    try {
+      await fs.chmod(envFilePath, 420);
+    } catch {}
     await fs.writeFile(envFilePath, content, "utf-8");
+    const role = projectId ? this.api.getUserRole(projectId) : void 0;
+    if (role === "member") {
+      await fs.chmod(envFilePath, 292);
+      if (this.fileProtection) {
+        const syncCallback = async () => {
+          if (projectId) {
+            const project = await this.storage.getLinkedProjectV2(projectId);
+            if (project) {
+              const dir = project.directories.find(
+                (d) =>
+                  normalizePath(d.directoryPath) ===
+                  normalizePath(directoryPath),
+              );
+              if (dir) {
+                await this.syncDirectory(project, dir);
+              }
+            }
+          }
+        };
+        this.fileProtection.watchFile(envFilePath, syncCallback);
+      }
+    }
   }
   /**
    * Delete env files from all directories when access is revoked
    */
   async cleanupAllDirectories(project) {
     for (const directory of project.directories) {
-      await this.deleteEnvFileFromDirectory(directory.directoryPath, directory.targetFile);
+      await this.deleteEnvFileFromDirectory(
+        directory.directoryPath,
+        directory.targetFile,
+      );
     }
   }
   /**
@@ -16221,31 +17603,44 @@ var SyncService = class {
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path2.resolve(platformPath, targetFile);
     const normalizedDir = path2.resolve(platformPath);
-    if (!envFilePath.startsWith(normalizedDir + path2.sep) && envFilePath !== normalizedDir) {
+    if (
+      !envFilePath.startsWith(normalizedDir + path2.sep) &&
+      envFilePath !== normalizedDir
+    ) {
       return;
+    }
+    if (this.fileProtection) {
+      this.fileProtection.unwatchFile(envFilePath);
     }
     try {
       await fs.access(envFilePath);
+      await fs.chmod(envFilePath, 420);
       await fs.unlink(envFilePath);
-    } catch {
-    }
+    } catch {}
   }
   /**
    * Link a project with directory options (V2)
    */
-  async linkProjectWithDirectory(projectId, projectName, organizationName, accessToken, expiresAt, options) {
+  async linkProjectWithDirectory(
+    projectId,
+    projectName,
+    organizationName,
+    accessToken,
+    expiresAt,
+    options,
+  ) {
     const directory = {
       directoryPath: normalizePath(options.directoryPath),
       targetFile: options.targetFile || getTargetFile(),
       environments: options.environments || [getEnvironment()],
       displayName: options.displayName,
       lastSyncedAt: null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
     if (options.conflictStrategy === "backup") {
       const conflict = await this.checkForConflicts(
         options.directoryPath,
-        directory.targetFile
+        directory.targetFile,
       );
       if (conflict.hasConflict) {
         await this.backupEnvFile(options.directoryPath, directory.targetFile);
@@ -16258,7 +17653,7 @@ var SyncService = class {
       accessToken,
       expiresAt,
       directory,
-      getEnvironment()
+      getEnvironment(),
     );
     const project = await this.storage.getLinkedProjectV2(projectId);
     if (!project) {
@@ -16268,16 +17663,19 @@ var SyncService = class {
       const variables = await this.api.getVariables(
         projectId,
         directory.environments[0],
-        accessToken
+        accessToken,
       );
       await this.mergeEnvFiles(
         directory.directoryPath,
         directory.targetFile,
         projectName,
         directory.environments.join(", "),
-        variables
+        variables,
       );
-      await this.storage.updateDirectorySyncTime(projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        projectId,
+        directory.directoryPath,
+      );
     } else if (options.conflictStrategy !== "skip") {
       await this.syncDirectory(project, directory);
     }
@@ -16293,19 +17691,21 @@ var SyncService = class {
       environments: options.environments || [getEnvironment()],
       displayName: options.displayName,
       lastSyncedAt: null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
     if (options.conflictStrategy === "backup") {
       const conflict = await this.checkForConflicts(
         options.directoryPath,
-        directory.targetFile
+        directory.targetFile,
       );
       if (conflict.hasConflict) {
         await this.backupEnvFile(options.directoryPath, directory.targetFile);
       }
     }
     await this.storage.addDirectoryToProject(project.projectId, directory);
-    const updatedProject = await this.storage.getLinkedProjectV2(project.projectId);
+    const updatedProject = await this.storage.getLinkedProjectV2(
+      project.projectId,
+    );
     if (!updatedProject) {
       return;
     }
@@ -16313,16 +17713,19 @@ var SyncService = class {
       const variables = await this.api.getVariables(
         project.projectId,
         directory.environments[0],
-        project.accessToken
+        project.accessToken,
       );
       await this.mergeEnvFiles(
         directory.directoryPath,
         directory.targetFile,
         project.projectName,
         directory.environments.join(", "),
-        variables
+        variables,
       );
-      await this.storage.updateDirectorySyncTime(project.projectId, directory.directoryPath);
+      await this.storage.updateDirectorySyncTime(
+        project.projectId,
+        directory.directoryPath,
+      );
     } else if (options.conflictStrategy !== "skip") {
       await this.syncDirectory(updatedProject, directory);
     }
@@ -16330,15 +17733,23 @@ var SyncService = class {
   /**
    * Remove a directory from a project (V2)
    */
-  async removeDirectoryFromProject(projectId, directoryPath, deleteEnvFile = true) {
+  async removeDirectoryFromProject(
+    projectId,
+    directoryPath,
+    deleteEnvFile = true,
+  ) {
     if (deleteEnvFile && shouldPreventCopyOnRevoke()) {
       const project = await this.storage.getLinkedProjectV2(projectId);
       if (project) {
         const directory = project.directories.find(
-          (d) => normalizePath(d.directoryPath) === normalizePath(directoryPath)
+          (d) =>
+            normalizePath(d.directoryPath) === normalizePath(directoryPath),
         );
         if (directory) {
-          await this.deleteEnvFileFromDirectory(directoryPath, directory.targetFile);
+          await this.deleteEnvFileFromDirectory(
+            directoryPath,
+            directory.targetFile,
+          );
         }
       }
     }
@@ -16369,10 +17780,11 @@ var SyncService = class {
       vscode3.window.showWarningMessage("No workspace folder open");
       return null;
     }
-    const linkedProject = await this.storage.getProjectForDirectory(workspacePath);
+    const linkedProject =
+      await this.storage.getProjectForDirectory(workspacePath);
     if (!linkedProject) {
       vscode3.window.showWarningMessage(
-        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.'
+        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.',
       );
       return null;
     }
@@ -16382,6 +17794,185 @@ var SyncService = class {
     this.stopPeriodicSync();
     this._onSyncComplete.dispose();
     this._onPermissionRevoked.dispose();
+  }
+};
+
+// src/services/realTimeSync.ts
+var vscode4 = __toESM(require("vscode"));
+var DEFAULT_REALTIME_INTERVAL = 5e3;
+var MAX_BACKOFF_INTERVAL = 3e4;
+var RealTimeSyncService = class {
+  api;
+  syncService;
+  storage;
+  pollTimer = null;
+  isPolling = false;
+  failureCount = 0;
+  MAX_FAILURES = 5;
+  _onRevocationDetected = new vscode4.EventEmitter();
+  onRevocationDetected = this._onRevocationDetected.event;
+  constructor(api, syncService2, storage) {
+    this.api = api;
+    this.syncService = syncService2;
+    this.storage = storage;
+  }
+  /**
+   * Start real-time sync polling
+   * This should be called when the extension activates and user is authenticated
+   */
+  async startRealTimeSync() {
+    if (this.pollTimer) {
+      return;
+    }
+    console.log("[RealTimeSync] Starting real-time permission sync");
+    this.isPolling = true;
+    this.failureCount = 0;
+    this.scheduleNextPoll();
+  }
+  /**
+   * Stop real-time sync polling
+   */
+  stopRealTimeSync() {
+    console.log("[RealTimeSync] Stopping real-time permission sync");
+    this.isPolling = false;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.failureCount = 0;
+  }
+  /**
+   * Schedule the next poll with exponential backoff on failures
+   */
+  scheduleNextPoll() {
+    if (!this.isPolling) {
+      return;
+    }
+    const baseInterval = getRealTimeSyncInterval() || DEFAULT_REALTIME_INTERVAL;
+    const backoffMultiplier = Math.min(
+      Math.pow(2, this.failureCount),
+      MAX_BACKOFF_INTERVAL / baseInterval,
+    );
+    const interval = Math.min(
+      baseInterval * backoffMultiplier,
+      MAX_BACKOFF_INTERVAL,
+    );
+    this.pollTimer = setTimeout(async () => {
+      await this.checkForRevocations();
+      this.scheduleNextPoll();
+    }, interval);
+  }
+  /**
+   * Check for permission revocations across all linked projects
+   */
+  async checkForRevocations() {
+    try {
+      const linkedProjects = await this.storage.getLinkedProjectsV2();
+      if (linkedProjects.length === 0) {
+        this.failureCount = 0;
+        return;
+      }
+      const accessTokens = linkedProjects.map((p) => p.accessToken);
+      const response = await this.api.checkPermissionEvents(accessTokens);
+      if (response.hasRevocations && response.events.length > 0) {
+        console.log(
+          `[RealTimeSync] Detected ${response.events.length} revocation event(s)`,
+        );
+        const eventsByToken = /* @__PURE__ */ new Map();
+        for (const event of response.events) {
+          await this.handleRevocationEvent(event, linkedProjects);
+          if (!eventsByToken.has(event.accessToken)) {
+            eventsByToken.set(event.accessToken, []);
+          }
+          eventsByToken.get(event.accessToken).push(event.eventId);
+        }
+        for (const [accessToken, eventIds] of eventsByToken) {
+          try {
+            await this.api.acknowledgeRevocations(eventIds, accessToken);
+          } catch (error) {
+            console.debug(
+              "[RealTimeSync] Failed to acknowledge events:",
+              error,
+            );
+          }
+        }
+      }
+      this.failureCount = 0;
+    } catch (error) {
+      this.failureCount = Math.min(this.failureCount + 1, this.MAX_FAILURES);
+      console.error("[RealTimeSync] Failed to check for revocations:", error);
+    }
+  }
+  /**
+   * Handle a single revocation event
+   */
+  async handleRevocationEvent(event, linkedProjects) {
+    const project = linkedProjects.find(
+      (p) => p.accessToken === event.accessToken,
+    );
+    if (!project) {
+      console.warn(
+        "[RealTimeSync] Revocation event for unknown project:",
+        event.projectId,
+      );
+      return;
+    }
+    console.log(
+      `[RealTimeSync] Processing revocation for project: ${project.projectName}`,
+    );
+    this._onRevocationDetected.fire({ project, reason: event.reason });
+    await this.triggerRevocationCleanup(project, event.reason);
+  }
+  /**
+   * Trigger the revocation cleanup process
+   * Clears cached variables and removes the linked project
+   */
+  async triggerRevocationCleanup(project, reason) {
+    try {
+      await this.syncService.cleanupAllDirectories(project);
+      await this.storage.removeLinkedProjectV2(project.projectId);
+      vscode4.window.showWarningMessage(
+        `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
+        "OK",
+      );
+      console.log(
+        `[RealTimeSync] Cleanup completed for project: ${project.projectName}`,
+      );
+    } catch (error) {
+      console.error(
+        "[RealTimeSync] Failed to cleanup after revocation:",
+        error,
+      );
+      try {
+        await this.storage.removeLinkedProjectV2(project.projectId);
+      } catch {}
+      vscode4.window.showErrorMessage(
+        `Access revoked for "${project.projectName}" but cleanup failed. Please manually remove any .env files.`,
+      );
+    }
+  }
+  /**
+   * Force an immediate check for revocations
+   * Useful when the extension wants to verify permissions immediately
+   */
+  async checkNow() {
+    try {
+      await this.checkForRevocations();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Clear all cached variables for a specific project
+   * This is called when a revocation is detected
+   */
+  async clearCachedVariables(project) {
+    await this.syncService.cleanupAllDirectories(project);
+  }
+  dispose() {
+    this.stopRealTimeSync();
+    this._onRevocationDetected.dispose();
   }
 };
 
@@ -16412,12 +18003,16 @@ var StorageService = class {
     if (this.migrationComplete) {
       return;
     }
-    const currentVersion = this.context.globalState.get(STORAGE_VERSION_KEY) || 1;
+    const currentVersion =
+      this.context.globalState.get(STORAGE_VERSION_KEY) || 1;
     if (currentVersion < CURRENT_STORAGE_VERSION) {
       if (currentVersion === 1) {
         await this.migrateV1ToV2();
       }
-      await this.context.globalState.update(STORAGE_VERSION_KEY, CURRENT_STORAGE_VERSION);
+      await this.context.globalState.update(
+        STORAGE_VERSION_KEY,
+        CURRENT_STORAGE_VERSION,
+      );
     }
     this.migrationComplete = true;
   }
@@ -16433,14 +18028,22 @@ var StorageService = class {
         targetFile: old.targetFile,
         environments: [old.environment],
         lastSyncedAt: old.lastSyncedAt,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
-      const existingIndex = newProjects.findIndex((p) => p.projectId === old.projectId);
+      const existingIndex = newProjects.findIndex(
+        (p) => p.projectId === old.projectId,
+      );
       if (existingIndex !== -1) {
-        newProjects[existingIndex].directories.push(directory);
-        newProjects[existingIndex].updatedAt = Date.now();
+        newProjects[existingIndex] = {
+          ...newProjects[existingIndex],
+          directories: [...newProjects[existingIndex].directories, directory],
+          updatedAt: Date.now(),
+        };
       } else {
-        const oldToken = await this.getAccessToken(old.projectId, old.workspacePath);
+        const oldToken = await this.getAccessToken(
+          old.projectId,
+          old.workspacePath,
+        );
         if (oldToken) {
           await this.setAccessTokenForProject(old.projectId, oldToken);
         }
@@ -16452,7 +18055,7 @@ var StorageService = class {
           directories: [directory],
           defaultEnvironment: old.environment,
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
         });
       }
     }
@@ -16499,7 +18102,7 @@ var StorageService = class {
    */
   async getAccessToken(projectId, workspacePath) {
     const key = `${ACCESS_TOKEN_PREFIX}${projectId}:${Buffer.from(workspacePath).toString("base64")}`;
-    return await this.context.secrets.get(key) || null;
+    return (await this.context.secrets.get(key)) || null;
   }
   /**
    * Store access token in secret storage - V1 format
@@ -16522,12 +18125,15 @@ var StorageService = class {
     const metadata = this.getLinkedProjectsMetadata();
     const projects = await Promise.all(
       metadata.map(async (m) => {
-        const accessToken = await this.getAccessToken(m.projectId, m.workspacePath);
+        const accessToken = await this.getAccessToken(
+          m.projectId,
+          m.workspacePath,
+        );
         return {
           ...m,
-          accessToken: accessToken || ""
+          accessToken: accessToken || "",
         };
-      })
+      }),
     );
     return projects.filter((p) => p.accessToken);
   }
@@ -16540,9 +18146,17 @@ var StorageService = class {
   async addLinkedProject(project) {
     const metadata = this.getLinkedProjectsMetadata();
     const filtered = metadata.filter(
-      (p) => !(p.projectId === project.projectId && p.workspacePath === project.workspacePath)
+      (p) =>
+        !(
+          p.projectId === project.projectId &&
+          p.workspacePath === project.workspacePath
+        ),
     );
-    await this.setAccessToken(project.projectId, project.workspacePath, project.accessToken);
+    await this.setAccessToken(
+      project.projectId,
+      project.workspacePath,
+      project.accessToken,
+    );
     const { accessToken, ...metadataOnly } = project;
     filtered.push(metadataOnly);
     await this.setLinkedProjectsMetadata(filtered);
@@ -16550,7 +18164,7 @@ var StorageService = class {
   async removeLinkedProject(projectId, workspacePath) {
     const metadata = this.getLinkedProjectsMetadata();
     const filtered = metadata.filter(
-      (p) => !(p.projectId === projectId && p.workspacePath === workspacePath)
+      (p) => !(p.projectId === projectId && p.workspacePath === workspacePath),
     );
     await this.deleteAccessToken(projectId, workspacePath);
     await this.setLinkedProjectsMetadata(filtered);
@@ -16561,7 +18175,10 @@ var StorageService = class {
     if (!match) {
       return null;
     }
-    const accessToken = await this.getAccessToken(match.projectId, match.workspacePath);
+    const accessToken = await this.getAccessToken(
+      match.projectId,
+      match.workspacePath,
+    );
     if (!accessToken) {
       return null;
     }
@@ -16570,11 +18187,15 @@ var StorageService = class {
   async updateLinkedProject(projectId, workspacePath, updates) {
     const metadata = this.getLinkedProjectsMetadata();
     const index = metadata.findIndex(
-      (p) => p.projectId === projectId && p.workspacePath === workspacePath
+      (p) => p.projectId === projectId && p.workspacePath === workspacePath,
     );
     if (index !== -1) {
       if (updates.accessToken) {
-        await this.setAccessToken(projectId, workspacePath, updates.accessToken);
+        await this.setAccessToken(
+          projectId,
+          workspacePath,
+          updates.accessToken,
+        );
       }
       const { accessToken, ...metadataUpdates } = updates;
       metadata[index] = { ...metadata[index], ...metadataUpdates };
@@ -16589,7 +18210,7 @@ var StorageService = class {
    */
   async getAccessTokenForProject(projectId) {
     const key = `${PROJECT_TOKEN_PREFIX}${projectId}`;
-    return await this.context.secrets.get(key) || null;
+    return (await this.context.secrets.get(key)) || null;
   }
   /**
    * Store access token for a project - V2 format
@@ -16627,7 +18248,7 @@ var StorageService = class {
       metadata.map(async (m) => {
         const accessToken = await this.getAccessTokenForProject(m.projectId);
         return { ...m, accessToken: accessToken || "" };
-      })
+      }),
     );
     return projects.filter((p) => p.accessToken);
   }
@@ -16650,21 +18271,32 @@ var StorageService = class {
   /**
    * Add a new linked project - V2 format
    */
-  async addLinkedProjectV2(projectId, projectName, organizationName, accessToken, expiresAt, directory, defaultEnvironment) {
+  async addLinkedProjectV2(
+    projectId,
+    projectName,
+    organizationName,
+    accessToken,
+    expiresAt,
+    directory,
+    defaultEnvironment,
+  ) {
     await this.migrateIfNeeded();
     const metadata = this.getLinkedProjectsMetadataV2();
     const existingIndex = metadata.findIndex((p) => p.projectId === projectId);
     if (existingIndex !== -1) {
       const normalizedPath = normalizePath(directory.directoryPath);
       const existingDir = metadata[existingIndex].directories.find(
-        (d) => normalizePath(d.directoryPath) === normalizedPath
+        (d) => normalizePath(d.directoryPath) === normalizedPath,
       );
       if (!existingDir) {
-        metadata[existingIndex].directories.push({
-          ...directory,
-          directoryPath: normalizedPath
-        });
-        metadata[existingIndex].updatedAt = Date.now();
+        metadata[existingIndex] = {
+          ...metadata[existingIndex],
+          directories: [
+            ...metadata[existingIndex].directories,
+            { ...directory, directoryPath: normalizedPath },
+          ],
+          updatedAt: Date.now(),
+        };
       }
     } else {
       await this.setAccessTokenForProject(projectId, accessToken);
@@ -16673,10 +18305,15 @@ var StorageService = class {
         projectName,
         organizationName,
         expiresAt,
-        directories: [{ ...directory, directoryPath: normalizePath(directory.directoryPath) }],
+        directories: [
+          {
+            ...directory,
+            directoryPath: normalizePath(directory.directoryPath),
+          },
+        ],
         defaultEnvironment,
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
       });
     }
     await this.setLinkedProjectsMetadataV2(metadata);
@@ -16693,16 +18330,19 @@ var StorageService = class {
     }
     const normalizedPath = normalizePath(directory.directoryPath);
     const existingDir = metadata[projectIndex].directories.find(
-      (d) => normalizePath(d.directoryPath) === normalizedPath
+      (d) => normalizePath(d.directoryPath) === normalizedPath,
     );
     if (existingDir) {
       throw new Error("Directory already linked to this project");
     }
-    metadata[projectIndex].directories.push({
-      ...directory,
-      directoryPath: normalizedPath
-    });
-    metadata[projectIndex].updatedAt = Date.now();
+    metadata[projectIndex] = {
+      ...metadata[projectIndex],
+      directories: [
+        ...metadata[projectIndex].directories,
+        { ...directory, directoryPath: normalizedPath },
+      ],
+      updatedAt: Date.now(),
+    };
     await this.setLinkedProjectsMetadataV2(metadata);
   }
   /**
@@ -16716,10 +18356,13 @@ var StorageService = class {
       return;
     }
     const normalizedPath = normalizePath(directoryPath);
-    metadata[projectIndex].directories = metadata[projectIndex].directories.filter(
-      (d) => normalizePath(d.directoryPath) !== normalizedPath
-    );
-    metadata[projectIndex].updatedAt = Date.now();
+    metadata[projectIndex] = {
+      ...metadata[projectIndex],
+      directories: metadata[projectIndex].directories.filter(
+        (d) => normalizePath(d.directoryPath) !== normalizedPath,
+      ),
+      updatedAt: Date.now(),
+    };
     if (metadata[projectIndex].directories.length === 0) {
       await this.deleteAccessTokenForProject(projectId);
       metadata.splice(projectIndex, 1);
@@ -16733,9 +18376,13 @@ var StorageService = class {
     await this.migrateIfNeeded();
     const projects = await this.getLinkedProjectsV2();
     const normalizedPath = normalizePath(directoryPath);
-    return projects.find(
-      (p) => p.directories.some((d) => normalizePath(d.directoryPath) === normalizedPath)
-    ) || null;
+    return (
+      projects.find((p) =>
+        p.directories.some(
+          (d) => normalizePath(d.directoryPath) === normalizedPath,
+        ),
+      ) || null
+    );
   }
   /**
    * Get all directories for a project - V2 format
@@ -16758,11 +18405,19 @@ var StorageService = class {
     }
     const normalizedPath = normalizePath(directoryPath);
     const dirIndex = metadata[projectIndex].directories.findIndex(
-      (d) => normalizePath(d.directoryPath) === normalizedPath
+      (d) => normalizePath(d.directoryPath) === normalizedPath,
     );
     if (dirIndex !== -1) {
-      metadata[projectIndex].directories[dirIndex].lastSyncedAt = Date.now();
-      metadata[projectIndex].updatedAt = Date.now();
+      const updatedDirectories = [...metadata[projectIndex].directories];
+      updatedDirectories[dirIndex] = {
+        ...updatedDirectories[dirIndex],
+        lastSyncedAt: Date.now(),
+      };
+      metadata[projectIndex] = {
+        ...metadata[projectIndex],
+        directories: updatedDirectories,
+        updatedAt: Date.now(),
+      };
       await this.setLinkedProjectsMetadataV2(metadata);
     }
   }
@@ -16774,8 +18429,11 @@ var StorageService = class {
     const metadata = this.getLinkedProjectsMetadataV2();
     const projectIndex = metadata.findIndex((p) => p.projectId === projectId);
     if (projectIndex !== -1) {
-      metadata[projectIndex].expiresAt = expiresAt;
-      metadata[projectIndex].updatedAt = Date.now();
+      metadata[projectIndex] = {
+        ...metadata[projectIndex],
+        expiresAt,
+        updatedAt: Date.now(),
+      };
       await this.setLinkedProjectsMetadataV2(metadata);
     }
   }
@@ -16806,9 +18464,14 @@ var StorageService = class {
 };
 
 // src/providers/projectsTreeProvider.ts
-var vscode4 = __toESM(require("vscode"));
+var vscode5 = __toESM(require("vscode"));
+var ROLE_LABELS = {
+  admin: "Admin",
+  team_lead: "Lead",
+  member: "Member",
+};
 var ProjectsTreeProvider = class {
-  _onDidChangeTreeData = new vscode4.EventEmitter();
+  _onDidChangeTreeData = new vscode5.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   api;
   storage;
@@ -16831,13 +18494,7 @@ var ProjectsTreeProvider = class {
   }
   async getChildren(element) {
     if (!this.isAuthenticated) {
-      return [
-        new ProjectTreeItem(
-          "Sign in to view projects",
-          vscode4.TreeItemCollapsibleState.None,
-          "message"
-        )
-      ];
+      return [];
     }
     if (!element) {
       try {
@@ -16846,27 +18503,29 @@ var ProjectsTreeProvider = class {
           return [
             new ProjectTreeItem(
               "No organizations found",
-              vscode4.TreeItemCollapsibleState.None,
-              "message"
-            )
+              vscode5.TreeItemCollapsibleState.None,
+              "message",
+            ),
           ];
         }
         return this.organizations.map(
-          (org) => new ProjectTreeItem(
-            org.name,
-            vscode4.TreeItemCollapsibleState.Collapsed,
-            "organization",
-            org
-          )
+          (org) =>
+            new ProjectTreeItem(
+              org.name,
+              vscode5.TreeItemCollapsibleState.Collapsed,
+              "organization",
+              org,
+            ),
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
-            vscode4.TreeItemCollapsibleState.None,
-            "error"
-          )
+            vscode5.TreeItemCollapsibleState.None,
+            "error",
+          ),
         ];
       }
     }
@@ -16877,92 +18536,95 @@ var ProjectsTreeProvider = class {
         if (projects.length === 0) {
           return [
             new ProjectTreeItem(
-              "No projects",
-              vscode4.TreeItemCollapsibleState.None,
-              "message"
-            )
+              "No projects yet",
+              vscode5.TreeItemCollapsibleState.None,
+              "message",
+            ),
           ];
         }
         const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
-        const workspacePath = this.getCurrentWorkspacePath();
         return projects.map((project) => {
-          const linkedV2 = linkedProjectsV2.find((lp) => lp.projectId === project._id);
-          const isLinkedToCurrentWorkspace = linkedV2 && workspacePath && linkedV2.directories.some(
-            (d) => normalizePath(d.directoryPath) === normalizePath(workspacePath)
+          const linkedV2 = linkedProjectsV2.find(
+            (lp) => lp.projectId === project._id,
           );
           if (linkedV2) {
             return new ProjectTreeItem(
               project.name,
-              vscode4.TreeItemCollapsibleState.Expanded,
+              vscode5.TreeItemCollapsibleState.Expanded,
               "linkedProject",
               element.organization,
               project,
-              element.organization.name
+              element.organization.name,
             );
           }
           return new ProjectTreeItem(
             project.name,
-            vscode4.TreeItemCollapsibleState.None,
+            vscode5.TreeItemCollapsibleState.None,
             "project",
-            void 0,
+            element.organization,
             project,
-            element.organization.name
+            element.organization.name,
           );
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
-            vscode4.TreeItemCollapsibleState.None,
-            "error"
-          )
+            vscode5.TreeItemCollapsibleState.None,
+            "error",
+          ),
         ];
       }
     }
     if (element.type === "linkedProject" && element.project) {
-      const linkedProject = await this.storage.getLinkedProjectV2(element.project._id);
+      const linkedProject = await this.storage.getLinkedProjectV2(
+        element.project._id,
+      );
       if (!linkedProject || linkedProject.directories.length === 0) {
         return [
           new ProjectTreeItem(
             "No directories linked",
-            vscode4.TreeItemCollapsibleState.None,
-            "message"
-          )
+            vscode5.TreeItemCollapsibleState.None,
+            "message",
+          ),
         ];
       }
       return linkedProject.directories.map(
-        (dir) => new ProjectTreeItem(
-          dir.displayName || getDisplayPath(dir.directoryPath),
-          vscode4.TreeItemCollapsibleState.None,
-          "linkedDirectory",
-          element.organization,
-          element.project,
-          element.organizationName,
-          dir
-        )
+        (dir) =>
+          new ProjectTreeItem(
+            dir.displayName || getDisplayPath(dir.directoryPath),
+            vscode5.TreeItemCollapsibleState.None,
+            "linkedDirectory",
+            element.organization,
+            element.project,
+            element.organizationName,
+            dir,
+          ),
       );
     }
     return [];
-  }
-  getCurrentWorkspacePath() {
-    const folders = vscode4.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) {
-      return null;
-    }
-    return folders[0].uri.fsPath;
   }
   dispose() {
     this._onDidChangeTreeData.dispose();
   }
 };
-var ProjectTreeItem = class extends vscode4.TreeItem {
+var ProjectTreeItem = class extends vscode5.TreeItem {
   type;
   organization;
   project;
   organizationName;
   directory;
-  constructor(label, collapsibleState, type, organization, project, organizationName, directory) {
+  constructor(
+    label,
+    collapsibleState,
+    type,
+    organization,
+    project,
+    organizationName,
+    directory,
+  ) {
     super(label, collapsibleState);
     this.type = type;
     this.organization = organization;
@@ -16972,61 +18634,138 @@ var ProjectTreeItem = class extends vscode4.TreeItem {
     this.contextValue = type;
     switch (type) {
       case "organization":
-        this.iconPath = new vscode4.ThemeIcon("organization");
-        this.description = organization?.tier === "pro" ? "Pro" : "Free";
+        this.iconPath = new vscode5.ThemeIcon(
+          "organization",
+          organization?.tier === "pro"
+            ? new vscode5.ThemeColor("charts.green")
+            : void 0,
+        );
+        this.description = this.buildOrgDescription(organization);
+        this.tooltip = this.createOrgTooltip(organization);
         break;
       case "project":
-        this.iconPath = new vscode4.ThemeIcon("folder");
+        this.iconPath = new vscode5.ThemeIcon("symbol-package");
         this.description = project?.description || void 0;
+        this.tooltip = this.createProjectTooltip(project, false);
         break;
       case "linkedProject":
-        this.iconPath = new vscode4.ThemeIcon("link");
+        this.iconPath = new vscode5.ThemeIcon(
+          "symbol-package",
+          new vscode5.ThemeColor("charts.green"),
+        );
         this.description = "Linked";
+        this.tooltip = this.createProjectTooltip(project, true);
         break;
       case "linkedDirectory":
-        this.iconPath = new vscode4.ThemeIcon("folder-opened");
-        this.description = directory?.environments.join(", ");
+        this.iconPath = new vscode5.ThemeIcon("folder-opened");
+        this.description = this.buildDirectoryDescription(directory);
         this.tooltip = this.createDirectoryTooltip(directory);
         break;
       case "message":
-        this.iconPath = new vscode4.ThemeIcon("info");
+        this.iconPath = new vscode5.ThemeIcon(
+          "info",
+          new vscode5.ThemeColor("descriptionForeground"),
+        );
         break;
       case "error":
-        this.iconPath = new vscode4.ThemeIcon("error");
+        this.iconPath = new vscode5.ThemeIcon(
+          "error",
+          new vscode5.ThemeColor("errorForeground"),
+        );
         break;
     }
   }
+  buildOrgDescription(org) {
+    if (!org) return void 0;
+    const parts = [];
+    parts.push(org.tier === "pro" ? "Pro" : "Free");
+    if (org.role) {
+      parts.push(ROLE_LABELS[org.role] || org.role);
+    }
+    return parts.join(" \xB7 ");
+  }
+  buildDirectoryDescription(dir) {
+    if (!dir) return void 0;
+    return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
+  }
+  createOrgTooltip(org) {
+    if (!org) return void 0;
+    const md = new vscode5.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(`### $(organization) ${org.name}
+
+`);
+    md.appendMarkdown(
+      `**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}
+
+`,
+    );
+    if (org.role) {
+      md.appendMarkdown(
+        `**Your Role:** ${ROLE_LABELS[org.role] || org.role}
+
+`,
+      );
+    }
+    md.appendMarkdown(`**Slug:** \`${org.slug}\``);
+    return md;
+  }
+  createProjectTooltip(project, isLinked) {
+    if (!project) return void 0;
+    const md = new vscode5.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### ${project.icon || "$(symbol-package)"} ${project.name}
+
+`,
+    );
+    if (isLinked) {
+      md.appendMarkdown("$(check) **Linked to this workspace**\n\n");
+    }
+    if (project.description) {
+      md.appendMarkdown(`${project.description}
+
+`);
+    }
+    md.appendMarkdown(`**Slug:** \`${project.slug}\``);
+    return md;
+  }
   createDirectoryTooltip(directory) {
-    if (!directory)
-      return void 0;
-    const tooltip = new vscode4.MarkdownString();
-    tooltip.appendMarkdown(`**${directory.displayName || "Directory"}**
+    if (!directory) return void 0;
+    const md = new vscode5.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### $(folder-opened) ${directory.displayName || "Directory"}
+
+`,
+    );
+    md.appendMarkdown(`**Path:** \`${directory.directoryPath}\`
 
 `);
-    tooltip.appendMarkdown(`**Path:** \`${directory.directoryPath}\`
+    md.appendMarkdown(`**Target:** \`${directory.targetFile}\`
 
 `);
-    tooltip.appendMarkdown(`**Target File:** ${directory.targetFile}
+    md.appendMarkdown(
+      `**Environments:** ${directory.environments.join(", ")}
 
-`);
-    tooltip.appendMarkdown(`**Environments:** ${directory.environments.join(", ")}
-
-`);
+`,
+    );
+    md.appendMarkdown("---\n\n");
     if (directory.lastSyncedAt) {
-      tooltip.appendMarkdown(
-        `**Last Synced:** ${new Date(directory.lastSyncedAt).toLocaleString()}`
+      md.appendMarkdown(
+        `$(sync) Last synced ${new Date(directory.lastSyncedAt).toLocaleString()}`,
       );
     } else {
-      tooltip.appendMarkdown("**Last Synced:** Never");
+      md.appendMarkdown("$(sync) Never synced");
     }
-    return tooltip;
+    return md;
   }
 };
 
 // src/providers/variablesTreeProvider.ts
-var vscode5 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 var VariablesTreeProvider = class {
-  _onDidChangeTreeData = new vscode5.EventEmitter();
+  _onDidChangeTreeData = new vscode6.EventEmitter();
   onDidChangeTreeData = this._onDidChangeTreeData.event;
   api;
   storage;
@@ -17047,75 +18786,97 @@ var VariablesTreeProvider = class {
     }
     const linkedProject = await this.getLinkedProject();
     if (!linkedProject) {
-      return [
-        new VariableTreeItem(
-          "No project linked",
-          vscode5.TreeItemCollapsibleState.None,
-          "message",
-          void 0,
-          "Link a project to view variables"
-        )
-      ];
+      return [];
     }
     try {
       this.variables = await this.api.getVariables(
         linkedProject.projectId,
         linkedProject.environment,
-        linkedProject.accessToken
+        linkedProject.accessToken,
       );
       if (this.variables.length === 0) {
         return [
           new VariableTreeItem(
             "No variables",
-            vscode5.TreeItemCollapsibleState.None,
+            vscode6.TreeItemCollapsibleState.None,
             "message",
             void 0,
-            `No variables for ${linkedProject.environment} environment`
-          )
+            `No variables for ${linkedProject.environment}`,
+          ),
         ];
       }
       const regularVars = this.variables.filter((v) => !v.isSensitive);
       const sensitiveVars = this.variables.filter((v) => v.isSensitive);
       const items = [];
+      const role = this.api.getUserRole(linkedProject.projectId);
+      const roleLabel = role
+        ? ` \xB7 ${role === "admin" ? "Admin" : role === "team_lead" ? "Lead" : "Member"}`
+        : "";
       items.push(
         new VariableTreeItem(
-          `Environment: ${linkedProject.environment}`,
-          vscode5.TreeItemCollapsibleState.None,
+          linkedProject.environment,
+          vscode6.TreeItemCollapsibleState.None,
           "header",
           void 0,
-          `${this.variables.length} variables`
-        )
+          `${this.variables.length} variable${this.variables.length !== 1 ? "s" : ""}${roleLabel}`,
+        ),
       );
       for (const variable of regularVars) {
         items.push(
           new VariableTreeItem(
             variable.key,
-            vscode5.TreeItemCollapsibleState.None,
+            vscode6.TreeItemCollapsibleState.None,
             "variable",
-            variable
-          )
+            variable,
+          ),
         );
       }
       if (sensitiveVars.length > 0) {
         items.push(
           new VariableTreeItem(
-            "Sensitive",
-            vscode5.TreeItemCollapsibleState.None,
+            `Sensitive (${sensitiveVars.length})`,
+            vscode6.TreeItemCollapsibleState.None,
             "separator",
-            void 0,
-            `${sensitiveVars.length} secrets`
-          )
+          ),
         );
         for (const variable of sensitiveVars) {
           items.push(
             new VariableTreeItem(
               variable.key,
-              vscode5.TreeItemCollapsibleState.None,
+              vscode6.TreeItemCollapsibleState.None,
               "sensitive",
-              variable
-            )
+              variable,
+            ),
           );
         }
+      }
+      if (role === "member") {
+        try {
+          const pendingRequests = await this.api.getVariableRequests(
+            linkedProject.projectId,
+            "pending",
+          );
+          if (pendingRequests.length > 0) {
+            items.push(
+              new VariableTreeItem(
+                `Pending Requests (${pendingRequests.length})`,
+                vscode6.TreeItemCollapsibleState.None,
+                "separator",
+              ),
+            );
+            for (const request of pendingRequests) {
+              items.push(
+                new VariableTreeItem(
+                  request.key,
+                  vscode6.TreeItemCollapsibleState.None,
+                  "request",
+                  void 0,
+                  request.status,
+                ),
+              );
+            }
+          }
+        } catch {}
       }
       return items;
     } catch (error) {
@@ -17123,9 +18884,9 @@ var VariablesTreeProvider = class {
       return [
         new VariableTreeItem(
           `Error: ${message}`,
-          vscode5.TreeItemCollapsibleState.None,
-          "error"
-        )
+          vscode6.TreeItemCollapsibleState.None,
+          "error",
+        ),
       ];
     }
   }
@@ -17137,7 +18898,7 @@ var VariablesTreeProvider = class {
     return await this.storage.getLinkedProjectForWorkspace(workspacePath);
   }
   getCurrentWorkspacePath() {
-    const folders = vscode5.workspace.workspaceFolders;
+    const folders = vscode6.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       return null;
     }
@@ -17147,65 +18908,111 @@ var VariablesTreeProvider = class {
     this._onDidChangeTreeData.dispose();
   }
 };
-var VariableTreeItem = class extends vscode5.TreeItem {
+var VariableTreeItem = class extends vscode6.TreeItem {
   type;
   variable;
   constructor(label, collapsibleState, type, variable, description) {
     super(label, collapsibleState);
     this.type = type;
     this.variable = variable;
-    this.description = description || variable?.description || void 0;
+    this.contextValue = type;
     switch (type) {
       case "variable":
-        this.iconPath = new vscode5.ThemeIcon("symbol-variable");
-        this.tooltip = this.createTooltip(variable);
+        this.iconPath = new vscode6.ThemeIcon("symbol-variable");
+        this.description = this.truncateValue(variable?.value || "");
+        this.tooltip = this.createVariableTooltip(variable, false);
         break;
       case "sensitive":
-        this.iconPath = new vscode5.ThemeIcon("lock");
-        this.tooltip = this.createTooltip(variable, true);
+        this.iconPath = new vscode6.ThemeIcon(
+          "lock",
+          new vscode6.ThemeColor("charts.yellow"),
+        );
+        this.description = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+        this.tooltip = this.createVariableTooltip(variable, true);
         break;
       case "header":
-        this.iconPath = new vscode5.ThemeIcon("server-environment");
+        this.iconPath = new vscode6.ThemeIcon(
+          "server-environment",
+          new vscode6.ThemeColor("charts.blue"),
+        );
+        this.description = description;
         break;
       case "separator":
-        this.iconPath = new vscode5.ThemeIcon("shield");
+        this.iconPath = new vscode6.ThemeIcon(
+          "shield",
+          new vscode6.ThemeColor("charts.yellow"),
+        );
+        this.description = description;
         break;
       case "message":
-        this.iconPath = new vscode5.ThemeIcon("info");
+        this.iconPath = new vscode6.ThemeIcon(
+          "info",
+          new vscode6.ThemeColor("descriptionForeground"),
+        );
+        this.description = description;
         break;
       case "error":
-        this.iconPath = new vscode5.ThemeIcon("error");
+        this.iconPath = new vscode6.ThemeIcon(
+          "error",
+          new vscode6.ThemeColor("errorForeground"),
+        );
+        break;
+      case "request":
+        this.iconPath = new vscode6.ThemeIcon(
+          "git-pull-request",
+          new vscode6.ThemeColor("charts.orange"),
+        );
+        this.description = description;
+        this.tooltip = new vscode6.MarkdownString(
+          `$(git-pull-request) **${label}**
+
+Status: *${description}*
+
+Submitted via extension`,
+        );
+        this.tooltip.supportThemeIcons = true;
         break;
     }
-    this.contextValue = type;
   }
-  createTooltip(variable, isSensitive = false) {
-    if (!variable) {
-      return "";
+  createVariableTooltip(variable, isSensitive = false) {
+    if (!variable) return void 0;
+    const md = new vscode6.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(`### $(symbol-variable) ${variable.key}
+
+`);
+    if (isSensitive) {
+      md.appendMarkdown("$(lock) *Sensitive \u2014 value hidden*\n\n");
+    } else {
+      md.appendCodeblock(variable.value, "properties");
+      md.appendMarkdown("\n");
     }
-    const lines = [
-      `**${variable.key}**`,
-      "",
-      isSensitive ? "*(Sensitive value hidden)*" : `Value: \`${this.truncateValue(variable.value)}\``,
-      "",
-      `Environments: ${variable.environments.join(", ")}`,
-      `Version: ${variable.version}`
-    ];
     if (variable.description) {
-      lines.push("", variable.description);
+      md.appendMarkdown(`${variable.description}
+
+`);
     }
-    return new vscode5.MarkdownString(lines.join("\n")).value;
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(
+      `**Environments:** ${variable.environments.join(", ")}  
+`,
+    );
+    md.appendMarkdown(`**Version:** ${variable.version}  
+`);
+    if (isSensitive) {
+      md.appendMarkdown("**Sensitive:** $(lock) Yes");
+    }
+    return md;
   }
-  truncateValue(value, maxLength = 50) {
-    if (value.length <= maxLength) {
-      return value;
-    }
-    return value.substring(0, maxLength) + "...";
+  truncateValue(value, maxLength = 40) {
+    if (!value) return "";
+    if (value.length <= maxLength) return value;
+    return value.substring(0, maxLength) + "\u2026";
   }
 };
 
 // src/providers/statusBar.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode7 = __toESM(require("vscode"));
 var StatusBarProvider = class {
   statusBarItem;
   authService;
@@ -17214,51 +19021,59 @@ var StatusBarProvider = class {
   constructor(authService2, syncService2) {
     this.authService = authService2;
     this.syncService = syncService2;
-    this.statusBarItem = vscode6.window.createStatusBarItem(
-      vscode6.StatusBarAlignment.Left,
-      100
+    this.statusBarItem = vscode7.window.createStatusBarItem(
+      vscode7.StatusBarAlignment.Left,
+      100,
     );
     this.statusBarItem.command = "envConnect.showStatus";
     this.authService.onAuthStateChanged(() => this.update());
-    this.syncService.onSyncComplete((result) => this.handleSyncComplete(result));
-    this.syncService.onPermissionRevoked((project) => this.handlePermissionRevoked(project));
+    this.syncService.onSyncComplete((result) =>
+      this.handleSyncComplete(result),
+    );
+    this.syncService.onPermissionRevoked((project) =>
+      this.handlePermissionRevoked(project),
+    );
     this.update();
     this.statusBarItem.show();
   }
   async update() {
     const isAuthenticated = await this.authService.isAuthenticated();
     if (!isAuthenticated) {
-      this.statusBarItem.text = "$(plug) ENV Connect";
-      this.statusBarItem.tooltip = "Click to sign in";
+      this.statusBarItem.text = "$(shield) ENV Connect";
+      this.statusBarItem.tooltip = "Click to sign in to ENV Connect";
       this.statusBarItem.backgroundColor = void 0;
       return;
     }
     const linkedProject = await this.syncService.getLinkedProject();
     if (!linkedProject) {
-      this.statusBarItem.text = "$(check) ENV Connect";
-      this.statusBarItem.tooltip = "Signed in - No project linked";
+      this.statusBarItem.text = "$(shield) ENV Connect";
+      this.statusBarItem.tooltip =
+        "Signed in \u2014 no project linked\nClick for options";
       this.statusBarItem.backgroundColor = void 0;
       return;
     }
     if (this.isSyncing) {
-      this.statusBarItem.text = "$(sync~spin) ENV Connect";
-      this.statusBarItem.tooltip = "Syncing variables...";
+      this.statusBarItem.text = `$(sync~spin) ${linkedProject.projectName}`;
+      this.statusBarItem.tooltip = "Syncing variables\u2026";
       this.statusBarItem.backgroundColor = void 0;
       return;
     }
-    const syncInfo = linkedProject.lastSyncedAt ? `Last sync: ${this.formatTime(linkedProject.lastSyncedAt)}` : "Never synced";
-    this.statusBarItem.text = "$(cloud) ENV Connect";
-    this.statusBarItem.tooltip = new vscode6.MarkdownString(
+    const syncInfo = linkedProject.lastSyncedAt
+      ? `Synced ${this.formatTime(linkedProject.lastSyncedAt)}`
+      : "Never synced";
+    this.statusBarItem.text = `$(shield) ${linkedProject.projectName}`;
+    this.statusBarItem.tooltip = new vscode7.MarkdownString(
       [
-        `**${linkedProject.projectName}**`,
+        `### $(shield) ${linkedProject.projectName}`,
         "",
-        `Organization: ${linkedProject.organizationName}`,
-        `Environment: ${linkedProject.environment}`,
-        `Target: ${linkedProject.targetFile}`,
+        `$(organization) ${linkedProject.organizationName}`,
+        `$(server-environment) ${linkedProject.environment}`,
+        `$(file) ${linkedProject.targetFile}`,
         "",
-        syncInfo
-      ].join("\n")
+        `$(sync) ${syncInfo}`,
+      ].join("\n"),
     );
+    this.statusBarItem.tooltip.supportThemeIcons = true;
     this.statusBarItem.backgroundColor = void 0;
   }
   setSyncing(syncing) {
@@ -17269,36 +19084,30 @@ var StatusBarProvider = class {
     this.isSyncing = false;
     this.update();
     if (result.success) {
-      vscode6.window.showInformationMessage(
-        `Synced ${result.variablesCount} variables to ${result.targetFile}`
+      vscode7.window.showInformationMessage(
+        `Synced ${result.variablesCount} variables to ${result.targetFile}`,
       );
     } else {
-      this.statusBarItem.backgroundColor = new vscode6.ThemeColor(
-        "statusBarItem.errorBackground"
+      this.statusBarItem.backgroundColor = new vscode7.ThemeColor(
+        "statusBarItem.errorBackground",
       );
-      vscode6.window.showErrorMessage(`Sync failed: ${result.error}`);
+      vscode7.window.showErrorMessage(`Sync failed: ${result.error}`);
     }
   }
   handlePermissionRevoked(project) {
-    this.statusBarItem.text = "$(warning) ENV Connect";
+    this.statusBarItem.text = `$(warning) ${project.projectName}`;
     this.statusBarItem.tooltip = `Access revoked for ${project.projectName}`;
-    this.statusBarItem.backgroundColor = new vscode6.ThemeColor(
-      "statusBarItem.warningBackground"
+    this.statusBarItem.backgroundColor = new vscode7.ThemeColor(
+      "statusBarItem.warningBackground",
     );
   }
   formatTime(timestamp) {
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 6e4);
     const hours = Math.floor(diff / 36e5);
-    if (minutes < 1) {
-      return "just now";
-    }
-    if (minutes < 60) {
-      return `${minutes}m ago`;
-    }
-    if (hours < 24) {
-      return `${hours}h ago`;
-    }
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
     return new Date(timestamp).toLocaleDateString();
   }
   dispose() {
@@ -17307,7 +19116,7 @@ var StatusBarProvider = class {
 };
 
 // src/ui/linkProjectDialog.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 var AVAILABLE_ENVIRONMENTS = ["development", "staging", "production"];
 var LinkProjectDialog = class {
   syncService;
@@ -17323,13 +19132,13 @@ var LinkProjectDialog = class {
       canSelectFolders: true,
       canSelectMany: false,
       openLabel: "Select Directory to Link",
-      title: "Select Project Directory"
+      title: "Select Project Directory",
     };
-    const workspaceFolders = vscode7.workspace.workspaceFolders;
+    const workspaceFolders = vscode8.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
       options.defaultUri = workspaceFolders[0].uri;
     }
-    const result = await vscode7.window.showOpenDialog(options);
+    const result = await vscode8.window.showOpenDialog(options);
     if (result && result.length > 0) {
       return result[0].fsPath;
     }
@@ -17343,12 +19152,12 @@ var LinkProjectDialog = class {
     const items = AVAILABLE_ENVIRONMENTS.map((env4) => ({
       label: env4.charAt(0).toUpperCase() + env4.slice(1),
       description: env4,
-      picked: env4 === defaultEnv
+      picked: env4 === defaultEnv,
     }));
-    const selected = await vscode7.window.showQuickPick(items, {
+    const selected = await vscode8.window.showQuickPick(items, {
       title: "Select Environments to Sync",
       placeHolder: "Choose which environments to include",
-      canPickMany: true
+      canPickMany: true,
     });
     if (!selected || selected.length === 0) {
       return void 0;
@@ -17360,7 +19169,7 @@ var LinkProjectDialog = class {
    */
   async getTargetFileName() {
     const defaultFile = getTargetFile();
-    const result = await vscode7.window.showInputBox({
+    const result = await vscode8.window.showInputBox({
       title: "Target Environment File",
       prompt: "Enter the filename for synced variables",
       value: defaultFile,
@@ -17376,7 +19185,7 @@ var LinkProjectDialog = class {
           return "Filename cannot contain path separators";
         }
         return void 0;
-      }
+      },
     });
     return result;
   }
@@ -17388,32 +19197,37 @@ var LinkProjectDialog = class {
       {
         label: "$(replace) Overwrite",
         description: "Replace the existing file completely",
-        detail: "All existing variables will be removed and replaced with synced variables"
+        detail:
+          "All existing variables will be removed and replaced with synced variables",
       },
       {
         label: "$(copy) Backup & Overwrite",
         description: "Create a backup before replacing",
-        detail: `Existing file will be saved as ${conflict.existingFile}.backup-<timestamp>`
+        detail: `Existing file will be saved as ${conflict.existingFile}.backup-<timestamp>`,
       },
       {
         label: "$(merge) Merge",
         description: "Combine existing and new variables",
-        detail: "Synced variables will override existing ones with same key; others preserved"
+        detail:
+          "Synced variables will override existing ones with same key; others preserved",
       },
       {
         label: "$(close) Skip",
         description: "Do not sync to this directory",
-        detail: "The existing file will remain unchanged"
-      }
+        detail: "The existing file will remain unchanged",
+      },
     ];
-    const selected = await vscode7.window.showQuickPick(items, {
+    const selected = await vscode8.window.showQuickPick(items, {
       title: "Existing .env File Found",
-      placeHolder: `${conflict.existingFile} has ${conflict.existingVariableCount} variables`
+      placeHolder: `${conflict.existingFile} has ${conflict.existingVariableCount} variables`,
     });
     if (!selected) {
       return void 0;
     }
-    if (selected.label.includes("Overwrite") && !selected.label.includes("Backup")) {
+    if (
+      selected.label.includes("Overwrite") &&
+      !selected.label.includes("Backup")
+    ) {
       return "overwrite";
     } else if (selected.label.includes("Backup")) {
       return "backup";
@@ -17439,7 +19253,10 @@ var LinkProjectDialog = class {
     if (!targetFile) {
       return void 0;
     }
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile,
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17447,32 +19264,32 @@ var LinkProjectDialog = class {
         return void 0;
       }
       if (strategy === "skip") {
-        vscode7.window.showInformationMessage("Skipped linking directory");
+        vscode8.window.showInformationMessage("Skipped linking directory");
         return void 0;
       }
       conflictStrategy = strategy;
     }
-    const displayName = await vscode7.window.showInputBox({
+    const displayName = await vscode8.window.showInputBox({
       title: "Directory Display Name (Optional)",
       prompt: "Enter a friendly name for this directory",
-      placeHolder: "e.g., Frontend, Backend, API Server"
+      placeHolder: "e.g., Frontend, Backend, API Server",
     });
     return {
       directoryPath: normalizePath(directoryPath),
       targetFile,
       environments,
       conflictStrategy,
-      displayName: displayName || void 0
+      displayName: displayName || void 0,
     };
   }
   /**
    * Show dialog to add another directory to an existing project
    */
   async showAddDirectoryDialog(projectName) {
-    const info = await vscode7.window.showInformationMessage(
+    const info = await vscode8.window.showInformationMessage(
       `Add another directory to "${projectName}"?`,
       "Select Directory",
-      "Cancel"
+      "Cancel",
     );
     if (info !== "Select Directory") {
       return void 0;
@@ -17489,7 +19306,10 @@ var LinkProjectDialog = class {
     if (!targetFile) {
       return void 0;
     }
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile,
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17498,16 +19318,16 @@ var LinkProjectDialog = class {
       }
       conflictStrategy = strategy;
     }
-    const displayName = await vscode7.window.showInputBox({
+    const displayName = await vscode8.window.showInputBox({
       title: "Directory Display Name (Optional)",
-      placeHolder: "e.g., Frontend, Backend"
+      placeHolder: "e.g., Frontend, Backend",
     });
     return {
       directoryPath: normalizePath(directoryPath),
       targetFile,
       environments,
       conflictStrategy,
-      displayName: displayName || void 0
+      displayName: displayName || void 0,
     };
   }
   /**
@@ -17519,7 +19339,10 @@ var LinkProjectDialog = class {
       return void 0;
     }
     const targetFile = getTargetFile();
-    const conflict = await this.syncService.checkForConflicts(directoryPath, targetFile);
+    const conflict = await this.syncService.checkForConflicts(
+      directoryPath,
+      targetFile,
+    );
     let conflictStrategy = "overwrite";
     if (conflict.hasConflict) {
       const strategy = await this.resolveConflict(conflict);
@@ -17532,15 +19355,222 @@ var LinkProjectDialog = class {
       directoryPath: normalizePath(directoryPath),
       targetFile,
       environments: [getEnvironment()],
-      conflictStrategy
+      conflictStrategy,
     };
+  }
+};
+
+// src/ui/requestVariableDialog.ts
+var vscode9 = __toESM(require("vscode"));
+var RequestVariableDialog = class {
+  /**
+   * Show the variable request dialog and collect all inputs.
+   * Returns undefined if the user cancels at any step.
+   */
+  async showRequestDialog(projectId) {
+    const key = await vscode9.window.showInputBox({
+      title: "Request Variable (1/5) - Key",
+      prompt: "Enter the variable key name",
+      placeHolder: "e.g., API_KEY, DATABASE_URL",
+      validateInput: (value2) => {
+        if (!value2) {
+          return "Key is required";
+        }
+        if (!/^[A-Z][A-Z0-9_]*$/.test(value2)) {
+          return "Must be uppercase, start with a letter, and contain only letters, numbers, and underscores";
+        }
+        if (value2.length > 100) {
+          return "Key must be 100 characters or less";
+        }
+        return void 0;
+      },
+    });
+    if (!key) {
+      return void 0;
+    }
+    const value = await vscode9.window.showInputBox({
+      title: "Request Variable (2/5) - Value",
+      prompt: `Enter the value for ${key}`,
+      placeHolder: "Variable value",
+      validateInput: (v) => {
+        if (!v) {
+          return "Value is required";
+        }
+        return void 0;
+      },
+    });
+    if (!value) {
+      return void 0;
+    }
+    const description = await vscode9.window.showInputBox({
+      title: "Request Variable (3/5) - Description",
+      prompt: "Enter a description (optional, press Enter to skip)",
+      placeHolder: "What is this variable used for?",
+    });
+    if (description === void 0) {
+      return void 0;
+    }
+    const envItems = await vscode9.window.showQuickPick(
+      [
+        { label: "Development", value: "development", picked: true },
+        { label: "Staging", value: "staging" },
+        { label: "Production", value: "production" },
+      ],
+      {
+        title: "Request Variable (4/5) - Environments",
+        placeHolder: "Select environments for this variable",
+        canPickMany: true,
+      },
+    );
+    if (!envItems || envItems.length === 0) {
+      return void 0;
+    }
+    const environments = envItems.map((item) => item.value);
+    const sensitiveChoice = await vscode9.window.showQuickPick(
+      [
+        { label: "No", description: "Regular variable", value: false },
+        {
+          label: "Yes",
+          description: "Secret, credential, or API key",
+          value: true,
+        },
+      ],
+      {
+        title: "Request Variable (5/5) - Sensitive?",
+        placeHolder: "Is this a sensitive value (secret/credential)?",
+      },
+    );
+    if (!sensitiveChoice) {
+      return void 0;
+    }
+    return {
+      key,
+      value,
+      description: description || void 0,
+      environments,
+      projectId,
+      isSensitive: sensitiveChoice.value,
+    };
+  }
+};
+
+// src/services/fileProtection.ts
+var vscode10 = __toESM(require("vscode"));
+var fs2 = __toESM(require("fs/promises"));
+var FileProtectionService = class {
+  watchers = /* @__PURE__ */ new Map();
+  debounceTimers = /* @__PURE__ */ new Map();
+  _isSyncing = false;
+  /**
+   * Set syncing state to suppress revert during our own writes
+   */
+  setSyncing(value) {
+    this._isSyncing = value;
+  }
+  /**
+   * Watch a synced .env file for unauthorized changes.
+   * When a change is detected, shows a warning with a "Request Variable" action
+   * and reverts the file by calling the resync callback.
+   */
+  watchFile(filePath, resyncCallback) {
+    if (this.watchers.has(filePath)) {
+      return;
+    }
+    const watcher = vscode10.workspace.createFileSystemWatcher(
+      new vscode10.RelativePattern(vscode10.Uri.file(filePath).fsPath, "**"),
+    );
+    const fileWatcher = vscode10.workspace.createFileSystemWatcher(filePath);
+    fileWatcher.onDidChange(async () => {
+      if (this._isSyncing) {
+        return;
+      }
+      const existing = this.debounceTimers.get(filePath);
+      if (existing) {
+        clearTimeout(existing);
+      }
+      this.debounceTimers.set(
+        filePath,
+        setTimeout(async () => {
+          this.debounceTimers.delete(filePath);
+          await this.handleUnauthorizedEdit(filePath, resyncCallback);
+        }, 500),
+      );
+    });
+    fileWatcher.onDidDelete(async () => {
+      if (this._isSyncing) {
+        return;
+      }
+      const existing = this.debounceTimers.get(filePath);
+      if (existing) {
+        clearTimeout(existing);
+      }
+      this.debounceTimers.set(
+        filePath,
+        setTimeout(async () => {
+          this.debounceTimers.delete(filePath);
+          await this.handleUnauthorizedEdit(filePath, resyncCallback);
+        }, 500),
+      );
+    });
+    watcher.dispose();
+    this.watchers.set(filePath, fileWatcher);
+  }
+  /**
+   * Stop watching a file
+   */
+  unwatchFile(filePath) {
+    const watcher = this.watchers.get(filePath);
+    if (watcher) {
+      watcher.dispose();
+      this.watchers.delete(filePath);
+    }
+    const timer = this.debounceTimers.get(filePath);
+    if (timer) {
+      clearTimeout(timer);
+      this.debounceTimers.delete(filePath);
+    }
+  }
+  /**
+   * Handle an unauthorized edit by showing a warning and reverting
+   */
+  async handleUnauthorizedEdit(filePath, resyncCallback) {
+    const action = await vscode10.window.showWarningMessage(
+      "This file is managed by ENV Connect. You cannot edit it directly.",
+      "Request Variable",
+      "OK",
+    );
+    try {
+      this._isSyncing = true;
+      try {
+        await fs2.chmod(filePath, 420);
+      } catch {}
+      await resyncCallback();
+      try {
+        await fs2.chmod(filePath, 292);
+      } catch {}
+    } finally {
+      this._isSyncing = false;
+    }
+    if (action === "Request Variable") {
+      await vscode10.commands.executeCommand("envConnect.requestVariable");
+    }
+  }
+  dispose() {
+    for (const watcher of this.watchers.values()) {
+      watcher.dispose();
+    }
+    this.watchers.clear();
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
   }
 };
 
 // src/utils/device.ts
 var os2 = __toESM(require("os"));
 var crypto3 = __toESM(require("crypto"));
-var vscode8 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var DEVICE_ID_KEY = "envConnect.deviceId";
 async function getDeviceId(context) {
   let deviceId = context.globalState.get(DEVICE_ID_KEY);
@@ -17556,7 +19586,11 @@ function getMachineId() {
   const username = os2.userInfo().username;
   const platform3 = os2.platform();
   const data = `${hostname2}-${username}-${platform3}`;
-  return crypto3.createHash("sha256").update(data).digest("hex").substring(0, 16);
+  return crypto3
+    .createHash("sha256")
+    .update(data)
+    .digest("hex")
+    .substring(0, 16);
 }
 function getDeviceName() {
   const hostname2 = os2.hostname();
@@ -17578,7 +19612,7 @@ function getPlatformName() {
   }
 }
 function getEditorName() {
-  const appName = vscode8.env.appName;
+  const appName = vscode11.env.appName;
   if (appName.toLowerCase().includes("cursor")) {
     return "Cursor";
   }
@@ -17587,7 +19621,7 @@ function getEditorName() {
 async function getDeviceInfo(context) {
   return {
     deviceId: await getDeviceId(context),
-    deviceName: getDeviceName()
+    deviceName: getDeviceName(),
   };
 }
 
@@ -17595,87 +19629,192 @@ async function getDeviceInfo(context) {
 var authService;
 var apiService;
 var syncService;
+var realTimeSyncService;
 var storageService;
+var fileProtectionService;
 var projectsTreeProvider;
 var variablesTreeProvider;
 var statusBarProvider;
 var linkProjectDialog;
+var requestVariableDialog;
+async function updateContextFlags() {
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  vscode12.commands.executeCommand(
+    "setContext",
+    "envConnect.hasLinkedProject",
+    !!linkedProject,
+  );
+  if (linkedProject) {
+    const role = apiService.getUserRole(linkedProject.projectId);
+    vscode12.commands.executeCommand(
+      "setContext",
+      "envConnect.userRole",
+      role || "",
+    );
+  }
+}
 async function activate(context) {
   storageService = new StorageService(context);
   await storageService.migrateIfNeeded();
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
+  fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
+  syncService.setFileProtection(fileProtectionService);
+  realTimeSyncService = new RealTimeSyncService(
+    apiService,
+    syncService,
+    storageService,
+  );
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
   statusBarProvider = new StatusBarProvider(authService, syncService);
   linkProjectDialog = new LinkProjectDialog(syncService);
+  requestVariableDialog = new RequestVariableDialog();
   context.subscriptions.push(
-    vscode9.window.registerTreeDataProvider("envConnect.projects", projectsTreeProvider),
-    vscode9.window.registerTreeDataProvider("envConnect.variables", variablesTreeProvider)
+    vscode12.window.registerTreeDataProvider(
+      "envConnect.projects",
+      projectsTreeProvider,
+    ),
+    vscode12.window.registerTreeDataProvider(
+      "envConnect.variables",
+      variablesTreeProvider,
+    ),
   );
   context.subscriptions.push(
-    vscode9.commands.registerCommand("envConnect.signIn", handleSignIn),
-    vscode9.commands.registerCommand("envConnect.signOut", handleSignOut),
-    vscode9.commands.registerCommand("envConnect.linkProject", handleLinkProject),
-    vscode9.commands.registerCommand("envConnect.unlinkProject", handleUnlinkProject),
-    vscode9.commands.registerCommand("envConnect.pullVariables", handlePullVariables),
-    vscode9.commands.registerCommand("envConnect.refresh", handleRefresh),
-    vscode9.commands.registerCommand("envConnect.openDashboard", handleOpenDashboard),
-    vscode9.commands.registerCommand("envConnect.showStatus", handleShowStatus),
+    vscode12.commands.registerCommand("envConnect.signIn", handleSignIn),
+    vscode12.commands.registerCommand("envConnect.signOut", handleSignOut),
+    vscode12.commands.registerCommand(
+      "envConnect.linkProject",
+      handleLinkProject,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.unlinkProject",
+      handleUnlinkProject,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.pullVariables",
+      handlePullVariables,
+    ),
+    vscode12.commands.registerCommand("envConnect.refresh", handleRefresh),
+    vscode12.commands.registerCommand(
+      "envConnect.openDashboard",
+      handleOpenDashboard,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.showStatus",
+      handleShowStatus,
+    ),
     // New V2 commands
-    vscode9.commands.registerCommand("envConnect.addDirectory", handleAddDirectory),
-    vscode9.commands.registerCommand("envConnect.removeDirectory", handleRemoveDirectory),
-    vscode9.commands.registerCommand("envConnect.selectEnvironments", handleSelectEnvironments)
+    vscode12.commands.registerCommand(
+      "envConnect.addDirectory",
+      handleAddDirectory,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.removeDirectory",
+      handleRemoveDirectory,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.selectEnvironments",
+      handleSelectEnvironments,
+    ),
+    vscode12.commands.registerCommand(
+      "envConnect.requestVariable",
+      handleRequestVariable,
+    ),
   );
   authService.onAuthStateChanged(async (session) => {
-    projectsTreeProvider.setAuthenticated(!!session);
+    const authenticated = !!session;
+    vscode12.commands.executeCommand(
+      "setContext",
+      "envConnect.isAuthenticated",
+      authenticated,
+    );
+    projectsTreeProvider.setAuthenticated(authenticated);
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   });
   const isAuthenticated = await authService.isAuthenticated();
+  vscode12.commands.executeCommand(
+    "setContext",
+    "envConnect.isAuthenticated",
+    isAuthenticated,
+  );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
   if (isAuthenticated && shouldAutoSync()) {
     syncService.startPeriodicSync();
+    if (isRealTimeSyncEnabled()) {
+      realTimeSyncService.startRealTimeSync();
+    }
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       syncService.syncAllDirectories(linkedProject);
     }
+    await updateContextFlags();
   }
+  realTimeSyncService.onRevocationDetected(({ project, reason }) => {
+    projectsTreeProvider.refresh();
+    variablesTreeProvider.refresh();
+    statusBarProvider.update();
+    console.log(
+      `[Extension] Revocation detected for ${project.projectName}: ${reason}`,
+    );
+  });
   context.subscriptions.push(
-    vscode9.workspace.onDidChangeWorkspaceFolders(() => {
+    vscode12.workspace.onDidChangeWorkspaceFolders(() => {
       variablesTreeProvider.refresh();
       statusBarProvider.update();
-    })
+    }),
   );
   context.subscriptions.push({
     dispose: () => {
       authService.dispose();
       syncService.dispose();
+      realTimeSyncService.dispose();
+      fileProtectionService.dispose();
       projectsTreeProvider.dispose();
       variablesTreeProvider.dispose();
       statusBarProvider.dispose();
-    }
+    },
   });
 }
 async function handleSignIn() {
   const success = await authService.signIn();
-  if (success && shouldAutoSync()) {
-    syncService.startPeriodicSync();
+  if (success) {
+    await vscode12.window.withProgress(
+      {
+        location: vscode12.ProgressLocation.Notification,
+        title: "ENV Connect: Setting up...",
+      },
+      async (progress) => {
+        progress.report({ message: "Loading projects and variables..." });
+        projectsTreeProvider.refresh();
+        variablesTreeProvider.refresh();
+        if (shouldAutoSync()) {
+          progress.report({ message: "Starting sync..." });
+          syncService.startPeriodicSync();
+          if (isRealTimeSyncEnabled()) {
+            realTimeSyncService.startRealTimeSync();
+          }
+        }
+      },
+    );
   }
 }
 async function handleSignOut() {
   await authService.signOut();
   syncService.stopPeriodicSync();
+  realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
 }
 async function handleLinkProject(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const shouldSignIn = await vscode9.window.showWarningMessage(
+    const shouldSignIn = await vscode12.window.showWarningMessage(
       "You need to sign in to link a project.",
-      "Sign In"
+      "Sign In",
     );
     if (shouldSignIn === "Sign In") {
       await handleSignIn();
@@ -17693,40 +19832,55 @@ async function handleLinkProject(item) {
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
+    if (!organization && item.project.organizationId) {
+      const orgs = await apiService.getOrganizations();
+      organization = orgs.find(
+        (org) => org._id === item.project.organizationId,
+      );
+      if (organization) {
+        organizationName = organization.name;
+      }
+    }
   } else {
     const organizations = await apiService.getOrganizations();
     if (organizations.length === 0) {
-      vscode9.window.showWarningMessage("No organizations found");
+      vscode12.window.showWarningMessage("No organizations found");
       return;
     }
-    const orgPick = await vscode9.window.showQuickPick(
+    const orgPick = await vscode12.window.showQuickPick(
       organizations.map((org) => ({
         label: org.name,
         description: org.tier === "pro" ? "Pro" : "Free",
-        organization: org
+        organization: org,
       })),
-      { placeHolder: "Select an organization" }
+      { placeHolder: "Select an organization" },
     );
     if (!orgPick) {
       return;
     }
-    const accessCheck = await apiService.checkExtensionAccess(orgPick.organization._id);
+    const accessCheck = await apiService.checkExtensionAccess(
+      orgPick.organization._id,
+    );
     if (!accessCheck.enabled) {
-      vscode9.window.showWarningMessage(accessCheck.reason || "Extension access requires Pro tier");
+      vscode12.window.showWarningMessage(
+        accessCheck.reason || "Extension access requires Pro tier",
+      );
       return;
     }
     const projects = await apiService.getProjects(orgPick.organization._id);
     if (projects.length === 0) {
-      vscode9.window.showWarningMessage("No projects found in this organization");
+      vscode12.window.showWarningMessage(
+        "No projects found in this organization",
+      );
       return;
     }
-    const projectPick = await vscode9.window.showQuickPick(
+    const projectPick = await vscode12.window.showQuickPick(
       projects.map((p) => ({
         label: p.name,
         description: p.description || void 0,
-        project: p
+        project: p,
       })),
-      { placeHolder: "Select a project to link" }
+      { placeHolder: "Select a project to link" },
     );
     if (!projectPick) {
       return;
@@ -17739,36 +19893,55 @@ async function handleLinkProject(item) {
   }
   const existingProject = await storageService.getLinkedProjectV2(projectId);
   if (existingProject) {
-    const choice = await vscode9.window.showInformationMessage(
+    const choice = await vscode12.window.showInformationMessage(
       `"${projectName}" is already linked. Add another directory?`,
       "Add Directory",
-      "Cancel"
+      "Cancel",
     );
     if (choice === "Add Directory") {
-      const linkOptions2 = await linkProjectDialog.showAddDirectoryDialog(projectName);
-      if (!linkOptions2)
-        return;
+      const linkOptions2 =
+        await linkProjectDialog.showAddDirectoryDialog(projectName);
+      if (!linkOptions2) return;
       try {
         await syncService.addDirectoryToProject(existingProject, linkOptions2);
-        vscode9.window.showInformationMessage(
-          `Added ${getDisplayPath(linkOptions2.directoryPath)} to ${projectName}`
+        vscode12.window.showInformationMessage(
+          `Added ${getDisplayPath(linkOptions2.directoryPath)} to ${projectName}`,
         );
         projectsTreeProvider.refresh();
         variablesTreeProvider.refresh();
         statusBarProvider.update();
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        vscode9.window.showErrorMessage(`Failed to add directory: ${message}`);
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        vscode12.window.showErrorMessage(`Failed to add directory: ${message}`);
       }
     }
     return;
   }
-  const linkOptions = await linkProjectDialog.showLinkDialog(
-    project,
-    organization
-  );
-  if (!linkOptions)
+  if (!project || !organization) {
+    vscode12.window.showErrorMessage("Project or organization not found");
     return;
+  }
+  const projectForDialog = {
+    _id: projectId,
+    name: projectName,
+    slug: projectName.toLowerCase().replace(/\s+/g, "-"),
+    description: project.description || null,
+    organizationId: organization._id,
+    icon: null,
+    color: null,
+  };
+  const organizationForDialog = {
+    _id: organization._id,
+    name: organizationName,
+    slug: organizationName.toLowerCase().replace(/\s+/g, "-"),
+    tier: organization.tier,
+  };
+  const linkOptions = await linkProjectDialog.showLinkDialog(
+    projectForDialog,
+    organizationForDialog,
+  );
+  if (!linkOptions) return;
   try {
     const deviceInfo = await getDeviceInfo(storageService.getContext());
     const access2 = await apiService.linkExtension(projectId, deviceInfo);
@@ -17778,23 +19951,24 @@ async function handleLinkProject(item) {
       organizationName,
       access2.accessToken,
       access2.expiresAt,
-      linkOptions
+      linkOptions,
     );
-    vscode9.window.showInformationMessage(
-      `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
+    vscode12.window.showInformationMessage(
+      `Linked ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`,
     );
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
+    await updateContextFlags();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to link project: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to link project: ${message}`);
   }
 }
 async function handleAddDirectory(item) {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode9.window.showWarningMessage("Please sign in first");
+    vscode12.window.showWarningMessage("Please sign in first");
     return;
   }
   let projectId;
@@ -17805,79 +19979,130 @@ async function handleAddDirectory(item) {
   } else {
     const linkedProjects = await storageService.getLinkedProjectsV2();
     if (linkedProjects.length === 0) {
-      vscode9.window.showWarningMessage("No linked projects. Link a project first.");
+      vscode12.window.showWarningMessage(
+        "No linked projects. Link a project first.",
+      );
       return;
     }
-    const projectPick = await vscode9.window.showQuickPick(
+    const projectPick = await vscode12.window.showQuickPick(
       linkedProjects.map((p) => ({
         label: p.projectName,
         description: `${p.directories.length} director${p.directories.length === 1 ? "y" : "ies"} linked`,
-        projectId: p.projectId
+        projectId: p.projectId,
       })),
-      { placeHolder: "Select a project to add a directory to" }
+      { placeHolder: "Select a project to add a directory to" },
     );
-    if (!projectPick)
-      return;
+    if (!projectPick) return;
     projectId = projectPick.projectId;
     projectName = projectPick.label;
   }
   const project = await storageService.getLinkedProjectV2(projectId);
   if (!project) {
-    vscode9.window.showWarningMessage("Project not found");
+    vscode12.window.showWarningMessage("Project not found");
     return;
   }
-  const linkOptions = await linkProjectDialog.showAddDirectoryDialog(projectName);
-  if (!linkOptions)
-    return;
+  const linkOptions =
+    await linkProjectDialog.showAddDirectoryDialog(projectName);
+  if (!linkOptions) return;
   try {
     await syncService.addDirectoryToProject(project, linkOptions);
-    vscode9.window.showInformationMessage(
-      `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`
+    vscode12.window.showInformationMessage(
+      `Added ${getDisplayPath(linkOptions.directoryPath)} to ${projectName}`,
     );
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to add directory: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to add directory: ${message}`);
   }
 }
 async function handleRemoveDirectory(item) {
   if (!item?.directory || !item.project) {
-    vscode9.window.showWarningMessage("Select a directory to remove");
+    vscode12.window.showWarningMessage("Select a directory to remove");
     return;
   }
-  const confirm = await vscode9.window.showWarningMessage(
+  const confirm = await vscode12.window.showWarningMessage(
     `Remove "${getDisplayPath(item.directory.directoryPath)}" from ${item.project.name}?`,
     "Remove",
-    "Cancel"
+    "Cancel",
   );
   if (confirm !== "Remove") {
     return;
   }
   try {
-    await syncService.removeDirectoryFromProject(item.project._id, item.directory.directoryPath);
-    vscode9.window.showInformationMessage("Directory removed");
+    await syncService.removeDirectoryFromProject(
+      item.project._id,
+      item.directory.directoryPath,
+    );
+    vscode12.window.showInformationMessage("Directory removed");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to remove directory: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to remove directory: ${message}`);
   }
 }
 async function handleSelectEnvironments(item) {
-  vscode9.window.showInformationMessage(
-    "To change environments, remove and re-add the directory with different environment settings."
+  vscode12.window.showInformationMessage(
+    "To change environments, remove and re-add the directory with different environment settings.",
   );
+}
+async function handleRequestVariable() {
+  const isAuth = await authService.isAuthenticated();
+  if (!isAuth) {
+    vscode12.window.showWarningMessage("Please sign in first");
+    return;
+  }
+  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  if (!linkedProject) {
+    vscode12.window.showWarningMessage(
+      'No project linked. Use "ENV Connect: Link Project" first.',
+    );
+    return;
+  }
+  const role = apiService.getUserRole(linkedProject.projectId);
+  if (role && role !== "member") {
+    vscode12.window.showInformationMessage(
+      "As an admin or team lead, you can create variables directly on the dashboard.",
+    );
+    return;
+  }
+  const input = await requestVariableDialog.showRequestDialog(
+    linkedProject.projectId,
+  );
+  if (!input) {
+    return;
+  }
+  try {
+    await vscode12.window.withProgress(
+      {
+        location: vscode12.ProgressLocation.Notification,
+        title: "ENV Connect: Submitting variable request...",
+      },
+      async () => {
+        await apiService.submitVariableRequest(input);
+      },
+    );
+    vscode12.window.showInformationMessage(
+      `Variable request for "${input.key}" submitted for approval.`,
+    );
+    variablesTreeProvider.refresh();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    vscode12.window.showErrorMessage(
+      `Failed to submit variable request: ${message}`,
+    );
+  }
 }
 async function handleUnlinkProject(item) {
   const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
   if (linkedProjectV2) {
     const projectId2 = item?.project?._id || linkedProjectV2.projectId;
-    const confirm2 = await vscode9.window.showWarningMessage(
+    const confirm2 = await vscode12.window.showWarningMessage(
       `Unlink "${linkedProjectV2.projectName}"? This will remove all synced .env files (${linkedProjectV2.directories.length} director${linkedProjectV2.directories.length === 1 ? "y" : "ies"}).`,
       "Unlink",
-      "Cancel"
+      "Cancel",
     );
     if (confirm2 !== "Unlink") {
       return;
@@ -17887,26 +20112,27 @@ async function handleUnlinkProject(item) {
       await apiService.unlinkExtension(projectId2, deviceInfo.deviceId);
       await syncService.cleanupAllDirectories(linkedProjectV2);
       await storageService.removeLinkedProjectV2(projectId2);
-      vscode9.window.showInformationMessage("Project unlinked");
+      vscode12.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
       variablesTreeProvider.refresh();
       statusBarProvider.update();
+      await updateContextFlags();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      vscode9.window.showErrorMessage(`Failed to unlink project: ${message}`);
+      vscode12.window.showErrorMessage(`Failed to unlink project: ${message}`);
     }
     return;
   }
   const linkedProject = await syncService.getLinkedProject();
   if (!linkedProject) {
-    vscode9.window.showWarningMessage("No project linked to this workspace");
+    vscode12.window.showWarningMessage("No project linked to this workspace");
     return;
   }
   const projectId = item?.project?._id || linkedProject.projectId;
-  const confirm = await vscode9.window.showWarningMessage(
+  const confirm = await vscode12.window.showWarningMessage(
     `Unlink "${linkedProject.projectName}"? This will remove the synced .env file.`,
     "Unlink",
-    "Cancel"
+    "Cancel",
   );
   if (confirm !== "Unlink") {
     return;
@@ -17915,47 +20141,56 @@ async function handleUnlinkProject(item) {
     const deviceInfo = await getDeviceInfo(storageService.getContext());
     await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
     await syncService.unlinkProject(projectId);
-    vscode9.window.showInformationMessage("Project unlinked");
+    vscode12.window.showInformationMessage("Project unlinked");
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    vscode9.window.showErrorMessage(`Failed to unlink project: ${message}`);
+    vscode12.window.showErrorMessage(`Failed to unlink project: ${message}`);
   }
 }
 async function handlePullVariables() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    vscode9.window.showWarningMessage("Please sign in first");
+    vscode12.window.showWarningMessage("Please sign in first");
     return;
   }
-  statusBarProvider.setSyncing(true);
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
-  if (linkedProjectV2) {
-    const results = await syncService.syncAllDirectories(linkedProjectV2);
-    statusBarProvider.setSyncing(false);
-    if (results) {
-      const successful = results.filter((r) => r.success).length;
-      const total = results.length;
-      if (successful === total) {
-        vscode9.window.showInformationMessage(
-          `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
-        );
-      } else {
-        vscode9.window.showWarningMessage(
-          `Synced ${successful}/${total} directories. Some failed.`
-        );
+  await vscode12.window.withProgress(
+    {
+      location: vscode12.ProgressLocation.Notification,
+      title: "ENV Connect: Pulling variables...",
+    },
+    async () => {
+      statusBarProvider.setSyncing(true);
+      const linkedProjectV2 =
+        await syncService.getLinkedProjectV2ForWorkspace();
+      if (linkedProjectV2) {
+        const results = await syncService.syncAllDirectories(linkedProjectV2);
+        statusBarProvider.setSyncing(false);
+        if (results) {
+          const successful = results.filter((r) => r.success).length;
+          const total = results.length;
+          if (successful === total) {
+            vscode12.window.showInformationMessage(
+              `Synced ${successful} director${successful === 1 ? "y" : "ies"}`,
+            );
+          } else {
+            vscode12.window.showWarningMessage(
+              `Synced ${successful}/${total} directories. Some failed.`,
+            );
+          }
+          variablesTreeProvider.refresh();
+        }
+        return;
       }
-      variablesTreeProvider.refresh();
-    }
-    return;
-  }
-  const result = await syncService.syncCurrentWorkspace();
-  statusBarProvider.setSyncing(false);
-  if (result) {
-    variablesTreeProvider.refresh();
-  }
+      const result = await syncService.syncCurrentWorkspace();
+      statusBarProvider.setSyncing(false);
+      if (result) {
+        variablesTreeProvider.refresh();
+      }
+    },
+  );
 }
 function handleRefresh() {
   projectsTreeProvider.refresh();
@@ -17964,14 +20199,14 @@ function handleRefresh() {
 }
 function handleOpenDashboard() {
   const serverUrl = getServerUrl();
-  vscode9.env.openExternal(vscode9.Uri.parse(serverUrl));
+  vscode12.env.openExternal(vscode12.Uri.parse(serverUrl));
 }
 async function handleShowStatus() {
   const isAuthenticated = await authService.isAuthenticated();
   if (!isAuthenticated) {
-    const action = await vscode9.window.showInformationMessage(
+    const action = await vscode12.window.showInformationMessage(
       "ENV Connect: Not signed in",
-      "Sign In"
+      "Sign In",
     );
     if (action === "Sign In") {
       await handleSignIn();
@@ -17984,86 +20219,90 @@ async function handleShowStatus() {
     {
       label: "$(account) Signed in as",
       description: user?.email || "Unknown",
-      alwaysShow: true
-    }
+      alwaysShow: true,
+    },
   ];
   if (linkedProjectV2) {
     items.push(
-      { kind: vscode9.QuickPickItemKind.Separator, label: "Linked Project" },
+      { kind: vscode12.QuickPickItemKind.Separator, label: "Linked Project" },
       {
         label: "$(folder) Project",
-        description: linkedProjectV2.projectName
+        description: linkedProjectV2.projectName,
       },
       {
         label: "$(organization) Organization",
-        description: linkedProjectV2.organizationName
+        description: linkedProjectV2.organizationName,
       },
       {
         label: "$(file-directory) Directories",
-        description: `${linkedProjectV2.directories.length} linked`
-      }
+        description: `${linkedProjectV2.directories.length} linked`,
+      },
     );
     for (const dir of linkedProjectV2.directories) {
       items.push({
         label: `  $(folder-opened) ${dir.displayName || getDisplayPath(dir.directoryPath)}`,
-        description: `${dir.environments.join(", ")} -> ${dir.targetFile}`
+        description: `${dir.environments.join(", ")} -> ${dir.targetFile}`,
       });
     }
   } else {
     const linkedProject = await syncService.getLinkedProject();
     if (linkedProject) {
       items.push(
-        { kind: vscode9.QuickPickItemKind.Separator, label: "Linked Project" },
+        { kind: vscode12.QuickPickItemKind.Separator, label: "Linked Project" },
         {
           label: "$(folder) Project",
-          description: linkedProject.projectName
+          description: linkedProject.projectName,
         },
         {
           label: "$(organization) Organization",
-          description: linkedProject.organizationName
+          description: linkedProject.organizationName,
         },
         {
           label: "$(server-environment) Environment",
-          description: linkedProject.environment
+          description: linkedProject.environment,
         },
         {
           label: "$(file) Target file",
-          description: linkedProject.targetFile
+          description: linkedProject.targetFile,
         },
         {
-          label: linkedProject.lastSyncedAt ? `$(clock) Last synced: ${new Date(linkedProject.lastSyncedAt).toLocaleString()}` : "$(clock) Never synced",
-          description: ""
-        }
+          label: linkedProject.lastSyncedAt
+            ? `$(clock) Last synced: ${new Date(linkedProject.lastSyncedAt).toLocaleString()}`
+            : "$(clock) Never synced",
+          description: "",
+        },
       );
     }
   }
   items.push(
-    { kind: vscode9.QuickPickItemKind.Separator, label: "Actions" },
+    { kind: vscode12.QuickPickItemKind.Separator, label: "Actions" },
     {
       label: "$(sync) Pull Variables",
-      description: "Sync variables now"
+      description: "Sync variables now",
     },
     {
       label: linkedProjectV2 ? "$(add) Add Directory" : "$(link) Link Project",
-      description: linkedProjectV2 ? "Add another directory" : "Connect to a project"
+      description: linkedProjectV2
+        ? "Add another directory"
+        : "Connect to a project",
     },
     {
       label: linkedProjectV2 ? "$(link-external) Unlink Project" : "",
-      description: linkedProjectV2 ? "Disconnect from project" : ""
+      description: linkedProjectV2 ? "Disconnect from project" : "",
     },
     {
       label: "$(globe) Open Dashboard",
-      description: "Open ENV Connect in browser"
+      description: "Open ENV Connect in browser",
     },
     {
       label: "$(sign-out) Sign Out",
-      description: "Sign out of ENV Connect"
-    }
+      description: "Sign out of ENV Connect",
+    },
   );
   const filteredItems = items.filter((i) => i.label);
-  const selected = await vscode9.window.showQuickPick(filteredItems, {
+  const selected = await vscode12.window.showQuickPick(filteredItems, {
     title: "ENV Connect Status",
-    placeHolder: "Select an action"
+    placeHolder: "Select an action",
   });
   if (!selected) {
     return;
@@ -18082,13 +20321,13 @@ async function handleShowStatus() {
     await handleSignOut();
   }
 }
-function deactivate() {
-}
+function deactivate() {}
 // Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  activate,
-  deactivate
-});
+0 &&
+  (module.exports = {
+    activate,
+    deactivate,
+  });
 /*! Bundled license information:
 
 mime-db/index.js:

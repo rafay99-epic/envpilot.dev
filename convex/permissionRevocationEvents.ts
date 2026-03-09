@@ -47,7 +47,9 @@ export const checkForToken = query({
   handler: async (ctx, args) => {
     const event = await ctx.db
       .query("permissionRevocationEvents")
-      .withIndex("by_access_token", (q) => q.eq("accessToken", args.accessToken))
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken),
+      )
       .filter((q) => q.eq(q.field("acknowledged"), false))
       .first();
 
@@ -172,8 +174,8 @@ export const cleanup = mutation({
       .filter((q) =>
         q.and(
           q.eq(q.field("acknowledged"), true),
-          q.lt(q.field("acknowledgedAt"), oneHourAgo)
-        )
+          q.lt(q.field("acknowledgedAt"), oneHourAgo),
+        ),
       )
       .collect();
 

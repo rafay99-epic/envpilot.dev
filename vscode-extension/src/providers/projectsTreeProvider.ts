@@ -1,69 +1,73 @@
-import * as vscode from 'vscode'
-import { ApiService } from '../services/api'
-import { StorageService } from '../utils/storage'
-import { getDisplayPath, normalizePath } from '../utils/paths'
-import type { Project, Organization, LinkedProject, LinkedDirectory } from '../types'
+import * as vscode from "vscode";
+import { ApiService } from "../services/api";
+import { StorageService } from "../utils/storage";
+import { getDisplayPath } from "../utils/paths";
+import type { Project, Organization, LinkedDirectory } from "../types";
 
 export type ProjectTreeItemType =
-  | 'organization'
-  | 'project'
-  | 'linkedProject'
-  | 'linkedDirectory'
-  | 'message'
-  | 'error'
+  | "organization"
+  | "project"
+  | "linkedProject"
+  | "linkedDirectory"
+  | "message"
+  | "error";
 
-export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<ProjectTreeItem | undefined | null | void>()
-  readonly onDidChangeTreeData = this._onDidChangeTreeData.event
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Admin",
+  team_lead: "Lead",
+  member: "Member",
+};
 
-  private api: ApiService
-  private storage: StorageService
-  private organizations: Organization[] = []
-  private projects: Map<string, Project[]> = new Map()
-  private isAuthenticated = false
+export class ProjectsTreeProvider
+  implements vscode.TreeDataProvider<ProjectTreeItem>
+{
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    ProjectTreeItem | undefined | null | void
+  >();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private api: ApiService;
+  private storage: StorageService;
+  private organizations: Organization[] = [];
+  private projects: Map<string, Project[]> = new Map();
+  private isAuthenticated = false;
 
   constructor(api: ApiService, storage: StorageService) {
-    this.api = api
-    this.storage = storage
+    this.api = api;
+    this.storage = storage;
   }
 
   setAuthenticated(authenticated: boolean): void {
-    this.isAuthenticated = authenticated
-    this.refresh()
+    this.isAuthenticated = authenticated;
+    this.refresh();
   }
 
   refresh(): void {
-    this._onDidChangeTreeData.fire()
+    this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(element: ProjectTreeItem): vscode.TreeItem {
-    return element
+    return element;
   }
 
   async getChildren(element?: ProjectTreeItem): Promise<ProjectTreeItem[]> {
     if (!this.isAuthenticated) {
-      return [
-        new ProjectTreeItem(
-          'Sign in to view projects',
-          vscode.TreeItemCollapsibleState.None,
-          'message'
-        ),
-      ]
+      return [];
     }
 
     // Root level - show organizations
     if (!element) {
       try {
-        this.organizations = await this.api.getOrganizations()
+        this.organizations = await this.api.getOrganizations();
 
         if (this.organizations.length === 0) {
           return [
             new ProjectTreeItem(
-              'No organizations found',
+              "No organizations found",
               vscode.TreeItemCollapsibleState.None,
-              'message'
+              "message",
             ),
-          ]
+          ];
         }
 
         return this.organizations.map(
@@ -71,89 +75,93 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
             new ProjectTreeItem(
               org.name,
               vscode.TreeItemCollapsibleState.Collapsed,
-              'organization',
-              org
-            )
-        )
+              "organization",
+              org,
+            ),
+        );
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
             vscode.TreeItemCollapsibleState.None,
-            'error'
+            "error",
           ),
-        ]
+        ];
       }
     }
 
     // Organization level - show projects
-    if (element.type === 'organization' && element.organization) {
+    if (element.type === "organization" && element.organization) {
       try {
-        const projects = await this.api.getProjects(element.organization._id)
-        this.projects.set(element.organization._id, projects)
+        const projects = await this.api.getProjects(element.organization._id);
+        this.projects.set(element.organization._id, projects);
 
         if (projects.length === 0) {
           return [
             new ProjectTreeItem(
-              'No projects',
+              "No projects yet",
               vscode.TreeItemCollapsibleState.None,
-              'message'
+              "message",
             ),
-          ]
+          ];
         }
 
-        // Get V2 linked projects
-        const linkedProjectsV2 = await this.storage.getLinkedProjectsV2()
+        const linkedProjectsV2 = await this.storage.getLinkedProjectsV2();
 
         return projects.map((project) => {
-          // Check if linked via V2
-          const linkedV2 = linkedProjectsV2.find((lp) => lp.projectId === project._id)
+          const linkedV2 = linkedProjectsV2.find(
+            (lp) => lp.projectId === project._id,
+          );
 
           if (linkedV2) {
             return new ProjectTreeItem(
               project.name,
               vscode.TreeItemCollapsibleState.Expanded,
-              'linkedProject',
+              "linkedProject",
               element.organization,
               project,
-              element.organization!.name
-            )
+              element.organization!.name,
+            );
           }
 
           return new ProjectTreeItem(
             project.name,
             vscode.TreeItemCollapsibleState.None,
-            'project',
-            undefined,
+            "project",
+            element.organization,
             project,
-            element.organization!.name
-          )
-        })
+            element.organization!.name,
+          );
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
         return [
           new ProjectTreeItem(
             `Error: ${message}`,
             vscode.TreeItemCollapsibleState.None,
-            'error'
+            "error",
           ),
-        ]
+        ];
       }
     }
 
     // Linked project level - show directories
-    if (element.type === 'linkedProject' && element.project) {
-      const linkedProject = await this.storage.getLinkedProjectV2(element.project._id)
+    if (element.type === "linkedProject" && element.project) {
+      const linkedProject = await this.storage.getLinkedProjectV2(
+        element.project._id,
+      );
 
       if (!linkedProject || linkedProject.directories.length === 0) {
         return [
           new ProjectTreeItem(
-            'No directories linked',
+            "No directories linked",
             vscode.TreeItemCollapsibleState.None,
-            'message'
+            "message",
           ),
-        ]
+        ];
       }
 
       return linkedProject.directories.map(
@@ -161,37 +169,29 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
           new ProjectTreeItem(
             dir.displayName || getDisplayPath(dir.directoryPath),
             vscode.TreeItemCollapsibleState.None,
-            'linkedDirectory',
+            "linkedDirectory",
             element.organization,
             element.project,
             element.organizationName,
-            dir
-          )
-      )
+            dir,
+          ),
+      );
     }
 
-    return []
-  }
-
-  private getCurrentWorkspacePath(): string | null {
-    const folders = vscode.workspace.workspaceFolders
-    if (!folders || folders.length === 0) {
-      return null
-    }
-    return folders[0].uri.fsPath
+    return [];
   }
 
   dispose(): void {
-    this._onDidChangeTreeData.dispose()
+    this._onDidChangeTreeData.dispose();
   }
 }
 
 export class ProjectTreeItem extends vscode.TreeItem {
-  type: ProjectTreeItemType
-  organization?: Organization
-  project?: Project
-  organizationName?: string
-  directory?: LinkedDirectory
+  type: ProjectTreeItemType;
+  organization?: Organization;
+  project?: Project;
+  organizationName?: string;
+  directory?: LinkedDirectory;
 
   constructor(
     label: string,
@@ -200,63 +200,141 @@ export class ProjectTreeItem extends vscode.TreeItem {
     organization?: Organization,
     project?: Project,
     organizationName?: string,
-    directory?: LinkedDirectory
+    directory?: LinkedDirectory,
   ) {
-    super(label, collapsibleState)
-    this.type = type
-    this.organization = organization
-    this.project = project
-    this.organizationName = organizationName
-    this.directory = directory
+    super(label, collapsibleState);
+    this.type = type;
+    this.organization = organization;
+    this.project = project;
+    this.organizationName = organizationName;
+    this.directory = directory;
+    this.contextValue = type;
 
-    // Set context value for menu filtering
-    this.contextValue = type
-
-    // Set icons and descriptions
     switch (type) {
-      case 'organization':
-        this.iconPath = new vscode.ThemeIcon('organization')
-        this.description = organization?.tier === 'pro' ? 'Pro' : 'Free'
-        break
-      case 'project':
-        this.iconPath = new vscode.ThemeIcon('folder')
-        this.description = project?.description || undefined
-        break
-      case 'linkedProject':
-        this.iconPath = new vscode.ThemeIcon('link')
-        this.description = 'Linked'
-        break
-      case 'linkedDirectory':
-        this.iconPath = new vscode.ThemeIcon('folder-opened')
-        this.description = directory?.environments.join(', ')
-        this.tooltip = this.createDirectoryTooltip(directory)
-        break
-      case 'message':
-        this.iconPath = new vscode.ThemeIcon('info')
-        break
-      case 'error':
-        this.iconPath = new vscode.ThemeIcon('error')
-        break
+      case "organization":
+        this.iconPath = new vscode.ThemeIcon(
+          "organization",
+          organization?.tier === "pro"
+            ? new vscode.ThemeColor("charts.green")
+            : undefined,
+        );
+        this.description = this.buildOrgDescription(organization);
+        this.tooltip = this.createOrgTooltip(organization);
+        break;
+
+      case "project":
+        this.iconPath = new vscode.ThemeIcon("symbol-package");
+        this.description = project?.description || undefined;
+        this.tooltip = this.createProjectTooltip(project, false);
+        break;
+
+      case "linkedProject":
+        this.iconPath = new vscode.ThemeIcon(
+          "symbol-package",
+          new vscode.ThemeColor("charts.green"),
+        );
+        this.description = "Linked";
+        this.tooltip = this.createProjectTooltip(project, true);
+        break;
+
+      case "linkedDirectory":
+        this.iconPath = new vscode.ThemeIcon("folder-opened");
+        this.description = this.buildDirectoryDescription(directory);
+        this.tooltip = this.createDirectoryTooltip(directory);
+        break;
+
+      case "message":
+        this.iconPath = new vscode.ThemeIcon(
+          "info",
+          new vscode.ThemeColor("descriptionForeground"),
+        );
+        break;
+
+      case "error":
+        this.iconPath = new vscode.ThemeIcon(
+          "error",
+          new vscode.ThemeColor("errorForeground"),
+        );
+        break;
     }
   }
 
-  private createDirectoryTooltip(directory?: LinkedDirectory): vscode.MarkdownString | undefined {
-    if (!directory) return undefined
-
-    const tooltip = new vscode.MarkdownString()
-    tooltip.appendMarkdown(`**${directory.displayName || 'Directory'}**\n\n`)
-    tooltip.appendMarkdown(`**Path:** \`${directory.directoryPath}\`\n\n`)
-    tooltip.appendMarkdown(`**Target File:** ${directory.targetFile}\n\n`)
-    tooltip.appendMarkdown(`**Environments:** ${directory.environments.join(', ')}\n\n`)
-
-    if (directory.lastSyncedAt) {
-      tooltip.appendMarkdown(
-        `**Last Synced:** ${new Date(directory.lastSyncedAt).toLocaleString()}`
-      )
-    } else {
-      tooltip.appendMarkdown('**Last Synced:** Never')
+  private buildOrgDescription(org?: Organization): string | undefined {
+    if (!org) return undefined;
+    const parts: string[] = [];
+    parts.push(org.tier === "pro" ? "Pro" : "Free");
+    if (org.role) {
+      parts.push(ROLE_LABELS[org.role] || org.role);
     }
+    return parts.join(" \u00b7 ");
+  }
 
-    return tooltip
+  private buildDirectoryDescription(dir?: LinkedDirectory): string | undefined {
+    if (!dir) return undefined;
+    return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
+  }
+
+  private createOrgTooltip(
+    org?: Organization,
+  ): vscode.MarkdownString | undefined {
+    if (!org) return undefined;
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(`### $(organization) ${org.name}\n\n`);
+    md.appendMarkdown(
+      `**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}\n\n`,
+    );
+    if (org.role) {
+      md.appendMarkdown(
+        `**Your Role:** ${ROLE_LABELS[org.role] || org.role}\n\n`,
+      );
+    }
+    md.appendMarkdown(`**Slug:** \`${org.slug}\``);
+    return md;
+  }
+
+  private createProjectTooltip(
+    project?: Project,
+    isLinked?: boolean,
+  ): vscode.MarkdownString | undefined {
+    if (!project) return undefined;
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### ${project.icon || "$(symbol-package)"} ${project.name}\n\n`,
+    );
+    if (isLinked) {
+      md.appendMarkdown("$(check) **Linked to this workspace**\n\n");
+    }
+    if (project.description) {
+      md.appendMarkdown(`${project.description}\n\n`);
+    }
+    md.appendMarkdown(`**Slug:** \`${project.slug}\``);
+    return md;
+  }
+
+  private createDirectoryTooltip(
+    directory?: LinkedDirectory,
+  ): vscode.MarkdownString | undefined {
+    if (!directory) return undefined;
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+    md.appendMarkdown(
+      `### $(folder-opened) ${directory.displayName || "Directory"}\n\n`,
+    );
+    md.appendMarkdown(`**Path:** \`${directory.directoryPath}\`\n\n`);
+    md.appendMarkdown(`**Target:** \`${directory.targetFile}\`\n\n`);
+    md.appendMarkdown(
+      `**Environments:** ${directory.environments.join(", ")}\n\n`,
+    );
+    md.appendMarkdown("---\n\n");
+    if (directory.lastSyncedAt) {
+      md.appendMarkdown(
+        `$(sync) Last synced ${new Date(directory.lastSyncedAt).toLocaleString()}`,
+      );
+    } else {
+      md.appendMarkdown("$(sync) Never synced");
+    }
+    return md;
   }
 }

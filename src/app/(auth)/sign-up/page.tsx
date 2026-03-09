@@ -1,17 +1,17 @@
-import { getSignUpUrl, withAuth } from '@workos-inc/authkit-nextjs'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import { getSignUpUrl, withAuth } from "@workos-inc/authkit-nextjs";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function SignUpPage() {
   // Check if user is already authenticated
-  const { user } = await withAuth()
+  const { user } = await withAuth();
 
   if (user) {
-    redirect('/dashboard')
+    redirect("/dashboard");
   }
 
   // Get the WorkOS sign-up URL
-  const signUpUrl = await getSignUpUrl()
+  const signUpUrl = await getSignUpUrl();
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
@@ -133,7 +133,7 @@ export default async function SignUpPage() {
 
         {/* Sign In Link */}
         <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <Link
             href="/sign-in"
             className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
@@ -153,5 +153,5 @@ export default async function SignUpPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

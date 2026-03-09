@@ -1,36 +1,46 @@
-'use client'
+"use client";
 
-import { useRef, useMemo } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Float, MeshDistortMaterial, Environment, Sphere } from '@react-three/drei'
-import * as THREE from 'three'
+import { useRef, useMemo } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import {
+  Float,
+  MeshDistortMaterial,
+  Environment,
+  Sphere,
+} from "@react-three/drei";
+import * as THREE from "three";
+
+function pseudoRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
 
 function ParticleField() {
-  const particlesRef = useRef<THREE.Points>(null)
-  const count = 200
+  const particlesRef = useRef<THREE.Points>(null);
+  const count = 200;
 
   const positions = useMemo(() => {
-    const pos = new Float32Array(count * 3)
+    const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 10
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 10
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 10
+      pos[i * 3] = (pseudoRandom(i + 1) - 0.5) * 10;
+      pos[i * 3 + 1] = (pseudoRandom(i + 101) - 0.5) * 10;
+      pos[i * 3 + 2] = (pseudoRandom(i + 201) - 0.5) * 10;
     }
-    return pos
-  }, [])
+    return pos;
+  }, []);
 
   useFrame((state) => {
     if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.02
-      particlesRef.current.rotation.x = state.clock.elapsedTime * 0.01
+      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.02;
+      particlesRef.current.rotation.x = state.clock.elapsedTime * 0.01;
     }
-  })
+  });
 
   const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    return geo
-  }, [positions])
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, [positions]);
 
   return (
     <points ref={particlesRef} geometry={geometry}>
@@ -42,25 +52,22 @@ function ParticleField() {
         sizeAttenuation
       />
     </points>
-  )
+  );
 }
 
 function VaultCore() {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.elapsedTime * 0.3
-      meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.5) * 0.1
+      meshRef.current.rotation.y = state.clock.elapsedTime * 0.3;
+      meshRef.current.rotation.z =
+        Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
     }
-  })
+  });
 
   return (
-    <Float
-      speed={2}
-      rotationIntensity={0.5}
-      floatIntensity={1}
-    >
+    <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
       <mesh ref={meshRef} scale={1.5}>
         <icosahedronGeometry args={[1, 1]} />
         <MeshDistortMaterial
@@ -72,29 +79,29 @@ function VaultCore() {
         />
       </mesh>
     </Float>
-  )
+  );
 }
 
 function ShieldRings() {
-  const ring1Ref = useRef<THREE.Mesh>(null)
-  const ring2Ref = useRef<THREE.Mesh>(null)
-  const ring3Ref = useRef<THREE.Mesh>(null)
+  const ring1Ref = useRef<THREE.Mesh>(null);
+  const ring2Ref = useRef<THREE.Mesh>(null);
+  const ring3Ref = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime
+    const t = state.clock.elapsedTime;
     if (ring1Ref.current) {
-      ring1Ref.current.rotation.x = t * 0.4
-      ring1Ref.current.rotation.y = t * 0.2
+      ring1Ref.current.rotation.x = t * 0.4;
+      ring1Ref.current.rotation.y = t * 0.2;
     }
     if (ring2Ref.current) {
-      ring2Ref.current.rotation.x = -t * 0.3
-      ring2Ref.current.rotation.z = t * 0.4
+      ring2Ref.current.rotation.x = -t * 0.3;
+      ring2Ref.current.rotation.z = t * 0.4;
     }
     if (ring3Ref.current) {
-      ring3Ref.current.rotation.y = t * 0.5
-      ring3Ref.current.rotation.z = -t * 0.3
+      ring3Ref.current.rotation.y = t * 0.5;
+      ring3Ref.current.rotation.z = -t * 0.3;
     }
-  })
+  });
 
   return (
     <group scale={1.5}>
@@ -111,7 +118,7 @@ function ShieldRings() {
         <meshStandardMaterial color="#93c5fd" metalness={0.8} roughness={0.2} />
       </mesh>
     </group>
-  )
+  );
 }
 
 function GlowingSphere() {
@@ -119,7 +126,7 @@ function GlowingSphere() {
     <Sphere args={[0.5, 32, 32]} position={[0, 0, 0]}>
       <meshBasicMaterial color="#3b82f6" transparent opacity={0.15} />
     </Sphere>
-  )
+  );
 }
 
 function Scene() {
@@ -143,7 +150,7 @@ function Scene() {
 
       <Environment preset="city" />
     </>
-  )
+  );
 }
 
 export default function HeroScene() {
@@ -152,11 +159,11 @@ export default function HeroScene() {
       <Canvas
         camera={{ position: [0, 0, 5], fov: 45 }}
         dpr={[1, 2]}
-        style={{ background: 'transparent' }}
+        style={{ background: "transparent" }}
       >
         <Scene />
       </Canvas>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white dark:to-zinc-950" />
     </div>
-  )
+  );
 }

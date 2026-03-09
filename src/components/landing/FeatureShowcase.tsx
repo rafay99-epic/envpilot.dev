@@ -1,36 +1,44 @@
-'use client'
+"use client";
 
-import { useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Float, Text, RoundedBox, MeshTransmissionMaterial, Line } from '@react-three/drei'
-import * as THREE from 'three'
+import { useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import {
+  Float,
+  Text,
+  RoundedBox,
+  MeshTransmissionMaterial,
+  Line,
+} from "@react-three/drei";
+import * as THREE from "three";
 
 interface FeatureBoxProps {
-  position: [number, number, number]
-  color: string
-  icon: string
-  isActive: boolean
-  onClick: () => void
+  position: [number, number, number];
+  color: string;
+  icon: string;
+  isActive: boolean;
+  onClick: () => void;
 }
 
-function FeatureBox({ position, color, icon, isActive, onClick }: FeatureBoxProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const [hovered, setHovered] = useState(false)
+function FeatureBox({
+  position,
+  color,
+  icon,
+  isActive,
+  onClick,
+}: FeatureBoxProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   useFrame((state) => {
     if (meshRef.current) {
-      const scale = isActive ? 1.2 : hovered ? 1.1 : 1
-      meshRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1)
-      meshRef.current.rotation.y = state.clock.elapsedTime * 0.3
+      const scale = isActive ? 1.2 : hovered ? 1.1 : 1;
+      meshRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
+      meshRef.current.rotation.y = state.clock.elapsedTime * 0.3;
     }
-  })
+  });
 
   return (
-    <Float
-      speed={2}
-      rotationIntensity={0.2}
-      floatIntensity={0.5}
-    >
+    <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
       <group position={position}>
         <RoundedBox
           ref={meshRef}
@@ -64,11 +72,11 @@ function FeatureBox({ position, color, icon, isActive, onClick }: FeatureBoxProp
         </Text>
       </group>
     </Float>
-  )
+  );
 }
 
 function ConnectingLines({ activeIndex }: { activeIndex: number }) {
-  void activeIndex // Suppress unused variable warning
+  void activeIndex; // Suppress unused variable warning
 
   const positions: [number, number, number][] = [
     [-2.5, 0, 0],
@@ -76,7 +84,7 @@ function ConnectingLines({ activeIndex }: { activeIndex: number }) {
     [2.5, 0, 0],
     [0, -1.5, 0],
     [-2.5, 0, 0], // Close the loop
-  ]
+  ];
 
   return (
     <Line
@@ -86,46 +94,68 @@ function ConnectingLines({ activeIndex }: { activeIndex: number }) {
       opacity={0.5}
       lineWidth={2}
     />
-  )
+  );
 }
 
 function DataFlow() {
-  const sphereRef = useRef<THREE.Mesh>(null)
+  const sphereRef = useRef<THREE.Mesh>(null);
   const positions: [number, number, number][] = [
     [-2.5, 0, 0],
     [0, 1.5, 0],
     [2.5, 0, 0],
     [0, -1.5, 0],
-  ]
+  ];
 
   useFrame((state) => {
     if (sphereRef.current) {
-      const t = (state.clock.elapsedTime * 0.3) % 1
-      const index = Math.floor(t * positions.length)
-      const nextIndex = (index + 1) % positions.length
-      const localT = (t * positions.length) % 1
+      const t = (state.clock.elapsedTime * 0.3) % 1;
+      const index = Math.floor(t * positions.length);
+      const nextIndex = (index + 1) % positions.length;
+      const localT = (t * positions.length) % 1;
 
-      const current = new THREE.Vector3(...positions[index])
-      const next = new THREE.Vector3(...positions[nextIndex])
-      sphereRef.current.position.lerpVectors(current, next, localT)
+      const current = new THREE.Vector3(...positions[index]);
+      const next = new THREE.Vector3(...positions[nextIndex]);
+      sphereRef.current.position.lerpVectors(current, next, localT);
     }
-  })
+  });
 
   return (
     <mesh ref={sphereRef}>
       <sphereGeometry args={[0.08, 16, 16]} />
       <meshBasicMaterial color="#60a5fa" />
     </mesh>
-  )
+  );
 }
 
-function Scene({ activeIndex, onFeatureClick }: { activeIndex: number; onFeatureClick: (index: number) => void }) {
+function Scene({
+  activeIndex,
+  onFeatureClick,
+}: {
+  activeIndex: number;
+  onFeatureClick: (index: number) => void;
+}) {
   const features = [
-    { position: [-2.5, 0, 0] as [number, number, number], color: '#1e40af', icon: '🔐' },
-    { position: [0, 1.5, 0] as [number, number, number], color: '#0369a1', icon: '👥' },
-    { position: [2.5, 0, 0] as [number, number, number], color: '#0e7490', icon: '🛡️' },
-    { position: [0, -1.5, 0] as [number, number, number], color: '#0d9488', icon: '📊' },
-  ]
+    {
+      position: [-2.5, 0, 0] as [number, number, number],
+      color: "#1e40af",
+      icon: "🔐",
+    },
+    {
+      position: [0, 1.5, 0] as [number, number, number],
+      color: "#0369a1",
+      icon: "👥",
+    },
+    {
+      position: [2.5, 0, 0] as [number, number, number],
+      color: "#0e7490",
+      icon: "🛡️",
+    },
+    {
+      position: [0, -1.5, 0] as [number, number, number],
+      color: "#0d9488",
+      icon: "📊",
+    },
+  ];
 
   return (
     <>
@@ -147,34 +177,38 @@ function Scene({ activeIndex, onFeatureClick }: { activeIndex: number; onFeature
         />
       ))}
     </>
-  )
+  );
 }
 
 const featureDetails = [
   {
-    title: 'End-to-End Encryption',
-    description: 'Your secrets are encrypted with AES-256 before leaving your browser. Only you and your team can access them.',
-    icon: '🔐',
+    title: "End-to-End Encryption",
+    description:
+      "Your secrets are encrypted with AES-256 before leaving your browser. Only you and your team can access them.",
+    icon: "🔐",
   },
   {
-    title: 'Team Collaboration',
-    description: 'Invite team members, create organizations, and manage access with granular role-based permissions.',
-    icon: '👥',
+    title: "Team Collaboration",
+    description:
+      "Invite team members, create organizations, and manage access with granular role-based permissions.",
+    icon: "👥",
   },
   {
-    title: 'Secure Access Control',
-    description: 'Define who can view, edit, or manage each secret. Protect sensitive data at every level.',
-    icon: '🛡️',
+    title: "Secure Access Control",
+    description:
+      "Define who can view, edit, or manage each secret. Protect sensitive data at every level.",
+    icon: "🛡️",
   },
   {
-    title: 'Audit & Compliance',
-    description: 'Complete audit trail of every access and modification. Stay compliant with SOC2, GDPR, and HIPAA.',
-    icon: '📊',
+    title: "Audit & Compliance",
+    description:
+      "Complete audit trail of every access and modification. Stay compliant with SOC2, GDPR, and HIPAA.",
+    icon: "📊",
   },
-]
+];
 
 export default function FeatureShowcase() {
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(0);
 
   return (
     <section className="relative py-24" id="showcase">
@@ -188,11 +222,11 @@ export default function FeatureShowcase() {
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">
           <div className="relative h-[400px] rounded-2xl border border-zinc-200 bg-gradient-to-br from-zinc-50 to-zinc-100 dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-950">
-            <Canvas
-              camera={{ position: [0, 0, 6], fov: 50 }}
-              dpr={[1, 2]}
-            >
-              <Scene activeIndex={activeIndex} onFeatureClick={setActiveIndex} />
+            <Canvas camera={{ position: [0, 0, 6], fov: 50 }} dpr={[1, 2]}>
+              <Scene
+                activeIndex={activeIndex}
+                onFeatureClick={setActiveIndex}
+              />
             </Canvas>
           </div>
 
@@ -203,21 +237,29 @@ export default function FeatureShowcase() {
                 onClick={() => setActiveIndex(index)}
                 className={`rounded-xl border p-6 text-left transition-all ${
                   activeIndex === index
-                    ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30'
-                    : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700'
+                    ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
+                    : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{feature.icon}</span>
-                  <h3 className={`text-lg font-semibold ${
-                    activeIndex === index ? 'text-blue-900 dark:text-blue-100' : 'text-zinc-900 dark:text-zinc-100'
-                  }`}>
+                  <h3
+                    className={`text-lg font-semibold ${
+                      activeIndex === index
+                        ? "text-blue-900 dark:text-blue-100"
+                        : "text-zinc-900 dark:text-zinc-100"
+                    }`}
+                  >
                     {feature.title}
                   </h3>
                 </div>
-                <p className={`mt-2 text-sm ${
-                  activeIndex === index ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400'
-                }`}>
+                <p
+                  className={`mt-2 text-sm ${
+                    activeIndex === index
+                      ? "text-blue-700 dark:text-blue-300"
+                      : "text-zinc-600 dark:text-zinc-400"
+                  }`}
+                >
                   {feature.description}
                 </p>
               </button>
@@ -226,5 +268,5 @@ export default function FeatureShowcase() {
         </div>
       </div>
     </section>
-  )
+  );
 }

@@ -1,1 +1,1 @@
-export { TemplateSelector } from './template-selector'
+export { TemplateSelector } from "./template-selector";

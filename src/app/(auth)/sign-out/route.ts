@@ -1,5 +1,5 @@
-import { signOut } from '@workos-inc/authkit-nextjs'
+import { signOut } from "@workos-inc/authkit-nextjs";
 
 export async function GET() {
-  return signOut()
+  return signOut();
 }

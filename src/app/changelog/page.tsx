@@ -6,7 +6,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useChangelogEntries } from "@/hooks";
 
-type ChangelogType = "feature" | "fix" | "improvement" | "security" | "breaking";
+type ChangelogType =
+  | "feature"
+  | "fix"
+  | "improvement"
+  | "security"
+  | "breaking";
 
 const TYPE_CONFIG: Record<
   ChangelogType,
@@ -207,13 +212,22 @@ export default function ChangelogPage() {
       <footer className="border-t border-zinc-200 py-12 dark:border-zinc-800">
         <div className="container mx-auto px-4 text-center md:px-6">
           <div className="flex items-center justify-center gap-6 text-sm text-zinc-500 dark:text-zinc-400">
-            <Link href="/" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+            <Link
+              href="/"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
               Home
             </Link>
-            <Link href="/wishlist" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+            <Link
+              href="/wishlist"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
               Wishlist
             </Link>
-            <Link href="/changelog" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+            <Link
+              href="/changelog"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
               Changelog
             </Link>
           </div>

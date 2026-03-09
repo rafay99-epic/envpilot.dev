@@ -36,16 +36,16 @@ export type TierAction =
  * Hook to get organization tier limits and current usage
  */
 export function useOrganizationTierLimits(
-  organizationId: Id<"organizations"> | undefined
+  organizationId: Id<"organizations"> | undefined,
 ) {
   const limitsData = useQuery(
     api.tierLimits.getOrganizationLimits,
-    organizationId ? { organizationId } : "skip"
+    organizationId ? { organizationId } : "skip",
   );
 
   const usageData = useQuery(
     api.tierLimits.getOrganizationUsage,
-    organizationId ? { organizationId } : "skip"
+    organizationId ? { organizationId } : "skip",
   );
 
   return {
@@ -61,10 +61,12 @@ export function useOrganizationTierLimits(
 /**
  * Hook to get project variable count and limits
  */
-export function useProjectVariableLimits(projectId: Id<"projects"> | undefined) {
+export function useProjectVariableLimits(
+  projectId: Id<"projects"> | undefined,
+) {
   const data = useQuery(
     api.tierLimits.getProjectVariableCount,
-    projectId ? { projectId } : "skip"
+    projectId ? { projectId } : "skip",
   );
 
   if (!data) {
@@ -103,7 +105,7 @@ export function useProjectVariableLimits(projectId: Id<"projects"> | undefined) 
 export function useUserOrganizationLimits(userId: Id<"users"> | undefined) {
   const data = useQuery(
     api.tierLimits.getUserOrganizationCount,
-    userId ? { userId } : "skip"
+    userId ? { userId } : "skip",
   );
 
   if (!data) {
@@ -124,7 +126,10 @@ export function useUserOrganizationLimits(userId: Id<"users"> | undefined) {
   const organizationsRemaining =
     data.limits.maxOrganizations === null
       ? Infinity
-      : Math.max(0, data.limits.maxOrganizations - data.usage.ownedOrganizations);
+      : Math.max(
+          0,
+          data.limits.maxOrganizations - data.usage.ownedOrganizations,
+        );
 
   return {
     isLoading: false,
@@ -142,7 +147,7 @@ export function useUserOrganizationLimits(userId: Id<"users"> | undefined) {
 export function useTierLimitCheck(
   organizationId: Id<"organizations"> | undefined,
   action: TierAction,
-  projectId?: Id<"projects">
+  projectId?: Id<"projects">,
 ) {
   const data = useQuery(
     api.tierLimits.checkTierLimit,
@@ -152,7 +157,7 @@ export function useTierLimitCheck(
           action,
           projectId,
         }
-      : "skip"
+      : "skip",
   );
 
   return {
@@ -167,7 +172,9 @@ export function useTierLimitCheck(
 /**
  * Helper hook to check multiple features at once
  */
-export function useTierFeatures(organizationId: Id<"organizations"> | undefined) {
+export function useTierFeatures(
+  organizationId: Id<"organizations"> | undefined,
+) {
   const { tier, limits, isLoading } = useOrganizationTierLimits(organizationId);
 
   return {
@@ -205,7 +212,7 @@ export function useTierFeatures(organizationId: Id<"organizations"> | undefined)
 export function useLimitDescription(
   current: number,
   limit: number | null,
-  itemName: string
+  itemName: string,
 ): string {
   return getLimitDescription(current, limit, itemName);
 }
@@ -216,7 +223,7 @@ export function useLimitDescription(
 export function getLimitDescription(
   current: number,
   limit: number | null,
-  itemName: string
+  itemName: string,
 ): string {
   if (limit === null) {
     return `Unlimited ${itemName}`;
@@ -236,7 +243,7 @@ export function getLimitDescription(
  */
 export function useLimitPercentage(
   current: number,
-  limit: number | null
+  limit: number | null,
 ): number {
   return calculateLimitPercentage(current, limit);
 }
@@ -246,7 +253,7 @@ export function useLimitPercentage(
  */
 export function calculateLimitPercentage(
   current: number,
-  limit: number | null
+  limit: number | null,
 ): number {
   if (limit === null) {
     return 0;

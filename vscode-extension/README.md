@@ -59,14 +59,14 @@ Variables are synced automatically, but you can manually pull:
 
 Open VS Code settings and search for "ENV Connect" to configure:
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `envConnect.serverUrl` | ENV Connect server URL | `http://localhost:3000` |
-| `envConnect.autoSync` | Auto-sync on workspace open | `true` |
-| `envConnect.syncInterval` | Permission check interval (seconds) | `300` |
-| `envConnect.targetFile` | Target file for synced variables | `.env.local` |
-| `envConnect.environment` | Default environment | `development` |
-| `envConnect.preventCopyOnRevoke` | Delete .env when permissions revoked | `true` |
+| Setting                          | Description                          | Default                 |
+| -------------------------------- | ------------------------------------ | ----------------------- |
+| `envConnect.serverUrl`           | ENV Connect server URL               | `http://localhost:3000` |
+| `envConnect.autoSync`            | Auto-sync on workspace open          | `true`                  |
+| `envConnect.syncInterval`        | Permission check interval (seconds)  | `300`                   |
+| `envConnect.targetFile`          | Target file for synced variables     | `.env.local`            |
+| `envConnect.environment`         | Default environment                  | `development`           |
+| `envConnect.preventCopyOnRevoke` | Delete .env when permissions revoked | `true`                  |
 
 ## Security
 
@@ -93,16 +93,16 @@ The status bar shows:
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `ENV Connect: Sign In` | Authenticate with ENV Connect |
-| `ENV Connect: Sign Out` | Sign out and clear credentials |
-| `ENV Connect: Link Project` | Link current workspace to a project |
-| `ENV Connect: Unlink Project` | Unlink and remove synced variables |
-| `ENV Connect: Pull Variables` | Manually sync variables |
-| `ENV Connect: Refresh` | Refresh the project tree |
-| `ENV Connect: Open Dashboard` | Open ENV Connect in browser |
-| `ENV Connect: Show Status` | Show status and quick actions |
+| Command                       | Description                         |
+| ----------------------------- | ----------------------------------- |
+| `ENV Connect: Sign In`        | Authenticate with ENV Connect       |
+| `ENV Connect: Sign Out`       | Sign out and clear credentials      |
+| `ENV Connect: Link Project`   | Link current workspace to a project |
+| `ENV Connect: Unlink Project` | Unlink and remove synced variables  |
+| `ENV Connect: Pull Variables` | Manually sync variables             |
+| `ENV Connect: Refresh`        | Refresh the project tree            |
+| `ENV Connect: Open Dashboard` | Open ENV Connect in browser         |
+| `ENV Connect: Show Status`    | Show status and quick actions       |
 
 ## Troubleshooting
 

@@ -83,7 +83,7 @@ export const listByType = query({
       v.literal("fix"),
       v.literal("improvement"),
       v.literal("security"),
-      v.literal("breaking")
+      v.literal("breaking"),
     ),
     limit: v.optional(v.number()),
   },
@@ -155,7 +155,7 @@ export const create = mutation({
       v.literal("fix"),
       v.literal("improvement"),
       v.literal("security"),
-      v.literal("breaking")
+      v.literal("breaking"),
     ),
     isPublished: v.optional(v.boolean()),
   },
@@ -193,8 +193,8 @@ export const update = mutation({
         v.literal("fix"),
         v.literal("improvement"),
         v.literal("security"),
-        v.literal("breaking")
-      )
+        v.literal("breaking"),
+      ),
     ),
   },
   handler: async (ctx, args) => {

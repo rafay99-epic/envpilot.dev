@@ -1,166 +1,177 @@
-'use client'
+"use client";
 
-import { useState, useEffect, use } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuthContext } from '@/components/auth'
-import { PERMISSIONS } from '@/lib/auth'
+import { useState, useEffect, use } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/auth";
 import {
   PROJECT_ICONS,
   PROJECT_COLORS,
   DEFAULT_PROJECT_ICON,
-  DEFAULT_PROJECT_COLOR
-} from '@/constants/project'
+  DEFAULT_PROJECT_COLOR,
+} from "@/constants/project";
 
 interface ProjectSettingsPageProps {
-  params: Promise<{ slug: string }>
+  params: Promise<{ slug: string }>;
 }
 
 interface Project {
-  _id: string
-  name: string
-  slug: string
-  description?: string
-  icon?: string
-  color?: string
-  organizationId: string
-  createdAt: number
-  updatedAt: number
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  organizationId: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
-export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps) {
-  const { slug } = use(params)
-  const router = useRouter()
-  const { hasPermission } = useAuthContext()
-  const canUpdateProject = hasPermission(PERMISSIONS.PROJECT_UPDATE)
-  const canDeleteProject = hasPermission(PERMISSIONS.PROJECT_DELETE)
+export default function ProjectSettingsPage({
+  params,
+}: ProjectSettingsPageProps) {
+  const { slug } = use(params);
+  const router = useRouter();
+  const { hasPermission, organization } = useAuthContext();
+  const canUpdateProject = hasPermission(PERMISSIONS.PROJECT_UPDATE);
+  const canDeleteProject = hasPermission(PERMISSIONS.PROJECT_DELETE);
 
-  const [project, setProject] = useState<Project | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [project, setProject] = useState<Project | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
     icon: DEFAULT_PROJECT_ICON,
     color: DEFAULT_PROJECT_COLOR,
-  })
+  });
 
   // Fetch project data
   useEffect(() => {
     async function fetchProject() {
       try {
-        const orgsResponse = await fetch('/api/organizations')
-        const orgsData = await orgsResponse.json()
-
-        if (!orgsData.organizations || orgsData.organizations.length === 0) {
-          setError('No organization found')
-          setIsLoading(false)
-          return
+        if (!organization?.id) {
+          setError("No organization found");
+          setIsLoading(false);
+          return;
         }
 
-        const organizationId = orgsData.organizations[0]._id
+        const projectsResponse = await fetch(
+          `/api/projects?organizationId=${organization.id}`,
+        );
+        const projectsData = await projectsResponse.json();
 
-        const projectsResponse = await fetch(`/api/projects?organizationId=${organizationId}`)
-        const projectsData = await projectsResponse.json()
-
-        const foundProject = projectsData.projects?.find((p: Project) => p.slug === slug)
+        const foundProject = projectsData.projects?.find(
+          (p: Project) => p.slug === slug,
+        );
 
         if (!foundProject) {
-          setError('Project not found')
+          setError("Project not found");
         } else {
-          setProject(foundProject)
+          setProject(foundProject);
           setFormData({
             name: foundProject.name,
-            description: foundProject.description || '',
+            description: foundProject.description || "",
             icon: foundProject.icon || DEFAULT_PROJECT_ICON,
             color: foundProject.color || DEFAULT_PROJECT_COLOR,
-          })
+          });
         }
       } catch {
-        setError('Failed to load project')
+        setError("Failed to load project");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchProject()
-  }, [slug])
+    fetchProject();
+  }, [organization?.id, slug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!project) return
+    e.preventDefault();
+    if (!project) return;
 
-    setError(null)
-    setSuccessMessage(null)
-    setIsSubmitting(true)
+    setError(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
 
     try {
       const response = await fetch(`/api/projects/${project._id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update project')
+        throw new Error(data.error || "Failed to update project");
       }
 
-      setProject(data.project)
-      setSuccessMessage('Project updated successfully')
+      setProject(data.project);
+      setSuccessMessage("Project updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!project || deleteConfirmText !== project.name) return
+    if (!project || deleteConfirmText !== project.name) return;
 
-    setIsDeleting(true)
-    setError(null)
+    setIsDeleting(true);
+    setError(null);
 
     try {
       const response = await fetch(`/api/projects/${project._id}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete project')
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete project");
       }
 
-      router.push('/dashboard/projects')
+      router.push("/dashboard/projects");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      setIsDeleting(false)
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsDeleting(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
       </div>
-    )
+    );
   }
 
   if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="h-6 w-6 text-red-600 dark:text-red-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -173,15 +184,25 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
           Back to Projects
         </Link>
       </div>
-    )
+    );
   }
 
   if (!canUpdateProject) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <svg
+            className="h-6 w-6 text-red-600 dark:text-red-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -197,7 +218,7 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
           Back to Project
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -208,8 +229,18 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
           href={`/dashboard/projects/${slug}`}
           className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
         </Link>
         <div>
@@ -239,7 +270,9 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
 
           {successMessage && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-              <p className="text-sm text-green-700 dark:text-green-400">{successMessage}</p>
+              <p className="text-sm text-green-700 dark:text-green-400">
+                {successMessage}
+              </p>
             </div>
           )}
 
@@ -257,7 +290,7 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
               </div>
               <div>
                 <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {formData.name || 'Project Name'}
+                  {formData.name || "Project Name"}
                 </p>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   {project?.slug}
@@ -268,14 +301,19 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
 
           {/* Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Project Name
             </label>
             <input
               type="text"
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
               className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400"
               placeholder="My Awesome Project"
               required
@@ -284,13 +322,21 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            >
               Description <span className="text-zinc-400">(optional)</span>
             </label>
             <textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
               rows={3}
               className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400"
               placeholder="A brief description of your project..."
@@ -307,11 +353,11 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                 <button
                   key={icon}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, icon }))}
+                  onClick={() => setFormData((prev) => ({ ...prev, icon }))}
                   className={`flex h-10 w-10 items-center justify-center rounded-lg text-lg transition-all ${
                     formData.icon === icon
-                      ? 'bg-zinc-900 dark:bg-zinc-100'
-                      : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'
+                      ? "bg-zinc-900 dark:bg-zinc-100"
+                      : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                   }`}
                 >
                   {icon}
@@ -330,11 +376,11 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, color }))}
+                  onClick={() => setFormData((prev) => ({ ...prev, color }))}
                   className={`h-8 w-8 rounded-lg transition-all ${
                     formData.color === color
-                      ? 'ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100'
-                      : ''
+                      ? "ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100"
+                      : ""
                   }`}
                   style={{ backgroundColor: color }}
                 />
@@ -355,7 +401,7 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                   Saving...
                 </>
               ) : (
-                'Save Changes'
+                "Save Changes"
               )}
             </button>
           </div>
@@ -378,8 +424,8 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                   Delete this project
                 </h3>
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  Once you delete a project, all its environment variables will be deleted.
-                  This action cannot be undone.
+                  Once you delete a project, all its environment variables will
+                  be deleted. This action cannot be undone.
                 </p>
               </div>
               <button
@@ -399,8 +445,18 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
           <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <div className="flex items-start gap-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <svg
+                  className="h-5 w-5 text-red-600 dark:text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
               </div>
               <div className="flex-1">
@@ -408,7 +464,8 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                   Delete Project
                 </h3>
                 <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  This action cannot be undone. All environment variables in this project will be permanently deleted.
+                  This action cannot be undone. All environment variables in
+                  this project will be permanently deleted.
                 </p>
                 <p className="mt-4 text-sm text-zinc-700 dark:text-zinc-300">
                   Type <strong>{project.name}</strong> to confirm:
@@ -425,8 +482,8 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setDeleteConfirmText('')
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText("");
                 }}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
@@ -443,7 +500,7 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
                     Deleting...
                   </>
                 ) : (
-                  'Delete Project'
+                  "Delete Project"
                 )}
               </button>
             </div>
@@ -451,5 +508,5 @@ export default function ProjectSettingsPage({ params }: ProjectSettingsPageProps
         </div>
       )}
     </div>
-  )
+  );
 }

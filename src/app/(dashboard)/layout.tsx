@@ -1,21 +1,51 @@
-import { withAuth } from '@workos-inc/authkit-nextjs'
-import { redirect } from 'next/navigation'
-import { AuthProvider } from '@/components/auth'
-import { DashboardNav } from '@/components/dashboard/dashboard-nav'
-import type { AuthUser, Organization } from '@/lib/auth'
-import { ROLES } from '@/lib/auth'
+import { withAuth } from "@workos-inc/authkit-nextjs";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../convex/_generated/api";
+import { AuthProvider } from "@/components/auth";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import type { AuthUser, Organization } from "@/lib/auth";
+import { getPermissionsForMembershipRole } from "@/lib/auth";
+import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import {
+  ACTIVE_ORG_COOKIE_NAME,
+  selectActiveOrganization,
+  type OrganizationWithMembershipRole,
+} from "@/lib/organization-context";
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   // Server-side auth check
-  const { user, organizationId, role } = await withAuth()
+  const { user } = await withAuth();
 
   if (!user) {
-    redirect('/sign-in')
+    redirect("/sign-in");
   }
+
+  const convexUser = await getOrCreateConvexUser(convex, {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName ?? null,
+    lastName: user.lastName ?? null,
+    profilePictureUrl: user.profilePictureUrl ?? null,
+  });
+
+  const organizations = (await convex.query(api.organizations.listForUser, {
+    userId: convexUser._id,
+  })) as OrganizationWithMembershipRole[];
+
+  const cookieStore = await cookies();
+  const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
+  const activeOrganization = selectActiveOrganization(
+    organizations,
+    preferredOrgId,
+  );
 
   // Transform to our AuthUser type
   const authUser: AuthUser = {
@@ -24,23 +54,24 @@ export default async function DashboardLayout({
     firstName: user.firstName ?? null,
     lastName: user.lastName ?? null,
     profilePictureUrl: user.profilePictureUrl ?? null,
-    organizationId: organizationId ?? null,
-    role: role ?? null,
-    permissions: [...(ROLES[role as keyof typeof ROLES]?.permissions ?? ROLES.MEMBER.permissions)],
+    organizationId: activeOrganization?._id ?? null,
+    role: activeOrganization?.role ?? null,
+    permissions: getPermissionsForMembershipRole(activeOrganization?.role),
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
-  }
+  };
 
-  // Mock organization data (would be fetched from database/WorkOS in production)
-  const organization: Organization | null = organizationId
+  const organization: Organization | null = activeOrganization
     ? {
-        id: organizationId,
-        name: 'My Organization',
-        slug: 'my-org',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        id: activeOrganization._id,
+        name: activeOrganization.name,
+        slug: activeOrganization.slug,
+        tier: activeOrganization.tier,
+        role: activeOrganization.role,
+        createdAt: new Date(activeOrganization.createdAt),
+        updatedAt: new Date(activeOrganization.updatedAt),
       }
-    : null
+    : null;
 
   return (
     <AuthProvider initialUser={authUser} initialOrganization={organization}>
@@ -56,5 +87,5 @@ export default async function DashboardLayout({
         </main>
       </div>
     </AuthProvider>
-  )
+  );
 }

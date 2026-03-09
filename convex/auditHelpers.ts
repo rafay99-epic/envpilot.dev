@@ -49,6 +49,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "org.created": "info",
   "project.created": "info",
   "variable.created": "info",
+  "variable.requested": "info",
+  "variable.request_approved": "info",
+  "variable.request_rejected": "warning",
+  "variable.request_canceled": "info",
 };
 
 // Resource type mapping for different action types
@@ -76,6 +80,10 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "variable.bulk_imported": "variable",
   "variable.rollback": "variable",
   "variable.restored": "variable",
+  "variable.requested": "variable",
+  "variable.request_approved": "variable",
+  "variable.request_rejected": "variable",
+  "variable.request_canceled": "variable",
 
   // Permission
   "permission.granted": "permission",
@@ -141,12 +149,13 @@ export interface AuditLogInput {
  */
 export async function createAuditLog(
   ctx: MutationCtx,
-  input: AuditLogInput
+  input: AuditLogInput,
 ): Promise<Id<"auditLogs">> {
   const now = Date.now();
 
   // Auto-derive severity if not provided
-  const severity = input.severity ?? ACTION_SEVERITY_MAP[input.action] ?? "info";
+  const severity =
+    input.severity ?? ACTION_SEVERITY_MAP[input.action] ?? "info";
 
   // Auto-derive resource type if not provided
   const resourceType = input.resourceType ?? ACTION_RESOURCE_MAP[input.action];
@@ -178,7 +187,13 @@ export async function logSecurityEvent(
   input: {
     organizationId: Id<"organizations">;
     userId: Id<"users">;
-    action: "security.access_denied" | "security.unauthorized_attempt" | "security.permission_check_failed" | "security.token_validation_failed" | "security.rate_limit_exceeded" | "security.suspicious_activity";
+    action:
+      | "security.access_denied"
+      | "security.unauthorized_attempt"
+      | "security.permission_check_failed"
+      | "security.token_validation_failed"
+      | "security.rate_limit_exceeded"
+      | "security.suspicious_activity";
     details: {
       attemptedAction: string;
       resource?: string;
@@ -189,7 +204,7 @@ export async function logSecurityEvent(
     variableId?: Id<"environmentVariables">;
     ipAddress?: string;
     userAgent?: string;
-  }
+  },
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
@@ -215,10 +230,14 @@ export async function logVariableAccess(
     ipAddress?: string;
     userAgent?: string;
     sessionId?: string;
-  }
+  },
 ): Promise<Id<"auditLogs">> {
-  const action = input.accessType === "export" ? "variable.exported" :
-                 input.accessType === "copy" ? "variable.copied" : "variable.accessed";
+  const action =
+    input.accessType === "export"
+      ? "variable.exported"
+      : input.accessType === "copy"
+        ? "variable.copied"
+        : "variable.accessed";
 
   return createAuditLog(ctx, {
     organizationId: input.organizationId,
@@ -250,7 +269,12 @@ export async function logPermissionChange(
     projectId: Id<"projects">;
     variableId: Id<"environmentVariables">;
     userId: Id<"users">;
-    action: "permission.granted" | "permission.revoked" | "permission.updated" | "permission.bulk_granted" | "permission.bulk_revoked";
+    action:
+      | "permission.granted"
+      | "permission.revoked"
+      | "permission.updated"
+      | "permission.bulk_granted"
+      | "permission.bulk_revoked";
     details: {
       targetUserId?: Id<"users">;
       targetUserEmail?: string;
@@ -263,7 +287,7 @@ export async function logPermissionChange(
     };
     ipAddress?: string;
     userAgent?: string;
-  }
+  },
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
@@ -280,7 +304,10 @@ export async function logBulkOperation(
     organizationId: Id<"organizations">;
     projectId: Id<"projects">;
     userId: Id<"users">;
-    action: "variable.bulk_imported" | "permission.bulk_granted" | "permission.bulk_revoked";
+    action:
+      | "variable.bulk_imported"
+      | "permission.bulk_granted"
+      | "permission.bulk_revoked";
     details: {
       totalCount: number;
       successCount: number;
@@ -291,11 +318,13 @@ export async function logBulkOperation(
     };
     ipAddress?: string;
     userAgent?: string;
-  }
+  },
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
-    resourceType: input.action.startsWith("variable") ? "variable" : "permission",
+    resourceType: input.action.startsWith("variable")
+      ? "variable"
+      : "permission",
   });
 }
 
@@ -378,7 +407,7 @@ export const logSecurityEventMutation = mutation({
       v.literal("security.permission_check_failed"),
       v.literal("security.token_validation_failed"),
       v.literal("security.rate_limit_exceeded"),
-      v.literal("security.suspicious_activity")
+      v.literal("security.suspicious_activity"),
     ),
     details: v.object({
       attemptedAction: v.string(),
@@ -411,10 +440,12 @@ export const logAuditExport = mutation({
     userId: v.id("users"),
     exportFormat: v.union(v.literal("csv"), v.literal("json")),
     recordCount: v.number(),
-    dateRange: v.optional(v.object({
-      start: v.number(),
-      end: v.number(),
-    })),
+    dateRange: v.optional(
+      v.object({
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
     filters: v.optional(v.string()),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),

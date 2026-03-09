@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { getClientFeatureFlags } from '@/lib/feature-flags'
+import { NextResponse } from "next/server";
+import { getClientFeatureFlags } from "@/lib/feature-flags";
 
 /**
  * GET /api/config
@@ -8,5 +8,5 @@ import { getClientFeatureFlags } from '@/lib/feature-flags'
 export async function GET() {
   return NextResponse.json({
     features: getClientFeatureFlags(),
-  })
+  });
 }

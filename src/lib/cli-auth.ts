@@ -1,37 +1,37 @@
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../convex/_generated/api'
-import type { Id, Doc } from '../../convex/_generated/dataModel'
-import { NextRequest } from 'next/server'
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../convex/_generated/api";
+import type { Id, Doc } from "../../convex/_generated/dataModel";
+import { NextRequest } from "next/server";
 
 /**
  * Result of CLI token validation
  */
 export interface CLIAuthResult {
-  valid: boolean
-  userId?: Id<'users'>
+  valid: boolean;
+  userId?: Id<"users">;
   user?: {
-    id: Id<'users'>
-    email: string
-    name?: string
-  }
-  error?: string
+    id: Id<"users">;
+    email: string;
+    name?: string;
+  };
+  error?: string;
 }
 
 /**
  * Extract the Bearer token from the Authorization header
  */
 export function extractBearerToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get('Authorization')
+  const authHeader = request.headers.get("Authorization");
 
   if (!authHeader) {
-    return null
+    return null;
   }
 
-  if (!authHeader.startsWith('Bearer ')) {
-    return null
+  if (!authHeader.startsWith("Bearer ")) {
+    return null;
   }
 
-  return authHeader.slice(7)
+  return authHeader.slice(7);
 }
 
 /**
@@ -39,37 +39,39 @@ export function extractBearerToken(request: NextRequest): string | null {
  */
 export async function validateCLIToken(
   convex: ConvexHttpClient,
-  token: string
+  token: string,
 ): Promise<CLIAuthResult> {
   try {
     const result = await convex.query(api.cliSessions.validateToken, {
       accessToken: token,
-    })
+    });
 
     if (!result.valid) {
       return {
         valid: false,
-        error: result.reason || 'Invalid token',
-      }
+        error: result.reason || "Invalid token",
+      };
     }
 
     // Update last used timestamp (fire and forget)
-    convex.mutation(api.cliSessions.updateLastUsed, {
-      accessToken: token,
-    }).catch(() => {
-      // Ignore errors in background update
-    })
+    convex
+      .mutation(api.cliSessions.updateLastUsed, {
+        accessToken: token,
+      })
+      .catch(() => {
+        // Ignore errors in background update
+      });
 
     return {
       valid: true,
       userId: result.userId,
       user: result.user,
-    }
+    };
   } catch (error) {
     return {
       valid: false,
-      error: 'Failed to validate token',
-    }
+      error: "Failed to validate token",
+    };
   }
 }
 
@@ -78,48 +80,47 @@ export async function validateCLIToken(
  */
 export async function authenticateCLIRequest(
   request: NextRequest,
-  convex: ConvexHttpClient
+  convex: ConvexHttpClient,
 ): Promise<CLIAuthResult> {
-  const token = extractBearerToken(request)
+  const token = extractBearerToken(request);
 
   if (!token) {
     return {
       valid: false,
-      error: 'Missing authorization header',
-    }
+      error: "Missing authorization header",
+    };
   }
 
-  return validateCLIToken(convex, token)
+  return validateCLIToken(convex, token);
 }
 
 /**
  * Create an unauthorized response
  */
-export function unauthorizedResponse(message: string = 'Unauthorized') {
+export function unauthorizedResponse(message: string = "Unauthorized") {
   return Response.json(
-    { error: message, code: 'UNAUTHORIZED' },
-    { status: 401 }
-  )
+    { error: message, code: "UNAUTHORIZED" },
+    { status: 401 },
+  );
 }
 
 /**
  * Create a forbidden response
  */
-export function forbiddenResponse(message: string = 'Forbidden') {
-  return Response.json(
-    { error: message, code: 'FORBIDDEN' },
-    { status: 403 }
-  )
+export function forbiddenResponse(message: string = "Forbidden") {
+  return Response.json({ error: message, code: "FORBIDDEN" }, { status: 403 });
 }
 
 /**
  * Create a tier limit exceeded response
  */
-export function tierLimitResponse(message: string = 'This feature requires Pro tier') {
+export function tierLimitResponse(
+  message: string = "This feature is currently unavailable",
+) {
   return Response.json(
-    { error: message, code: 'PAYMENT_REQUIRED' },
-    { status: 402 }
-  )
+    { error: message, code: "PAYMENT_REQUIRED" },
+    { status: 402 },
+  );
 }
 
 /**
@@ -127,18 +128,19 @@ export function tierLimitResponse(message: string = 'This feature requires Pro t
  */
 export async function checkCLIAccess(
   convex: ConvexHttpClient,
-  organizationId: Id<'organizations'>
-): Promise<{ allowed: boolean; tier: 'free' | 'pro' }> {
-  const org = await convex.query(api.organizations.getById, { organizationId })
+  organizationId: Id<"organizations">,
+): Promise<{ allowed: boolean; tier: "free" | "pro" }> {
+  const org = await convex.query(api.organizations.getById, { organizationId });
 
   if (!org) {
-    return { allowed: false, tier: 'free' }
+    return { allowed: false, tier: "free" };
   }
 
+  // Pre-alpha mode: CLI access is enabled for all tiers.
   return {
-    allowed: org.tier === 'pro',
+    allowed: true,
     tier: org.tier,
-  }
+  };
 }
 
 /**
@@ -146,8 +148,10 @@ export async function checkCLIAccess(
  */
 export async function getUserOrganizations(
   convex: ConvexHttpClient,
-  userId: Id<'users'>
-): Promise<Array<Doc<'organizations'> & { role: string }>> {
-  const memberships = await convex.query(api.organizations.listForUser, { userId })
-  return memberships as Array<Doc<'organizations'> & { role: string }>
+  userId: Id<"users">,
+): Promise<Array<Doc<"organizations"> & { role: string }>> {
+  const memberships = await convex.query(api.organizations.listForUser, {
+    userId,
+  });
+  return memberships as Array<Doc<"organizations"> & { role: string }>;
 }

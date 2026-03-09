@@ -1,222 +1,307 @@
-import * as vscode from 'vscode'
-import { ApiService } from '../services/api'
-import { StorageService } from '../utils/storage'
-import type { EnvironmentVariable, LinkedProject } from '../types'
+import * as vscode from "vscode";
+import { ApiService } from "../services/api";
+import { StorageService } from "../utils/storage";
+import type { EnvironmentVariable, LinkedProject } from "../types";
 
-export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTreeItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<VariableTreeItem | undefined | null | void>()
-  readonly onDidChangeTreeData = this._onDidChangeTreeData.event
+export class VariablesTreeProvider
+  implements vscode.TreeDataProvider<VariableTreeItem>
+{
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    VariableTreeItem | undefined | null | void
+  >();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  private api: ApiService
-  private storage: StorageService
-  private variables: EnvironmentVariable[] = []
+  private api: ApiService;
+  private storage: StorageService;
+  private variables: EnvironmentVariable[] = [];
 
   constructor(api: ApiService, storage: StorageService) {
-    this.api = api
-    this.storage = storage
+    this.api = api;
+    this.storage = storage;
   }
 
   refresh(): void {
-    this._onDidChangeTreeData.fire()
+    this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(element: VariableTreeItem): vscode.TreeItem {
-    return element
+    return element;
   }
 
   async getChildren(element?: VariableTreeItem): Promise<VariableTreeItem[]> {
     if (element) {
-      // Variables don't have children
-      return []
+      return [];
     }
 
-    const linkedProject = await this.getLinkedProject()
+    const linkedProject = await this.getLinkedProject();
     if (!linkedProject) {
-      return [
-        new VariableTreeItem(
-          'No project linked',
-          vscode.TreeItemCollapsibleState.None,
-          'message',
-          undefined,
-          'Link a project to view variables'
-        ),
-      ]
+      return [];
     }
 
     try {
       this.variables = await this.api.getVariables(
         linkedProject.projectId,
         linkedProject.environment,
-        linkedProject.accessToken
-      )
+        linkedProject.accessToken,
+      );
 
       if (this.variables.length === 0) {
         return [
           new VariableTreeItem(
-            'No variables',
+            "No variables",
             vscode.TreeItemCollapsibleState.None,
-            'message',
+            "message",
             undefined,
-            `No variables for ${linkedProject.environment} environment`
+            `No variables for ${linkedProject.environment}`,
           ),
-        ]
+        ];
       }
 
-      // Group by sensitivity
-      const regularVars = this.variables.filter((v) => !v.isSensitive)
-      const sensitiveVars = this.variables.filter((v) => v.isSensitive)
+      const regularVars = this.variables.filter((v) => !v.isSensitive);
+      const sensitiveVars = this.variables.filter((v) => v.isSensitive);
 
-      const items: VariableTreeItem[] = []
+      const items: VariableTreeItem[] = [];
 
-      // Add environment header
+      // Environment & count header
+      const role = this.api.getUserRole(linkedProject.projectId);
+      const roleLabel = role
+        ? ` \u00b7 ${role === "admin" ? "Admin" : role === "team_lead" ? "Lead" : "Member"}`
+        : "";
       items.push(
         new VariableTreeItem(
-          `Environment: ${linkedProject.environment}`,
+          linkedProject.environment,
           vscode.TreeItemCollapsibleState.None,
-          'header',
+          "header",
           undefined,
-          `${this.variables.length} variables`
-        )
-      )
+          `${this.variables.length} variable${this.variables.length !== 1 ? "s" : ""}${roleLabel}`,
+        ),
+      );
 
-      // Add regular variables
+      // Regular variables
       for (const variable of regularVars) {
         items.push(
           new VariableTreeItem(
             variable.key,
             vscode.TreeItemCollapsibleState.None,
-            'variable',
-            variable
-          )
-        )
+            "variable",
+            variable,
+          ),
+        );
       }
 
-      // Add sensitive variables with a separator
+      // Sensitive section
       if (sensitiveVars.length > 0) {
         items.push(
           new VariableTreeItem(
-            'Sensitive',
+            `Sensitive (${sensitiveVars.length})`,
             vscode.TreeItemCollapsibleState.None,
-            'separator',
-            undefined,
-            `${sensitiveVars.length} secrets`
-          )
-        )
+            "separator",
+          ),
+        );
 
         for (const variable of sensitiveVars) {
           items.push(
             new VariableTreeItem(
               variable.key,
               vscode.TreeItemCollapsibleState.None,
-              'sensitive',
-              variable
-            )
-          )
+              "sensitive",
+              variable,
+            ),
+          );
         }
       }
 
-      return items
+      // Pending requests for members
+      if (role === "member") {
+        try {
+          const pendingRequests = await this.api.getVariableRequests(
+            linkedProject.projectId,
+            "pending",
+          );
+
+          if (pendingRequests.length > 0) {
+            items.push(
+              new VariableTreeItem(
+                `Pending Requests (${pendingRequests.length})`,
+                vscode.TreeItemCollapsibleState.None,
+                "separator",
+              ),
+            );
+
+            for (const request of pendingRequests) {
+              items.push(
+                new VariableTreeItem(
+                  request.key,
+                  vscode.TreeItemCollapsibleState.None,
+                  "request",
+                  undefined,
+                  request.status,
+                ),
+              );
+            }
+          }
+        } catch {
+          // Not critical
+        }
+      }
+
+      return items;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
+      const message = error instanceof Error ? error.message : "Unknown error";
       return [
         new VariableTreeItem(
           `Error: ${message}`,
           vscode.TreeItemCollapsibleState.None,
-          'error'
+          "error",
         ),
-      ]
+      ];
     }
   }
 
   private async getLinkedProject(): Promise<LinkedProject | null> {
-    const workspacePath = this.getCurrentWorkspacePath()
+    const workspacePath = this.getCurrentWorkspacePath();
     if (!workspacePath) {
-      return null
+      return null;
     }
-    return await this.storage.getLinkedProjectForWorkspace(workspacePath)
+    return await this.storage.getLinkedProjectForWorkspace(workspacePath);
   }
 
   private getCurrentWorkspacePath(): string | null {
-    const folders = vscode.workspace.workspaceFolders
+    const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-      return null
+      return null;
     }
-    return folders[0].uri.fsPath
+    return folders[0].uri.fsPath;
   }
 
   dispose(): void {
-    this._onDidChangeTreeData.dispose()
+    this._onDidChangeTreeData.dispose();
   }
 }
 
+type VariableTreeItemType =
+  | "variable"
+  | "sensitive"
+  | "header"
+  | "separator"
+  | "message"
+  | "error"
+  | "request";
+
 export class VariableTreeItem extends vscode.TreeItem {
-  type: 'variable' | 'sensitive' | 'header' | 'separator' | 'message' | 'error'
-  variable?: EnvironmentVariable
+  type: VariableTreeItemType;
+  variable?: EnvironmentVariable;
 
   constructor(
     label: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    type: 'variable' | 'sensitive' | 'header' | 'separator' | 'message' | 'error',
+    type: VariableTreeItemType,
     variable?: EnvironmentVariable,
-    description?: string
+    description?: string,
   ) {
-    super(label, collapsibleState)
-    this.type = type
-    this.variable = variable
-    this.description = description || variable?.description || undefined
+    super(label, collapsibleState);
+    this.type = type;
+    this.variable = variable;
+    this.contextValue = type;
 
-    // Set icons
     switch (type) {
-      case 'variable':
-        this.iconPath = new vscode.ThemeIcon('symbol-variable')
-        this.tooltip = this.createTooltip(variable)
-        break
-      case 'sensitive':
-        this.iconPath = new vscode.ThemeIcon('lock')
-        this.tooltip = this.createTooltip(variable, true)
-        break
-      case 'header':
-        this.iconPath = new vscode.ThemeIcon('server-environment')
-        break
-      case 'separator':
-        this.iconPath = new vscode.ThemeIcon('shield')
-        break
-      case 'message':
-        this.iconPath = new vscode.ThemeIcon('info')
-        break
-      case 'error':
-        this.iconPath = new vscode.ThemeIcon('error')
-        break
-    }
+      case "variable":
+        this.iconPath = new vscode.ThemeIcon("symbol-variable");
+        this.description = this.truncateValue(variable?.value || "");
+        this.tooltip = this.createVariableTooltip(variable, false);
+        break;
 
-    this.contextValue = type
+      case "sensitive":
+        this.iconPath = new vscode.ThemeIcon(
+          "lock",
+          new vscode.ThemeColor("charts.yellow"),
+        );
+        this.description = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+        this.tooltip = this.createVariableTooltip(variable, true);
+        break;
+
+      case "header":
+        this.iconPath = new vscode.ThemeIcon(
+          "server-environment",
+          new vscode.ThemeColor("charts.blue"),
+        );
+        this.description = description;
+        break;
+
+      case "separator":
+        this.iconPath = new vscode.ThemeIcon(
+          "shield",
+          new vscode.ThemeColor("charts.yellow"),
+        );
+        this.description = description;
+        break;
+
+      case "message":
+        this.iconPath = new vscode.ThemeIcon(
+          "info",
+          new vscode.ThemeColor("descriptionForeground"),
+        );
+        this.description = description;
+        break;
+
+      case "error":
+        this.iconPath = new vscode.ThemeIcon(
+          "error",
+          new vscode.ThemeColor("errorForeground"),
+        );
+        break;
+
+      case "request":
+        this.iconPath = new vscode.ThemeIcon(
+          "git-pull-request",
+          new vscode.ThemeColor("charts.orange"),
+        );
+        this.description = description;
+        this.tooltip = new vscode.MarkdownString(
+          `$(git-pull-request) **${label}**\n\nStatus: *${description}*\n\nSubmitted via extension`,
+        );
+        (this.tooltip as vscode.MarkdownString).supportThemeIcons = true;
+        break;
+    }
   }
 
-  private createTooltip(variable?: EnvironmentVariable, isSensitive = false): string {
-    if (!variable) {
-      return ''
-    }
+  private createVariableTooltip(
+    variable?: EnvironmentVariable,
+    isSensitive = false,
+  ): vscode.MarkdownString | undefined {
+    if (!variable) return undefined;
 
-    const lines = [
-      `**${variable.key}**`,
-      '',
-      isSensitive ? '*(Sensitive value hidden)*' : `Value: \`${this.truncateValue(variable.value)}\``,
-      '',
-      `Environments: ${variable.environments.join(', ')}`,
-      `Version: ${variable.version}`,
-    ]
+    const md = new vscode.MarkdownString("", true);
+    md.supportThemeIcons = true;
+
+    md.appendMarkdown(`### $(symbol-variable) ${variable.key}\n\n`);
+
+    if (isSensitive) {
+      md.appendMarkdown("$(lock) *Sensitive \u2014 value hidden*\n\n");
+    } else {
+      md.appendCodeblock(variable.value, "properties");
+      md.appendMarkdown("\n");
+    }
 
     if (variable.description) {
-      lines.push('', variable.description)
+      md.appendMarkdown(`${variable.description}\n\n`);
     }
 
-    return new vscode.MarkdownString(lines.join('\n')).value
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(
+      `**Environments:** ${variable.environments.join(", ")}  \n`,
+    );
+    md.appendMarkdown(`**Version:** ${variable.version}  \n`);
+    if (isSensitive) {
+      md.appendMarkdown("**Sensitive:** $(lock) Yes");
+    }
+
+    return md;
   }
 
-  private truncateValue(value: string, maxLength = 50): string {
-    if (value.length <= maxLength) {
-      return value
-    }
-    return value.substring(0, maxLength) + '...'
+  private truncateValue(value: string, maxLength = 40): string {
+    if (!value) return "";
+    if (value.length <= maxLength) return value;
+    return value.substring(0, maxLength) + "\u2026";
   }
 }

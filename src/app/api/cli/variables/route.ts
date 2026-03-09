@@ -1,17 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../../../convex/_generated/api'
-import { Id } from '../../../../../convex/_generated/dataModel'
+import { NextRequest, NextResponse } from "next/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../../../convex/_generated/api";
+import { Id } from "../../../../../convex/_generated/dataModel";
 import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
-  checkCLIAccess,
-  tierLimitResponse,
-} from '@/lib/cli-auth'
-import { createSecret, readSecret } from '@/lib/vault'
+} from "@/lib/cli-auth";
+import { createSecret, readSecret } from "@/lib/vault";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/cli/variables
@@ -19,57 +17,48 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
  */
 export async function GET(request: NextRequest) {
   // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex)
+  const authResult = await authenticateCLIRequest(request, convex);
 
   if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error)
+    return unauthorizedResponse(authResult.error);
   }
 
-  const url = new URL(request.url)
-  const projectId = url.searchParams.get('projectId')
-  const environment = url.searchParams.get('environment')
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get("projectId");
+  const environment = url.searchParams.get("environment");
 
   if (!projectId) {
     return NextResponse.json(
-      { error: 'Missing projectId parameter' },
-      { status: 400 }
-    )
+      { error: "Missing projectId parameter" },
+      { status: 400 },
+    );
   }
 
   try {
     // Get project to find organization
     const project = await convex.query(api.projects.getById, {
-      projectId: projectId as Id<'projects'>,
-    })
+      projectId: projectId as Id<"projects">,
+    });
 
     if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Check membership
     const membership = await convex.query(api.organizations.getMembership, {
       organizationId: project.organizationId,
       userId: authResult.userId,
-    })
+    });
 
     if (!membership) {
-      return forbiddenResponse('You are not a member of this organization')
-    }
-
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, project.organizationId)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
+      return forbiddenResponse("You are not a member of this organization");
     }
 
     // Get variables with access info
     const variables = await convex.query(api.variables.listWithAccess, {
-      projectId: projectId as Id<'projects'>,
+      projectId: projectId as Id<"projects">,
       userId: authResult.userId,
-    })
+    });
 
     // Decrypt values for accessible variables
     const variablesWithValues = await Promise.all(
@@ -79,50 +68,50 @@ export async function GET(request: NextRequest) {
         .map(async (variable) => {
           try {
             // Decrypt the value from vault
-            const value = await readSecret(variable.vaultRef)
+            const value = await readSecret(variable.vaultRef);
 
             return {
               _id: variable._id,
               key: variable.key,
-              value: value || '',
+              value: value || "",
               environment: variable.environments,
               description: variable.description,
               isSensitive: variable.isSensitive,
               version: variable.version,
               createdAt: variable.createdAt,
               updatedAt: variable.updatedAt,
-            }
+            };
           } catch (error) {
             // If decryption fails, return without value
             return {
               _id: variable._id,
               key: variable.key,
-              value: '[DECRYPTION_FAILED]',
+              value: "[DECRYPTION_FAILED]",
               environment: variable.environments,
               description: variable.description,
               isSensitive: variable.isSensitive,
               version: variable.version,
               createdAt: variable.createdAt,
               updatedAt: variable.updatedAt,
-            }
+            };
           }
-        })
-    )
+        }),
+    );
 
     return NextResponse.json({
       success: true,
       data: variablesWithValues,
       meta: {
         total: variablesWithValues.length,
-        environment: environment || 'all',
+        environment: environment || "all",
       },
-    })
+    });
   } catch (error) {
-    console.error('CLI variables error:', error)
+    console.error("CLI variables error:", error);
     return NextResponse.json(
-      { error: 'Failed to list variables' },
-      { status: 500 }
-    )
+      { error: "Failed to list variables" },
+      { status: 500 },
+    );
   }
 }
 
@@ -132,92 +121,119 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex)
+  const authResult = await authenticateCLIRequest(request, convex);
 
   if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error)
+    return unauthorizedResponse(authResult.error);
   }
 
   try {
-    const body = await request.json()
-    const { projectId, key, value, environment, description, isSensitive } = body
+    const body = await request.json();
+    const { projectId, key, value, environment, description, isSensitive } =
+      body;
 
     if (!projectId || !key || value === undefined || !environment) {
       return NextResponse.json(
-        { error: 'Missing required fields: projectId, key, value, environment' },
-        { status: 400 }
-      )
+        {
+          error: "Missing required fields: projectId, key, value, environment",
+        },
+        { status: 400 },
+      );
     }
 
     // Validate key format
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
       return NextResponse.json(
-        { error: 'Invalid key format. Must start with letter/underscore and contain only alphanumeric/underscores.' },
-        { status: 400 }
-      )
+        {
+          error:
+            "Invalid key format. Must start with letter/underscore and contain only alphanumeric/underscores.",
+        },
+        { status: 400 },
+      );
     }
 
     // Get project to find organization
     const project = await convex.query(api.projects.getById, {
-      projectId: projectId as Id<'projects'>,
-    })
+      projectId: projectId as Id<"projects">,
+    });
 
     if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Check membership and role
     const membership = await convex.query(api.organizations.getMembership, {
       organizationId: project.organizationId,
       userId: authResult.userId,
-    })
+    });
 
     if (!membership) {
-      return forbiddenResponse('You are not a member of this organization')
+      return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Only admins and team leads can create variables
-    if (membership.role === 'member') {
-      return forbiddenResponse('Members cannot create variables')
-    }
+    const environments = Array.isArray(environment)
+      ? environment
+      : [environment];
 
-    // Check tier for CLI access
-    const tierAccess = await checkCLIAccess(convex, project.organizationId)
-    if (!tierAccess.allowed) {
-      return tierLimitResponse('CLI/API access requires Pro tier')
+    // Members create pending requests instead of writing directly.
+    if (membership.role === "member") {
+      const vaultResult = await createSecret(key, value, {
+        organizationId: project.organizationId,
+        projectId: projectId,
+      });
+      const requestId = await convex.mutation(api.variableRequests.create, {
+        key,
+        vaultRef: vaultResult.id,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive: isSensitive ?? false,
+        requestedBy: authResult.userId,
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          requested: true,
+          data: { requestId },
+          message: "Variable request submitted for admin approval",
+        },
+        { status: 202 },
+      );
     }
 
     // Store value in vault
     const vaultResult = await createSecret(key, value, {
       organizationId: project.organizationId,
       projectId: projectId,
-    })
-    const vaultRef = vaultResult.id
+    });
+    const vaultRef = vaultResult.id;
 
     // Create variable
     const variableId = await convex.mutation(api.variables.create, {
       key,
       vaultRef,
       description,
-      environments: Array.isArray(environment) ? environment : [environment],
-      projectId: projectId as Id<'projects'>,
+      environments,
+      projectId: projectId as Id<"projects">,
       isSensitive: isSensitive ?? false,
       createdBy: authResult.userId,
-    })
+    });
 
     return NextResponse.json({
       success: true,
       data: { _id: variableId },
-    })
+    });
   } catch (error) {
-    console.error('CLI create variable error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to create variable'
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    console.error("CLI create variable error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to create variable";
+    if (
+      message.includes("pending request") ||
+      message.includes("already exists")
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

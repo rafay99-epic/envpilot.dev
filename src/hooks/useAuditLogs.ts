@@ -9,13 +9,13 @@ import { Id } from "../../convex/_generated/dataModel";
  */
 export function useOrganizationAuditLogs(
   organizationId: Id<"organizations"> | undefined,
-  options?: { limit?: number; offset?: number }
+  options?: { limit?: number; offset?: number },
 ) {
   return useQuery(
     api.auditLogs.listByOrganization,
     organizationId
       ? { organizationId, limit: options?.limit, offset: options?.offset }
-      : "skip"
+      : "skip",
   );
 }
 
@@ -24,11 +24,11 @@ export function useOrganizationAuditLogs(
  */
 export function useProjectAuditLogs(
   projectId: Id<"projects"> | undefined,
-  options?: { limit?: number }
+  options?: { limit?: number },
 ) {
   return useQuery(
     api.auditLogs.listByProject,
-    projectId ? { projectId, limit: options?.limit } : "skip"
+    projectId ? { projectId, limit: options?.limit } : "skip",
   );
 }
 
@@ -37,11 +37,11 @@ export function useProjectAuditLogs(
  */
 export function useVariableAuditLogs(
   variableId: Id<"environmentVariables"> | undefined,
-  options?: { limit?: number }
+  options?: { limit?: number },
 ) {
   return useQuery(
     api.auditLogs.listByVariable,
-    variableId ? { variableId, limit: options?.limit } : "skip"
+    variableId ? { variableId, limit: options?.limit } : "skip",
   );
 }
 
@@ -50,7 +50,7 @@ export function useVariableAuditLogs(
  */
 export function useSecurityEvents(
   organizationId: Id<"organizations"> | undefined,
-  options?: { limit?: number; includeSeverity?: string[] }
+  options?: { limit?: number; includeSeverity?: string[] },
 ) {
   return useQuery(
     api.auditLogs.listSecurityEvents,
@@ -60,7 +60,7 @@ export function useSecurityEvents(
           limit: options?.limit,
           includeSeverity: options?.includeSeverity,
         }
-      : "skip"
+      : "skip",
   );
 }
 
@@ -69,7 +69,7 @@ export function useSecurityEvents(
  */
 export function useSensitiveDataAccess(
   organizationId: Id<"organizations"> | undefined,
-  options?: { startTime?: number; endTime?: number; limit?: number }
+  options?: { startTime?: number; endTime?: number; limit?: number },
 ) {
   return useQuery(
     api.auditLogs.listSensitiveDataAccess,
@@ -80,7 +80,7 @@ export function useSensitiveDataAccess(
           endTime: options?.endTime,
           limit: options?.limit,
         }
-      : "skip"
+      : "skip",
   );
 }
 
@@ -89,7 +89,7 @@ export function useSensitiveDataAccess(
  */
 export function usePermissionChanges(
   organizationId: Id<"organizations"> | undefined,
-  options?: { startTime?: number; endTime?: number; limit?: number }
+  options?: { startTime?: number; endTime?: number; limit?: number },
 ) {
   return useQuery(
     api.auditLogs.listPermissionChanges,
@@ -100,7 +100,7 @@ export function usePermissionChanges(
           endTime: options?.endTime,
           limit: options?.limit,
         }
-      : "skip"
+      : "skip",
   );
 }
 
@@ -109,11 +109,11 @@ export function usePermissionChanges(
  */
 export function useAuditLogSummary(
   organizationId: Id<"organizations"> | undefined,
-  daysBack?: number
+  daysBack?: number,
 ) {
   return useQuery(
     api.auditLogs.getSummary,
-    organizationId ? { organizationId, daysBack } : "skip"
+    organizationId ? { organizationId, daysBack } : "skip",
   );
 }
 
@@ -123,11 +123,11 @@ export function useAuditLogSummary(
 export function useComplianceReport(
   organizationId: Id<"organizations"> | undefined,
   startTime: number,
-  endTime: number
+  endTime: number,
 ) {
   return useQuery(
     api.auditLogs.getComplianceReport,
-    organizationId ? { organizationId, startTime, endTime } : "skip"
+    organizationId ? { organizationId, startTime, endTime } : "skip",
   );
 }
 
@@ -136,11 +136,11 @@ export function useComplianceReport(
  */
 export function useRecentAlerts(
   organizationId: Id<"organizations"> | undefined,
-  limit?: number
+  limit?: number,
 ) {
   return useQuery(
     api.auditLogs.getRecentAlerts,
-    organizationId ? { organizationId, limit } : "skip"
+    organizationId ? { organizationId, limit } : "skip",
   );
 }
 
@@ -149,11 +149,11 @@ export function useRecentAlerts(
  */
 export function useAlertCount(
   organizationId: Id<"organizations"> | undefined,
-  since?: number
+  since?: number,
 ) {
   return useQuery(
     api.auditLogs.getAlertCount,
-    organizationId ? { organizationId, since } : "skip"
+    organizationId ? { organizationId, since } : "skip",
   );
 }
 
@@ -169,7 +169,7 @@ export function useAuditLogsByTimeRange(
     actionFilter?: string[];
     severityFilter?: string[];
     resourceTypeFilter?: string[];
-  }
+  },
 ) {
   return useQuery(
     api.auditLogs.listByTimeRange,
@@ -183,7 +183,7 @@ export function useAuditLogsByTimeRange(
           severityFilter: options?.severityFilter,
           resourceTypeFilter: options?.resourceTypeFilter,
         }
-      : "skip"
+      : "skip",
   );
 }
 
@@ -195,13 +195,13 @@ export function useAuditLogsForExport(
   startTime: number,
   endTime: number,
   format: "csv" | "json",
-  includeDetails?: boolean
+  includeDetails?: boolean,
 ) {
   return useQuery(
     api.auditLogs.getForExport,
     organizationId
       ? { organizationId, startTime, endTime, format, includeDetails }
-      : "skip"
+      : "skip",
   );
 }
 

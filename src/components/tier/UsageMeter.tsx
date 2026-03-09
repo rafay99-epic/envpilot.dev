@@ -77,15 +77,25 @@ export function UsageMeter({
   return (
     <div className={`${className}`}>
       {showValue && (
-        <div className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}>
+        <div
+          className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}
+        >
           <span className="font-medium text-slate-700 dark:text-slate-300">
             {label}
           </span>
           <span className={getTextColor()}>
             {isUnlimited ? (
               <span className="flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 Unlimited
               </span>
@@ -100,7 +110,9 @@ export function UsageMeter({
       >
         <div
           className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}
-          style={{ width: isUnlimited ? "100%" : `${Math.min(percentage, 100)}%` }}
+          style={{
+            width: isUnlimited ? "100%" : `${Math.min(percentage, 100)}%`,
+          }}
         />
       </div>
     </div>
@@ -124,7 +136,11 @@ interface UsageSummaryProps {
 /**
  * Summary component showing multiple usage meters
  */
-export function UsageSummary({ usage, limits, className = "" }: UsageSummaryProps) {
+export function UsageSummary({
+  usage,
+  limits,
+  className = "",
+}: UsageSummaryProps) {
   return (
     <div className={`space-y-4 ${className}`}>
       {usage.projects !== undefined && (

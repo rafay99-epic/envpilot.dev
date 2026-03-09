@@ -149,16 +149,16 @@ npm run dev:convex
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start both Next.js and Convex development servers |
-| `npm run dev:next` | Start only the Next.js development server |
-| `npm run dev:convex` | Start only the Convex development server |
-| `npm run build` | Build the Next.js application for production |
-| `npm run start` | Start the production Next.js server |
-| `npm run lint` | Run ESLint |
-| `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run convex:deploy` | Deploy Convex functions to production |
+| Command                 | Description                                       |
+| ----------------------- | ------------------------------------------------- |
+| `npm run dev`           | Start both Next.js and Convex development servers |
+| `npm run dev:next`      | Start only the Next.js development server         |
+| `npm run dev:convex`    | Start only the Convex development server          |
+| `npm run build`         | Build the Next.js application for production      |
+| `npm run start`         | Start the production Next.js server               |
+| `npm run lint`          | Run ESLint                                        |
+| `npm run test:e2e`      | Run Playwright end-to-end tests                   |
+| `npm run convex:deploy` | Deploy Convex functions to production             |
 
 ## Development Workflow
 
@@ -169,6 +169,7 @@ npm run dev
 ```
 
 This runs:
+
 - Next.js dev server on `http://localhost:3000`
 - Convex dev server syncing functions and schema
 
