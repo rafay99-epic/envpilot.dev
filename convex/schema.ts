@@ -65,7 +65,7 @@ export default defineSchema({
     role: v.union(
       v.literal("admin"),
       v.literal("team_lead"),
-      v.literal("member"),
+      v.literal("member")
     ),
     // When the member joined
     joinedAt: v.number(),
@@ -162,7 +162,7 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("approved"),
       v.literal("rejected"),
-      v.literal("canceled"),
+      v.literal("canceled")
     ),
     // Optional reviewer decision note
     reviewReason: v.optional(v.string()),
@@ -220,7 +220,7 @@ export default defineSchema({
     permission: v.union(
       v.literal("read"), // Can view the variable value
       v.literal("write"), // Can modify the variable
-      v.literal("admin"), // Can manage permissions
+      v.literal("admin") // Can manage permissions
     ),
     // Who granted this permission
     grantedBy: v.id("users"),
@@ -280,7 +280,7 @@ export default defineSchema({
     role: v.union(
       v.literal("admin"),
       v.literal("team_lead"),
-      v.literal("member"),
+      v.literal("member")
     ),
     // Unique invitation token
     token: v.string(),
@@ -291,7 +291,7 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("accepted"),
       v.literal("declined"),
-      v.literal("expired"),
+      v.literal("expired")
     ),
     // When the invitation expires
     expiresAt: v.number(),
@@ -326,7 +326,7 @@ export default defineSchema({
       v.literal("planned"), // Accepted for development
       v.literal("in_progress"), // Currently being built
       v.literal("completed"), // Shipped
-      v.literal("declined"), // Not accepted
+      v.literal("declined") // Not accepted
     ),
     // Category for organization
     category: v.optional(v.string()),
@@ -380,7 +380,7 @@ export default defineSchema({
       v.literal("fix"), // Bug fix
       v.literal("improvement"), // Enhancement/improvement
       v.literal("security"), // Security update
-      v.literal("breaking"), // Breaking change
+      v.literal("breaking") // Breaking change
     ),
     // Whether the entry is published and visible
     isPublished: v.boolean(),
@@ -471,7 +471,7 @@ export default defineSchema({
       v.literal("billing.tier_downgraded"),
       // Audit log actions (meta)
       v.literal("audit.exported"),
-      v.literal("audit.viewed"),
+      v.literal("audit.viewed")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -485,8 +485,8 @@ export default defineSchema({
         v.literal("info"),
         v.literal("warning"),
         v.literal("error"),
-        v.literal("critical"),
-      ),
+        v.literal("critical")
+      )
     ),
     // Resource type for easier filtering
     resourceType: v.optional(
@@ -498,8 +498,8 @@ export default defineSchema({
         v.literal("access_token"),
         v.literal("invitation"),
         v.literal("billing"),
-        v.literal("security"),
-      ),
+        v.literal("security")
+      )
     ),
     // Whether this action involved sensitive data
     involvesSensitiveData: v.optional(v.boolean()),
@@ -543,7 +543,7 @@ export default defineSchema({
       v.literal("past_due"),
       v.literal("paused"),
       v.literal("trialing"),
-      v.literal("unpaid"),
+      v.literal("unpaid")
     ),
     // Billing period
     currentPeriodStart: v.number(),
@@ -592,7 +592,7 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("authenticated"),
-      v.literal("expired"),
+      v.literal("expired")
     ),
     // Access token (generated after authentication)
     accessToken: v.optional(v.string()),

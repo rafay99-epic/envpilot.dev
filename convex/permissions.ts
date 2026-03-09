@@ -35,7 +35,7 @@ type PermissionCheckResult = {
 async function checkCanManagePermissions(
   ctx: MutationCtx | QueryCtx,
   variableId: Id<"environmentVariables">,
-  userId: Id<"users">,
+  userId: Id<"users">
 ): Promise<PermissionCheckResult> {
   const variable = await ctx.db.get(variableId);
   if (!variable || variable.deletedAt) {
@@ -50,7 +50,7 @@ async function checkCanManagePermissions(
   const membership = await ctx.db
     .query("organizationMembers")
     .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId),
+      q.eq("organizationId", project.organizationId).eq("userId", userId)
     )
     .first();
 
@@ -115,7 +115,7 @@ export const getForVariable = query({
             ? { name: revokedBy.name, email: revokedBy.email }
             : null,
         };
-      }),
+      })
     );
 
     return permissionsWithUsers;
@@ -128,7 +128,7 @@ export const getForUser = query({
     const permissions = await ctx.db
       .query("variablePermissions")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true),
+        q.eq("userId", args.userId).eq("isActive", true)
       )
       .collect();
 
@@ -150,7 +150,7 @@ export const getForUser = query({
             ? { _id: project._id, name: project.name, slug: project.slug }
             : null,
         };
-      }),
+      })
     );
 
     return permissionsWithDetails.filter(Boolean);
@@ -164,7 +164,7 @@ export const checkPermission = query({
     requiredPermission: v.union(
       v.literal("read"),
       v.literal("write"),
-      v.literal("admin"),
+      v.literal("admin")
     ),
   },
   handler: async (ctx, args) => {
@@ -173,7 +173,7 @@ export const checkPermission = query({
     const permission = await ctx.db
       .query("variablePermissions")
       .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId),
+        q.eq("variableId", args.variableId).eq("userId", args.userId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
@@ -226,7 +226,7 @@ export const getHistory = query({
           userName: user?.name ?? user?.email ?? "Unknown",
           grantedByName: grantedBy?.name ?? grantedBy?.email ?? "Unknown",
         };
-      }),
+      })
     );
 
     return historyWithUsers;
@@ -260,7 +260,7 @@ export const getAssignableMembers = query({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", args.requestingUserId),
+          .eq("userId", args.requestingUserId)
       )
       .first();
 
@@ -280,7 +280,7 @@ export const getAssignableMembers = query({
     const allMembers = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", project.organizationId),
+        q.eq("organizationId", project.organizationId)
       )
       .collect();
 
@@ -292,7 +292,7 @@ export const getAssignableMembers = query({
       .collect();
 
     const usersWithPermissions = new Set(
-      existingPermissions.map((p) => p.userId.toString()),
+      existingPermissions.map((p) => p.userId.toString())
     );
 
     // Filter members based on requester's role
@@ -328,7 +328,7 @@ export const getAssignableMembers = query({
                 role: member.role,
               }
             : null;
-        }),
+        })
     );
 
     return assignableMembers.filter(Boolean);
@@ -357,9 +357,7 @@ export const canManageVariablePermissions = query({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.userId),
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -435,7 +433,7 @@ export const getUsersWithProjectAccess = query({
           variables: entry.variables,
           totalVariables: entry.variables.length,
         };
-      }),
+      })
     );
 
     return result.filter((r) => r.user !== null);
@@ -453,7 +451,7 @@ export const grant = mutation({
     permission: v.union(
       v.literal("read"),
       v.literal("write"),
-      v.literal("admin"),
+      v.literal("admin")
     ),
     grantedBy: v.id("users"),
     expiresAt: v.optional(v.number()),
@@ -478,13 +476,13 @@ export const grant = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", args.grantedBy),
+          .eq("userId", args.grantedBy)
       )
       .first();
 
     if (!granterMembership) {
       throw new Error(
-        "Not authorized: User is not a member of the organization",
+        "Not authorized: User is not a member of the organization"
       );
     }
 
@@ -494,7 +492,7 @@ export const grant = mutation({
       granterMembership.role !== "team_lead"
     ) {
       throw new Error(
-        "Only admins and team leads can manage variable permissions",
+        "Only admins and team leads can manage variable permissions"
       );
     }
 
@@ -507,9 +505,7 @@ export const grant = mutation({
     const targetMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.userId),
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -530,14 +526,14 @@ export const grant = mutation({
     const existingPermission = await ctx.db
       .query("variablePermissions")
       .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId),
+        q.eq("variableId", args.variableId).eq("userId", args.userId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
 
     if (existingPermission) {
       throw new Error(
-        "User already has an active permission for this variable",
+        "User already has an active permission for this variable"
       );
     }
 
@@ -578,7 +574,7 @@ export const update = mutation({
   args: {
     permissionId: v.id("variablePermissions"),
     permission: v.optional(
-      v.union(v.literal("read"), v.literal("write"), v.literal("admin")),
+      v.union(v.literal("read"), v.literal("write"), v.literal("admin"))
     ),
     expiresAt: v.optional(v.number()),
     updatedBy: v.id("users"),
@@ -599,11 +595,11 @@ export const update = mutation({
     const authCheck = await checkCanManagePermissions(
       ctx,
       existingPerm.variableId,
-      args.updatedBy,
+      args.updatedBy
     );
     if (!authCheck.canManage) {
       throw new Error(
-        authCheck.reason ?? "Not authorized to manage permissions",
+        authCheck.reason ?? "Not authorized to manage permissions"
       );
     }
 
@@ -632,7 +628,7 @@ export const update = mutation({
         .withIndex("by_org_and_user", (q) =>
           q
             .eq("organizationId", project.organizationId)
-            .eq("userId", existingPerm.userId),
+            .eq("userId", existingPerm.userId)
         )
         .first();
 
@@ -700,13 +696,13 @@ export const revoke = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy),
+          .eq("userId", args.revokedBy)
       )
       .first();
 
     if (!revokerMembership) {
       throw new Error(
-        "Not authorized: User is not a member of the organization",
+        "Not authorized: User is not a member of the organization"
       );
     }
 
@@ -715,14 +711,14 @@ export const revoke = mutation({
       revokerMembership.role !== "team_lead"
     ) {
       throw new Error(
-        "Only admins and team leads can manage variable permissions",
+        "Only admins and team leads can manage variable permissions"
       );
     }
 
     const permission = await ctx.db
       .query("variablePermissions")
       .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId),
+        q.eq("variableId", args.variableId).eq("userId", args.userId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
@@ -738,7 +734,7 @@ export const revoke = mutation({
         .withIndex("by_org_and_user", (q) =>
           q
             .eq("organizationId", project.organizationId)
-            .eq("userId", args.userId),
+            .eq("userId", args.userId)
         )
         .first();
 
@@ -787,7 +783,7 @@ export const bulkGrant = mutation({
     permission: v.union(
       v.literal("read"),
       v.literal("write"),
-      v.literal("admin"),
+      v.literal("admin")
     ),
     grantedBy: v.id("users"),
     expiresAt: v.optional(v.number()),
@@ -809,11 +805,11 @@ export const bulkGrant = mutation({
     const authCheck = await checkCanManagePermissions(
       ctx,
       args.variableId,
-      args.grantedBy,
+      args.grantedBy
     );
     if (!authCheck.canManage) {
       throw new Error(
-        authCheck.reason ?? "Not authorized to manage permissions",
+        authCheck.reason ?? "Not authorized to manage permissions"
       );
     }
 
@@ -832,7 +828,7 @@ export const bulkGrant = mutation({
       const existing = await ctx.db
         .query("variablePermissions")
         .withIndex("by_variable_and_user", (q) =>
-          q.eq("variableId", args.variableId).eq("userId", userId),
+          q.eq("variableId", args.variableId).eq("userId", userId)
         )
         .filter((q) => q.eq(q.field("isActive"), true))
         .first();
@@ -894,13 +890,13 @@ export const bulkRevokeForUser = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy),
+          .eq("userId", args.revokedBy)
       )
       .first();
 
     if (!revokerMembership) {
       throw new Error(
-        "Not authorized: User is not a member of the organization",
+        "Not authorized: User is not a member of the organization"
       );
     }
 
@@ -909,7 +905,7 @@ export const bulkRevokeForUser = mutation({
       revokerMembership.role !== "team_lead"
     ) {
       throw new Error(
-        "Only admins and team leads can manage variable permissions",
+        "Only admins and team leads can manage variable permissions"
       );
     }
 
@@ -917,9 +913,7 @@ export const bulkRevokeForUser = mutation({
     const targetMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.userId),
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -944,7 +938,7 @@ export const bulkRevokeForUser = mutation({
       const permissions = await ctx.db
         .query("variablePermissions")
         .withIndex("by_variable_and_user", (q) =>
-          q.eq("variableId", variable._id).eq("userId", args.userId),
+          q.eq("variableId", variable._id).eq("userId", args.userId)
         )
         .filter((q) => q.eq(q.field("isActive"), true))
         .collect();
@@ -1005,13 +999,13 @@ export const revokeAllForVariable = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy),
+          .eq("userId", args.revokedBy)
       )
       .first();
 
     if (!revokerMembership) {
       throw new Error(
-        "Not authorized: User is not a member of the organization",
+        "Not authorized: User is not a member of the organization"
       );
     }
 
@@ -1068,7 +1062,7 @@ export const cleanupExpired = internalMutation({
       .collect();
 
     const expiredPermissions = allPermissions.filter(
-      (p) => p.expiresAt && p.expiresAt < now,
+      (p) => p.expiresAt && p.expiresAt < now
     );
 
     for (const perm of expiredPermissions) {

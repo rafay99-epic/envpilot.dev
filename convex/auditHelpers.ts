@@ -149,7 +149,7 @@ export interface AuditLogInput {
  */
 export async function createAuditLog(
   ctx: MutationCtx,
-  input: AuditLogInput,
+  input: AuditLogInput
 ): Promise<Id<"auditLogs">> {
   const now = Date.now();
 
@@ -204,7 +204,7 @@ export async function logSecurityEvent(
     variableId?: Id<"environmentVariables">;
     ipAddress?: string;
     userAgent?: string;
-  },
+  }
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
@@ -230,7 +230,7 @@ export async function logVariableAccess(
     ipAddress?: string;
     userAgent?: string;
     sessionId?: string;
-  },
+  }
 ): Promise<Id<"auditLogs">> {
   const action =
     input.accessType === "export"
@@ -287,7 +287,7 @@ export async function logPermissionChange(
     };
     ipAddress?: string;
     userAgent?: string;
-  },
+  }
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
@@ -318,7 +318,7 @@ export async function logBulkOperation(
     };
     ipAddress?: string;
     userAgent?: string;
-  },
+  }
 ): Promise<Id<"auditLogs">> {
   return createAuditLog(ctx, {
     ...input,
@@ -407,7 +407,7 @@ export const logSecurityEventMutation = mutation({
       v.literal("security.permission_check_failed"),
       v.literal("security.token_validation_failed"),
       v.literal("security.rate_limit_exceeded"),
-      v.literal("security.suspicious_activity"),
+      v.literal("security.suspicious_activity")
     ),
     details: v.object({
       attemptedAction: v.string(),
@@ -444,7 +444,7 @@ export const logAuditExport = mutation({
       v.object({
         start: v.number(),
         end: v.number(),
-      }),
+      })
     ),
     filters: v.optional(v.string()),
     ipAddress: v.optional(v.string()),

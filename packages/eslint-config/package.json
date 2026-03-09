@@ -1,0 +1,21 @@
+{
+  "name": "@env-connect/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "exports": {
+    "./base": "./base.mjs",
+    "./next": "./next.mjs",
+    "./node": "./node.mjs"
+  },
+  "files": [
+    "*.mjs"
+  ],
+  "dependencies": {
+    "typescript-eslint": "^8"
+  },
+  "peerDependencies": {
+    "eslint": "^9",
+    "typescript": "^5"
+  }
+}

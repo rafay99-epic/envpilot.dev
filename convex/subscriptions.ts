@@ -19,7 +19,7 @@ export const subscriptionStatus = v.union(
   v.literal("past_due"),
   v.literal("paused"),
   v.literal("trialing"),
-  v.literal("unpaid"),
+  v.literal("unpaid")
 );
 
 // ==========================================
@@ -35,7 +35,7 @@ export const getByOrganization = query({
     return await ctx.db
       .query("subscriptions")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
   },
@@ -50,7 +50,7 @@ export const getByStripeSubscriptionId = query({
     return await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId),
+        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
       )
       .first();
   },
@@ -65,7 +65,7 @@ export const getStripeCustomer = query({
     return await ctx.db
       .query("stripeCustomers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
   },
@@ -80,7 +80,7 @@ export const getStripeCustomerById = query({
     return await ctx.db
       .query("stripeCustomers")
       .withIndex("by_stripe_customer", (q) =>
-        q.eq("stripeCustomerId", args.stripeCustomerId),
+        q.eq("stripeCustomerId", args.stripeCustomerId)
       )
       .first();
   },
@@ -95,7 +95,7 @@ export const hasActiveSubscription = query({
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
 
@@ -131,7 +131,7 @@ export const upsertStripeCustomer = mutation({
     const existing = await ctx.db
       .query("stripeCustomers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
 
@@ -179,7 +179,7 @@ export const createSubscription = mutation({
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId),
+        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
       )
       .first();
 
@@ -236,7 +236,7 @@ export const updateSubscription = mutation({
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId),
+        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
       )
       .first();
 
@@ -282,7 +282,7 @@ export const deleteSubscription = mutation({
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId),
+        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
       )
       .first();
 
@@ -306,7 +306,7 @@ export const syncOrganizationTier = mutation({
       v.literal("billing.tier_downgraded"),
       v.literal("billing.subscription_created"),
       v.literal("billing.subscription_updated"),
-      v.literal("billing.subscription_canceled"),
+      v.literal("billing.subscription_canceled")
     ),
     details: v.optional(v.string()),
   },
@@ -355,7 +355,7 @@ export const logBillingEvent = mutation({
     userId: v.id("users"),
     action: v.union(
       v.literal("billing.payment_succeeded"),
-      v.literal("billing.payment_failed"),
+      v.literal("billing.payment_failed")
     ),
     details: v.string(),
   },
@@ -391,7 +391,7 @@ export const prepareCheckout = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId),
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -403,7 +403,7 @@ export const prepareCheckout = mutation({
     const existingSubscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
 
@@ -419,7 +419,7 @@ export const prepareCheckout = mutation({
     const stripeCustomer = await ctx.db
       .query("stripeCustomers")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .first();
 

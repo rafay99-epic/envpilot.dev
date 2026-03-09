@@ -16,7 +16,7 @@ export const listByOrganization = query({
     return await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -56,7 +56,7 @@ export const getBySlug = query({
     const project = await ctx.db
       .query("projects")
       .withIndex("by_org_and_slug", (q) =>
-        q.eq("organizationId", args.organizationId).eq("slug", args.slug),
+        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
       )
       .first();
 
@@ -71,7 +71,7 @@ export const listWithStats = query({
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+        q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
@@ -85,7 +85,7 @@ export const listWithStats = query({
           .collect();
 
         return { ...project, variableCount: variables.length };
-      }),
+      })
     );
 
     return projectsWithStats;
@@ -105,7 +105,7 @@ export const listForUser = query({
         const projects = await ctx.db
           .query("projects")
           .withIndex("by_organization", (q) =>
-            q.eq("organizationId", membership.organizationId),
+            q.eq("organizationId", membership.organizationId)
           )
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
@@ -114,7 +114,7 @@ export const listForUser = query({
           ...project,
           userRole: membership.role,
         }));
-      }),
+      })
     );
 
     return allProjects.flat();
@@ -149,14 +149,14 @@ export const create = mutation({
       const projectCount = await ctx.db
         .query("projects")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId),
+          q.eq("organizationId", args.organizationId)
         )
         .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .collect();
 
       if (projectCount.length >= limits.maxProjects) {
         throw new Error(
-          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`,
+          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`
         );
       }
     }
@@ -164,7 +164,7 @@ export const create = mutation({
     const existingProject = await ctx.db
       .query("projects")
       .withIndex("by_org_and_slug", (q) =>
-        q.eq("organizationId", args.organizationId).eq("slug", args.slug),
+        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
       )
       .first();
 
@@ -334,14 +334,14 @@ export const duplicate = mutation({
       const projectCount = await ctx.db
         .query("projects")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", sourceProject.organizationId),
+          q.eq("organizationId", sourceProject.organizationId)
         )
         .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .collect();
 
       if (projectCount.length >= limits.maxProjects) {
         throw new Error(
-          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`,
+          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`
         );
       }
     }
@@ -351,7 +351,7 @@ export const duplicate = mutation({
       .withIndex("by_org_and_slug", (q) =>
         q
           .eq("organizationId", sourceProject.organizationId)
-          .eq("slug", args.newSlug),
+          .eq("slug", args.newSlug)
       )
       .first();
 

@@ -35,7 +35,7 @@ export const listByProject = query({
             ? { _id: user._id, name: user.name, email: user.email }
             : null,
         };
-      }),
+      })
     );
 
     return tokensWithUsers;
@@ -65,7 +65,7 @@ export const listByUser = query({
             ? { _id: org._id, name: org.name, slug: org.slug }
             : null,
         };
-      }),
+      })
     );
 
     return tokensWithProjects;
@@ -80,7 +80,7 @@ export const validateToken = query({
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken),
+        q.eq("accessToken", args.accessToken)
       )
       .first();
 
@@ -111,7 +111,7 @@ export const validateToken = query({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", access.userId),
+          .eq("userId", access.userId)
       )
       .first();
 
@@ -140,7 +140,7 @@ export const getByProjectAndUser = query({
     return await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId),
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
@@ -257,7 +257,7 @@ export const revokeAllForUser = mutation({
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId),
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
@@ -306,7 +306,7 @@ export const updateLastUsed = mutation({
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken),
+        q.eq("accessToken", args.accessToken)
       )
       .first();
 
@@ -325,7 +325,7 @@ export const updateLastUsed = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", access.userId),
+          .eq("userId", access.userId)
       )
       .first();
 
@@ -335,7 +335,7 @@ export const updateLastUsed = mutation({
       const pendingRevocation = await ctx.db
         .query("permissionRevocationEvents")
         .withIndex("by_access_token", (q) =>
-          q.eq("accessToken", access.accessToken),
+          q.eq("accessToken", access.accessToken)
         )
         .filter((q) => q.eq(q.field("acknowledged"), false))
         .first();
@@ -377,7 +377,7 @@ export const refresh = mutation({
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken),
+        q.eq("accessToken", args.accessToken)
       )
       .first();
 
@@ -404,7 +404,7 @@ export const refresh = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", project.organizationId)
-          .eq("userId", access.userId),
+          .eq("userId", access.userId)
       )
       .first();
 
@@ -414,7 +414,7 @@ export const refresh = mutation({
       const pendingRevocation = await ctx.db
         .query("permissionRevocationEvents")
         .withIndex("by_access_token", (q) =>
-          q.eq("accessToken", access.accessToken),
+          q.eq("accessToken", access.accessToken)
         )
         .filter((q) => q.eq(q.field("acknowledged"), false))
         .first();
@@ -433,7 +433,7 @@ export const refresh = mutation({
       }
 
       throw new Error(
-        "Access token no longer valid for organization membership",
+        "Access token no longer valid for organization membership"
       );
     }
 
@@ -467,13 +467,13 @@ export const linkExtension = mutation({
     const existingAccess = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId),
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
       .filter((q) =>
         q.and(
           q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId),
-        ),
+          q.eq(q.field("deviceId"), args.deviceId)
+        )
       )
       .first();
 
@@ -533,13 +533,13 @@ export const unlinkExtension = mutation({
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId),
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
       .filter((q) =>
         q.and(
           q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId),
-        ),
+          q.eq(q.field("deviceId"), args.deviceId)
+        )
       )
       .first();
 
@@ -589,7 +589,7 @@ export const cleanupExpired = mutation({
     const expiredTokens = await ctx.db
       .query("projectAccess")
       .filter((q) =>
-        q.and(q.eq(q.field("isActive"), true), q.lt(q.field("expiresAt"), now)),
+        q.and(q.eq(q.field("isActive"), true), q.lt(q.field("expiresAt"), now))
       )
       .collect();
 
