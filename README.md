@@ -10,7 +10,8 @@ Secure environment variable management for teams. ENV Connect provides a central
 - **Organization Support**: Manage multiple organizations with separate projects
 - **Granular Permissions**: Control who can view, edit, or manage each variable
 - **Audit Logging**: Track all changes and access to environment variables
-- **VS Code Extension Support**: Sync variables directly to your development environment
+- **CLI Tool**: Manage variables from the command line
+- **VS Code Extension**: Sync variables directly in your editor
 
 ## Tech Stack
 
@@ -19,38 +20,68 @@ Secure environment variable management for teams. ENV Connect provides a central
 - **Authentication**: [WorkOS AuthKit](https://workos.com/docs/user-management)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 - **Testing**: [Playwright](https://playwright.dev/)
+- **Monorepo**: [Turborepo](https://turbo.build/) with [Bun](https://bun.sh/)
 - **Language**: TypeScript with strict mode
 
-## Getting Started
+## Monorepo Structure
 
-### Prerequisites
+```
+root/
+├── apps/
+│   ├── web/                  # Next.js web app
+│   ├── cli/                  # CLI tool (@env-connect/cli)
+│   └── vscode-extension/     # VS Code extension
+├── packages/
+│   ├── shared-types/         # Common TypeScript interfaces
+│   └── eslint-config/        # Shared ESLint presets
+├── convex/                   # Convex backend
+├── turbo.json                # Turborepo task pipeline
+└── package.json              # Workspace root
+```
 
-- Node.js 18.x or later
-- npm 9.x or later
-
-### Quick Start
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd ENV_Connect_2
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
 
 # Install dependencies
-npm install
+bun install
 
 # Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your configuration
+cp .env.example apps/web/.env.local
+# Edit apps/web/.env.local with your configuration
 
-# Start development servers
-npm run dev
+# Start development (web + Convex)
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-### Environment Variables
+## Commands
 
-Copy `.env.example` to `.env.local` and configure:
+| Command                     | Description                        |
+| --------------------------- | ---------------------------------- |
+| `bun run dev`               | Start web app + Convex dev servers |
+| `bun run dev:web`           | Start only the web app             |
+| `bun run dev:convex`        | Start only Convex                  |
+| `bun run dev:cli`           | Watch CLI in dev mode              |
+| `bun run dev:extension`     | Watch extension for debugging      |
+| `bun run build`             | Build all apps                     |
+| `bun run build:web`         | Build only the web app             |
+| `bun run build:cli`         | Build only the CLI                 |
+| `bun run build:extension`   | Build only the extension           |
+| `bun run package:extension` | Package extension as `.vsix`       |
+| `bun run lint`              | Lint all workspaces                |
+| `bun run typecheck`         | Typecheck all workspaces           |
+| `bun run test`              | Run tests                          |
+| `bun run test:e2e`          | Run Playwright E2E tests           |
+| `bun run format:check`      | Check formatting                   |
+| `bun run format:fix`        | Fix formatting                     |
+
+## Environment Variables
+
+Required in `apps/web/.env.local`:
 
 | Variable                 | Description                       |
 | ------------------------ | --------------------------------- |
@@ -59,36 +90,6 @@ Copy `.env.example` to `.env.local` and configure:
 | `WORKOS_CLIENT_ID`       | WorkOS client ID                  |
 | `WORKOS_COOKIE_PASSWORD` | Cookie encryption key (32+ chars) |
 | `NEXT_PUBLIC_APP_URL`    | Application URL                   |
-
-See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructions.
-
-## Available Scripts
-
-| Command                 | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `npm run dev`           | Start Next.js and Convex development servers |
-| `npm run build`         | Build for production                         |
-| `npm run start`         | Start production server                      |
-| `npm run lint`          | Run ESLint                                   |
-| `npm run test:e2e`      | Run Playwright E2E tests                     |
-| `npm run convex:deploy` | Deploy Convex functions                      |
-
-## Project Structure
-
-```
-├── convex/              # Convex backend functions and schema
-├── src/
-│   ├── app/             # Next.js App Router pages
-│   │   ├── (auth)/      # Authentication routes
-│   │   ├── (dashboard)/ # Dashboard routes
-│   │   └── api/         # API routes
-│   ├── components/      # React components
-│   ├── hooks/           # Custom React hooks
-│   └── lib/             # Utility libraries
-├── docs/                # Documentation
-├── public/              # Static assets
-└── tests/               # E2E tests
-```
 
 ## Documentation
 
@@ -106,37 +107,18 @@ See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructio
 
 ### Data Flow
 
-1. Frontend components use Convex React hooks
-2. Convex provides real-time subscriptions
-3. Sensitive values stored in WorkOS Vault
+1. Frontend components use Convex React hooks for real-time subscriptions
+2. API routes use `ConvexHttpClient` for server-side queries
+3. Sensitive values stored in WorkOS Vault (Convex stores vault reference IDs only)
 4. Audit logs track all operations
 
-### Database Schema
-
-Key entities:
-
-- **Users**: Synced from WorkOS
-- **Organizations**: Team containers
-- **Projects**: Logical groupings of variables
-- **Environment Variables**: Key-value pairs with vault references
-- **Permissions**: Granular access control
-- **Audit Logs**: Complete activity history
-
-## Security
+### Security
 
 - All sensitive values encrypted via WorkOS Vault
 - Role-based access control (Admin, Team Lead, Member)
 - Variable-level permissions
 - Session management with secure cookies
 - Comprehensive audit logging
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm run test:e2e`
-5. Submit a pull request
 
 ## License
 

@@ -1,43 +1,33 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-# Ignore node_modules in root and all sub-packages (cli, vscode-extension, etc.)
-/node_modules
+# Dependencies
 node_modules/
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.vsix
 
-# next.js
-/.next/
-/out/
+# Turborepo
+.turbo
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
+# Environment files
 .env*
+!.env.example
 
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Convex generated
+convex/_generated/
+
+# Testing
+coverage/
+
+# OS / IDE
+.DS_Store
+*.pem
+*.log
+.vercel
+.vscode

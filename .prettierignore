@@ -1,13 +1,11 @@
 .automaker
-.vscode
 .next
 out
 build
+dist
 node_modules
-cli/dist
-vscode-extension/dist
 convex/_generated
 coverage
-package-lock.json
-cli/package-lock.json
-vscode-extension/package-lock.json
+bun.lock
+*.vsix
+.turbo
