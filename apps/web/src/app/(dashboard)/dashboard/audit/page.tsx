@@ -1,8 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import {
+  TerminalWindow,
+  TerminalCard,
+  TerminalInput,
+  TerminalSelect,
+  TerminalButton,
+  TerminalEmptyState,
+} from "@/components/dashboard/terminal-ui";
+import { Download, Shield } from "lucide-react";
 
-// Mock audit logs - would come from Convex in production
 const mockAuditLogs: AuditLog[] = [];
 
 interface AuditLog {
@@ -64,7 +72,6 @@ export default function AuditPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [dateRange, setDateRange] = useState("7d");
 
-  // Filter logs
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -84,205 +91,123 @@ export default function AuditPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-          Audit Logs
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <h1 className="text-xl font-bold text-zinc-100">Audit Logs</h1>
+        <p className="mt-1 text-sm text-zinc-500">
           Track all activity across your organization
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        {/* Search */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
+          <TerminalInput
             type="text"
             placeholder="Search by user, action, or resource..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-600 dark:focus:ring-zinc-600"
           />
         </div>
-
-        {/* Category Filter */}
-        <select
+        <TerminalSelect
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-600"
         >
           {actionCategories.map((category) => (
             <option key={category.value} value={category.value}>
               {category.label}
             </option>
           ))}
-        </select>
-
-        {/* Date Range Filter */}
-        <select
+        </TerminalSelect>
+        <TerminalSelect
           value={dateRange}
           onChange={(e) => setDateRange(e.target.value)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-600 dark:focus:ring-zinc-600"
         >
           <option value="24h">Last 24 hours</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
           <option value="90d">Last 90 days</option>
-        </select>
-
-        {/* Export */}
-        <button className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-            />
-          </svg>
+        </TerminalSelect>
+        <TerminalButton variant="secondary">
+          <Download className="h-4 w-4" />
           Export
-        </button>
+        </TerminalButton>
       </div>
 
       {/* Audit Logs */}
       {filteredLogs.length === 0 ? (
-        <EmptyState hasLogs={logs.length > 0} />
+        <TerminalWindow title="audit-log">
+          <TerminalEmptyState
+            command={`envpilot audit --days ${dateRange === "24h" ? "1" : dateRange.replace("d", "")}`}
+            message={
+              logs.length > 0
+                ? "No matching events. Try adjusting your search or filters."
+                : "No audit events yet. Activity will be recorded as you use Envpilot."
+            }
+          />
+        </TerminalWindow>
       ) : (
-        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <TerminalWindow title="audit-log">
+          <div className="divide-y divide-zinc-800/50">
             {filteredLogs.map((log) => (
               <AuditLogRow key={log.id} log={log} />
             ))}
           </div>
-        </div>
+        </TerminalWindow>
       )}
 
       {/* Compliance Info */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <TerminalCard>
         <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-            <svg
-              className="h-5 w-5 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+            <Shield className="h-4 w-4 text-green-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <h3 className="text-sm font-semibold text-zinc-100">
               Compliance & Security
             </h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-500">
               All audit logs are retained for 90 days on the free tier and 365
               days on the pro tier. Logs include IP addresses and user agents
               for security analysis.
             </p>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ hasLogs }: { hasLogs: boolean }) {
-  return (
-    <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <svg
-          className="h-6 w-6 text-zinc-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-          />
-        </svg>
-      </div>
-      <h3 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-        {hasLogs ? "No matching events" : "No audit events yet"}
-      </h3>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        {hasLogs
-          ? "Try adjusting your search or filters."
-          : "Activity will be recorded as you use Envpilot."}
-      </p>
+      </TerminalCard>
     </div>
   );
 }
 
 function AuditLogRow({ log }: { log: AuditLog }) {
   const actionLabel = actionLabels[log.action] || log.action;
+  const time = new Date(log.createdAt).toLocaleString();
 
   return (
-    <div className="flex items-start gap-4 px-6 py-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-        {log.userName.charAt(0).toUpperCase()}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-zinc-900 dark:text-zinc-100">
-          <span className="font-medium">{log.userName}</span>{" "}
-          <span className="text-zinc-600 dark:text-zinc-400">
-            {actionLabel}
-          </span>
+    <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs">
+      <span className="text-zinc-600 whitespace-nowrap">[{time}]</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-zinc-300">
+          <span className="text-green-400">{log.userName}</span>{" "}
+          <span className="text-zinc-500">{actionLabel}</span>
           {log.projectName && (
             <>
               {" "}
-              in{" "}
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                {log.projectName}
-              </span>
+              in <span className="text-amber-400">{log.projectName}</span>
             </>
           )}
           {log.variableKey && (
             <>
               {" "}
-              <code className="rounded bg-zinc-100 px-1 font-mono text-xs dark:bg-zinc-800">
+              <code className="rounded bg-zinc-800 px-1 text-amber-400">
                 {log.variableKey}
               </code>
             </>
           )}
         </p>
-        <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-          <span>{new Date(log.createdAt).toLocaleString()}</span>
-          {log.ipAddress && (
-            <>
-              <span>•</span>
-              <span>{log.ipAddress}</span>
-            </>
-          )}
-        </div>
+        {log.ipAddress && (
+          <p className="mt-0.5 text-zinc-600">{log.ipAddress}</p>
+        )}
       </div>
     </div>
   );

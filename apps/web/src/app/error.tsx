@@ -11,59 +11,60 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
     console.error("Application error:", error);
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-          <svg
-            className="h-8 w-8 text-red-600 dark:text-red-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f172a] px-4">
+      {/* Grid background */}
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+        {/* Terminal header */}
+        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+          <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <span className="ml-2 text-xs text-zinc-500">error</span>
         </div>
 
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-            Something went wrong
-          </h1>
-          <p className="mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="p-8 font-mono text-sm">
+          <p className="text-red-400">
+            ERROR: Something went wrong [exit code 1]
+          </p>
+          <p className="mt-2 text-zinc-400">
             An unexpected error occurred. Please try again or contact support if
             the problem persists.
           </p>
-        </div>
 
-        <div className="flex gap-4">
-          <button
-            onClick={() => reset()}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            Try Again
-          </button>
-          <Link
-            href="/"
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            Go Home
-          </Link>
-        </div>
+          {error.digest && (
+            <p className="mt-4 text-xs text-zinc-600">
+              Error ID: {error.digest}
+            </p>
+          )}
 
-        {error.digest && (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
-            Error ID: {error.digest}
-          </p>
-        )}
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={() => reset()}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+            >
+              Try Again
+            </button>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+            >
+              Go Home
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

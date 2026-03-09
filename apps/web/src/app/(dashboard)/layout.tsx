@@ -75,13 +75,23 @@ export default async function DashboardLayout({
 
   return (
     <AuthProvider initialUser={authUser} initialOrganization={organization}>
-      <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <div className="dark flex min-h-screen bg-[#0f172a] text-zinc-100">
+        {/* Subtle grid background */}
+        <div
+          className="pointer-events-none fixed inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+
         {/* Sidebar Navigation */}
         <DashboardNav />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto px-4 py-8 md:px-6 lg:px-8">
+        <main className="relative z-10 flex-1 overflow-auto">
+          <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
             {children}
           </div>
         </main>

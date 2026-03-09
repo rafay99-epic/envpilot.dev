@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useAuthContext } from "./auth-provider";
+import { LogOut, LayoutDashboard, Settings } from "lucide-react";
 
 export function UserButton() {
   const { user, organization, isImpersonating, impersonator, signOut } =
@@ -26,7 +27,7 @@ export function UserButton() {
     return (
       <Link
         href="/sign-in"
-        className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
       >
         Sign In
       </Link>
@@ -41,7 +42,7 @@ export function UserButton() {
     <div className="relative" ref={menuRef}>
       {/* Impersonation Banner */}
       {isImpersonating && impersonator && (
-        <div className="absolute -top-8 right-0 rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800">
+        <div className="absolute -top-8 right-0 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-400">
           Viewing as {user.email}
         </div>
       )}
@@ -49,40 +50,42 @@ export function UserButton() {
       {/* User Avatar Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full p-1 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        className="flex w-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-zinc-800"
         aria-label="User menu"
       >
         {user.profilePictureUrl ? (
           <img
             src={user.profilePictureUrl}
             alt={`${user.firstName ?? "User"}'s avatar`}
-            className="h-8 w-8 rounded-full object-cover"
+            className="h-8 w-8 rounded-full object-cover ring-2 ring-zinc-700"
           />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10 text-sm font-medium text-green-400 ring-2 ring-zinc-700">
             {initials}
           </div>
         )}
+        <div className="min-w-0 flex-1 text-left">
+          <p className="truncate text-sm font-medium text-zinc-200">
+            {user.firstName} {user.lastName}
+          </p>
+          <p className="truncate text-xs text-zinc-500">{user.email}</p>
+        </div>
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu — opens upward */}
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900 shadow-2xl">
           {/* User Info */}
-          <div className="border-b border-zinc-200 px-4 pb-3 dark:border-zinc-700">
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          <div className="border-b border-zinc-700/50 px-4 py-3">
+            <p className="text-sm font-medium text-zinc-100">
               {user.firstName} {user.lastName}
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {user.email}
-            </p>
+            <p className="text-xs text-zinc-500">{user.email}</p>
             {organization && (
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {organization.name}
-              </p>
+              <p className="mt-1 text-xs text-zinc-500">{organization.name}</p>
             )}
             {user.role && (
-              <span className="mt-2 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
                 {user.role}
               </span>
             )}
@@ -92,29 +95,32 @@ export function UserButton() {
           <div className="py-1">
             <Link
               href="/dashboard"
-              className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
               onClick={() => setIsOpen(false)}
             >
+              <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Link>
             <Link
-              href="/settings"
-              className="block px-4 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              href="/dashboard/settings"
+              className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
               onClick={() => setIsOpen(false)}
             >
+              <Settings className="h-4 w-4" />
               Settings
             </Link>
           </div>
 
           {/* Sign Out */}
-          <div className="border-t border-zinc-200 pt-1 dark:border-zinc-700">
+          <div className="border-t border-zinc-700/50 py-1">
             <button
               onClick={() => {
                 setIsOpen(false);
                 signOut();
               }}
-              className="block w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-[#ef5350] transition-colors hover:bg-red-500/5"
             >
+              <LogOut className="h-4 w-4" />
               Sign out
             </button>
           </div>

@@ -2,50 +2,56 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
-      <div className="flex flex-col items-center gap-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-          <svg
-            className="h-10 w-10 text-zinc-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f172a] px-4">
+      {/* Grid background */}
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+        {/* Terminal header */}
+        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+          <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <span className="ml-2 text-xs text-zinc-500">not-found</span>
         </div>
 
-        <div>
-          <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100">
-            404
-          </h1>
-          <h2 className="mt-2 text-xl font-semibold text-zinc-700 dark:text-zinc-300">
-            Page Not Found
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-zinc-600 dark:text-zinc-400">
-            The page you&apos;re looking for doesn&apos;t exist or has been
-            moved.
+        <div className="p-8 font-mono text-sm">
+          <p className="text-zinc-500">
+            <span className="text-green-400">$</span> curl -I /unknown-page
           </p>
-        </div>
+          <div className="mt-4 space-y-1">
+            <p className="text-red-400">HTTP/1.1 404 Not Found</p>
+            <p className="text-zinc-500">Content-Type: text/html</p>
+          </div>
+          <div className="mt-6 border-t border-zinc-700/50 pt-6">
+            <p className="text-4xl font-bold text-zinc-100">404</p>
+            <p className="mt-1 text-zinc-400">
+              The page you&apos;re looking for doesn&apos;t exist or has been
+              moved.
+            </p>
+          </div>
 
-        <div className="flex gap-4">
-          <Link
-            href="/"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            Go Home
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            Dashboard
-          </Link>
+          <div className="mt-6 flex gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+            >
+              Go Home
+            </Link>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+            >
+              Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     </div>

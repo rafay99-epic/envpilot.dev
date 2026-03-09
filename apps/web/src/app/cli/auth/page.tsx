@@ -5,6 +5,15 @@ import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { AuthProvider, useAuthContext } from "@/components/auth/auth-provider";
+import {
+  Terminal,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Monitor,
+  Mail,
+  KeyRound,
+} from "lucide-react";
 
 export default function CLIAuthPage() {
   return (
@@ -99,183 +108,160 @@ function CLIAuthPageContent() {
 
   if (authLoading || status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
+        <span className="font-mono text-sm text-green-400">
+          <span className="text-zinc-500">$</span> authenticating
+          <span
+            className="inline-block w-2 bg-green-400"
+            style={{ animation: "blink 1s step-end infinite" }}
+          >
+            &nbsp;
+          </span>
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-blue-600 dark:text-blue-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            CLI Authentication
-          </h1>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f172a] px-4">
+      {/* Grid background */}
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
+        {/* Terminal header */}
+        <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+          <div className="h-3 w-3 rounded-full bg-[#ef5350]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#fbbf24]/80" />
+          <div className="h-3 w-3 rounded-full bg-[#22c55e]/80" />
+          <span className="ml-2 text-xs text-zinc-500">cli-auth</span>
         </div>
 
-        {/* Status-specific content */}
-        {status === "confirming" && (
-          <>
-            <div className="mb-6">
-              <p className="text-gray-600 dark:text-gray-400 text-center">
-                The Envpilot CLI is requesting access to your account.
+        <div className="p-6 font-mono text-sm">
+          {/* Command header */}
+          <p className="text-zinc-500">
+            <span className="text-green-400">$</span> envpilot login --authorize
+          </p>
+
+          {/* Status-specific content */}
+          {status === "confirming" && (
+            <>
+              <div className="mt-4 border-t border-zinc-700/50 pt-4">
+                <p className="text-zinc-300">
+                  The Envpilot CLI is requesting access to your account.
+                </p>
+              </div>
+
+              {/* Session info */}
+              <div className="mt-4 space-y-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-zinc-500">
+                    <Monitor className="h-3.5 w-3.5" />
+                    Device
+                  </span>
+                  <span className="text-zinc-200">
+                    {session?.deviceName || "CLI"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-zinc-500">
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Code
+                  </span>
+                  <span className="font-bold tracking-wider text-green-400">
+                    {code?.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-zinc-500">
+                    <Mail className="h-3.5 w-3.5" />
+                    Account
+                  </span>
+                  <span className="text-zinc-200">{user?.email}</span>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={isSubmitting}
+                  className="flex-1 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Authorizing..." : "Authorize"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {status === "success" && (
+            <div className="mt-4 border-t border-zinc-700/50 pt-4">
+              <div className="flex items-center gap-2 text-green-400">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-semibold">Authentication Successful</span>
+              </div>
+              <p className="mt-3 text-zinc-400">
+                You can now close this window and return to your terminal.
+              </p>
+              <div className="mt-4 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3">
+                <p className="text-green-400">
+                  ✓ CLI authenticated successfully
+                </p>
+                <p className="mt-1 text-zinc-500">
+                  Session: {code?.toUpperCase()}
+                </p>
+              </div>
+              <button
+                onClick={() => window.close()}
+                className="mt-4 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+              >
+                Close Window
+              </button>
+            </div>
+          )}
+
+          {status === "expired" && (
+            <div className="mt-4 border-t border-zinc-700/50 pt-4">
+              <div className="flex items-center gap-2 text-[#fbbf24]">
+                <Clock className="h-5 w-5" />
+                <span className="font-semibold">Code Expired</span>
+              </div>
+              <p className="mt-3 text-zinc-400">
+                The authentication code has expired. Run the login command
+                again:
+              </p>
+              <div className="mt-4 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3">
+                <p className="text-zinc-500">
+                  <span className="text-green-400">$</span> envpilot login
+                </p>
+              </div>
+            </div>
+          )}
+
+          {status === "error" && (
+            <div className="mt-4 border-t border-zinc-700/50 pt-4">
+              <div className="flex items-center gap-2 text-[#ef5350]">
+                <XCircle className="h-5 w-5" />
+                <span className="font-semibold">Authentication Failed</span>
+              </div>
+              <p className="mt-3 text-zinc-400">
+                {errorMessage || "An error occurred during authentication."}
               </p>
             </div>
-
-            {/* Session info */}
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Device
-                </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {session?.deviceName || "CLI"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Code
-                </span>
-                <span className="text-sm font-mono font-bold text-gray-900 dark:text-white tracking-wider">
-                  {code?.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Account
-                </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user?.email}
-                </span>
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleCancel}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirm}
-                disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                {isSubmitting ? "Authorizing..." : "Authorize"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {status === "success" && (
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-green-600 dark:text-green-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Authentication Successful
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              You can now close this window and return to your terminal.
-            </p>
-            <button
-              onClick={() => window.close()}
-              className="px-6 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
-            >
-              Close Window
-            </button>
-          </div>
-        )}
-
-        {status === "expired" && (
-          <div className="text-center">
-            <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-yellow-600 dark:text-yellow-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Code Expired
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              The authentication code has expired. Please run{" "}
-              <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">
-                envpilot login
-              </code>{" "}
-              again to get a new code.
-            </p>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-red-600 dark:text-red-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Authentication Failed
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              {errorMessage || "An error occurred during authentication."}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

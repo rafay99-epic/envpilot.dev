@@ -1,5 +1,5 @@
-import LandingVariantLoader from "@/components/landing/variants/LandingVariantLoader";
+import TerminalLanding from "@/components/landing/variants/TerminalLanding";
 
 export default function HomePage() {
-  return <LandingVariantLoader />;
+  return <TerminalLanding />;
 }
