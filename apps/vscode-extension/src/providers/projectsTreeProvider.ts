@@ -235,11 +235,20 @@ export class ProjectTreeItem extends vscode.TreeItem {
         this.tooltip = this.createProjectTooltip(project, true);
         break;
 
-      case "linkedDirectory":
-        this.iconPath = new vscode.ThemeIcon("folder-opened");
+      case "linkedDirectory": {
+        const staleness = this.getSyncStaleness(directory);
+        this.iconPath = new vscode.ThemeIcon(
+          "folder-opened",
+          staleness === "fresh"
+            ? new vscode.ThemeColor("charts.green")
+            : staleness === "stale"
+              ? new vscode.ThemeColor("charts.yellow")
+              : undefined
+        );
         this.description = this.buildDirectoryDescription(directory);
         this.tooltip = this.createDirectoryTooltip(directory);
         break;
+      }
 
       case "message":
         this.iconPath = new vscode.ThemeIcon(
@@ -309,6 +318,14 @@ export class ProjectTreeItem extends vscode.TreeItem {
     }
     md.appendMarkdown(`**Slug:** \`${project.slug}\``);
     return md;
+  }
+
+  private getSyncStaleness(
+    dir?: LinkedDirectory
+  ): "fresh" | "stale" | "never" {
+    if (!dir?.lastSyncedAt) return "never";
+    const ageMs = Date.now() - dir.lastSyncedAt;
+    return ageMs < 3600000 ? "fresh" : "stale";
   }
 
   private createDirectoryTooltip(

@@ -203,20 +203,29 @@ export class VariableTreeItem extends vscode.TreeItem {
     this.contextValue = type;
 
     switch (type) {
-      case "variable":
+      case "variable": {
         this.iconPath = new vscode.ThemeIcon("symbol-variable");
-        this.description = this.truncateValue(variable?.value || "");
+        const valueStr = this.truncateValue(variable?.value || "");
+        const versionTag = variable?.version ? ` v${variable.version}` : "";
+        this.description = valueStr + versionTag;
         this.tooltip = this.createVariableTooltip(variable, false);
         break;
+      }
 
-      case "sensitive":
+      case "sensitive": {
         this.iconPath = new vscode.ThemeIcon(
           "lock",
           new vscode.ThemeColor("charts.yellow")
         );
-        this.description = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+        const charCount = variable?.value?.length ?? 0;
+        const vTag = variable?.version ? ` v${variable.version}` : "";
+        this.description =
+          charCount > 0
+            ? `\u2022\u2022\u2022\u2022\u2022\u2022 (${charCount} chars)${vTag}`
+            : `\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022${vTag}`;
         this.tooltip = this.createVariableTooltip(variable, true);
         break;
+      }
 
       case "header":
         this.iconPath = new vscode.ThemeIcon(
