@@ -1,7 +1,13 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { success, error, withSpinner, formatRole, roleNotice } from "../lib/ui.js";
+import {
+  success,
+  error,
+  withSpinner,
+  formatRole,
+  roleNotice,
+} from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,

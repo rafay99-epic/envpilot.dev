@@ -271,7 +271,9 @@ async function listVariables(
 
   if (role === "member") {
     console.log(
-      chalk.dim("As a Member, you may only see variables you have been granted access to.")
+      chalk.dim(
+        "As a Member, you may only see variables you have been granted access to."
+      )
     );
   }
 
