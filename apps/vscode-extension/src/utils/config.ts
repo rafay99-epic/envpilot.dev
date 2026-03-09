@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { ExtensionConfig } from "../types";
 
-const CONFIG_SECTION = "envConnect";
+const CONFIG_SECTION = "envpilot";
 
 export function getConfig(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);

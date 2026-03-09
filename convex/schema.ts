@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 /**
- * Convex Schema for ENV Connect
+ * Convex Schema for Envpilot
  * Real-time backend for environment variable management
  */
 

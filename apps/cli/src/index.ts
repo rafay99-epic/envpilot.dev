@@ -13,10 +13,8 @@ import { logoutCommand } from "./commands/logout.js";
 const program = new Command();
 
 program
-  .name("env-connect")
-  .description(
-    "ENV Connect CLI - Sync, secure, and share environment variables"
-  )
+  .name("envpilot")
+  .description("Envpilot CLI - Sync, secure, and share environment variables")
   .version("0.1.0");
 
 // Add all commands

@@ -58,7 +58,7 @@ export class AuthService {
     return vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: "ENV Connect: Waiting for sign-in...",
+        title: "Envpilot: Waiting for sign-in...",
         cancellable: true,
       },
       async (progress, cancellationToken) => {
@@ -140,7 +140,7 @@ export class AuthService {
   async signOut(): Promise<void> {
     await this.storage.clearAuthSession();
     this._onAuthStateChanged.fire(null);
-    vscode.window.showInformationMessage("Signed out of ENV Connect");
+    vscode.window.showInformationMessage("Signed out of Envpilot");
   }
 
   /**

@@ -163,7 +163,7 @@ export function DashboardNav() {
                 </svg>
               </div>
               <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                ENV Connect
+                Envpilot
               </span>
             </Link>
           </div>
@@ -223,7 +223,7 @@ export function DashboardNav() {
             </svg>
           </div>
           <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            ENV Connect
+            Envpilot
           </span>
         </Link>
 

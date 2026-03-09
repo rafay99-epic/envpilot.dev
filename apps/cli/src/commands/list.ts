@@ -203,9 +203,7 @@ async function listVariables(
   const environment = options.env || projectConfig?.environment;
 
   if (!projectId) {
-    error(
-      "No project specified. Use --project or run `env-connect init` first."
-    );
+    error("No project specified. Use --project or run `envpilot init` first.");
     process.exit(1);
   }
 

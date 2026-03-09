@@ -17,7 +17,7 @@ export class StatusBarProvider {
       vscode.StatusBarAlignment.Left,
       100
     );
-    this.statusBarItem.command = "envConnect.showStatus";
+    this.statusBarItem.command = "envpilot.showStatus";
 
     this.authService.onAuthStateChanged(() => this.update());
     this.syncService.onSyncComplete((result) =>
@@ -35,8 +35,8 @@ export class StatusBarProvider {
     const isAuthenticated = await this.authService.isAuthenticated();
 
     if (!isAuthenticated) {
-      this.statusBarItem.text = "$(shield) ENV Connect";
-      this.statusBarItem.tooltip = "Click to sign in to ENV Connect";
+      this.statusBarItem.text = "$(shield) Envpilot";
+      this.statusBarItem.tooltip = "Click to sign in to Envpilot";
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
@@ -44,7 +44,7 @@ export class StatusBarProvider {
     const linkedProject = await this.syncService.getLinkedProject();
 
     if (!linkedProject) {
-      this.statusBarItem.text = "$(shield) ENV Connect";
+      this.statusBarItem.text = "$(shield) Envpilot";
       this.statusBarItem.tooltip =
         "Signed in \u2014 no project linked\nClick for options";
       this.statusBarItem.backgroundColor = undefined;

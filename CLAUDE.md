@@ -41,7 +41,7 @@ bun run dev:convex                                 # sync functions during devel
 
 ## Architecture
 
-ENV Connect is a secure environment variable management platform with three client surfaces: a **Next.js web app**, a **CLI tool**, and a **VS Code extension**, managed as a **bun workspaces + Turborepo** monorepo.
+Envpilot is a secure environment variable management platform with three client surfaces: a **Next.js web app**, a **CLI tool**, and a **VS Code extension**, managed as a **bun workspaces + Turborepo** monorepo.
 
 ### Data Flow
 
@@ -58,11 +58,11 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 ### Key Directories
 
 - `convex/` — Backend functions (queries, mutations) and `schema.ts` (database schema). Auto-generates types in `convex/_generated/`. Has its own independent tsconfig. **Must stay at the monorepo root** (Convex CLI requirement).
-- `apps/web/` — Next.js web app (`@env-connect/web`).
+- `apps/web/` — Next.js web app (`@envpilot/web`).
   - `apps/web/src/app/api/` — REST API routes. Use `withAuth()` middleware for auth. Use `ConvexHttpClient` for server-side Convex calls.
   - `apps/web/src/hooks/` — Custom React hooks wrapping Convex queries.
   - `apps/web/src/lib/` — Shared utilities: auth, vault, stripe, email, tier-limits, feature-flags.
-- `apps/cli/` — CLI npm package (`@env-connect/cli`). Uses Commander.js, builds with tsup, tests with vitest.
+- `apps/cli/` — CLI npm package (`@envpilot/cli`). Uses Commander.js, builds with tsup, tests with vitest.
 - `apps/vscode-extension/` — VS Code extension package. OAuth-based auth, real-time sync, esbuild bundled.
 - `packages/` — Shared config packages (tsconfig, eslint-config, prettier-config).
 
@@ -83,7 +83,7 @@ Three-tier RBAC defined in `apps/web/src/lib/auth.ts`:
 - Convex validators (`v.*`) for backend function args, separate from Zod
 - Tailwind CSS v4 via PostCSS
 - ESLint v9 flat config across all packages
-- TypeScript configs extend shared bases from `@env-connect/tsconfig`
+- TypeScript configs extend shared bases from `@envpilot/tsconfig`
 - Convex tsconfig is independent (required by Convex runtime)
 
 ### Environment Variables

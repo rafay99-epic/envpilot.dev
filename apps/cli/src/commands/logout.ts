@@ -4,7 +4,7 @@ import { createAPIClient } from "../lib/api.js";
 import { clearAuth, isAuthenticated, getUser } from "../lib/config.js";
 
 export const logoutCommand = new Command("logout")
-  .description("Log out from ENV Connect")
+  .description("Log out from Envpilot")
   .action(async () => {
     try {
       if (!isAuthenticated()) {

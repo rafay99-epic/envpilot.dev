@@ -194,7 +194,7 @@ function OrganizationSettings({
             </label>
             <div className="mt-1 flex rounded-lg border border-zinc-200 dark:border-zinc-700">
               <span className="flex items-center rounded-l-lg border-r border-zinc-200 bg-zinc-50 px-3 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
-                envconnect.app/
+                envpilot.dev/
               </span>
               <input
                 type="text"
@@ -265,7 +265,7 @@ function IntegrationsSettings() {
           />
           <IntegrationCard
             name="Cursor Extension"
-            description="ENV Connect support for Cursor editor"
+            description="Envpilot support for Cursor editor"
             icon={
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
                 <span className="text-lg font-bold">C</span>
@@ -286,7 +286,7 @@ function IntegrationsSettings() {
 
         <div className="mt-6 rounded-lg bg-zinc-900 p-4 dark:bg-zinc-950">
           <code className="text-sm text-green-400">
-            npm install -g @envconnect/cli
+            npm install -g @envpilot/cli
           </code>
         </div>
       </div>

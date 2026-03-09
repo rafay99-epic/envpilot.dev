@@ -138,7 +138,7 @@ function CLIAuthPageContent() {
           <>
             <div className="mb-6">
               <p className="text-gray-600 dark:text-gray-400 text-center">
-                The ENV Connect CLI is requesting access to your account.
+                The Envpilot CLI is requesting access to your account.
               </p>
             </div>
 
@@ -244,7 +244,7 @@ function CLIAuthPageContent() {
             <p className="text-gray-600 dark:text-gray-400">
               The authentication code has expired. Please run{" "}
               <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm">
-                env-connect login
+                envpilot login
               </code>{" "}
               again to get a new code.
             </p>

@@ -43,7 +43,7 @@ export const switchCommand = new Command("switch")
         const environment = (options.env || target) as Environment;
 
         if (!projectConfig) {
-          error("No project initialized. Run `env-connect init` first.");
+          error("No project initialized. Run `envpilot init` first.");
           process.exit(1);
         }
 
@@ -190,7 +190,7 @@ export const switchCommand = new Command("switch")
 
         if (switchType === "environment") {
           if (!projectConfig) {
-            error("No project initialized. Run `env-connect init` first.");
+            error("No project initialized. Run `envpilot init` first.");
             process.exit(1);
           }
 

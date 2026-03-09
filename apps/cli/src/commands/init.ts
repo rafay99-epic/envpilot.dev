@@ -17,7 +17,7 @@ import { notAuthenticated } from "../lib/errors.js";
 import type { Organization, Project, Environment } from "../types/index.js";
 
 export const initCommand = new Command("init")
-  .description("Initialize ENV Connect in the current directory")
+  .description("Initialize Envpilot in the current directory")
   .option("-o, --organization <id>", "Organization ID")
   .option("-p, --project <id>", "Project ID")
   .option(
@@ -34,7 +34,7 @@ export const initCommand = new Command("init")
 
       // Check if already initialized
       if (hasProjectConfig() && !options.force) {
-        warning("This directory is already initialized with ENV Connect.");
+        warning("This directory is already initialized with Envpilot.");
         const { proceed } = await inquirer.prompt([
           {
             type: "confirm",
@@ -193,14 +193,14 @@ export const initCommand = new Command("init")
       console.log();
       success("Project initialized!");
       console.log();
-      console.log(chalk.dim("Configuration saved to .envconnect"));
+      console.log(chalk.dim("Configuration saved to .envpilot"));
       console.log();
       console.log("Next steps:");
       console.log(
-        `  ${chalk.cyan("env-connect pull")}     Download environment variables`
+        `  ${chalk.cyan("envpilot pull")}     Download environment variables`
       );
       console.log(
-        `  ${chalk.cyan("env-connect push")}     Upload local .env to cloud`
+        `  ${chalk.cyan("envpilot push")}     Upload local .env to cloud`
       );
       console.log();
     } catch (err) {

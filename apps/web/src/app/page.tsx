@@ -32,7 +32,7 @@ export default async function HomePage() {
               </svg>
             </div>
             <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              ENV Connect
+              Envpilot
             </span>
           </Link>
 
@@ -119,7 +119,7 @@ export default async function HomePage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400 md:text-xl">
-              Stop sharing secrets over Slack. ENV Connect provides encrypted
+              Stop sharing secrets over Slack. Envpilot provides encrypted
               storage, role-based access control, and seamless integrations for
               your environment variables.
             </p>
@@ -404,7 +404,7 @@ export default async function HomePage() {
                   </svg>
                 </div>
                 <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                  ENV Connect
+                  Envpilot
                 </span>
               </Link>
               <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
@@ -532,8 +532,7 @@ export default async function HomePage() {
           </div>
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-zinc-200 pt-8 dark:border-zinc-800 sm:flex-row">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              &copy; {new Date().getFullYear()} ENV Connect. All rights
-              reserved.
+              &copy; {new Date().getFullYear()} Envpilot. All rights reserved.
             </p>
             <div className="flex gap-4">
               <Link

@@ -81,15 +81,15 @@ export function notAuthenticated(): CLIError {
   return new CLIError(
     "You are not authenticated.",
     ErrorCodes.NOT_AUTHENTICATED,
-    "Run `env-connect login` to authenticate."
+    "Run `envpilot login` to authenticate."
   );
 }
 
 export function notInitialized(): CLIError {
   return new CLIError(
-    "This directory is not initialized with ENV Connect.",
+    "This directory is not initialized with Envpilot.",
     ErrorCodes.NOT_INITIALIZED,
-    "Run `env-connect init` to initialize."
+    "Run `envpilot init` to initialize."
   );
 }
 
@@ -97,7 +97,7 @@ export function projectNotFound(projectId: string): CLIError {
   return new CLIError(
     `Project not found: ${projectId}`,
     ErrorCodes.PROJECT_NOT_FOUND,
-    "Run `env-connect list projects` to see available projects."
+    "Run `envpilot list projects` to see available projects."
   );
 }
 
@@ -105,7 +105,7 @@ export function organizationNotFound(organizationId: string): CLIError {
   return new CLIError(
     `Organization not found: ${organizationId}`,
     ErrorCodes.ORGANIZATION_NOT_FOUND,
-    "Run `env-connect list organizations` to see available organizations."
+    "Run `envpilot list organizations` to see available organizations."
   );
 }
 

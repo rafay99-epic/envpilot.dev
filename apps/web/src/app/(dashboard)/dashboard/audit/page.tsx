@@ -236,7 +236,7 @@ function EmptyState({ hasLogs }: { hasLogs: boolean }) {
       <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
         {hasLogs
           ? "Try adjusting your search or filters."
-          : "Activity will be recorded as you use ENV Connect."}
+          : "Activity will be recorded as you use Envpilot."}
       </p>
     </div>
   );

@@ -23,13 +23,13 @@ import type {
   LinkDirectoryOptions,
 } from "../types";
 
-const ENV_FILE_HEADER = `# ENV Connect - Synced Environment Variables
+const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 # DO NOT EDIT MANUALLY - Changes will be overwritten on next sync
 # Project: {projectName}
 # Environment: {environment}
 # Synced at: {syncedAt}
 #
-# To modify variables, use the ENV Connect dashboard.
+# To modify variables, use the Envpilot dashboard.
 
 `;
 
@@ -273,7 +273,7 @@ export class SyncService {
       await this.storage.getLinkedProjectForWorkspace(workspacePath);
     if (!linkedProject) {
       vscode.window.showWarningMessage(
-        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.'
+        'No project linked to this workspace. Use "Envpilot: Link Project" to link a project.'
       );
       return null;
     }
@@ -1107,7 +1107,7 @@ export class SyncService {
       await this.storage.getProjectForDirectory(workspacePath);
     if (!linkedProject) {
       vscode.window.showWarningMessage(
-        'No project linked to this workspace. Use "ENV Connect: Link Project" to link a project.'
+        'No project linked to this workspace. Use "Envpilot: Link Project" to link a project.'
       );
       return null;
     }

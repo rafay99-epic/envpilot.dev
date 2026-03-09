@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ENV Connect",
+  title: "Envpilot",
   description: "Secure environment variable management for teams",
 };
 

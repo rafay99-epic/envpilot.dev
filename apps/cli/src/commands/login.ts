@@ -15,7 +15,7 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 150; // 5 minutes
 
 export const loginCommand = new Command("login")
-  .description("Authenticate with ENV Connect")
+  .description("Authenticate with Envpilot")
   .option("--api-url <url>", "API URL (default: http://localhost:3000)")
   .option("--no-browser", "Do not automatically open the browser")
   .action(async (options) => {
@@ -102,10 +102,10 @@ export const loginCommand = new Command("login")
           console.log();
           console.log("Next steps:");
           console.log(
-            `  ${chalk.cyan("env-connect init")}     Initialize a project in the current directory`
+            `  ${chalk.cyan("envpilot init")}     Initialize a project in the current directory`
           );
           console.log(
-            `  ${chalk.cyan("env-connect list")}     List your projects and organizations`
+            `  ${chalk.cyan("envpilot list")}     List your projects and organizations`
           );
           console.log();
           break;

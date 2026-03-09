@@ -130,7 +130,7 @@ export default function NewOrganizationPage() {
               </label>
               <div className="mt-2 flex items-center">
                 <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  envconnect.app/
+                  envpilot.dev/
                 </span>
                 <input
                   type="text"

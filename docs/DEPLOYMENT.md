@@ -2,7 +2,7 @@
 
 ## Overview
 
-ENV Connect deploys to three platforms:
+Envpilot deploys to three platforms:
 
 | Component         | Platform            | Command                      |
 | ----------------- | ------------------- | ---------------------------- |
@@ -19,7 +19,7 @@ ENV Connect deploys to three platforms:
 2. Configure the project:
    - **Framework**: Next.js
    - **Root Directory**: `apps/web`
-   - **Build Command**: `cd ../.. && bun install && bunx turbo build --filter=@env-connect/web`
+   - **Build Command**: `cd ../.. && bun install && bunx turbo build --filter=@envpilot/web`
    - **Install Command**: `bun install` (from monorepo root)
    - **Output Directory**: `.next`
 
@@ -87,7 +87,7 @@ cd apps/vscode-extension
 npx @vscode/vsce package
 ```
 
-This creates a `.vsix` file (e.g., `env-connect-0.1.0.vsix`).
+This creates a `.vsix` file (e.g., `envpilot-0.1.0.vsix`).
 
 ### Publish
 
@@ -99,7 +99,7 @@ npx @vscode/vsce publish
 Requirements:
 
 - A Personal Access Token from [Azure DevOps](https://dev.azure.com)
-- Publisher `env-connect` registered in the [VS Code Marketplace](https://marketplace.visualstudio.com/manage)
+- Publisher `envpilot` registered in the [VS Code Marketplace](https://marketplace.visualstudio.com/manage)
 
 ### Version Bump
 
@@ -107,7 +107,7 @@ Update `version` in `apps/vscode-extension/package.json` before publishing.
 
 ### Extension Configuration
 
-The extension connects to the web app at the URL configured in `envConnect.serverUrl` setting (defaults to `http://localhost:3000`). For production, users should set this to the Vercel deployment URL.
+The extension connects to the web app at the URL configured in `envpilot.serverUrl` setting (defaults to `http://localhost:3000`). For production, users should set this to the Vercel deployment URL.
 
 ## CLI
 
@@ -126,7 +126,7 @@ npm publish
 
 Requirements:
 
-- npm account with publish access to `@env-connect` scope
+- npm account with publish access to `@envpilot` scope
 - Run `npm login` first
 
 ### Version Bump
@@ -135,7 +135,7 @@ Update `version` in `apps/cli/package.json` before publishing.
 
 ### Binary
 
-After installation (`npm install -g @env-connect/cli`), the CLI is available as `env-connect`.
+After installation (`npm install -g @envpilot/cli`), the CLI is available as `envpilot`.
 
 ## CI/CD
 

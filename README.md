@@ -1,6 +1,6 @@
-# ENV Connect
+# Envpilot
 
-Secure environment variable management for teams. ENV Connect provides a centralized platform for managing, sharing, and syncing environment variables across your development team and deployment environments.
+Secure environment variable management for teams. Envpilot provides a centralized platform for managing, sharing, and syncing environment variables across your development team and deployment environments.
 
 ## Features
 
@@ -33,7 +33,7 @@ Secure environment variable management for teams. ENV Connect provides a central
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd ENV_Connect_2
+cd envpilot
 
 # Install dependencies
 npm install

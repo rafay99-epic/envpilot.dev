@@ -15,7 +15,7 @@ import type {
 } from "../types";
 
 /**
- * API service for communicating with the ENV Connect backend
+ * API service for communicating with the Envpilot backend
  */
 export class ApiService {
   private client: AxiosInstance;
