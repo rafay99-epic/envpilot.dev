@@ -286,14 +286,14 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "bun run package",
-    "build": "bun run compile",
-    "compile": "bun run check-types && bun run lint && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "vscode:prepublish": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "build": "bun run check-types && bun run lint && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "concurrently \"bun run watch:esbuild\" \"bun run watch:tsc\"",
     "watch:esbuild": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "bun run check-types && bun run lint && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "package": "bun run check-types && bun run lint && vsce package --no-dependencies --allow-missing-repository",
     "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest"

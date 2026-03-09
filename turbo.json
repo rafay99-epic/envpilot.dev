@@ -9,6 +9,14 @@
       "cache": false,
       "persistent": true
     },
+    "watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "package": {
+      "dependsOn": ["^build"],
+      "outputs": ["*.vsix"]
+    },
     "lint": {},
     "typecheck": {},
     "test": {

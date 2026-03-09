@@ -9,9 +9,16 @@
     "convex"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --filter=@env-connect/web --filter=@env-connect/backend",
+    "dev:web": "turbo run dev --filter=@env-connect/web",
+    "dev:convex": "turbo run dev --filter=@env-connect/backend",
+    "dev:cli": "turbo run dev --filter=@env-connect/cli",
+    "dev:extension": "turbo run watch --filter=./apps/vscode-extension",
     "build": "turbo run build",
-    "build:all": "turbo run build",
+    "build:web": "turbo run build --filter=@env-connect/web",
+    "build:cli": "turbo run build --filter=@env-connect/cli",
+    "build:extension": "turbo run build --filter=./apps/vscode-extension",
+    "package:extension": "turbo run package --filter=./apps/vscode-extension",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
