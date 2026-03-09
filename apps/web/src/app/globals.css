@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --terminal-bg: #0f172a;
+  --terminal-card: rgba(24, 24, 27, 0.9);
+  --terminal-border: rgba(113, 113, 122, 0.5);
+  --terminal-green: #22c55e;
+  --terminal-amber: #fbbf24;
+  --terminal-red: #ef5350;
 }
 
 @theme inline {
@@ -23,4 +31,16 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Typing cursor blink */
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
