@@ -132,9 +132,7 @@ export class RealTimeSyncService {
     }>,
     linkedProjects: LinkedProjectV2[]
   ): Promise<void> {
-    console.log(
-      `[RealTimeSync] Detected ${events.length} revocation event(s)`
-    );
+    console.log(`[RealTimeSync] Detected ${events.length} revocation event(s)`);
 
     const eventIds: string[] = [];
 
@@ -144,9 +142,7 @@ export class RealTimeSyncService {
       );
 
       if (!project) {
-        console.warn(
-          "[RealTimeSync] Revocation event for unknown project"
-        );
+        console.warn("[RealTimeSync] Revocation event for unknown project");
         continue;
       }
 

@@ -37,7 +37,10 @@ export const listByOrganization = query({
     const offsetLogs = args.offset ? logs.slice(args.offset) : logs;
     const resultLogs = offsetLogs.slice(0, limit);
 
-    const userMap = await batchGetUsers(ctx, resultLogs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      resultLogs.map((l) => l.userId)
+    );
     return resultLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -61,7 +64,10 @@ export const listByProject = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const userMap = await batchGetUsers(ctx, logs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
+    );
     return logs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -85,7 +91,10 @@ export const listByVariable = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const userMap = await batchGetUsers(ctx, logs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
+    );
     return logs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -149,7 +158,10 @@ export const listByAction = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    const userMap = await batchGetUsers(ctx, logs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
+    );
     return logs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -215,7 +227,10 @@ export const listSecurityEvents = query({
 
     const limitedLogs = securityLogs.slice(0, args.limit ?? 100);
 
-    const userMap = await batchGetUsers(ctx, limitedLogs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
+    );
     return limitedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -278,23 +293,48 @@ export const listSensitiveDataAccess = query({
 
     const limitedLogs = sensitiveAccessLogs.slice(0, args.limit ?? 100);
 
-    const userMap = await batchGetUsers(ctx, limitedLogs.map((l) => l.userId));
-    const varIds = limitedLogs.map((l) => l.variableId).filter(Boolean) as Id<"environmentVariables">[];
-    const projIds = limitedLogs.map((l) => l.projectId).filter(Boolean) as Id<"projects">[];
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
+    );
+    const varIds = limitedLogs
+      .map((l) => l.variableId)
+      .filter(Boolean) as Id<"environmentVariables">[];
+    const projIds = limitedLogs
+      .map((l) => l.projectId)
+      .filter(Boolean) as Id<"projects">[];
     const [vars, projs] = await Promise.all([
-      Promise.all([...new Set(varIds.map(String))].map((id) => ctx.db.get(id as Id<"environmentVariables">))),
-      Promise.all([...new Set(projIds.map(String))].map((id) => ctx.db.get(id as Id<"projects">))),
+      Promise.all(
+        [...new Set(varIds.map(String))].map((id) =>
+          ctx.db.get(id as Id<"environmentVariables">)
+        )
+      ),
+      Promise.all(
+        [...new Set(projIds.map(String))].map((id) =>
+          ctx.db.get(id as Id<"projects">)
+        )
+      ),
     ]);
-    const varMap = new Map(vars.filter(Boolean).map((v) => [v!._id.toString(), v!]));
-    const projMap = new Map(projs.filter(Boolean).map((p) => [p!._id.toString(), p!]));
+    const varMap = new Map(
+      vars.filter(Boolean).map((v) => [v!._id.toString(), v!])
+    );
+    const projMap = new Map(
+      projs.filter(Boolean).map((p) => [p!._id.toString(), p!])
+    );
 
     return limitedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
         ...log,
         ...userDisplay(u),
-        variableKey: (log.variableId ? varMap.get(log.variableId.toString())?.key : null) ?? "Unknown",
-        projectName: (log.projectId ? projMap.get(log.projectId.toString())?.name : null) ?? "Unknown",
+        variableKey:
+          (log.variableId
+            ? varMap.get(log.variableId.toString())?.key
+            : null) ?? "Unknown",
+        projectName:
+          (log.projectId
+            ? projMap.get(log.projectId.toString())?.name
+            : null) ?? "Unknown",
         parsedDetails: log.details ? JSON.parse(log.details) : null,
       };
     });
@@ -436,7 +476,10 @@ export const listByTimeRange = query({
       );
     }
 
-    const userMap = await batchGetUsers(ctx, filteredLogs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      filteredLogs.map((l) => l.userId)
+    );
     return filteredLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
@@ -667,15 +710,38 @@ export const getForExport = query({
       .order("desc")
       .take(10000); // Limit for performance
 
-    const userMap = await batchGetUsers(ctx, logs.map((l) => l.userId));
-    const projIds = [...new Set(logs.map((l) => l.projectId).filter(Boolean).map(String))];
-    const varIds = [...new Set(logs.map((l) => l.variableId).filter(Boolean).map(String))];
+    const userMap = await batchGetUsers(
+      ctx,
+      logs.map((l) => l.userId)
+    );
+    const projIds = [
+      ...new Set(
+        logs
+          .map((l) => l.projectId)
+          .filter(Boolean)
+          .map(String)
+      ),
+    ];
+    const varIds = [
+      ...new Set(
+        logs
+          .map((l) => l.variableId)
+          .filter(Boolean)
+          .map(String)
+      ),
+    ];
     const [projs, vars] = await Promise.all([
       Promise.all(projIds.map((id) => ctx.db.get(id as Id<"projects">))),
-      Promise.all(varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))),
+      Promise.all(
+        varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
+      ),
     ]);
-    const projMap = new Map(projs.filter(Boolean).map((p) => [p!._id.toString(), p!]));
-    const varMap = new Map(vars.filter(Boolean).map((v) => [v!._id.toString(), v!]));
+    const projMap = new Map(
+      projs.filter(Boolean).map((p) => [p!._id.toString(), p!])
+    );
+    const varMap = new Map(
+      vars.filter(Boolean).map((v) => [v!._id.toString(), v!])
+    );
 
     const exportData = logs.map((log) => {
       const u = userMap.get(log.userId.toString());
@@ -683,8 +749,12 @@ export const getForExport = query({
         timestamp: new Date(log.createdAt).toISOString(),
         action: log.action,
         ...userDisplay(u),
-        projectName: log.projectId ? projMap.get(log.projectId.toString())?.name ?? null : null,
-        variableKey: log.variableId ? varMap.get(log.variableId.toString())?.key ?? null : null,
+        projectName: log.projectId
+          ? (projMap.get(log.projectId.toString())?.name ?? null)
+          : null,
+        variableKey: log.variableId
+          ? (varMap.get(log.variableId.toString())?.key ?? null)
+          : null,
         severity: log.severity ?? "info",
         resourceType: log.resourceType ?? null,
         ipAddress: log.ipAddress ?? null,
@@ -735,7 +805,10 @@ export const getRecentAlerts = query({
 
     const limitedLogs = alertLogs.slice(0, limit);
 
-    const userMap = await batchGetUsers(ctx, limitedLogs.map((l) => l.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      limitedLogs.map((l) => l.userId)
+    );
     return limitedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {

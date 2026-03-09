@@ -134,7 +134,9 @@ export const getForUser = query({
       .collect();
 
     // Batch fetch variables
-    const varIds = [...new Set(permissions.map((p) => p.variableId.toString()))];
+    const varIds = [
+      ...new Set(permissions.map((p) => p.variableId.toString())),
+    ];
     const variables = await Promise.all(
       varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
     );

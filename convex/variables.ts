@@ -72,7 +72,6 @@ export const listByOrganization = query({
   },
 });
 
-
 export const getById = query({
   args: { variableId: v.id("environmentVariables") },
   handler: async (ctx, args) => {

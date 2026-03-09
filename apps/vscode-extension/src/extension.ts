@@ -15,11 +15,7 @@ import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
 import { getDeviceInfo } from "./utils/device";
-import {
-  getServerUrl,
-  getConvexUrl,
-  shouldAutoSync,
-} from "./utils/config";
+import { getServerUrl, getConvexUrl, shouldAutoSync } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 
 let authService: AuthService;
@@ -71,12 +67,16 @@ async function initializeConvexService(): Promise<void> {
         );
         convexUrl = response.data?.convexUrl || "";
       } catch {
-        console.warn("[Extension] Failed to auto-detect Convex URL from server");
+        console.warn(
+          "[Extension] Failed to auto-detect Convex URL from server"
+        );
       }
     }
 
     if (!convexUrl) {
-      console.warn("[Extension] No Convex URL available — WebSocket sync disabled");
+      console.warn(
+        "[Extension] No Convex URL available — WebSocket sync disabled"
+      );
       return;
     }
 
@@ -102,10 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
   fileProtectionService = new FileProtectionService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
-  realTimeSyncService = new RealTimeSyncService(
-    syncService,
-    storageService
-  );
+  realTimeSyncService = new RealTimeSyncService(syncService, storageService);
 
   // Initialize Convex WebSocket connection
   await initializeConvexService();

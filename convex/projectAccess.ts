@@ -28,7 +28,10 @@ export const listByProject = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    const userMap = await batchGetUsers(ctx, tokens.map((t) => t.userId));
+    const userMap = await batchGetUsers(
+      ctx,
+      tokens.map((t) => t.userId)
+    );
 
     return tokens.map((token) => ({
       ...token,
@@ -58,7 +61,9 @@ export const listByUser = query({
 
     // Batch fetch orgs from projects
     const orgIds = [
-      ...new Set(projects.filter(Boolean).map((p) => p!.organizationId.toString())),
+      ...new Set(
+        projects.filter(Boolean).map((p) => p!.organizationId.toString())
+      ),
     ];
     const orgs = await Promise.all(
       orgIds.map((id) => ctx.db.get(id as Id<"organizations">))

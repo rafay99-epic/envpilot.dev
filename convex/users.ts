@@ -50,9 +50,7 @@ export const search = query({
       )
       .collect();
 
-    const users = await Promise.all(
-      members.map((m) => ctx.db.get(m.userId))
-    );
+    const users = await Promise.all(members.map((m) => ctx.db.get(m.userId)));
 
     const matches = users
       .filter(
