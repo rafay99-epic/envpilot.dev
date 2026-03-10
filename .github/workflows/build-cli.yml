@@ -108,5 +108,6 @@ jobs:
             ```bash
             # Download and unzip, then:
             chmod +x envpilot-darwin-arm64
+            xattr -d com.apple.quarantine envpilot-darwin-arm64  # macOS only
             sudo mv envpilot-darwin-arm64 /usr/local/bin/envpilot
             ```

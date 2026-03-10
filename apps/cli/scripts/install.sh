@@ -4,7 +4,7 @@ set -euo pipefail
 # Envpilot CLI installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/envpilot/main/apps/cli/scripts/install.sh | bash
 
-REPO="YOUR_ORG/envpilot"
+REPO="rafay99-epic/envpilot.dev"
 INSTALL_DIR="${ENVPILOT_INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="envpilot"
 
@@ -86,6 +86,11 @@ main() {
 
   # Install
   chmod +x "$binary_path"
+
+  # Remove macOS quarantine attribute (Gatekeeper blocks unsigned binaries)
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    xattr -d com.apple.quarantine "$binary_path" 2>/dev/null || true
+  fi
 
   if [ -w "$INSTALL_DIR" ]; then
     mv "$binary_path" "${INSTALL_DIR}/${BINARY_NAME}${extension}"
