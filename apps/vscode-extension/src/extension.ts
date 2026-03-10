@@ -362,7 +362,8 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
   if (item?.project) {
     projectId = item.project._id;
     projectName = item.project.name;
-    organizationId = item.organization?._id || item.project.organizationId || "";
+    organizationId =
+      item.organization?._id || item.project.organizationId || "";
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
