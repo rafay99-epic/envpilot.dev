@@ -20,6 +20,18 @@ export function useOrganizationAuditLogs(
 }
 
 /**
+ * Hook for getting total audit log count by organization
+ */
+export function useOrganizationAuditLogCount(
+  organizationId: Id<"organizations"> | undefined
+) {
+  return useQuery(
+    api.auditLogs.countByOrganization,
+    organizationId ? { organizationId } : "skip"
+  );
+}
+
+/**
  * Hook for listing audit logs by project
  */
 export function useProjectAuditLogs(

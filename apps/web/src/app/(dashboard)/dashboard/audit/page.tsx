@@ -1,32 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import { useAuthContext } from "@/components/auth";
+import {
+  useOrganizationAuditLogs,
+  useOrganizationAuditLogCount,
+  useAuditLogSummary,
+  useAuditLogsForExport,
+} from "@/hooks";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
   TerminalCard,
   TerminalInput,
   TerminalSelect,
   TerminalButton,
+  TerminalLoading,
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
-import { Download, Shield } from "lucide-react";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedList } from "@/components/dashboard/animated-list";
+import {
+  Download,
+  Shield,
+  Activity,
+  AlertTriangle,
+  Lock,
+  Search,
+} from "lucide-react";
 
-const mockAuditLogs: AuditLog[] = [];
-
-interface AuditLog {
-  id: string;
-  action: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  projectId?: string;
-  projectName?: string;
-  variableId?: string;
-  variableKey?: string;
-  details?: string;
-  ipAddress?: string;
-  createdAt: number;
-}
+const PAGE_SIZE = 10;
 
 const actionLabels: Record<string, string> = {
   "org.created": "Organization created",
@@ -43,17 +46,27 @@ const actionLabels: Record<string, string> = {
   "variable.deleted": "Variable deleted",
   "variable.accessed": "Variable accessed",
   "variable.exported": "Variable exported",
+  "variable.copied": "Variable copied",
   "permission.granted": "Permission granted",
   "permission.revoked": "Permission revoked",
   "permission.updated": "Permission updated",
+  "permission.bulk_granted": "Bulk permissions granted",
+  "permission.bulk_revoked": "Bulk permissions revoked",
   "invitation.sent": "Invitation sent",
   "invitation.accepted": "Invitation accepted",
   "invitation.declined": "Invitation declined",
   "invitation.expired": "Invitation expired",
   "access.token_created": "Access token created",
   "access.token_revoked": "Access token revoked",
+  "access.token_used": "Access token used",
   "access.extension_linked": "Extension linked",
   "access.extension_unlinked": "Extension unlinked",
+  "security.access_denied": "Access denied",
+  "security.unauthorized_attempt": "Unauthorized attempt",
+  "security.permission_check_failed": "Permission check failed",
+  "security.token_validation_failed": "Token validation failed",
+  "security.rate_limit_exceeded": "Rate limit exceeded",
+  "security.suspicious_activity": "Suspicious activity",
 };
 
 const actionCategories = [
@@ -64,24 +77,75 @@ const actionCategories = [
   { value: "permission", label: "Permissions" },
   { value: "invitation", label: "Invitations" },
   { value: "access", label: "Access" },
+  { value: "security", label: "Security" },
 ];
 
+const severityColors: Record<string, string> = {
+  info: "text-blue-400",
+  warning: "text-amber-400",
+  error: "text-red-400",
+  critical: "text-red-500 font-bold",
+};
+
+const dateRangeMs: Record<string, number> = {
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  "90d": 90 * 24 * 60 * 60 * 1000,
+};
+
 export default function AuditPage() {
-  const [logs] = useState<AuditLog[]>(mockAuditLogs);
+  const { organization } = useAuthContext();
+  const activeOrganizationId = organization?.id as
+    | Id<"organizations">
+    | undefined;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [dateRange, setDateRange] = useState("7d");
+  const [dateRange, setDateRange] = useState("30d");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportRange, setExportRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
 
-  const filteredLogs = logs.filter((log) => {
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
+  // Fetch paginated logs from Convex (server-side pagination)
+  const logs = useOrganizationAuditLogs(activeOrganizationId, {
+    limit: PAGE_SIZE,
+    offset,
+  });
+  const totalCount = useOrganizationAuditLogCount(activeOrganizationId);
+
+  // Summary stats
+  const daysBack =
+    dateRange === "24h" ? 1 : parseInt(dateRange.replace("d", ""));
+  const summary = useAuditLogSummary(activeOrganizationId, daysBack);
+
+  // Export data - only fetched when exporting
+  const exportData = useAuditLogsForExport(
+    isExporting && exportRange ? activeOrganizationId : undefined,
+    exportRange?.start ?? 0,
+    exportRange?.end ?? 0,
+    "json",
+    true
+  );
+
+  const isLoading = logs === undefined || totalCount === undefined;
+  const totalPages =
+    totalCount !== undefined
+      ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+      : 1;
+
+  // Client-side filtering on the current page of server data
+  const filteredLogs = (logs ?? []).filter((log) => {
     const matchesSearch =
       searchQuery === "" ||
       log.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (log.projectName?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-        false) ||
-      (log.variableKey?.toLowerCase().includes(searchQuery.toLowerCase()) ??
-        false);
+      log.action.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory =
       selectedCategory === "all" ||
@@ -90,24 +154,164 @@ export default function AuditPage() {
     return matchesSearch && matchesCategory;
   });
 
+  const handleExportJSON = () => {
+    const now = Date.now();
+    setExportRange({
+      start: now - (dateRangeMs[dateRange] ?? dateRangeMs["30d"]),
+      end: now,
+    });
+    setIsExporting(true);
+  };
+
+  // Trigger download once export data is ready
+  if (isExporting && exportData) {
+    const blob = new Blob([JSON.stringify(exportData.data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setIsExporting(false);
+    setExportRange(null);
+  }
+
+  const handleExportCSV = () => {
+    if (!logs || logs.length === 0) return;
+
+    const allLogs = filteredLogs;
+    const headers = [
+      "Timestamp",
+      "Action",
+      "User",
+      "Email",
+      "Severity",
+      "IP Address",
+    ];
+    const rows = allLogs.map((log) => [
+      new Date(log.createdAt).toISOString(),
+      actionLabels[log.action] ?? log.action,
+      log.userName,
+      log.userEmail,
+      log.severity ?? "info",
+      log.ipAddress ?? "",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-zinc-100">Audit Logs</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Track all activity across your organization
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-zinc-100">Audit Logs</h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Track all activity across your organization
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <TerminalButton variant="secondary" onClick={handleExportCSV}>
+            <Download className="h-4 w-4" />
+            CSV
+          </TerminalButton>
+          <TerminalButton
+            variant="secondary"
+            onClick={handleExportJSON}
+            disabled={isExporting}
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? "Preparing..." : "JSON"}
+          </TerminalButton>
+        </div>
       </div>
+
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <TerminalCard>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10">
+                <Activity className="h-4 w-4 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">Total Events</p>
+                <p className="text-lg font-bold text-zinc-100">
+                  {summary.totalEvents.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </TerminalCard>
+          <TerminalCard>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">Security Events</p>
+                <p className="text-lg font-bold text-zinc-100">
+                  {summary.securityEventCount}
+                </p>
+              </div>
+            </div>
+          </TerminalCard>
+          <TerminalCard>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
+                <Lock className="h-4 w-4 text-red-400" />
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">Sensitive Access</p>
+                <p className="text-lg font-bold text-zinc-100">
+                  {summary.sensitiveAccessCount}
+                </p>
+              </div>
+            </div>
+          </TerminalCard>
+          <TerminalCard>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+                <Shield className="h-4 w-4 text-green-400" />
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500">Period</p>
+                <p className="text-lg font-bold text-zinc-100">
+                  {summary.periodDays}d
+                </p>
+              </div>
+            </div>
+          </TerminalCard>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <TerminalInput
             type="text"
             placeholder="Search by user, action, or resource..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
           />
         </div>
         <TerminalSelect
@@ -129,31 +333,44 @@ export default function AuditPage() {
           <option value="30d">Last 30 days</option>
           <option value="90d">Last 90 days</option>
         </TerminalSelect>
-        <TerminalButton variant="secondary">
-          <Download className="h-4 w-4" />
-          Export
-        </TerminalButton>
       </div>
 
       {/* Audit Logs */}
-      {filteredLogs.length === 0 ? (
+      {isLoading ? (
+        <TerminalLoading />
+      ) : filteredLogs.length === 0 ? (
         <TerminalWindow title="audit-log">
           <TerminalEmptyState
-            command={`envpilot audit --days ${dateRange === "24h" ? "1" : dateRange.replace("d", "")}`}
+            command={`envpilot audit --days ${daysBack}`}
             message={
-              logs.length > 0
-                ? "No matching events. Try adjusting your search or filters."
+              totalCount && totalCount > 0
+                ? "No matching events on this page. Try adjusting your search or filters."
                 : "No audit events yet. Activity will be recorded as you use Envpilot."
             }
           />
         </TerminalWindow>
       ) : (
         <TerminalWindow title="audit-log">
-          <div className="divide-y divide-zinc-800/50">
+          <AnimatedList
+            className="divide-y divide-zinc-800/50"
+            pageKey={currentPage}
+          >
             {filteredLogs.map((log) => (
-              <AuditLogRow key={log.id} log={log} />
+              <AuditLogRow key={log._id} log={log} />
             ))}
-          </div>
+          </AnimatedList>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            hasNextPage={currentPage < totalPages}
+            hasPrevPage={currentPage > 1}
+            onNextPage={() => goToPage(currentPage + 1)}
+            onPrevPage={() => goToPage(currentPage - 1)}
+            onGoToPage={goToPage}
+            startIndex={offset + 1}
+            endIndex={Math.min(offset + PAGE_SIZE, totalCount ?? 0)}
+            totalItems={totalCount ?? 0}
+          />
         </TerminalWindow>
       )}
 
@@ -179,35 +396,58 @@ export default function AuditPage() {
   );
 }
 
-function AuditLogRow({ log }: { log: AuditLog }) {
+interface AuditLogData {
+  _id: string;
+  action: string;
+  userName: string;
+  userEmail: string;
+  severity?: string;
+  ipAddress?: string;
+  projectId?: string;
+  variableId?: string;
+  resourceType?: string;
+  createdAt: number;
+  parsedDetails?: Record<string, unknown> | null;
+}
+
+function AuditLogRow({ log }: { log: AuditLogData }) {
   const actionLabel = actionLabels[log.action] || log.action;
   const time = new Date(log.createdAt).toLocaleString();
+  const severityClass =
+    severityColors[log.severity ?? "info"] ?? "text-zinc-500";
+
+  // Extract useful details from parsed JSON
+  const details = log.parsedDetails;
+  const detailText = details
+    ? (details.variableKey as string) ||
+      (details.projectName as string) ||
+      (details.description as string) ||
+      null
+    : null;
 
   return (
-    <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs">
-      <span className="text-zinc-600 whitespace-nowrap">[{time}]</span>
+    <div className="flex items-start gap-3 px-5 py-3 font-mono text-xs transition-colors hover:bg-green-500/5">
+      <span className="shrink-0 whitespace-nowrap text-zinc-600">[{time}]</span>
       <div className="min-w-0 flex-1">
         <p className="text-zinc-300">
           <span className="text-green-400">{log.userName}</span>{" "}
-          <span className="text-zinc-500">{actionLabel}</span>
-          {log.projectName && (
-            <>
-              {" "}
-              in <span className="text-amber-400">{log.projectName}</span>
-            </>
-          )}
-          {log.variableKey && (
+          <span className={severityClass}>{actionLabel}</span>
+          {detailText && (
             <>
               {" "}
               <code className="rounded bg-zinc-800 px-1 text-amber-400">
-                {log.variableKey}
+                {detailText}
               </code>
             </>
           )}
         </p>
-        {log.ipAddress && (
-          <p className="mt-0.5 text-zinc-600">{log.ipAddress}</p>
-        )}
+        <div className="mt-0.5 flex items-center gap-3 text-zinc-600">
+          <span>{log.userEmail}</span>
+          {log.ipAddress && <span>{log.ipAddress}</span>}
+          {log.severity && log.severity !== "info" && (
+            <span className={severityClass}>{log.severity}</span>
+          )}
+        </div>
       </div>
     </div>
   );

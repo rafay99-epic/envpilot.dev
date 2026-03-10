@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useVariables, useProjects, useConvexUser } from "@/hooks";
+import {
+  useVariables,
+  useProjects,
+  useConvexUser,
+  usePagination,
+} from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -15,7 +20,39 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
-import { Plus, Search, Lock, Eye, EyeOff, Copy, Pencil } from "lucide-react";
+import { Pagination } from "@/components/dashboard/pagination";
+import { staggeredRow } from "@/components/dashboard/animated-list";
+import {
+  VariableEditModal,
+  type VariableFormData,
+} from "@/components/variables";
+import { ConfirmDialog } from "@/components/ui";
+import { motion } from "framer-motion";
+import {
+  Plus,
+  Search,
+  Lock,
+  Eye,
+  EyeOff,
+  Copy,
+  Pencil,
+  Trash2,
+  Check,
+  Loader2,
+} from "lucide-react";
+
+interface Variable {
+  _id: Id<"environmentVariables">;
+  key: string;
+  description?: string;
+  environments: string[];
+  isSensitive: boolean;
+  updatedAt: number;
+  projectId: Id<"projects">;
+  projectName?: string;
+  vaultRef?: string;
+  version: number;
+}
 
 export default function VariablesPage() {
   const { hasPermission, organization, user } = useAuthContext();
@@ -26,16 +63,32 @@ export default function VariablesPage() {
   const { variables, isLoading } = useVariables(activeOrganizationId);
   const { projects } = useProjects(activeOrganizationId, convexUserId);
   const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE);
+  const canUpdateVariable = hasPermission(PERMISSIONS.VARIABLE_UPDATE);
+  const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
 
+  // Modal states
+  const [editingVariable, setEditingVariable] = useState<Variable | null>(null);
+  const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
+    null
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Reveal value state
+  const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
+    {}
+  );
+  const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
+
   const environments = Array.from(
-    new Set(variables.flatMap((v) => v.environments))
+    new Set((variables as Variable[]).flatMap((v) => v.environments))
   ).sort();
 
-  const filteredVariables = variables.filter((variable) => {
+  const filteredVariables = (variables as Variable[]).filter((variable) => {
     const matchesSearch =
       searchQuery === "" ||
       variable.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -53,6 +106,101 @@ export default function VariablesPage() {
 
     return matchesSearch && matchesProject && matchesEnvironment;
   });
+
+  const pagination = usePagination(filteredVariables, { pageSize: 15 });
+
+  const handleRevealValue = async (variable: Variable) => {
+    if (revealedValues[variable._id]) return;
+    if (!variable.vaultRef || !organization?.id) return;
+
+    setRevealingIds((prev) => new Set(prev).add(variable._id));
+    try {
+      const res = await fetch(
+        `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to read secret");
+      setRevealedValues((prev) => ({
+        ...prev,
+        [variable._id]: data.data.value,
+      }));
+    } catch {
+      setError("Failed to reveal variable value.");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setRevealingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variable._id);
+        return next;
+      });
+    }
+  };
+
+  const handleUpdateVariable = async (
+    variableId: Id<"environmentVariables">,
+    data: VariableFormData
+  ) => {
+    setNotice(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/variables/${variableId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          value: data.value || undefined,
+          description: data.description || undefined,
+          environments: data.environments,
+          isSensitive: data.isSensitive,
+          changeReason: "Updated via dashboard",
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update variable");
+      }
+
+      setNotice("Variable updated successfully.");
+      setTimeout(() => setNotice(null), 3000);
+      // Clear cached revealed value since it may have changed
+      setRevealedValues((prev) => {
+        const next = { ...prev };
+        delete next[variableId];
+        return next;
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update variable";
+      setError(message);
+      throw err;
+    }
+  };
+
+  const handleDeleteVariable = async () => {
+    if (!deletingVariable) return;
+
+    setNotice(null);
+    setError(null);
+    try {
+      const response = await fetch(`/api/variables/${deletingVariable._id}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete variable");
+      }
+
+      setDeletingVariable(null);
+      setNotice("Variable deleted successfully.");
+      setTimeout(() => setNotice(null), 3000);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete variable";
+      setError(message);
+    }
+  };
 
   if (!organization) {
     return (
@@ -89,6 +237,18 @@ export default function VariablesPage() {
           </TerminalButton>
         )}
       </div>
+
+      {/* Notices */}
+      {notice && (
+        <div className="rounded-lg border border-green-700/50 bg-green-900/20 px-4 py-3">
+          <p className="text-sm text-green-400">{notice}</p>
+        </div>
+      )}
+      {error && (
+        <div className="rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3">
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -166,85 +326,197 @@ export default function VariablesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {filteredVariables.map((variable) => (
-                  <VariableRow key={variable._id} variable={variable} />
+                {pagination.pageItems.map((variable, i) => (
+                  <VariableRow
+                    key={variable._id}
+                    variable={variable}
+                    index={i}
+                    revealedValue={revealedValues[variable._id] ?? null}
+                    isRevealing={revealingIds.has(variable._id)}
+                    onReveal={() => handleRevealValue(variable)}
+                    onEdit={
+                      canUpdateVariable
+                        ? () => setEditingVariable(variable)
+                        : undefined
+                    }
+                    onDelete={
+                      canDeleteVariable
+                        ? () => setDeletingVariable(variable)
+                        : undefined
+                    }
+                  />
                 ))}
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            hasPrevPage={pagination.hasPrevPage}
+            onNextPage={pagination.nextPage}
+            onPrevPage={pagination.prevPage}
+            onGoToPage={pagination.goToPage}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            totalItems={pagination.totalItems}
+          />
         </TerminalWindow>
       )}
+
+      {/* Edit Modal */}
+      <VariableEditModal
+        isOpen={!!editingVariable}
+        onClose={() => setEditingVariable(null)}
+        variable={editingVariable}
+        onSave={handleUpdateVariable}
+      />
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={!!deletingVariable}
+        onClose={() => setDeletingVariable(null)}
+        onConfirm={handleDeleteVariable}
+        title="Delete Variable"
+        message={`Are you sure you want to delete "${deletingVariable?.key}"? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }
 
-interface Variable {
-  _id: string;
-  key: string;
-  description?: string;
-  environments: string[];
-  isSensitive: boolean;
-  updatedAt: number;
-  projectId: string;
-}
+function VariableRow({
+  variable,
+  index = 0,
+  revealedValue,
+  isRevealing,
+  onReveal,
+  onEdit,
+  onDelete,
+}: {
+  variable: Variable;
+  index?: number;
+  revealedValue: string | null;
+  isRevealing: boolean;
+  onReveal: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  const [isValueVisible, setIsValueVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-function VariableRow({ variable }: { variable: Variable }) {
-  const [isRevealed, setIsRevealed] = useState(false);
+  const handleToggleReveal = () => {
+    if (!revealedValue && !isRevealing) {
+      onReveal();
+      setIsValueVisible(true);
+    } else {
+      setIsValueVisible(!isValueVisible);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!revealedValue) return;
+    try {
+      await navigator.clipboard.writeText(revealedValue);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+    }
+  };
 
   return (
-    <tr className="transition-colors hover:bg-green-500/5">
-      <td className="whitespace-nowrap px-5 py-3">
-        <div className="flex items-center gap-2">
-          {variable.isSensitive && (
-            <Lock className="h-3.5 w-3.5 text-amber-500" />
-          )}
-          <code className="font-mono text-sm text-amber-400">
-            {variable.key}
-          </code>
-        </div>
-        {variable.description && (
-          <p className="mt-0.5 text-xs text-zinc-600">{variable.description}</p>
-        )}
-      </td>
-      <td className="whitespace-nowrap px-5 py-3">
-        <div className="flex flex-wrap gap-1">
-          {variable.environments.map((env) => (
-            <TerminalBadge key={env} color="green">
-              {env}
-            </TerminalBadge>
-          ))}
-        </div>
-      </td>
-      <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">
-        {new Date(variable.updatedAt).toLocaleDateString()}
-      </td>
-      <td className="whitespace-nowrap px-5 py-3 text-right">
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => setIsRevealed(!isRevealed)}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
-            title={isRevealed ? "Hide value" : "Reveal value"}
-          >
-            {isRevealed ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
+    <>
+      <motion.tr
+        className="transition-colors hover:bg-green-500/5"
+        {...staggeredRow(index)}
+      >
+        <td className="whitespace-nowrap px-5 py-3">
+          <div className="flex items-center gap-2">
+            {variable.isSensitive && (
+              <Lock className="h-3.5 w-3.5 text-amber-500" />
             )}
-          </button>
-          <button
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
-            title="Copy value"
-          >
-            <Copy className="h-4 w-4" />
-          </button>
-          <button
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
-            title="Edit variable"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        </div>
-      </td>
-    </tr>
+            <code className="font-mono text-sm text-amber-400">
+              {variable.key}
+            </code>
+          </div>
+          {variable.description && (
+            <p className="mt-0.5 text-xs text-zinc-600">
+              {variable.description}
+            </p>
+          )}
+          {isValueVisible && revealedValue && (
+            <div className="mt-1 rounded bg-zinc-800 px-2 py-1">
+              <code className="break-all font-mono text-xs text-green-400">
+                {revealedValue}
+              </code>
+            </div>
+          )}
+        </td>
+        <td className="whitespace-nowrap px-5 py-3">
+          <div className="flex flex-wrap gap-1">
+            {variable.environments.map((env) => (
+              <TerminalBadge key={env} color="green">
+                {env}
+              </TerminalBadge>
+            ))}
+          </div>
+        </td>
+        <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">
+          {new Date(variable.updatedAt).toLocaleDateString()}
+        </td>
+        <td className="whitespace-nowrap px-5 py-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={handleToggleReveal}
+              disabled={isRevealing}
+              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
+              title={
+                isValueVisible && revealedValue ? "Hide value" : "Reveal value"
+              }
+            >
+              {isRevealing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isValueVisible && revealedValue ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={handleCopy}
+              disabled={!revealedValue}
+              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-30"
+              title={copied ? "Copied!" : "Copy value"}
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                title="Edit variable"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                title="Delete variable"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </td>
+      </motion.tr>
+    </>
   );
 }

@@ -18,6 +18,7 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
+import { AnimatedList } from "@/components/dashboard/animated-list";
 import { Plus, ChevronRight, Check } from "lucide-react";
 
 export default function DashboardPage() {
@@ -184,11 +185,11 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              <div className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-zinc-800/50">
                 {projects.map((project: RecentProject) => (
                   <ProjectRow key={project._id} project={project} />
                 ))}
-              </div>
+              </AnimatedList>
             )}
           </TerminalWindow>
 
@@ -213,16 +214,16 @@ export default function DashboardPage() {
                 message="No recent activity. Start by creating a project!"
               />
             ) : (
-              <div className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-zinc-800/50">
                 {activity.slice(0, 5).map((item: ActivityItem) => (
                   <ActivityRow key={item._id} activity={item} />
                 ))}
-              </div>
+              </AnimatedList>
             )}
           </TerminalWindow>
         </div>
 
-        {/* Right Column — Team */}
+        {/* Right Column -- Team */}
         <div className="space-y-6">
           <TerminalWindow title="team-members">
             <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
@@ -252,7 +253,7 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              <div className="divide-y divide-zinc-800/50">
+              <AnimatedList className="divide-y divide-zinc-800/50">
                 {members
                   .filter(
                     (member): member is NonNullable<typeof member> =>
@@ -261,7 +262,7 @@ export default function DashboardPage() {
                   .map((member) => (
                     <TeamMemberRow key={String(member._id)} member={member} />
                   ))}
-              </div>
+              </AnimatedList>
             )}
           </TerminalWindow>
         </div>

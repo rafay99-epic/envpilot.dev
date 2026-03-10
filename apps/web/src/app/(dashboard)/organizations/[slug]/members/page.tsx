@@ -4,6 +4,9 @@ import { useState, useEffect, use, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ConfirmDialog, ProjectIcon } from "@/components/ui";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedList } from "@/components/dashboard/animated-list";
+import { usePagination } from "@/hooks";
 
 interface Member {
   _id: string;
@@ -432,6 +435,9 @@ export default function OrganizationMembersPage({
     }
   }
 
+  const membersPagination = usePagination(members, { pageSize: 10 });
+  const invitationsPagination = usePagination(invitations, { pageSize: 10 });
+
   const canInvite =
     organization?.role === "admin" || organization?.role === "team_lead";
   const isAdmin = organization?.role === "admin";
@@ -536,9 +542,12 @@ export default function OrganizationMembersPage({
             Members ({members.length})
           </h2>
         </div>
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {members.map((member) => (
-            <li key={member._id}>
+        <AnimatedList
+          className="divide-y divide-zinc-200 dark:divide-zinc-800"
+          pageKey={membersPagination.currentPage}
+        >
+          {membersPagination.pageItems.map((member) => (
+            <div key={member._id}>
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex items-center gap-4">
                   {member.user.avatarUrl ? (
@@ -827,9 +836,21 @@ export default function OrganizationMembersPage({
                   ) : null}
                 </div>
               )}
-            </li>
+            </div>
           ))}
-        </ul>
+        </AnimatedList>
+        <Pagination
+          currentPage={membersPagination.currentPage}
+          totalPages={membersPagination.totalPages}
+          hasNextPage={membersPagination.hasNextPage}
+          hasPrevPage={membersPagination.hasPrevPage}
+          onNextPage={membersPagination.nextPage}
+          onPrevPage={membersPagination.prevPage}
+          onGoToPage={membersPagination.goToPage}
+          startIndex={membersPagination.startIndex}
+          endIndex={membersPagination.endIndex}
+          totalItems={membersPagination.totalItems}
+        />
       </div>
 
       {/* Pending Invitations */}
@@ -840,9 +861,12 @@ export default function OrganizationMembersPage({
               Pending Invitations ({invitations.length})
             </h2>
           </div>
-          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {invitations.map((invitation) => (
-              <li
+          <AnimatedList
+            className="divide-y divide-zinc-200 dark:divide-zinc-800"
+            pageKey={invitationsPagination.currentPage}
+          >
+            {invitationsPagination.pageItems.map((invitation) => (
+              <div
                 key={invitation._id}
                 className="flex items-center justify-between px-6 py-4"
               >
@@ -932,9 +956,21 @@ export default function OrganizationMembersPage({
                     </>
                   )}
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </AnimatedList>
+          <Pagination
+            currentPage={invitationsPagination.currentPage}
+            totalPages={invitationsPagination.totalPages}
+            hasNextPage={invitationsPagination.hasNextPage}
+            hasPrevPage={invitationsPagination.hasPrevPage}
+            onNextPage={invitationsPagination.nextPage}
+            onPrevPage={invitationsPagination.prevPage}
+            onGoToPage={invitationsPagination.goToPage}
+            startIndex={invitationsPagination.startIndex}
+            endIndex={invitationsPagination.endIndex}
+            totalItems={invitationsPagination.totalItems}
+          />
         </div>
       )}
 

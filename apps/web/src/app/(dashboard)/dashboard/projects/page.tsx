@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useProjects, useConvexUser } from "@/hooks";
+import { useProjects, useConvexUser, usePagination } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
-  TerminalCard,
   TerminalButtonLink,
   TerminalLoading,
   TerminalEmptyState,
-  TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedGrid } from "@/components/dashboard/animated-list";
 import { Plus, Clock, ChevronRight } from "lucide-react";
 
 export default function ProjectsPage() {
@@ -26,6 +26,7 @@ export default function ProjectsPage() {
     convexUserId
   );
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const pagination = usePagination(projects, { pageSize: 9 });
 
   if (!organization) {
     return (
@@ -77,11 +78,28 @@ export default function ProjectsPage() {
           />
         </TerminalWindow>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <ProjectCard key={project._id} project={project} />
-          ))}
-        </div>
+        <>
+          <AnimatedGrid
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            pageKey={pagination.currentPage}
+          >
+            {pagination.pageItems.map((project) => (
+              <ProjectCard key={project._id} project={project} />
+            ))}
+          </AnimatedGrid>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            hasPrevPage={pagination.hasPrevPage}
+            onNextPage={pagination.nextPage}
+            onPrevPage={pagination.prevPage}
+            onGoToPage={pagination.goToPage}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            totalItems={pagination.totalItems}
+          />
+        </>
       )}
     </div>
   );

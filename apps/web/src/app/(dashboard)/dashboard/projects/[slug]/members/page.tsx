@@ -4,6 +4,9 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedList } from "@/components/dashboard/animated-list";
+import { usePagination } from "@/hooks";
 
 interface ProjectMember {
   _id: string;
@@ -203,6 +206,8 @@ export default function ProjectMembersPage({
     }
   }
 
+  const membersPagination = usePagination(members, { pageSize: 10 });
+
   if (isLoading) {
     return <TerminalLoading />;
   }
@@ -315,69 +320,86 @@ export default function ProjectMembersPage({
             No members assigned to this project yet.
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {members.map((member) => (
-              <div
-                key={member._id}
-                className="flex items-center justify-between px-6 py-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
-                    {member.user.name
-                      ? member.user.name.charAt(0).toUpperCase()
-                      : member.user.email.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {member.user.name || member.user.email}
-                    </p>
-                    {member.user.name && (
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {member.user.email}
+          <>
+            <AnimatedList
+              className="divide-y divide-zinc-100 dark:divide-zinc-800"
+              pageKey={membersPagination.currentPage}
+            >
+              {membersPagination.pageItems.map((member) => (
+                <div
+                  key={member._id}
+                  className="flex items-center justify-between px-6 py-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
+                      {member.user.name
+                        ? member.user.name.charAt(0).toUpperCase()
+                        : member.user.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {member.user.name || member.user.email}
                       </p>
-                    )}
+                      {member.user.name && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {member.user.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        handleUpdateRole(
+                          member.userId,
+                          e.target.value as "viewer" | "developer" | "manager"
+                        )
+                      }
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="developer">Developer</option>
+                      <option value="manager">Manager</option>
+                    </select>
+
+                    <button
+                      onClick={() => handleRemoveMember(member.userId)}
+                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      title="Remove from project"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <select
-                    value={member.role}
-                    onChange={(e) =>
-                      handleUpdateRole(
-                        member.userId,
-                        e.target.value as "viewer" | "developer" | "manager"
-                      )
-                    }
-                    className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  >
-                    <option value="viewer">Viewer</option>
-                    <option value="developer">Developer</option>
-                    <option value="manager">Manager</option>
-                  </select>
-
-                  <button
-                    onClick={() => handleRemoveMember(member.userId)}
-                    className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                    title="Remove from project"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </AnimatedList>
+            <Pagination
+              currentPage={membersPagination.currentPage}
+              totalPages={membersPagination.totalPages}
+              hasNextPage={membersPagination.hasNextPage}
+              hasPrevPage={membersPagination.hasPrevPage}
+              onNextPage={membersPagination.nextPage}
+              onPrevPage={membersPagination.prevPage}
+              onGoToPage={membersPagination.goToPage}
+              startIndex={membersPagination.startIndex}
+              endIndex={membersPagination.endIndex}
+              totalItems={membersPagination.totalItems}
+            />
+          </>
         )}
       </div>
 

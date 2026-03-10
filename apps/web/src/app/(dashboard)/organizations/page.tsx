@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedGrid } from "@/components/dashboard/animated-list";
+import { usePagination } from "@/hooks";
 
 interface Organization {
   _id: string;
@@ -19,6 +22,7 @@ export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagination = usePagination(organizations, { pageSize: 9 });
 
   useEffect(() => {
     async function fetchOrganizations() {
@@ -130,79 +134,96 @@ export default function OrganizationsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {organizations.map((org) => (
-            <Link
-              key={org._id}
-              href={`/organizations/${org.slug}`}
-              className="group rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-            >
-              <div className="flex items-start gap-4">
-                {org.logoUrl ? (
-                  <img
-                    src={org.logoUrl}
-                    alt={org.name}
-                    className="h-12 w-12 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                    <span className="text-lg font-semibold text-zinc-600 dark:text-zinc-400">
-                      {org.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
-                      {org.name}
-                    </h3>
-                    {org.tier === "pro" && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        Pro
+        <>
+          <AnimatedGrid
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            pageKey={pagination.currentPage}
+          >
+            {pagination.pageItems.map((org) => (
+              <Link
+                key={org._id}
+                href={`/organizations/${org.slug}`}
+                className="group rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+              >
+                <div className="flex items-start gap-4">
+                  {org.logoUrl ? (
+                    <img
+                      src={org.logoUrl}
+                      alt={org.name}
+                      className="h-12 w-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                      <span className="text-lg font-semibold text-zinc-600 dark:text-zinc-400">
+                        {org.name.charAt(0).toUpperCase()}
                       </span>
-                    )}
+                    </div>
+                  )}
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
+                        {org.name}
+                      </h3>
+                      {org.tier === "pro" && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          Pro
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
+                      {org.slug}
+                    </p>
                   </div>
-                  <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-                    {org.slug}
-                  </p>
                 </div>
-              </div>
-              {org.description && (
-                <p className="mt-3 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  {org.description}
-                </p>
-              )}
-              <div className="mt-4 flex items-center justify-between">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    org.role === "admin"
-                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                      : org.role === "team_lead"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-                  }`}
-                >
-                  {org.role === "team_lead"
-                    ? "Team Lead"
-                    : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
-                </span>
-                <svg
-                  className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </div>
-            </Link>
-          ))}
-        </div>
+                {org.description && (
+                  <p className="mt-3 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    {org.description}
+                  </p>
+                )}
+                <div className="mt-4 flex items-center justify-between">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      org.role === "admin"
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        : org.role === "team_lead"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {org.role === "team_lead"
+                      ? "Team Lead"
+                      : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
+                  </span>
+                  <svg
+                    className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </Link>
+            ))}
+          </AnimatedGrid>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            hasPrevPage={pagination.hasPrevPage}
+            onNextPage={pagination.nextPage}
+            onPrevPage={pagination.prevPage}
+            onGoToPage={pagination.goToPage}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            totalItems={pagination.totalItems}
+          />
+        </>
       )}
     </div>
   );
