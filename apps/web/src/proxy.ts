@@ -16,6 +16,8 @@ export default authkitMiddleware({
       "/callback",
       "/changelog",
       "/wishlist",
+      "/privacy",
+      "/terms",
       "/api/health",
       "/api/config",
       "/api/webhooks/stripe",
