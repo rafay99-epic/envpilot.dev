@@ -1,7 +1,7 @@
 {
   "name": "@envpilot/cli",
-  "version": "0.1.1",
-  "description": "CLI tool for Envpilot environment variable management",
+  "version": "1.0.0",
+  "description": "Envpilot CLI — sync and manage environment variables from the terminal",
   "type": "module",
   "bin": {
     "envpilot": "./dist/index.js"
@@ -51,11 +51,14 @@
     "dotenv",
     "secrets"
   ],
-  "author": "",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
     "url": "https://github.com/rafay99-epic/envpilot.dev"
   },
-  "homepage": "https://www.envpilot.dev"
+  "homepage": "https://www.envpilot.dev",
+  "bugs": {
+    "url": "https://github.com/rafay99-epic/envpilot.dev/issues"
+  }
 }

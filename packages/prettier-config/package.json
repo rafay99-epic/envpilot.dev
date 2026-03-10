@@ -1,6 +1,7 @@
 {
   "name": "@envpilot/prettier-config",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Shared Prettier config for Envpilot monorepo",
   "private": true,
   "license": "MIT",
   "main": "index.json",

@@ -63,15 +63,15 @@ export function OrganizationSwitcher({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function handleSelectOrganization(orgId: string) {
+  function handleSelectOrganization(org: Organization) {
     setIsOpen(false);
-    setActiveOrganizationCookie(orgId);
+    setActiveOrganizationCookie(org._id);
     if (onOrganizationChange) {
-      onOrganizationChange(orgId);
+      onOrganizationChange(org._id);
     }
 
     if (pathname.startsWith("/organizations")) {
-      router.push(`/organizations/${orgId}`);
+      router.push(`/organizations/${org.slug}`);
     } else {
       router.push("/dashboard");
     }
@@ -172,7 +172,7 @@ export function OrganizationSwitcher({
             {organizations.map((org) => (
               <button
                 key={org._id}
-                onClick={() => handleSelectOrganization(org._id)}
+                onClick={() => handleSelectOrganization(org)}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
                   org._id === currentOrg?._id
                     ? "bg-zinc-50 dark:bg-zinc-700/50"

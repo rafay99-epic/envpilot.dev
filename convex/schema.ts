@@ -782,4 +782,62 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_acknowledged", ["acknowledged"])
     .index("by_expires_at", ["expiresAt"]),
+
+  // ==========================================
+  // SUPPORT TICKETS
+  // ==========================================
+  supportTickets: defineTable({
+    // Submitter information
+    name: v.string(),
+    email: v.string(),
+    // Support category
+    category: v.union(
+      v.literal("bug"),
+      v.literal("account"),
+      v.literal("billing"),
+      v.literal("cli"),
+      v.literal("extension"),
+      v.literal("other")
+    ),
+    // Ticket subject
+    subject: v.string(),
+    // Detailed description of the issue
+    message: v.string(),
+    // Ticket priority
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    // Ticket status
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"),
+      v.literal("resolved"),
+      v.literal("closed")
+    ),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_created_at", ["createdAt"]),
+
+  // ==========================================
+  // CONTACT MESSAGES
+  // ==========================================
+  contactMessages: defineTable({
+    // Sender information
+    name: v.string(),
+    email: v.string(),
+    // Message subject
+    subject: v.string(),
+    // Message body
+    message: v.string(),
+    // Whether the message has been read
+    isRead: v.boolean(),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_is_read", ["isRead"])
+    .index("by_created_at", ["createdAt"]),
 });

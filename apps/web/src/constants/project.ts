@@ -3,18 +3,18 @@
  */
 
 export const PROJECT_ICONS = [
-  "📁",
-  "🚀",
-  "💻",
-  "🌐",
-  "📱",
-  "🔧",
-  "📦",
-  "🎨",
-  "⚡",
-  "🔐",
-  "📊",
-  "🛠️",
+  "folder",
+  "globe",
+  "smartphone",
+  "server",
+  "terminal",
+  "database",
+  "cloud",
+  "package",
+  "zap",
+  "lock",
+  "bar-chart-2",
+  "rocket",
 ] as const;
 
 export const PROJECT_COLORS = [
@@ -32,8 +32,27 @@ export const PROJECT_COLORS = [
   "#f5f3ff",
 ] as const;
 
-export const DEFAULT_PROJECT_ICON = "📁";
+export const DEFAULT_PROJECT_ICON = "folder";
 export const DEFAULT_PROJECT_COLOR = "#f4f4f5";
+
+/**
+ * Maps legacy emoji icons to their Lucide replacements.
+ * Used for backward compatibility with existing projects in the database.
+ */
+export const LEGACY_ICON_MAP: Record<string, ProjectIcon> = {
+  "📁": "folder",
+  "🚀": "rocket",
+  "💻": "terminal",
+  "🌐": "globe",
+  "📱": "smartphone",
+  "🔧": "server",
+  "📦": "package",
+  "🎨": "cloud",
+  "⚡": "zap",
+  "🔐": "lock",
+  "📊": "bar-chart-2",
+  "🛠️": "database",
+};
 
 export const ENVIRONMENTS = ["development", "staging", "production"] as const;
 

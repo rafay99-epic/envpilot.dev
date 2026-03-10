@@ -4,16 +4,17 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
 export default function TeamPage() {
   const router = useRouter();
   const { organization } = useAuthContext();
 
   useEffect(() => {
-    if (organization?.id) {
-      router.replace(`/organizations/${organization.id}/members`);
+    if (organization?.slug) {
+      router.replace(`/organizations/${organization.slug}/members`);
     }
-  }, [organization?.id, router]);
+  }, [organization?.slug, router]);
 
   if (!organization) {
     return (
@@ -34,9 +35,5 @@ export default function TeamPage() {
     );
   }
 
-  return (
-    <div className="flex items-center justify-center py-12">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
-    </div>
-  );
+  return <TerminalLoading />;
 }

@@ -18,6 +18,8 @@ export default authkitMiddleware({
       "/wishlist",
       "/privacy",
       "/terms",
+      "/support",
+      "/contact",
       "/api/health",
       "/api/config",
       "/api/webhooks/stripe",

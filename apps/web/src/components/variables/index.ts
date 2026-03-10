@@ -1,5 +1,5 @@
 export { VariableForm, type VariableFormData } from "./variable-form";
-export { VariableCreateModal } from "./variable-create-modal";
+export { VariableCreateDrawer } from "./variable-create-drawer";
 export { VariableEditModal } from "./variable-edit-modal";
 export { VariableHistory } from "./variable-history";
 export { VariableListItem } from "./variable-list-item";

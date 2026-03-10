@@ -233,6 +233,12 @@ export default function ChangelogPage() {
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
               </Link>
+              <Link href="/support" className="hover:text-zinc-400">
+                Support
+              </Link>
+              <Link href="/contact" className="hover:text-zinc-400">
+                Contact
+              </Link>
             </div>
             <p className="text-xs text-zinc-700">
               &copy; {new Date().getFullYear()} Envpilot

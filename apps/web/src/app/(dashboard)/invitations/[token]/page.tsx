@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
 interface InvitationDetails {
   email: string;
@@ -87,7 +88,7 @@ export default function InvitationAcceptPage({
 
       // Redirect to the organization after a brief delay
       setTimeout(() => {
-        router.push(`/organizations/${data.organization._id}`);
+        router.push(`/organizations/${data.organization.slug}`);
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -117,16 +118,7 @@ export default function InvitationAcceptPage({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
-          <p className="mt-4 text-zinc-600 dark:text-zinc-400">
-            Loading invitation...
-          </p>
-        </div>
-      </div>
-    );
+    return <TerminalLoading />;
   }
 
   if (status === "expired") {
