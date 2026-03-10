@@ -66,12 +66,11 @@ export const listWithStats = query({
 
     // If userId provided, filter by project membership for non-admins
     if (args.userId) {
+      const userId = args.userId;
       const membership = await ctx.db
         .query("organizationMembers")
         .withIndex("by_org_and_user", (q) =>
-          q
-            .eq("organizationId", args.organizationId)
-            .eq("userId", args.userId)
+          q.eq("organizationId", args.organizationId).eq("userId", userId)
         )
         .first();
 
@@ -79,7 +78,7 @@ export const listWithStats = query({
         // Get user's project memberships
         const projectMemberships = await ctx.db
           .query("projectMembers")
-          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect();
 
         const assignedProjectIds = new Set(
@@ -159,12 +158,9 @@ export const listForUser = query({
           })
         );
 
-        return projectsInOrg.filter(Boolean) as Array<
-          Awaited<ReturnType<typeof ctx.db.get>> & {
-            userRole: string;
-            projectRole: string | null;
-          }
-        >;
+        return projectsInOrg.filter(
+          (p): p is NonNullable<typeof p> => p !== null
+        );
       })
     );
 
@@ -199,9 +195,7 @@ export const create = mutation({
     const creatorMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("userId", args.createdBy)
+        q.eq("organizationId", args.organizationId).eq("userId", args.createdBy)
       )
       .first();
 

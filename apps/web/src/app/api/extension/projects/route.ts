@@ -63,15 +63,25 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       data: {
-        projects: userProjects.map((project) => ({
-          _id: project._id,
-          name: project.name,
-          slug: project.slug,
-          description: project.description || null,
-          organizationId: project.organizationId,
-          icon: project.icon || null,
-          color: project.color || null,
-        })),
+        projects: userProjects.map(
+          (project: {
+            _id: string;
+            name: string;
+            slug: string;
+            description?: string;
+            organizationId: string;
+            icon?: string;
+            color?: string;
+          }) => ({
+            _id: project._id,
+            name: project.name,
+            slug: project.slug,
+            description: project.description || null,
+            organizationId: project.organizationId,
+            icon: project.icon || null,
+            color: project.color || null,
+          })
+        ),
       },
     });
   } catch (error) {
