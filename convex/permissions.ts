@@ -95,7 +95,8 @@ async function checkCanManagePermissions(
 
   return {
     canManage: false,
-    reason: "Only admins, team leads, and project managers can manage variable permissions",
+    reason:
+      "Only admins, team leads, and project managers can manage variable permissions",
   };
 }
 
@@ -320,9 +321,7 @@ export const getAssignableMembers = query({
       const requesterProjectMembership = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>
-          q
-            .eq("projectId", project._id)
-            .eq("userId", args.requestingUserId)
+          q.eq("projectId", project._id).eq("userId", args.requestingUserId)
         )
         .first();
 

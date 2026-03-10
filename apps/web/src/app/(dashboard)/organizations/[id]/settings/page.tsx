@@ -344,9 +344,7 @@ export default function OrganizationSettingsPage({
                   );
                   if (!response.ok) {
                     const data = await response.json();
-                    throw new Error(
-                      data.error || "Failed to update settings"
-                    );
+                    throw new Error(data.error || "Failed to update settings");
                   }
                   setSuccessMessage("Access control settings updated");
                 } catch (err) {
@@ -367,9 +365,7 @@ export default function OrganizationSettingsPage({
             >
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out dark:bg-zinc-900 ${
-                  teamLeadsCanCreateProjects
-                    ? "translate-x-5"
-                    : "translate-x-0"
+                  teamLeadsCanCreateProjects ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>

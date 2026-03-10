@@ -21,7 +21,10 @@ export default function ProjectsPage() {
     | Id<"organizations">
     | undefined;
   const { convexUserId } = useConvexUser(user?.id);
-  const { projects, isLoading } = useProjects(activeOrganizationId, convexUserId);
+  const { projects, isLoading } = useProjects(
+    activeOrganizationId,
+    convexUserId
+  );
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
 
   if (!organization) {

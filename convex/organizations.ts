@@ -599,9 +599,7 @@ export const updateSettings = mutation({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("userId", args.updatedBy)
+        q.eq("organizationId", args.organizationId).eq("userId", args.updatedBy)
       )
       .first();
 

@@ -142,7 +142,9 @@ If you didn't expect this invitation, you can safely ignore this email.
     const resend = getResendClient();
 
     if (!resend) {
-      console.error("[EMAIL] RESEND_API_KEY not configured - cannot send email");
+      console.error(
+        "[EMAIL] RESEND_API_KEY not configured - cannot send email"
+      );
       return { success: false, error: "RESEND_API_KEY not configured" };
     }
 
@@ -161,7 +163,10 @@ If you didn't expect this invitation, you can safely ignore this email.
     });
 
     if (error) {
-      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
+      console.error(
+        "[EMAIL] Resend API error:",
+        JSON.stringify(error, null, 2)
+      );
       return { success: false, error: error.message };
     }
 

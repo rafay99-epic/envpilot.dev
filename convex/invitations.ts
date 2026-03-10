@@ -117,11 +117,7 @@ export const create = mutation({
     ),
     projectIds: v.optional(v.array(v.id("projects"))),
     projectRole: v.optional(
-      v.union(
-        v.literal("viewer"),
-        v.literal("developer"),
-        v.literal("manager")
-      )
+      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),

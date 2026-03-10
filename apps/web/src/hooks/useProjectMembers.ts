@@ -7,9 +7,7 @@ import { Id } from "@convex/_generated/dataModel";
 /**
  * Hook to get all members of a project
  */
-export function useProjectMembers(
-  projectId: Id<"projects"> | undefined
-) {
+export function useProjectMembers(projectId: Id<"projects"> | undefined) {
   const members = useQuery(
     api.projectMembers.listByProject,
     projectId ? { projectId } : "skip"
@@ -48,14 +46,11 @@ export function useAssignableProjectMembers(
 ) {
   const members = useQuery(
     api.projectMembers.getAssignableOrgMembers,
-    projectId && requestingUserId
-      ? { projectId, requestingUserId }
-      : "skip"
+    projectId && requestingUserId ? { projectId, requestingUserId } : "skip"
   );
 
   return {
     members: members ?? [],
-    isLoading:
-      projectId && requestingUserId ? members === undefined : false,
+    isLoading: projectId && requestingUserId ? members === undefined : false,
   };
 }

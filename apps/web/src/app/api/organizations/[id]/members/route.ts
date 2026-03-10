@@ -141,7 +141,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    console.log("[INVITE] Creating invitation for:", email, "role:", role, "org:", organizationId);
+    console.log(
+      "[INVITE] Creating invitation for:",
+      email,
+      "role:",
+      role,
+      "org:",
+      organizationId
+    );
 
     const result = await convex.mutation(api.invitations.create, {
       email,
@@ -152,13 +159,25 @@ export async function POST(request: Request, { params }: RouteParams) {
       invitedBy: convexUser._id,
     });
 
-    console.log("[INVITE] Invitation created:", result.invitationId, "token:", result.token);
+    console.log(
+      "[INVITE] Invitation created:",
+      result.invitationId,
+      "token:",
+      result.token
+    );
 
     // Send invitation email
     const inviterName = convexUser.name || convexUser.email || "A team member";
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
 
-    console.log("[INVITE] Sending email to:", email, "from:", inviterName, "org:", organization.name);
+    console.log(
+      "[INVITE] Sending email to:",
+      email,
+      "from:",
+      inviterName,
+      "org:",
+      organization.name
+    );
 
     const emailResult = await sendInvitationEmail({
       to: email,
@@ -172,7 +191,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     console.log("[INVITE] Email result:", JSON.stringify(emailResult));
 
     if (!emailResult.success) {
-      console.error("[INVITE] Failed to send invitation email:", emailResult.error);
+      console.error(
+        "[INVITE] Failed to send invitation email:",
+        emailResult.error
+      );
     }
 
     return NextResponse.json(

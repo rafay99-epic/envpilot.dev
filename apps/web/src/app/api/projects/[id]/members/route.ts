@@ -65,10 +65,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     // Also get assignable members if user can manage
     let assignableMembers = null;
-    if (
-      membership.role === "admin" ||
-      membership.role === "team_lead"
-    ) {
+    if (membership.role === "admin" || membership.role === "team_lead") {
       assignableMembers = await convex.query(
         api.projectMembers.getAssignableOrgMembers,
         {

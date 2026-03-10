@@ -173,9 +173,7 @@ export default function ProjectMembersPage({
       }
 
       setMembers((prev) =>
-        prev.map((m) =>
-          m.userId === userId ? { ...m, role: newRole } : m
-        )
+        prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m))
       );
       setSuccessMessage("Role updated");
     } catch (err) {
@@ -413,8 +411,8 @@ export default function ProjectMembersPage({
                   <option value="">Select a member...</option>
                   {assignableMembers.map((m) => (
                     <option key={m._id} value={m._id}>
-                      {m.name || m.email}{" "}
-                      {m.name ? `(${m.email})` : ""} - {m.orgRole}
+                      {m.name || m.email} {m.name ? `(${m.email})` : ""} -{" "}
+                      {m.orgRole}
                     </option>
                   ))}
                 </select>
@@ -426,35 +424,33 @@ export default function ProjectMembersPage({
                   Project Role
                 </label>
                 <div className="mt-2 space-y-2">
-                  {(["viewer", "developer", "manager"] as const).map(
-                    (role) => (
-                      <label
-                        key={role}
-                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                          selectedRole === role
-                            ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
-                            : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          value={role}
-                          checked={selectedRole === role}
-                          onChange={() => setSelectedRole(role)}
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                            {ROLE_LABELS[role]}
-                          </p>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {ROLE_DESCRIPTIONS[role]}
-                          </p>
-                        </div>
-                      </label>
-                    )
-                  )}
+                  {(["viewer", "developer", "manager"] as const).map((role) => (
+                    <label
+                      key={role}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        selectedRole === role
+                          ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
+                          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={role}
+                        checked={selectedRole === role}
+                        onChange={() => setSelectedRole(role)}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {ROLE_LABELS[role]}
+                        </p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {ROLE_DESCRIPTIONS[role]}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
 

@@ -317,11 +317,7 @@ export default defineSchema({
     projectIds: v.optional(v.array(v.id("projects"))),
     // Optional: project-level role for the assigned projects
     projectRole: v.optional(
-      v.union(
-        v.literal("viewer"),
-        v.literal("developer"),
-        v.literal("manager")
-      )
+      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
     // Unique invitation token
     token: v.string(),

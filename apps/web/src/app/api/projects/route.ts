@@ -131,7 +131,10 @@ export async function POST(request: Request) {
       });
       if (org?.settings?.teamLeadsCanCreateProjects === false) {
         return NextResponse.json(
-          { error: "Project creation is restricted to admins in this organization" },
+          {
+            error:
+              "Project creation is restricted to admins in this organization",
+          },
           { status: 403 }
         );
       }

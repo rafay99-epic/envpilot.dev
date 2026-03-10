@@ -788,8 +788,7 @@ export default function OrganizationMembersPage({
                             <span
                               className="flex h-6 w-6 items-center justify-center rounded text-xs"
                               style={{
-                                backgroundColor:
-                                  project.color || "#71717a",
+                                backgroundColor: project.color || "#71717a",
                               }}
                             >
                               {project.icon || "📁"}
@@ -815,10 +814,7 @@ export default function OrganizationMembersPage({
                         value={inviteProjectRole}
                         onChange={(e) =>
                           setInviteProjectRole(
-                            e.target.value as
-                              | "viewer"
-                              | "developer"
-                              | "manager"
+                            e.target.value as "viewer" | "developer" | "manager"
                           )
                         }
                         className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"

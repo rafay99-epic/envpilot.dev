@@ -106,9 +106,7 @@ export const getAssignableOrgMembers = query({
       const projectMembership = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>
-          q
-            .eq("projectId", args.projectId)
-            .eq("userId", args.requestingUserId)
+          q.eq("projectId", args.projectId).eq("userId", args.requestingUserId)
         )
         .first();
 
@@ -208,7 +206,10 @@ export const addMember = mutation({
         )
         .first();
 
-      if (!callerProjectMembership || callerProjectMembership.role !== "manager") {
+      if (
+        !callerProjectMembership ||
+        callerProjectMembership.role !== "manager"
+      ) {
         throw new Error(
           "Not authorized: only org admins and project managers can add project members"
         );
@@ -219,9 +220,7 @@ export const addMember = mutation({
     const targetOrgMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.userId)
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
       )
       .first();
 
@@ -316,7 +315,10 @@ export const removeMember = mutation({
         )
         .first();
 
-      if (!callerProjectMembership || callerProjectMembership.role !== "manager") {
+      if (
+        !callerProjectMembership ||
+        callerProjectMembership.role !== "manager"
+      ) {
         throw new Error(
           "Not authorized: only org admins and project managers can remove project members"
         );
@@ -449,7 +451,10 @@ export const updateMemberRole = mutation({
         )
         .first();
 
-      if (!callerProjectMembership || callerProjectMembership.role !== "manager") {
+      if (
+        !callerProjectMembership ||
+        callerProjectMembership.role !== "manager"
+      ) {
         throw new Error(
           "Not authorized: only org admins and project managers can update project member roles"
         );
