@@ -11,6 +11,7 @@ import {
   DEFAULT_PROJECT_ICON,
   DEFAULT_PROJECT_COLOR,
 } from "@/constants/project";
+import { ProjectIcon } from "@/components/ui";
 import { TemplateSelector } from "@/components/templates";
 import type { EnvironmentTemplate } from "@/constants/templates";
 
@@ -329,10 +330,10 @@ export default function NewProjectPage() {
             </p>
             <div className="mt-4 flex items-center gap-4">
               <div
-                className="flex h-12 w-12 items-center justify-center rounded-lg text-xl"
+                className="flex h-12 w-12 items-center justify-center rounded-lg"
                 style={{ backgroundColor: formData.color }}
               >
-                {formData.icon}
+                <ProjectIcon icon={formData.icon} size={24} />
               </div>
               <div>
                 <p className="font-semibold text-zinc-900 dark:text-zinc-100">
@@ -426,13 +427,21 @@ export default function NewProjectPage() {
                   key={icon}
                   type="button"
                   onClick={() => setFormData((prev) => ({ ...prev, icon }))}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg text-lg transition-all ${
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
                     formData.icon === icon
                       ? "bg-zinc-900 dark:bg-zinc-100"
                       : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
                   }`}
                 >
-                  {icon}
+                  <ProjectIcon
+                    icon={icon}
+                    size={18}
+                    className={
+                      formData.icon === icon
+                        ? "text-white dark:text-zinc-900"
+                        : "text-zinc-600 dark:text-zinc-400"
+                    }
+                  />
                 </button>
               ))}
             </div>

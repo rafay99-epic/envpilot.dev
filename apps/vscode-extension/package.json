@@ -2,11 +2,17 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "envpilot",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "license": "UNLICENSED",
+  "homepage": "https://www.envpilot.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/envpilot/envpilot"
+    "url": "https://github.com/rafay99-epic/envpilot.dev"
+  },
+  "bugs": {
+    "url": "https://github.com/rafay99-epic/envpilot.dev/issues"
   },
   "engines": {
     "vscode": "^1.85.0"

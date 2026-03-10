@@ -1,7 +1,11 @@
 {
   "name": "@envpilot/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "Envpilot web dashboard — manage secrets, teams, and projects",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "license": "UNLICENSED",
+  "homepage": "https://www.envpilot.dev",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,6 +28,7 @@
     "next": "^16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-hotkeys-hook": "^5.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.9.2",

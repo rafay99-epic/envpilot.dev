@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
 interface Organization {
   _id: string;
@@ -39,36 +40,7 @@ export default function OrganizationsPage() {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-              Organizations
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage your organizations and team workspaces.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-lg bg-zinc-200 dark:bg-zinc-700" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-5 w-2/3 rounded bg-zinc-200 dark:bg-zinc-700" />
-                  <div className="h-4 w-1/2 rounded bg-zinc-200 dark:bg-zinc-700" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <TerminalLoading />;
   }
 
   if (error) {
@@ -162,7 +134,7 @@ export default function OrganizationsPage() {
           {organizations.map((org) => (
             <Link
               key={org._id}
-              href={`/organizations/${org._id}`}
+              href={`/organizations/${org.slug}`}
               className="group rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
             >
               <div className="flex items-start gap-4">

@@ -9,7 +9,7 @@ import {
   useFeatureRequestMutations,
 } from "@/hooks";
 import { Id } from "@convex/_generated/dataModel";
-import { ChevronUp, Plus, X } from "lucide-react";
+import { ChevronUp, Plus, X, AlertTriangle } from "lucide-react";
 
 type TabType = "requests" | "roadmap";
 type StatusFilter =
@@ -61,6 +61,11 @@ export default function WishlistPage() {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [votedFeatures, setVotedFeatures] = useState<Set<string>>(new Set());
   const [voterEmail, setVoterEmail] = useState("");
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [pendingVoteId, setPendingVoteId] =
+    useState<Id<"featureRequests"> | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const featureRequests = useFeatureRequests(
     statusFilter === "all" ? undefined : statusFilter,
@@ -73,35 +78,53 @@ export default function WishlistPage() {
   const handleVote = useCallback(
     async (featureId: Id<"featureRequests">) => {
       if (!voterEmail) {
-        const email = prompt("Enter your email to vote:");
-        if (!email) return;
-        setVoterEmail(email);
+        setPendingVoteId(featureId);
+        setShowEmailPrompt(true);
+        return;
+      }
 
-        try {
-          await vote({ featureRequestId: featureId, voterEmail: email });
+      try {
+        if (votedFeatures.has(featureId)) {
+          await unvote({ featureRequestId: featureId, voterEmail });
+          setVotedFeatures((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(featureId);
+            return newSet;
+          });
+        } else {
+          await vote({ featureRequestId: featureId, voterEmail });
           setVotedFeatures((prev) => new Set([...prev, featureId]));
-        } catch {
-          alert("Failed to vote. You may have already voted for this feature.");
         }
-      } else {
-        try {
-          if (votedFeatures.has(featureId)) {
-            await unvote({ featureRequestId: featureId, voterEmail });
-            setVotedFeatures((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(featureId);
-              return newSet;
-            });
-          } else {
-            await vote({ featureRequestId: featureId, voterEmail });
-            setVotedFeatures((prev) => new Set([...prev, featureId]));
-          }
-        } catch {
-          alert("Failed to update vote.");
-        }
+      } catch {
+        setToastMessage(
+          "Failed to update vote. You may have already voted for this feature."
+        );
       }
     },
     [voterEmail, votedFeatures, vote, unvote]
+  );
+
+  const handleEmailSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const email = emailInput.trim();
+      if (!email || !pendingVoteId) return;
+
+      setVoterEmail(email);
+      setShowEmailPrompt(false);
+      setEmailInput("");
+
+      try {
+        await vote({ featureRequestId: pendingVoteId, voterEmail: email });
+        setVotedFeatures((prev) => new Set([...prev, pendingVoteId]));
+      } catch {
+        setToastMessage(
+          "Failed to vote. You may have already voted for this feature."
+        );
+      }
+      setPendingVoteId(null);
+    },
+    [emailInput, pendingVoteId, vote]
   );
 
   return (
@@ -303,6 +326,12 @@ export default function WishlistPage() {
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
               </Link>
+              <Link href="/support" className="hover:text-zinc-400">
+                Support
+              </Link>
+              <Link href="/contact" className="hover:text-zinc-400">
+                Contact
+              </Link>
             </div>
             <p className="text-xs text-zinc-700">
               &copy; {new Date().getFullYear()} Envpilot
@@ -310,6 +339,68 @@ export default function WishlistPage() {
           </div>
         </div>
       </footer>
+
+      {/* Email Prompt Dialog */}
+      {showEmailPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-950 font-mono shadow-2xl">
+            <div className="border-b border-zinc-800 px-5 py-4">
+              <h3 className="text-sm font-semibold text-zinc-100">
+                Enter your email to vote
+              </h3>
+            </div>
+            <form onSubmit={handleEmailSubmit} className="px-5 py-4">
+              <p className="mb-3 text-xs text-zinc-400">
+                Your email is used to track your votes and prevent duplicates.
+              </p>
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoFocus
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailPrompt(false);
+                    setPendingVoteId(null);
+                    setEmailInput("");
+                  }}
+                  className="rounded border border-zinc-700 px-4 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded border border-green-500/30 bg-green-500/10 px-4 py-1.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"
+                >
+                  Vote
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[100]">
+          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 font-mono text-xs text-red-400 shadow-lg">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{toastMessage}</span>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="ml-2 opacity-60 transition-opacity hover:opacity-100"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

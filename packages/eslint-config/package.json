@@ -1,6 +1,7 @@
 {
   "name": "@envpilot/eslint-config",
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Shared ESLint flat config for Envpilot monorepo",
   "private": true,
   "license": "MIT",
   "exports": {

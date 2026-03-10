@@ -1,7 +1,15 @@
 {
   "name": "envpilot-monorepo",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "Envpilot — secure environment variable management for teams",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "license": "UNLICENSED",
+  "homepage": "https://www.envpilot.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafay99-epic/envpilot.dev"
+  },
   "packageManager": "bun@1.3.10",
   "workspaces": [
     "apps/*",

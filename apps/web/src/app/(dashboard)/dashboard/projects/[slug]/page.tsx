@@ -3,16 +3,15 @@
 import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import type { Id } from "@convex/_generated/dataModel";
+import { useHotkeys } from "react-hotkeys-hook";
 import { useAuthContext } from "@/components/auth";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { PERMISSIONS } from "@/lib/auth";
-import {
-  ENVIRONMENTS,
-  DEFAULT_PROJECT_ICON,
-  DEFAULT_PROJECT_COLOR,
-} from "@/constants/project";
+import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
+import { ProjectIcon } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui";
 import {
-  VariableCreateModal,
+  VariableCreateDrawer,
   VariableEditModal,
   VariableHistory,
   VariableListItem,
@@ -83,6 +82,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
   const canReviewRequests = hasPermission(PERMISSIONS.VARIABLE_CREATE);
   const canRequestVariable = organization?.role === "member";
+
+  // Keyboard shortcut: Cmd/Ctrl+K to open Add Variable drawer
+  useHotkeys(
+    "mod+k",
+    (e) => {
+      e.preventDefault();
+      if (canCreateVariable || canRequestVariable) {
+        setShowCreateModal(true);
+      }
+    },
+    { enableOnFormTags: false }
+  );
 
   const [project, setProject] = useState<Project | null>(null);
   const [variables, setVariables] = useState<Variable[]>([]);
@@ -397,11 +408,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }).format(new Date(timestamp));
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
-      </div>
-    );
+    return <TerminalLoading />;
   }
 
   if (error && !project) {
@@ -460,10 +467,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </svg>
           </Link>
           <div
-            className="flex h-12 w-12 items-center justify-center rounded-lg text-xl"
+            className="flex h-12 w-12 items-center justify-center rounded-lg"
             style={{ backgroundColor: project.color || DEFAULT_PROJECT_COLOR }}
           >
-            {project.icon || DEFAULT_PROJECT_ICON}
+            <ProjectIcon icon={project.icon} size={24} />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
@@ -570,15 +577,19 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 />
               </svg>
               {canCreateVariable ? "Add Variable" : "Request Variable"}
+              <kbd className="ml-1.5 hidden rounded bg-white/20 px-1.5 py-0.5 text-xs font-normal sm:inline-block">
+                {typeof navigator !== "undefined" &&
+                /Mac/.test(navigator.userAgent)
+                  ? "⌘K"
+                  : "Ctrl+K"}
+              </kbd>
             </button>
           )}
         </div>
 
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {isLoadingVariables ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
-            </div>
+            <TerminalLoading />
           ) : variables.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
@@ -721,11 +732,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
       </div>
 
-      <VariableCreateModal
+      <VariableCreateDrawer
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateVariable}
-        title={canCreateVariable ? "Create Variable" : "Request Variable"}
+        title={canCreateVariable ? "Add Variables" : "Request Variables"}
         submitLabel={canCreateVariable ? "Create Variable" : "Submit Request"}
       />
 

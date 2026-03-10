@@ -15,7 +15,7 @@ const program = new Command();
 program
   .name("envpilot")
   .description("Envpilot CLI - Sync, secure, and share environment variables")
-  .version("0.1.0");
+  .version("1.0.0");
 
 // Add all commands
 program.addCommand(loginCommand);

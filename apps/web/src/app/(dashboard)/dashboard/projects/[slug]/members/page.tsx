@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
+import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
 interface ProjectMember {
   _id: string;
@@ -116,7 +117,6 @@ export default function ProjectMembersPage({
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization?.id, slug]);
 
   async function handleAddMember(e: React.FormEvent) {
@@ -204,11 +204,7 @@ export default function ProjectMembersPage({
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900" />
-      </div>
-    );
+    return <TerminalLoading />;
   }
 
   if (error && !project) {
