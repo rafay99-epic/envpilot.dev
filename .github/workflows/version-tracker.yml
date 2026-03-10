@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout PR head
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Checkout base branch for comparison
         uses: actions/checkout@v4
@@ -38,43 +40,65 @@ jobs:
           echo "cli=$(jq -r '.version' base/apps/cli/package.json)" >> "$GITHUB_OUTPUT"
           echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Detect version changes
+      - name: Detect version changes and bump types
         id: changes
         run: |
+          classify_bump() {
+            local base="$1" current="$2"
+            if [ "$base" = "$current" ]; then echo "none"; return; fi
+
+            IFS='.' read -r base_major base_minor base_patch <<< "$base"
+            IFS='.' read -r cur_major cur_minor cur_patch <<< "$current"
+
+            if [ "$cur_major" -gt "$base_major" ] 2>/dev/null; then echo "major"
+            elif [ "$cur_minor" -gt "$base_minor" ] 2>/dev/null; then echo "minor"
+            elif [ "$cur_patch" -gt "$base_patch" ] 2>/dev/null; then echo "patch"
+            else echo "patch"; fi
+          }
+
           changed=""
+          bump_types=""
           summary=""
 
-          if [ "${{ steps.current.outputs.root }}" != "${{ steps.base.outputs.root }}" ]; then
+          root_bump=$(classify_bump "${{ steps.base.outputs.root }}" "${{ steps.current.outputs.root }}")
+          web_bump=$(classify_bump "${{ steps.base.outputs.web }}" "${{ steps.current.outputs.web }}")
+          cli_bump=$(classify_bump "${{ steps.base.outputs.cli }}" "${{ steps.current.outputs.cli }}")
+          ext_bump=$(classify_bump "${{ steps.base.outputs.extension }}" "${{ steps.current.outputs.extension }}")
+
+          if [ "$root_bump" != "none" ]; then
             changed="${changed}root,"
-            summary="${summary}| **Monorepo** | \`${{ steps.base.outputs.root }}\` | \`${{ steps.current.outputs.root }}\` | :arrow_up: |\n"
+            bump_types="${bump_types}${root_bump},"
+            summary="${summary}| **Monorepo** | \`${{ steps.base.outputs.root }}\` | \`${{ steps.current.outputs.root }}\` | :arrow_up: ${root_bump} |\n"
           else
             summary="${summary}| **Monorepo** | \`${{ steps.current.outputs.root }}\` | \`${{ steps.current.outputs.root }}\` | -- |\n"
           fi
 
-          if [ "${{ steps.current.outputs.web }}" != "${{ steps.base.outputs.web }}" ]; then
+          if [ "$web_bump" != "none" ]; then
             changed="${changed}web,"
-            summary="${summary}| **Web App** | \`${{ steps.base.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | :arrow_up: |\n"
+            bump_types="${bump_types}${web_bump},"
+            summary="${summary}| **Web App** | \`${{ steps.base.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | :arrow_up: ${web_bump} |\n"
           else
             summary="${summary}| **Web App** | \`${{ steps.current.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | -- |\n"
           fi
 
-          if [ "${{ steps.current.outputs.cli }}" != "${{ steps.base.outputs.cli }}" ]; then
+          if [ "$cli_bump" != "none" ]; then
             changed="${changed}cli,"
-            summary="${summary}| **CLI** | \`${{ steps.base.outputs.cli }}\` | \`${{ steps.current.outputs.cli }}\` | :arrow_up: |\n"
+            bump_types="${bump_types}${cli_bump},"
+            summary="${summary}| **CLI** | \`${{ steps.base.outputs.cli }}\` | \`${{ steps.current.outputs.cli }}\` | :arrow_up: ${cli_bump} |\n"
           else
             summary="${summary}| **CLI** | \`${{ steps.current.outputs.cli }}\` | \`${{ steps.current.outputs.cli }}\` | -- |\n"
           fi
 
-          if [ "${{ steps.current.outputs.extension }}" != "${{ steps.base.outputs.extension }}" ]; then
+          if [ "$ext_bump" != "none" ]; then
             changed="${changed}extension,"
-            summary="${summary}| **VS Code Extension** | \`${{ steps.base.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | :arrow_up: |\n"
+            bump_types="${bump_types}${ext_bump},"
+            summary="${summary}| **VS Code Extension** | \`${{ steps.base.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | :arrow_up: ${ext_bump} |\n"
           else
             summary="${summary}| **VS Code Extension** | \`${{ steps.current.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | -- |\n"
           fi
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
-
-          # Write summary to a file (multiline-safe)
+          echo "bump_types=$bump_types" >> "$GITHUB_OUTPUT"
           printf "%b" "$summary" > /tmp/version-summary.txt
 
       - name: Post PR comment
@@ -104,7 +128,6 @@ jobs:
               status,
             ].join('\n');
 
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -134,21 +157,10 @@ jobs:
         if: github.event_name == 'pull_request'
         id: files
         run: |
-          touches_web=false
-          touches_cli=false
-          touches_extension=false
-          touches_convex=false
-          touches_ci=false
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD 2>/dev/null || true)
 
-          # Compare base to head
-          changed_files=$(diff -rq base/ . --exclude=base --exclude=.git --exclude=node_modules 2>/dev/null | grep -v "^Only in base" | sed 's|^Files base/||;s| and .*||' || true)
-
-          # Also check git diff for new files
-          git_diff_files=$(cd base && git diff --name-only HEAD..FETCH_HEAD 2>/dev/null || true)
-          all_files="$changed_files
-          $git_diff_files"
-
-          echo "$all_files" | while IFS= read -r file; do
+          rm -f /tmp/touched_packages
+          echo "$changed_files" | while IFS= read -r file; do
             case "$file" in
               apps/web/*) echo "web" >> /tmp/touched_packages ;;
               apps/cli/*) echo "cli" >> /tmp/touched_packages ;;
@@ -158,7 +170,6 @@ jobs:
             esac
           done
 
-          # Deduplicate
           if [ -f /tmp/touched_packages ]; then
             sort -u /tmp/touched_packages > /tmp/touched_unique
             echo "packages=$(paste -sd',' /tmp/touched_unique)" >> "$GITHUB_OUTPUT"
@@ -171,16 +182,15 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const versionChanged = '${{ steps.changes.outputs.changed }}'.split(',').filter(Boolean);
+            const bumpTypes = '${{ steps.changes.outputs.bump_types }}'.split(',').filter(Boolean);
             const packagesChanged = '${{ steps.files.outputs.packages }}'.split(',').filter(Boolean);
 
-            // All possible labels with their colors and descriptions
+            // All possible labels with colors and descriptions
             const allLabels = {
-              // Version bump labels
-              'version:monorepo':  { color: '1a7f37', description: 'PR bumps the monorepo version' },
-              'version:web':       { color: '0969da', description: 'PR bumps the web app version' },
-              'version:cli':       { color: '8250df', description: 'PR bumps the CLI version' },
-              'version:extension': { color: 'bf8700', description: 'PR bumps the extension version' },
+              // Semver bump type labels (industry standard)
+              'semver:major':      { color: 'e11d48', description: 'PR includes a breaking/major version bump' },
+              'semver:minor':      { color: 'f59e0b', description: 'PR includes a minor (feature) version bump' },
+              'semver:patch':      { color: '22c55e', description: 'PR includes a patch (fix) version bump' },
               // Scope labels (which packages have file changes)
               'scope:web':         { color: '1f6feb', description: 'PR touches the web app' },
               'scope:cli':         { color: 'a371f7', description: 'PR touches the CLI' },
@@ -191,11 +201,10 @@ jobs:
 
             const labelsToAdd = new Set();
 
-            // Version bump labels
-            const versionMap = { root: 'version:monorepo', web: 'version:web', cli: 'version:cli', extension: 'version:extension' };
-            for (const key of versionChanged) {
-              if (versionMap[key]) labelsToAdd.add(versionMap[key]);
-            }
+            // Semver labels — use the highest bump type across all packages
+            if (bumpTypes.includes('major')) labelsToAdd.add('semver:major');
+            else if (bumpTypes.includes('minor')) labelsToAdd.add('semver:minor');
+            else if (bumpTypes.includes('patch')) labelsToAdd.add('semver:patch');
 
             // Scope labels based on file changes
             const scopeMap = { web: 'scope:web', cli: 'scope:cli', extension: 'scope:extension', convex: 'scope:convex', ci: 'scope:ci' };
@@ -225,7 +234,24 @@ jobs:
               }
             }
 
-            // Add labels to the PR
+            // Remove stale semver labels before adding new ones
+            const semverLabels = ['semver:major', 'semver:minor', 'semver:patch'];
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            for (const label of currentLabels) {
+              if (semverLabels.includes(label.name) && !labelsToAdd.has(label.name)) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label.name,
+                });
+              }
+            }
+
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -245,6 +271,7 @@ jobs:
           echo "============================="
           if [ -n "${{ steps.changes.outputs.changed }}" ]; then
             echo "  Changed: ${{ steps.changes.outputs.changed }}"
+            echo "  Bump types: ${{ steps.changes.outputs.bump_types }}"
           else
             echo "  No version changes detected."
           fi
