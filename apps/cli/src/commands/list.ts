@@ -7,9 +7,10 @@ import {
   header,
   withSpinner,
   maskValue,
+  formatRole,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated } from "../lib/config.js";
+import { isAuthenticated, getRole } from "../lib/config.js";
 import { readProjectConfig } from "../lib/project-config.js";
 import { notAuthenticated } from "../lib/errors.js";
 import type { Organization, Project, Variable } from "../types/index.js";
@@ -187,6 +188,12 @@ async function listProjects(
       { key: "active", header: "" },
     ]
   );
+
+  const role = getRole();
+  if (role) {
+    console.log();
+    console.log(chalk.dim(`Your role: ${formatRole(role)}`));
+  }
 }
 
 async function listVariables(
@@ -256,6 +263,19 @@ async function listVariables(
 
   console.log();
   console.log(chalk.dim(`Total: ${variables.length} variables`));
+
+  const role = getRole();
+  if (role) {
+    console.log(chalk.dim(`Your role: ${formatRole(role)}`));
+  }
+
+  if (role === "member") {
+    console.log(
+      chalk.dim(
+        "As a Member, you may only see variables you have been granted access to."
+      )
+    );
+  }
 
   if (!options.showValues) {
     console.log(chalk.dim("Use --show-values to see actual values"));

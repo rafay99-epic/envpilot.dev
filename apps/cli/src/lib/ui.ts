@@ -186,3 +186,32 @@ export function line(): void {
 export function blank(): void {
   console.log();
 }
+
+/**
+ * Format a role name with color
+ */
+export function formatRole(role: string | undefined): string {
+  switch (role) {
+    case "admin":
+      return chalk.green("Admin");
+    case "team_lead":
+      return chalk.blue("Team Lead");
+    case "member":
+      return chalk.yellow("Member");
+    default:
+      return chalk.dim("Unknown");
+  }
+}
+
+/**
+ * Print a role-based access notice for members
+ */
+export function roleNotice(role: string | undefined): void {
+  if (role === "member") {
+    console.log(
+      chalk.yellow(
+        "  You have Member access. Write operations will create pending requests for approval."
+      )
+    );
+  }
+}

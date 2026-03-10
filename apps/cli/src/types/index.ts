@@ -75,6 +75,7 @@ export const cliConfigSchema = z.object({
   activeProjectId: z.string().optional(),
   activeOrganizationId: z.string().optional(),
   user: userSchema.optional(),
+  role: z.enum(["admin", "team_lead", "member"]).optional(),
 });
 
 export type CLIConfig = z.infer<typeof cliConfigSchema>;

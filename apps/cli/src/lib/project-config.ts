@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join } from "node:path";
 import {
   projectConfigSchema,
@@ -163,4 +164,43 @@ export function ensureEnvInGitignore(directory: string = process.cwd()): void {
     : content + "\n.env\n";
 
   writeFileSync(gitignorePath, newContent, "utf-8");
+}
+
+/**
+ * Check if any .env files are tracked by git.
+ * Returns a list of tracked .env file paths, or an empty array if none.
+ */
+export function getTrackedEnvFiles(
+  directory: string = process.cwd()
+): string[] {
+  try {
+    const result = execSync("git ls-files --cached .env .env.* .env.local", {
+      cwd: directory,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    return result
+      .trim()
+      .split("\n")
+      .filter((f) => f.length > 0);
+  } catch {
+    // Not a git repo or git not available — skip check
+    return [];
+  }
+}
+
+/**
+ * Check if inside a git repository.
+ */
+export function isGitRepo(directory: string = process.cwd()): boolean {
+  try {
+    execSync("git rev-parse --is-inside-work-tree", {
+      cwd: directory,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }

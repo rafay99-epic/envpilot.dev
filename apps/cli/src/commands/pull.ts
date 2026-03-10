@@ -10,8 +10,11 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated } from "../lib/config.js";
-import { readProjectConfig } from "../lib/project-config.js";
+import { isAuthenticated, getRole } from "../lib/config.js";
+import {
+  readProjectConfig,
+  getTrackedEnvFiles,
+} from "../lib/project-config.js";
 import {
   readEnvFile,
   writeEnvFile,
@@ -42,6 +45,27 @@ export const pullCommand = new Command("pull")
       const projectConfig = readProjectConfig();
       if (!projectConfig) {
         throw notInitialized();
+      }
+
+      // Check for .env files tracked by git
+      const trackedFiles = getTrackedEnvFiles();
+      if (trackedFiles.length > 0) {
+        error("Security risk: .env files are tracked by git!");
+        console.log();
+        for (const file of trackedFiles) {
+          console.log(chalk.red(`  tracked: ${file}`));
+        }
+        console.log();
+        console.log(
+          chalk.yellow(
+            "  Run the following to untrack them (without deleting the files):"
+          )
+        );
+        for (const file of trackedFiles) {
+          console.log(chalk.cyan(`    git rm --cached ${file}`));
+        }
+        console.log();
+        process.exit(1);
       }
 
       const environment =
@@ -144,6 +168,12 @@ export const pullCommand = new Command("pull")
       success(
         `Downloaded ${variables.length} variables to ${chalk.bold(outputPath)}`
       );
+
+      if (getRole() === "member") {
+        info(
+          "As a Member, you may only see variables you have been granted access to."
+        );
+      }
 
       // Show summary
       console.log();
