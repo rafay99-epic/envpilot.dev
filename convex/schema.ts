@@ -41,6 +41,13 @@ export default defineSchema({
     logoUrl: v.optional(v.string()),
     // Subscription tier: "free" or "pro"
     tier: v.union(v.literal("free"), v.literal("pro")),
+    // Organization-level settings for access control
+    settings: v.optional(
+      v.object({
+        // Whether team leads can create new projects (default: true)
+        teamLeadsCanCreateProjects: v.boolean(),
+      })
+    ),
     // WorkOS organization ID (for SSO integration)
     workosOrgId: v.optional(v.string()),
     // User who created the organization
@@ -103,6 +110,29 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_org_and_slug", ["organizationId", "slug"])
     .index("by_created_by", ["createdBy"]),
+
+  // ==========================================
+  // PROJECT MEMBERS (Project-level access control)
+  // ==========================================
+  projectMembers: defineTable({
+    // Reference to the project
+    projectId: v.id("projects"),
+    // Reference to the user
+    userId: v.id("users"),
+    // Project-level role
+    role: v.union(
+      v.literal("viewer"), // Can view variables they have explicit permission to
+      v.literal("developer"), // Can view all variables, create/edit variables
+      v.literal("manager") // Can also manage project members
+    ),
+    // Who added this member to the project
+    addedBy: v.id("users"),
+    // When the member was added
+    addedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_user", ["userId"])
+    .index("by_project_and_user", ["projectId", "userId"]),
 
   // ==========================================
   // ENVIRONMENT VARIABLES
@@ -283,6 +313,16 @@ export default defineSchema({
       v.literal("team_lead"),
       v.literal("member")
     ),
+    // Optional: projects to assign the invited user to upon acceptance
+    projectIds: v.optional(v.array(v.id("projects"))),
+    // Optional: project-level role for the assigned projects
+    projectRole: v.optional(
+      v.union(
+        v.literal("viewer"),
+        v.literal("developer"),
+        v.literal("manager")
+      )
+    ),
     // Unique invitation token
     token: v.string(),
     // User who sent the invitation
@@ -421,6 +461,9 @@ export default defineSchema({
       v.literal("project.created"),
       v.literal("project.updated"),
       v.literal("project.deleted"),
+      v.literal("project.member_added"),
+      v.literal("project.member_removed"),
+      v.literal("project.member_role_changed"),
       // Variable actions
       v.literal("variable.created"),
       v.literal("variable.updated"),

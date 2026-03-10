@@ -60,6 +60,24 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // For non-admins, verify project membership
+    if (membership.role !== "admin") {
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: id as Id<"projects">,
+          userId: convexUser._id,
+        }
+      );
+
+      if (!projectMembership) {
+        return NextResponse.json(
+          { error: "You do not have access to this project" },
+          { status: 403 }
+        );
+      }
+    }
+
     return NextResponse.json({ project });
   } catch (error) {
     console.error("Error fetching project:", error);
@@ -115,12 +133,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check if user has permission to update projects (admin or team_lead)
+    // Check if user has permission to update projects
+    // Admins, team_leads, and project managers can update
     if (membership.role !== "admin" && membership.role !== "team_lead") {
-      return NextResponse.json(
-        { error: "Insufficient permissions to update projects" },
-        { status: 403 }
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: id as Id<"projects">,
+          userId: convexUser._id,
+        }
       );
+
+      if (!projectMembership || projectMembership.role !== "manager") {
+        return NextResponse.json(
+          { error: "Insufficient permissions to update projects" },
+          { status: 403 }
+        );
+      }
     }
 
     const { name, description, icon, color } = validation.data;

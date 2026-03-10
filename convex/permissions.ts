@@ -62,21 +62,40 @@ async function checkCanManagePermissions(
     };
   }
 
-  // Only admins and team leads can manage permissions
-  if (membership.role !== "admin" && membership.role !== "team_lead") {
+  // Admins and team leads can manage via org role
+  if (membership.role === "admin" || membership.role === "team_lead") {
     return {
-      canManage: false,
-      reason: "Only admins and team leads can manage variable permissions",
+      canManage: true,
+      membership: {
+        role: membership.role,
+        organizationId: membership.organizationId,
+        userId: membership.userId,
+      },
+    };
+  }
+
+  // Project managers can also manage permissions within their project
+  const projectMembership = await ctx.db
+    .query("projectMembers")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", project._id).eq("userId", userId)
+    )
+    .first();
+
+  if (projectMembership?.role === "manager") {
+    return {
+      canManage: true,
+      membership: {
+        role: "project_manager",
+        organizationId: membership.organizationId,
+        userId: membership.userId,
+      },
     };
   }
 
   return {
-    canManage: true,
-    membership: {
-      role: membership.role,
-      organizationId: membership.organizationId,
-      userId: membership.userId,
-    },
+    canManage: false,
+    reason: "Only admins, team leads, and project managers can manage variable permissions",
   };
 }
 
@@ -292,20 +311,32 @@ export const getAssignableMembers = query({
       return [];
     }
 
-    // Only admins and team leads can manage permissions
-    if (
-      requesterMembership.role !== "admin" &&
-      requesterMembership.role !== "team_lead"
-    ) {
+    // Check if requester can manage permissions (org admin, team lead, or project manager)
+    const isOrgAdmin = requesterMembership.role === "admin";
+    const isTeamLead = requesterMembership.role === "team_lead";
+
+    let isProjectManager = false;
+    if (!isOrgAdmin && !isTeamLead) {
+      const requesterProjectMembership = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q
+            .eq("projectId", project._id)
+            .eq("userId", args.requestingUserId)
+        )
+        .first();
+
+      isProjectManager = requesterProjectMembership?.role === "manager";
+    }
+
+    if (!isOrgAdmin && !isTeamLead && !isProjectManager) {
       return [];
     }
 
-    // Get all organization members
-    const allMembers = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", project.organizationId)
-      )
+    // Get project members (scoped to this project, not all org members)
+    const projectMembers = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
       .collect();
 
     // Get existing permissions for this variable
@@ -319,37 +350,33 @@ export const getAssignableMembers = query({
       existingPermissions.map((p) => p.userId.toString())
     );
 
-    // Filter members based on requester's role
+    // Filter project members
     const assignableMembers = await Promise.all(
-      allMembers
-        .filter((member) => {
-          // Don't include users who already have permissions
-          if (usersWithPermissions.has(member.userId.toString())) {
-            return false;
-          }
-
-          // Don't include the requester themselves
-          if (member.userId === args.requestingUserId) {
-            return false;
-          }
-
-          // Team leads can only assign to members
-          if (requesterMembership.role === "team_lead") {
-            return member.role === "member";
-          }
-
-          // Admins can assign to anyone except themselves
+      projectMembers
+        .filter((pm) => {
+          if (usersWithPermissions.has(pm.userId.toString())) return false;
+          if (pm.userId === args.requestingUserId) return false;
           return true;
         })
-        .map(async (member) => {
-          const user = await ctx.db.get(member.userId);
+        .map(async (pm) => {
+          const user = await ctx.db.get(pm.userId);
+          const orgMembership = await ctx.db
+            .query("organizationMembers")
+            .withIndex("by_org_and_user", (q) =>
+              q
+                .eq("organizationId", project.organizationId)
+                .eq("userId", pm.userId)
+            )
+            .first();
+
           return user
             ? {
                 _id: user._id,
                 email: user.email,
                 name: user.name,
                 avatarUrl: user.avatarUrl,
-                role: member.role,
+                role: orgMembership?.role ?? "member",
+                projectRole: pm.role,
               }
             : null;
         })
@@ -392,21 +419,42 @@ export const canManageVariablePermissions = query({
       };
     }
 
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    if (membership.role === "admin") {
       return {
-        canManage: false,
-        reason: "Only admins and team leads can manage variable permissions",
+        canManage: true,
+        role: membership.role,
+        allowedPermissions: ["read", "write", "admin"],
+      };
+    }
+
+    if (membership.role === "team_lead") {
+      return {
+        canManage: true,
+        role: membership.role,
+        allowedPermissions: ["read", "write"],
+      };
+    }
+
+    // Check if user is a project manager
+    const projectMembership = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", project._id).eq("userId", args.userId)
+      )
+      .first();
+
+    if (projectMembership?.role === "manager") {
+      return {
+        canManage: true,
+        role: "project_manager",
+        allowedPermissions: ["read", "write"],
       };
     }
 
     return {
-      canManage: true,
-      role: membership.role,
-      // Team leads can only grant read/write, not admin
-      allowedPermissions:
-        membership.role === "team_lead"
-          ? ["read", "write"]
-          : ["read", "write", "admin"],
+      canManage: false,
+      reason:
+        "Only admins, team leads, and project managers can manage variable permissions",
     };
   },
 });

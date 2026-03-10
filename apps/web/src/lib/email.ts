@@ -1,6 +1,9 @@
 import { Resend } from "resend";
 
-const FROM_EMAIL = process.env.FROM_EMAIL || "Envpilot <noreply@envpilot.dev>";
+const RAW_FROM_EMAIL = process.env.FROM_EMAIL || "noreply@invite.envpilot.dev";
+const FROM_EMAIL = RAW_FROM_EMAIL.includes("<")
+  ? RAW_FROM_EMAIL
+  : `Envpilot <${RAW_FROM_EMAIL}>`;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 function getResendClient(): Resend | null {
@@ -139,11 +142,17 @@ If you didn't expect this invitation, you can safely ignore this email.
     const resend = getResendClient();
 
     if (!resend) {
-      console.warn("RESEND_API_KEY not configured - skipping email send");
-      return { success: true };
+      console.error("[EMAIL] RESEND_API_KEY not configured - cannot send email");
+      return { success: false, error: "RESEND_API_KEY not configured" };
     }
 
-    const { error } = await resend.emails.send({
+    console.log("[EMAIL] Sending invitation email:", {
+      from: FROM_EMAIL,
+      to,
+      subject: `${inviterName} invited you to join ${organizationName}`,
+    });
+
+    const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject: `${inviterName} invited you to join ${organizationName}`,
@@ -152,13 +161,14 @@ If you didn't expect this invitation, you can safely ignore this email.
     });
 
     if (error) {
-      console.error("Failed to send invitation email:", error);
+      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
 
+    console.log("[EMAIL] Email sent successfully:", JSON.stringify(data));
     return { success: true };
   } catch (err) {
-    console.error("Error sending invitation email:", err);
+    console.error("[EMAIL] Exception sending email:", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to send email",

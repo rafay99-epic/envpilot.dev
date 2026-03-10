@@ -43,6 +43,14 @@ interface SearchUser {
   hasPendingInvitation?: boolean;
 }
 
+interface Project {
+  _id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  color?: string;
+}
+
 export default function OrganizationMembersPage({
   params,
 }: {
@@ -54,6 +62,7 @@ export default function OrganizationMembersPage({
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -62,6 +71,12 @@ export default function OrganizationMembersPage({
   >("member");
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [inviteProjectRole, setInviteProjectRole] = useState<
+    "viewer" | "developer" | "manager"
+  >("developer");
 
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -75,9 +90,10 @@ export default function OrganizationMembersPage({
 
   async function fetchData() {
     try {
-      const [orgRes, membersRes] = await Promise.all([
+      const [orgRes, membersRes, projectsRes] = await Promise.all([
         fetch(`/api/organizations/${id}`),
         fetch(`/api/organizations/${id}/members`),
+        fetch(`/api/projects?organizationId=${id}`),
       ]);
 
       if (!orgRes.ok) {
@@ -91,6 +107,17 @@ export default function OrganizationMembersPage({
         const membersData = await membersRes.json();
         setMembers(membersData.members || []);
         setInvitations(membersData.invitations || []);
+      }
+
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        setProjects(projectsData.projects || []);
+      } else {
+        console.error(
+          "[MEMBERS] Failed to fetch projects:",
+          projectsRes.status,
+          await projectsRes.text().catch(() => "")
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -108,17 +135,36 @@ export default function OrganizationMembersPage({
       const response = await fetch(`/api/organizations/${id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          ...(inviteRole !== "admin" && selectedProjectIds.length > 0
+            ? { projectIds: selectedProjectIds, projectRole: inviteProjectRole }
+            : {}),
+        }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || "Failed to send invitation");
       }
 
       setShowInviteModal(false);
       setInviteEmail("");
       setInviteRole("member");
+      setSelectedProjectIds([]);
+      setInviteProjectRole("developer");
+
+      if (data.emailSent) {
+        setNotice("Invitation sent successfully! Email delivered.");
+      } else {
+        setNotice(
+          `Invitation created, but email could not be sent${data.emailError ? `: ${data.emailError}` : ""}. Share the invitation link manually.`
+        );
+      }
+      setTimeout(() => setNotice(null), 8000);
+
       fetchData();
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "An error occurred");
@@ -347,6 +393,26 @@ export default function OrganizationMembersPage({
         )}
       </div>
 
+      {notice && (
+        <div
+          className={`rounded-lg border p-4 ${
+            notice.includes("could not be sent")
+              ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20"
+              : "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-900/20"
+          }`}
+        >
+          <p
+            className={`text-sm ${
+              notice.includes("could not be sent")
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-green-700 dark:text-green-400"
+            }`}
+          >
+            {notice}
+          </p>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
@@ -557,7 +623,7 @@ export default function OrganizationMembersPage({
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Invite Team Member
@@ -676,6 +742,101 @@ export default function OrganizationMembersPage({
                   <option value="member">Member</option>
                 </select>
               </div>
+              {inviteRole !== "admin" && projects.length === 0 && (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    No projects available. Create a project first to assign
+                    project-level access during invitation.
+                  </p>
+                </div>
+              )}
+              {inviteRole !== "admin" && projects.length > 0 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      Assign to Projects
+                    </label>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Select which projects this member can access.
+                    </p>
+                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                      {projects.map((project) => (
+                        <label
+                          key={project._id}
+                          className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProjectIds.includes(project._id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProjectIds([
+                                  ...selectedProjectIds,
+                                  project._id,
+                                ]);
+                              } else {
+                                setSelectedProjectIds(
+                                  selectedProjectIds.filter(
+                                    (id) => id !== project._id
+                                  )
+                                );
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                          />
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="flex h-6 w-6 items-center justify-center rounded text-xs"
+                              style={{
+                                backgroundColor:
+                                  project.color || "#71717a",
+                              }}
+                            >
+                              {project.icon || "📁"}
+                            </span>
+                            <span className="text-sm text-zinc-900 dark:text-zinc-100">
+                              {project.name}
+                            </span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedProjectIds.length > 0 && (
+                    <div>
+                      <label
+                        htmlFor="projectRole"
+                        className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                      >
+                        Project Role
+                      </label>
+                      <select
+                        id="projectRole"
+                        value={inviteProjectRole}
+                        onChange={(e) =>
+                          setInviteProjectRole(
+                            e.target.value as
+                              | "viewer"
+                              | "developer"
+                              | "manager"
+                          )
+                        }
+                        className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                      >
+                        <option value="viewer">
+                          Viewer - Read-only access
+                        </option>
+                        <option value="developer">
+                          Developer - Add and edit variables
+                        </option>
+                        <option value="manager">
+                          Manager - Manage project members
+                        </option>
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -683,6 +844,8 @@ export default function OrganizationMembersPage({
                     setShowInviteModal(false);
                     setInviteEmail("");
                     setInviteRole("member");
+                    setSelectedProjectIds([]);
+                    setInviteProjectRole("developer");
                     setInviteError(null);
                     setSearchResults([]);
                     setShowSearchResults(false);

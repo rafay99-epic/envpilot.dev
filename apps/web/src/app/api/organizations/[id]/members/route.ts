@@ -15,6 +15,8 @@ const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
   role: z.enum(["admin", "team_lead", "member"]),
+  projectIds: z.array(z.string()).optional(),
+  projectRole: z.enum(["viewer", "developer", "manager"]).optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -125,7 +127,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { email, role } = validation.data;
+    const { email, role, projectIds, projectRole } = validation.data;
 
     // Get organization details for the email
     const organization = await convex.query(api.organizations.getById, {
@@ -139,16 +141,24 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
+    console.log("[INVITE] Creating invitation for:", email, "role:", role, "org:", organizationId);
+
     const result = await convex.mutation(api.invitations.create, {
       email,
       organizationId,
       role,
+      projectIds: projectIds as Id<"projects">[] | undefined,
+      projectRole,
       invitedBy: convexUser._id,
     });
+
+    console.log("[INVITE] Invitation created:", result.invitationId, "token:", result.token);
 
     // Send invitation email
     const inviterName = convexUser.name || convexUser.email || "A team member";
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
+
+    console.log("[INVITE] Sending email to:", email, "from:", inviterName, "org:", organization.name);
 
     const emailResult = await sendInvitationEmail({
       to: email,
@@ -159,14 +169,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       expiresAt,
     });
 
+    console.log("[INVITE] Email result:", JSON.stringify(emailResult));
+
     if (!emailResult.success) {
-      console.warn("Failed to send invitation email:", emailResult.error);
+      console.error("[INVITE] Failed to send invitation email:", emailResult.error);
     }
 
     return NextResponse.json(
       {
         invitation: result,
         emailSent: emailResult.success,
+        emailError: emailResult.error,
       },
       { status: 201 }
     );

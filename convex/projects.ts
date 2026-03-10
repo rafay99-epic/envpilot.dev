@@ -51,15 +51,46 @@ export const getBySlug = query({
 });
 
 export const listWithStats = query({
-  args: { organizationId: v.id("organizations") },
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.optional(v.id("users")),
+  },
   handler: async (ctx, args) => {
-    const projects = await ctx.db
+    let projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+
+    // If userId provided, filter by project membership for non-admins
+    if (args.userId) {
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", args.organizationId)
+            .eq("userId", args.userId)
+        )
+        .first();
+
+      if (membership && membership.role !== "admin") {
+        // Get user's project memberships
+        const projectMemberships = await ctx.db
+          .query("projectMembers")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .collect();
+
+        const assignedProjectIds = new Set(
+          projectMemberships.map((pm) => pm.projectId.toString())
+        );
+
+        projects = projects.filter((p) =>
+          assignedProjectIds.has(p._id.toString())
+        );
+      }
+    }
 
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
@@ -87,18 +118,53 @@ export const listForUser = query({
 
     const allProjects = await Promise.all(
       memberships.map(async (membership) => {
-        const projects = await ctx.db
-          .query("projects")
-          .withIndex("by_organization", (q) =>
-            q.eq("organizationId", membership.organizationId)
-          )
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        // Admins see all projects in the org
+        if (membership.role === "admin") {
+          const projects = await ctx.db
+            .query("projects")
+            .withIndex("by_organization", (q) =>
+              q.eq("organizationId", membership.organizationId)
+            )
+            .filter((q) => q.eq(q.field("deletedAt"), undefined))
+            .collect();
+
+          return projects.map((project) => ({
+            ...project,
+            userRole: membership.role,
+            projectRole: null as string | null,
+          }));
+        }
+
+        // Team leads and members only see projects they're assigned to
+        const projectMemberships = await ctx.db
+          .query("projectMembers")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
           .collect();
 
-        return projects.map((project) => ({
-          ...project,
-          userRole: membership.role,
-        }));
+        const projectsInOrg = await Promise.all(
+          projectMemberships.map(async (pm) => {
+            const project = await ctx.db.get(pm.projectId);
+            if (
+              !project ||
+              project.deletedAt ||
+              project.organizationId !== membership.organizationId
+            ) {
+              return null;
+            }
+            return {
+              ...project,
+              userRole: membership.role,
+              projectRole: pm.role as string | null,
+            };
+          })
+        );
+
+        return projectsInOrg.filter(Boolean) as Array<
+          Awaited<ReturnType<typeof ctx.db.get>> & {
+            userRole: string;
+            projectRole: string | null;
+          }
+        >;
       })
     );
 
@@ -127,6 +193,26 @@ export const create = mutation({
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
       throw new Error("Organization not found");
+    }
+
+    // Check if team leads are allowed to create projects
+    const creatorMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.createdBy)
+      )
+      .first();
+
+    if (creatorMembership?.role === "team_lead") {
+      const teamLeadsCanCreate =
+        org.settings?.teamLeadsCanCreateProjects ?? true;
+      if (!teamLeadsCanCreate) {
+        throw new Error(
+          "Project creation is restricted to admins in this organization"
+        );
+      }
     }
 
     const limits = getTierLimits(org.tier);
@@ -168,6 +254,17 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // Auto-add the creator as a project manager (unless they're an admin)
+    if (creatorMembership && creatorMembership.role !== "admin") {
+      await ctx.db.insert("projectMembers", {
+        projectId,
+        userId: args.createdBy,
+        role: "manager",
+        addedBy: args.createdBy,
+        addedAt: now,
+      });
+    }
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
@@ -376,6 +473,47 @@ export const duplicate = mutation({
           version: 1,
           createdAt: now,
           updatedAt: now,
+        });
+      }
+    }
+
+    // Copy project members from source project
+    const sourceMembers = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    for (const member of sourceMembers) {
+      await ctx.db.insert("projectMembers", {
+        projectId: newProjectId,
+        userId: member.userId,
+        role: member.role,
+        addedBy: args.createdBy,
+        addedAt: now,
+      });
+    }
+
+    // Auto-add the creator as manager if not already a member and not admin
+    const creatorMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", sourceProject.organizationId)
+          .eq("userId", args.createdBy)
+      )
+      .first();
+
+    if (creatorMembership && creatorMembership.role !== "admin") {
+      const creatorAlreadyMember = sourceMembers.some(
+        (m) => m.userId === args.createdBy
+      );
+      if (!creatorAlreadyMember) {
+        await ctx.db.insert("projectMembers", {
+          projectId: newProjectId,
+          userId: args.createdBy,
+          role: "manager",
+          addedBy: args.createdBy,
+          addedAt: now,
         });
       }
     }

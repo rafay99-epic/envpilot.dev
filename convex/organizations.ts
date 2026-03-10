@@ -467,6 +467,24 @@ export const removeMember = mutation({
       }
     }
 
+    // Also clean up all projectMembers records for this user
+    const allProjectMemberships = await Promise.all(
+      projects.map(async (project) => {
+        return await ctx.db
+          .query("projectMembers")
+          .withIndex("by_project_and_user", (q) =>
+            q.eq("projectId", project._id).eq("userId", args.userId)
+          )
+          .collect();
+      })
+    );
+
+    for (const memberships of allProjectMemberships) {
+      for (const pm of memberships) {
+        await ctx.db.delete(pm._id);
+      }
+    }
+
     await ctx.db.delete(membership._id);
 
     await ctx.db.insert("auditLogs", {
@@ -514,6 +532,37 @@ export const updateMemberRole = mutation({
 
     const oldRole = membership.role;
 
+    // When demoting from admin to non-admin, auto-create projectMembers
+    // for all org projects so the user doesn't lose access
+    if (oldRole === "admin" && args.newRole !== "admin") {
+      const orgProjects = await ctx.db
+        .query("projects")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect();
+
+      for (const project of orgProjects) {
+        const existingPm = await ctx.db
+          .query("projectMembers")
+          .withIndex("by_project_and_user", (q) =>
+            q.eq("projectId", project._id).eq("userId", args.userId)
+          )
+          .first();
+
+        if (!existingPm) {
+          await ctx.db.insert("projectMembers", {
+            projectId: project._id,
+            userId: args.userId,
+            role: args.newRole === "team_lead" ? "manager" : "developer",
+            addedBy: args.updatedBy,
+            addedAt: now,
+          });
+        }
+      }
+    }
+
     await ctx.db.patch(membership._id, { role: args.newRole });
 
     await ctx.db.insert("auditLogs", {
@@ -529,5 +578,50 @@ export const updateMemberRole = mutation({
     });
 
     return membership._id;
+  },
+});
+
+/**
+ * Update organization settings
+ * Only admins can modify settings
+ */
+export const updateSettings = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    settings: v.object({
+      teamLeadsCanCreateProjects: v.boolean(),
+    }),
+    updatedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.updatedBy)
+      )
+      .first();
+
+    if (!membership || membership.role !== "admin") {
+      throw new Error("Only admins can update organization settings");
+    }
+
+    await ctx.db.patch(args.organizationId, {
+      settings: args.settings,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.updatedBy,
+      action: "org.updated",
+      details: JSON.stringify({ settings: args.settings }),
+      createdAt: now,
+    });
+
+    return args.organizationId;
   },
 });

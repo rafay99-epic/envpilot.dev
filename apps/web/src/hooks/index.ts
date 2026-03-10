@@ -85,6 +85,16 @@ export {
   type TierAction,
 } from "./useTierLimits";
 
+// Convex user hook
+export { useConvexUser } from "./useConvexUser";
+
+// Project members hooks
+export {
+  useProjectMembers,
+  useProjectMembership,
+  useAssignableProjectMembers,
+} from "./useProjectMembers";
+
 // Audit log hooks
 export {
   useOrganizationAuditLogs,

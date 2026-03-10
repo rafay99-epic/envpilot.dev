@@ -115,6 +115,14 @@ export const create = mutation({
       v.literal("team_lead"),
       v.literal("member")
     ),
+    projectIds: v.optional(v.array(v.id("projects"))),
+    projectRole: v.optional(
+      v.union(
+        v.literal("viewer"),
+        v.literal("developer"),
+        v.literal("manager")
+      )
+    ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
@@ -211,6 +219,8 @@ export const create = mutation({
       email: args.email,
       organizationId: args.organizationId,
       role: args.role,
+      projectIds: args.projectIds,
+      projectRole: args.projectRole,
       token,
       invitedBy: args.invitedBy,
       status: "pending",
@@ -283,6 +293,27 @@ export const accept = mutation({
       invitedBy: invitation.invitedBy,
     });
 
+    // Create project memberships if projects were specified in the invitation
+    if (
+      invitation.projectIds &&
+      invitation.projectIds.length > 0 &&
+      invitation.role !== "admin"
+    ) {
+      const projectRole = invitation.projectRole ?? "developer";
+      for (const projectId of invitation.projectIds) {
+        const project = await ctx.db.get(projectId);
+        if (project && !project.deletedAt) {
+          await ctx.db.insert("projectMembers", {
+            projectId,
+            userId: args.userId,
+            role: projectRole,
+            addedBy: invitation.invitedBy,
+            addedAt: now,
+          });
+        }
+      }
+    }
+
     await ctx.db.patch(invitation._id, {
       status: "accepted",
       respondedAt: now,
@@ -295,6 +326,8 @@ export const accept = mutation({
       details: JSON.stringify({
         invitationId: invitation._id,
         role: invitation.role,
+        projectIds: invitation.projectIds,
+        projectRole: invitation.projectRole,
       }),
       createdAt: now,
     });
