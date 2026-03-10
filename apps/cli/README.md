@@ -40,19 +40,19 @@ envpilot push
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `envpilot login` | Authenticate with your Envpilot account |
-| `envpilot logout` | Log out and clear stored credentials |
-| `envpilot init` | Link the current directory to an Envpilot project |
-| `envpilot pull` | Pull environment variables into a local `.env` file |
-| `envpilot push` | Push local `.env` changes to Envpilot |
-| `envpilot list orgs` | List your organizations |
-| `envpilot list projects` | List projects in the active organization |
-| `envpilot list variables` | List variables in the active project |
-| `envpilot switch` | Switch the active project |
-| `envpilot config` | View or update CLI configuration |
-| `envpilot whoami` | Show the currently authenticated user |
+| Command                   | Description                                         |
+| ------------------------- | --------------------------------------------------- |
+| `envpilot login`          | Authenticate with your Envpilot account             |
+| `envpilot logout`         | Log out and clear stored credentials                |
+| `envpilot init`           | Link the current directory to an Envpilot project   |
+| `envpilot pull`           | Pull environment variables into a local `.env` file |
+| `envpilot push`           | Push local `.env` changes to Envpilot               |
+| `envpilot list orgs`      | List your organizations                             |
+| `envpilot list projects`  | List projects in the active organization            |
+| `envpilot list variables` | List variables in the active project                |
+| `envpilot switch`         | Switch the active project                           |
+| `envpilot config`         | View or update CLI configuration                    |
+| `envpilot whoami`         | Show the currently authenticated user               |
 
 ## Role-Based Access
 
