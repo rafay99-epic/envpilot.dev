@@ -12,7 +12,6 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
-    "build:binaries": "bash scripts/build-binaries.sh",
     "dev": "tsup src/index.ts --format esm --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
