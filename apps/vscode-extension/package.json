@@ -237,8 +237,8 @@
       "properties": {
         "envpilot.serverUrl": {
           "type": "string",
-          "default": "http://localhost:3000",
-          "description": "The URL of the Envpilot server"
+          "default": "",
+          "description": "The URL of the Envpilot server (auto-configured at build time)"
         },
         "envpilot.autoSync": {
           "type": "boolean",
@@ -326,12 +326,12 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "build": "node scripts/build.mjs",
     "compile": "npm run typecheck && npm run lint && npm run build && vsce package --no-dependencies",
     "dev": "npm-run-all -p dev:*",
-    "dev:esbuild": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "dev:esbuild": "node scripts/build.mjs --watch",
     "dev:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run typecheck && npm run lint && esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "package": "npm run typecheck && npm run lint && node scripts/build.mjs --minify",
     "package:vsix": "npm run package && vsce package --no-dependencies",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",

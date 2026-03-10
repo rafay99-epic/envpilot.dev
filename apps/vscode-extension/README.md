@@ -61,7 +61,7 @@ Open VS Code settings and search for "Envpilot" to configure:
 
 | Setting                        | Description                          | Default                 |
 | ------------------------------ | ------------------------------------ | ----------------------- |
-| `envpilot.serverUrl`           | Envpilot server URL                  | `http://localhost:3000` |
+| `envpilot.serverUrl`           | Envpilot server URL                  | Set at build time          |
 | `envpilot.autoSync`            | Auto-sync on workspace open          | `true`                  |
 | `envpilot.syncInterval`        | Permission check interval (seconds)  | `300`                   |
 | `envpilot.targetFile`          | Target file for synced variables     | `.env.local`            |
