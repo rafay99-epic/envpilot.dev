@@ -1,0 +1,251 @@
+name: Version Tracker
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  track-versions:
+    name: Track Package Versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+
+      - name: Checkout base branch for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: base
+
+      - name: Read current versions
+        id: current
+        run: |
+          echo "root=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
+          echo "web=$(jq -r '.version' apps/web/package.json)" >> "$GITHUB_OUTPUT"
+          echo "cli=$(jq -r '.version' apps/cli/package.json)" >> "$GITHUB_OUTPUT"
+          echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Read base versions
+        id: base
+        run: |
+          echo "root=$(jq -r '.version' base/package.json)" >> "$GITHUB_OUTPUT"
+          echo "web=$(jq -r '.version' base/apps/web/package.json)" >> "$GITHUB_OUTPUT"
+          echo "cli=$(jq -r '.version' base/apps/cli/package.json)" >> "$GITHUB_OUTPUT"
+          echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Detect version changes
+        id: changes
+        run: |
+          changed=""
+          summary=""
+
+          if [ "${{ steps.current.outputs.root }}" != "${{ steps.base.outputs.root }}" ]; then
+            changed="${changed}root,"
+            summary="${summary}| **Monorepo** | \`${{ steps.base.outputs.root }}\` | \`${{ steps.current.outputs.root }}\` | :arrow_up: |\n"
+          else
+            summary="${summary}| **Monorepo** | \`${{ steps.current.outputs.root }}\` | \`${{ steps.current.outputs.root }}\` | -- |\n"
+          fi
+
+          if [ "${{ steps.current.outputs.web }}" != "${{ steps.base.outputs.web }}" ]; then
+            changed="${changed}web,"
+            summary="${summary}| **Web App** | \`${{ steps.base.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | :arrow_up: |\n"
+          else
+            summary="${summary}| **Web App** | \`${{ steps.current.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | -- |\n"
+          fi
+
+          if [ "${{ steps.current.outputs.cli }}" != "${{ steps.base.outputs.cli }}" ]; then
+            changed="${changed}cli,"
+            summary="${summary}| **CLI** | \`${{ steps.base.outputs.cli }}\` | \`${{ steps.current.outputs.cli }}\` | :arrow_up: |\n"
+          else
+            summary="${summary}| **CLI** | \`${{ steps.current.outputs.cli }}\` | \`${{ steps.current.outputs.cli }}\` | -- |\n"
+          fi
+
+          if [ "${{ steps.current.outputs.extension }}" != "${{ steps.base.outputs.extension }}" ]; then
+            changed="${changed}extension,"
+            summary="${summary}| **VS Code Extension** | \`${{ steps.base.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | :arrow_up: |\n"
+          else
+            summary="${summary}| **VS Code Extension** | \`${{ steps.current.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | -- |\n"
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+          # Write summary to a file (multiline-safe)
+          printf "%b" "$summary" > /tmp/version-summary.txt
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryRows = fs.readFileSync('/tmp/version-summary.txt', 'utf8').trim();
+            const changed = '${{ steps.changes.outputs.changed }}'.replace(/,$/,'');
+
+            let status;
+            if (changed === '') {
+              status = 'No version bumps detected in this PR.';
+            } else {
+              const parts = changed.split(',').filter(Boolean);
+              status = `Version bumped: **${parts.join('**, **')}**`;
+            }
+
+            const body = [
+              '## Version Tracker',
+              '',
+              '| Package | Base | PR | Status |',
+              '|---------|------|-----|--------|',
+              summaryRows,
+              '',
+              status,
+            ].join('\n');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.startsWith('## Version Tracker')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Detect changed files
+        if: github.event_name == 'pull_request'
+        id: files
+        run: |
+          touches_web=false
+          touches_cli=false
+          touches_extension=false
+          touches_convex=false
+          touches_ci=false
+
+          # Compare base to head
+          changed_files=$(diff -rq base/ . --exclude=base --exclude=.git --exclude=node_modules 2>/dev/null | grep -v "^Only in base" | sed 's|^Files base/||;s| and .*||' || true)
+
+          # Also check git diff for new files
+          git_diff_files=$(cd base && git diff --name-only HEAD..FETCH_HEAD 2>/dev/null || true)
+          all_files="$changed_files
+          $git_diff_files"
+
+          echo "$all_files" | while IFS= read -r file; do
+            case "$file" in
+              apps/web/*) echo "web" >> /tmp/touched_packages ;;
+              apps/cli/*) echo "cli" >> /tmp/touched_packages ;;
+              apps/vscode-extension/*) echo "extension" >> /tmp/touched_packages ;;
+              convex/*) echo "convex" >> /tmp/touched_packages ;;
+              .github/*) echo "ci" >> /tmp/touched_packages ;;
+            esac
+          done
+
+          # Deduplicate
+          if [ -f /tmp/touched_packages ]; then
+            sort -u /tmp/touched_packages > /tmp/touched_unique
+            echo "packages=$(paste -sd',' /tmp/touched_unique)" >> "$GITHUB_OUTPUT"
+          else
+            echo "packages=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add labels to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const versionChanged = '${{ steps.changes.outputs.changed }}'.split(',').filter(Boolean);
+            const packagesChanged = '${{ steps.files.outputs.packages }}'.split(',').filter(Boolean);
+
+            // All possible labels with their colors and descriptions
+            const allLabels = {
+              // Version bump labels
+              'version:monorepo':  { color: '1a7f37', description: 'PR bumps the monorepo version' },
+              'version:web':       { color: '0969da', description: 'PR bumps the web app version' },
+              'version:cli':       { color: '8250df', description: 'PR bumps the CLI version' },
+              'version:extension': { color: 'bf8700', description: 'PR bumps the extension version' },
+              // Scope labels (which packages have file changes)
+              'scope:web':         { color: '1f6feb', description: 'PR touches the web app' },
+              'scope:cli':         { color: 'a371f7', description: 'PR touches the CLI' },
+              'scope:extension':   { color: 'd4a72c', description: 'PR touches the VS Code extension' },
+              'scope:convex':      { color: 'e8912d', description: 'PR touches Convex backend functions' },
+              'scope:ci':          { color: '656d76', description: 'PR touches CI/CD workflows' },
+            };
+
+            const labelsToAdd = new Set();
+
+            // Version bump labels
+            const versionMap = { root: 'version:monorepo', web: 'version:web', cli: 'version:cli', extension: 'version:extension' };
+            for (const key of versionChanged) {
+              if (versionMap[key]) labelsToAdd.add(versionMap[key]);
+            }
+
+            // Scope labels based on file changes
+            const scopeMap = { web: 'scope:web', cli: 'scope:cli', extension: 'scope:extension', convex: 'scope:convex', ci: 'scope:ci' };
+            for (const key of packagesChanged) {
+              if (scopeMap[key]) labelsToAdd.add(scopeMap[key]);
+            }
+
+            if (labelsToAdd.size === 0) return;
+
+            // Ensure labels exist in the repo
+            for (const label of labelsToAdd) {
+              const meta = allLabels[label];
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                });
+              } catch {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: meta.color,
+                  description: meta.description,
+                });
+              }
+            }
+
+            // Add labels to the PR
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: [...labelsToAdd],
+            });
+
+      - name: Print version summary
+        run: |
+          echo "============================="
+          echo "  Envpilot Version Report"
+          echo "============================="
+          echo "  Monorepo:          ${{ steps.current.outputs.root }}"
+          echo "  Web App:           ${{ steps.current.outputs.web }}"
+          echo "  CLI:               ${{ steps.current.outputs.cli }}"
+          echo "  VS Code Extension: ${{ steps.current.outputs.extension }}"
+          echo "============================="
+          if [ -n "${{ steps.changes.outputs.changed }}" ]; then
+            echo "  Changed: ${{ steps.changes.outputs.changed }}"
+          else
+            echo "  No version changes detected."
+          fi
+          echo "============================="
