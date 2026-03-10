@@ -91,17 +91,23 @@ export class ApiService {
   async getVariables(
     projectId: string,
     environment: string,
-    accessToken?: string
+    accessToken?: string,
+    organizationId?: string
   ): Promise<EnvironmentVariable[]> {
     const headers: Record<string, string> = {};
     if (accessToken) {
       headers["X-Access-Token"] = accessToken;
     }
 
+    const params: Record<string, string> = { projectId, environment };
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+
     const response = await this.client.get<
       ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
     >("/api/extension/variables", {
-      params: { projectId, environment },
+      params,
       headers,
     });
 

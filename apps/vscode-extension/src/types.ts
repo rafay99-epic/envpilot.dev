@@ -69,6 +69,7 @@ export interface ProjectAccess {
 export interface LinkedProject {
   projectId: string;
   projectName: string;
+  organizationId: string;
   organizationName: string;
   accessToken: string;
   expiresAt: number;
@@ -152,6 +153,7 @@ export interface LinkedDirectory {
 export interface LinkedProjectV2 {
   projectId: string;
   projectName: string;
+  organizationId: string;
   organizationName: string;
   accessToken: string;
   expiresAt: number;

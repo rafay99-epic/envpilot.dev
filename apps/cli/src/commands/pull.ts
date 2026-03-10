@@ -92,6 +92,9 @@ export const pullCommand = new Command("pull")
           }>("/api/cli/variables", {
             projectId: projectConfig.projectId,
             environment,
+            ...(projectConfig.organizationId && {
+              organizationId: projectConfig.organizationId,
+            }),
           });
           metaProjectRole = response.meta?.projectRole;
           return response.data || [];

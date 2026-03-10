@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
@@ -23,6 +24,7 @@ export default function OrganizationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
+  const router = useRouter();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [memberCount, setMemberCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -256,12 +258,15 @@ export default function OrganizationPage({
           </Link>
         )}
 
-        <Link
-          href="/dashboard/projects"
-          onClick={() =>
-            organization && setActiveOrganizationCookie(organization._id)
-          }
-          className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+        <button
+          onClick={() => {
+            if (organization) {
+              setActiveOrganizationCookie(organization._id);
+            }
+            router.push("/dashboard/projects");
+            router.refresh();
+          }}
+          className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 text-left transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
             <svg
@@ -299,7 +304,7 @@ export default function OrganizationPage({
               d="M9 5l7 7-7 7"
             />
           </svg>
-        </Link>
+        </button>
       </div>
 
       {/* Organization Info */}

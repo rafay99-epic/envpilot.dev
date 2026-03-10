@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Envpilot CLI — sync and manage environment variables from the terminal",
   "type": "module",
   "bin": {

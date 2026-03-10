@@ -350,6 +350,7 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
 
   let projectId: string;
   let projectName: string;
+  let organizationId: string;
   let organizationName: string;
   let project:
     | { _id: string; name: string; description: string | null }
@@ -361,6 +362,8 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
   if (item?.project) {
     projectId = item.project._id;
     projectName = item.project.name;
+    organizationId =
+      item.organization?._id || item.project.organizationId || "";
     organizationName = item.organizationName || "Unknown";
     project = item.project;
     organization = item.organization;
@@ -436,6 +439,7 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
 
     projectId = projectPick.project._id;
     projectName = projectPick.project.name;
+    organizationId = orgPick.organization._id;
     organizationName = orgPick.organization.name;
     project = projectPick.project;
     organization = orgPick.organization;
@@ -513,6 +517,7 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     await syncService.linkProjectWithDirectory(
       projectId,
       projectName,
+      organizationId,
       organizationName,
       access.accessToken,
       access.expiresAt,

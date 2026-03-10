@@ -44,4 +44,9 @@ export function setActiveOrganizationCookie(orgId: string) {
   }
 
   document.cookie = `${ACTIVE_ORG_COOKIE_NAME}=${encodeURIComponent(orgId)}; path=/; max-age=${ACTIVE_ORG_COOKIE_TTL_SECONDS}; samesite=lax`;
+
+  // Notify listeners (e.g. useAuth) so React state stays in sync
+  window.dispatchEvent(
+    new CustomEvent("org-context-changed", { detail: { orgId } })
+  );
 }

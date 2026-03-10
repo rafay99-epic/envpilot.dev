@@ -35,6 +35,7 @@ interface LinkedProjectMetadata {
 interface LinkedProjectMetadataV2 {
   projectId: string;
   projectName: string;
+  organizationId: string;
   organizationName: string;
   expiresAt: number;
   directories: LinkedDirectory[];
@@ -125,6 +126,7 @@ export class StorageService {
         newProjects.push({
           projectId: old.projectId,
           projectName: old.projectName,
+          organizationId: "",
           organizationName: old.organizationName,
           expiresAt: old.expiresAt,
           directories: [directory],
@@ -237,6 +239,7 @@ export class StorageService {
         );
         return {
           ...m,
+          organizationId: "",
           accessToken: accessToken || "",
         };
       })
@@ -311,7 +314,7 @@ export class StorageService {
       return null;
     }
 
-    return { ...match, accessToken };
+    return { ...match, organizationId: "", accessToken };
   }
 
   async updateLinkedProject(
@@ -437,6 +440,7 @@ export class StorageService {
   async addLinkedProjectV2(
     projectId: string,
     projectName: string,
+    organizationId: string,
     organizationName: string,
     accessToken: string,
     expiresAt: number,
@@ -474,6 +478,7 @@ export class StorageService {
       metadata.push({
         projectId,
         projectName,
+        organizationId,
         organizationName,
         expiresAt,
         directories: [
