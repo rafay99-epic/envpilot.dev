@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: build-cli-${{ github.ref }}
@@ -84,3 +85,28 @@ jobs:
           name: envpilot-cli-all-${{ github.sha }}
           path: binaries/
           retention-days: 14
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cli-build
+          message: |
+            ## 🔧 CLI Binaries Ready
+
+            **[Download artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})**  — scroll to "Artifacts" at the bottom.
+
+            | Platform | Artifact |
+            |----------|----------|
+            | macOS (Apple Silicon) | `envpilot-darwin-arm64` |
+            | macOS (Intel) | `envpilot-darwin-x64` |
+            | Linux (x64) | `envpilot-linux-x64` |
+            | Linux (ARM64) | `envpilot-linux-arm64` |
+            | Windows (x64) | `envpilot-windows-x64.exe` |
+
+            **Install (macOS/Linux):**
+            ```bash
+            # Download and unzip, then:
+            chmod +x envpilot-darwin-arm64
+            sudo mv envpilot-darwin-arm64 /usr/local/bin/envpilot
+            ```
