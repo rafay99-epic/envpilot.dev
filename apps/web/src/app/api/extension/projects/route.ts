@@ -51,6 +51,8 @@ export async function GET(request: Request) {
             organizationId: project.organizationId,
             icon: project.icon || null,
             color: project.color || null,
+            userRole: project.userRole ?? null,
+            projectRole: project.projectRole ?? null,
           })),
         },
       });
@@ -72,6 +74,8 @@ export async function GET(request: Request) {
             organizationId: string;
             icon?: string;
             color?: string;
+            userRole?: string;
+            projectRole?: string | null;
           }) => ({
             _id: project._id,
             name: project.name,
@@ -80,6 +84,8 @@ export async function GET(request: Request) {
             organizationId: project.organizationId,
             icon: project.icon || null,
             color: project.color || null,
+            userRole: project.userRole ?? null,
+            projectRole: project.projectRole ?? null,
           })
         ),
       },

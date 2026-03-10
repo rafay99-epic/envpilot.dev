@@ -215,3 +215,34 @@ export function roleNotice(role: string | undefined): void {
     );
   }
 }
+
+/**
+ * Format a project role name with color
+ */
+export function formatProjectRole(role: string | null | undefined): string {
+  switch (role) {
+    case "manager":
+      return chalk.green("Manager");
+    case "developer":
+      return chalk.blue("Developer");
+    case "viewer":
+      return chalk.yellow("Viewer");
+    default:
+      return chalk.dim("-");
+  }
+}
+
+/**
+ * Print a project role notice for viewers
+ */
+export function projectRoleNotice(
+  projectRole: string | null | undefined
+): void {
+  if (projectRole === "viewer") {
+    console.log(
+      chalk.yellow(
+        "  You have Viewer access to this project. You can only view variables you have been explicitly granted access to."
+      )
+    );
+  }
+}

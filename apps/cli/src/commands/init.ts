@@ -8,7 +8,9 @@ import {
   warning,
   withSpinner,
   formatRole,
+  formatProjectRole,
   roleNotice,
+  projectRoleNotice,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
@@ -227,8 +229,16 @@ export const initCommand = new Command("init")
       console.log();
       console.log(chalk.dim("Configuration saved to .envpilot"));
       if (selectedOrg.role) {
-        console.log(chalk.dim(`  Role: ${formatRole(selectedOrg.role)}`));
+        console.log(chalk.dim(`  Org role: ${formatRole(selectedOrg.role)}`));
         roleNotice(selectedOrg.role);
+      }
+      if (selectedProject.projectRole) {
+        console.log(
+          chalk.dim(
+            `  Project role: ${formatProjectRole(selectedProject.projectRole)}`
+          )
+        );
+        projectRoleNotice(selectedProject.projectRole);
       }
       console.log();
       console.log("Next steps:");

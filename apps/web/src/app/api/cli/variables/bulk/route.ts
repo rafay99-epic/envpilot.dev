@@ -60,8 +60,38 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Members cannot write directly; they submit requests for review.
-    if (membership.role === "member") {
+    // Resolve project-level role
+    let projectRole: string | null = null;
+    if (membership.role !== "admin") {
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: projectId as Id<"projects">,
+          userId: authResult.userId,
+        }
+      );
+      if (projectMembership) {
+        projectRole = projectMembership.role;
+      }
+    }
+
+    // Determine effective write permission
+    const canWriteDirectly =
+      membership.role === "admin" ||
+      membership.role === "team_lead" ||
+      projectRole === "manager";
+
+    const isViewer = projectRole === "viewer";
+
+    // Viewers are hard-blocked from writing
+    if (isViewer) {
+      return forbiddenResponse(
+        "You have Viewer access to this project. Push is not allowed."
+      );
+    }
+
+    // Members and developers create pending requests instead of writing directly.
+    if (!canWriteDirectly) {
       let requested = 0;
       let skipped = 0;
 

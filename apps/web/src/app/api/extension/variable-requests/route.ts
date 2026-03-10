@@ -140,11 +140,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (membership.role !== "member") {
+    // Resolve project-level role
+    let projectRole: string | null = null;
+    if (membership.role !== "admin") {
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: projectId as Id<"projects">,
+          userId: convexUser._id,
+        }
+      );
+      if (projectMembership) {
+        projectRole = projectMembership.role;
+      }
+    }
+
+    const isViewer = projectRole === "viewer";
+    const canWriteDirectly =
+      membership.role === "admin" ||
+      membership.role === "team_lead" ||
+      projectRole === "manager";
+
+    // Viewers are hard-blocked
+    if (isViewer) {
       return NextResponse.json(
         {
           error:
-            "Only members can submit variable requests. Use direct variable creation instead.",
+            "You have Viewer access to this project. Variable requests are not allowed.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Admins, team leads, and managers should use direct variable creation
+    if (canWriteDirectly) {
+      return NextResponse.json(
+        {
+          error:
+            "You have direct write access. Use direct variable creation instead of submitting a request.",
         },
         { status: 403 }
       );

@@ -10,6 +10,7 @@ import type {
   ApiResponse,
   DeviceInfo,
   MembershipRole,
+  ProjectRole,
   VariableRequest,
 } from "../types";
 
@@ -20,6 +21,7 @@ export class ApiService {
   private client: AxiosInstance;
   private storage: StorageService;
   private roleCache: Map<string, MembershipRole> = new Map();
+  private projectRoleCache: Map<string, ProjectRole> = new Map();
 
   constructor(storage: StorageService) {
     this.storage = storage;
@@ -62,7 +64,16 @@ export class ApiService {
     >("/api/extension/projects", {
       params: organizationId ? { organizationId } : undefined,
     });
-    return response.data.data?.projects || [];
+    const projects = response.data.data?.projects || [];
+
+    // Cache project roles from the response
+    for (const project of projects) {
+      if (project.projectRole) {
+        this.projectRoleCache.set(project._id, project.projectRole);
+      }
+    }
+
+    return projects;
   }
 
   async getProject(projectId: string): Promise<Project | null> {
@@ -103,10 +114,17 @@ export class ApiService {
   }
 
   /**
-   * Get the cached role for a project (populated after getVariables call)
+   * Get the cached org role for a project (populated after getVariables call)
    */
   getUserRole(projectId: string): MembershipRole | undefined {
     return this.roleCache.get(projectId);
+  }
+
+  /**
+   * Get the cached project role (populated after getProjects call)
+   */
+  getProjectRole(projectId: string): ProjectRole | undefined {
+    return this.projectRoleCache.get(projectId);
   }
 
   // Project Access (Extension Linking)

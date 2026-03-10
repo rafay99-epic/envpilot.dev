@@ -6,7 +6,9 @@ import {
   error,
   withSpinner,
   formatRole,
+  formatProjectRole,
   roleNotice,
+  projectRoleNotice,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
@@ -186,6 +188,14 @@ export const switchCommand = new Command("switch")
         });
 
         success(`Switched to project: ${chalk.bold(project.name)}`);
+        if (project.projectRole) {
+          console.log(
+            chalk.dim(
+              `  Project role: ${formatProjectRole(project.projectRole)}`
+            )
+          );
+          projectRoleNotice(project.projectRole);
+        }
         return;
       }
 
@@ -328,6 +338,14 @@ export const switchCommand = new Command("switch")
           });
 
           success(`Switched to project: ${chalk.bold(project.name)}`);
+          if (project.projectRole) {
+            console.log(
+              chalk.dim(
+                `  Project role: ${formatProjectRole(project.projectRole)}`
+              )
+            );
+            projectRoleNotice(project.projectRole);
+          }
         }
       }
     } catch (err) {

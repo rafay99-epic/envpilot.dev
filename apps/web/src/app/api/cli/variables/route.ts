@@ -115,12 +115,29 @@ export async function GET(request: NextRequest) {
         })
     );
 
+    // Resolve project role for the user
+    let projectRole: string | null = null;
+    if (membership.role !== "admin") {
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: projectId as Id<"projects">,
+          userId: authResult.userId,
+        }
+      );
+      if (projectMembership) {
+        projectRole = projectMembership.role;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: variablesWithValues,
       meta: {
         total: variablesWithValues.length,
         environment: environment || "all",
+        role: membership.role,
+        projectRole,
       },
     });
   } catch (error) {
@@ -177,12 +194,42 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
+    // Resolve project-level role
+    let projectRole: string | null = null;
+    if (membership.role !== "admin") {
+      const projectMembership = await convex.query(
+        api.projectMembers.getProjectMembership,
+        {
+          projectId: projectId as Id<"projects">,
+          userId: authResult.userId,
+        }
+      );
+      if (projectMembership) {
+        projectRole = projectMembership.role;
+      }
+    }
+
+    // Determine effective write permission
+    const canWriteDirectly =
+      membership.role === "admin" ||
+      membership.role === "team_lead" ||
+      projectRole === "manager";
+
+    const isViewer = projectRole === "viewer";
+
+    // Viewers are hard-blocked from writing
+    if (isViewer) {
+      return forbiddenResponse(
+        "You have Viewer access to this project. Variable creation is not allowed."
+      );
+    }
+
     const environments = Array.isArray(environment)
       ? environment
       : [environment];
 
-    // Members create pending requests instead of writing directly.
-    if (membership.role === "member") {
+    // Members and developers create pending requests instead of writing directly.
+    if (!canWriteDirectly) {
       const vaultResult = await createSecret(key, value, {
         organizationId: project.organizationId,
         projectId: projectId,

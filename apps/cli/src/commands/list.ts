@@ -8,6 +8,7 @@ import {
   withSpinner,
   maskValue,
   formatRole,
+  formatProjectRole,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getRole } from "../lib/config.js";
@@ -178,6 +179,10 @@ async function listProjects(
       name: project.name,
       slug: project.slug,
       description: project.description || chalk.dim("-"),
+      role:
+        project.userRole === "admin"
+          ? formatRole("admin")
+          : formatProjectRole(project.projectRole),
       active: projectConfig?.projectId === project._id ? chalk.green("✓") : "",
     })),
     [
@@ -185,6 +190,7 @@ async function listProjects(
       { key: "name", header: "Name" },
       { key: "slug", header: "Slug" },
       { key: "description", header: "Description", width: 30 },
+      { key: "role", header: "Role" },
       { key: "active", header: "" },
     ]
   );
@@ -192,7 +198,7 @@ async function listProjects(
   const role = getRole();
   if (role) {
     console.log();
-    console.log(chalk.dim(`Your role: ${formatRole(role)}`));
+    console.log(chalk.dim(`Your org role: ${formatRole(role)}`));
   }
 }
 
@@ -214,6 +220,8 @@ async function listVariables(
     process.exit(1);
   }
 
+  let metaProjectRole: string | null | undefined;
+
   const variables = await withSpinner("Fetching variables...", async () => {
     const params: Record<string, string> = { projectId };
     if (environment) {
@@ -223,8 +231,14 @@ async function listVariables(
     const response = await api.get<{
       success: boolean;
       data: Variable[];
-      meta: { total: number; environment: string };
+      meta: {
+        total: number;
+        environment: string;
+        role?: string;
+        projectRole?: string | null;
+      };
     }>("/api/cli/variables", params);
+    metaProjectRole = response.meta?.projectRole;
     return response.data || [];
   });
 
@@ -266,14 +280,17 @@ async function listVariables(
 
   const role = getRole();
   if (role) {
-    console.log(chalk.dim(`Your role: ${formatRole(role)}`));
+    console.log(chalk.dim(`Your org role: ${formatRole(role)}`));
+  }
+  if (metaProjectRole) {
+    console.log(
+      chalk.dim(`Your project role: ${formatProjectRole(metaProjectRole)}`)
+    );
   }
 
-  if (role === "member") {
+  if (role === "member" || metaProjectRole === "viewer") {
     console.log(
-      chalk.dim(
-        "As a Member, you may only see variables you have been granted access to."
-      )
+      chalk.dim("You may only see variables you have been granted access to.")
     );
   }
 

@@ -18,6 +18,12 @@ const ROLE_LABELS: Record<string, string> = {
   member: "Member",
 };
 
+const PROJECT_ROLE_LABELS: Record<string, string> = {
+  viewer: "Viewer",
+  developer: "Developer",
+  manager: "Manager",
+};
+
 export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<
     ProjectTreeItem | undefined | null | void
@@ -222,7 +228,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
 
       case "project":
         this.iconPath = new vscode.ThemeIcon("symbol-package");
-        this.description = project?.description || undefined;
+        this.description = this.buildProjectDescription(project, false);
         this.tooltip = this.createProjectTooltip(project, false);
         break;
 
@@ -231,7 +237,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
           "symbol-package",
           new vscode.ThemeColor("charts.green")
         );
-        this.description = "Linked";
+        this.description = this.buildProjectDescription(project, true);
         this.tooltip = this.createProjectTooltip(project, true);
         break;
 
@@ -276,6 +282,29 @@ export class ProjectTreeItem extends vscode.TreeItem {
     return parts.join(" \u00b7 ");
   }
 
+  private buildProjectDescription(
+    project?: Project,
+    isLinked?: boolean
+  ): string | undefined {
+    if (!project) return undefined;
+    const parts: string[] = [];
+    if (isLinked) {
+      parts.push("Linked");
+    }
+    // Show project-level role if available, otherwise show org role for admins
+    if (project.userRole === "admin") {
+      parts.push("Admin");
+    } else if (project.projectRole) {
+      parts.push(
+        PROJECT_ROLE_LABELS[project.projectRole] || project.projectRole
+      );
+    }
+    if (parts.length === 0 && project.description) {
+      return project.description;
+    }
+    return parts.join(" \u00b7 ") || project.description || undefined;
+  }
+
   private buildDirectoryDescription(dir?: LinkedDirectory): string | undefined {
     if (!dir) return undefined;
     return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
@@ -316,7 +345,19 @@ export class ProjectTreeItem extends vscode.TreeItem {
     if (project.description) {
       md.appendMarkdown(`${project.description}\n\n`);
     }
-    md.appendMarkdown(`**Slug:** \`${project.slug}\``);
+    md.appendMarkdown(`**Slug:** \`${project.slug}\`\n\n`);
+    if (project.userRole === "admin") {
+      md.appendMarkdown("**Your Role:** $(shield) Admin (full access)\n\n");
+    } else if (project.projectRole) {
+      const roleDescriptions: Record<string, string> = {
+        manager: "Manager (manage members, variables, and permissions)",
+        developer: "Developer (view and edit variables)",
+        viewer: "Viewer (view explicitly permitted variables only)",
+      };
+      md.appendMarkdown(
+        `**Your Project Role:** ${roleDescriptions[project.projectRole] || project.projectRole}\n\n`
+      );
+    }
     return md;
   }
 

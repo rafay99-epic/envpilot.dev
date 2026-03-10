@@ -10,7 +10,7 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated, getRole } from "../lib/config.js";
+import { isAuthenticated } from "../lib/config.js";
 import {
   readProjectConfig,
   getTrackedEnvFiles,
@@ -75,17 +75,25 @@ export const pullCommand = new Command("pull")
       const api = createAPIClient();
 
       // Fetch variables
+      let metaProjectRole: string | null | undefined;
+
       const variables = await withSpinner(
         `Fetching ${chalk.bold(environment)} variables...`,
         async () => {
           const response = await api.get<{
             success: boolean;
             data: Variable[];
-            meta: { total: number; environment: string };
+            meta: {
+              total: number;
+              environment: string;
+              role?: string;
+              projectRole?: string | null;
+            };
           }>("/api/cli/variables", {
             projectId: projectConfig.projectId,
             environment,
           });
+          metaProjectRole = response.meta?.projectRole;
           return response.data || [];
         }
       );
@@ -169,9 +177,9 @@ export const pullCommand = new Command("pull")
         `Downloaded ${variables.length} variables to ${chalk.bold(outputPath)}`
       );
 
-      if (getRole() === "member") {
+      if (metaProjectRole === "viewer") {
         info(
-          "As a Member, you may only see variables you have been granted access to."
+          "You have Viewer access to this project. You may only see variables you have been explicitly granted access to."
         );
       }
 

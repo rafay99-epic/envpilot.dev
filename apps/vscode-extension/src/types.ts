@@ -3,6 +3,7 @@
  */
 
 export type MembershipRole = "admin" | "team_lead" | "member";
+export type ProjectRole = "viewer" | "developer" | "manager";
 
 export interface User {
   id: string;
@@ -38,6 +39,8 @@ export interface Project {
   organizationId: string;
   icon: string | null;
   color: string | null;
+  userRole?: MembershipRole | null;
+  projectRole?: ProjectRole | null;
 }
 
 export interface EnvironmentVariable {

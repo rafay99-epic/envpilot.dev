@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { UserButton, OrganizationSwitcher } from "@/components/auth";
 import { useAuthContext } from "@/components/auth";
 import {
@@ -21,6 +24,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  badge?: number;
 }
 
 const navItems: NavItem[] = [
@@ -75,6 +79,11 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
     >
       {item.icon}
       {item.label}
+      {item.badge != null && item.badge > 0 && (
+        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-xs font-medium text-amber-400">
+          {item.badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -82,6 +91,26 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
 export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { organization } = useAuthContext();
+
+  const orgRole = organization?.role;
+  const canReview = orgRole === "admin" || orgRole === "team_lead";
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+  const stats = useQuery(
+    api.dashboard.getStats,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+  const pendingCount =
+    canReview && stats?.pendingRequests ? stats.pendingRequests.total : 0;
+
+  const navItemsWithBadges = useMemo(
+    () =>
+      navItems.map((item) =>
+        item.href === "/dashboard/variables" && pendingCount > 0
+          ? { ...item, badge: pendingCount }
+          : item
+      ),
+    [pendingCount]
+  );
 
   return (
     <>
@@ -110,7 +139,7 @@ export function DashboardNav() {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-3">
-            {navItems.map((item) => (
+            {navItemsWithBadges.map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
           </nav>
@@ -164,7 +193,7 @@ export function DashboardNav() {
 
               {/* Navigation */}
               <nav className="flex-1 space-y-1 p-3">
-                {navItems.map((item) => (
+                {navItemsWithBadges.map((item) => (
                   <NavLink
                     key={item.href}
                     item={item}
