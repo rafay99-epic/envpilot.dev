@@ -162,22 +162,29 @@ export default function TermsOfServicePage() {
               <Section id="definitions" n={2} title="Definitions">
                 <ul className="space-y-2 pl-4">
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">&ldquo;Organization&rdquo;</span>{" "}
+                    <span className="text-zinc-300">
+                      &ldquo;Organization&rdquo;
+                    </span>{" "}
                     &mdash; a workspace containing projects, team members, and
                     configuration data.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
                     <span className="text-zinc-300">&ldquo;Project&rdquo;</span>{" "}
-                    &mdash; a logical grouping of environment variables within an
-                    Organization.
+                    &mdash; a logical grouping of environment variables within
+                    an Organization.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">&ldquo;Variables&rdquo; / &ldquo;Secrets&rdquo;</span>{" "}
+                    <span className="text-zinc-300">
+                      &ldquo;Variables&rdquo; / &ldquo;Secrets&rdquo;
+                    </span>{" "}
                     &mdash; the environment variable key-value pairs you store
                     through the Service.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">&ldquo;Admin,&rdquo; &ldquo;Team Lead,&rdquo; &ldquo;Member&rdquo;</span>{" "}
+                    <span className="text-zinc-300">
+                      &ldquo;Admin,&rdquo; &ldquo;Team Lead,&rdquo;
+                      &ldquo;Member&rdquo;
+                    </span>{" "}
                     &mdash; role-based access tiers within an Organization.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
@@ -219,19 +226,18 @@ export default function TermsOfServicePage() {
                   <p>Three-tier role-based access control:</p>
                   <ul className="mt-2 space-y-1 pl-4">
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">Admin:</span>{" "}
-                      full access including rollback, permission management,
-                      billing, and org settings.
+                      <span className="text-zinc-300">Admin:</span> full access
+                      including rollback, permission management, billing, and
+                      org settings.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">Team Lead:</span>{" "}
-                      manage projects and variables, grant/revoke per-variable
-                      access.
+                      <span className="text-zinc-300">Team Lead:</span> manage
+                      projects and variables, grant/revoke per-variable access.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">Member:</span>{" "}
-                      read-only projects; requires explicit per-variable
-                      permission grants.
+                      <span className="text-zinc-300">Member:</span> read-only
+                      projects; requires explicit per-variable permission
+                      grants.
                     </li>
                   </ul>
                   <p className="mt-2">
@@ -247,13 +253,34 @@ export default function TermsOfServicePage() {
                   shall not:
                 </p>
                 <ul className="mt-3 space-y-2 pl-4">
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Store, transmit, or distribute unlawful, harmful, or abusive content.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Attempt unauthorized access to any part of the Service or other accounts.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Interfere with the Service through denial-of-service attacks, scraping, or excessive API usage.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Reverse engineer, decompile, or disassemble the Service, except where permitted by law.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Process content that infringes any third party&apos;s intellectual property rights.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Resell or redistribute access to the Service without our written consent.</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">Use the Service in any manner that could damage, disable, or impair it for other users.</li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Store, transmit, or distribute unlawful, harmful, or abusive
+                    content.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Attempt unauthorized access to any part of the Service or
+                    other accounts.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Interfere with the Service through denial-of-service
+                    attacks, scraping, or excessive API usage.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Reverse engineer, decompile, or disassemble the Service,
+                    except where permitted by law.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Process content that infringes any third party&apos;s
+                    intellectual property rights.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Resell or redistribute access to the Service without our
+                    written consent.
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-red-400 before:content-['x']">
+                    Use the Service in any manner that could damage, disable, or
+                    impair it for other users.
+                  </li>
                 </ul>
               </Section>
 
@@ -290,9 +317,9 @@ export default function TermsOfServicePage() {
 
                 <Subsection title="6.4 Data Export">
                   <p>
-                    You may export your environment variables at any time through
-                    the web application, CLI, or VS Code extension. We support
-                    standard .env file format for portability.
+                    You may export your environment variables at any time
+                    through the web application, CLI, or VS Code extension. We
+                    support standard .env file format for portability.
                   </p>
                 </Subsection>
               </Section>
@@ -361,7 +388,11 @@ export default function TermsOfServicePage() {
                 </p>
               </Section>
 
-              <Section id="audit-logging" n={10} title="Audit Logging and Monitoring">
+              <Section
+                id="audit-logging"
+                n={10}
+                title="Audit Logging and Monitoring"
+              >
                 <p>
                   All actions are recorded in audit logs, including action type,
                   user identity, timestamp, IP address, and user-agent. Audit
@@ -398,9 +429,8 @@ export default function TermsOfServicePage() {
                     AVAILABLE&rdquo; WITHOUT WARRANTIES OF ANY KIND, EITHER
                     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED
                     WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-                    PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT
-                    THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR
-                    ERROR-FREE.
+                    PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT
+                    THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE.
                   </p>
                   <p className="mt-3 text-xs uppercase tracking-wider text-amber-400">
                     SOME JURISDICTIONS DO NOT ALLOW THE EXCLUSION OF IMPLIED
@@ -437,12 +467,12 @@ export default function TermsOfServicePage() {
 
               <Section id="indemnification" n={14} title="Indemnification">
                 <p>
-                  You agree to indemnify, defend, and hold harmless Envpilot
-                  and its officers, directors, employees, agents, and licensors
-                  from claims, liabilities, damages, losses, and expenses
-                  (including legal fees) arising from: (a) your use of the
-                  Service; (b) violation of these Terms; (c) violation of
-                  third-party rights; or (d) your Content.
+                  You agree to indemnify, defend, and hold harmless Envpilot and
+                  its officers, directors, employees, agents, and licensors from
+                  claims, liabilities, damages, losses, and expenses (including
+                  legal fees) arising from: (a) your use of the Service; (b)
+                  violation of these Terms; (c) violation of third-party rights;
+                  or (d) your Content.
                 </p>
               </Section>
 
@@ -483,7 +513,11 @@ export default function TermsOfServicePage() {
                 </Subsection>
               </Section>
 
-              <Section id="consumer-protection" n={16} title="Consumer Protection">
+              <Section
+                id="consumer-protection"
+                n={16}
+                title="Consumer Protection"
+              >
                 <Subsection title="16.1 EU and UK">
                   <p>
                     If you are a consumer in the EU or UK, nothing in these
@@ -506,13 +540,17 @@ export default function TermsOfServicePage() {
                 <Subsection title="16.3 Japan">
                   <p>
                     If you are a consumer in Japan, the Consumer Contract Act
-                    (Act No. 61 of 2000) applies to the extent that it cannot
-                    be excluded by contract.
+                    (Act No. 61 of 2000) applies to the extent that it cannot be
+                    excluded by contract.
                   </p>
                 </Subsection>
               </Section>
 
-              <Section id="governing-law" n={17} title="Governing Law and Disputes">
+              <Section
+                id="governing-law"
+                n={17}
+                title="Governing Law and Disputes"
+              >
                 <Subsection title="17.1 Governing Law">
                   <p>
                     These Terms are governed by the laws of the State of
@@ -674,7 +712,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 border-b border-zinc-800/50 py-8 first:pt-0 last:border-b-0">
+    <section
+      id={id}
+      className="scroll-mt-24 border-b border-zinc-800/50 py-8 first:pt-0 last:border-b-0"
+    >
       <h2 className="text-base font-semibold text-zinc-100">
         <span className="text-green-500">{String(n).padStart(2, "0")}.</span>{" "}
         {title}

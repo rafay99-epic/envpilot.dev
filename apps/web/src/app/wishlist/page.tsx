@@ -20,7 +20,10 @@ type StatusFilter =
   | "in_progress"
   | "completed";
 
-const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
+const statusConfig: Record<
+  string,
+  { label: string; color: string; dot: string }
+> = {
   submitted: { label: "submitted", color: "text-zinc-400", dot: "bg-zinc-400" },
   under_review: {
     label: "under-review",
@@ -215,9 +218,7 @@ export default function WishlistPage() {
                             : "border-zinc-800 text-zinc-500 hover:border-zinc-700"
                         }`}
                       >
-                        {status === "all"
-                          ? "*"
-                          : status.replace("_", "-")}
+                        {status === "all" ? "*" : status.replace("_", "-")}
                       </button>
                     ))}
                   </div>
@@ -245,9 +246,7 @@ export default function WishlistPage() {
                 {!featureRequests ? (
                   <div className="flex items-center justify-center py-16">
                     <div className="text-xs text-zinc-600">
-                      <span className="animate-pulse text-green-500">
-                        &gt;
-                      </span>{" "}
+                      <span className="animate-pulse text-green-500">&gt;</span>{" "}
                       loading requests...
                     </div>
                   </div>
@@ -345,7 +344,9 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
           <h3 className="text-sm font-semibold text-zinc-100">
             {feature.title}
           </h3>
-          <span className={`flex items-center gap-1.5 text-[10px] ${status.color}`}>
+          <span
+            className={`flex items-center gap-1.5 text-[10px] ${status.color}`}
+          >
             <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
             {status.label}
           </span>
@@ -464,7 +465,9 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
           {/* Column header */}
           <div className="mb-4 flex items-center gap-2 border-b border-zinc-800 pb-3">
             <span className={`h-2 w-2 rounded-full ${col.dot}`} />
-            <h3 className={`text-xs font-bold uppercase tracking-wider ${col.color}`}>
+            <h3
+              className={`text-xs font-bold uppercase tracking-wider ${col.color}`}
+            >
               {col.title}
             </h3>
             <span className="ml-auto text-xs text-zinc-600">
@@ -475,9 +478,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
           {/* Cards */}
           <div className="space-y-3">
             {col.items.length === 0 ? (
-              <p className="py-6 text-center text-xs text-zinc-700">
-                # empty
-              </p>
+              <p className="py-6 text-center text-xs text-zinc-700"># empty</p>
             ) : (
               col.items.map((feature) => (
                 <div
@@ -499,10 +500,12 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                       "updatedAt" in feature &&
                       typeof feature.updatedAt === "number" && (
                         <span>
-                          {new Date(feature.updatedAt as number).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric" }
-                          )}
+                          {new Date(
+                            feature.updatedAt as number
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                       )}
                   </div>

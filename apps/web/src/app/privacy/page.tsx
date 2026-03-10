@@ -176,21 +176,35 @@ export default function PrivacyPolicyPage() {
                     (WorkOS AuthKit), we receive and store:
                   </p>
                   <ul className="mt-2 space-y-1 pl-4">
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Email address</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">First and last name (if provided)</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Profile picture URL (if provided)</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Account creation and last-active timestamps</li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Email address
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      First and last name (if provided)
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Profile picture URL (if provided)
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Account creation and last-active timestamps
+                    </li>
                   </ul>
                 </Subsection>
 
                 <Subsection title="3.2 Organization and Team Data">
-                  <p>
-                    When you create or join an organization, we store:
-                  </p>
+                  <p>When you create or join an organization, we store:</p>
                   <ul className="mt-2 space-y-1 pl-4">
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Organization name, description, and logo</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Membership details (your role: admin, team lead, or member)</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Invitation records (invitee email, assigned role, status, expiration)</li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Organization name, description, and logo
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Membership details (your role: admin, team lead, or
+                      member)
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Invitation records (invitee email, assigned role, status,
+                      expiration)
+                    </li>
                   </ul>
                 </Subsection>
 
@@ -211,11 +225,21 @@ export default function PrivacyPolicyPage() {
                     log entries include:
                   </p>
                   <ul className="mt-2 space-y-1 pl-4">
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Action type and timestamp</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">User who performed the action</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">IP address and user-agent string</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Request and session identifiers</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Geographic location derived from IP (country/region only)</li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Action type and timestamp
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      User who performed the action
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      IP address and user-agent string
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Request and session identifiers
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Geographic location derived from IP (country/region only)
+                    </li>
                   </ul>
                 </Subsection>
 
@@ -258,18 +282,18 @@ export default function PrivacyPolicyPage() {
                     controls.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Security:</span>{" "}
-                    detect unauthorized access, investigate incidents, maintain
-                    audit trails.
+                    <span className="text-zinc-300">Security:</span> detect
+                    unauthorized access, investigate incidents, maintain audit
+                    trails.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Billing:</span>{" "}
-                    process subscription payments, manage plan tiers, send
+                    <span className="text-zinc-300">Billing:</span> process
+                    subscription payments, manage plan tiers, send
                     payment-related communications.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Communications:</span>{" "}
-                    send team invitations and account-related notifications.
+                    <span className="text-zinc-300">Communications:</span> send
+                    team invitations and account-related notifications.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
                     <span className="text-zinc-300">Product improvement:</span>{" "}
@@ -317,7 +341,11 @@ export default function PrivacyPolicyPage() {
                 </Subsection>
               </Section>
 
-              <Section id="legal-bases" n={6} title="Legal Bases for Processing (EEA/UK)">
+              <Section
+                id="legal-bases"
+                n={6}
+                title="Legal Bases for Processing (EEA/UK)"
+              >
                 <p>
                   If you are in the European Economic Area or the United
                   Kingdom, we process your personal data under the following
@@ -325,23 +353,31 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <ul className="mt-3 space-y-2 pl-4">
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Contract (Art. 6(1)(b)):</span>{" "}
+                    <span className="text-zinc-300">
+                      Contract (Art. 6(1)(b)):
+                    </span>{" "}
                     processing necessary to provide the Service you signed up
                     for, including account management, authentication, secret
                     storage, and billing.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Legitimate interests (Art. 6(1)(f)):</span>{" "}
+                    <span className="text-zinc-300">
+                      Legitimate interests (Art. 6(1)(f)):
+                    </span>{" "}
                     security logging, fraud prevention, aggregate analytics for
                     product improvement, and maintaining platform integrity.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Legal obligation (Art. 6(1)(c)):</span>{" "}
+                    <span className="text-zinc-300">
+                      Legal obligation (Art. 6(1)(c)):
+                    </span>{" "}
                     where required to comply with applicable laws or lawful
                     government requests.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Consent (Art. 6(1)(a)):</span>{" "}
+                    <span className="text-zinc-300">
+                      Consent (Art. 6(1)(a)):
+                    </span>{" "}
                     where applicable, such as optional communications. You may
                     withdraw consent at any time.
                   </li>
@@ -366,22 +402,30 @@ export default function PrivacyPolicyPage() {
                       <tr>
                         <td className="px-4 py-3 text-green-400">WorkOS</td>
                         <td className="px-4 py-3">Auth, encrypted vault</td>
-                        <td className="px-4 py-3">Email, name, tokens, encrypted secrets</td>
+                        <td className="px-4 py-3">
+                          Email, name, tokens, encrypted secrets
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-green-400">Convex</td>
                         <td className="px-4 py-3">Real-time database</td>
-                        <td className="px-4 py-3">Account metadata, project data, audit logs</td>
+                        <td className="px-4 py-3">
+                          Account metadata, project data, audit logs
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-green-400">Stripe</td>
                         <td className="px-4 py-3">Payment processing</td>
-                        <td className="px-4 py-3">Email, billing address, payment method</td>
+                        <td className="px-4 py-3">
+                          Email, billing address, payment method
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-green-400">Resend</td>
                         <td className="px-4 py-3">Transactional email</td>
-                        <td className="px-4 py-3">Recipient email, invitation details</td>
+                        <td className="px-4 py-3">
+                          Recipient email, invitation details
+                        </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-green-400">Vercel</td>
@@ -397,16 +441,28 @@ export default function PrivacyPolicyPage() {
                 </p>
               </Section>
 
-              <Section id="international-transfers" n={8} title="International Data Transfers">
+              <Section
+                id="international-transfers"
+                n={8}
+                title="International Data Transfers"
+              >
                 <p>
                   Your data may be transferred to and processed in the United
                   States and other countries where our providers operate. For
                   transfers from the EEA, UK, or Switzerland, we rely on:
                 </p>
                 <ul className="mt-3 space-y-1 pl-4">
-                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Standard Contractual Clauses (SCCs) approved by the European Commission</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">The EU-U.S. Data Privacy Framework, where applicable</li>
-                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Supplementary technical measures including end-to-end encryption</li>
+                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                    Standard Contractual Clauses (SCCs) approved by the European
+                    Commission
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                    The EU-U.S. Data Privacy Framework, where applicable
+                  </li>
+                  <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                    Supplementary technical measures including end-to-end
+                    encryption
+                  </li>
                 </ul>
                 <p className="mt-3">
                   For Asia-Pacific jurisdictions (Japan, South Korea, Singapore,
@@ -433,20 +489,25 @@ export default function PrivacyPolicyPage() {
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="px-4 py-3 text-green-400">wos-session</td>
+                        <td className="px-4 py-3 text-green-400">
+                          wos-session
+                        </td>
                         <td className="px-4 py-3">Auth session</td>
-                        <td className="px-4 py-3">Strictly necessary, HTTP-only, Secure</td>
+                        <td className="px-4 py-3">
+                          Strictly necessary, HTTP-only, Secure
+                        </td>
                         <td className="px-4 py-3">Session</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <p className="mt-4">
-                  We do not use analytics cookies, advertising cookies, marketing
-                  trackers, or third-party tracking pixels. Since we only use
-                  strictly necessary cookies, no consent banner is required under
-                  the ePrivacy Directive. If we introduce non-essential cookies
-                  in the future, we will obtain your consent first.
+                  We do not use analytics cookies, advertising cookies,
+                  marketing trackers, or third-party tracking pixels. Since we
+                  only use strictly necessary cookies, no consent banner is
+                  required under the ePrivacy Directive. If we introduce
+                  non-essential cookies in the future, we will obtain your
+                  consent first.
                 </p>
               </Section>
 
@@ -458,8 +519,8 @@ export default function PrivacyPolicyPage() {
                     account deletion request.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                    <span className="text-zinc-300">Audit logs:</span>{" "}
-                    retained for 2 years from creation, then purged.
+                    <span className="text-zinc-300">Audit logs:</span> retained
+                    for 2 years from creation, then purged.
                   </li>
                   <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
                     <span className="text-zinc-300">Secret values:</span>{" "}
@@ -487,14 +548,38 @@ export default function PrivacyPolicyPage() {
                 <Subsection title="11.1 GDPR Rights (EEA/UK)">
                   <p>You have the right to:</p>
                   <ul className="mt-2 space-y-1 pl-4">
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Access</span> your personal data and obtain a copy</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Rectify</span> inaccurate or incomplete data</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Erase</span> your data (&ldquo;right to be forgotten&rdquo;)</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Restrict</span> processing of your data</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Port</span> your data in a structured, machine-readable format</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Object</span> to processing based on legitimate interests</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Withdraw consent</span> at any time</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']"><span className="text-zinc-300">Lodge a complaint</span> with your local data protection authority</li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Access</span> your
+                      personal data and obtain a copy
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Rectify</span> inaccurate
+                      or incomplete data
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Erase</span> your data
+                      (&ldquo;right to be forgotten&rdquo;)
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Restrict</span> processing
+                      of your data
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Port</span> your data in a
+                      structured, machine-readable format
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Object</span> to
+                      processing based on legitimate interests
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Withdraw consent</span> at
+                      any time
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">Lodge a complaint</span>{" "}
+                      with your local data protection authority
+                    </li>
                   </ul>
                 </Subsection>
 
@@ -505,11 +590,22 @@ export default function PrivacyPolicyPage() {
                     with comprehensive privacy laws, you have the right to:
                   </p>
                   <ul className="mt-2 space-y-1 pl-4">
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Know what personal information we collect and why</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Request deletion of your personal information</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Opt out of sale or sharing (we do not sell or share your data)</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Non-discrimination for exercising your rights</li>
-                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">Correct inaccurate personal information</li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Know what personal information we collect and why
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Request deletion of your personal information
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Opt out of sale or sharing (we do not sell or share your
+                      data)
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Non-discrimination for exercising your rights
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Correct inaccurate personal information
+                    </li>
                   </ul>
                   <p className="mt-3">
                     We do not sell personal information as defined by the CCPA.
@@ -520,8 +616,8 @@ export default function PrivacyPolicyPage() {
                 <Subsection title="11.3 Asia-Pacific Privacy Laws">
                   <ul className="mt-2 space-y-2 pl-4">
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">Japan (APPI):</span>{" "}
-                      You may request disclosure, correction, or deletion. We
+                      <span className="text-zinc-300">Japan (APPI):</span> You
+                      may request disclosure, correction, or deletion. We
                       transfer data internationally using contractual
                       safeguards.
                     </li>
@@ -536,10 +632,9 @@ export default function PrivacyPolicyPage() {
                       required.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">India (DPDPA):</span>{" "}
-                      You may access, correct, erase, and port your data. You
-                      may nominate another person to exercise rights on your
-                      behalf.
+                      <span className="text-zinc-300">India (DPDPA):</span> You
+                      may access, correct, erase, and port your data. You may
+                      nominate another person to exercise rights on your behalf.
                     </li>
                   </ul>
                 </Subsection>
@@ -560,7 +655,7 @@ export default function PrivacyPolicyPage() {
                 </Subsection>
               </Section>
 
-              <Section id="childrens-privacy" n={12} title="Children&apos;s Privacy">
+              <Section id="childrens-privacy" n={12} title="Children's Privacy">
                 <p>
                   The Service is not directed at individuals under 16 years of
                   age (or the applicable minimum age in your jurisdiction). We
@@ -570,7 +665,11 @@ export default function PrivacyPolicyPage() {
                 </p>
               </Section>
 
-              <Section id="breach-notification" n={13} title="Data Breach Notification">
+              <Section
+                id="breach-notification"
+                n={13}
+                title="Data Breach Notification"
+              >
                 <p>
                   In the event of a personal data breach likely to result in a
                   risk to your rights and freedoms, we will notify the relevant
@@ -659,7 +758,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 border-b border-zinc-800/50 py-8 first:pt-0 last:border-b-0">
+    <section
+      id={id}
+      className="scroll-mt-24 border-b border-zinc-800/50 py-8 first:pt-0 last:border-b-0"
+    >
       <h2 className="text-base font-semibold text-zinc-100">
         <span className="text-green-500">{String(n).padStart(2, "0")}.</span>{" "}
         {title}
