@@ -52,6 +52,21 @@ export const listByOrganization = query({
   },
 });
 
+export const countByOrganization = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_org_and_created", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    return logs.length;
+  },
+});
+
 export const listByProject = query({
   args: {
     projectId: v.id("projects"),

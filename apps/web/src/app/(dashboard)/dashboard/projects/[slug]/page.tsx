@@ -6,6 +6,9 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { AnimatedList } from "@/components/dashboard/animated-list";
+import { usePagination } from "@/hooks";
 import { PERMISSIONS } from "@/lib/auth";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
 import { ProjectIcon } from "@/components/ui";
@@ -43,6 +46,7 @@ interface Variable {
   version: number;
   createdAt: number;
   updatedAt: number;
+  vaultRef?: string;
   permission?: "read" | "write" | "admin" | null;
 }
 
@@ -118,6 +122,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   // User state (for request cancellation)
   const [convexUserId, setConvexUserId] = useState<Id<"users"> | null>(null);
 
+  // Reveal value state
+  const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
+    {}
+  );
+  const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     async function fetchUser() {
       try {
@@ -171,9 +181,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     setIsLoadingVariables(true);
     try {
       const params = new URLSearchParams({ projectId: project._id });
-      if (selectedEnvironment !== "all") {
-        params.set("environment", selectedEnvironment);
-      }
 
       const response = await fetch(`/api/variables?${params.toString()}`);
       const data = await response.json();
@@ -187,7 +194,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     } finally {
       setIsLoadingVariables(false);
     }
-  }, [project, selectedEnvironment]);
+  }, [project]);
 
   const fetchRequests = useCallback(async () => {
     if (!project) return;
@@ -401,6 +408,40 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
+  const handleRevealValue = async (variable: Variable) => {
+    if (revealedValues[variable._id]) return;
+    if (!variable.vaultRef || !organization?.id) return;
+
+    setRevealingIds((prev) => new Set(prev).add(variable._id));
+    try {
+      const res = await fetch(
+        `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to read secret");
+      setRevealedValues((prev) => ({
+        ...prev,
+        [variable._id]: data.data.value,
+      }));
+    } catch {
+      setError("Failed to reveal variable value.");
+    } finally {
+      setRevealingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(variable._id);
+        return next;
+      });
+    }
+  };
+
+  const filteredVariables =
+    selectedEnvironment === "all"
+      ? variables
+      : variables.filter((v) => v.environments.includes(selectedEnvironment));
+
+  const variablePagination = usePagination(filteredVariables, { pageSize: 10 });
+  const requestPagination = usePagination(requests, { pageSize: 5 });
+
   const formatDate = (timestamp: number) =>
     new Intl.DateTimeFormat("en-US", {
       dateStyle: "short",
@@ -554,7 +595,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               Environment Variables
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {variables.length} variable{variables.length !== 1 ? "s" : ""}
+              {filteredVariables.length} variable
+              {filteredVariables.length !== 1 ? "s" : ""}
               {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
             </p>
           </div>
@@ -590,7 +632,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {isLoadingVariables ? (
             <TerminalLoading />
-          ) : variables.length === 0 ? (
+          ) : filteredVariables.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
                 <svg
@@ -617,18 +659,40 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               </p>
             </div>
           ) : (
-            variables.map((variable) => (
-              <VariableListItem
-                key={variable._id}
-                variable={variable}
-                onEdit={() => setEditingVariable(variable)}
-                onDelete={() => setDeletingVariable(variable)}
-                onViewHistory={() => handleViewHistory(variable)}
-                canEdit={canUpdateVariable}
-                canDelete={canDeleteVariable}
-                permissionLevel={variable.permission ?? null}
+            <>
+              <AnimatedList
+                className="divide-y divide-zinc-200 dark:divide-zinc-800"
+                pageKey={variablePagination.currentPage}
+              >
+                {variablePagination.pageItems.map((variable) => (
+                  <VariableListItem
+                    key={variable._id}
+                    variable={variable}
+                    onEdit={() => setEditingVariable(variable)}
+                    onDelete={() => setDeletingVariable(variable)}
+                    onViewHistory={() => handleViewHistory(variable)}
+                    onReveal={() => handleRevealValue(variable)}
+                    revealedValue={revealedValues[variable._id] ?? null}
+                    isRevealing={revealingIds.has(variable._id)}
+                    canEdit={canUpdateVariable}
+                    canDelete={canDeleteVariable}
+                    permissionLevel={variable.permission ?? null}
+                  />
+                ))}
+              </AnimatedList>
+              <Pagination
+                currentPage={variablePagination.currentPage}
+                totalPages={variablePagination.totalPages}
+                hasNextPage={variablePagination.hasNextPage}
+                hasPrevPage={variablePagination.hasPrevPage}
+                onNextPage={variablePagination.nextPage}
+                onPrevPage={variablePagination.prevPage}
+                onGoToPage={variablePagination.goToPage}
+                startIndex={variablePagination.startIndex}
+                endIndex={variablePagination.endIndex}
+                totalItems={variablePagination.totalItems}
               />
-            ))
+            </>
           )}
         </div>
       </div>
@@ -649,85 +713,104 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               No requests yet.
             </div>
           ) : (
-            requests.map((request) => (
-              <div key={request._id} className="px-6 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {request.key}
-                      </code>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          request.status === "approved"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : request.status === "rejected"
-                              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              : request.status === "canceled"
-                                ? "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
-                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        }`}
-                      >
-                        {request.status}
-                      </span>
+            <>
+              <AnimatedList
+                className="divide-y divide-zinc-200 dark:divide-zinc-800"
+                pageKey={requestPagination.currentPage}
+              >
+                {requestPagination.pageItems.map((request) => (
+                  <div key={request._id} className="px-6 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                            {request.key}
+                          </code>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              request.status === "approved"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                : request.status === "rejected"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  : request.status === "canceled"
+                                    ? "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                            }`}
+                          >
+                            {request.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                          Requested by{" "}
+                          {request.requester?.name ??
+                            request.requester?.email ??
+                            "Unknown"}
+                          {" · "}
+                          {formatDate(request.createdAt)}
+                        </p>
+                        {request.description && (
+                          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                            {request.description}
+                          </p>
+                        )}
+                        {request.reviewReason && (
+                          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                            Review note: {request.reviewReason}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {canReviewRequests && request.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() =>
+                                updateRequestStatus(request._id, "approve")
+                              }
+                              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateRequestStatus(request._id, "reject")
+                              }
+                              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {!canReviewRequests &&
+                          convexUserId &&
+                          request.status === "pending" &&
+                          request.requestedBy === convexUserId && (
+                            <button
+                              onClick={() =>
+                                updateRequestStatus(request._id, "cancel")
+                              }
+                              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Requested by{" "}
-                      {request.requester?.name ??
-                        request.requester?.email ??
-                        "Unknown"}
-                      {" · "}
-                      {formatDate(request.createdAt)}
-                    </p>
-                    {request.description && (
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-                        {request.description}
-                      </p>
-                    )}
-                    {request.reviewReason && (
-                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        Review note: {request.reviewReason}
-                      </p>
-                    )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {canReviewRequests && request.status === "pending" && (
-                      <>
-                        <button
-                          onClick={() =>
-                            updateRequestStatus(request._id, "approve")
-                          }
-                          className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() =>
-                            updateRequestStatus(request._id, "reject")
-                          }
-                          className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    {!canReviewRequests &&
-                      convexUserId &&
-                      request.status === "pending" &&
-                      request.requestedBy === convexUserId && (
-                        <button
-                          onClick={() =>
-                            updateRequestStatus(request._id, "cancel")
-                          }
-                          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                  </div>
-                </div>
-              </div>
-            ))
+                ))}
+              </AnimatedList>
+              <Pagination
+                currentPage={requestPagination.currentPage}
+                totalPages={requestPagination.totalPages}
+                hasNextPage={requestPagination.hasNextPage}
+                hasPrevPage={requestPagination.hasPrevPage}
+                onNextPage={requestPagination.nextPage}
+                onPrevPage={requestPagination.prevPage}
+                onGoToPage={requestPagination.goToPage}
+                startIndex={requestPagination.startIndex}
+                endIndex={requestPagination.endIndex}
+                totalItems={requestPagination.totalItems}
+              />
+            </>
           )}
         </div>
       </div>

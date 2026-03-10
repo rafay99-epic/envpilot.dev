@@ -85,6 +85,9 @@ export {
   type TierAction,
 } from "./useTierLimits";
 
+// Pagination hook
+export { usePagination } from "./usePagination";
+
 // Convex user hook
 export { useConvexUser } from "./useConvexUser";
 
@@ -98,6 +101,7 @@ export {
 // Audit log hooks
 export {
   useOrganizationAuditLogs,
+  useOrganizationAuditLogCount,
   useProjectAuditLogs,
   useVariableAuditLogs,
   useSecurityEvents,

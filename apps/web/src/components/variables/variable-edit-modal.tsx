@@ -1,6 +1,6 @@
 "use client";
 
-import { Modal } from "@/components/ui";
+import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import type { Id } from "@convex/_generated/dataModel";
 import type { Environment } from "@/constants/project";
@@ -29,30 +29,33 @@ export function VariableEditModal({
   variable,
   onSave,
 }: VariableEditModalProps) {
-  if (!variable) return null;
-
-  const initialData: Partial<VariableFormData> = {
-    key: variable.key,
-    value: "", // Empty for security - user must re-enter to change
-    description: variable.description || "",
-    environments: variable.environments as Environment[],
-    isSensitive: variable.isSensitive,
-  };
+  const initialData: Partial<VariableFormData> | undefined = variable
+    ? {
+        key: variable.key,
+        value: "", // Empty for security - user must re-enter to change
+        description: variable.description || "",
+        environments: variable.environments as Environment[],
+        isSensitive: variable.isSensitive,
+      }
+    : undefined;
 
   const handleSubmit = async (data: VariableFormData) => {
+    if (!variable) return;
     await onSave(variable._id, data);
     onClose();
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Variable" size="lg">
-      <VariableForm
-        initialData={initialData}
-        onSubmit={handleSubmit}
-        onCancel={onClose}
-        submitLabel="Update Variable"
-        isEditing
-      />
-    </Modal>
+    <DrawerPanel isOpen={isOpen} onClose={onClose} title="Edit Variable">
+      {initialData && (
+        <VariableForm
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          onCancel={onClose}
+          submitLabel="Update Variable"
+          isEditing
+        />
+      )}
+    </DrawerPanel>
   );
 }
