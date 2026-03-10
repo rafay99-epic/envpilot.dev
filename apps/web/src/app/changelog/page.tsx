@@ -5,6 +5,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useChangelogEntries } from "@/hooks";
+import { ChevronRight } from "lucide-react";
 
 type ChangelogType =
   | "feature"
@@ -15,32 +16,37 @@ type ChangelogType =
 
 const TYPE_CONFIG: Record<
   ChangelogType,
-  { label: string; color: string; bgColor: string }
+  { label: string; color: string; dot: string; prefix: string }
 > = {
   feature: {
-    label: "Feature",
-    color: "text-emerald-700 dark:text-emerald-400",
-    bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+    label: "feature",
+    color: "text-emerald-400",
+    dot: "bg-emerald-400",
+    prefix: "+",
   },
   fix: {
-    label: "Bug Fix",
-    color: "text-red-700 dark:text-red-400",
-    bgColor: "bg-red-100 dark:bg-red-900/30",
+    label: "fix",
+    color: "text-red-400",
+    dot: "bg-red-400",
+    prefix: "!",
   },
   improvement: {
-    label: "Improvement",
-    color: "text-blue-700 dark:text-blue-400",
-    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    label: "improvement",
+    color: "text-blue-400",
+    dot: "bg-blue-400",
+    prefix: "~",
   },
   security: {
-    label: "Security",
-    color: "text-amber-700 dark:text-amber-400",
-    bgColor: "bg-amber-100 dark:bg-amber-900/30",
+    label: "security",
+    color: "text-amber-400",
+    dot: "bg-amber-400",
+    prefix: "#",
   },
   breaking: {
-    label: "Breaking",
-    color: "text-purple-700 dark:text-purple-400",
-    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    label: "breaking",
+    color: "text-purple-400",
+    dot: "bg-purple-400",
+    prefix: "!!",
   },
 };
 
@@ -61,102 +67,112 @@ export default function ChangelogPage() {
     : entries;
 
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
       {/* Header */}
-      <header className="border-b border-zinc-200 dark:border-zinc-800">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 dark:bg-zinc-100">
-              <svg
-                className="h-4 w-4 text-white dark:text-zinc-900"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-              </svg>
-            </div>
-            <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Envpilot
-            </span>
+            <span className="text-green-400">$</span>
+            <span className="font-bold text-zinc-100">envpilot</span>
+            <span className="text-xs text-zinc-600">v1.0</span>
           </Link>
 
-          <nav className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              Home
-            </Link>
+          <nav className="hidden items-center gap-6 md:flex">
+            {[
+              { label: "Changelog", href: "/changelog" },
+              { label: "Wishlist", href: "/wishlist" },
+              { label: "Docs", href: "/docs" },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="text-xs text-zinc-500 transition-colors hover:text-green-400"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3">
             <Link
               href="/sign-in"
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
             >
-              Sign In
+              sign-in
             </Link>
-          </nav>
+            <Link
+              href="/sign-up"
+              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
+            >
+              get-started
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1">
-        <div className="container mx-auto px-4 py-12 md:px-6 lg:py-16">
-          {/* Page Header */}
-          <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-5xl">
-              Changelog
-            </h1>
-            <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
-              All the latest updates, improvements, and fixes to Envpilot.
+      <main className="pt-14">
+        {/* Hero */}
+        <section className="border-b border-zinc-800/50 py-16">
+          <div className="mx-auto max-w-5xl px-4">
+            <p className="text-xs uppercase tracking-widest text-green-500">
+              {"// changelog"}
             </p>
-          </div>
+            <h1 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
+              What&apos;s new in Envpilot
+            </h1>
+            <p className="mt-3 max-w-xl text-sm text-zinc-500">
+              All the latest updates, improvements, and fixes. Follow along as
+              we build.
+            </p>
 
-          {/* Filter Tabs */}
-          <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => setSelectedType(null)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                selectedType === null
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-              }`}
-            >
-              All Updates
-            </button>
-            {ALL_TYPES.map((type) => {
-              const config = TYPE_CONFIG[type];
-              return (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    selectedType === type
-                      ? `${config.bgColor} ${config.color}`
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                  }`}
-                >
-                  {config.label}
-                </button>
-              );
-            })}
+            {/* Filter pills */}
+            <div className="mt-8 flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedType(null)}
+                className={`rounded border px-3 py-1.5 text-xs transition-all ${
+                  selectedType === null
+                    ? "border-green-500/30 bg-green-500/10 text-green-400"
+                    : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
+                }`}
+              >
+                all
+              </button>
+              {ALL_TYPES.map((type) => {
+                const config = TYPE_CONFIG[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedType(type)}
+                    className={`rounded border px-3 py-1.5 text-xs transition-all ${
+                      selectedType === type
+                        ? "border-green-500/30 bg-green-500/10 text-green-400"
+                        : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
+                    }`}
+                  >
+                    <span className={config.color}>{config.prefix}</span>{" "}
+                    {config.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        </section>
 
-          {/* Changelog Entries */}
-          <div className="mx-auto max-w-3xl">
+        {/* Entries */}
+        <section className="py-12">
+          <div className="mx-auto max-w-5xl px-4">
             {isLoading ? (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-6 w-32 rounded bg-zinc-200 dark:bg-zinc-700" />
-                    <div className="mt-4 h-8 w-3/4 rounded bg-zinc-200 dark:bg-zinc-700" />
+                  <div
+                    key={i}
+                    className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6"
+                  >
+                    <div className="h-4 w-24 animate-pulse rounded bg-zinc-800" />
+                    <div className="mt-4 h-6 w-2/3 animate-pulse rounded bg-zinc-800" />
                     <div className="mt-4 space-y-2">
-                      <div className="h-4 w-full rounded bg-zinc-200 dark:bg-zinc-700" />
-                      <div className="h-4 w-5/6 rounded bg-zinc-200 dark:bg-zinc-700" />
+                      <div className="h-3 w-full animate-pulse rounded bg-zinc-800" />
+                      <div className="h-3 w-4/5 animate-pulse rounded bg-zinc-800" />
                     </div>
                   </div>
                 ))}
@@ -164,9 +180,9 @@ export default function ChangelogPage() {
             ) : filteredEntries && filteredEntries.length > 0 ? (
               <div className="relative">
                 {/* Timeline line */}
-                <div className="absolute left-0 top-0 hidden h-full w-px bg-zinc-200 dark:bg-zinc-800 md:block md:left-[60px]" />
+                <div className="absolute left-[7px] top-2 hidden h-[calc(100%-16px)] w-px bg-zinc-800 md:block" />
 
-                <div className="space-y-12">
+                <div className="space-y-8">
                   {filteredEntries.map((entry) => (
                     <ChangelogEntry
                       key={entry._id}
@@ -180,60 +196,48 @@ export default function ChangelogPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <svg
-                  className="mx-auto h-12 w-12 text-zinc-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                  />
-                </svg>
-                <h3 className="mt-4 text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                  No updates yet
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-12 text-center">
+                <p className="text-sm text-zinc-500">
+                  <span className="text-green-500">$</span> envpilot changelog
+                  --filter {selectedType ?? "all"}
+                </p>
+                <p className="mt-2 text-xs text-zinc-600">
                   {selectedType
-                    ? `No ${TYPE_CONFIG[selectedType].label.toLowerCase()} updates found.`
-                    : "Check back soon for product updates and improvements."}
+                    ? `No ${TYPE_CONFIG[selectedType].label} updates found.`
+                    : "No updates yet. Check back soon."}
                 </p>
               </div>
             )}
           </div>
-        </div>
+        </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-200 py-12 dark:border-zinc-800">
-        <div className="container mx-auto px-4 text-center md:px-6">
-          <div className="flex items-center justify-center gap-6 text-sm text-zinc-500 dark:text-zinc-400">
-            <Link
-              href="/"
-              className="hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              Home
-            </Link>
-            <Link
-              href="/wishlist"
-              className="hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              Wishlist
-            </Link>
-            <Link
-              href="/changelog"
-              className="hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              Changelog
-            </Link>
+      <footer className="border-t border-zinc-800/50 py-8">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex items-center gap-2 text-xs text-zinc-600">
+              <span className="text-green-500">$</span> envpilot --version{" "}
+              <span className="text-zinc-500">1.0.0</span>
+            </div>
+            <div className="flex gap-4 text-xs text-zinc-600">
+              <Link href="/docs" className="hover:text-zinc-400">
+                Docs
+              </Link>
+              <Link href="/changelog" className="hover:text-zinc-400">
+                Changelog
+              </Link>
+              <Link href="/privacy" className="hover:text-zinc-400">
+                Privacy
+              </Link>
+              <Link href="/terms" className="hover:text-zinc-400">
+                Terms
+              </Link>
+            </div>
+            <p className="text-xs text-zinc-700">
+              &copy; {new Date().getFullYear()} Envpilot
+            </p>
           </div>
-          <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-            &copy; {new Date().getFullYear()} Envpilot. All rights reserved.
-          </p>
         </div>
       </footer>
     </div>
@@ -257,46 +261,38 @@ function ChangelogEntry({
   const date = new Date(publishedAt);
   const formattedDate = date.toLocaleDateString("en-US", {
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
   });
 
   return (
-    <article className="relative pl-0 md:pl-24">
-      {/* Date marker for timeline (desktop) */}
-      <div className="absolute left-0 top-0 hidden text-right md:block">
-        <time className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        </time>
-      </div>
+    <article className="group relative pl-0 md:pl-8">
+      {/* Timeline dot */}
+      <div
+        className={`absolute left-0 top-[22px] hidden h-[15px] w-[15px] rounded-full border-2 border-zinc-950 md:block ${config.dot}`}
+      />
 
-      {/* Timeline dot (desktop) */}
-      <div className="absolute left-[56px] top-1.5 hidden h-2 w-2 rounded-full bg-zinc-400 ring-4 ring-white dark:bg-zinc-600 dark:ring-zinc-950 md:block" />
-
-      {/* Entry content */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        {/* Header */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${config.bgColor} ${config.color}`}
-          >
-            {config.label}
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 transition-colors hover:border-zinc-700">
+        {/* Header row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <time className="text-xs text-zinc-500">{formattedDate}</time>
+          <span className="text-zinc-700">&middot;</span>
+          <span className={`text-xs font-medium ${config.color}`}>
+            [{config.prefix}] {config.label}
           </span>
-          <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
             {version}
           </span>
-          <time className="text-sm text-zinc-500 dark:text-zinc-400 md:hidden">
-            {formattedDate}
-          </time>
         </div>
 
         {/* Title */}
-        <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="mt-3 flex items-center gap-2 text-lg font-semibold text-zinc-100">
+          <ChevronRight className="h-4 w-4 text-green-500" />
           {title}
         </h2>
 
         {/* Markdown Content */}
-        <div className="prose prose-zinc max-w-none dark:prose-invert prose-headings:font-semibold prose-h3:text-lg prose-h4:text-base prose-a:text-blue-600 prose-a:no-underline prose-a:hover:underline prose-code:rounded prose-code:bg-zinc-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-sm prose-code:before:content-none prose-code:after:content-none dark:prose-a:text-blue-400 dark:prose-code:bg-zinc-800">
+        <div className="mt-4 text-sm leading-relaxed text-zinc-400 [&_a]:text-blue-400 [&_a]:hover:underline [&_code]:rounded [&_code]:bg-zinc-800 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_code]:text-green-400 [&_h3]:mt-4 [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h4]:mt-3 [&_h4]:font-medium [&_h4]:text-zinc-300 [&_li]:ml-4 [&_li]:list-disc [&_p]:mt-2 [&_ul]:mt-2 [&_ul]:space-y-1">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       </div>
