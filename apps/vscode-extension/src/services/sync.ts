@@ -485,6 +485,7 @@ export class SyncService {
   async linkProject(
     projectId: string,
     projectName: string,
+    organizationId: string,
     organizationName: string,
     accessToken: string,
     expiresAt: number
@@ -498,6 +499,7 @@ export class SyncService {
     const linkedProject: LinkedProject = {
       projectId,
       projectName,
+      organizationId,
       organizationName,
       accessToken,
       expiresAt,
@@ -995,6 +997,7 @@ export class SyncService {
   async linkProjectWithDirectory(
     projectId: string,
     projectName: string,
+    organizationId: string,
     organizationName: string,
     accessToken: string,
     expiresAt: number,
@@ -1024,6 +1027,7 @@ export class SyncService {
     await this.storage.addLinkedProjectV2(
       projectId,
       projectName,
+      organizationId,
       organizationName,
       accessToken,
       expiresAt,

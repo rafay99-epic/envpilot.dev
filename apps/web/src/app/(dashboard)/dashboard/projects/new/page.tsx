@@ -219,6 +219,14 @@ export default function NewProjectPage() {
               ? "Choose a template to get started quickly"
               : "Configure your project details"}
           </p>
+          {organization && (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Creating in{" "}
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                {organization.name}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

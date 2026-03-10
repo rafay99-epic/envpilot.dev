@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",

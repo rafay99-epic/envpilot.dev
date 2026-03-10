@@ -154,13 +154,17 @@ export const pushCommand = new Command("push")
       const remoteVariables = await withSpinner(
         "Fetching current variables...",
         async () => {
+          const params: Record<string, string> = {
+            projectId: projectConfig.projectId,
+            environment,
+          };
+          if (projectConfig.organizationId) {
+            params.organizationId = projectConfig.organizationId;
+          }
           const response = await api.get<{
             success: boolean;
             data: Variable[];
-          }>("/api/cli/variables", {
-            projectId: projectConfig.projectId,
-            environment,
-          });
+          }>("/api/cli/variables", params);
           return response.data || [];
         }
       );
@@ -265,6 +269,9 @@ export const pushCommand = new Command("push")
               value,
             })),
             mode,
+            ...(projectConfig.organizationId && {
+              organizationId: projectConfig.organizationId,
+            }),
           });
           return response.data;
         }

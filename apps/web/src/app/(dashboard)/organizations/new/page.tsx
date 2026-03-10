@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { setActiveOrganizationCookie } from "@/lib/organization-context";
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -56,7 +57,9 @@ export default function NewOrganizationPage() {
         throw new Error(data.error || "Failed to create organization");
       }
 
+      setActiveOrganizationCookie(data.organization._id);
       router.push(`/organizations/${data.organization.slug}`);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsSubmitting(false);

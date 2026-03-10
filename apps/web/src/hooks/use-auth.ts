@@ -69,6 +69,13 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     }
   }, [initialData, fetchUser]);
 
+  // Re-fetch auth state when active organization changes (cookie update)
+  useEffect(() => {
+    const handler = () => fetchUser();
+    window.addEventListener("org-context-changed", handler);
+    return () => window.removeEventListener("org-context-changed", handler);
+  }, [fetchUser]);
+
   const signOutHandler = useCallback(async () => {
     window.location.href = "/sign-out";
   }, []);

@@ -256,11 +256,15 @@ export class APIClient {
    */
   async listVariables(
     projectId: string,
-    environment?: string
+    environment?: string,
+    organizationId?: string
   ): Promise<Variable[]> {
     const params: Record<string, string> = { projectId };
     if (environment) {
       params.environment = environment;
+    }
+    if (organizationId) {
+      params.organizationId = organizationId;
     }
     const response = await this.get<ApiResponse<Variable[]>>(
       "/api/cli/variables",
@@ -286,6 +290,7 @@ export class APIClient {
     environment: string;
     description?: string;
     isSensitive?: boolean;
+    organizationId?: string;
   }): Promise<Variable> {
     return this.post<Variable>("/api/cli/variables", data);
   }
@@ -324,6 +329,7 @@ export class APIClient {
       isSensitive?: boolean;
     }>;
     mode: "merge" | "replace";
+    organizationId?: string;
   }): Promise<{ created: number; updated: number; deleted: number }> {
     return this.post("/api/cli/variables/bulk", data);
   }
