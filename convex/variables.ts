@@ -159,7 +159,7 @@ export const listWithAccess = query({
       return [];
     }
 
-    // Get user's membership to determine their role
+    // Get user's org membership to determine their role
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -169,6 +169,24 @@ export const listWithAccess = query({
 
     if (!membership) {
       return [];
+    }
+
+    const isOrgAdmin = membership.role === "admin";
+
+    // For non-admins, check project membership
+    let projectRole: string | null = null;
+    if (!isOrgAdmin) {
+      const projectMembership = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", args.projectId).eq("userId", args.userId)
+        )
+        .first();
+
+      if (!projectMembership) {
+        return []; // No project access
+      }
+      projectRole = projectMembership.role;
     }
 
     const variables = await ctx.db
@@ -187,46 +205,61 @@ export const listWithAccess = query({
           .filter((q) => q.eq(q.field("isActive"), true))
           .first();
 
-        // Check if permission is expired
         const now = Date.now();
         const isPermissionValid =
           permission && (!permission.expiresAt || permission.expiresAt > now);
 
-        // Admins and Team Leads have full access by role
-        const hasRoleBasedAccess =
-          membership.role === "admin" || membership.role === "team_lead";
-        // Members are read-only by default in pre-alpha.
-        const hasDefaultMemberReadAccess = membership.role === "member";
+        // Determine access based on org role + project role
+        let hasAccess = false;
+        let effectivePermission: string | null = null;
+        let roleAccess = false;
+        let canManagePermissions = false;
 
-        // Optional explicit per-variable permission (still supported).
-        const hasPermissionBasedAccess = isPermissionValid;
+        if (isOrgAdmin) {
+          // Org admins: full access to everything
+          hasAccess = true;
+          roleAccess = true;
+          canManagePermissions = true;
+        } else if (projectRole === "manager") {
+          // Project managers: full read/write + manage permissions
+          hasAccess = true;
+          roleAccess = true;
+          canManagePermissions = true;
+        } else if (projectRole === "developer") {
+          // Developers: can read all variables
+          hasAccess = true;
+          roleAccess = true;
+          effectivePermission = isPermissionValid
+            ? permission.permission
+            : "read";
+        } else if (projectRole === "viewer") {
+          // Viewers: only variables with explicit per-variable permissions
+          hasAccess = !!isPermissionValid;
+          effectivePermission = isPermissionValid
+            ? permission.permission
+            : null;
+        }
+
+        // Explicit permission overrides role-based access
+        if (isPermissionValid) {
+          effectivePermission = permission.permission;
+          hasAccess = true;
+        }
 
         return {
           ...variable,
-          // hasAccess: true if user can view this variable
-          hasAccess:
-            hasRoleBasedAccess ||
-            hasDefaultMemberReadAccess ||
-            hasPermissionBasedAccess,
-          // permission: explicit per-variable permission level (null for role-based access)
-          permission: isPermissionValid
-            ? permission.permission
-            : hasDefaultMemberReadAccess
-              ? "read"
-              : null,
-          // roleAccess: indicates if access is granted via role (not per-variable permission)
-          roleAccess: hasRoleBasedAccess || hasDefaultMemberReadAccess,
-          // userRole: the user's role in the organization
+          hasAccess,
+          permission: effectivePermission,
+          roleAccess,
           userRole: membership.role,
-          // canManagePermissions: true if user can grant/revoke permissions
-          canManagePermissions:
-            membership.role === "admin" || membership.role === "team_lead",
+          projectRole,
+          canManagePermissions,
         };
       })
     );
 
-    // For members, filter out variables they don't have access to
-    if (membership.role === "member") {
+    // Filter out variables the user can't access
+    if (!isOrgAdmin && projectRole !== "manager") {
       return variablesWithAccess.filter((v) => v.hasAccess);
     }
 

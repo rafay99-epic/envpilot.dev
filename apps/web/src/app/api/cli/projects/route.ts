@@ -43,9 +43,10 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Get projects
-    const projects = await convex.query(api.projects.listByOrganization, {
+    // Get projects (filtered by membership for non-admins)
+    const projects = await convex.query(api.projects.listWithStats, {
       organizationId: organizationId as Id<"organizations">,
+      userId: authResult.userId,
     });
 
     return NextResponse.json({

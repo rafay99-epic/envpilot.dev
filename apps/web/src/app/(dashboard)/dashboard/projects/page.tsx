@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useProjects } from "@/hooks";
+import { useProjects, useConvexUser } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -16,11 +16,15 @@ import {
 import { Plus, Clock, ChevronRight } from "lucide-react";
 
 export default function ProjectsPage() {
-  const { hasPermission, organization } = useAuthContext();
+  const { hasPermission, organization, user } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
-  const { projects, isLoading } = useProjects(activeOrganizationId);
+  const { convexUserId } = useConvexUser(user?.id);
+  const { projects, isLoading } = useProjects(
+    activeOrganizationId,
+    convexUserId
+  );
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
 
   if (!organization) {

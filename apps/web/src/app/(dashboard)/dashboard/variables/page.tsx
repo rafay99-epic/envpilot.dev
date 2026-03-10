@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useVariables, useProjects } from "@/hooks";
+import { useVariables, useProjects, useConvexUser } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -18,12 +18,13 @@ import {
 import { Plus, Search, Lock, Eye, EyeOff, Copy, Pencil } from "lucide-react";
 
 export default function VariablesPage() {
-  const { hasPermission, organization } = useAuthContext();
+  const { hasPermission, organization, user } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
+  const { convexUserId } = useConvexUser(user?.id);
   const { variables, isLoading } = useVariables(activeOrganizationId);
-  const { projects } = useProjects(activeOrganizationId);
+  const { projects } = useProjects(activeOrganizationId, convexUserId);
   const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE);
 
   const [searchQuery, setSearchQuery] = useState("");

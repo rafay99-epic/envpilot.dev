@@ -56,9 +56,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
-      // List projects for a specific organization
+      // List projects for a specific organization (filtered by membership for non-admins)
       const projects = await convex.query(api.projects.listWithStats, {
         organizationId: organizationId as Id<"organizations">,
+        userId: convexUser._id,
       });
       return NextResponse.json({ projects });
     } else {
@@ -121,6 +122,22 @@ export async function POST(request: Request) {
         { error: "Insufficient permissions to create projects" },
         { status: 403 }
       );
+    }
+
+    // Check org settings for team lead project creation
+    if (membership.role === "team_lead") {
+      const org = await convex.query(api.organizations.getById, {
+        organizationId: organizationId as Id<"organizations">,
+      });
+      if (org?.settings?.teamLeadsCanCreateProjects === false) {
+        return NextResponse.json(
+          {
+            error:
+              "Project creation is restricted to admins in this organization",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const projectId = await convex.mutation(api.projects.create, {

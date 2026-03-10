@@ -6,12 +6,15 @@ import { Id } from "@convex/_generated/dataModel";
 
 /**
  * Hook for dashboard projects - returns all projects accessible to the current user
- * This is a simplified wrapper for dashboard UI
+ * Filters by project membership for non-admin users
  */
-export function useProjects(organizationId: Id<"organizations"> | undefined) {
+export function useProjects(
+  organizationId: Id<"organizations"> | undefined,
+  userId?: Id<"users">
+) {
   const projects = useQuery(
     api.projects.listWithStats,
-    organizationId ? { organizationId } : "skip"
+    organizationId ? { organizationId, userId } : "skip"
   );
 
   return {

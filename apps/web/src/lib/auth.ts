@@ -165,3 +165,50 @@ export function getPermissionsForMembershipRole(
 
   return [...ROLES[MEMBERSHIP_ROLE_TO_ROLE[membershipRole]].permissions];
 }
+
+// Project-level roles
+export type ProjectRole = "viewer" | "developer" | "manager";
+
+/**
+ * Get effective permissions based on project role
+ * Project roles grant additional capabilities within a specific project
+ */
+export function getPermissionsForProjectRole(
+  projectRole: ProjectRole | null | undefined
+): Permission[] {
+  if (!projectRole) return [];
+
+  switch (projectRole) {
+    case "manager":
+      return [
+        PERMISSIONS.PROJECT_READ,
+        PERMISSIONS.PROJECT_UPDATE,
+        PERMISSIONS.VARIABLE_CREATE,
+        PERMISSIONS.VARIABLE_READ,
+        PERMISSIONS.VARIABLE_UPDATE,
+        PERMISSIONS.VARIABLE_DELETE,
+        PERMISSIONS.VARIABLE_MANAGE_PERMISSIONS,
+      ];
+    case "developer":
+      return [
+        PERMISSIONS.PROJECT_READ,
+        PERMISSIONS.VARIABLE_CREATE,
+        PERMISSIONS.VARIABLE_READ,
+        PERMISSIONS.VARIABLE_UPDATE,
+        PERMISSIONS.VARIABLE_DELETE,
+      ];
+    case "viewer":
+      return [PERMISSIONS.PROJECT_READ, PERMISSIONS.VARIABLE_READ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Check if team leads can create projects (based on org settings)
+ */
+export function canTeamLeadCreateProjects(
+  orgSettings: { teamLeadsCanCreateProjects: boolean } | undefined | null
+): boolean {
+  return orgSettings?.teamLeadsCanCreateProjects ?? true;
+}

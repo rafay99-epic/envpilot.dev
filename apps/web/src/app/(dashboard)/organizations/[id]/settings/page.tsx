@@ -12,6 +12,9 @@ interface Organization {
   logoUrl?: string;
   tier: "free" | "pro";
   role: "admin" | "team_lead" | "member";
+  settings?: {
+    teamLeadsCanCreateProjects: boolean;
+  };
 }
 
 export default function OrganizationSettingsPage({
@@ -32,6 +35,9 @@ export default function OrganizationSettingsPage({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [teamLeadsCanCreateProjects, setTeamLeadsCanCreateProjects] =
+    useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -47,6 +53,9 @@ export default function OrganizationSettingsPage({
         setOrganization(data.organization);
         setName(data.organization.name);
         setDescription(data.organization.description || "");
+        setTeamLeadsCanCreateProjects(
+          data.organization.settings?.teamLeadsCanCreateProjects ?? true
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -289,6 +298,78 @@ export default function OrganizationSettingsPage({
               access.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Access Control */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          Access Control
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Control what team leads can do in your organization.
+        </p>
+
+        <div className="mt-6 space-y-4">
+          <label className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                Allow team leads to create projects
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                When disabled, only admins can create new projects.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={teamLeadsCanCreateProjects}
+              onClick={async () => {
+                const newValue = !teamLeadsCanCreateProjects;
+                setTeamLeadsCanCreateProjects(newValue);
+                setIsSavingSettings(true);
+                setError(null);
+                try {
+                  const response = await fetch(
+                    `/api/organizations/${id}/settings`,
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        settings: {
+                          teamLeadsCanCreateProjects: newValue,
+                        },
+                      }),
+                    }
+                  );
+                  if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || "Failed to update settings");
+                  }
+                  setSuccessMessage("Access control settings updated");
+                } catch (err) {
+                  setTeamLeadsCanCreateProjects(!newValue);
+                  setError(
+                    err instanceof Error ? err.message : "An error occurred"
+                  );
+                } finally {
+                  setIsSavingSettings(false);
+                }
+              }}
+              disabled={isSavingSettings}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                teamLeadsCanCreateProjects
+                  ? "bg-zinc-900 dark:bg-zinc-100"
+                  : "bg-zinc-200 dark:bg-zinc-700"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out dark:bg-zinc-900 ${
+                  teamLeadsCanCreateProjects ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </label>
         </div>
       </div>
 

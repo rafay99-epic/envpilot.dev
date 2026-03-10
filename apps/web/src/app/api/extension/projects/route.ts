@@ -35,8 +35,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 
-      const projects = await convex.query(api.projects.listByOrganization, {
+      // Use membership-aware query for project listing
+      const projects = await convex.query(api.projects.listWithStats, {
         organizationId: organizationId as Id<"organizations">,
+        userId: convexUser._id,
       });
 
       return NextResponse.json({
@@ -54,35 +56,32 @@ export async function GET(request: Request) {
       });
     }
 
-    // Get all organizations the user belongs to
-    const organizations = await convex.query(api.organizations.listForUser, {
+    // Get all projects the user has access to (across all orgs)
+    const userProjects = await convex.query(api.projects.listForUser, {
       userId: convexUser._id,
     });
 
-    const allProjects = await Promise.all(
-      organizations
-        .filter((org): org is NonNullable<typeof org> => org !== null)
-        .map(async (org) => {
-          const projects = await convex.query(api.projects.listByOrganization, {
-            organizationId: org._id,
-          });
-          return projects;
-        })
-    );
-
-    const flatProjects = allProjects.flat();
-
     return NextResponse.json({
       data: {
-        projects: flatProjects.map((project) => ({
-          _id: project._id,
-          name: project.name,
-          slug: project.slug,
-          description: project.description || null,
-          organizationId: project.organizationId,
-          icon: project.icon || null,
-          color: project.color || null,
-        })),
+        projects: userProjects.map(
+          (project: {
+            _id: string;
+            name: string;
+            slug: string;
+            description?: string;
+            organizationId: string;
+            icon?: string;
+            color?: string;
+          }) => ({
+            _id: project._id,
+            name: project.name,
+            slug: project.slug,
+            description: project.description || null,
+            organizationId: project.organizationId,
+            icon: project.icon || null,
+            color: project.color || null,
+          })
+        ),
       },
     });
   } catch (error) {
