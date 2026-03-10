@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { ApiService } from "./api";
-import { FileProtectionService } from "./fileProtection";
+import { FileProtectionService, type ProtectionMode } from "./fileProtection";
+import { ClipboardGuardService } from "./clipboardGuard";
 import { ConvexService } from "./convex";
 import { StorageService } from "../utils/storage";
 import {
@@ -42,6 +43,7 @@ export class SyncService {
   private storage: StorageService;
   private convexService: ConvexService | null = null;
   private fileProtection: FileProtectionService | null = null;
+  private clipboardGuard: ClipboardGuardService | null = null;
   private metadataSubIds: string[] = [];
   private lastMetadataHash = new Map<string, string>();
   private syncDebounceTimers = new Map<string, NodeJS.Timeout>();
@@ -70,6 +72,13 @@ export class SyncService {
    */
   setFileProtection(fileProtection: FileProtectionService): void {
     this.fileProtection = fileProtection;
+  }
+
+  /**
+   * Set the clipboard guard service for copy/paste protection
+   */
+  setClipboardGuard(clipboardGuard: ClipboardGuardService): void {
+    this.clipboardGuard = clipboardGuard;
   }
 
   /**
@@ -418,15 +427,53 @@ export class SyncService {
     // Write file
     await fs.writeFile(envFilePath, content, "utf-8");
 
-    // For members: set read-only and watch for changes
-    const role = this.api.getUserRole(project.projectId);
-    if (role === "member") {
+    // Apply role-based file protection
+    const protectionMode = this.getProtectionMode(project.projectId);
+    if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
       if (this.fileProtection) {
-        this.fileProtection.watchFile(envFilePath, async () => {
-          await this.syncProject(project);
-        });
+        this.fileProtection.watchFile(
+          envFilePath,
+          async () => {
+            await this.syncProject(project);
+          },
+          protectionMode
+        );
       }
+      // Register clipboard protection for non-writable files
+      if (this.clipboardGuard) {
+        this.clipboardGuard.protectFile(envFilePath, protectionMode);
+      }
+    } else {
+      // Ensure writable files are unprotected from clipboard guard
+      if (this.clipboardGuard) {
+        this.clipboardGuard.unprotectFile(envFilePath);
+      }
+    }
+  }
+
+  /**
+   * Determine the file protection mode based on org role and project role.
+   */
+  private getProtectionMode(projectId: string): ProtectionMode {
+    const orgRole = this.api.getUserRole(projectId);
+
+    // Admins and team leads always get full access
+    if (orgRole === "admin" || orgRole === "team_lead") {
+      return "writable";
+    }
+
+    // For members, check project-level role
+    const projectRole = this.api.getProjectRole(projectId);
+    switch (projectRole) {
+      case "manager":
+        return "writable";
+      case "developer":
+        return "readonly-with-request";
+      case "viewer":
+        return "strict-readonly";
+      default:
+        return "readonly-with-request";
     }
   }
 
@@ -464,9 +511,12 @@ export class SyncService {
       return; // Don't delete files outside workspace
     }
 
-    // Stop watching before deletion
+    // Stop watching and clipboard protection before deletion
     if (this.fileProtection) {
       this.fileProtection.unwatchFile(envFilePath);
+    }
+    if (this.clipboardGuard) {
+      this.clipboardGuard.unprotectFile(envFilePath);
     }
 
     try {
@@ -919,9 +969,11 @@ export class SyncService {
 
     await fs.writeFile(envFilePath, content, "utf-8");
 
-    // For members: set read-only and watch for changes
-    const role = projectId ? this.api.getUserRole(projectId) : undefined;
-    if (role === "member") {
+    // Apply role-based file protection
+    const protectionMode = projectId
+      ? this.getProtectionMode(projectId)
+      : "readonly-with-request";
+    if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
       if (this.fileProtection) {
         const syncCallback = async () => {
@@ -940,7 +992,20 @@ export class SyncService {
             }
           }
         };
-        this.fileProtection.watchFile(envFilePath, syncCallback);
+        this.fileProtection.watchFile(
+          envFilePath,
+          syncCallback,
+          protectionMode
+        );
+      }
+      // Register clipboard protection for non-writable files
+      if (this.clipboardGuard) {
+        this.clipboardGuard.protectFile(envFilePath, protectionMode);
+      }
+    } else {
+      // Ensure writable files are unprotected from clipboard guard
+      if (this.clipboardGuard) {
+        this.clipboardGuard.unprotectFile(envFilePath);
       }
     }
   }
@@ -976,9 +1041,12 @@ export class SyncService {
       return;
     }
 
-    // Stop watching before deletion
+    // Stop watching and clipboard protection before deletion
     if (this.fileProtection) {
       this.fileProtection.unwatchFile(envFilePath);
+    }
+    if (this.clipboardGuard) {
+      this.clipboardGuard.unprotectFile(envFilePath);
     }
 
     try {

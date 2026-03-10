@@ -86,6 +86,32 @@ export default function OrganizationMembersPage({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const [expandedSessionsUserId, setExpandedSessionsUserId] = useState<
+    string | null
+  >(null);
+  const [memberSessions, setMemberSessions] = useState<{
+    cliTokens: Array<{
+      _id: string;
+      deviceName: string;
+      lastUsedAt?: number;
+      createdAt: number;
+      expiresAt: number;
+      tokenPreview: string;
+    }>;
+    extensionSessions: Array<{
+      _id: string;
+      projectId: string;
+      projectName: string;
+      deviceName: string;
+      lastUsedAt?: number;
+      createdAt: number;
+      expiresAt: number;
+      tokenPreview: string;
+    }>;
+  } | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [isRevokingSession, setIsRevokingSession] = useState(false);
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -285,6 +311,79 @@ export default function OrganizationMembersPage({
     setSearchResults([]);
   }
 
+  async function toggleSessions(userId: string) {
+    if (expandedSessionsUserId === userId) {
+      setExpandedSessionsUserId(null);
+      setMemberSessions(null);
+      return;
+    }
+
+    setExpandedSessionsUserId(userId);
+    setIsLoadingSessions(true);
+    setMemberSessions(null);
+
+    try {
+      const response = await fetch(
+        `/api/organizations/${slug}/members/${userId}/sessions`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setMemberSessions(data);
+      } else {
+        const data = await response.json();
+        setError(data.error || "Failed to fetch sessions");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch sessions");
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  }
+
+  async function handleRevokeSession(
+    userId: string,
+    type: "cli" | "extension" | "all",
+    sessionId?: string
+  ) {
+    setIsRevokingSession(true);
+    try {
+      const response = await fetch(
+        `/api/organizations/${slug}/members/${userId}/sessions`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, sessionId }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to revoke session");
+      }
+
+      setNotice(
+        type === "all"
+          ? "All sessions revoked successfully. Notification email sent."
+          : "Session revoked successfully. Notification email sent."
+      );
+      setTimeout(() => setNotice(null), 5000);
+
+      // Refresh the sessions list without closing the panel
+      setIsLoadingSessions(true);
+      const refreshRes = await fetch(
+        `/api/organizations/${slug}/members/${userId}/sessions`
+      );
+      if (refreshRes.ok) {
+        setMemberSessions(await refreshRes.json());
+      }
+      setIsLoadingSessions(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke session");
+    } finally {
+      setIsRevokingSession(false);
+    }
+  }
+
   function handleCancelInvitation(invitationId: string) {
     setConfirmDialog({
       isOpen: true,
@@ -439,88 +538,295 @@ export default function OrganizationMembersPage({
         </div>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {members.map((member) => (
-            <li
-              key={member._id}
-              className="flex items-center justify-between px-6 py-4"
-            >
-              <div className="flex items-center gap-4">
-                {member.user.avatarUrl ? (
-                  <img
-                    src={member.user.avatarUrl}
-                    alt={member.user.name || member.user.email}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-                      {(member.user.name || member.user.email)
-                        .charAt(0)
-                        .toUpperCase()}
-                    </span>
+            <li key={member._id}>
+              <div className="flex items-center justify-between px-6 py-4">
+                <div className="flex items-center gap-4">
+                  {member.user.avatarUrl ? (
+                    <img
+                      src={member.user.avatarUrl}
+                      alt={member.user.name || member.user.email}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                        {(member.user.name || member.user.email)
+                          .charAt(0)
+                          .toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                      {member.user.name || "Unnamed User"}
+                    </p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {member.user.email}
+                    </p>
                   </div>
-                )}
-                <div>
-                  <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {member.user.name || "Unnamed User"}
-                  </p>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {member.user.email}
-                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {isAdmin ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        handleRoleChange(
+                          member.user._id,
+                          e.target.value as "admin" | "team_lead" | "member"
+                        )
+                      }
+                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="team_lead">Team Lead</option>
+                      <option value="member">Member</option>
+                    </select>
+                  ) : (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        member.role === "admin"
+                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                          : member.role === "team_lead"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      {member.role === "team_lead"
+                        ? "Team Lead"
+                        : member.role.charAt(0).toUpperCase() +
+                          member.role.slice(1)}
+                    </span>
+                  )}
+                  {canInvite && (
+                    <button
+                      onClick={() => toggleSessions(member.user._id)}
+                      className={`rounded-md p-1.5 transition-colors ${
+                        expandedSessionsUserId === member.user._id
+                          ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                          : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                      }`}
+                      title="Manage sessions"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleRemoveMember(member.user._id)}
+                      className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                {isAdmin ? (
-                  <select
-                    value={member.role}
-                    onChange={(e) =>
-                      handleRoleChange(
-                        member.user._id,
-                        e.target.value as "admin" | "team_lead" | "member"
-                      )
-                    }
-                    className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="team_lead">Team Lead</option>
-                    <option value="member">Member</option>
-                  </select>
-                ) : (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      member.role === "admin"
-                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                        : member.role === "team_lead"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-                    }`}
-                  >
-                    {member.role === "team_lead"
-                      ? "Team Lead"
-                      : member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)}
-                  </span>
-                )}
-                {isAdmin && (
-                  <button
-                    onClick={() => handleRemoveMember(member.user._id)}
-                    className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
-                  >
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
+
+              {/* Expandable Sessions Panel */}
+              {expandedSessionsUserId === member.user._id && (
+                <div className="border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+                  {isLoadingSessions ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
+                      <span className="ml-2 text-sm text-zinc-500">
+                        Loading sessions...
+                      </span>
+                    </div>
+                  ) : memberSessions ? (
+                    <div className="space-y-4">
+                      {/* CLI Tokens */}
+                      <div>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          CLI Tokens ({memberSessions.cliTokens.length})
+                        </h4>
+                        {memberSessions.cliTokens.length === 0 ? (
+                          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+                            No active CLI sessions.
+                          </p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {memberSessions.cliTokens.map((token) => (
+                              <div
+                                key={token._id}
+                                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <svg
+                                    className="h-4 w-4 text-zinc-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  <div>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                      {token.deviceName}
+                                    </p>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                      Created{" "}
+                                      {new Date(
+                                        token.createdAt
+                                      ).toLocaleDateString()}
+                                      {token.lastUsedAt &&
+                                        ` · Last used ${new Date(token.lastUsedAt).toLocaleDateString()}`}
+                                      {" · "}
+                                      <span className="font-mono">
+                                        {token.tokenPreview}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    setConfirmDialog({
+                                      isOpen: true,
+                                      title: "Revoke CLI Token",
+                                      message: `Revoke the CLI token for "${token.deviceName}"? The user will need to re-authenticate.`,
+                                      onConfirm: () =>
+                                        handleRevokeSession(
+                                          member.user._id,
+                                          "cli",
+                                          token._id
+                                        ),
+                                    })
+                                  }
+                                  disabled={isRevokingSession}
+                                  className="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                >
+                                  Revoke
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Extension Sessions */}
+                      <div>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          VS Code Extension (
+                          {memberSessions.extensionSessions.length})
+                        </h4>
+                        {memberSessions.extensionSessions.length === 0 ? (
+                          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+                            No active extension sessions.
+                          </p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {memberSessions.extensionSessions.map((session) => (
+                              <div
+                                key={session._id}
+                                className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <svg
+                                    className="h-4 w-4 text-zinc-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  <div>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                      {session.projectName}
+                                    </p>
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                      {session.deviceName} · Linked{" "}
+                                      {new Date(
+                                        session.createdAt
+                                      ).toLocaleDateString()}
+                                      {session.lastUsedAt &&
+                                        ` · Last used ${new Date(session.lastUsedAt).toLocaleDateString()}`}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    setConfirmDialog({
+                                      isOpen: true,
+                                      title: "Revoke Extension Session",
+                                      message: `Revoke the extension link for "${session.projectName}" on "${session.deviceName}"? The extension will lose access immediately.`,
+                                      onConfirm: () =>
+                                        handleRevokeSession(
+                                          member.user._id,
+                                          "extension",
+                                          session._id
+                                        ),
+                                    })
+                                  }
+                                  disabled={isRevokingSession}
+                                  className="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                >
+                                  Revoke
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Revoke All Button */}
+                      {(memberSessions.cliTokens.length > 0 ||
+                        memberSessions.extensionSessions.length > 0) && (
+                        <div className="flex justify-end border-t border-zinc-200 pt-3 dark:border-zinc-700">
+                          <button
+                            onClick={() =>
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: "Revoke All Sessions",
+                                message: `Revoke all CLI and extension sessions for ${member.user.name || member.user.email}? They will be immediately logged out of all devices and will need to re-authenticate. A notification email will be sent.`,
+                                onConfirm: () =>
+                                  handleRevokeSession(member.user._id, "all"),
+                              })
+                            }
+                            disabled={isRevokingSession}
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 dark:bg-red-700 dark:hover:bg-red-800"
+                          >
+                            {isRevokingSession
+                              ? "Revoking..."
+                              : "Revoke All Sessions"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </li>
           ))}
         </ul>

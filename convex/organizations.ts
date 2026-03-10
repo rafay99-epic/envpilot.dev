@@ -467,6 +467,19 @@ export const removeMember = mutation({
       }
     }
 
+    // Revoke all active CLI tokens for this user
+    const activeCliTokens = await ctx.db
+      .query("cliTokens")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", args.userId).eq("isActive", true)
+      )
+      .collect();
+
+    for (const cliToken of activeCliTokens) {
+      await ctx.db.patch(cliToken._id, { isActive: false, revokedAt: now });
+      revokedTokenCount++;
+    }
+
     // Also clean up all projectMembers records for this user
     const allProjectMemberships = await Promise.all(
       projects.map(async (project) => {
@@ -621,5 +634,345 @@ export const updateSettings = mutation({
     });
 
     return args.organizationId;
+  },
+});
+
+// ==========================================
+// SESSION MANAGEMENT
+// ==========================================
+
+/**
+ * Get all active sessions (CLI tokens + extension links) for a member.
+ * Only admins and team leads can view another member's sessions.
+ */
+export const getMemberSessions = query({
+  args: {
+    organizationId: v.id("organizations"),
+    targetUserId: v.id("users"),
+    callerUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Verify caller is admin or team_lead
+    const callerMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.callerUserId)
+      )
+      .first();
+
+    if (
+      !callerMembership ||
+      (callerMembership.role !== "admin" &&
+        callerMembership.role !== "team_lead")
+    ) {
+      throw new Error("Only admins and team leads can view member sessions");
+    }
+
+    // Verify target is a member of this org
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.targetUserId)
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error("User is not a member of this organization");
+    }
+
+    // Get active CLI tokens
+    const cliTokens = await ctx.db
+      .query("cliTokens")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", args.targetUserId).eq("isActive", true)
+      )
+      .collect();
+
+    const maskedCliTokens = cliTokens.map((token) => ({
+      _id: token._id,
+      deviceName: token.deviceName || "Unknown device",
+      lastUsedAt: token.lastUsedAt,
+      createdAt: token.createdAt,
+      expiresAt: token.expiresAt,
+      tokenPreview: token.accessToken.slice(0, 8) + "...",
+    }));
+
+    // Get active extension sessions across all org projects
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    const extensionSessions = [];
+    for (const project of projects) {
+      const accessRecords = await ctx.db
+        .query("projectAccess")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", project._id).eq("userId", args.targetUserId)
+        )
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+
+      for (const access of accessRecords) {
+        extensionSessions.push({
+          _id: access._id,
+          projectId: project._id,
+          projectName: project.name,
+          deviceName: access.deviceName || "Unknown device",
+          lastUsedAt: access.lastUsedAt,
+          createdAt: access.createdAt,
+          expiresAt: access.expiresAt,
+          tokenPreview: access.accessToken.slice(0, 8) + "...",
+        });
+      }
+    }
+
+    return { cliTokens: maskedCliTokens, extensionSessions };
+  },
+});
+
+/**
+ * Revoke a specific CLI token for a member.
+ */
+export const revokeMemberCliToken = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    tokenId: v.id("cliTokens"),
+    revokedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Verify caller is admin or team_lead
+    const callerMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
+      )
+      .first();
+
+    if (
+      !callerMembership ||
+      (callerMembership.role !== "admin" &&
+        callerMembership.role !== "team_lead")
+    ) {
+      throw new Error("Only admins and team leads can revoke sessions");
+    }
+
+    const token = await ctx.db.get(args.tokenId);
+    if (!token || !token.isActive) {
+      throw new Error("Token not found or already revoked");
+    }
+
+    await ctx.db.patch(args.tokenId, { isActive: false, revokedAt: now });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.revokedBy,
+      action: "access.token_revoked",
+      details: JSON.stringify({
+        tokenId: args.tokenId,
+        targetUserId: token.userId,
+        deviceName: token.deviceName,
+        type: "cli",
+      }),
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Revoke a specific extension session (project access) for a member.
+ */
+export const revokeMemberExtensionSession = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    projectAccessId: v.id("projectAccess"),
+    revokedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
+
+    // Verify caller is admin or team_lead
+    const callerMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
+      )
+      .first();
+
+    if (
+      !callerMembership ||
+      (callerMembership.role !== "admin" &&
+        callerMembership.role !== "team_lead")
+    ) {
+      throw new Error("Only admins and team leads can revoke sessions");
+    }
+
+    const access = await ctx.db.get(args.projectAccessId);
+    if (!access || !access.isActive) {
+      throw new Error("Extension session not found or already revoked");
+    }
+
+    // Verify the project belongs to this org
+    const project = await ctx.db.get(access.projectId);
+    if (!project || project.organizationId !== args.organizationId) {
+      throw new Error("Project does not belong to this organization");
+    }
+
+    await ctx.db.patch(args.projectAccessId, { isActive: false });
+
+    // Create revocation event for real-time extension sync
+    await ctx.db.insert("permissionRevocationEvents", {
+      accessToken: access.accessToken,
+      projectId: access.projectId,
+      userId: access.userId,
+      reason: "Session revoked by administrator",
+      revokedBy: args.revokedBy,
+      revokedAt: now,
+      acknowledged: false,
+      expiresAt: revocationExpiresAt,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.revokedBy,
+      action: "access.extension_unlinked",
+      details: JSON.stringify({
+        projectAccessId: args.projectAccessId,
+        targetUserId: access.userId,
+        projectId: access.projectId,
+        deviceName: access.deviceName,
+        type: "extension",
+      }),
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Revoke ALL active sessions (CLI + extension) for a member
+ * without removing them from the organization.
+ */
+export const revokeAllMemberSessions = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    targetUserId: v.id("users"),
+    revokedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
+
+    // Verify caller is admin or team_lead
+    const callerMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
+      )
+      .first();
+
+    if (
+      !callerMembership ||
+      (callerMembership.role !== "admin" &&
+        callerMembership.role !== "team_lead")
+    ) {
+      throw new Error("Only admins and team leads can revoke sessions");
+    }
+
+    // Verify target is a member
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.targetUserId)
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error("User is not a member of this organization");
+    }
+
+    let revokedCliCount = 0;
+    let revokedExtensionCount = 0;
+
+    // Revoke all active CLI tokens
+    const activeCliTokens = await ctx.db
+      .query("cliTokens")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", args.targetUserId).eq("isActive", true)
+      )
+      .collect();
+
+    for (const token of activeCliTokens) {
+      await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
+      revokedCliCount++;
+    }
+
+    // Revoke all active extension sessions across org projects
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    for (const project of projects) {
+      const activeTokens = await ctx.db
+        .query("projectAccess")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", project._id).eq("userId", args.targetUserId)
+        )
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+
+      for (const token of activeTokens) {
+        await ctx.db.patch(token._id, { isActive: false });
+        await ctx.db.insert("permissionRevocationEvents", {
+          accessToken: token.accessToken,
+          projectId: project._id,
+          userId: args.targetUserId,
+          reason: "All sessions revoked by administrator",
+          revokedBy: args.revokedBy,
+          revokedAt: now,
+          acknowledged: false,
+          expiresAt: revocationExpiresAt,
+        });
+        revokedExtensionCount++;
+      }
+    }
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.revokedBy,
+      action: "access.token_revoked",
+      details: JSON.stringify({
+        targetUserId: args.targetUserId,
+        revokedCliTokens: revokedCliCount,
+        revokedExtensionSessions: revokedExtensionCount,
+        type: "all",
+      }),
+      createdAt: now,
+    });
+
+    return {
+      success: true,
+      revokedCliTokens: revokedCliCount,
+      revokedExtensionSessions: revokedExtensionCount,
+    };
   },
 });

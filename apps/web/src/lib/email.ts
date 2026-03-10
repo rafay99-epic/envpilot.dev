@@ -180,3 +180,141 @@ If you didn't expect this invitation, you can safely ignore this email.
     };
   }
 }
+
+interface SessionRevocationEmailParams {
+  to: string;
+  organizationName: string;
+  revokedByName: string;
+  revokedType: "cli" | "extension" | "all";
+  revokedCount: number;
+}
+
+export async function sendSessionRevocationEmail({
+  to,
+  organizationName,
+  revokedByName,
+  revokedType,
+  revokedCount,
+}: SessionRevocationEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const safeOrgName = escapeHtml(organizationName);
+  const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase());
+  const safeRevokedByName = escapeHtml(revokedByName);
+
+  const typeDisplay =
+    revokedType === "cli"
+      ? "CLI"
+      : revokedType === "extension"
+        ? "VS Code Extension"
+        : "CLI and VS Code Extension";
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sessions Revoked - ${safeOrgName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <div style="display: inline-block; width: 64px; height: 64px; background-color: #dc2626; border-radius: 12px; line-height: 64px; text-align: center;">
+                <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${safeOrgInitial}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
+                Sessions Revoked
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #52525b;">
+                <strong>${safeRevokedByName}</strong> has revoked your <strong>${typeDisplay}</strong> session${revokedCount > 1 ? "s" : ""} in <strong>${safeOrgName}</strong>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #71717a;">
+                ${revokedCount} session${revokedCount > 1 ? "s were" : " was"} revoked. You will need to re-authenticate to regain access.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+                If you believe this was done in error, contact your organization administrator.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const textContent = `
+Sessions Revoked - ${organizationName}
+
+${revokedByName} has revoked your ${typeDisplay} session${revokedCount > 1 ? "s" : ""} in ${organizationName}.
+
+${revokedCount} session${revokedCount > 1 ? "s were" : " was"} revoked. You will need to re-authenticate to regain access.
+
+If you believe this was done in error, contact your organization administrator.
+`;
+
+  try {
+    const resend = getResendClient();
+
+    if (!resend) {
+      console.error(
+        "[EMAIL] RESEND_API_KEY not configured - cannot send email"
+      );
+      return { success: false, error: "RESEND_API_KEY not configured" };
+    }
+
+    console.log("[EMAIL] Sending session revocation email:", {
+      from: FROM_EMAIL,
+      to,
+      subject: `Sessions revoked in ${organizationName}`,
+    });
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `Sessions revoked in ${organizationName}`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    if (error) {
+      console.error(
+        "[EMAIL] Resend API error:",
+        JSON.stringify(error, null, 2)
+      );
+      return { success: false, error: error.message };
+    }
+
+    console.log("[EMAIL] Email sent successfully:", JSON.stringify(data));
+    return { success: true };
+  } catch (err) {
+    console.error("[EMAIL] Exception sending email:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to send email",
+    };
+  }
+}
