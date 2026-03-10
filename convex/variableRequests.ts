@@ -260,9 +260,22 @@ export const review = mutation({
       args.reviewedBy
     );
 
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Check if the reviewer is a project manager
+    const projectMembership = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", request.projectId).eq("userId", args.reviewedBy)
+      )
+      .first();
+    const isProjectManager = projectMembership?.role === "manager";
+
+    if (
+      membership.role !== "admin" &&
+      membership.role !== "team_lead" &&
+      !isProjectManager
+    ) {
       throw new Error(
-        "Only admins and team leads can review variable requests"
+        "Only admins, team leads, and project managers can review variable requests"
       );
     }
 

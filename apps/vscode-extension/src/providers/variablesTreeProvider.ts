@@ -62,9 +62,22 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
       // Environment & count header
       const role = this.api.getUserRole(linkedProject.projectId);
-      const roleLabel = role
-        ? ` \u00b7 ${role === "admin" ? "Admin" : role === "team_lead" ? "Lead" : "Member"}`
-        : "";
+      const projectRole = this.api.getProjectRole(linkedProject.projectId);
+
+      let roleLabel = "";
+      if (role === "admin") {
+        roleLabel = " \u00b7 Admin";
+      } else if (projectRole) {
+        const projectRoleLabels: Record<string, string> = {
+          viewer: "Viewer",
+          developer: "Developer",
+          manager: "Manager",
+        };
+        roleLabel = ` \u00b7 ${projectRoleLabels[projectRole] || projectRole}`;
+      } else if (role) {
+        roleLabel = ` \u00b7 ${role === "team_lead" ? "Lead" : "Member"}`;
+      }
+
       items.push(
         new VariableTreeItem(
           linkedProject.environment,
@@ -109,8 +122,8 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
         }
       }
 
-      // Pending requests for members
-      if (role === "member") {
+      // Pending requests for members/viewers
+      if (role === "member" || projectRole === "viewer") {
         try {
           const pendingRequests = await this.api.getVariableRequests(
             linkedProject.projectId,

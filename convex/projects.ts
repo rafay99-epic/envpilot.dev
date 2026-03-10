@@ -64,7 +64,13 @@ export const listWithStats = query({
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
-    // If userId provided, filter by project membership for non-admins
+    // Resolve org membership and project memberships for role data
+    let userRole: string | null = null;
+    let projectMemberships: Array<{
+      projectId: { toString(): string };
+      role: string;
+    }> = [];
+
     if (args.userId) {
       const userId = args.userId;
       const membership = await ctx.db
@@ -74,9 +80,13 @@ export const listWithStats = query({
         )
         .first();
 
+      if (membership) {
+        userRole = membership.role;
+      }
+
       if (membership && membership.role !== "admin") {
         // Get user's project memberships
-        const projectMemberships = await ctx.db
+        projectMemberships = await ctx.db
           .query("projectMembers")
           .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect();
@@ -91,6 +101,11 @@ export const listWithStats = query({
       }
     }
 
+    // Build a lookup map for project roles
+    const projectRoleMap = new Map(
+      projectMemberships.map((pm) => [pm.projectId.toString(), pm.role])
+    );
+
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
         const variables = await ctx.db
@@ -99,7 +114,14 @@ export const listWithStats = query({
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
 
-        return { ...project, variableCount: variables.length };
+        return {
+          ...project,
+          variableCount: variables.length,
+          userRole: userRole as string | null,
+          projectRole:
+            (projectRoleMap.get(project._id.toString()) as string | null) ??
+            null,
+        };
       })
     );
 

@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         organizationId: project.organizationId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
+        userRole: project.userRole ?? null,
+        projectRole: project.projectRole ?? null,
       })),
     });
   } catch (error) {

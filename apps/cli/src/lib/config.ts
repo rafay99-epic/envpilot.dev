@@ -1,8 +1,8 @@
 import Conf from "conf";
 import type { CLIConfig, User } from "../types/index.js";
 
-// Default API URL - can be overridden via config
-const DEFAULT_API_URL = "http://localhost:3000";
+// Default API URL - production by default, can be overridden via config
+const DEFAULT_API_URL = "https://www.envpilot.dev";
 
 // Config store using conf package
 const config = new Conf<CLIConfig>({

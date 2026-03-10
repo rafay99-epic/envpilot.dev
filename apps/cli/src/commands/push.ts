@@ -73,6 +73,26 @@ export const pushCommand = new Command("push")
         process.exit(1);
       }
 
+      const api = createAPIClient();
+
+      // Check project role before proceeding
+      const projects = await api.get<{
+        success: boolean;
+        data: Array<{ _id: string; projectRole?: string | null }>;
+      }>("/api/cli/projects", { organizationId: projectConfig.organizationId });
+      const currentProject = projects.data?.find(
+        (p) => p._id === projectConfig.projectId
+      );
+      const projectRole = currentProject?.projectRole;
+
+      // Hard-block viewers from push
+      if (projectRole === "viewer") {
+        error(
+          "Unfortunately, as a member, you cannot push in any environment. Please access or request access to your team lead."
+        );
+        process.exit(1);
+      }
+
       // Warn members before push
       const role = getRole();
       if (role === "member") {
@@ -129,8 +149,6 @@ export const pushCommand = new Command("push")
         error("No valid variables to push.");
         return;
       }
-
-      const api = createAPIClient();
 
       // Fetch current remote variables for comparison
       const remoteVariables = await withSpinner(

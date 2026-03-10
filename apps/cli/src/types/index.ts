@@ -32,6 +32,9 @@ export const organizationSchema = z.object({
 
 export type Organization = z.infer<typeof organizationSchema>;
 
+// Project role type (project-level access)
+export type ProjectRole = "viewer" | "developer" | "manager";
+
 // Project types
 export const projectSchema = z.object({
   _id: z.string(),
@@ -41,6 +44,8 @@ export const projectSchema = z.object({
   description: z.string().optional(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  userRole: z.string().nullable().optional(),
+  projectRole: z.string().nullable().optional(),
 });
 
 export type Project = z.infer<typeof projectSchema>;

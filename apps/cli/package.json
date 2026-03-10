@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI tool for Envpilot environment variable management",
   "type": "module",
   "bin": {
@@ -8,11 +8,11 @@
   },
   "main": "./dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean",
-    "build:binaries": "bash scripts/build-binaries.sh",
     "dev": "tsup src/index.ts --format esm --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
@@ -52,5 +52,10 @@
     "secrets"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafay99-epic/envpilot.dev"
+  },
+  "homepage": "https://www.envpilot.dev"
 }

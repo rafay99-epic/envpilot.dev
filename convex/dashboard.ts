@@ -46,6 +46,14 @@ export const getStats = query({
       )
       .collect();
 
+    // Get pending variable requests count
+    const pendingRequests = await ctx.db
+      .query("environmentVariableRequests")
+      .withIndex("by_organization_and_status", (q) =>
+        q.eq("organizationId", args.organizationId).eq("status", "pending")
+      )
+      .collect();
+
     // Get audit logs from last 7 days
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recentAuditLogs = await ctx.db
@@ -79,6 +87,9 @@ export const getStats = query({
       },
       auditEvents: {
         last7Days: recentAuditLogs.length,
+      },
+      pendingRequests: {
+        total: pendingRequests.length,
       },
     };
   },

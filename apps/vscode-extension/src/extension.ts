@@ -53,10 +53,16 @@ async function updateContextFlags(): Promise<void> {
   );
   if (linkedProject) {
     const role = apiService.getUserRole(linkedProject.projectId);
+    const projectRole = apiService.getProjectRole(linkedProject.projectId);
     vscode.commands.executeCommand(
       "setContext",
       "envpilot.userRole",
       role || ""
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.projectRole",
+      projectRole || ""
     );
   }
 }
