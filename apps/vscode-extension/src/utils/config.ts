@@ -3,11 +3,21 @@ import type { ExtensionConfig } from "../types";
 
 const CONFIG_SECTION = "envpilot";
 
+/**
+ * Default server URL injected at build time via esbuild --define.
+ * Falls back to localhost for local development if not defined.
+ */
+declare const __DEFAULT_SERVER_URL__: string;
+const DEFAULT_SERVER_URL =
+  typeof __DEFAULT_SERVER_URL__ !== "undefined"
+    ? __DEFAULT_SERVER_URL__
+    : "http://localhost:3000";
+
 export function getConfig(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
   return {
-    serverUrl: config.get<string>("serverUrl", "http://localhost:3000"),
+    serverUrl: config.get<string>("serverUrl", DEFAULT_SERVER_URL),
     autoSync: config.get<boolean>("autoSync", true),
     syncInterval: config.get<number>("syncInterval", 300),
     targetFile: config.get<string>("targetFile", ".env.local"),
