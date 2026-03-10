@@ -14,6 +14,7 @@ import { StatusBarProvider } from "./providers/statusBar";
 import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
+import { ClipboardGuardService } from "./services/clipboardGuard";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
@@ -34,6 +35,7 @@ let realTimeSyncService: RealTimeSyncService;
 let convexService: ConvexService | null = null;
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
+let clipboardGuardService: ClipboardGuardService;
 let gitCommitGuardService: GitCommitGuardService;
 let envCodeLensProvider: EnvCodeLensProvider;
 let dashboardPanelProvider: DashboardPanelProvider;
@@ -116,9 +118,12 @@ export async function activate(context: vscode.ExtensionContext) {
   authService = new AuthService(context, storageService);
   apiService = new ApiService(storageService);
   fileProtectionService = new FileProtectionService();
+  clipboardGuardService = new ClipboardGuardService();
+  clipboardGuardService.activate();
   gitCommitGuardService = new GitCommitGuardService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
+  syncService.setClipboardGuard(clipboardGuardService);
   realTimeSyncService = new RealTimeSyncService(syncService, storageService);
 
   // Initialize Convex WebSocket connection
@@ -292,6 +297,7 @@ export async function activate(context: vscode.ExtensionContext) {
       realTimeSyncService.dispose();
       convexService?.dispose();
       fileProtectionService.dispose();
+      clipboardGuardService.dispose();
       gitCommitGuardService.dispose();
       envCodeLensProvider.dispose();
       dashboardPanelProvider.dispose();
@@ -830,9 +836,22 @@ function handleRefresh(): void {
   statusBarProvider.update();
 }
 
-function handleOpenDashboard(): void {
+async function handleOpenDashboard(): Promise<void> {
   const serverUrl = getServerUrl();
-  vscode.env.openExternal(vscode.Uri.parse(serverUrl));
+  try {
+    const opened = await vscode.env.openExternal(vscode.Uri.parse(serverUrl));
+    if (!opened) {
+      await vscode.env.clipboard.writeText(serverUrl);
+      vscode.window.showInformationMessage(
+        "Could not open browser. Dashboard URL copied to clipboard."
+      );
+    }
+  } catch {
+    await vscode.env.clipboard.writeText(serverUrl);
+    vscode.window.showInformationMessage(
+      "Could not open browser. Dashboard URL copied to clipboard."
+    );
+  }
 }
 
 async function handleShowStatus(): Promise<void> {
@@ -983,6 +1002,25 @@ async function handleRemoveCommitGuard(): Promise<void> {
   vscode.window.showInformationMessage("Envpilot: Commit guard hook removed.");
 }
 
-export function deactivate() {
-  // Cleanup handled by dispose subscriptions
+export async function deactivate() {
+  // Clean up synced .env files to prevent secrets from persisting on disk
+  try {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const projects = storageService.getLinkedProjectsMetadataV2();
+    for (const project of projects) {
+      for (const dir of project.directories) {
+        const envFilePath = path.resolve(dir.directoryPath, dir.targetFile);
+        try {
+          await fs.chmod(envFilePath, 0o644);
+          await fs.unlink(envFilePath);
+        } catch {
+          // File may not exist or be inaccessible
+        }
+      }
+    }
+  } catch {
+    // Best-effort cleanup — don't block deactivation
+  }
+  // Remaining cleanup handled by dispose subscriptions
 }

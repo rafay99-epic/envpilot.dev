@@ -1,13 +1,22 @@
 import * as vscode from "vscode";
 import * as fs from "fs/promises";
 
+export type ProtectionMode =
+  | "strict-readonly"
+  | "readonly-with-request"
+  | "writable";
+
 /**
  * FileProtectionService monitors synced .env files and reverts unauthorized edits.
- * Only active for member-role users — admins/team leads can edit freely.
+ * Protection modes:
+ * - "strict-readonly": Viewer role — no edits, no request option
+ * - "readonly-with-request": Developer/Member role — no edits, but can request changes
+ * - "writable": Manager/Team Lead/Admin — full edit access
  */
 export class FileProtectionService {
   private watchers: Map<string, vscode.FileSystemWatcher> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+  private protectionModes: Map<string, ProtectionMode> = new Map();
   private _isSyncing = false;
 
   /**
@@ -22,11 +31,17 @@ export class FileProtectionService {
    * When a change is detected, shows a warning with a "Request Variable" action
    * and reverts the file by calling the resync callback.
    */
-  watchFile(filePath: string, resyncCallback: () => Promise<void>): void {
+  watchFile(
+    filePath: string,
+    resyncCallback: () => Promise<void>,
+    mode: ProtectionMode = "readonly-with-request"
+  ): void {
     // Don't create duplicate watchers
     if (this.watchers.has(filePath)) {
       return;
     }
+
+    this.protectionModes.set(filePath, mode);
 
     const watcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(vscode.Uri.file(filePath).fsPath, "**")
@@ -96,6 +111,8 @@ export class FileProtectionService {
       clearTimeout(timer);
       this.debounceTimers.delete(filePath);
     }
+
+    this.protectionModes.delete(filePath);
   }
 
   /**
@@ -105,11 +122,21 @@ export class FileProtectionService {
     filePath: string,
     resyncCallback: () => Promise<void>
   ): Promise<void> {
-    const action = await vscode.window.showWarningMessage(
-      "This file is managed by Envpilot. You cannot edit it directly.",
-      "Request Variable",
-      "OK"
-    );
+    const mode = this.protectionModes.get(filePath) || "readonly-with-request";
+
+    let action: string | undefined;
+    if (mode === "strict-readonly") {
+      action = await vscode.window.showWarningMessage(
+        "This file is managed by Envpilot. You have viewer access and cannot modify it.",
+        "OK"
+      );
+    } else {
+      action = await vscode.window.showWarningMessage(
+        "This file is managed by Envpilot. You cannot edit it directly.",
+        "Request Variable",
+        "OK"
+      );
+    }
 
     // Revert the file regardless of which button was clicked
     try {
@@ -149,5 +176,7 @@ export class FileProtectionService {
       clearTimeout(timer);
     }
     this.debounceTimers.clear();
+
+    this.protectionModes.clear();
   }
 }

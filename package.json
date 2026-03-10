@@ -25,7 +25,8 @@
     "build:web": "turbo build --filter=@envpilot/web",
     "build:cli": "turbo build --filter=@envpilot/cli",
     "build:extension": "turbo build --filter=envpilot",
-    "package:extension": "cd apps/vscode-extension && npx @vscode/vsce package --no-dependencies",
+    "package:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce package --no-dependencies",
+    "publish:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce publish --no-dependencies",
     "lint": "turbo lint",
     "lint:web": "turbo lint --filter=@envpilot/web",
     "lint:cli": "turbo lint --filter=@envpilot/cli",
@@ -40,7 +41,8 @@
     "check:all": "turbo lint typecheck build && prettier --check .",
     "convex:deploy": "convex deploy",
     "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && echo 'Environment ready — edit .env.local with your values'",
-    "generate:secret": "openssl rand -base64 32 | tr -d '\\n' && echo ''"
+    "generate:secret": "openssl rand -base64 32 | tr -d '\\n' && echo ''",
+    "publish:cli": "turbo build --filter=@envpilot/cli && cd apps/cli && npm publish --access public"
   },
   "devDependencies": {
     "@envpilot/prettier-config": "workspace:*",
