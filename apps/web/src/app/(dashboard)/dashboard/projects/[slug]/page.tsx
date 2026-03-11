@@ -20,6 +20,9 @@ import {
   VariableListItem,
   type VariableFormData,
 } from "@/components/variables";
+import { useTierFeatures } from "@/hooks/useTierLimits";
+import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import { ProOnlyBadge } from "@/components/tier/FeatureGate";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -86,6 +89,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
   const canReviewRequests = hasPermission(PERMISSIONS.VARIABLE_CREATE);
   const canRequestVariable = organization?.role === "member";
+
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+  const { features: tierFeatures } = useTierFeatures(orgId);
+  const enforcing = isTierEnforcementEnabled();
+  const versionHistoryAllowed = !enforcing || tierFeatures.versionHistory;
 
   // Keyboard shortcut: Cmd/Ctrl+K to open Add Variable drawer
   useHotkeys(
@@ -248,6 +256,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
       const result = await response.json();
       if (!response.ok && response.status !== 202) {
+        if (result.code === "TIER_LIMIT_REACHED") {
+          throw new Error("Variable limit reached. Upgrade to Pro for unlimited variables.");
+        }
         throw new Error(result.error || "Failed to create variable");
       }
 
@@ -670,7 +681,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     variable={variable}
                     onEdit={() => setEditingVariable(variable)}
                     onDelete={() => setDeletingVariable(variable)}
-                    onViewHistory={() => handleViewHistory(variable)}
+                    onViewHistory={
+                      versionHistoryAllowed
+                        ? () => handleViewHistory(variable)
+                        : undefined
+                    }
                     onReveal={() => handleRevealValue(variable)}
                     revealedValue={revealedValues[variable._id] ?? null}
                     isRevealing={revealingIds.has(variable._id)}
@@ -819,6 +834,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateVariable}
+        organizationId={organization?.id}
+        projectId={project?._id}
         title={canCreateVariable ? "Add Variables" : "Request Variables"}
         submitLabel={canCreateVariable ? "Create Variable" : "Submit Request"}
       />

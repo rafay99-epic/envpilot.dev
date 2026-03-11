@@ -19,7 +19,7 @@
     },
     "apps/cli": {
       "name": "@envpilot/cli",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "bin": {
         "envpilot": "./dist/index.js",
       },
@@ -46,7 +46,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "dependencies": {
         "axios": "^1.6.2",
         "convex": "^1.32.0",
@@ -68,7 +68,7 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "dependencies": {
         "@react-three/drei": "^10.7.7",
         "@react-three/fiber": "^9.5.0",
@@ -90,6 +90,7 @@
         "stripe": "^20.3.1",
         "three": "^0.183.1",
         "zod": "^4.3.6",
+        "zustand": "^5.0.11",
       },
       "devDependencies": {
         "@envpilot/eslint-config": "workspace:*",
@@ -108,7 +109,7 @@
     },
     "packages/eslint-config": {
       "name": "@envpilot/eslint-config",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "typescript-eslint": "^8",
       },
@@ -119,11 +120,11 @@
     },
     "packages/prettier-config": {
       "name": "@envpilot/prettier-config",
-      "version": "1.0.0",
+      "version": "1.1.0",
     },
     "packages/tsconfig": {
       "name": "@envpilot/tsconfig",
-      "version": "1.0.0",
+      "version": "1.1.0",
     },
   },
   "packages": {

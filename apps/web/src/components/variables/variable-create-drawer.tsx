@@ -4,11 +4,18 @@ import { useState } from "react";
 import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import { BulkPasteForm } from "./bulk-paste-form";
+import { useTierLimitCheck } from "@/hooks/useTierLimits";
+import { ProOnlyBadge, LimitWarning } from "@/components/tier/FeatureGate";
+import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface VariableCreateDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (data: VariableFormData) => Promise<void>;
+  organizationId?: string;
+  projectId?: string;
   title?: string;
   submitLabel?: string;
 }
@@ -19,11 +26,23 @@ export function VariableCreateDrawer({
   isOpen,
   onClose,
   onCreate,
+  organizationId,
+  projectId,
   title = "Add Variables",
   submitLabel = "Create Variable",
 }: VariableCreateDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabMode>("single");
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+
+  const orgId = organizationId as Id<"organizations"> | undefined;
+  const projId = projectId as Id<"projects"> | undefined;
+  const enforcing = isTierEnforcementEnabled();
+
+  const varCheck = useTierLimitCheck(orgId, "create_variable", projId);
+  const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
+
+  const bulkBlocked = enforcing && !bulkCheck.isLoading && !bulkCheck.allowed;
+  const varBlocked = enforcing && !varCheck.isLoading && !varCheck.allowed;
 
   function handleClose() {
     if (isBulkSubmitting) return;
@@ -51,12 +70,10 @@ export function VariableCreateDrawer({
     }
 
     if (failures.length > 0 && failures.length < entries.length) {
-      // Some succeeded, some failed — close but the parent will refresh
       handleClose();
     } else if (failures.length === 0) {
       handleClose();
     }
-    // If all failed, stay open so the user can see the errors
   }
 
   const bulkSubmitLabel = submitLabel.includes("Request")
@@ -70,6 +87,19 @@ export function VariableCreateDrawer({
       title={title}
       preventClose={isBulkSubmitting}
     >
+      {/* Variable limit warning */}
+      {enforcing &&
+        varCheck.current !== undefined &&
+        varCheck.limit !== undefined && (
+          <div className="mb-4">
+            <LimitWarning
+              current={varCheck.current}
+              limit={varCheck.limit}
+              resourceName="variables"
+            />
+          </div>
+        )}
+
       {/* Tab switcher */}
       <div className="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
         <button
@@ -86,22 +116,41 @@ export function VariableCreateDrawer({
         <button
           type="button"
           onClick={() => setActiveTab("bulk")}
-          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`flex-1 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors inline-flex justify-center ${
             activeTab === "bulk"
               ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
               : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           }`}
         >
           Bulk Paste
+          {bulkBlocked && <ProOnlyBadge size="sm" />}
         </button>
       </div>
 
       {/* Tab content */}
       {activeTab === "single" ? (
-        <VariableForm
-          onSubmit={handleSingleSubmit}
-          onCancel={handleClose}
-          submitLabel={submitLabel}
+        varBlocked ? (
+          <UpgradePrompt
+            reason={
+              varCheck.reason || "You have reached the variable limit."
+            }
+            feature="Unlimited Variables"
+            currentTier="free"
+            variant="inline"
+          />
+        ) : (
+          <VariableForm
+            onSubmit={handleSingleSubmit}
+            onCancel={handleClose}
+            submitLabel={submitLabel}
+          />
+        )
+      ) : bulkBlocked ? (
+        <UpgradePrompt
+          reason="Bulk import is a Pro feature. Upgrade to import variables from .env files."
+          feature="Bulk Import"
+          currentTier="free"
+          variant="inline"
         />
       ) : (
         <BulkPasteForm

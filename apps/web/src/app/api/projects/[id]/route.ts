@@ -8,6 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -170,9 +171,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ project });
   } catch (error) {
     console.error("Error updating project:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to update project";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to update project");
   }
 }
 
@@ -227,8 +226,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting project:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to delete project";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to delete project");
   }
 }

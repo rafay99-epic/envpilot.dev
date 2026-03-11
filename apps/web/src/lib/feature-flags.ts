@@ -27,6 +27,14 @@ export const FEATURE_FLAGS = {
    * Allows linking VS Code extension for syncing env variables.
    */
   EXTENSION: "extension",
+
+  /**
+   * Tier Limit Enforcement
+   * When enabled, Free tier limits are enforced (project, variable, member caps).
+   * When disabled (default), all limits are bypassed (pre-alpha mode).
+   * Set NEXT_PUBLIC_ENFORCE_TIER_LIMITS=true to enable.
+   */
+  TIER_LIMITS: "tier_limits",
 } as const;
 
 export type FeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
@@ -47,6 +55,9 @@ export function isFeatureEnabled(flag: FeatureFlag): boolean {
       // Extension is always available (gated by tier, not feature flag)
       return true;
 
+    case FEATURE_FLAGS.TIER_LIMITS:
+      return process.env.NEXT_PUBLIC_ENFORCE_TIER_LIMITS === "true";
+
     default:
       return false;
   }
@@ -60,6 +71,7 @@ export function getFeatureFlagStates(): Record<FeatureFlag, boolean> {
     [FEATURE_FLAGS.PAYMENTS]: isFeatureEnabled(FEATURE_FLAGS.PAYMENTS),
     [FEATURE_FLAGS.API_ACCESS]: isFeatureEnabled(FEATURE_FLAGS.API_ACCESS),
     [FEATURE_FLAGS.EXTENSION]: isFeatureEnabled(FEATURE_FLAGS.EXTENSION),
+    [FEATURE_FLAGS.TIER_LIMITS]: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
   };
 }
 
@@ -70,5 +82,6 @@ export function getFeatureFlagStates(): Record<FeatureFlag, boolean> {
 export function getClientFeatureFlags(): Record<string, boolean> {
   return {
     payments: isFeatureEnabled(FEATURE_FLAGS.PAYMENTS),
+    tierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
   };
 }

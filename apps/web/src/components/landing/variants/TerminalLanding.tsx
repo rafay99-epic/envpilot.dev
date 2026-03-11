@@ -681,14 +681,14 @@ export default function TerminalLanding() {
                   </div>
                   <div className="mt-5 space-y-2 text-xs">
                     {[
-                      "Unlimited projects",
-                      "Unlimited variables",
-                      "Unlimited team members",
+                      "Up to 3 projects",
+                      "50 variables per project",
+                      "Up to 3 team members",
                       "CLI + VS Code Extension",
                       "Web Dashboard",
                       "AES-256 encrypted vault",
                       "Role-based access control",
-                      "Full audit logging",
+                      "7-day audit log retention",
                     ].map((item) => (
                       <p
                         key={item}
@@ -718,7 +718,7 @@ export default function TerminalLanding() {
                 >
                   <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-bold text-zinc-400">
-                      $10
+                      $15
                     </span>
                     <span className="text-xs text-zinc-600">
                       / month / organization
@@ -730,12 +730,14 @@ export default function TerminalLanding() {
                   </div>
                   <div className="mt-5 space-y-2 text-xs">
                     {[
-                      "Everything in Free",
+                      "Unlimited projects",
+                      "Unlimited variables",
+                      "Unlimited team members",
+                      "Version history & rollback",
+                      "Bulk .env import",
+                      "Granular permissions",
+                      "365-day audit retention",
                       "Priority support",
-                      "Advanced audit exports",
-                      "Custom integrations",
-                      "SSO / SAML support",
-                      "SLA guarantees",
                     ].map((item) => (
                       <p
                         key={item}

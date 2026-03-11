@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
 import { z } from "zod";
 import {
   getOrCreateConvexUser,
@@ -157,8 +158,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     console.error("Error creating project:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to create project";
+    const message = sanitizeConvexError(error);
 
     if (message.includes("slug already exists")) {
       return NextResponse.json(
@@ -167,6 +167,6 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to create project");
   }
 }

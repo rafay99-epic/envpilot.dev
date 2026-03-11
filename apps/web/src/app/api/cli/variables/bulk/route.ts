@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { handleApiError } from "@/lib/api-errors";
 import {
   authenticateCLIRequest,
   unauthorizedResponse,
@@ -232,10 +233,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("CLI bulk variables error:", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to bulk update variables";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to bulk update variables");
   }
 }

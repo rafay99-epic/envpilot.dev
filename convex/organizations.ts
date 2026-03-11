@@ -498,6 +498,29 @@ export const removeMember = mutation({
       }
     }
 
+    // Revoke all active variable permissions for this user across org projects
+    let revokedPermissionCount = 0;
+    const activePermissions = await ctx.db
+      .query("variablePermissions")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", args.userId).eq("isActive", true)
+      )
+      .collect();
+
+    const orgProjectIds = new Set(projects.map((p) => p._id));
+
+    for (const perm of activePermissions) {
+      const variable = await ctx.db.get(perm.variableId);
+      if (variable && orgProjectIds.has(variable.projectId)) {
+        await ctx.db.patch(perm._id, {
+          isActive: false,
+          revokedAt: now,
+          revokedBy: args.removedBy,
+        });
+        revokedPermissionCount++;
+      }
+    }
+
     await ctx.db.delete(membership._id);
 
     await ctx.db.insert("auditLogs", {
@@ -507,6 +530,7 @@ export const removeMember = mutation({
       details: JSON.stringify({
         removedUserId: args.userId,
         revokedAccessTokens: revokedTokenCount,
+        revokedVariablePermissions: revokedPermissionCount,
       }),
       createdAt: now,
     });

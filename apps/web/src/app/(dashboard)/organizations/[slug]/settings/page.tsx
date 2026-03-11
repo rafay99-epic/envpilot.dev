@@ -285,13 +285,19 @@ export default function OrganizationSettingsPage({
         <div className="mt-4 flex items-center justify-between">
           <div>
             <p className="font-medium text-zinc-900 dark:text-zinc-100">
-              Pre-alpha Access
+              {organization.tier === "pro" ? "Pro Plan" : "Free Plan"}
             </p>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Billing is currently disabled. All organizations have full feature
-              access.
+              View your resource usage and available features on the Usage &
+              Plan page.
             </p>
           </div>
+          <a
+            href="/dashboard/usage"
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            View Usage
+          </a>
         </div>
       </div>
 

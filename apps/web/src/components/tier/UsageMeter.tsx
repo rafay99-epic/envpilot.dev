@@ -1,6 +1,7 @@
 "use client";
 
 import { calculateLimitPercentage } from "@/hooks/useTierLimits";
+import { Infinity } from "lucide-react";
 
 interface UsageMeterProps {
   /**
@@ -64,14 +65,14 @@ export function UsageMeter({
     if (isUnlimited) return "bg-green-500";
     if (isAtLimit) return "bg-red-500";
     if (isNearLimit) return "bg-amber-500";
-    return "bg-blue-500";
+    return "bg-green-500";
   };
 
   const getTextColor = () => {
-    if (isUnlimited) return "text-green-600 dark:text-green-400";
-    if (isAtLimit) return "text-red-600 dark:text-red-400";
-    if (isNearLimit) return "text-amber-600 dark:text-amber-400";
-    return "text-slate-600 dark:text-slate-400";
+    if (isUnlimited) return "text-green-400";
+    if (isAtLimit) return "text-red-400";
+    if (isNearLimit) return "text-amber-400";
+    return "text-zinc-300";
   };
 
   return (
@@ -80,23 +81,13 @@ export function UsageMeter({
         <div
           className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}
         >
-          <span className="font-medium text-slate-700 dark:text-slate-300">
+          <span className="font-medium text-zinc-300">
             {label}
           </span>
           <span className={getTextColor()}>
             {isUnlimited ? (
               <span className="flex items-center gap-1">
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <Infinity className="h-3.5 w-3.5" />
                 Unlimited
               </span>
             ) : (
@@ -106,7 +97,7 @@ export function UsageMeter({
         </div>
       )}
       <div
-        className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden ${sizeClasses[size].container}`}
+        className={`w-full bg-zinc-700 rounded-full overflow-hidden ${sizeClasses[size].container}`}
       >
         <div
           className={`h-full rounded-full transition-all duration-300 ${getBarColor()}`}
