@@ -144,7 +144,10 @@ export function UpgradePrompt({
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center ${className}`}
     >
-      <div className="absolute inset-0 bg-black/60" onClick={() => onUpgradeClick?.()} />
+      <div
+        className="absolute inset-0 bg-black/60"
+        onClick={() => onUpgradeClick?.()}
+      />
       <div className="relative w-full max-w-md mx-4 overflow-hidden rounded-xl border border-zinc-700/50 bg-zinc-900 shadow-2xl">
         <div className="border-b border-zinc-700/50 bg-zinc-800/50 px-6 py-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10">

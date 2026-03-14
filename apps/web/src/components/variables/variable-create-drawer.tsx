@@ -131,9 +131,7 @@ export function VariableCreateDrawer({
       {activeTab === "single" ? (
         varBlocked ? (
           <UpgradePrompt
-            reason={
-              varCheck.reason || "You have reached the variable limit."
-            }
+            reason={varCheck.reason || "You have reached the variable limit."}
             feature="Unlimited Variables"
             currentTier="free"
             variant="inline"

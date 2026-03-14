@@ -129,12 +129,8 @@ export default function UsagePage() {
     orgs: enforcementEnabled ? displayLimits.maxOrganizations : null,
     projects: enforcementEnabled ? displayLimits.maxProjects : null,
     teamMembers: enforcementEnabled ? displayLimits.maxTeamMembers : null,
-    variables: enforcementEnabled
-      ? displayLimits.maxVariablesPerProject
-      : null,
-    auditDays: enforcementEnabled
-      ? displayLimits.auditLogRetentionDays
-      : 730,
+    variables: enforcementEnabled ? displayLimits.maxVariablesPerProject : null,
+    auditDays: enforcementEnabled ? displayLimits.auditLogRetentionDays : 730,
   };
 
   return (

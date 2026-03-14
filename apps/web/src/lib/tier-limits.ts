@@ -81,10 +81,7 @@ export function isValidTier(tier: string): tier is Tier {
  * Get tier limits with validation.
  * When enforce is false (pre-alpha mode), returns unlimited config for all tiers.
  */
-export function getTierLimits(
-  tier: string,
-  enforce?: boolean
-): TierLimits {
+export function getTierLimits(tier: string, enforce?: boolean): TierLimits {
   if (!isValidTier(tier)) {
     throw new Error(`Invalid tier: ${tier}`);
   }

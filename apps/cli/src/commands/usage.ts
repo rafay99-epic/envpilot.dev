@@ -10,10 +10,7 @@ import {
   blank,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import {
-  isAuthenticated,
-  getActiveOrganizationId,
-} from "../lib/config.js";
+import { isAuthenticated, getActiveOrganizationId } from "../lib/config.js";
 import { readProjectConfig } from "../lib/project-config.js";
 import { notAuthenticated } from "../lib/errors.js";
 import type { Organization } from "../types/index.js";
@@ -107,9 +104,7 @@ export const usageCommand = new Command("usage")
       blank();
 
       if (!usage.enforcementEnabled) {
-        info(
-          "Pre-alpha mode — all limits are bypassed. Billing coming soon."
-        );
+        info("Pre-alpha mode — all limits are bypassed. Billing coming soon.");
         blank();
       }
 
@@ -118,10 +113,7 @@ export const usageCommand = new Command("usage")
       blank();
 
       keyValue([
-        [
-          "Projects",
-          formatUsage(usage.usage.projects, usage.limits.projects),
-        ],
+        ["Projects", formatUsage(usage.usage.projects, usage.limits.projects)],
         [
           "Team Members",
           formatUsage(usage.usage.teamMembers, usage.limits.teamMembers),
@@ -161,10 +153,7 @@ export const usageCommand = new Command("usage")
           featureStatus(usage.features.granularPermissions),
         ],
         ["Extension Access", featureStatus(usage.features.extensionAccess)],
-        [
-          "Audit Log Retention",
-          `${usage.features.auditLogRetentionDays} days`,
-        ],
+        ["Audit Log Retention", `${usage.features.auditLogRetentionDays} days`],
       ]);
       blank();
     } catch (err) {

@@ -7,7 +7,11 @@ import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
-import { sanitizeConvexError, isTierLimitError, handleApiError } from "@/lib/api-errors";
+import {
+  sanitizeConvexError,
+  isTierLimitError,
+  handleApiError,
+} from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 

@@ -202,7 +202,9 @@ export default function OrganizationMembersPage({
 
       if (!response.ok) {
         if (data.code === "TIER_LIMIT_REACHED") {
-          setInviteError("Team member limit reached. Upgrade to Pro for unlimited team members.");
+          setInviteError(
+            "Team member limit reached. Upgrade to Pro for unlimited team members."
+          );
           return;
         }
         throw new Error(data.error || "Failed to send invitation");

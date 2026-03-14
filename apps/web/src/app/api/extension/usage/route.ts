@@ -40,10 +40,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const usageData = await convex.query(
-      api.tierLimits.getOrganizationUsage,
-      { organizationId: organizationId as Id<"organizations"> }
-    );
+    const usageData = await convex.query(api.tierLimits.getOrganizationUsage, {
+      organizationId: organizationId as Id<"organizations">,
+    });
 
     const enforcementEnabled = isTierEnforcementEnabled();
     const limits = getTierLimits(usageData.tier);
@@ -69,7 +68,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to get usage information";
+      error instanceof Error
+        ? error.message
+        : "Failed to get usage information";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -27,8 +27,6 @@ export function openUrl(url: string): void {
 function handleError(error: Error | null): void {
   if (error) {
     // Native command failed — fall back to VS Code API
-    vscode.env.openExternal(
-      vscode.Uri.parse("https://www.envpilot.dev")
-    );
+    vscode.env.openExternal(vscode.Uri.parse("https://www.envpilot.dev"));
   }
 }

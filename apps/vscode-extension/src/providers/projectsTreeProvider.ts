@@ -2,7 +2,12 @@ import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
 import { getDisplayPath } from "../utils/paths";
-import type { Project, Organization, LinkedDirectory, UsageInfo } from "../types";
+import type {
+  Project,
+  Organization,
+  LinkedDirectory,
+  UsageInfo,
+} from "../types";
 
 export type ProjectTreeItemType =
   | "organization"

@@ -115,7 +115,9 @@ export default function NewProjectPage() {
 
       if (!response.ok) {
         if (data.code === "TIER_LIMIT_REACHED") {
-          setError("You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects.");
+          setError(
+            "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
+          );
           return;
         }
         throw new Error(data.error || "Failed to create project");

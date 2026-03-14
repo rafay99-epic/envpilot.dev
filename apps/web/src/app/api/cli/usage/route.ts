@@ -42,10 +42,9 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    const usageData = await convex.query(
-      api.tierLimits.getOrganizationUsage,
-      { organizationId: organizationId as Id<"organizations"> }
-    );
+    const usageData = await convex.query(api.tierLimits.getOrganizationUsage, {
+      organizationId: organizationId as Id<"organizations">,
+    });
 
     const enforcementEnabled = isTierEnforcementEnabled();
     const limits = getTierLimits(usageData.tier);

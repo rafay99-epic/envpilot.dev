@@ -24,8 +24,11 @@ export function useTierStoreSync() {
     orgId ? { organizationId: orgId } : "skip"
   );
 
-  const { setUsageData, clearUsageData, organizationId: storedOrgId } =
-    useTierStore();
+  const {
+    setUsageData,
+    clearUsageData,
+    organizationId: storedOrgId,
+  } = useTierStore();
 
   // Sync Convex data into Zustand store
   useEffect(() => {

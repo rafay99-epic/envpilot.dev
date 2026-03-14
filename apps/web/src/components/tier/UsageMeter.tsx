@@ -81,9 +81,7 @@ export function UsageMeter({
         <div
           className={`flex justify-between items-center mb-1 ${sizeClasses[size].text}`}
         >
-          <span className="font-medium text-zinc-300">
-            {label}
-          </span>
+          <span className="font-medium text-zinc-300">{label}</span>
           <span className={getTextColor()}>
             {isUnlimited ? (
               <span className="flex items-center gap-1">

@@ -257,7 +257,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       const result = await response.json();
       if (!response.ok && response.status !== 202) {
         if (result.code === "TIER_LIMIT_REACHED") {
-          throw new Error("Variable limit reached. Upgrade to Pro for unlimited variables.");
+          throw new Error(
+            "Variable limit reached. Upgrade to Pro for unlimited variables."
+          );
         }
         throw new Error(result.error || "Failed to create variable");
       }
