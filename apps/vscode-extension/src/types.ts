@@ -20,6 +20,36 @@ export interface Organization {
   role?: MembershipRole;
 }
 
+export interface UsageInfo {
+  tier: "free" | "pro";
+  enforcementEnabled: boolean;
+  limits: {
+    projects: number | null;
+    variablesPerProject: number | null;
+    teamMembers: number | null;
+  };
+  usage: {
+    projects: number;
+    teamMembers: number;
+    pendingInvitations: number;
+    totalVariables: number;
+    maxVariablesInProject: number;
+    maxVariablesProjectName: string;
+    variablesPerProject: Array<{
+      projectId: string;
+      projectName: string;
+      count: number;
+    }>;
+  };
+  features: {
+    versionHistory: boolean;
+    bulkImport: boolean;
+    extensionAccess: boolean;
+    granularPermissions: boolean;
+    auditLogRetentionDays: number;
+  };
+}
+
 export interface VariableRequest {
   _id: string;
   key: string;

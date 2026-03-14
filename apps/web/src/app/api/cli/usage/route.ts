@@ -12,11 +12,10 @@ import { getTierLimits, isTierEnforcementEnabled } from "@/lib/tier-limits";
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
- * GET /api/cli/tier
- * Get tier information for an organization
+ * GET /api/cli/usage
+ * Get tier limits and current usage for an organization
  */
 export async function GET(request: NextRequest) {
-  // Authenticate
   const authResult = await authenticateCLIRequest(request, convex);
 
   if (!authResult.valid || !authResult.userId) {
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check membership
     const membership = await convex.query(api.organizations.getMembership, {
       organizationId: organizationId as Id<"organizations">,
       userId: authResult.userId,
@@ -44,30 +42,23 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Get organization
-    const org = await convex.query(api.organizations.getById, {
-      organizationId: organizationId as Id<"organizations">,
-    });
-
-    if (!org) {
-      return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 }
-      );
-    }
+    const usageData = await convex.query(
+      api.tierLimits.getOrganizationUsage,
+      { organizationId: organizationId as Id<"organizations"> }
+    );
 
     const enforcementEnabled = isTierEnforcementEnabled();
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(usageData.tier);
 
     return NextResponse.json({
-      tier: org.tier,
+      tier: usageData.tier,
       enforcementEnabled,
-      apiAccessEnabled: limits.apiAccessEnabled,
       limits: {
         projects: limits.maxProjects,
         variablesPerProject: limits.maxVariablesPerProject,
         teamMembers: limits.maxTeamMembers,
       },
+      usage: usageData.usage,
       features: {
         versionHistory: limits.variableVersionHistoryEnabled,
         bulkImport: limits.bulkImportEnabled,
@@ -77,9 +68,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("CLI tier error:", error);
+    console.error("CLI usage error:", error);
     return NextResponse.json(
-      { error: "Failed to get tier information" },
+      { error: "Failed to get usage information" },
       { status: 500 }
     );
   }

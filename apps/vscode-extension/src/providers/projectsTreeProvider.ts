@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
 import { getDisplayPath } from "../utils/paths";
-import type { Project, Organization, LinkedDirectory } from "../types";
+import type { Project, Organization, LinkedDirectory, UsageInfo } from "../types";
 
 export type ProjectTreeItemType =
   | "organization"
@@ -34,6 +34,7 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
   private storage: StorageService;
   private organizations: Organization[] = [];
   private projects: Map<string, Project[]> = new Map();
+  private usageCache: Map<string, UsageInfo> = new Map();
   private isAuthenticated = false;
 
   constructor(api: ApiService, storage: StorageService) {
@@ -74,13 +75,28 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
           ];
         }
 
+        // Fetch usage data for all orgs in parallel (non-blocking)
+        const usageResults = await Promise.allSettled(
+          this.organizations.map((org) => this.api.getUsage(org._id))
+        );
+        for (let i = 0; i < this.organizations.length; i++) {
+          const result = usageResults[i];
+          if (result.status === "fulfilled" && result.value) {
+            this.usageCache.set(this.organizations[i]._id, result.value);
+          }
+        }
+
         return this.organizations.map(
           (org) =>
             new ProjectTreeItem(
               org.name,
               vscode.TreeItemCollapsibleState.Collapsed,
               "organization",
-              org
+              org,
+              undefined,
+              undefined,
+              undefined,
+              this.usageCache.get(org._id)
             )
         );
       } catch (error) {
@@ -196,6 +212,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
   project?: Project;
   organizationName?: string;
   directory?: LinkedDirectory;
+  usage?: UsageInfo;
 
   constructor(
     label: string,
@@ -204,7 +221,8 @@ export class ProjectTreeItem extends vscode.TreeItem {
     organization?: Organization,
     project?: Project,
     organizationName?: string,
-    directory?: LinkedDirectory
+    directory?: LinkedDirectory,
+    usage?: UsageInfo
   ) {
     super(label, collapsibleState);
     this.type = type;
@@ -212,6 +230,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
     this.project = project;
     this.organizationName = organizationName;
     this.directory = directory;
+    this.usage = usage;
     this.contextValue = type;
 
     switch (type) {
@@ -223,7 +242,7 @@ export class ProjectTreeItem extends vscode.TreeItem {
             : undefined
         );
         this.description = this.buildOrgDescription(organization);
-        this.tooltip = this.createOrgTooltip(organization);
+        this.tooltip = this.createOrgTooltip(organization, usage);
         break;
 
       case "project":
@@ -310,8 +329,14 @@ export class ProjectTreeItem extends vscode.TreeItem {
     return `${dir.environments.join(", ")} \u2192 ${dir.targetFile}`;
   }
 
+  private formatUsageRatio(current: number, limit: number | null): string {
+    if (limit === null) return `${current} / unlimited`;
+    return `${current} / ${limit}`;
+  }
+
   private createOrgTooltip(
-    org?: Organization
+    org?: Organization,
+    usage?: UsageInfo
   ): vscode.MarkdownString | undefined {
     if (!org) return undefined;
     const md = new vscode.MarkdownString("", true);
@@ -325,7 +350,45 @@ export class ProjectTreeItem extends vscode.TreeItem {
         `**Your Role:** ${ROLE_LABELS[org.role] || org.role}\n\n`
       );
     }
-    md.appendMarkdown(`**Slug:** \`${org.slug}\``);
+    md.appendMarkdown(`**Slug:** \`${org.slug}\`\n\n`);
+
+    // Usage data
+    if (usage) {
+      md.appendMarkdown("---\n\n");
+
+      if (!usage.enforcementEnabled) {
+        md.appendMarkdown("$(info) *Pre-alpha — all limits bypassed*\n\n");
+      }
+
+      md.appendMarkdown("**Usage**\n\n");
+      md.appendMarkdown(
+        `- Projects: ${this.formatUsageRatio(usage.usage.projects, usage.limits.projects)}\n`
+      );
+      md.appendMarkdown(
+        `- Team Members: ${this.formatUsageRatio(usage.usage.teamMembers, usage.limits.teamMembers)}\n`
+      );
+      md.appendMarkdown(
+        `- Variables (max): ${this.formatUsageRatio(usage.usage.maxVariablesInProject, usage.limits.variablesPerProject)}\n`
+      );
+      md.appendMarkdown(`- Total Variables: ${usage.usage.totalVariables}\n\n`);
+
+      md.appendMarkdown("**Features**\n\n");
+      const check = "$(check)";
+      const x = "$(x)";
+      md.appendMarkdown(
+        `- Version History: ${usage.features.versionHistory ? check : x}\n`
+      );
+      md.appendMarkdown(
+        `- Bulk Import: ${usage.features.bulkImport ? check : x}\n`
+      );
+      md.appendMarkdown(
+        `- Granular Permissions: ${usage.features.granularPermissions ? check : x}\n`
+      );
+      md.appendMarkdown(
+        `- Audit Retention: ${usage.features.auditLogRetentionDays} days\n`
+      );
+    }
+
     return md;
   }
 

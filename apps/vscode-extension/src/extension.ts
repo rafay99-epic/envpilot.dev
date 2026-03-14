@@ -18,6 +18,7 @@ import { ClipboardGuardService } from "./services/clipboardGuard";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
+import { openUrl } from "./utils/browser";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -836,22 +837,9 @@ function handleRefresh(): void {
   statusBarProvider.update();
 }
 
-async function handleOpenDashboard(): Promise<void> {
+function handleOpenDashboard(): void {
   const serverUrl = getServerUrl();
-  try {
-    const opened = await vscode.env.openExternal(vscode.Uri.parse(serverUrl));
-    if (!opened) {
-      await vscode.env.clipboard.writeText(serverUrl);
-      vscode.window.showInformationMessage(
-        "Could not open browser. Dashboard URL copied to clipboard."
-      );
-    }
-  } catch {
-    await vscode.env.clipboard.writeText(serverUrl);
-    vscode.window.showInformationMessage(
-      "Could not open browser. Dashboard URL copied to clipboard."
-    );
-  }
+  openUrl(serverUrl);
 }
 
 async function handleShowStatus(): Promise<void> {

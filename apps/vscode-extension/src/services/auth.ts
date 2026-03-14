@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as crypto from "crypto";
 import axios, { AxiosError } from "axios";
 import { getServerUrl } from "../utils/config";
+import { openUrl } from "../utils/browser";
 import { StorageService } from "../utils/storage";
 import type { AuthSession, User, ApiResponse } from "../types";
 
@@ -39,11 +40,8 @@ export class AuthService {
     // Build the auth URL
     const authUrl = `${serverUrl}/extension/auth?session=${sessionToken}`;
 
-    // Open in browser with fallback for environments where openExternal fails
-    const opened = await openUrlWithFallback(authUrl);
-    if (!opened) {
-      return false;
-    }
+    // Open in browser
+    openUrl(authUrl);
 
     // Auto-poll for auth completion with progress indicator
     return this.pollForAuthCompletion(sessionToken);
@@ -239,61 +237,3 @@ function generateSessionToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-/**
- * Open a URL in the default browser with fallback handling.
- * Handles cases where vscode.env.openExternal fails (e.g., no default browser
- * configured on Windows, or running in Cursor/other VS Code forks).
- */
-async function openUrlWithFallback(url: string): Promise<boolean> {
-  try {
-    const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
-    if (opened) {
-      return true;
-    }
-
-    // openExternal returned false — offer alternatives
-    return await showBrowserFallback(url);
-  } catch {
-    // openExternal threw an error — offer alternatives
-    return await showBrowserFallback(url);
-  }
-}
-
-async function showBrowserFallback(url: string): Promise<boolean> {
-  const action = await vscode.window.showWarningMessage(
-    "Could not open the browser automatically. This can happen if no default browser is set, or you're using Cursor or another editor.",
-    "Copy URL",
-    "Try Again",
-    "Cancel"
-  );
-
-  if (action === "Copy URL") {
-    await vscode.env.clipboard.writeText(url);
-    vscode.window.showInformationMessage(
-      "Sign-in URL copied to clipboard. Paste it in your browser to continue."
-    );
-    return true;
-  } else if (action === "Try Again") {
-    try {
-      const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
-      if (opened) {
-        return true;
-      }
-      // Still failed — copy to clipboard as last resort
-      await vscode.env.clipboard.writeText(url);
-      vscode.window.showInformationMessage(
-        "Browser still could not be opened. URL copied to clipboard — paste it in your browser."
-      );
-      return true;
-    } catch {
-      await vscode.env.clipboard.writeText(url);
-      vscode.window.showInformationMessage(
-        "Browser still could not be opened. URL copied to clipboard — paste it in your browser."
-      );
-      return true;
-    }
-  }
-
-  // User cancelled
-  return false;
-}

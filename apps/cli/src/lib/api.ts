@@ -6,6 +6,7 @@ import type {
   Variable,
   User,
   TierInfo,
+  UsageInfo,
 } from "../types/index.js";
 
 /**
@@ -188,6 +189,16 @@ export class APIClient {
       );
     }
 
+    // Handle tier limit errors (403 with TIER_LIMIT_REACHED code)
+    if (response.status === 403 && code === "TIER_LIMIT_REACHED") {
+      throw new APIError(
+        message ||
+          "Tier limit reached. Run `envpilot usage` to see your plan limits.",
+        403,
+        "TIER_LIMIT_REACHED"
+      );
+    }
+
     // Handle authorization errors
     if (response.status === 403) {
       throw new APIError(message || "Access denied.", 403, code || "FORBIDDEN");
@@ -196,7 +207,8 @@ export class APIClient {
     // Handle tier limit errors
     if (response.status === 402) {
       throw new APIError(
-        message || "Payment is currently disabled for this pre-alpha build.",
+        message ||
+          "Tier limit reached. Run `envpilot usage` to see your plan limits.",
         402,
         "PAYMENT_REQUIRED"
       );
@@ -221,6 +233,13 @@ export class APIClient {
    */
   async getTierInfo(organizationId: string): Promise<TierInfo> {
     return this.get<TierInfo>("/api/cli/tier", { organizationId });
+  }
+
+  /**
+   * Get usage info for the active organization
+   */
+  async getUsage(organizationId: string): Promise<UsageInfo> {
+    return this.get<UsageInfo>("/api/cli/usage", { organizationId });
   }
 
   /**

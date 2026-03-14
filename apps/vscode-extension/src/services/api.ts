@@ -12,6 +12,7 @@ import type {
   MembershipRole,
   ProjectRole,
   VariableRequest,
+  UsageInfo,
 } from "../types";
 
 /**
@@ -204,6 +205,19 @@ export class ApiService {
       ApiResponse<{ enabled: boolean; reason?: string }>
     >(`/api/extension/check-access/${organizationId}`);
     return response.data.data || { enabled: false, reason: "Unknown error" };
+  }
+
+  // Usage info
+  async getUsage(organizationId: string): Promise<UsageInfo | null> {
+    try {
+      const response = await this.client.get<ApiResponse<UsageInfo>>(
+        "/api/extension/usage",
+        { params: { organizationId } }
+      );
+      return response.data.data || null;
+    } catch {
+      return null;
+    }
   }
 
   // Variable Requests
