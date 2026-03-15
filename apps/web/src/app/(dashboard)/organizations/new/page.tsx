@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
+import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 
 export default function NewOrganizationPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tierLimitHit, setTierLimitHit] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -54,6 +56,11 @@ export default function NewOrganizationPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.code === "TIER_LIMIT_REACHED") {
+          setTierLimitHit(true);
+          setIsSubmitting(false);
+          return;
+        }
         throw new Error(data.error || "Failed to create organization");
       }
 
@@ -97,9 +104,18 @@ export default function NewOrganizationPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        {tierLimitHit && (
+          <UpgradePrompt
+            reason="You've reached the organization limit on the Free plan. Upgrade to Pro for unlimited organizations."
+            feature="Unlimited Organizations"
+            currentTier="free"
+            variant="card"
+          />
+        )}
+
+        {error && !tierLimitHit && (
+          <div className="rounded-lg border border-red-800/50 bg-red-900/20 p-4">
+            <p className="text-sm text-red-400">{error}</p>
           </div>
         )}
 

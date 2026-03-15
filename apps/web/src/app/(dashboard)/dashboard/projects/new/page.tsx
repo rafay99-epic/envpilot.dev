@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
+import { useTierLimitCheck } from "@/hooks/useTierLimits";
+import { LimitWarning } from "@/components/tier/FeatureGate";
+import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
+import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   PROJECT_ICONS,
   PROJECT_COLORS,
@@ -19,6 +24,9 @@ export default function NewProjectPage() {
   const router = useRouter();
   const { hasPermission, organization } = useAuthContext();
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+  const tierCheck = useTierLimitCheck(orgId, "create_project");
+  const enforcing = isTierEnforcementEnabled();
 
   const [step, setStep] = useState<"template" | "details">("template");
   const [selectedTemplate, setSelectedTemplate] =
@@ -106,6 +114,12 @@ export default function NewProjectPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.code === "TIER_LIMIT_REACHED") {
+          setError(
+            "You've reached the project limit on your current plan. Upgrade to Pro for unlimited projects."
+          );
+          return;
+        }
         throw new Error(data.error || "Failed to create project");
       }
 
@@ -153,6 +167,25 @@ export default function NewProjectPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Tier limit check — block only when enforcement is enabled
+  if (enforcing && !tierCheck.isLoading && !tierCheck.allowed) {
+    return (
+      <div className="mx-auto max-w-lg py-12">
+        <UpgradePrompt
+          reason={tierCheck.reason || "You have reached your project limit."}
+          feature="Unlimited Projects"
+          currentTier="free"
+          variant="card"
+          onUpgradeClick={() => {
+            if (organization?.slug) {
+              window.location.href = `/organizations/${organization.slug}/settings`;
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   if (!canCreateProject) {
     return (
@@ -255,6 +288,17 @@ export default function NewProjectPage() {
           {step === "template" ? "Select Template" : "Project Details"}
         </span>
       </div>
+
+      {/* Tier limit warning when approaching limit */}
+      {enforcing &&
+        tierCheck.current !== undefined &&
+        tierCheck.limit !== undefined && (
+          <LimitWarning
+            current={tierCheck.current}
+            limit={tierCheck.limit}
+            resourceName="projects"
+          />
+        )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">

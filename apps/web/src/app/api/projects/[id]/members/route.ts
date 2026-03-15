@@ -8,6 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -137,9 +138,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ membershipId }, { status: 201 });
   } catch (error) {
     console.error("Error adding project member:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to add project member";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to add project member");
   }
 }
 
@@ -177,9 +176,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ updated: true });
   } catch (error) {
     console.error("Error updating project member role:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to update role";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to update role");
   }
 }
 
@@ -216,8 +213,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     return NextResponse.json({ removed: true });
   } catch (error) {
     console.error("Error removing project member:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to remove member";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to remove member");
   }
 }

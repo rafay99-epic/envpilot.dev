@@ -14,11 +14,13 @@ import {
   Key,
   Users,
   ClipboardList,
+  Gauge,
   Settings,
   Menu,
   X,
   Terminal,
 } from "lucide-react";
+import { useTierStoreSync } from "@/hooks/useTierStore";
 
 interface NavItem {
   href: string;
@@ -52,6 +54,11 @@ const navItems: NavItem[] = [
     href: "/dashboard/audit",
     label: "Audit Logs",
     icon: <ClipboardList className="h-4 w-4" />,
+  },
+  {
+    href: "/dashboard/usage",
+    label: "Usage & Plan",
+    icon: <Gauge className="h-4 w-4" />,
   },
   {
     href: "/dashboard/settings",
@@ -91,6 +98,9 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
 export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { organization } = useAuthContext();
+
+  // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
+  useTierStoreSync();
 
   const orgRole = organization?.role;
   const canReview = orgRole === "admin" || orgRole === "team_lead";

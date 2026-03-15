@@ -6,7 +6,11 @@ import { Id } from "./_generated/dataModel";
  * Tier Limits Configuration
  *
  * Defines limits for each subscription tier.
- * Free tier is generous to start, Pro tier is unlimited.
+ * Free tier has sensible defaults, Pro tier is unlimited.
+ *
+ * Enforcement is controlled by the NEXT_PUBLIC_ENFORCE_TIER_LIMITS env var
+ * on the client/API layer. When enforcement is disabled (pre-alpha mode),
+ * the UI still displays tier info but no actions are blocked.
  */
 
 export type Tier = "free" | "pro";
@@ -24,26 +28,42 @@ export interface TierLimits {
   bulkImportEnabled: boolean;
 }
 
+/**
+ * Unlimited tier config used when enforcement is disabled (pre-alpha mode).
+ * All limits are null (unlimited) and all features are enabled.
+ */
+const UNLIMITED_LIMITS: TierLimits = {
+  maxProjects: null,
+  maxVariablesPerProject: null,
+  maxTeamMembers: null,
+  maxOrganizations: null,
+  auditLogRetentionDays: 730,
+  apiAccessEnabled: true,
+  extensionAccessEnabled: true,
+  granularPermissionsEnabled: true,
+  variableVersionHistoryEnabled: true,
+  bulkImportEnabled: true,
+};
+
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
-    // Pre-alpha mode: billing is bypassed and all limits/features are unlocked.
+    maxProjects: 3,
+    maxVariablesPerProject: 50,
+    maxTeamMembers: 3,
+    maxOrganizations: 1,
+    auditLogRetentionDays: 7,
+    apiAccessEnabled: true,
+    extensionAccessEnabled: true,
+    granularPermissionsEnabled: false,
+    variableVersionHistoryEnabled: false,
+    bulkImportEnabled: false,
+  },
+  pro: {
     maxProjects: null,
     maxVariablesPerProject: null,
     maxTeamMembers: null,
     maxOrganizations: null,
-    auditLogRetentionDays: 730,
-    apiAccessEnabled: true,
-    extensionAccessEnabled: true,
-    granularPermissionsEnabled: true, // Enabled for all tiers - core access control feature
-    variableVersionHistoryEnabled: true,
-    bulkImportEnabled: true,
-  },
-  pro: {
-    maxProjects: null, // unlimited
-    maxVariablesPerProject: null, // unlimited
-    maxTeamMembers: null, // unlimited
-    maxOrganizations: null, // unlimited
-    auditLogRetentionDays: 730, // 2 years
+    auditLogRetentionDays: 365,
     apiAccessEnabled: true,
     extensionAccessEnabled: true,
     granularPermissionsEnabled: true,
@@ -60,11 +80,18 @@ export function isValidTier(tier: string): tier is Tier {
 }
 
 /**
- * Get tier limits with validation
+ * Get tier limits with validation.
+ * When enforce is false (pre-alpha mode), returns unlimited config for all tiers.
  */
-export function getTierLimits(tier: string): TierLimits {
+export function getTierLimits(
+  tier: string,
+  enforce: boolean = true
+): TierLimits {
   if (!isValidTier(tier)) {
     throw new Error(`Invalid tier: ${tier}`);
+  }
+  if (!enforce) {
+    return UNLIMITED_LIMITS;
   }
   return TIER_LIMITS[tier];
 }
@@ -106,31 +133,54 @@ export const getOrganizationUsage = query({
       throw new Error("Organization not found");
     }
 
-    // Count projects
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    // Parallel fetch: projects, members, pending invitations
+    const [projects, members, pendingInvitations] = await Promise.all([
+      ctx.db
+        .query("projects")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect(),
+      ctx.db
+        .query("organizationMembers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect(),
+      ctx.db
+        .query("invitations")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .filter((q) => q.eq(q.field("status"), "pending"))
+        .collect(),
+    ]);
 
-    // Count team members
-    const members = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
+    // Parallel fetch: variable counts per project
+    const variableResults = await Promise.all(
+      projects.map(async (project) => {
+        const variables = await ctx.db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect();
+        return {
+          projectId: project._id as string,
+          projectName: project.name,
+          count: variables.length,
+        };
+      })
+    );
 
-    // Count pending invitations
-    const pendingInvitations = await ctx.db
-      .query("invitations")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+    let totalVariables = 0;
+    let maxVariableProject = { projectId: "", projectName: "", count: 0 };
+    for (const vc of variableResults) {
+      totalVariables += vc.count;
+      if (vc.count > maxVariableProject.count) {
+        maxVariableProject = vc;
+      }
+    }
 
     return {
       tier: org.tier,
@@ -139,6 +189,10 @@ export const getOrganizationUsage = query({
         projects: projects.length,
         teamMembers: members.length,
         pendingInvitations: pendingInvitations.length,
+        totalVariables,
+        maxVariablesInProject: maxVariableProject.count,
+        maxVariablesProjectName: maxVariableProject.projectName,
+        variablesPerProject: variableResults,
       },
     };
   },

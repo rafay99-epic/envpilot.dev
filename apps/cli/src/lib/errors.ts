@@ -111,9 +111,9 @@ export function organizationNotFound(organizationId: string): CLIError {
 
 export function tierLimitExceeded(feature: string): CLIError {
   return new CLIError(
-    `This feature is currently unavailable: ${feature}`,
+    `Tier limit reached: ${feature}`,
     ErrorCodes.TIER_LIMIT_EXCEEDED,
-    "Please try again later."
+    "Run `envpilot usage` to see your current plan limits, or upgrade to Pro."
   );
 }
 

@@ -4,7 +4,7 @@ const args = process.argv.slice(2);
 const isWatch = args.includes("--watch");
 const isMinify = args.includes("--minify");
 
-const serverUrl = process.env.ENVPILOT_SERVER_URL || "";
+const serverUrl = process.env.ENVPILOT_SERVER_URL || "https://www.envpilot.dev";
 
 /** @type {import('esbuild').BuildOptions} */
 const buildOptions = {

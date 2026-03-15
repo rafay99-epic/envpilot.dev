@@ -9,6 +9,7 @@ import { switchCommand } from "./commands/switch.js";
 import { listCommand } from "./commands/list.js";
 import { configCommand } from "./commands/config.js";
 import { logoutCommand } from "./commands/logout.js";
+import { usageCommand } from "./commands/usage.js";
 
 const program = new Command();
 
@@ -26,6 +27,7 @@ program.addCommand(pushCommand);
 program.addCommand(switchCommand);
 program.addCommand(listCommand);
 program.addCommand(configCommand);
+program.addCommand(usageCommand);
 
 // Parse command line arguments
 program.parse();

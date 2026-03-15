@@ -7,6 +7,8 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
+import { isTierEnforcementEnabled, TIER_LIMITS } from "@/lib/tier-limits";
+import { LimitWarning } from "@/components/tier/FeatureGate";
 
 interface Member {
   _id: string;
@@ -37,6 +39,7 @@ interface Organization {
   _id: string;
   name: string;
   role: "admin" | "team_lead" | "member";
+  tier?: "free" | "pro";
 }
 
 interface SearchUser {
@@ -122,6 +125,15 @@ export default function OrganizationMembersPage({
     onConfirm: () => void;
   }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
+  const enforcing = isTierEnforcementEnabled();
+  const tierLimits =
+    organization?.tier === "pro" ? TIER_LIMITS.pro : TIER_LIMITS.free;
+  const totalMemberSlots = members.length + invitations.length;
+  const memberLimitReached =
+    enforcing &&
+    tierLimits.maxTeamMembers !== null &&
+    totalMemberSlots >= tierLimits.maxTeamMembers;
+
   useEffect(() => {
     fetchData();
   }, [slug]);
@@ -189,6 +201,12 @@ export default function OrganizationMembersPage({
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.code === "TIER_LIMIT_REACHED") {
+          setInviteError(
+            "Team member limit reached. Upgrade to Pro for unlimited team members."
+          );
+          return;
+        }
         throw new Error(data.error || "Failed to send invitation");
       }
 
@@ -489,7 +507,17 @@ export default function OrganizationMembersPage({
         {canInvite && (
           <button
             onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            disabled={memberLimitReached}
+            title={
+              memberLimitReached
+                ? `Team member limit reached (${totalMemberSlots}/${tierLimits.maxTeamMembers}). Upgrade to Pro for unlimited members.`
+                : undefined
+            }
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              memberLimitReached
+                ? "cursor-not-allowed bg-zinc-700 text-zinc-400"
+                : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            }`}
           >
             <svg
               className="h-4 w-4"
@@ -508,6 +536,15 @@ export default function OrganizationMembersPage({
           </button>
         )}
       </div>
+
+      {/* Member limit warning */}
+      {enforcing && tierLimits.maxTeamMembers !== null && (
+        <LimitWarning
+          current={totalMemberSlots}
+          limit={tierLimits.maxTeamMembers}
+          resourceName="team members"
+        />
+      )}
 
       {notice && (
         <div

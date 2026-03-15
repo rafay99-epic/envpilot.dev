@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
 import { z } from "zod";
 import { sendInvitationEmail } from "@/lib/email";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -225,8 +226,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   } catch (error) {
     console.error("Error inviting member:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to invite member";
+    const message = sanitizeConvexError(error);
 
     if (message.includes("already a member")) {
       return NextResponse.json(
@@ -242,7 +242,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to invite member");
   }
 }
 

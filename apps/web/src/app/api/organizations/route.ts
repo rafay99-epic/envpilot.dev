@@ -7,6 +7,11 @@ import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
+import {
+  sanitizeConvexError,
+  isTierLimitError,
+  handleApiError,
+} from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -140,8 +145,7 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("Error creating organization:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to create organization";
+    const message = sanitizeConvexError(error);
 
     if (message.includes("slug already exists")) {
       return NextResponse.json(
@@ -150,6 +154,6 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to create organization");
   }
 }
