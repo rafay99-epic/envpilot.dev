@@ -1,32 +1,23 @@
 import * as vscode from "vscode";
-import { execFile } from "child_process";
+import * as output from "./outputChannel";
 
 /**
- * Open a URL in the default browser.
- *
- * Tries the OS's native command first (child_process), then falls back to
- * vscode.env.openExternal. We prefer child_process because openExternal
- * is broken on certain OS versions (e.g., macOS Tahoe) where it shows
- * "No application found to open URL" even when a default browser is set.
+ * Open a URL in the default browser with clipboard fallback.
+ * Always copies the URL to clipboard first as a safety net
+ * (before openExternal can show error dialogs).
+ * Returns true if the browser appeared to open, false otherwise.
  */
-export function openUrl(url: string): void {
-  const platform = process.platform;
+export async function openUrlReliably(url: string): Promise<boolean> {
+  // Always copy to clipboard first — safety net
+  await vscode.env.clipboard.writeText(url);
 
-  if (platform === "darwin") {
-    execFile("open", [url], handleError);
-  } else if (platform === "linux") {
-    execFile("xdg-open", [url], handleError);
-  } else if (platform === "win32") {
-    execFile("cmd", ["/c", "start", "", url], handleError);
-  } else {
-    // Unknown platform — fall back to VS Code API
-    vscode.env.openExternal(vscode.Uri.parse(url));
-  }
-}
+  // Log to output channel (URLs are clickable there)
+  output.log(`Open this URL in your browser: ${url}`);
 
-function handleError(error: Error | null): void {
-  if (error) {
-    // Native command failed — fall back to VS Code API
-    vscode.env.openExternal(vscode.Uri.parse("https://www.envpilot.dev"));
+  // Try VS Code's built-in browser opener
+  try {
+    return await vscode.env.openExternal(vscode.Uri.parse(url));
+  } catch {
+    return false;
   }
 }

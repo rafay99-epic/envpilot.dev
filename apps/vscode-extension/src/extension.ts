@@ -18,7 +18,7 @@ import { ClipboardGuardService } from "./services/clipboardGuard";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
-import { openUrl } from "./utils/browser";
+import { openUrlReliably } from "./utils/browser";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -837,9 +837,14 @@ function handleRefresh(): void {
   statusBarProvider.update();
 }
 
-function handleOpenDashboard(): void {
+async function handleOpenDashboard(): Promise<void> {
   const serverUrl = getServerUrl();
-  openUrl(serverUrl);
+  const opened = await openUrlReliably(serverUrl);
+  if (!opened) {
+    vscode.window.showInformationMessage(
+      "Dashboard URL copied to clipboard. Paste it in your browser."
+    );
+  }
 }
 
 async function handleShowStatus(): Promise<void> {

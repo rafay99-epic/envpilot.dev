@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { getServerUrl } from "../utils/config";
-import { openUrl } from "../utils/browser";
+import { openUrlReliably } from "../utils/browser";
+import * as output from "../utils/outputChannel";
 import { StorageService } from "../utils/storage";
 import type { AuthSession, User, ApiResponse } from "../types";
 
-const AUTH_CALLBACK_PATH = "/api/extension/auth/callback";
 const AUTH_CHECK_PATH = "/api/extension/auth/check";
 
 /**
@@ -40,8 +40,21 @@ export class AuthService {
     // Build the auth URL
     const authUrl = `${serverUrl}/extension/auth?session=${sessionToken}`;
 
-    // Open in browser
-    openUrl(authUrl);
+    // Open in browser (also copies URL to clipboard as safety net)
+    const browserOpened = await openUrlReliably(authUrl);
+
+    if (browserOpened) {
+      output.log("Browser opened for sign-in");
+    } else {
+      // Browser failed — tell user about clipboard and output channel
+      const action = await vscode.window.showWarningMessage(
+        "Could not open browser. The sign-in URL has been copied to your clipboard.",
+        "Show Output Log"
+      );
+      if (action === "Show Output Log") {
+        output.show();
+      }
+    }
 
     // Auto-poll for auth completion with progress indicator
     return this.pollForAuthCompletion(sessionToken);
@@ -236,3 +249,4 @@ function generateSessionToken(): string {
   // Use crypto module for cryptographically secure random tokens
   return crypto.randomBytes(32).toString("hex");
 }
+
