@@ -249,4 +249,3 @@ function generateSessionToken(): string {
   // Use crypto module for cryptographically secure random tokens
   return crypto.randomBytes(32).toString("hex");
 }
-

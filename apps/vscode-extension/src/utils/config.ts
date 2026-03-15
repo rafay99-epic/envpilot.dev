@@ -17,7 +17,8 @@ export function getConfig(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
   return {
-    serverUrl: config.get<string>("serverUrl", DEFAULT_SERVER_URL) || DEFAULT_SERVER_URL,
+    serverUrl:
+      config.get<string>("serverUrl", DEFAULT_SERVER_URL) || DEFAULT_SERVER_URL,
     autoSync: config.get<boolean>("autoSync", true),
     syncInterval: config.get<number>("syncInterval", 300),
     targetFile: config.get<string>("targetFile", ".env.local"),
