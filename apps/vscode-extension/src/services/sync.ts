@@ -1024,9 +1024,7 @@ export class SyncService {
           directory.targetFile
         );
       } catch (err) {
-        errors.push(
-          err instanceof Error ? err : new Error(String(err))
-        );
+        errors.push(err instanceof Error ? err : new Error(String(err)));
       }
     }
 

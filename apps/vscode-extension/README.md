@@ -66,20 +66,20 @@ Variables are synced automatically, but you can manually pull:
 
 Open VS Code settings and search for "Envpilot" to configure:
 
-| Setting                              | Description                                                 | Default         |
-| ------------------------------------ | ----------------------------------------------------------- | --------------- |
-| `envpilot.serverUrl`                 | Envpilot server URL                                         | Set at build    |
-| `envpilot.autoSync`                  | Auto-sync on workspace open                                 | `true`          |
-| `envpilot.syncInterval`              | Permission check interval (seconds)                         | `300`           |
-| `envpilot.targetFile`                | Target file for synced variables                            | `.env.local`    |
-| `envpilot.environment`               | Default environment                                         | `development`   |
-| `envpilot.preventCopyOnRevoke`       | Delete .env when permissions revoked                        | `true`          |
-| `envpilot.defaultConflictResolution` | Action when existing .env files found                       | `prompt`        |
-| `envpilot.enableMultiDirectorySync`  | Allow linking multiple directories                          | `true`          |
-| `envpilot.syncOnDirectoryOpen`       | Auto-sync when opening a linked directory                   | `true`          |
-| `envpilot.enableCodeLens`            | Show CodeLens annotations above .env files                  | `true`          |
-| `envpilot.commitGuard.enabled`       | Enable dual-layer .env commit protection                    | `true`          |
-| `envpilot.commitGuard.autoInstallHook` | Auto-install pre-commit hook to block .env commits        | `true`          |
+| Setting                                | Description                                        | Default       |
+| -------------------------------------- | -------------------------------------------------- | ------------- |
+| `envpilot.serverUrl`                   | Envpilot server URL                                | Set at build  |
+| `envpilot.autoSync`                    | Auto-sync on workspace open                        | `true`        |
+| `envpilot.syncInterval`                | Permission check interval (seconds)                | `300`         |
+| `envpilot.targetFile`                  | Target file for synced variables                   | `.env.local`  |
+| `envpilot.environment`                 | Default environment                                | `development` |
+| `envpilot.preventCopyOnRevoke`         | Delete .env when permissions revoked               | `true`        |
+| `envpilot.defaultConflictResolution`   | Action when existing .env files found              | `prompt`      |
+| `envpilot.enableMultiDirectorySync`    | Allow linking multiple directories                 | `true`        |
+| `envpilot.syncOnDirectoryOpen`         | Auto-sync when opening a linked directory          | `true`        |
+| `envpilot.enableCodeLens`              | Show CodeLens annotations above .env files         | `true`        |
+| `envpilot.commitGuard.enabled`         | Enable dual-layer .env commit protection           | `true`        |
+| `envpilot.commitGuard.autoInstallHook` | Auto-install pre-commit hook to block .env commits | `true`        |
 
 ## Security
 
@@ -109,23 +109,23 @@ The status bar shows:
 
 ## Commands
 
-| Command                              | Description                          |
-| ------------------------------------ | ------------------------------------ |
-| `Envpilot: Sign In`                  | Authenticate with Envpilot           |
-| `Envpilot: Sign Out`                 | Sign out and clear credentials       |
-| `Envpilot: Link Project`            | Link current workspace to a project  |
-| `Envpilot: Unlink Project`          | Unlink and remove synced variables   |
-| `Envpilot: Pull Variables`          | Manually sync variables              |
-| `Envpilot: Refresh`                 | Refresh the project tree             |
-| `Envpilot: Open Dashboard`          | Open Envpilot in browser             |
-| `Envpilot: Open Dashboard Panel`    | Open built-in dashboard panel        |
-| `Envpilot: Show Status`             | Show status and quick actions        |
-| `Envpilot: Add Directory`           | Add a sync directory to a project    |
-| `Envpilot: Remove Directory`        | Remove a sync directory              |
-| `Envpilot: Select Environments`     | Choose environments to sync          |
-| `Envpilot: Request Variable`        | Request access to a variable         |
-| `Envpilot: Install Commit Guard`    | Install pre-commit hook              |
-| `Envpilot: Remove Commit Guard`     | Remove pre-commit hook               |
+| Command                          | Description                         |
+| -------------------------------- | ----------------------------------- |
+| `Envpilot: Sign In`              | Authenticate with Envpilot          |
+| `Envpilot: Sign Out`             | Sign out and clear credentials      |
+| `Envpilot: Link Project`         | Link current workspace to a project |
+| `Envpilot: Unlink Project`       | Unlink and remove synced variables  |
+| `Envpilot: Pull Variables`       | Manually sync variables             |
+| `Envpilot: Refresh`              | Refresh the project tree            |
+| `Envpilot: Open Dashboard`       | Open Envpilot in browser            |
+| `Envpilot: Open Dashboard Panel` | Open built-in dashboard panel       |
+| `Envpilot: Show Status`          | Show status and quick actions       |
+| `Envpilot: Add Directory`        | Add a sync directory to a project   |
+| `Envpilot: Remove Directory`     | Remove a sync directory             |
+| `Envpilot: Select Environments`  | Choose environments to sync         |
+| `Envpilot: Request Variable`     | Request access to a variable        |
+| `Envpilot: Install Commit Guard` | Install pre-commit hook             |
+| `Envpilot: Remove Commit Guard`  | Remove pre-commit hook              |
 
 ## Troubleshooting
 
