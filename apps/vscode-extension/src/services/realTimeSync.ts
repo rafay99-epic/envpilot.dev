@@ -18,6 +18,7 @@ export class RealTimeSyncService {
   private revocationSubId: string | null = null;
   private tokenSubIds: string[] = [];
   private isRunning = false;
+  private isProcessingRevocation = false;
 
   private _onRevocationDetected = new vscode.EventEmitter<{
     project: LinkedProjectV2;
@@ -120,6 +121,7 @@ export class RealTimeSyncService {
 
   /**
    * Handle incoming revocation events from WebSocket subscription.
+   * Deduplicates by access token and processes with a timeout guard.
    */
   private async handleRevocationEvents(
     events: Array<{
@@ -132,91 +134,170 @@ export class RealTimeSyncService {
     }>,
     linkedProjects: LinkedProjectV2[]
   ): Promise<void> {
-    console.log(`[RealTimeSync] Detected ${events.length} revocation event(s)`);
+    if (this.isProcessingRevocation) {
+      return; // Avoid concurrent revocation processing
+    }
+    this.isProcessingRevocation = true;
 
-    const eventIds: string[] = [];
-
-    for (const event of events) {
-      const project = linkedProjects.find(
-        (p) => p.accessToken === event.accessToken
+    try {
+      console.log(
+        `[RealTimeSync] Detected ${events.length} revocation event(s)`
       );
 
-      if (!project) {
-        console.warn("[RealTimeSync] Revocation event for unknown project");
-        continue;
+      const eventIds: string[] = [];
+
+      // Deduplicate events by access token — process each token only once
+      const seen = new Set<string>();
+      const deduped = events.filter((e) => {
+        if (seen.has(e.accessToken)) return false;
+        seen.add(e.accessToken);
+        return true;
+      });
+
+      for (const event of deduped) {
+        const project = linkedProjects.find(
+          (p) => p.accessToken === event.accessToken
+        );
+
+        if (!project) {
+          console.warn("[RealTimeSync] Revocation event for unknown project");
+          continue;
+        }
+
+        // Collect all event IDs for this token (including duplicates)
+        for (const e of events) {
+          if (e.accessToken === event.accessToken) {
+            eventIds.push(e.eventId);
+          }
+        }
+
+        // Emit event for UI updates
+        this._onRevocationDetected.fire({ project, reason: event.reason });
+
+        // Trigger cleanup with timeout
+        await Promise.race([
+          this.triggerRevocationCleanup(project, event.reason),
+          new Promise<void>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Revocation cleanup timed out")),
+              30000
+            )
+          ),
+        ]).catch((err) => {
+          console.error("[RealTimeSync] Cleanup error:", err);
+        });
       }
 
-      eventIds.push(event.eventId);
+      // Acknowledge events with retry (up to 3 attempts)
+      if (eventIds.length > 0 && this.convexService) {
+        await this.acknowledgeWithRetry(eventIds, 3);
+      }
 
-      // Emit event for UI updates
-      this._onRevocationDetected.fire({ project, reason: event.reason });
-
-      // Trigger cleanup
-      await this.triggerRevocationCleanup(project, event.reason);
+      // Refresh subscriptions since projects were removed
+      await this.refreshSubscriptions();
+    } finally {
+      this.isProcessingRevocation = false;
     }
+  }
 
-    // Acknowledge events via Convex mutation (no HTTP)
-    if (eventIds.length > 0 && this.convexService) {
+  /**
+   * Acknowledge revocation events with exponential backoff retry.
+   */
+  private async acknowledgeWithRetry(
+    eventIds: string[],
+    maxAttempts: number
+  ): Promise<void> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.convexService.acknowledgeRevocations(eventIds);
+        await this.convexService!.acknowledgeRevocations(eventIds);
+        return;
       } catch (error) {
-        console.debug("[RealTimeSync] Failed to acknowledge events:", error);
+        console.debug(
+          `[RealTimeSync] Acknowledge attempt ${attempt}/${maxAttempts} failed:`,
+          error
+        );
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
       }
     }
-
-    // Refresh subscriptions since projects were removed
-    await this.refreshSubscriptions();
   }
 
   /**
    * Handle token becoming invalid (detected via WebSocket subscription).
    */
   private async handleTokenInvalid(project: LinkedProjectV2): Promise<void> {
-    console.log(
-      `[RealTimeSync] Token invalid for project: ${project.projectName}`
-    );
+    if (this.isProcessingRevocation) {
+      return;
+    }
+    this.isProcessingRevocation = true;
 
-    this._onRevocationDetected.fire({
-      project,
-      reason: "Access token expired or revoked",
-    });
+    try {
+      console.log(
+        `[RealTimeSync] Token invalid for project: ${project.projectName}`
+      );
 
-    await this.triggerRevocationCleanup(
-      project,
-      "Access token expired or revoked"
-    );
-    await this.refreshSubscriptions();
+      this._onRevocationDetected.fire({
+        project,
+        reason: "Access token expired or revoked",
+      });
+
+      await Promise.race([
+        this.triggerRevocationCleanup(
+          project,
+          "Access token expired or revoked"
+        ),
+        new Promise<void>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Revocation cleanup timed out")),
+            30000
+          )
+        ),
+      ]).catch((err) => {
+        console.error("[RealTimeSync] Cleanup error:", err);
+      });
+
+      await this.refreshSubscriptions();
+    } finally {
+      this.isProcessingRevocation = false;
+    }
   }
 
   /**
    * Trigger the revocation cleanup process.
+   * Ensures files are deleted before removing the project from storage.
    */
   private async triggerRevocationCleanup(
     project: LinkedProjectV2,
     reason: string
   ): Promise<void> {
+    let cleanupSucceeded = false;
+
     try {
       await this.syncService.cleanupAllDirectories(project);
-      await this.storage.removeLinkedProjectV2(project.projectId);
+      cleanupSucceeded = true;
+    } catch (error) {
+      console.error(
+        "[RealTimeSync] Failed to cleanup files after revocation:",
+        error
+      );
+    }
 
+    // Always remove project from storage (access is revoked regardless)
+    try {
+      await this.storage.removeLinkedProjectV2(project.projectId);
+    } catch {
+      // Storage removal failed — will be cleaned up on next sync
+    }
+
+    if (cleanupSucceeded) {
       vscode.window.showWarningMessage(
         `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
         "OK"
       );
-    } catch (error) {
-      console.error(
-        "[RealTimeSync] Failed to cleanup after revocation:",
-        error
-      );
-
-      try {
-        await this.storage.removeLinkedProjectV2(project.projectId);
-      } catch {
-        // Ignore cleanup errors
-      }
-
+    } else {
       vscode.window.showErrorMessage(
-        `Access revoked for "${project.projectName}" but cleanup failed. Please manually remove any .env files.`
+        `Access revoked for "${project.projectName}" but file cleanup failed. Please manually remove any .env files.`
       );
     }
   }

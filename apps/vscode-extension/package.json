@@ -1,7 +1,7 @@
 {
   "name": "envpilot",
   "displayName": "Envpilot",
-  "description": "Securely sync environment variables from Envpilot to your local projects",
+  "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
   "version": "1.2.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -22,7 +22,8 @@
   ],
   "icon": "media/icon.png",
   "categories": [
-    "Other"
+    "Other",
+    "SCM Providers"
   ],
   "keywords": [
     "environment",
@@ -30,7 +31,11 @@
     "env",
     "secrets",
     "dotenv",
-    "configuration"
+    "configuration",
+    "sync",
+    "vault",
+    "security",
+    "team"
   ],
   "activationEvents": [
     "workspaceContains:.env*",
@@ -360,7 +365,6 @@
   },
   "dependencies": {
     "axios": "^1.6.2",
-    "convex": "^1.32.0",
-    "uuid": "^9.0.1"
+    "convex": "^1.32.0"
   }
 }

@@ -1011,13 +1011,28 @@ export class SyncService {
   }
 
   /**
-   * Delete env files from all directories when access is revoked
+   * Delete env files from all directories when access is revoked.
+   * Continues cleanup even if individual directories fail.
    */
   async cleanupAllDirectories(project: LinkedProjectV2): Promise<void> {
+    const errors: Error[] = [];
+
     for (const directory of project.directories) {
-      await this.deleteEnvFileFromDirectory(
-        directory.directoryPath,
-        directory.targetFile
+      try {
+        await this.deleteEnvFileFromDirectory(
+          directory.directoryPath,
+          directory.targetFile
+        );
+      } catch (err) {
+        errors.push(
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(
+        `Failed to cleanup ${errors.length}/${project.directories.length} directories`
       );
     }
   }

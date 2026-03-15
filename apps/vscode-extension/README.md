@@ -7,9 +7,16 @@ Securely sync environment variables from Envpilot to your local projects. This e
 - **Secure Authentication**: Sign in with your Envpilot account using OAuth
 - **Project Linking**: Link your workspace to an Envpilot project
 - **Automatic Sync**: Environment variables are synced to your local `.env` file
-- **Permission-Aware**: When permissions are revoked, synced files are automatically removed
+- **Real-time Revocation**: When permissions are revoked, synced files are instantly removed via WebSocket
+- **Clipboard Protection**: Copy/paste of secrets is blocked for read-only variables
+- **File Protection**: Read-only `.env` files are automatically reverted if edited
+- **Commit Guard**: Dual-layer protection prevents accidental `.env` commits (VS Code staging guard + pre-commit hook)
 - **Multi-Environment**: Sync variables for development, staging, or production
-- **Real-time Updates**: Periodic checking for permission changes
+- **Multi-Directory**: Link multiple directories within the same project
+- **CodeLens Annotations**: Inline sync status and actions above `.env` files
+- **Dashboard Panel**: Built-in webview dashboard for project overview
+- **Role-Based Access**: Admin, Team Lead, and Member roles with granular permissions
+- **Real-time Updates**: Convex WebSocket subscriptions for instant change detection
 
 ## Requirements
 
@@ -32,7 +39,7 @@ Securely sync environment variables from Envpilot to your local projects. This e
 1. Open the Command Palette
 2. Run `Envpilot: Sign In`
 3. A browser window will open for authentication
-4. After signing in, click "Check Sign In" in VS Code
+4. Once authenticated, the extension detects it automatically
 
 ### Link a Project
 
@@ -59,19 +66,28 @@ Variables are synced automatically, but you can manually pull:
 
 Open VS Code settings and search for "Envpilot" to configure:
 
-| Setting                        | Description                          | Default           |
-| ------------------------------ | ------------------------------------ | ----------------- |
-| `envpilot.serverUrl`           | Envpilot server URL                  | Set at build time |
-| `envpilot.autoSync`            | Auto-sync on workspace open          | `true`            |
-| `envpilot.syncInterval`        | Permission check interval (seconds)  | `300`             |
-| `envpilot.targetFile`          | Target file for synced variables     | `.env.local`      |
-| `envpilot.environment`         | Default environment                  | `development`     |
-| `envpilot.preventCopyOnRevoke` | Delete .env when permissions revoked | `true`            |
+| Setting                              | Description                                                 | Default         |
+| ------------------------------------ | ----------------------------------------------------------- | --------------- |
+| `envpilot.serverUrl`                 | Envpilot server URL                                         | Set at build    |
+| `envpilot.autoSync`                  | Auto-sync on workspace open                                 | `true`          |
+| `envpilot.syncInterval`              | Permission check interval (seconds)                         | `300`           |
+| `envpilot.targetFile`                | Target file for synced variables                            | `.env.local`    |
+| `envpilot.environment`               | Default environment                                         | `development`   |
+| `envpilot.preventCopyOnRevoke`       | Delete .env when permissions revoked                        | `true`          |
+| `envpilot.defaultConflictResolution` | Action when existing .env files found                       | `prompt`        |
+| `envpilot.enableMultiDirectorySync`  | Allow linking multiple directories                          | `true`          |
+| `envpilot.syncOnDirectoryOpen`       | Auto-sync when opening a linked directory                   | `true`          |
+| `envpilot.enableCodeLens`            | Show CodeLens annotations above .env files                  | `true`          |
+| `envpilot.commitGuard.enabled`       | Enable dual-layer .env commit protection                    | `true`          |
+| `envpilot.commitGuard.autoInstallHook` | Auto-install pre-commit hook to block .env commits        | `true`          |
 
 ## Security
 
 - **No plaintext secrets in storage**: Authentication tokens are stored securely in VS Code's secret storage
-- **Permission revocation**: When your access is revoked, the synced `.env` file is automatically deleted
+- **Real-time revocation**: When access is revoked, synced `.env` files are instantly deleted via WebSocket
+- **Clipboard protection**: Copy/paste is blocked for read-only environment files
+- **File protection**: Unauthorized edits to read-only `.env` files are automatically reverted
+- **Commit guard**: Dual-layer protection prevents committing `.env` files to git
 - **Token expiration**: Access tokens expire after 30 days and are automatically refreshed
 - **Audit logging**: All extension activity is logged in Envpilot's audit log
 
@@ -93,16 +109,23 @@ The status bar shows:
 
 ## Commands
 
-| Command                    | Description                         |
-| -------------------------- | ----------------------------------- |
-| `Envpilot: Sign In`        | Authenticate with Envpilot          |
-| `Envpilot: Sign Out`       | Sign out and clear credentials      |
-| `Envpilot: Link Project`   | Link current workspace to a project |
-| `Envpilot: Unlink Project` | Unlink and remove synced variables  |
-| `Envpilot: Pull Variables` | Manually sync variables             |
-| `Envpilot: Refresh`        | Refresh the project tree            |
-| `Envpilot: Open Dashboard` | Open Envpilot in browser            |
-| `Envpilot: Show Status`    | Show status and quick actions       |
+| Command                              | Description                          |
+| ------------------------------------ | ------------------------------------ |
+| `Envpilot: Sign In`                  | Authenticate with Envpilot           |
+| `Envpilot: Sign Out`                 | Sign out and clear credentials       |
+| `Envpilot: Link Project`            | Link current workspace to a project  |
+| `Envpilot: Unlink Project`          | Unlink and remove synced variables   |
+| `Envpilot: Pull Variables`          | Manually sync variables              |
+| `Envpilot: Refresh`                 | Refresh the project tree             |
+| `Envpilot: Open Dashboard`          | Open Envpilot in browser             |
+| `Envpilot: Open Dashboard Panel`    | Open built-in dashboard panel        |
+| `Envpilot: Show Status`             | Show status and quick actions        |
+| `Envpilot: Add Directory`           | Add a sync directory to a project    |
+| `Envpilot: Remove Directory`        | Remove a sync directory              |
+| `Envpilot: Select Environments`     | Choose environments to sync          |
+| `Envpilot: Request Variable`        | Request access to a variable         |
+| `Envpilot: Install Commit Guard`    | Install pre-commit hook              |
+| `Envpilot: Remove Commit Guard`     | Remove pre-commit hook               |
 
 ## Troubleshooting
 
@@ -118,12 +141,16 @@ Your access to the project has been revoked by an administrator. Contact your te
 
 Your access token has expired. Sign out and sign in again to refresh your credentials.
 
+### Browser doesn't open on sign-in
+
+If the browser fails to open, the sign-in URL is automatically copied to your clipboard. Paste it in your browser to continue. You can also check the Envpilot Output Channel for a clickable link.
+
 ### Variables not syncing
 
 1. Check that you're signed in
 2. Verify a project is linked to your workspace
 3. Try manually pulling variables with `Envpilot: Pull Variables`
-4. Check the output panel for error messages
+4. Check the Output panel (Envpilot) for error messages
 
 ## Privacy
 
@@ -134,8 +161,4 @@ Your access token has expired. Sign out and sign in again to refresh your creden
 
 ## Support
 
-For issues and feature requests, visit the [Envpilot GitHub repository](https://github.com/envpilot/envpilot).
-
-## License
-
-MIT
+For issues and feature requests, visit the [Envpilot GitHub repository](https://github.com/rafay99-epic/envpilot.dev/issues).
