@@ -342,17 +342,20 @@ export const remove = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
     const project = await ctx.db.get(args.projectId);
     if (!project) {
       throw new Error("Project not found");
     }
 
+    // Soft-delete the project
     await ctx.db.patch(args.projectId, {
       deletedAt: now,
       updatedAt: now,
     });
 
+    // Soft-delete all variables
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -366,12 +369,100 @@ export const remove = mutation({
       });
     }
 
+    // Delete variable versions for each variable
+    let deletedVersions = 0;
+    for (const variable of variables) {
+      const versions = await ctx.db
+        .query("variableVersions")
+        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+        .collect();
+      for (const version of versions) {
+        await ctx.db.delete(version._id);
+        deletedVersions++;
+      }
+    }
+
+    // Deactivate variable permissions for each variable
+    let deactivatedPermissions = 0;
+    for (const variable of variables) {
+      const permissions = await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      for (const perm of permissions) {
+        await ctx.db.patch(perm._id, {
+          isActive: false,
+          revokedAt: now,
+          revokedBy: args.deletedBy,
+        });
+        deactivatedPermissions++;
+      }
+    }
+
+    // Delete project members
+    const projectMembers = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const member of projectMembers) {
+      await ctx.db.delete(member._id);
+    }
+
+    // Revoke project access tokens
+    let revokedTokens = 0;
+    const accessTokens = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    for (const token of accessTokens) {
+      await ctx.db.patch(token._id, { isActive: false });
+      await ctx.db.insert("permissionRevocationEvents", {
+        accessToken: token.accessToken,
+        projectId: args.projectId,
+        userId: token.userId,
+        reason: "Project deleted",
+        revokedBy: args.deletedBy,
+        revokedAt: now,
+        acknowledged: false,
+        expiresAt: revocationExpiresAt,
+      });
+      revokedTokens++;
+    }
+
+    // Cancel pending variable requests
+    let canceledRequests = 0;
+    const pendingRequests = await ctx.db
+      .query("environmentVariableRequests")
+      .withIndex("by_project_and_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "pending")
+      )
+      .collect();
+    for (const req of pendingRequests) {
+      await ctx.db.patch(req._id, {
+        status: "canceled",
+        reviewReason: "Project deleted",
+        reviewedBy: args.deletedBy,
+        reviewedAt: now,
+        updatedAt: now,
+      });
+      canceledRequests++;
+    }
+
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
       userId: args.deletedBy,
       action: "project.deleted",
-      details: JSON.stringify({ variablesDeleted: variables.length }),
+      details: JSON.stringify({
+        variablesDeleted: variables.length,
+        versionsDeleted: deletedVersions,
+        permissionsDeactivated: deactivatedPermissions,
+        membersRemoved: projectMembers.length,
+        tokensRevoked: revokedTokens,
+        requestsCanceled: canceledRequests,
+      }),
       createdAt: now,
     });
 
@@ -548,5 +639,229 @@ export const duplicate = mutation({
     });
 
     return newProjectId;
+  },
+});
+
+/**
+ * Move a project to another organization
+ */
+export const move = mutation({
+  args: {
+    projectId: v.id("projects"),
+    targetOrganizationId: v.id("organizations"),
+    movedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new Error("Project not found");
+    }
+
+    if (project.organizationId === args.targetOrganizationId) {
+      throw new Error("Project is already in the target organization");
+    }
+
+    const sourceOrg = await ctx.db.get(project.organizationId);
+    if (!sourceOrg) {
+      throw new Error("Source organization not found");
+    }
+
+    const targetOrg = await ctx.db.get(args.targetOrganizationId);
+    if (!targetOrg) {
+      throw new Error("Target organization not found");
+    }
+
+    // Verify caller is admin in source org
+    const sourceMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", project.organizationId)
+          .eq("userId", args.movedBy)
+      )
+      .first();
+
+    if (!sourceMembership || sourceMembership.role !== "admin") {
+      throw new Error("You must be an admin in the source organization");
+    }
+
+    // Verify caller is at least a member of target org
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.targetOrganizationId)
+          .eq("userId", args.movedBy)
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error("You must be a member of the target organization");
+    }
+
+    // Tier check: both orgs must be pro
+    const limits = getTierLimits(sourceOrg.tier);
+    const targetLimits = getTierLimits(targetOrg.tier);
+    if (limits.maxProjects !== null || targetLimits.maxProjects !== null) {
+      // If either org has limits, check pro tier
+      if (sourceOrg.tier !== "pro" || targetOrg.tier !== "pro") {
+        throw new Error(
+          "Both organizations must be on the Pro plan to transfer projects"
+        );
+      }
+    }
+
+    // Check slug uniqueness in target org
+    const existingSlug = await ctx.db
+      .query("projects")
+      .withIndex("by_org_and_slug", (q) =>
+        q
+          .eq("organizationId", args.targetOrganizationId)
+          .eq("slug", project.slug)
+      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .first();
+
+    if (existingSlug) {
+      throw new Error(
+        `A project with slug "${project.slug}" already exists in the target organization`
+      );
+    }
+
+    // Check target org project count
+    if (targetLimits.maxProjects !== null) {
+      const targetProjects = await ctx.db
+        .query("projects")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.targetOrganizationId)
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect();
+
+      if (targetProjects.length >= targetLimits.maxProjects) {
+        throw new Error(
+          `Target organization has reached its project limit (${targetLimits.maxProjects})`
+        );
+      }
+    }
+
+    // Move the project
+    await ctx.db.patch(args.projectId, {
+      organizationId: args.targetOrganizationId,
+      updatedAt: now,
+    });
+
+    // Clean up source org relationships
+    // Delete project members
+    let removedMembers = 0;
+    const projectMembers = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const member of projectMembers) {
+      await ctx.db.delete(member._id);
+      removedMembers++;
+    }
+
+    // Revoke project access tokens
+    let revokedTokens = 0;
+    const accessTokens = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    for (const token of accessTokens) {
+      await ctx.db.patch(token._id, { isActive: false });
+      await ctx.db.insert("permissionRevocationEvents", {
+        accessToken: token.accessToken,
+        projectId: args.projectId,
+        userId: token.userId,
+        reason: "Project moved to another organization",
+        revokedBy: args.movedBy,
+        revokedAt: now,
+        acknowledged: false,
+        expiresAt: revocationExpiresAt,
+      });
+      revokedTokens++;
+    }
+
+    // Deactivate variable permissions
+    let deactivatedPermissions = 0;
+    const variables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    for (const variable of variables) {
+      const permissions = await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      for (const perm of permissions) {
+        await ctx.db.patch(perm._id, {
+          isActive: false,
+          revokedAt: now,
+          revokedBy: args.movedBy,
+        });
+        deactivatedPermissions++;
+      }
+    }
+
+    // Cancel pending variable requests
+    let canceledRequests = 0;
+    const pendingRequests = await ctx.db
+      .query("environmentVariableRequests")
+      .withIndex("by_project_and_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "pending")
+      )
+      .collect();
+    for (const req of pendingRequests) {
+      await ctx.db.patch(req._id, {
+        status: "canceled",
+        reviewReason: "Project moved to another organization",
+        reviewedBy: args.movedBy,
+        reviewedAt: now,
+        updatedAt: now,
+      });
+      canceledRequests++;
+    }
+
+    // Audit log in source org
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: args.movedBy,
+      action: "project.moved",
+      details: JSON.stringify({
+        targetOrganizationId: args.targetOrganizationId,
+        targetOrganizationName: targetOrg.name,
+        removedMembers,
+        revokedTokens,
+        deactivatedPermissions,
+        canceledRequests,
+      }),
+      createdAt: now,
+    });
+
+    // Audit log in target org
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.targetOrganizationId,
+      projectId: args.projectId,
+      userId: args.movedBy,
+      action: "project.moved",
+      details: JSON.stringify({
+        sourceOrganizationId: project.organizationId,
+        sourceOrganizationName: sourceOrg.name,
+        variableCount: variables.length,
+      }),
+      createdAt: now,
+    });
+
+    return args.projectId;
   },
 });

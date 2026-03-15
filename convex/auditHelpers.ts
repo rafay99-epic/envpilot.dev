@@ -26,6 +26,7 @@ export type AuditResourceType =
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   // Critical actions
   "org.deleted": "critical",
+  "org.transferred": "critical",
   "variable.deleted": "critical",
   "security.unauthorized_attempt": "critical",
   "security.suspicious_activity": "critical",
@@ -48,6 +49,7 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "permission.granted": "info",
   "org.created": "info",
   "project.created": "info",
+  "project.moved": "warning",
   "variable.created": "info",
   "variable.requested": "info",
   "variable.request_approved": "info",
@@ -64,11 +66,13 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "org.member_added": "organization",
   "org.member_removed": "organization",
   "org.member_role_changed": "organization",
+  "org.transferred": "organization",
 
   // Project
   "project.created": "project",
   "project.updated": "project",
   "project.deleted": "project",
+  "project.moved": "project",
 
   // Variable
   "variable.created": "variable",

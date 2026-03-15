@@ -40,6 +40,12 @@ export default function OrganizationSettingsPage({
     useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Transfer state
+  const [transferEmail, setTransferEmail] = useState("");
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  const [transferConfirmText, setTransferConfirmText] = useState("");
+
   useEffect(() => {
     async function fetchOrganization() {
       try {
@@ -115,6 +121,31 @@ export default function OrganizationSettingsPage({
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsDeleting(false);
+    }
+  }
+
+  async function handleTransfer() {
+    if (transferConfirmText !== organization?.name || !transferEmail) return;
+
+    setIsTransferring(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/organizations/${slug}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserEmail: transferEmail }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to transfer organization");
+      }
+
+      router.push("/organizations");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsTransferring(false);
     }
   }
 
@@ -370,6 +401,97 @@ export default function OrganizationSettingsPage({
               />
             </button>
           </label>
+        </div>
+      </div>
+
+      {/* Transfer Ownership */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          Transfer Ownership
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Transfer this organization to another user. They will become the admin
+          and all current members will be removed.
+        </p>
+
+        <div className="mt-6 space-y-4">
+          <div>
+            <label
+              htmlFor="transferEmail"
+              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+            >
+              New Owner&apos;s Email
+            </label>
+            <input
+              type="email"
+              id="transferEmail"
+              value={transferEmail}
+              onChange={(e) => setTransferEmail(e.target.value)}
+              placeholder="Enter new owner's email"
+              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            />
+          </div>
+
+          {showTransferConfirm && transferEmail ? (
+            <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
+              <div className="text-sm text-zinc-700 dark:text-zinc-300">
+                <p className="font-medium text-red-600 dark:text-red-400">
+                  This action cannot be undone.
+                </p>
+                <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-600 dark:text-zinc-400">
+                  <li>New owner becomes admin</li>
+                  <li>All current members will be removed</li>
+                  <li>All projects and variables stay intact</li>
+                  <li>All active sessions will be revoked</li>
+                  <li>Notification emails will be sent</li>
+                </ul>
+              </div>
+              <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                Type{" "}
+                <span className="font-mono font-semibold">
+                  {organization?.name}
+                </span>{" "}
+                to confirm:
+              </p>
+              <input
+                type="text"
+                value={transferConfirmText}
+                onChange={(e) => setTransferConfirmText(e.target.value)}
+                placeholder="Organization name"
+                className="block w-full rounded-lg border border-red-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-red-700 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowTransferConfirm(false);
+                    setTransferConfirmText("");
+                  }}
+                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTransfer}
+                  disabled={
+                    transferConfirmText !== organization?.name || isTransferring
+                  }
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isTransferring
+                    ? "Transferring..."
+                    : "Transfer Ownership"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowTransferConfirm(true)}
+              disabled={!transferEmail}
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              Transfer Ownership
+            </button>
+          )}
         </div>
       </div>
 

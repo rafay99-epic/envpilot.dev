@@ -453,6 +453,7 @@ export default defineSchema({
       v.literal("org.member_added"),
       v.literal("org.member_removed"),
       v.literal("org.member_role_changed"),
+      v.literal("org.transferred"),
       // Project actions
       v.literal("project.created"),
       v.literal("project.updated"),
@@ -460,6 +461,7 @@ export default defineSchema({
       v.literal("project.member_added"),
       v.literal("project.member_removed"),
       v.literal("project.member_role_changed"),
+      v.literal("project.moved"),
       // Variable actions
       v.literal("variable.created"),
       v.literal("variable.updated"),

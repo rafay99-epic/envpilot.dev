@@ -318,3 +318,340 @@ If you believe this was done in error, contact your organization administrator.
     };
   }
 }
+
+interface OrgTransferEmailParams {
+  to: string;
+  organizationName: string;
+  previousOwnerName: string;
+  orgSlug: string;
+}
+
+export async function sendOrgTransferEmail({
+  to,
+  organizationName,
+  previousOwnerName,
+  orgSlug,
+}: OrgTransferEmailParams): Promise<{ success: boolean; error?: string }> {
+  const safeOrgName = escapeHtml(organizationName);
+  const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase());
+  const safePreviousOwner = escapeHtml(previousOwnerName);
+  const orgUrl = `${APP_URL}/organizations/${orgSlug}`;
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization Transferred - ${safeOrgName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <div style="display: inline-block; width: 64px; height: 64px; background-color: #18181b; border-radius: 12px; line-height: 64px; text-align: center;">
+                <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${safeOrgInitial}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
+                You Are Now the Owner
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #52525b;">
+                <strong>${safePreviousOwner}</strong> has transferred ownership of <strong>${safeOrgName}</strong> to you. You are now the admin.
+              </p>
+              <p style="margin: 12px 0 0 0; font-size: 14px; line-height: 1.5; color: #71717a;">
+                All previous members have been removed and will need to be re-invited.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <a href="${orgUrl}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">
+                Go to Organization
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+                If you didn't expect this transfer, please contact support.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const textContent = `
+You Are Now the Owner of ${organizationName}
+
+${previousOwnerName} has transferred ownership of ${organizationName} to you. You are now the admin.
+
+All previous members have been removed and will need to be re-invited.
+
+Go to your organization: ${orgUrl}
+
+If you didn't expect this transfer, please contact support.
+`;
+
+  try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.error("[EMAIL] RESEND_API_KEY not configured");
+      return { success: false, error: "RESEND_API_KEY not configured" };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `You are now the owner of ${organizationName}`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    if (error) {
+      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
+      return { success: false, error: error.message };
+    }
+
+    console.log("[EMAIL] Org transfer email sent:", JSON.stringify(data));
+    return { success: true };
+  } catch (err) {
+    console.error("[EMAIL] Exception sending email:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to send email",
+    };
+  }
+}
+
+interface OrgTransferNotificationEmailParams {
+  to: string;
+  organizationName: string;
+}
+
+export async function sendOrgTransferNotificationEmail({
+  to,
+  organizationName,
+}: OrgTransferNotificationEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const safeOrgName = escapeHtml(organizationName);
+  const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase());
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization Transferred - ${safeOrgName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <div style="display: inline-block; width: 64px; height: 64px; background-color: #dc2626; border-radius: 12px; line-height: 64px; text-align: center;">
+                <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${safeOrgInitial}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
+                Organization Transferred
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #52525b;">
+                <strong>${safeOrgName}</strong> has been transferred to a new owner. Your membership and access have been revoked.
+              </p>
+              <p style="margin: 12px 0 0 0; font-size: 14px; line-height: 1.5; color: #71717a;">
+                Contact the new owner if you need to be re-invited.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+                If you believe this was done in error, please contact support.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const textContent = `
+Organization Transferred - ${organizationName}
+
+${organizationName} has been transferred to a new owner. Your membership and access have been revoked.
+
+Contact the new owner if you need to be re-invited.
+
+If you believe this was done in error, please contact support.
+`;
+
+  try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.error("[EMAIL] RESEND_API_KEY not configured");
+      return { success: false, error: "RESEND_API_KEY not configured" };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `Organization ${organizationName} has been transferred`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    if (error) {
+      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
+      return { success: false, error: error.message };
+    }
+
+    console.log("[EMAIL] Transfer notification email sent:", JSON.stringify(data));
+    return { success: true };
+  } catch (err) {
+    console.error("[EMAIL] Exception sending email:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to send email",
+    };
+  }
+}
+
+interface ProjectTransferEmailParams {
+  to: string;
+  projectName: string;
+  organizationName: string;
+  transferredByName: string;
+}
+
+export async function sendProjectTransferEmail({
+  to,
+  projectName,
+  organizationName,
+  transferredByName,
+}: ProjectTransferEmailParams): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const safeProjectName = escapeHtml(projectName);
+  const safeOrgName = escapeHtml(organizationName);
+  const safeTransferredBy = escapeHtml(transferredByName);
+  const safeInitial = escapeHtml(projectName.charAt(0).toUpperCase());
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Transferred - ${safeProjectName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <div style="display: inline-block; width: 64px; height: 64px; background-color: #18181b; border-radius: 12px; line-height: 64px; text-align: center;">
+                <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${safeInitial}</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
+                Project Transferred
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #52525b;">
+                <strong>${safeTransferredBy}</strong> has transferred the project <strong>${safeProjectName}</strong> to your organization <strong>${safeOrgName}</strong>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+                The project and all its environment variables are now available in your organization.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const textContent = `
+Project Transferred - ${projectName}
+
+${transferredByName} has transferred the project ${projectName} to your organization ${organizationName}.
+
+The project and all its environment variables are now available in your organization.
+`;
+
+  try {
+    const resend = getResendClient();
+    if (!resend) {
+      console.error("[EMAIL] RESEND_API_KEY not configured");
+      return { success: false, error: "RESEND_API_KEY not configured" };
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [to],
+      subject: `Project ${projectName} transferred to ${organizationName}`,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    if (error) {
+      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
+      return { success: false, error: error.message };
+    }
+
+    console.log("[EMAIL] Project transfer email sent:", JSON.stringify(data));
+    return { success: true };
+  } catch (err) {
+    console.error("[EMAIL] Exception sending email:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to send email",
+    };
+  }
+}

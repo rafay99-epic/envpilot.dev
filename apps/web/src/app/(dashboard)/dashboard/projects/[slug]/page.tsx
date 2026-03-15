@@ -118,6 +118,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [editingVariable, setEditingVariable] = useState<Variable | null>(null);
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
@@ -233,6 +235,51 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const refreshProjectData = async () => {
     await Promise.all([fetchVariables(), fetchRequests()]);
+  };
+
+  const handleExport = async (
+    environment: string | undefined,
+    format: "env" | "json"
+  ) => {
+    if (!project) return;
+    setIsExporting(true);
+    setShowExportMenu(false);
+
+    try {
+      const params = new URLSearchParams({ format });
+      if (environment) params.set("environment", environment);
+
+      const response = await fetch(
+        `/api/projects/${project._id}/export?${params.toString()}`
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to export variables");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      const disposition = response.headers.get("content-disposition");
+      const filenameMatch = disposition?.match(/filename="?([^"]+)"?/);
+      a.download = filenameMatch?.[1] || `${environment || "all"}.${format}`;
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setNotice(
+        `Exported variables${environment ? ` for ${environment}` : ""} as .${format}`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleCreateVariable = async (data: VariableFormData) => {
@@ -613,33 +660,107 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
             </p>
           </div>
-          {(canCreateVariable || canRequestVariable) && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+          <div className="flex items-center gap-2">
+            {/* Export Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={isExporting}
+                className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              {canCreateVariable ? "Add Variable" : "Request Variable"}
-              <kbd className="ml-1.5 hidden rounded bg-white/20 px-1.5 py-0.5 text-xs font-normal sm:inline-block">
-                {typeof navigator !== "undefined" &&
-                /Mac/.test(navigator.userAgent)
-                  ? "⌘K"
-                  : "Ctrl+K"}
-              </kbd>
-            </button>
-          )}
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                {isExporting ? "Exporting..." : "Export"}
+              </button>
+              {showExportMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowExportMenu(false)}
+                  />
+                  <div className="absolute right-0 z-20 mt-2 w-56 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      .env format
+                    </div>
+                    {["development", "staging", "production"].map((env) => (
+                      <button
+                        key={`env-${env}`}
+                        onClick={() => handleExport(env, "env")}
+                        className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      >
+                        {env.charAt(0).toUpperCase() + env.slice(1)}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => handleExport(undefined, "env")}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    >
+                      All Environments
+                    </button>
+                    <div className="my-1 border-t border-zinc-200 dark:border-zinc-700" />
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                      .json format
+                    </div>
+                    {["development", "staging", "production"].map((env) => (
+                      <button
+                        key={`json-${env}`}
+                        onClick={() => handleExport(env, "json")}
+                        className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      >
+                        {env.charAt(0).toUpperCase() + env.slice(1)}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => handleExport(undefined, "json")}
+                      className="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    >
+                      All Environments
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Add Variable Button */}
+            {(canCreateVariable || canRequestVariable) && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                {canCreateVariable ? "Add Variable" : "Request Variable"}
+                <kbd className="ml-1.5 hidden rounded bg-white/20 px-1.5 py-0.5 text-xs font-normal sm:inline-block">
+                  {typeof navigator !== "undefined" &&
+                  /Mac/.test(navigator.userAgent)
+                    ? "⌘K"
+                    : "Ctrl+K"}
+                </kbd>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
