@@ -29,24 +29,33 @@ export default async function DashboardLayout({
     redirect("/sign-in");
   }
 
-  const convexUser = await getOrCreateConvexUser(convex, {
-    id: user.id,
-    email: user.email,
-    firstName: user.firstName ?? null,
-    lastName: user.lastName ?? null,
-    profilePictureUrl: user.profilePictureUrl ?? null,
-  });
+  let convexUser;
+  let organizations: OrganizationWithMembershipRole[] = [];
+  let activeOrganization: OrganizationWithMembershipRole | null = null;
 
-  const organizations = (await convex.query(api.organizations.listForUser, {
-    userId: convexUser._id,
-  })) as OrganizationWithMembershipRole[];
+  try {
+    convexUser = await getOrCreateConvexUser(convex, {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
+      profilePictureUrl: user.profilePictureUrl ?? null,
+    });
 
-  const cookieStore = await cookies();
-  const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
-  const activeOrganization = selectActiveOrganization(
-    organizations,
-    preferredOrgId
-  );
+    organizations = (await convex.query(api.organizations.listForUser, {
+      userId: convexUser._id,
+    })) as OrganizationWithMembershipRole[];
+
+    const cookieStore = await cookies();
+    const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
+    activeOrganization = selectActiveOrganization(
+      organizations,
+      preferredOrgId
+    );
+  } catch (err) {
+    // Log but don't crash — client-side auth hook will fetch the data
+    console.error("Failed to load organization context in layout:", err);
+  }
 
   // Transform to our AuthUser type
   const authUser: AuthUser = {
