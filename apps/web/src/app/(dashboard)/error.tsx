@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const MAX_AUTO_RETRIES = 2;
 
 export default function DashboardError({
   error,
@@ -9,9 +11,32 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const retryCount = useRef(0);
+  const [showError, setShowError] = useState(false);
+
   useEffect(() => {
     console.error("Dashboard error:", error);
-  }, [error]);
+
+    // Auto-retry transient errors (e.g. 502 during org switch) before showing UI
+    if (retryCount.current < MAX_AUTO_RETRIES) {
+      retryCount.current += 1;
+      const delay = retryCount.current * 1000;
+      const timer = setTimeout(() => reset(), delay);
+      return () => clearTimeout(timer);
+    }
+
+    setShowError(true);
+  }, [error, reset]);
+
+  if (!showError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="font-mono text-sm text-zinc-500">
+          <span className="text-green-400">$</span> retrying...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center py-12">

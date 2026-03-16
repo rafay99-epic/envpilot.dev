@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const MAX_AUTO_RETRIES = 2;
 
 export default function Error({
   error,
@@ -10,9 +12,33 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const retryCount = useRef(0);
+  const [showError, setShowError] = useState(false);
+
   useEffect(() => {
     console.error("Application error:", error);
-  }, [error]);
+
+    // Auto-retry transient errors (502, network failures) up to MAX_AUTO_RETRIES times
+    if (retryCount.current < MAX_AUTO_RETRIES) {
+      retryCount.current += 1;
+      const delay = retryCount.current * 1000;
+      const timer = setTimeout(() => reset(), delay);
+      return () => clearTimeout(timer);
+    }
+
+    setShowError(true);
+  }, [error, reset]);
+
+  if (!showError) {
+    // Show a minimal loading state while auto-retrying
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
+        <div className="font-mono text-sm text-zinc-500">
+          <span className="text-green-400">$</span> retrying...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0f172a] px-4">

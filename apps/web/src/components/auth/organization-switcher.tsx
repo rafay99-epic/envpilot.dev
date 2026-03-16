@@ -80,18 +80,28 @@ export function OrganizationSwitcher({
   }, []);
 
   function handleSelectOrganization(org: Organization) {
+    if (org._id === currentOrgId) {
+      setIsOpen(false);
+      return;
+    }
+
     setIsOpen(false);
     setActiveOrganizationCookie(org._id);
     if (onOrganizationChange) {
       onOrganizationChange(org._id);
     }
 
-    if (pathname.startsWith("/organizations")) {
-      router.push(`/organizations/${org.slug}`);
-    } else {
-      router.push("/dashboard");
-    }
-    router.refresh();
+    // Navigate after a short delay to let the auth state refresh via
+    // the org-context-changed event listener in useAuth. Avoids firing
+    // a server-side router.refresh() which would cause duplicate Convex
+    // queries and potential 502 errors during the transition.
+    setTimeout(() => {
+      if (pathname.startsWith("/organizations")) {
+        router.push(`/organizations/${org.slug}`);
+      } else {
+        router.push("/dashboard");
+      }
+    }, 100);
   }
 
   if (isLoading) {
