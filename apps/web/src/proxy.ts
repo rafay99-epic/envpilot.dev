@@ -22,6 +22,7 @@ export default authkitMiddleware({
       "/contact",
       "/api/health",
       "/api/config",
+      "/monitoring",
       "/api/webhooks/stripe",
       // CLI API endpoints use bearer token auth, not browser session auth
       "/api/cli/auth",

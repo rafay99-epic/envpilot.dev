@@ -22,7 +22,12 @@
         "STRIPE_WEBHOOK_SECRET",
         "STRIPE_PRO_PRICE_ID",
         "RESEND_API_KEY",
-        "FROM_EMAIL"
+        "FROM_EMAIL",
+        "SENTRY_DSN",
+        "NEXT_PUBLIC_SENTRY_DSN",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT"
       ],
       "outputs": [".next/**", "dist/**"]
     },

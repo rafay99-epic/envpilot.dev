@@ -19,6 +19,7 @@ import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import { openUrlReliably } from "./utils/browser";
+import { initSentry, captureError, closeSentry } from "./utils/sentry";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -28,6 +29,23 @@ import {
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 import * as output from "./utils/outputChannel";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function wrapCommand(
+  fn: (...args: any[]) => Promise<any>
+): (...args: any[]) => Promise<void> {
+  return async (...args: any[]) => {
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    try {
+      await fn(...args);
+    } catch (err) {
+      captureError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      output.error(message);
+      vscode.window.showErrorMessage(`Envpilot: ${message}`);
+    }
+  };
+}
 
 let authService: AuthService;
 let apiService: ApiService;
@@ -109,6 +127,8 @@ async function initializeConvexService(): Promise<void> {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  initSentry();
+
   // Initialize storage
   storageService = new StorageService(context);
 
@@ -179,53 +199,71 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("envpilot.signIn", handleSignIn),
-    vscode.commands.registerCommand("envpilot.signOut", handleSignOut),
-    vscode.commands.registerCommand("envpilot.linkProject", handleLinkProject),
+    vscode.commands.registerCommand(
+      "envpilot.signIn",
+      wrapCommand(handleSignIn)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.signOut",
+      wrapCommand(handleSignOut)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.linkProject",
+      wrapCommand(handleLinkProject)
+    ),
     vscode.commands.registerCommand(
       "envpilot.unlinkProject",
-      handleUnlinkProject
+      wrapCommand(handleUnlinkProject)
     ),
     vscode.commands.registerCommand(
       "envpilot.pullVariables",
-      handlePullVariables
+      wrapCommand(handlePullVariables)
     ),
-    vscode.commands.registerCommand("envpilot.refresh", handleRefresh),
+    vscode.commands.registerCommand(
+      "envpilot.refresh",
+      wrapCommand(async () => handleRefresh())
+    ),
     vscode.commands.registerCommand(
       "envpilot.openDashboard",
-      handleOpenDashboard
+      wrapCommand(handleOpenDashboard)
     ),
-    vscode.commands.registerCommand("envpilot.showStatus", handleShowStatus),
+    vscode.commands.registerCommand(
+      "envpilot.showStatus",
+      wrapCommand(handleShowStatus)
+    ),
     // New V2 commands
     vscode.commands.registerCommand(
       "envpilot.addDirectory",
-      handleAddDirectory
+      wrapCommand(handleAddDirectory)
     ),
     vscode.commands.registerCommand(
       "envpilot.removeDirectory",
-      handleRemoveDirectory
+      wrapCommand(handleRemoveDirectory)
     ),
     vscode.commands.registerCommand(
       "envpilot.selectEnvironments",
-      handleSelectEnvironments
+      wrapCommand(handleSelectEnvironments)
     ),
     vscode.commands.registerCommand(
       "envpilot.requestVariable",
-      handleRequestVariable
+      wrapCommand(handleRequestVariable)
     ),
     // Commit guard commands
     vscode.commands.registerCommand(
       "envpilot.installCommitGuard",
-      handleInstallCommitGuard
+      wrapCommand(handleInstallCommitGuard)
     ),
     vscode.commands.registerCommand(
       "envpilot.removeCommitGuard",
-      handleRemoveCommitGuard
+      wrapCommand(handleRemoveCommitGuard)
     ),
     // Dashboard panel command
-    vscode.commands.registerCommand("envpilot.openDashboardPanel", () => {
-      dashboardPanelProvider.show();
-    })
+    vscode.commands.registerCommand(
+      "envpilot.openDashboardPanel",
+      wrapCommand(async () => {
+        dashboardPanelProvider.show();
+      })
+    )
   );
 
   // Subscribe to auth state changes
@@ -1016,4 +1054,5 @@ export async function deactivate() {
     // Best-effort cleanup — don't block deactivation
   }
   // Remaining cleanup handled by dispose subscriptions
+  await closeSentry();
 }

@@ -12,6 +12,7 @@ import {
   readProjectConfig,
   getProjectConfigPath,
 } from "../lib/project-config.js";
+import { handleError } from "../lib/errors.js";
 
 export const configCommand = new Command("config")
   .description("Manage CLI configuration")
@@ -54,8 +55,7 @@ export const configCommand = new Command("config")
           process.exit(1);
       }
     } catch (err) {
-      error(err instanceof Error ? err.message : "Config operation failed");
-      process.exit(1);
+      await handleError(err);
     }
   });
 

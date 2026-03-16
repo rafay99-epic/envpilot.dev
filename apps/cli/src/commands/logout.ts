@@ -1,7 +1,8 @@
 import { Command } from "commander";
-import { success, error, info } from "../lib/ui.js";
+import { success, info } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { clearAuth, isAuthenticated, getUser } from "../lib/config.js";
+import { handleError } from "../lib/errors.js";
 
 export const logoutCommand = new Command("logout")
   .description("Log out from Envpilot")
@@ -27,7 +28,6 @@ export const logoutCommand = new Command("logout")
 
       success(`Logged out${user?.email ? ` from ${user.email}` : ""}`);
     } catch (err) {
-      error(err instanceof Error ? err.message : "Logout failed");
-      process.exit(1);
+      await handleError(err);
     }
   });

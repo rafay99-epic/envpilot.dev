@@ -14,12 +14,18 @@ const buildOptions = {
   external: ["vscode"],
   format: "cjs",
   platform: "node",
-  sourcemap: isWatch,
+  sourcemap: true,
   minify: isMinify,
   define: {
     ...(serverUrl && {
       __DEFAULT_SERVER_URL__: JSON.stringify(serverUrl),
     }),
+    __EXTENSION_SENTRY_DSN__: JSON.stringify(
+      process.env.SENTRY_EXTENSION_DSN || ""
+    ),
+    __EXTENSION_VERSION__: JSON.stringify(
+      process.env.npm_package_version || "0.0.0"
+    ),
   },
 };
 

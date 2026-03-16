@@ -22,7 +22,7 @@ import {
   writeProjectConfig,
   updateProjectConfig,
 } from "../lib/project-config.js";
-import { notAuthenticated } from "../lib/errors.js";
+import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization, Project, Environment } from "../types/index.js";
 
 export const switchCommand = new Command("switch")
@@ -349,7 +349,6 @@ export const switchCommand = new Command("switch")
         }
       }
     } catch (err) {
-      error(err instanceof Error ? err.message : "Switch failed");
-      process.exit(1);
+      await handleError(err);
     }
   });

@@ -28,18 +28,18 @@ Envpilot is a centralized platform for managing, sharing, and syncing environmen
 
 ## Tech Stack
 
-| Layer              | Technology                                                      |
-| ------------------ | --------------------------------------------------------------- |
-| **Web App**        | Next.js 16, React 19, React Compiler, Tailwind CSS v4          |
-| **Backend**        | Convex (real-time database), WorkOS Vault (secrets)             |
-| **Authentication** | WorkOS AuthKit (email, OAuth, SAML)                             |
-| **Billing**        | Stripe (optional)                                               |
-| **Email**          | Resend (optional)                                               |
-| **CLI**            | Commander.js, Zod v4, tsup                                     |
-| **VS Code Ext.**   | VS Code Extension API, esbuild                                 |
-| **Monorepo**       | Bun workspaces, Turborepo                                      |
-| **Testing**        | Playwright (E2E), Vitest (unit)                                 |
-| **Language**       | TypeScript (strict mode)                                        |
+| Layer              | Technology                                            |
+| ------------------ | ----------------------------------------------------- |
+| **Web App**        | Next.js 16, React 19, React Compiler, Tailwind CSS v4 |
+| **Backend**        | Convex (real-time database), WorkOS Vault (secrets)   |
+| **Authentication** | WorkOS AuthKit (email, OAuth, SAML)                   |
+| **Billing**        | Stripe (optional)                                     |
+| **Email**          | Resend (optional)                                     |
+| **CLI**            | Commander.js, Zod v4, tsup                            |
+| **VS Code Ext.**   | VS Code Extension API, esbuild                        |
+| **Monorepo**       | Bun workspaces, Turborepo                             |
+| **Testing**        | Playwright (E2E), Vitest (unit)                       |
+| **Language**       | TypeScript (strict mode)                              |
 
 ## Prerequisites
 
@@ -75,27 +75,27 @@ Copy `.env.example` to `.env.local` at the monorepo root. The web app reads it v
 
 ### Required
 
-| Variable                   | Description                                |
-| -------------------------- | ------------------------------------------ |
-| `NEXT_PUBLIC_CONVEX_URL`   | Convex deployment URL                      |
-| `CONVEX_DEPLOYMENT`        | Convex deployment identifier               |
-| `WORKOS_API_KEY`           | WorkOS API key                             |
-| `WORKOS_CLIENT_ID`         | WorkOS client ID                           |
-| `WORKOS_COOKIE_PASSWORD`   | Cookie encryption key (32+ characters)     |
-| `NEXT_PUBLIC_APP_URL`      | Application URL (e.g. `http://localhost:3000`) |
-| `WORKOS_REDIRECT_URI`      | OAuth redirect URI                         |
+| Variable                 | Description                                    |
+| ------------------------ | ---------------------------------------------- |
+| `NEXT_PUBLIC_CONVEX_URL` | Convex deployment URL                          |
+| `CONVEX_DEPLOYMENT`      | Convex deployment identifier                   |
+| `WORKOS_API_KEY`         | WorkOS API key                                 |
+| `WORKOS_CLIENT_ID`       | WorkOS client ID                               |
+| `WORKOS_COOKIE_PASSWORD` | Cookie encryption key (32+ characters)         |
+| `NEXT_PUBLIC_APP_URL`    | Application URL (e.g. `http://localhost:3000`) |
+| `WORKOS_REDIRECT_URI`    | OAuth redirect URI                             |
 
 ### Optional
 
-| Variable                          | Description                        |
-| --------------------------------- | ---------------------------------- |
-| `STRIPE_SECRET_KEY`               | Stripe secret key                  |
-| `STRIPE_WEBHOOK_SECRET`           | Stripe webhook signing secret      |
-| `STRIPE_PRO_PRICE_ID`            | Stripe price ID for Pro tier       |
-| `NEXT_PUBLIC_PAYMENTS_ENABLED`    | Set `true` to enable billing       |
-| `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` | Set `true` to enforce tier caps    |
+| Variable                          | Description                            |
+| --------------------------------- | -------------------------------------- |
+| `STRIPE_SECRET_KEY`               | Stripe secret key                      |
+| `STRIPE_WEBHOOK_SECRET`           | Stripe webhook signing secret          |
+| `STRIPE_PRO_PRICE_ID`             | Stripe price ID for Pro tier           |
+| `NEXT_PUBLIC_PAYMENTS_ENABLED`    | Set `true` to enable billing           |
+| `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` | Set `true` to enforce tier caps        |
 | `RESEND_API_KEY`                  | Resend API key for transactional email |
-| `FROM_EMAIL`                      | Sender address for outbound email  |
+| `FROM_EMAIL`                      | Sender address for outbound email      |
 
 ## Available Scripts
 
@@ -103,47 +103,47 @@ All commands are run from the monorepo root with `bun run`.
 
 ### Development
 
-| Command               | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| `bun run dev`         | Start Next.js + Convex dev servers in parallel   |
-| `bun run dev:web`     | Start Next.js only                               |
-| `bun run dev:convex`  | Start Convex only                                |
-| `bun run dev:cli`     | CLI watch mode                                   |
+| Command                 | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| `bun run dev`           | Start Next.js + Convex dev servers in parallel |
+| `bun run dev:web`       | Start Next.js only                             |
+| `bun run dev:convex`    | Start Convex only                              |
+| `bun run dev:cli`       | CLI watch mode                                 |
 | `bun run dev:extension` | VS Code extension watch mode                   |
 
 ### Build
 
-| Command                  | Description               |
-| ------------------------ | ------------------------- |
-| `bun run build`          | Build all apps            |
-| `bun run build:web`      | Build web app only        |
-| `bun run build:cli`      | Build CLI only            |
-| `bun run build:extension`| Build & package extension |
+| Command                   | Description               |
+| ------------------------- | ------------------------- |
+| `bun run build`           | Build all apps            |
+| `bun run build:web`       | Build web app only        |
+| `bun run build:cli`       | Build CLI only            |
+| `bun run build:extension` | Build & package extension |
 
 ### Quality
 
-| Command               | Description                                          |
-| --------------------- | ---------------------------------------------------- |
-| `bun run lint`        | ESLint across all workspaces                         |
-| `bun run typecheck`   | TypeScript type-check all workspaces                 |
-| `bun run format:check`| Prettier check                                       |
-| `bun run format:fix`  | Prettier auto-fix                                    |
-| `bun run check:all`   | Full CI pipeline (lint + typecheck + build + format) |
+| Command                | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `bun run lint`         | ESLint across all workspaces                         |
+| `bun run typecheck`    | TypeScript type-check all workspaces                 |
+| `bun run format:check` | Prettier check                                       |
+| `bun run format:fix`   | Prettier auto-fix                                    |
+| `bun run check:all`    | Full CI pipeline (lint + typecheck + build + format) |
 
 ### Testing
 
-| Command              | Description                          |
-| -------------------- | ------------------------------------ |
-| `bun run test:e2e`   | Playwright E2E tests (Chromium)      |
-| `bun run test:cli`   | Vitest unit tests for CLI            |
+| Command            | Description                     |
+| ------------------ | ------------------------------- |
+| `bun run test:e2e` | Playwright E2E tests (Chromium) |
+| `bun run test:cli` | Vitest unit tests for CLI       |
 
 ### Deployment
 
-| Command                   | Description                          |
-| ------------------------- | ------------------------------------ |
-| `bun run convex:deploy`   | Deploy Convex functions to production|
-| `bun run publish:cli`     | Publish CLI to npm                   |
-| `bun run publish:extension`| Publish extension to VS Code marketplace |
+| Command                     | Description                              |
+| --------------------------- | ---------------------------------------- |
+| `bun run convex:deploy`     | Deploy Convex functions to production    |
+| `bun run publish:cli`       | Publish CLI to npm                       |
+| `bun run publish:extension` | Publish extension to VS Code marketplace |
 
 ## Project Structure
 
@@ -217,11 +217,11 @@ Convex serves as the real-time database. Sensitive values are **never** stored i
 
 ### Roles & Permissions
 
-| Role          | Capabilities                                                    |
-| ------------- | --------------------------------------------------------------- |
+| Role          | Capabilities                                                        |
+| ------------- | ------------------------------------------------------------------- |
 | **Admin**     | Full access: manage org, projects, variables, rollback, permissions |
-| **Team Lead** | Manage projects and variables, grant/revoke per-variable access |
-| **Member**    | Read-only project access; variable access requires explicit grant |
+| **Team Lead** | Manage projects and variables, grant/revoke per-variable access     |
+| **Member**    | Read-only project access; variable access requires explicit grant   |
 
 ## Documentation
 

@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect, useReducer, useRef } from "react";
 
@@ -26,8 +27,8 @@ export default function Error({
       return () => clearTimeout(timer);
     }
 
-    // All retries exhausted — schedule showing the error UI via a microtask
-    // to avoid synchronous setState within an effect body.
+    // All retries exhausted — report to Sentry and show error UI
+    Sentry.captureException(error);
     const timer = setTimeout(() => markExhausted(), 0);
     return () => clearTimeout(timer);
   }, [error, reset]);

@@ -12,7 +12,7 @@ import {
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getActiveOrganizationId } from "../lib/config.js";
 import { readProjectConfig } from "../lib/project-config.js";
-import { notAuthenticated } from "../lib/errors.js";
+import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization } from "../types/index.js";
 
 /**
@@ -157,7 +157,6 @@ export const usageCommand = new Command("usage")
       ]);
       blank();
     } catch (err) {
-      error(err instanceof Error ? err.message : "Failed to get usage");
-      process.exit(1);
+      await handleError(err);
     }
   });
