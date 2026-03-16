@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Strips Convex internal metadata (Request IDs, stack traces, file paths)
@@ -54,6 +55,14 @@ export function handleApiError(
       { status: 403 }
     );
   }
+
+  // Report 500-class errors to Sentry (tier limits are expected, not bugs)
+  const isConvexError =
+    error instanceof Error && /\[Request ID:/.test(error.message);
+  Sentry.captureException(error, {
+    tags: { source: isConvexError ? "convex" : "api-route" },
+    extra: { sanitizedMessage: message },
+  });
 
   return NextResponse.json({ error: message }, { status: 500 });
 }

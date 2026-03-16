@@ -21,7 +21,11 @@ import {
   getEnvPathForEnvironment,
   diffEnvVars,
 } from "../lib/env-file.js";
-import { notAuthenticated, notInitialized } from "../lib/errors.js";
+import {
+  notAuthenticated,
+  notInitialized,
+  handleError,
+} from "../lib/errors.js";
 import type { Variable } from "../types/index.js";
 
 export const pullCommand = new Command("pull")
@@ -198,7 +202,6 @@ export const pullCommand = new Command("pull")
         chalk.dim(`  Removed: ${Object.keys(diffResult.removed).length}`)
       );
     } catch (err) {
-      error(err instanceof Error ? err.message : "Pull failed");
-      process.exit(1);
+      await handleError(err);
     }
   });

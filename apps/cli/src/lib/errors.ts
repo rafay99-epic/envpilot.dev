@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { captureError, flushSentry } from "./sentry.js";
 
 /**
  * Custom error class for CLI errors
@@ -52,10 +53,28 @@ export function formatError(error: unknown): string {
 }
 
 /**
- * Handle errors and exit with appropriate code
+ * Handle errors, report to Sentry, and exit with appropriate code.
+ * Skips Sentry reporting for user-caused errors (auth, input, init).
  */
-export function handleError(error: unknown): never {
+export async function handleError(error: unknown): Promise<never> {
   console.error(formatError(error));
+
+  // Report unexpected errors to Sentry (skip user-caused errors)
+  const skipCodes: Set<string> = new Set([
+    ErrorCodes.NOT_AUTHENTICATED,
+    ErrorCodes.INVALID_INPUT,
+    ErrorCodes.NOT_INITIALIZED,
+  ]);
+
+  if (error instanceof CLIError) {
+    if (!skipCodes.has(error.code)) {
+      captureError(error, { errorCode: error.code });
+    }
+  } else {
+    captureError(error);
+  }
+
+  await flushSentry();
 
   // Exit with error code based on error type
   if (error instanceof CLIError) {

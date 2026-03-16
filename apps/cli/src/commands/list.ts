@@ -13,7 +13,7 @@ import {
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getRole } from "../lib/config.js";
 import { readProjectConfig } from "../lib/project-config.js";
-import { notAuthenticated } from "../lib/errors.js";
+import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization, Project, Variable } from "../types/index.js";
 
 export const listCommand = new Command("list")
@@ -65,8 +65,7 @@ export const listCommand = new Command("list")
           process.exit(1);
       }
     } catch (err) {
-      error(err instanceof Error ? err.message : "List failed");
-      process.exit(1);
+      await handleError(err);
     }
   });
 

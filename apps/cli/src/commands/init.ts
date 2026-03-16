@@ -25,7 +25,7 @@ import {
   ensureEnvInGitignore,
   getTrackedEnvFiles,
 } from "../lib/project-config.js";
-import { notAuthenticated } from "../lib/errors.js";
+import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization, Project, Environment } from "../types/index.js";
 
 export const initCommand = new Command("init")
@@ -250,7 +250,6 @@ export const initCommand = new Command("init")
       );
       console.log();
     } catch (err) {
-      error(err instanceof Error ? err.message : "Initialization failed");
-      process.exit(1);
+      await handleError(err);
     }
   });

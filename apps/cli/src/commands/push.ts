@@ -25,6 +25,7 @@ import {
   notAuthenticated,
   notInitialized,
   fileNotFound,
+  handleError,
 } from "../lib/errors.js";
 import type { Variable } from "../types/index.js";
 
@@ -304,7 +305,6 @@ export const pushCommand = new Command("push")
         }
       }
     } catch (err) {
-      error(err instanceof Error ? err.message : "Push failed");
-      process.exit(1);
+      await handleError(err);
     }
   });

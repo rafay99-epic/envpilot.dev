@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { initSentry } from "./lib/sentry.js";
+initSentry();
+
 import { Command } from "commander";
 import { loginCommand } from "./commands/login.js";
 import { initCommand } from "./commands/init.js";
@@ -16,7 +19,7 @@ const program = new Command();
 program
   .name("envpilot")
   .description("Envpilot CLI - Sync, secure, and share environment variables")
-  .version("1.0.0");
+  .version("1.3.0");
 
 // Add all commands
 program.addCommand(loginCommand);

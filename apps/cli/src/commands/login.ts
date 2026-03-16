@@ -3,6 +3,7 @@ import chalk from "chalk";
 import open from "open";
 import { createSpinner, success, info, error } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
+import { handleError } from "../lib/errors.js";
 import {
   setAccessToken,
   setRefreshToken,
@@ -129,8 +130,7 @@ export const loginCommand = new Command("login")
         process.exit(1);
       }
     } catch (err) {
-      error(err instanceof Error ? err.message : "Authentication failed");
-      process.exit(1);
+      await handleError(err);
     }
   });
 

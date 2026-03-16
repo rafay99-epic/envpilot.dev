@@ -334,8 +334,8 @@ export default function ContactPage() {
                   className="hover:text-zinc-500"
                 >
                   Syntax Lab Technology
-                </a>
-                {" "}&middot;{" "}
+                </a>{" "}
+                &middot;{" "}
                 <a
                   href="https://rafay99.com"
                   target="_blank"
