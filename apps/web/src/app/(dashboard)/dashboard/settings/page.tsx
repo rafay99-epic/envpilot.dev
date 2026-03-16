@@ -17,8 +17,11 @@ import {
   Lock,
   Terminal,
   Monitor,
-  Bell,
-  BellOff,
+  Variable,
+  Users,
+  KeyRound,
+  ShieldAlert,
+  type LucideIcon,
 } from "lucide-react";
 
 type SettingsTab = "general" | "notifications" | "integrations" | "security";
@@ -305,26 +308,36 @@ function NotificationSettings() {
     key: keyof NotificationPrefs;
     label: string;
     description: string;
+    icon: LucideIcon;
+    activeColor: string;
   }[] = [
     {
       key: "variableChanges",
       label: "Variable changes",
       description: "When variables you have access to are modified",
+      icon: Variable,
+      activeColor: "text-blue-400",
     },
     {
       key: "memberUpdates",
       label: "Team updates",
       description: "When members join or leave your organization",
+      icon: Users,
+      activeColor: "text-purple-400",
     },
     {
       key: "accessRequests",
       label: "Access requests",
       description: "When someone requests access to variables",
+      icon: KeyRound,
+      activeColor: "text-amber-400",
     },
     {
       key: "securityAlerts",
       label: "Security alerts",
       description: "Session revocations and suspicious activity",
+      icon: ShieldAlert,
+      activeColor: "text-red-400",
     },
   ];
 
@@ -355,19 +368,15 @@ function NotificationSettings() {
           Choose which email notifications you receive
         </p>
 
-        <div className="mt-6 space-y-1">
-          {notifications.map(({ key, label, description }) => (
+        <div className="mt-6 space-y-3">
+          {notifications.map(({ key, label, description, icon: Icon, activeColor }) => (
             <div
               key={key}
-              className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4"
+              className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4"
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700/50">
-                  {prefs[key] ? (
-                    <Bell className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <BellOff className="h-4 w-4 text-zinc-500" />
-                  )}
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-700/40">
+                  <Icon className={`h-5 w-5 ${prefs[key] ? activeColor : "text-zinc-500"}`} />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-zinc-100">{label}</p>
