@@ -224,9 +224,7 @@ function GeneralSettings({
               <Lock className="h-4 w-4 text-zinc-400" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-100">
-                {user?.email}
-              </p>
+              <p className="text-sm font-medium text-zinc-100">{user?.email}</p>
               <p className="text-xs text-zinc-500">
                 Member since{" "}
                 {user?.createdAt
@@ -369,35 +367,39 @@ function NotificationSettings() {
         </p>
 
         <div className="mt-6 space-y-3">
-          {notifications.map(({ key, label, description, icon: Icon, activeColor }) => (
-            <div
-              key={key}
-              className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-700/40">
-                  <Icon className={`h-5 w-5 ${prefs[key] ? activeColor : "text-zinc-500"}`} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-100">{label}</p>
-                  <p className="text-xs text-zinc-500">{description}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => handleToggle(key)}
-                disabled={savingKey === key}
-                className={`relative h-6 w-11 rounded-full transition-colors ${
-                  prefs[key] ? "bg-green-500" : "bg-zinc-600"
-                } ${savingKey === key ? "opacity-50" : ""}`}
+          {notifications.map(
+            ({ key, label, description, icon: Icon, activeColor }) => (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4"
               >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                    prefs[key] ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-700/40">
+                    <Icon
+                      className={`h-5 w-5 ${prefs[key] ? activeColor : "text-zinc-500"}`}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-zinc-100">{label}</p>
+                    <p className="text-xs text-zinc-500">{description}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggle(key)}
+                  disabled={savingKey === key}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${
+                    prefs[key] ? "bg-green-500" : "bg-zinc-600"
+                  } ${savingKey === key ? "opacity-50" : ""}`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                      prefs[key] ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            )
+          )}
         </div>
       </TerminalCard>
     </div>

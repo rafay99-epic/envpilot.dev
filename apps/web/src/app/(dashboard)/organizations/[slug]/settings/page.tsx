@@ -174,18 +174,15 @@ export default function OrganizationSettingsPage({
     setIsSavingSettings(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/organizations/${slug}/settings`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            settings: {
-              teamLeadsCanCreateProjects: newValue,
-            },
-          }),
-        }
-      );
+      const response = await fetch(`/api/organizations/${slug}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: {
+            teamLeadsCanCreateProjects: newValue,
+          },
+        }),
+      });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Failed to update settings");
@@ -193,9 +190,7 @@ export default function OrganizationSettingsPage({
       setSuccessMessage("Access control settings updated");
     } catch (err) {
       setTeamLeadsCanCreateProjects(!newValue);
-      setError(
-        err instanceof Error ? err.message : "An error occurred"
-      );
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsSavingSettings(false);
     }
@@ -416,7 +411,9 @@ function GeneralOrgSettings({
         <h2 className="text-base font-semibold text-zinc-100">Plan</h2>
         <div className="mt-4 flex items-start justify-between gap-4">
           <div>
-            <TerminalBadge color={organization.tier === "pro" ? "green" : "zinc"}>
+            <TerminalBadge
+              color={organization.tier === "pro" ? "green" : "zinc"}
+            >
               {organization.tier === "pro" ? "Pro Plan" : "Free Plan"}
             </TerminalBadge>
             <p className="mt-2 text-sm text-zinc-500">
@@ -424,7 +421,11 @@ function GeneralOrgSettings({
               Plan page.
             </p>
           </div>
-          <TerminalButtonLink href="/dashboard/usage" variant="secondary" className="shrink-0">
+          <TerminalButtonLink
+            href="/dashboard/usage"
+            variant="secondary"
+            className="shrink-0"
+          >
             View Usage
           </TerminalButtonLink>
         </div>
@@ -478,9 +479,7 @@ function AccessControlSettings({
             >
               <span
                 className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                  teamLeadsCanCreateProjects
-                    ? "translate-x-5"
-                    : "translate-x-0"
+                  teamLeadsCanCreateProjects ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -649,9 +648,7 @@ function DangerZoneSettings({
               <TerminalButton
                 variant="danger"
                 onClick={handleDelete}
-                disabled={
-                  deleteConfirmText !== organization.name || isDeleting
-                }
+                disabled={deleteConfirmText !== organization.name || isDeleting}
               >
                 {isDeleting ? "Deleting..." : "Delete Organization"}
               </TerminalButton>

@@ -64,10 +64,7 @@ export async function apiRequest(
 /**
  * Creates a test organization via the API
  */
-export async function createTestOrg(
-  request: APIRequestContext,
-  name?: string
-) {
+export async function createTestOrg(request: APIRequestContext, name?: string) {
   const orgName = name || `test-org-${Date.now()}`;
   const slug = orgName.toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
@@ -138,10 +135,7 @@ export async function createTestVariable(
 /**
  * Deletes a test organization (cleanup)
  */
-export async function deleteTestOrg(
-  request: APIRequestContext,
-  slug: string
-) {
+export async function deleteTestOrg(request: APIRequestContext, slug: string) {
   const response = await apiRequest(
     request,
     "DELETE",
@@ -244,14 +238,9 @@ export async function transferOrganization(
   orgSlug: string,
   targetUserEmail: string
 ) {
-  return apiRequest(
-    request,
-    "POST",
-    `/api/organizations/${orgSlug}/transfer`,
-    {
-      data: { targetUserEmail },
-    }
-  );
+  return apiRequest(request, "POST", `/api/organizations/${orgSlug}/transfer`, {
+    data: { targetUserEmail },
+  });
 }
 
 export { base as test, expect };

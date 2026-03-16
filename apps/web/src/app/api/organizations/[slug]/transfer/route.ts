@@ -74,8 +74,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       if (org?.tier !== "pro") {
         return NextResponse.json(
           {
-            error:
-              "Organization must be on the Pro plan to transfer ownership",
+            error: "Organization must be on the Pro plan to transfer ownership",
           },
           { status: 403 }
         );
@@ -129,7 +128,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         orgSlug: slug,
       });
     } catch (emailErr) {
-      console.warn("[EMAIL] Failed to send transfer email to new owner:", emailErr);
+      console.warn(
+        "[EMAIL] Failed to send transfer email to new owner:",
+        emailErr
+      );
     }
 
     // Send confirmation to previous owner (non-blocking)
@@ -141,7 +143,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         orgSlug: slug,
       });
     } catch (emailErr) {
-      console.warn("[EMAIL] Failed to send transfer confirmation to previous owner:", emailErr);
+      console.warn(
+        "[EMAIL] Failed to send transfer confirmation to previous owner:",
+        emailErr
+      );
     }
 
     return NextResponse.json({

@@ -208,8 +208,12 @@ async function notifyMemberUpdate(
   role?: string
 ) {
   try {
-    const org = await convex.query(api.organizations.getById, { organizationId });
-    const members = await convex.query(api.organizations.getMembers, { organizationId });
+    const org = await convex.query(api.organizations.getById, {
+      organizationId,
+    });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
     const orgName = org?.name || "Unknown organization";
 
     for (const member of members) {

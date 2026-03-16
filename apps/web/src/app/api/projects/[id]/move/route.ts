@@ -117,16 +117,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const targetOrg = await convex.query(api.organizations.getById, {
         organizationId: targetOrganizationId as Id<"organizations">,
       });
-      const targetMembers = await convex.query(
-        api.organizations.getMembers,
-        {
-          organizationId: targetOrganizationId as Id<"organizations">,
-        }
-      );
+      const targetMembers = await convex.query(api.organizations.getMembers, {
+        organizationId: targetOrganizationId as Id<"organizations">,
+      });
 
-      const adminMembers = targetMembers.filter(
-        (m) => m && m.role === "admin"
-      );
+      const adminMembers = targetMembers.filter((m) => m && m.role === "admin");
       const userName =
         user.firstName && user.lastName
           ? `${user.firstName} ${user.lastName}`
@@ -134,14 +129,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       for (const admin of adminMembers) {
         if (admin?.user?.email) {
-          await convex.action(api.emails.sendProjectTransferEmail, {
-            to: admin.user.email,
-            projectName: project.name,
-            organizationName: targetOrg?.name || "your organization",
-            transferredByName: userName,
-          }).catch((err: unknown) =>
-            console.warn("[EMAIL] Failed to send project transfer email:", err)
-          );
+          await convex
+            .action(api.emails.sendProjectTransferEmail, {
+              to: admin.user.email,
+              projectName: project.name,
+              organizationName: targetOrg?.name || "your organization",
+              transferredByName: userName,
+            })
+            .catch((err: unknown) =>
+              console.warn(
+                "[EMAIL] Failed to send project transfer email:",
+                err
+              )
+            );
         }
       }
     } catch (emailErr) {

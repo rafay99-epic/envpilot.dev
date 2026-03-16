@@ -71,7 +71,10 @@ function headingRow(text: string): string {
 </tr>`;
 }
 
-function paragraphRow(text: string, style = "font-size: 16px; line-height: 1.5; color: #52525b;"): string {
+function paragraphRow(
+  text: string,
+  style = "font-size: 16px; line-height: 1.5; color: #52525b;"
+): string {
   return `<tr>
   <td style="padding: 0 40px 30px 40px; text-align: center;">
     <p style="margin: 0; ${style}">${text}</p>
@@ -119,7 +122,10 @@ async function sendEmail(
     });
 
     if (error) {
-      console.error("[EMAIL] Resend API error:", JSON.stringify(error, null, 2));
+      console.error(
+        "[EMAIL] Resend API error:",
+        JSON.stringify(error, null, 2)
+      );
       return { success: false, error: error.message };
     }
 
@@ -143,7 +149,11 @@ export const sendInvitationEmail = action({
     to: v.string(),
     inviterName: v.string(),
     organizationName: v.string(),
-    role: v.union(v.literal("admin"), v.literal("team_lead"), v.literal("member")),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("team_lead"),
+      v.literal("member")
+    ),
     token: v.string(),
     expiresAt: v.number(),
   },
@@ -151,11 +161,14 @@ export const sendInvitationEmail = action({
     const config = getEmailConfig();
     const appUrl = config?.appUrl || "http://localhost:3000";
     const invitationUrl = `${appUrl}/invitations/${args.token}`;
-    const expirationDate = new Date(args.expiresAt).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const expirationDate = new Date(args.expiresAt).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }
+    );
     const roleDisplay =
       args.role === "team_lead"
         ? "Team Lead"
@@ -200,7 +213,11 @@ export const sendSessionRevocationEmail = action({
     to: v.string(),
     organizationName: v.string(),
     revokedByName: v.string(),
-    revokedType: v.union(v.literal("cli"), v.literal("extension"), v.literal("all")),
+    revokedType: v.union(
+      v.literal("cli"),
+      v.literal("extension"),
+      v.literal("all")
+    ),
     revokedCount: v.number(),
   },
   handler: async (_ctx, args) => {
@@ -229,13 +246,20 @@ export const sendSessionRevocationEmail = action({
           `${args.revokedCount} session${plural ? "s were" : " was"} revoked. You will need to re-authenticate to regain access.`,
           "font-size: 14px; line-height: 1.5; color: #71717a;"
         ),
-        footerRow("If you believe this was done in error, contact your organization administrator."),
+        footerRow(
+          "If you believe this was done in error, contact your organization administrator."
+        ),
       ].join("")
     );
 
     const text = `Sessions Revoked - ${args.organizationName}\n\n${args.revokedByName} has revoked your ${typeDisplay} session${plural ? "s" : ""} in ${args.organizationName}.\n\n${args.revokedCount} session${plural ? "s were" : " was"} revoked. You will need to re-authenticate to regain access.\n\nIf you believe this was done in error, contact your organization administrator.`;
 
-    return sendEmail(args.to, `Sessions revoked in ${args.organizationName}`, html, text);
+    return sendEmail(
+      args.to,
+      `Sessions revoked in ${args.organizationName}`,
+      html,
+      text
+    );
   },
 });
 
@@ -264,7 +288,9 @@ export const sendOrgTransferEmail = action({
           `<strong>${safePrevOwner}</strong> has transferred ownership of <strong>${safeOrg}</strong> to you. You are now the admin.<br><br><span style="font-size: 14px; color: #71717a;">All existing members, projects, and settings remain intact.</span>`
         ),
         buttonRow(orgUrl, "Go to Organization"),
-        footerRow("If you didn't expect this transfer, please contact support."),
+        footerRow(
+          "If you didn't expect this transfer, please contact support."
+        ),
       ].join("")
     );
 
@@ -299,7 +325,9 @@ export const sendOrgTransferConfirmationEmail = action({
         paragraphRow(
           `You have successfully transferred ownership of <strong>${safeOrg}</strong> to <strong>${safeNewOwner}</strong>.<br><br><span style="font-size: 14px; color: #71717a;">All other members, projects, and settings remain intact. You have been removed from the organization.</span>`
         ),
-        footerRow("If you didn't initiate this transfer, please contact support immediately."),
+        footerRow(
+          "If you didn't initiate this transfer, please contact support immediately."
+        ),
       ].join("")
     );
 
@@ -363,12 +391,19 @@ export const sendVariableChangeEmail = action({
     variableName: v.string(),
     projectName: v.string(),
     changedByName: v.string(),
-    changeType: v.union(v.literal("created"), v.literal("updated"), v.literal("deleted")),
+    changeType: v.union(
+      v.literal("created"),
+      v.literal("updated"),
+      v.literal("deleted")
+    ),
   },
   handler: async (ctx, args) => {
-    const prefs = await ctx.runQuery(internal.userPreferences.getByUserIdInternal, {
-      userId: args.userId,
-    });
+    const prefs = await ctx.runQuery(
+      internal.userPreferences.getByUserIdInternal,
+      {
+        userId: args.userId,
+      }
+    );
     if (prefs?.emailNotifications?.variableChanges === false) {
       return { success: true, skipped: true };
     }
@@ -389,7 +424,9 @@ export const sendVariableChangeEmail = action({
       `Variable ${args.changeType} - ${safeProject}`,
       [
         iconRow(initial),
-        headingRow(`Variable ${args.changeType.charAt(0).toUpperCase() + args.changeType.slice(1)}`),
+        headingRow(
+          `Variable ${args.changeType.charAt(0).toUpperCase() + args.changeType.slice(1)}`
+        ),
         paragraphRow(
           `<strong>${safeChangedBy}</strong> ${actionWord} <strong>${safeProject}</strong>.<br><br><span style="font-size: 14px; color: #71717a;">Variable: <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code></span>`
         ),
@@ -416,13 +453,20 @@ export const sendMemberUpdateEmail = action({
     to: v.string(),
     organizationName: v.string(),
     memberName: v.string(),
-    updateType: v.union(v.literal("added"), v.literal("removed"), v.literal("role_changed")),
+    updateType: v.union(
+      v.literal("added"),
+      v.literal("removed"),
+      v.literal("role_changed")
+    ),
     role: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const prefs = await ctx.runQuery(internal.userPreferences.getByUserIdInternal, {
-      userId: args.userId,
-    });
+    const prefs = await ctx.runQuery(
+      internal.userPreferences.getByUserIdInternal,
+      {
+        userId: args.userId,
+      }
+    );
     if (prefs?.emailNotifications?.memberUpdates === false) {
       return { success: true, skipped: true };
     }
@@ -472,9 +516,12 @@ export const sendAccessRequestEmail = action({
     organizationName: v.string(),
   },
   handler: async (ctx, args) => {
-    const prefs = await ctx.runQuery(internal.userPreferences.getByUserIdInternal, {
-      userId: args.userId,
-    });
+    const prefs = await ctx.runQuery(
+      internal.userPreferences.getByUserIdInternal,
+      {
+        userId: args.userId,
+      }
+    );
     if (prefs?.emailNotifications?.accessRequests === false) {
       return { success: true, skipped: true };
     }

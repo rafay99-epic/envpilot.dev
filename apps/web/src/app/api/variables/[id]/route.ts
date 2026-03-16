@@ -208,7 +208,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     // Notify project members about variable update (non-blocking)
-    notifyVariableChange(convexUser._id, variable.key, variable.projectId, organizationId, convexUser.name || convexUser.email || "A team member", "updated");
+    notifyVariableChange(
+      convexUser._id,
+      variable.key,
+      variable.projectId,
+      organizationId,
+      convexUser.name || convexUser.email || "A team member",
+      "updated"
+    );
 
     return NextResponse.json({ variable: updatedVariable });
   } catch {
@@ -279,7 +286,14 @@ export async function DELETE(request: Request, context: RouteContext) {
     });
 
     // Notify project members about variable deletion (non-blocking)
-    notifyVariableChange(convexUser._id, variable.key, variable.projectId, organizationId, convexUser.name || convexUser.email || "A team member", "deleted");
+    notifyVariableChange(
+      convexUser._id,
+      variable.key,
+      variable.projectId,
+      organizationId,
+      convexUser.name || convexUser.email || "A team member",
+      "deleted"
+    );
 
     return NextResponse.json({ success: true });
   } catch {

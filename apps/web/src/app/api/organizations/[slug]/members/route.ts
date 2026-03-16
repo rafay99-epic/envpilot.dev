@@ -311,7 +311,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     });
 
     // Notify org members about the role change (non-blocking)
-    const roleDisplay = role === "team_lead" ? "Team Lead" : role.charAt(0).toUpperCase() + role.slice(1);
+    const roleDisplay =
+      role === "team_lead"
+        ? "Team Lead"
+        : role.charAt(0).toUpperCase() + role.slice(1);
     notifyMemberUpdate(
       targetUserId as Id<"users">,
       targetUser?.name || targetUser?.email || "A member",
@@ -432,8 +435,12 @@ async function notifyMemberUpdate(
   role?: string
 ) {
   try {
-    const org = await convex.query(api.organizations.getById, { organizationId });
-    const members = await convex.query(api.organizations.getMembers, { organizationId });
+    const org = await convex.query(api.organizations.getById, {
+      organizationId,
+    });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
     const orgName = org?.name || "Unknown organization";
 
     for (const member of members) {

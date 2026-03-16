@@ -200,7 +200,14 @@ export async function POST(request: Request) {
     const variable = await convex.query(api.variables.getById, { variableId });
 
     // Notify project members about variable creation (non-blocking)
-    notifyVariableChange(convexUser._id, key, projectId as Id<"projects">, organizationId, convexUser.name || convexUser.email || "A team member", "created");
+    notifyVariableChange(
+      convexUser._id,
+      key,
+      projectId as Id<"projects">,
+      organizationId,
+      convexUser.name || convexUser.email || "A team member",
+      "created"
+    );
 
     return NextResponse.json({ variable }, { status: 201 });
   } catch (error) {
@@ -269,7 +276,9 @@ async function notifyAccessRequest(
 ) {
   try {
     const project = await convex.query(api.projects.getById, { projectId });
-    const org = await convex.query(api.organizations.getById, { organizationId });
+    const org = await convex.query(api.organizations.getById, {
+      organizationId,
+    });
     const members = await convex.query(api.organizations.getMembers, {
       organizationId,
     });

@@ -143,7 +143,8 @@ export default function ProjectSettingsPage({
   }, [project?.organizationId]);
 
   const handleTransfer = async () => {
-    if (!project || transferConfirmText !== project.name || !targetOrgId) return;
+    if (!project || transferConfirmText !== project.name || !targetOrgId)
+      return;
 
     setIsTransferring(true);
     setError(null);
@@ -433,8 +434,7 @@ function GeneralProjectSettings({
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-zinc-300">
-                Description{" "}
-                <span className="text-zinc-500">(optional)</span>
+                Description <span className="text-zinc-500">(optional)</span>
               </label>
               <textarea
                 value={formData.description}
@@ -460,9 +460,7 @@ function GeneralProjectSettings({
                   <button
                     key={icon}
                     type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({ ...prev, icon }))
-                    }
+                    onClick={() => setFormData((prev) => ({ ...prev, icon }))}
                     className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
                       formData.icon === icon
                         ? "bg-green-500/20 ring-1 ring-green-500/50"
@@ -493,9 +491,7 @@ function GeneralProjectSettings({
                   <button
                     key={color}
                     type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({ ...prev, color }))
-                    }
+                    onClick={() => setFormData((prev) => ({ ...prev, color }))}
                     className={`h-8 w-8 rounded-lg transition-all ${
                       formData.color === color
                         ? "ring-2 ring-green-400 ring-offset-2 ring-offset-zinc-900"
@@ -601,9 +597,7 @@ function DangerZoneProjectSettings({
             <div className="space-y-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
               <p className="text-sm text-zinc-100">
                 Type{" "}
-                <span className="font-mono font-semibold">
-                  {project.name}
-                </span>{" "}
+                <span className="font-mono font-semibold">{project.name}</span>{" "}
                 to confirm transfer:
               </p>
               <TerminalInput
@@ -647,9 +641,7 @@ function DangerZoneProjectSettings({
 
       {/* Delete Project */}
       <TerminalCard className="border-red-500/30">
-        <h2 className="text-base font-semibold text-red-400">
-          Delete Project
-        </h2>
+        <h2 className="text-base font-semibold text-red-400">Delete Project</h2>
         <p className="mt-2 text-sm text-zinc-500">
           Once you delete a project, all its environment variables will be
           deleted. This action cannot be undone.
@@ -659,8 +651,8 @@ function DangerZoneProjectSettings({
           <div className="mt-4 space-y-4">
             <p className="text-sm text-zinc-100">
               Type{" "}
-              <span className="font-mono font-semibold">{project.name}</span>{" "}
-              to confirm deletion:
+              <span className="font-mono font-semibold">{project.name}</span> to
+              confirm deletion:
             </p>
             <TerminalInput
               type="text"

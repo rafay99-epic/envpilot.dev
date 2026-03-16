@@ -22,7 +22,11 @@ test.describe("Variable Export API", () => {
   test.beforeAll(async ({ request }) => {
     // Create test org and project
     org = await createTestOrg(request, `export-test-${Date.now()}`);
-    project = await createTestProject(request, org._id, `export-proj-${Date.now()}`);
+    project = await createTestProject(
+      request,
+      org._id,
+      `export-proj-${Date.now()}`
+    );
 
     // Create variables across different environments
     await createTestVariable(request, project._id, {
@@ -147,7 +151,9 @@ test.describe("Variable Export API", () => {
     });
 
     const body = await response.text();
-    const lines = body.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+    const lines = body
+      .split("\n")
+      .filter((l) => l.trim() && !l.startsWith("#"));
 
     for (const line of lines) {
       // Each line should match KEY=value pattern

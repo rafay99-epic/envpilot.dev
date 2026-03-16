@@ -216,9 +216,7 @@ export default function ProjectMembersPage({
   if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-lg font-semibold text-zinc-100">
-          {error}
-        </h2>
+        <h2 className="text-lg font-semibold text-zinc-100">{error}</h2>
       </div>
     );
   }
@@ -228,9 +226,7 @@ export default function ProjectMembersPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-zinc-100">
-            Project Members
-          </h1>
+          <h1 className="text-xl font-bold text-zinc-100">Project Members</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Manage who has access to {project?.name}
           </p>
@@ -277,8 +273,8 @@ export default function ProjectMembersPage({
       {/* Info banner */}
       <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
         <p className="text-sm text-blue-400">
-          Organization admins have implicit access to all projects. Their
-          access cannot be removed at the project level.
+          Organization admins have implicit access to all projects. Their access
+          cannot be removed at the project level.
         </p>
       </div>
 

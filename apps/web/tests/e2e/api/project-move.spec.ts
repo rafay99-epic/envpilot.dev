@@ -75,9 +75,7 @@ test.describe("Move Project Between Orgs", () => {
     expect(varsResponse.status()).toBe(200);
 
     const varsBody = await varsResponse.json();
-    const keys = varsBody.variables?.map(
-      (v: { key: string }) => v.key
-    ) || [];
+    const keys = varsBody.variables?.map((v: { key: string }) => v.key) || [];
     expect(keys).toContain("RETAINED_VAR");
   });
 

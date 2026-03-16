@@ -78,10 +78,7 @@ test.describe("Transfer Organization Ownership", () => {
   });
 
   test("validates email format", async ({ request }) => {
-    const org = await createTestOrg(
-      request,
-      `transfer-validate-${Date.now()}`
-    );
+    const org = await createTestOrg(request, `transfer-validate-${Date.now()}`);
 
     const response = await transferOrganization(
       request,
@@ -98,10 +95,7 @@ test.describe("Transfer Organization Ownership", () => {
   test("org retains projects and variables after transfer", async ({
     request,
   }) => {
-    const org = await createTestOrg(
-      request,
-      `transfer-retain-${Date.now()}`
-    );
+    const org = await createTestOrg(request, `transfer-retain-${Date.now()}`);
 
     const project = await createTestProject(
       request,
