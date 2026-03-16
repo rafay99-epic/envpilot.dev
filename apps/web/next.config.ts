@@ -1,9 +1,13 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { APP_VERSIONS } from "./src/lib/versions";
 
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSIONS.web,
+  },
 };
 
 export default withSentryConfig(nextConfig, {

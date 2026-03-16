@@ -1,0 +1,9 @@
+/**
+ * Single source of truth for current release versions.
+ * Bump these when publishing a new release of any surface.
+ */
+export const APP_VERSIONS = {
+  web: "1.3.1",
+  cli: "1.3.1",
+  extension: "1.3.1",
+} as const;

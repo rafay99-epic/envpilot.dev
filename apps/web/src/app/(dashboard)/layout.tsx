@@ -6,6 +6,7 @@ import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { CommandPalette } from "@/components/command-palette";
+import { UpdateBanner } from "@/components/dashboard/update-banner";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getPermissionsForMembershipRole } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -108,6 +109,9 @@ export default async function DashboardLayout({
 
         {/* Global Search Command Palette */}
         <CommandPalette />
+
+        {/* Update Available Notification */}
+        <UpdateBanner />
       </div>
     </AuthProvider>
   );
