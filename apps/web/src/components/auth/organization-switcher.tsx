@@ -17,12 +17,20 @@ interface Organization {
 interface OrganizationSwitcherProps {
   currentOrgId?: string;
   onOrganizationChange?: (orgId: string) => void;
+  collapsed?: boolean;
+}
+
+function formatRole(role: string): string {
+  return role === "team_lead"
+    ? "Team Lead"
+    : role.charAt(0).toUpperCase() + role.slice(1);
 }
 
 export function OrganizationSwitcher({
   currentOrgId,
   onOrganizationChange,
-}: OrganizationSwitcherProps = {}) {
+  collapsed,
+}: OrganizationSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -88,12 +96,16 @@ export function OrganizationSwitcher({
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-3 px-3 py-2">
+      <div
+        className={`flex items-center gap-3 ${collapsed ? "justify-center px-0 py-2" : "px-3 py-2"}`}
+      >
         <div className="h-8 w-8 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-700" />
-        <div className="flex-1">
-          <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
-          <div className="mt-1 h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
-        </div>
+        {!collapsed && (
+          <div className="flex-1">
+            <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+            <div className="mt-1 h-3 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
+          </div>
+        )}
       </div>
     );
   }
@@ -102,9 +114,10 @@ export function OrganizationSwitcher({
     return (
       <Link
         href="/organizations/new"
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        title={collapsed ? "Create Organization" : undefined}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 ${collapsed ? "justify-center px-0" : ""}`}
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600">
           <svg
             className="h-4 w-4 text-zinc-400"
             fill="none"
@@ -119,7 +132,9 @@ export function OrganizationSwitcher({
             />
           </svg>
         </div>
-        <span className="text-sm font-medium">Create Organization</span>
+        {!collapsed && (
+          <span className="text-sm font-medium">Create Organization</span>
+        )}
       </Link>
     );
   }
@@ -128,54 +143,64 @@ export function OrganizationSwitcher({
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        title={collapsed ? currentOrg?.name : undefined}
+        className={`flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+          collapsed ? "justify-center px-0" : "justify-between gap-3 px-3"
+        }`}
       >
-        <div className="flex items-center gap-3 overflow-hidden">
+        <div
+          className={`flex items-center overflow-hidden ${collapsed ? "justify-center" : "gap-3"}`}
+        >
           {currentOrg?.logoUrl ? (
             <img
               src={currentOrg.logoUrl}
               alt={currentOrg.name}
-              className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
+              className="h-8 w-8 shrink-0 rounded-lg object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-700">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-200 dark:bg-zinc-700">
               <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
                 {currentOrg?.name.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              {currentOrg?.name || "Select Organization"}
-            </p>
-            {currentOrg && (
-              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                {currentOrg.role === "team_lead"
-                  ? "Team Lead"
-                  : currentOrg.role.charAt(0).toUpperCase() +
-                    currentOrg.role.slice(1)}
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {currentOrg?.name || "Select Organization"}
               </p>
-            )}
-          </div>
+              {currentOrg && (
+                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  {formatRole(currentOrg.role)}
+                </p>
+              )}
+            </div>
+          )}
         </div>
-        <svg
-          className={`h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        {!collapsed && (
+          <svg
+            className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        )}
       </button>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute left-0 right-0 z-50 mt-1 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+        <div
+          className={`absolute z-50 mt-1 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800 ${
+            collapsed ? "left-full top-0 ml-2 w-64" : "left-0 right-0"
+          }`}
+        >
           <div className="max-h-64 overflow-y-auto">
             {organizations.map((org) => (
               <button
@@ -212,9 +237,7 @@ export function OrganizationSwitcher({
                     )}
                   </div>
                   <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {org.role === "team_lead"
-                      ? "Team Lead"
-                      : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
+                    {formatRole(org.role)}
                   </p>
                 </div>
                 {org._id === currentOrg?._id && (

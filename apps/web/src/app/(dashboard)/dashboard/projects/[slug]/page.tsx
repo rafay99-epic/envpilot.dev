@@ -95,9 +95,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const enforcing = isTierEnforcementEnabled();
   const versionHistoryAllowed = !enforcing || tierFeatures.versionHistory;
 
-  // Keyboard shortcut: Cmd/Ctrl+K to open Add Variable drawer
+  // Keyboard shortcut: Cmd/Ctrl+Shift+K to open Add Variable drawer
   useHotkeys(
-    "mod+k",
+    "mod+shift+k",
     (e) => {
       e.preventDefault();
       if (canCreateVariable || canRequestVariable) {
@@ -737,8 +737,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 <kbd className="ml-1.5 hidden rounded bg-white/20 px-1.5 py-0.5 text-xs font-normal sm:inline-block">
                   {typeof navigator !== "undefined" &&
                   /Mac/.test(navigator.userAgent)
-                    ? "⌘K"
-                    : "Ctrl+K"}
+                    ? "⌘⇧K"
+                    : "Ctrl+Shift+K"}
                 </kbd>
               </button>
             )}
