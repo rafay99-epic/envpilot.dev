@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { sendInvitationEmail } from "@/lib/email";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 
@@ -165,7 +164,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const inviterName = convexUser.name || convexUser.email || "A team member";
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
 
-    const emailResult = await sendInvitationEmail({
+    const emailResult = await convex.action(api.emails.sendInvitationEmail, {
       to: invitation.email,
       inviterName,
       organizationName: organization.name,

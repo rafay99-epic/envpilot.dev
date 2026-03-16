@@ -6,7 +6,6 @@ import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { sendSessionRevocationEmail } from "@/lib/email";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -155,7 +154,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         });
 
         if (targetUser?.email && org) {
-          await sendSessionRevocationEmail({
+          await convex.action(api.emails.sendSessionRevocationEmail, {
             to: targetUser.email,
             organizationName: org.name,
             revokedByName: user.firstName

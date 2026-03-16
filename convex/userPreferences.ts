@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 
 const DEFAULT_NOTIFICATIONS = {
   variableChanges: true,
@@ -9,6 +9,26 @@ const DEFAULT_NOTIFICATIONS = {
 };
 
 export const getByUserId = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const prefs = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (!prefs) {
+      return {
+        emailNotifications: DEFAULT_NOTIFICATIONS,
+      };
+    }
+
+    return {
+      emailNotifications: prefs.emailNotifications ?? DEFAULT_NOTIFICATIONS,
+    };
+  },
+});
+
+export const getByUserIdInternal = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const prefs = await ctx.db

@@ -7,10 +7,6 @@ import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
-import {
-  sendOrgTransferEmail,
-  sendOrgTransferConfirmationEmail,
-} from "@/lib/email";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -126,7 +122,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Send email to new owner (non-blocking)
     try {
-      await sendOrgTransferEmail({
+      await convex.action(api.emails.sendOrgTransferEmail, {
         to: targetUserEmail,
         organizationName: orgName,
         previousOwnerName,
@@ -138,7 +134,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Send confirmation to previous owner (non-blocking)
     try {
-      await sendOrgTransferConfirmationEmail({
+      await convex.action(api.emails.sendOrgTransferConfirmationEmail, {
         to: user.email,
         organizationName: orgName,
         newOwnerEmail: targetUserEmail,

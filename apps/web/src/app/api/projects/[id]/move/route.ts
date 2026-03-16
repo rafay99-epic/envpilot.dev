@@ -6,7 +6,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
-import { sendProjectTransferEmail } from "@/lib/email";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -135,12 +134,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       for (const admin of adminMembers) {
         if (admin?.user?.email) {
-          await sendProjectTransferEmail({
+          await convex.action(api.emails.sendProjectTransferEmail, {
             to: admin.user.email,
             projectName: project.name,
             organizationName: targetOrg?.name || "your organization",
             transferredByName: userName,
-          }).catch((err) =>
+          }).catch((err: unknown) =>
             console.warn("[EMAIL] Failed to send project transfer email:", err)
           );
         }

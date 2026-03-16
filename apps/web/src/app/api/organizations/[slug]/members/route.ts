@@ -5,7 +5,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
 import { z } from "zod";
-import { sendInvitationEmail } from "@/lib/email";
+
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
@@ -200,7 +200,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       organization.name
     );
 
-    const emailResult = await sendInvitationEmail({
+    const emailResult = await convex.action(api.emails.sendInvitationEmail, {
       to: email,
       inviterName,
       organizationName: organization.name,

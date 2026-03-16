@@ -207,6 +207,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       variableId: id as Id<"environmentVariables">,
     });
 
+    // Notify project members about variable update (non-blocking)
+    notifyVariableChange(convexUser._id, variable.key, variable.projectId, organizationId, convexUser.name || convexUser.email || "A team member", "updated");
+
     return NextResponse.json({ variable: updatedVariable });
   } catch {
     return NextResponse.json(
@@ -275,11 +278,53 @@ export async function DELETE(request: Request, context: RouteContext) {
       deletedBy: convexUser._id,
     });
 
+    // Notify project members about variable deletion (non-blocking)
+    notifyVariableChange(convexUser._id, variable.key, variable.projectId, organizationId, convexUser.name || convexUser.email || "A team member", "deleted");
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json(
       { error: "Failed to delete variable" },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Send variable change notification emails to project members (non-blocking).
+ */
+async function notifyVariableChange(
+  changerUserId: Id<"users">,
+  variableName: string,
+  projectId: Id<"projects">,
+  organizationId: Id<"organizations">,
+  changedByName: string,
+  changeType: "created" | "updated" | "deleted"
+) {
+  try {
+    const project = await convex.query(api.projects.getById, { projectId });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
+
+    const projectName = project?.name || "Unknown project";
+
+    for (const member of members) {
+      if (!member?.user?.email || member.user._id === changerUserId) continue;
+      convex
+        .action(api.emails.sendVariableChangeEmail, {
+          userId: member.user._id,
+          to: member.user.email,
+          variableName,
+          projectName,
+          changedByName,
+          changeType,
+        })
+        .catch((err: unknown) =>
+          console.warn("[EMAIL] Variable notification failed:", err)
+        );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] Error sending variable notifications:", err);
   }
 }
