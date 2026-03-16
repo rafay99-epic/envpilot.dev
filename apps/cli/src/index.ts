@@ -13,6 +13,7 @@ import { listCommand } from "./commands/list.js";
 import { configCommand } from "./commands/config.js";
 import { logoutCommand } from "./commands/logout.js";
 import { usageCommand } from "./commands/usage.js";
+import { checkForUpdate } from "./lib/version-check.js";
 
 const program = new Command();
 
@@ -31,6 +32,11 @@ program.addCommand(switchCommand);
 program.addCommand(listCommand);
 program.addCommand(configCommand);
 program.addCommand(usageCommand);
+
+// Check for updates after each command (non-blocking)
+program.hook("postAction", () => {
+  checkForUpdate();
+});
 
 // Parse command line arguments
 program.parse();

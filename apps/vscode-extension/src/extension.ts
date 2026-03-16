@@ -18,6 +18,7 @@ import { ClipboardGuardService } from "./services/clipboardGuard";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
+import { VersionCheckService } from "./services/versionCheck";
 import { openUrlReliably } from "./utils/browser";
 import { initSentry, captureError, closeSentry } from "./utils/sentry";
 import { getDeviceInfo } from "./utils/device";
@@ -302,6 +303,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
     await updateContextFlags();
   }
+
+  // Check for extension updates (non-blocking)
+  const versionCheckService = new VersionCheckService(context);
+  versionCheckService.checkForUpdate();
 
   // Subscribe to real-time revocation events for UI updates
   realTimeSyncService.onRevocationDetected(({ project, reason }) => {
