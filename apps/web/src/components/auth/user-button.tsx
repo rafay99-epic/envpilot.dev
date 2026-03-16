@@ -82,11 +82,11 @@ export function UserButton() {
             </p>
             <p className="text-xs text-zinc-500">{user.email}</p>
             {organization && (
-              <p className="mt-1 text-xs text-zinc-500">{organization.name}</p>
+              <p className="mt-1 text-xs text-zinc-500 capitalize">{organization.name}</p>
             )}
             {user.role && (
-              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
-                {user.role}
+              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 capitalize">
+                {user.role === "team_lead" ? "Team Lead" : user.role}
               </span>
             )}
           </div>
