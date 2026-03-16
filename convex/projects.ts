@@ -694,7 +694,7 @@ export const move = mutation({
       throw new Error("You must be an admin in the source organization");
     }
 
-    // Verify caller is at least a member of target org
+    // Verify caller is admin in target org
     const targetMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -704,8 +704,8 @@ export const move = mutation({
       )
       .first();
 
-    if (!targetMembership) {
-      throw new Error("You must be a member of the target organization");
+    if (!targetMembership || targetMembership.role !== "admin") {
+      throw new Error("You must be an admin of the target organization");
     }
 
     // Tier check: both orgs must be pro

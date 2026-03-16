@@ -106,11 +106,15 @@ export const upsert = mutation({
 export const updateProfile = mutation({
   args: {
     userId: v.id("users"),
+    callerUserId: v.id("users"),
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, ...updates } = args;
+    if (args.callerUserId !== args.userId) {
+      throw new Error("You can only update your own profile");
+    }
+    const { userId, callerUserId: _caller, ...updates } = args;
 
     const user = await ctx.db.get(userId);
     if (!user) {
@@ -174,8 +178,11 @@ export const getOwnSessions = query({
 });
 
 export const revokeOwnSessions = mutation({
-  args: { userId: v.id("users") },
+  args: { userId: v.id("users"), callerUserId: v.id("users") },
   handler: async (ctx, args) => {
+    if (args.callerUserId !== args.userId) {
+      throw new Error("You can only revoke your own sessions");
+    }
     const now = Date.now();
     let count = 0;
 

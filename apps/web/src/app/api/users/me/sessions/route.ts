@@ -46,6 +46,7 @@ export async function DELETE() {
     const convexUser = await getOrCreateConvexUser(convex, user);
     const result = await convex.mutation(api.users.revokeOwnSessions, {
       userId: convexUser._id,
+      callerUserId: convexUser._id,
     });
 
     return NextResponse.json({ success: true, revoked: result.revoked });

@@ -77,9 +77,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     );
 
-    if (!targetMembership) {
+    if (!targetMembership || targetMembership.role !== "admin") {
       return NextResponse.json(
-        { error: "You must be a member of the target organization" },
+        { error: "You must be an admin of the target organization" },
         { status: 403 }
       );
     }

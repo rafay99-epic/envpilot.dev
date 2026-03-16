@@ -51,6 +51,7 @@ export const getByUserIdInternal = internalQuery({
 export const upsert = mutation({
   args: {
     userId: v.id("users"),
+    callerUserId: v.id("users"),
     emailNotifications: v.optional(
       v.object({
         variableChanges: v.boolean(),
@@ -61,6 +62,9 @@ export const upsert = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    if (args.callerUserId !== args.userId) {
+      throw new Error("You can only update your own preferences");
+    }
     const now = Date.now();
     const existing = await ctx.db
       .query("userPreferences")

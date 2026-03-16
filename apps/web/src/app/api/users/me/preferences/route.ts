@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest) {
 
     await convex.mutation(api.userPreferences.upsert, {
       userId: convexUser._id,
+      callerUserId: convexUser._id,
       emailNotifications: validation.data.emailNotifications,
     });
 

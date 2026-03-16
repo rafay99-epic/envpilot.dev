@@ -71,6 +71,7 @@ export async function PATCH(request: NextRequest) {
 
     await convex.mutation(api.users.updateProfile, {
       userId: convexUser._id,
+      callerUserId: convexUser._id,
       name,
     });
 
