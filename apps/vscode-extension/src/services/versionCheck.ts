@@ -29,8 +29,8 @@ export class VersionCheckService {
       const latestVersion = response.data?.extension;
       if (!latestVersion) return;
 
-      const currentVersion =
-        this.context.extension.packageJSON.version as string;
+      const currentVersion = this.context.extension.packageJSON
+        .version as string;
 
       if (latestVersion !== currentVersion) {
         const action = await vscode.window.showInformationMessage(
@@ -40,9 +40,7 @@ export class VersionCheckService {
 
         if (action === "Update") {
           vscode.env.openExternal(
-            vscode.Uri.parse(
-              "vscode:extension/envpilot.envpilot"
-            )
+            vscode.Uri.parse("vscode:extension/envpilot.envpilot")
           );
         }
       }
