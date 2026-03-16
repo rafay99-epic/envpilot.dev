@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 const MAX_AUTO_RETRIES = 2;
 
@@ -12,7 +12,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   const retryCount = useRef(0);
-  const [showError, setShowError] = useState(false);
+  const [retriesExhausted, markExhausted] = useReducer(() => true, false);
 
   useEffect(() => {
     console.error("Dashboard error:", error);
@@ -25,10 +25,13 @@ export default function DashboardError({
       return () => clearTimeout(timer);
     }
 
-    setShowError(true);
+    // All retries exhausted — schedule showing the error UI via a microtask
+    // to avoid synchronous setState within an effect body.
+    const timer = setTimeout(() => markExhausted(), 0);
+    return () => clearTimeout(timer);
   }, [error, reset]);
 
-  if (!showError) {
+  if (!retriesExhausted) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="font-mono text-sm text-zinc-500">

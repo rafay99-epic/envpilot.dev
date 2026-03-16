@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 const MAX_AUTO_RETRIES = 2;
 
@@ -13,7 +13,7 @@ export default function Error({
   reset: () => void;
 }) {
   const retryCount = useRef(0);
-  const [showError, setShowError] = useState(false);
+  const [retriesExhausted, markExhausted] = useReducer(() => true, false);
 
   useEffect(() => {
     console.error("Application error:", error);
@@ -26,10 +26,13 @@ export default function Error({
       return () => clearTimeout(timer);
     }
 
-    setShowError(true);
+    // All retries exhausted — schedule showing the error UI via a microtask
+    // to avoid synchronous setState within an effect body.
+    const timer = setTimeout(() => markExhausted(), 0);
+    return () => clearTimeout(timer);
   }, [error, reset]);
 
-  if (!showError) {
+  if (!retriesExhausted) {
     // Show a minimal loading state while auto-retrying
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
