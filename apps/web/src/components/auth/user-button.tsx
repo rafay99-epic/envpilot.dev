@@ -107,7 +107,7 @@ export function UserButton() {
               onClick={() => setIsOpen(false)}
             >
               <Settings className="h-4 w-4" />
-              Settings
+              Account Settings
             </Link>
           </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   Terminal,
+  ArrowLeft,
 } from "lucide-react";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 
@@ -26,46 +27,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
-  badge?: number;
 }
-
-const navItems: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Overview",
-    icon: <LayoutDashboard className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/projects",
-    label: "Projects",
-    icon: <FolderOpen className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/variables",
-    label: "Variables",
-    icon: <Key className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/team",
-    label: "Team",
-    icon: <Users className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/audit",
-    label: "Audit Logs",
-    icon: <ClipboardList className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/usage",
-    label: "Usage & Plan",
-    icon: <Gauge className="h-4 w-4" />,
-  },
-  {
-    href: "/dashboard/settings",
-    label: "Settings",
-    icon: <Settings className="h-4 w-4" />,
-  },
-];
 
 function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname();
@@ -86,41 +48,102 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
     >
       {item.icon}
       {item.label}
-      {item.badge != null && item.badge > 0 && (
-        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-xs font-medium text-amber-400">
-          {item.badge}
-        </span>
-      )}
     </Link>
   );
 }
 
 export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
   const { organization } = useAuthContext();
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
 
-  const orgRole = organization?.role;
-  const canReview = orgRole === "admin" || orgRole === "team_lead";
   const orgId = organization?.id as Id<"organizations"> | undefined;
-  const stats = useQuery(
-    api.dashboard.getStats,
-    orgId ? { organizationId: orgId } : "skip"
-  );
-  const pendingCount =
-    canReview && stats?.pendingRequests ? stats.pendingRequests.total : 0;
 
-  const navItemsWithBadges = useMemo(
-    () =>
-      navItems.map((item) =>
-        item.href === "/dashboard/variables" && pendingCount > 0
-          ? { ...item, badge: pendingCount }
-          : item
-      ),
-    [pendingCount]
+  // Detect project context from pathname
+  const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
+  const projectSlug =
+    projectSlugMatch?.[1] && projectSlugMatch[1] !== "new"
+      ? projectSlugMatch[1]
+      : null;
+  const isProjectContext = !!projectSlug;
+
+  // Fetch project name when in project context
+  const project = useQuery(
+    api.projects.getBySlug,
+    isProjectContext && orgId
+      ? { organizationId: orgId, slug: projectSlug! }
+      : "skip"
   );
+
+  // Org-level settings href
+  const orgSettingsHref = organization?.slug
+    ? `/organizations/${organization.slug}/settings`
+    : "/dashboard/settings";
+
+  // Org-level nav items
+  const orgNavItems: NavItem[] = [
+    {
+      href: "/dashboard",
+      label: "Overview",
+      icon: <LayoutDashboard className="h-4 w-4" />,
+    },
+    {
+      href: "/dashboard/projects",
+      label: "Projects",
+      icon: <FolderOpen className="h-4 w-4" />,
+    },
+    {
+      href: "/dashboard/team",
+      label: "Team",
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      href: "/dashboard/audit",
+      label: "Audit Logs",
+      icon: <ClipboardList className="h-4 w-4" />,
+    },
+    {
+      href: "/dashboard/usage",
+      label: "Usage & Plan",
+      icon: <Gauge className="h-4 w-4" />,
+    },
+    {
+      href: orgSettingsHref,
+      label: "Settings",
+      icon: <Settings className="h-4 w-4" />,
+    },
+  ];
+
+  // Project-level nav items
+  const projectNavItems: NavItem[] = projectSlug
+    ? [
+        {
+          href: `/dashboard/projects/${projectSlug}`,
+          label: "Overview",
+          icon: <LayoutDashboard className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}`,
+          label: "Variables",
+          icon: <Key className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/members`,
+          label: "Members",
+          icon: <Users className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/settings`,
+          label: "Settings",
+          icon: <Settings className="h-4 w-4" />,
+        },
+      ]
+    : [];
+
+  const activeNavItems = isProjectContext ? projectNavItems : orgNavItems;
 
   return (
     <>
@@ -147,10 +170,26 @@ export function DashboardNav() {
             />
           </div>
 
+          {/* Project Context Header */}
+          {isProjectContext && (
+            <div className="border-b border-zinc-800 px-3 py-2">
+              <Link
+                href="/dashboard/projects"
+                className="flex items-center gap-2 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to Projects</span>
+              </Link>
+              <p className="mt-1 truncate pl-[22px] text-sm font-medium text-zinc-100">
+                {project?.name || projectSlug}
+              </p>
+            </div>
+          )}
+
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-3">
-            {navItemsWithBadges.map((item) => (
-              <NavLink key={item.href} item={item} />
+            {activeNavItems.map((item) => (
+              <NavLink key={item.href + item.label} item={item} />
             ))}
           </nav>
 
@@ -201,11 +240,28 @@ export function DashboardNav() {
                 />
               </div>
 
+              {/* Project Context Header (Mobile) */}
+              {isProjectContext && (
+                <div className="border-b border-zinc-800 px-3 py-2">
+                  <Link
+                    href="/dashboard/projects"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>Back to Projects</span>
+                  </Link>
+                  <p className="mt-1 truncate pl-[22px] text-sm font-medium text-zinc-100">
+                    {project?.name || projectSlug}
+                  </p>
+                </div>
+              )}
+
               {/* Navigation */}
               <nav className="flex-1 space-y-1 p-3">
-                {navItemsWithBadges.map((item) => (
+                {activeNavItems.map((item) => (
                   <NavLink
-                    key={item.href}
+                    key={item.href + item.label}
                     item={item}
                     onClick={() => setIsMobileMenuOpen(false)}
                   />

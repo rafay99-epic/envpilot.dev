@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import {
   TerminalWindow,
   TerminalCard,
@@ -10,23 +9,19 @@ import {
   TerminalButton,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
-import { Plus, Shield, Check } from "lucide-react";
+import { Plus, Shield, Check, ExternalLink, Copy } from "lucide-react";
 
-type SettingsTab = "general" | "organization" | "integrations" | "security";
+type SettingsTab = "general" | "integrations" | "security";
 
 export default function SettingsPage() {
-  const { user, organization, hasPermission } = useAuthContext();
-  const canManageOrg = hasPermission(PERMISSIONS.ORG_ADMIN);
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
-  const tabs: { id: SettingsTab; label: string; requiresAdmin?: boolean }[] = [
+  const tabs: { id: SettingsTab; label: string }[] = [
     { id: "general", label: "General" },
-    { id: "organization", label: "Organization", requiresAdmin: true },
     { id: "integrations", label: "Integrations" },
     { id: "security", label: "Security" },
   ];
-
-  const filteredTabs = tabs.filter((tab) => !tab.requiresAdmin || canManageOrg);
 
   return (
     <div className="space-y-6">
@@ -34,14 +29,14 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl font-bold text-zinc-100">Settings</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Manage your account and organization preferences
+          Manage your account preferences
         </p>
       </div>
 
       {/* Tabs */}
       <div className="border-b border-zinc-800">
         <nav className="-mb-px flex space-x-6">
-          {filteredTabs.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -60,9 +55,6 @@ export default function SettingsPage() {
       {/* Tab Content */}
       <div className="max-w-2xl">
         {activeTab === "general" && <GeneralSettings user={user} />}
-        {activeTab === "organization" && (
-          <OrganizationSettings organization={organization} />
-        )}
         {activeTab === "integrations" && <IntegrationsSettings />}
         {activeTab === "security" && <SecuritySettings />}
       </div>
@@ -150,91 +142,6 @@ function GeneralSettings({
   );
 }
 
-function OrganizationSettings({
-  organization,
-}: {
-  organization: { name: string; slug: string | null } | null;
-}) {
-  const [name, setName] = useState(organization?.name || "");
-  const [slug, setSlug] = useState(organization?.slug || "");
-
-  return (
-    <div className="space-y-6">
-      <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
-          Organization Details
-        </h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage your organization settings
-        </p>
-
-        <div className="mt-6 space-y-4">
-          <div>
-            <label
-              htmlFor="orgName"
-              className="block text-sm font-medium text-zinc-300"
-            >
-              Organization Name
-            </label>
-            <TerminalInput
-              type="text"
-              id="orgName"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="orgSlug"
-              className="block text-sm font-medium text-zinc-300"
-            >
-              Organization URL
-            </label>
-            <div className="mt-1 flex rounded-lg border border-zinc-700 overflow-hidden">
-              <span className="flex items-center border-r border-zinc-700 bg-zinc-800 px-3 text-sm text-zinc-500">
-                envpilot.dev/
-              </span>
-              <input
-                type="text"
-                id="orgSlug"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="w-full bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <TerminalButton>Save Changes</TerminalButton>
-        </div>
-      </TerminalCard>
-
-      {/* Danger Zone */}
-      <div className="rounded-lg border border-red-500/30 bg-zinc-900/90 p-6">
-        <h2 className="text-base font-semibold text-red-400">Danger Zone</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Irreversible actions for your organization
-        </p>
-
-        <div className="mt-6 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 p-4">
-          <div>
-            <p className="text-sm font-medium text-zinc-100">
-              Delete Organization
-            </p>
-            <p className="text-sm text-zinc-500">
-              Permanently delete this organization and all its data
-            </p>
-          </div>
-          <TerminalButton variant="danger">Delete</TerminalButton>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function IntegrationsSettings() {
   return (
     <div className="space-y-6" id="integrations">
@@ -256,6 +163,7 @@ function IntegrationsSettings() {
               </svg>
             }
             installed={false}
+            href="https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot"
           />
           <IntegrationCard
             name="Cursor Extension"
@@ -271,19 +179,25 @@ function IntegrationsSettings() {
       </TerminalCard>
 
       <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">CLI Tool</h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage variables from your terminal
-        </p>
-
-        <TerminalWindow title="terminal" className="mt-6">
-          <div className="p-4 font-mono text-sm">
-            <code className="text-green-400">
-              <span className="text-zinc-500">$</span> npm install -g
-              @envpilot/cli
-            </code>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100">CLI Tool</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Manage variables from your terminal
+            </p>
           </div>
-        </TerminalWindow>
+          <a
+            href="https://www.npmjs.com/package/@envpilot/cli"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+          >
+            View on npm
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+
+        <CliInstallCommand />
       </TerminalCard>
     </div>
   );
@@ -294,12 +208,32 @@ function IntegrationCard({
   description,
   icon,
   installed,
+  href,
 }: {
   name: string;
   description: string;
   icon: React.ReactNode;
   installed: boolean;
+  href?: string;
 }) {
+  const button = installed ? (
+    <TerminalButton variant="secondary">
+      <Check className="h-3 w-3" /> Installed
+    </TerminalButton>
+  ) : href ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+    >
+      Install
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  ) : (
+    <TerminalButton>Install</TerminalButton>
+  );
+
   return (
     <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
       <div className="flex items-center gap-4">
@@ -309,16 +243,46 @@ function IntegrationCard({
           <p className="text-xs text-zinc-500">{description}</p>
         </div>
       </div>
-      <TerminalButton variant={installed ? "secondary" : "primary"}>
-        {installed ? (
-          <>
-            <Check className="h-3 w-3" /> Installed
-          </>
-        ) : (
-          "Install"
-        )}
-      </TerminalButton>
+      {button}
     </div>
+  );
+}
+
+function CliInstallCommand() {
+  const [copied, setCopied] = useState(false);
+  const command = "npm install -g @envpilot/cli";
+
+  function handleCopy() {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <TerminalWindow title="terminal" className="mt-6">
+      <div className="flex items-center justify-between p-4 font-mono text-sm">
+        <code className="text-green-400">
+          <span className="text-zinc-500">$</span> {command}
+        </code>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-green-400" />
+              <span className="text-green-400">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+    </TerminalWindow>
   );
 }
 
