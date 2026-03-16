@@ -1,4 +1,7 @@
 import { Resend } from "resend";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 const RAW_FROM_EMAIL = process.env.FROM_EMAIL || "noreply@invite.envpilot.dev";
 const FROM_EMAIL = RAW_FROM_EMAIL.includes("<")
@@ -660,5 +663,37 @@ The project and all its environment variables are now available in your organiza
       success: false,
       error: err instanceof Error ? err.message : "Failed to send email",
     };
+  }
+}
+
+// ============================================================
+// Notification Preference Helper
+// ============================================================
+
+type NotificationType =
+  | "variableChanges"
+  | "memberUpdates"
+  | "accessRequests"
+  | "securityAlerts";
+
+/**
+ * Check if a user has opted in to a specific notification type.
+ * Returns true by default (opt-in) if no preferences are saved.
+ * Non-blocking — returns true on any error to avoid suppressing notifications.
+ */
+export async function shouldSendNotification(
+  convexClient: ConvexHttpClient,
+  userId: Id<"users">,
+  eventType: NotificationType
+): Promise<boolean> {
+  try {
+    const prefs = await convexClient.query(api.userPreferences.getByUserId, {
+      userId,
+    });
+
+    if (!prefs?.emailNotifications) return true;
+    return prefs.emailNotifications[eventType] ?? true;
+  } catch {
+    return true;
   }
 }

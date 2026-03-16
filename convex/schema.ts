@@ -28,6 +28,25 @@ export default defineSchema({
     .index("by_email", ["email"]),
 
   // ==========================================
+  // USER PREFERENCES
+  // ==========================================
+  userPreferences: defineTable({
+    // Reference to the user
+    userId: v.id("users"),
+    // Email notification preferences
+    emailNotifications: v.optional(
+      v.object({
+        variableChanges: v.boolean(),
+        memberUpdates: v.boolean(),
+        accessRequests: v.boolean(),
+        securityAlerts: v.boolean(),
+      })
+    ),
+    // Last updated
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // ==========================================
   // ORGANIZATIONS
   // ==========================================
   organizations: defineTable({
