@@ -28,8 +28,8 @@ env:
   RESEND_API_KEY: re_placeholder
 
 jobs:
-  app:
-    name: App (Type/Lint/Build)
+  check:
+    name: Lint / Typecheck / Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,71 +38,18 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        run: bunx turbo typecheck --filter=@envpilot/web
-
-      - name: Lint
-        run: bunx turbo lint --filter=@envpilot/web
-
-      - name: Build
-        run: bunx turbo build --filter=@envpilot/web
-
-  cli:
-    name: CLI (Lint/Build)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint
-        run: bunx turbo lint --filter=@envpilot/cli
-
-      - name: Build
-        run: bunx turbo build --filter=@envpilot/cli
-
-  extension:
-    name: VS Code Extension (Type/Lint/Compile)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        run: bunx turbo typecheck --filter=envpilot
-
-      - name: Lint
-        run: bunx turbo lint --filter=envpilot
-
-      - name: Build
-        run: bunx turbo build --filter=envpilot
-
-  format:
-    name: Format Check (Prettier)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - name: Lint, typecheck & build (all packages)
+        run: bunx turbo lint typecheck build
 
       - name: Prettier check
         run: bunx prettier --check .
@@ -116,6 +63,13 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
