@@ -298,12 +298,27 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const { userId: targetUserId, role } = validation.data;
 
+    // Get target user info before updating
+    const targetUser = await convex.query(api.users.getById, {
+      userId: targetUserId as Id<"users">,
+    });
+
     await convex.mutation(api.organizations.updateMemberRole, {
       organizationId,
       userId: targetUserId as Id<"users">,
       newRole: role,
       updatedBy: convexUser._id,
     });
+
+    // Notify org members about the role change (non-blocking)
+    const roleDisplay = role === "team_lead" ? "Team Lead" : role.charAt(0).toUpperCase() + role.slice(1);
+    notifyMemberUpdate(
+      targetUserId as Id<"users">,
+      targetUser?.name || targetUser?.email || "A member",
+      organizationId,
+      "role_changed",
+      roleDisplay
+    );
 
     return NextResponse.json({ updated: true });
   } catch (error) {
@@ -377,11 +392,24 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       }
     }
 
+    // Get target user info before removing
+    const targetUser = await convex.query(api.users.getById, {
+      userId: targetUserId,
+    });
+
     await convex.mutation(api.organizations.removeMember, {
       organizationId,
       userId: targetUserId,
       removedBy: convexUser._id,
     });
+
+    // Notify org members about the removal (non-blocking)
+    notifyMemberUpdate(
+      targetUserId,
+      targetUser?.name || targetUser?.email || "A member",
+      organizationId,
+      "removed"
+    );
 
     return NextResponse.json({ removed: true });
   } catch (error) {
@@ -390,5 +418,40 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       { error: "Failed to remove member" },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Notify org members about a team change (non-blocking).
+ */
+async function notifyMemberUpdate(
+  subjectUserId: Id<"users">,
+  memberName: string,
+  organizationId: Id<"organizations">,
+  updateType: "added" | "removed" | "role_changed",
+  role?: string
+) {
+  try {
+    const org = await convex.query(api.organizations.getById, { organizationId });
+    const members = await convex.query(api.organizations.getMembers, { organizationId });
+    const orgName = org?.name || "Unknown organization";
+
+    for (const member of members) {
+      if (!member?.user?.email || member.user._id === subjectUserId) continue;
+      convex
+        .action(api.emails.sendMemberUpdateEmail, {
+          userId: member.user._id,
+          to: member.user.email,
+          organizationName: orgName,
+          memberName,
+          updateType,
+          role,
+        })
+        .catch((err: unknown) =>
+          console.warn("[EMAIL] Member update notification failed:", err)
+        );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] Error sending member update notifications:", err);
   }
 }
