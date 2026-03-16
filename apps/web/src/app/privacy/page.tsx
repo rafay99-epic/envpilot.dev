@@ -742,9 +742,29 @@ export default function PrivacyPolicyPage() {
                 Contact
               </Link>
             </div>
-            <p className="text-xs text-zinc-700">
-              &copy; {new Date().getFullYear()} Envpilot
-            </p>
+            <div className="text-right text-xs text-zinc-700">
+              <p>&copy; {new Date().getFullYear()} Envpilot</p>
+              <p className="text-[10px] text-zinc-800">
+                Built at{" "}
+                <a
+                  href="https://syntaxlabtechnology.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-zinc-500"
+                >
+                  Syntax Lab Technology
+                </a>
+                {" "}&middot;{" "}
+                <a
+                  href="https://rafay99.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-zinc-500"
+                >
+                  Abdul Rafay
+                </a>
+              </p>
+            </div>
           </div>
         </div>
       </footer>
