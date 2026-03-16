@@ -124,6 +124,7 @@ export const create = mutation({
     logoUrl: v.optional(v.string()),
     createdBy: v.id("users"),
     workosOrgId: v.optional(v.string()),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Rate limit: prevent excessive org creation
@@ -133,6 +134,7 @@ export const create = mutation({
     });
 
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Check organization creation limits based on user's tier
     const userMemberships = await ctx.db
@@ -152,7 +154,7 @@ export const create = mutation({
     }
 
     const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = getTierLimits(effectiveTier);
+    const limits = getTierLimits(effectiveTier, enforce);
 
     if (limits.maxOrganizations !== null) {
       if (userMemberships.length >= limits.maxOrganizations) {
@@ -299,7 +301,7 @@ export const updateTier = mutation({
 });
 
 /**
- * Delete an organization
+ * Delete an organization with full cascade cleanup
  */
 export const remove = mutation({
   args: {
@@ -308,7 +310,9 @@ export const remove = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
+    // Audit log first (before deleting)
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
       userId: args.deletedBy,
@@ -316,17 +320,144 @@ export const remove = mutation({
       createdAt: now,
     });
 
+    // Fetch ALL projects (including soft-deleted)
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+
+    for (const project of projects) {
+      // Soft-delete variables
+      const variables = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect();
+
+      for (const variable of variables) {
+        await ctx.db.patch(variable._id, { deletedAt: now, updatedAt: now });
+
+        // Delete variable versions
+        const versions = await ctx.db
+          .query("variableVersions")
+          .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+          .collect();
+        for (const version of versions) {
+          await ctx.db.delete(version._id);
+        }
+
+        // Deactivate variable permissions
+        const permissions = await ctx.db
+          .query("variablePermissions")
+          .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+          .filter((q) => q.eq(q.field("isActive"), true))
+          .collect();
+        for (const perm of permissions) {
+          await ctx.db.patch(perm._id, {
+            isActive: false,
+            revokedAt: now,
+            revokedBy: args.deletedBy,
+          });
+        }
+      }
+
+      // Delete project members
+      const projectMembers = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .collect();
+      for (const pm of projectMembers) {
+        await ctx.db.delete(pm._id);
+      }
+
+      // Revoke project access tokens
+      const accessTokens = await ctx.db
+        .query("projectAccess")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      for (const token of accessTokens) {
+        await ctx.db.patch(token._id, { isActive: false });
+        await ctx.db.insert("permissionRevocationEvents", {
+          accessToken: token.accessToken,
+          projectId: project._id,
+          userId: token.userId,
+          reason: "Organization deleted",
+          revokedBy: args.deletedBy,
+          revokedAt: now,
+          acknowledged: false,
+          expiresAt: revocationExpiresAt,
+        });
+      }
+
+      // Cancel pending variable requests
+      const pendingRequests = await ctx.db
+        .query("environmentVariableRequests")
+        .withIndex("by_project_and_status", (q) =>
+          q.eq("projectId", project._id).eq("status", "pending")
+        )
+        .collect();
+      for (const req of pendingRequests) {
+        await ctx.db.patch(req._id, {
+          status: "canceled",
+          reviewReason: "Organization deleted",
+          reviewedBy: args.deletedBy,
+          reviewedAt: now,
+          updatedAt: now,
+        });
+      }
+
+      // Delete the project record
+      await ctx.db.delete(project._id);
+    }
+
+    // Delete invitations
+    const invitations = await ctx.db
+      .query("invitations")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    for (const inv of invitations) {
+      await ctx.db.delete(inv._id);
+    }
+
+    // Delete subscriptions
+    const subscriptions = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    for (const sub of subscriptions) {
+      await ctx.db.delete(sub._id);
+    }
+
+    // Delete stripe customers
+    const stripeCustomers = await ctx.db
+      .query("stripeCustomers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    for (const sc of stripeCustomers) {
+      await ctx.db.delete(sc._id);
+    }
+
+    // Delete org members
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
       .collect();
-
     for (const member of members) {
       await ctx.db.delete(member._id);
     }
 
+    // Delete the organization
     await ctx.db.delete(args.organizationId);
 
     return args.organizationId;
@@ -346,9 +477,11 @@ export const addMember = mutation({
       v.literal("member")
     ),
     invitedBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Check tier limits for adding team members
     const org = await ctx.db.get(args.organizationId);
@@ -356,7 +489,7 @@ export const addMember = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
     if (limits.maxTeamMembers !== null) {
       const currentMembers = await ctx.db
         .query("organizationMembers")
@@ -998,5 +1131,105 @@ export const revokeAllMemberSessions = mutation({
       revokedCliTokens: revokedCliCount,
       revokedExtensionSessions: revokedExtensionCount,
     };
+  },
+});
+
+/**
+ * Transfer organization ownership to another user.
+ * All members, projects, variables, and settings remain intact.
+ * Only the owner (createdBy) changes and the new owner gets admin role.
+ */
+export const transferOwnership = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    targetUserId: v.id("users"),
+    transferredBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
+
+    const org = await ctx.db.get(args.organizationId);
+    if (!org) {
+      throw new Error("Organization not found");
+    }
+
+    // Verify caller is admin
+    const callerMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.transferredBy)
+      )
+      .first();
+
+    if (!callerMembership || callerMembership.role !== "admin") {
+      throw new Error("Only admins can transfer organization ownership");
+    }
+
+    // Verify target user exists
+    const targetUser = await ctx.db.get(args.targetUserId);
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
+    // Cannot transfer to yourself
+    if (args.targetUserId === args.transferredBy) {
+      throw new Error("Cannot transfer ownership to yourself");
+    }
+
+    // Tier check
+    const limits = getTierLimits(org.tier, enforce);
+    if (limits.maxProjects !== null && org.tier !== "pro") {
+      throw new Error(
+        "Organization must be on the Pro plan to transfer ownership"
+      );
+    }
+
+    // Add or promote target user to admin
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.targetUserId)
+      )
+      .first();
+
+    if (targetMembership) {
+      await ctx.db.patch(targetMembership._id, { role: "admin" });
+    } else {
+      await ctx.db.insert("organizationMembers", {
+        organizationId: args.organizationId,
+        userId: args.targetUserId,
+        role: "admin",
+        joinedAt: now,
+        invitedBy: args.transferredBy,
+      });
+    }
+
+    // Remove previous owner from the organization
+    await ctx.db.delete(callerMembership._id);
+
+    // Update org creator
+    await ctx.db.patch(args.organizationId, {
+      createdBy: args.targetUserId,
+    });
+
+    // Audit log
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.transferredBy,
+      action: "org.transferred",
+      details: JSON.stringify({
+        transferredFrom: args.transferredBy,
+        transferredTo: args.targetUserId,
+      }),
+      createdAt: now,
+    });
+
+    return args.organizationId;
   },
 });

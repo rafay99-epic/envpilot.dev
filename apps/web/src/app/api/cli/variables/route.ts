@@ -9,6 +9,7 @@ import {
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import { z } from "zod";
+import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const createVariableSchema = z.object({
   projectId: z.string().min(1),
@@ -271,6 +272,7 @@ export async function POST(request: NextRequest) {
       projectId: projectId as Id<"projects">,
       isSensitive: isSensitive ?? false,
       createdBy: authResult.userId,
+      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     return NextResponse.json({

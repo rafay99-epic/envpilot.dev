@@ -11,6 +11,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
+import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -166,6 +167,15 @@ export async function POST(request: Request) {
         requestedBy: convexUser._id,
       });
 
+      // Notify admins/team leads about the access request (non-blocking)
+      notifyAccessRequest(
+        convexUser._id,
+        convexUser.name || convexUser.email || "A team member",
+        key,
+        projectId as Id<"projects">,
+        organizationId
+      );
+
       return NextResponse.json(
         {
           requested: true,
@@ -184,9 +194,20 @@ export async function POST(request: Request) {
       projectId: projectId as Id<"projects">,
       isSensitive,
       createdBy: convexUser._id,
+      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const variable = await convex.query(api.variables.getById, { variableId });
+
+    // Notify project members about variable creation (non-blocking)
+    notifyVariableChange(
+      convexUser._id,
+      key,
+      projectId as Id<"projects">,
+      organizationId,
+      convexUser.name || convexUser.email || "A team member",
+      "created"
+    );
 
     return NextResponse.json({ variable }, { status: 201 });
   } catch (error) {
@@ -200,5 +221,89 @@ export async function POST(request: Request) {
     }
 
     return handleApiError(error, "Failed to create variable");
+  }
+}
+
+/**
+ * Send variable change notification emails to project members (non-blocking).
+ * Fires and forgets — errors are logged but never thrown.
+ */
+async function notifyVariableChange(
+  changerUserId: Id<"users">,
+  variableName: string,
+  projectId: Id<"projects">,
+  organizationId: Id<"organizations">,
+  changedByName: string,
+  changeType: "created" | "updated" | "deleted"
+) {
+  try {
+    const project = await convex.query(api.projects.getById, { projectId });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
+
+    const projectName = project?.name || "Unknown project";
+
+    for (const member of members) {
+      if (!member?.user?.email || member.user._id === changerUserId) continue;
+      convex
+        .action(api.emails.sendVariableChangeEmail, {
+          userId: member.user._id,
+          to: member.user.email,
+          variableName,
+          projectName,
+          changedByName,
+          changeType,
+        })
+        .catch((err: unknown) =>
+          console.warn("[EMAIL] Variable notification failed:", err)
+        );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] Error sending variable notifications:", err);
+  }
+}
+
+/**
+ * Send access request notification emails to admins/team leads (non-blocking).
+ */
+async function notifyAccessRequest(
+  requesterUserId: Id<"users">,
+  requesterName: string,
+  variableName: string,
+  projectId: Id<"projects">,
+  organizationId: Id<"organizations">
+) {
+  try {
+    const project = await convex.query(api.projects.getById, { projectId });
+    const org = await convex.query(api.organizations.getById, {
+      organizationId,
+    });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
+
+    const projectName = project?.name || "Unknown project";
+    const orgName = org?.name || "Unknown organization";
+
+    for (const member of members) {
+      if (!member?.user?.email || member.user._id === requesterUserId) continue;
+      if (member.role !== "admin" && member.role !== "team_lead") continue;
+
+      convex
+        .action(api.emails.sendAccessRequestEmail, {
+          userId: member.user._id,
+          to: member.user.email,
+          requesterName,
+          variableName,
+          projectName,
+          organizationName: orgName,
+        })
+        .catch((err: unknown) =>
+          console.warn("[EMAIL] Access request notification failed:", err)
+        );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] Error sending access request notifications:", err);
   }
 }

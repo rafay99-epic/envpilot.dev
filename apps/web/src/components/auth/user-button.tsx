@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuthContext } from "./auth-provider";
 import { LogOut, LayoutDashboard, Settings } from "lucide-react";
 
-export function UserButton() {
+export function UserButton({ collapsed }: { collapsed?: boolean }) {
   const { user, organization, isImpersonating, impersonator, signOut } =
     useAuthContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -50,31 +50,38 @@ export function UserButton() {
       {/* User Avatar Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-zinc-800"
+        className={`flex w-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-zinc-800 ${collapsed ? "justify-center" : ""}`}
         aria-label="User menu"
+        title={collapsed ? `${user.firstName} ${user.lastName}` : undefined}
       >
         {user.profilePictureUrl ? (
           <img
             src={user.profilePictureUrl}
             alt={`${user.firstName ?? "User"}'s avatar`}
-            className="h-8 w-8 rounded-full object-cover ring-2 ring-zinc-700"
+            className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-zinc-700"
           />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10 text-sm font-medium text-green-400 ring-2 ring-zinc-700">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500/10 text-sm font-medium text-green-400 ring-2 ring-zinc-700">
             {initials}
           </div>
         )}
-        <div className="min-w-0 flex-1 text-left">
-          <p className="truncate text-sm font-medium text-zinc-200">
-            {user.firstName} {user.lastName}
-          </p>
-          <p className="truncate text-xs text-zinc-500">{user.email}</p>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1 text-left">
+            <p className="truncate text-sm font-medium text-zinc-200">
+              {user.firstName} {user.lastName}
+            </p>
+            <p className="truncate text-xs text-zinc-500">{user.email}</p>
+          </div>
+        )}
       </button>
 
-      {/* Dropdown Menu — opens upward */}
+      {/* Dropdown Menu — opens upward in sidebar, downward when collapsed (mobile header) */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-64 overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900 shadow-2xl">
+        <div
+          className={`absolute z-50 w-64 overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900 shadow-2xl ${
+            collapsed ? "right-0 top-full mt-2" : "bottom-full left-0 mb-2"
+          }`}
+        >
           {/* User Info */}
           <div className="border-b border-zinc-700/50 px-4 py-3">
             <p className="text-sm font-medium text-zinc-100">
@@ -82,11 +89,13 @@ export function UserButton() {
             </p>
             <p className="text-xs text-zinc-500">{user.email}</p>
             {organization && (
-              <p className="mt-1 text-xs text-zinc-500">{organization.name}</p>
+              <p className="mt-1 text-xs text-zinc-500 capitalize">
+                {organization.name}
+              </p>
             )}
             {user.role && (
-              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
-                {user.role}
+              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 capitalize">
+                {user.role === "team_lead" ? "Team Lead" : user.role}
               </span>
             )}
           </div>
@@ -107,7 +116,7 @@ export function UserButton() {
               onClick={() => setIsOpen(false)}
             >
               <Settings className="h-4 w-4" />
-              Settings
+              Account Settings
             </Link>
           </div>
 

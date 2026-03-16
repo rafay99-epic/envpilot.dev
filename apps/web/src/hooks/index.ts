@@ -85,6 +85,9 @@ export {
   type TierAction,
 } from "./useTierLimits";
 
+// Global search hook
+export { useGlobalSearch } from "./useGlobalSearch";
+
 // Pagination hook
 export { usePagination } from "./usePagination";
 

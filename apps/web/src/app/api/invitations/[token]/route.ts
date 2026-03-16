@@ -2,6 +2,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
@@ -114,6 +115,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
       organizationId,
     });
 
+    // Notify existing org members about the new member (non-blocking)
+    notifyMemberUpdate(
+      convexUser._id,
+      convexUser.name || convexUser.email || "A new member",
+      organizationId,
+      "added"
+    );
+
     const response = NextResponse.json({
       accepted: true,
       organization,
@@ -185,5 +194,44 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       error instanceof Error ? error.message : "Failed to decline invitation";
 
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/**
+ * Notify org members about a team change (non-blocking).
+ */
+async function notifyMemberUpdate(
+  subjectUserId: Id<"users">,
+  memberName: string,
+  organizationId: Id<"organizations">,
+  updateType: "added" | "removed" | "role_changed",
+  role?: string
+) {
+  try {
+    const org = await convex.query(api.organizations.getById, {
+      organizationId,
+    });
+    const members = await convex.query(api.organizations.getMembers, {
+      organizationId,
+    });
+    const orgName = org?.name || "Unknown organization";
+
+    for (const member of members) {
+      if (!member?.user?.email || member.user._id === subjectUserId) continue;
+      convex
+        .action(api.emails.sendMemberUpdateEmail, {
+          userId: member.user._id,
+          to: member.user.email,
+          organizationName: orgName,
+          memberName,
+          updateType,
+          role,
+        })
+        .catch((err: unknown) =>
+          console.warn("[EMAIL] Member update notification failed:", err)
+        );
+    }
+  } catch (err) {
+    console.warn("[EMAIL] Error sending member update notifications:", err);
   }
 }

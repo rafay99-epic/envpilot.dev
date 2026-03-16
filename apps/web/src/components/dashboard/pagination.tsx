@@ -55,7 +55,7 @@ export function Pagination({
             <button
               key={page}
               onClick={() => onGoToPage(page as number)}
-              className={`min-w-[28px] rounded-md px-2 py-1 font-mono text-xs transition-colors ${
+              className={`min-w-7 rounded-md px-2 py-1 font-mono text-xs transition-colors ${
                 page === currentPage
                   ? "bg-green-500/15 text-green-400 border border-green-500/30"
                   : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"

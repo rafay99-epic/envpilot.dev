@@ -130,7 +130,7 @@ export const getOrganizationUsage = query({
   handler: async (ctx, args) => {
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
-      throw new Error("Organization not found");
+      return null;
     }
 
     // Parallel fetch: projects, members, pending invitations

@@ -64,6 +64,27 @@ export async function GET(_request: Request, { params }: RouteParams) {
       projectId: id as Id<"projects">,
     });
 
+    // Fetch org admins who have implicit access to all projects
+    const orgMembers = await convex.query(api.organizations.getMembers, {
+      organizationId: project.organizationId,
+    });
+    const adminMembers = (orgMembers ?? [])
+      .filter(
+        (m): m is NonNullable<typeof m> => m != null && m.role === "admin"
+      )
+      .map((m) => ({
+        _id: `admin_${m.userId}`,
+        projectId: id,
+        userId: m.userId,
+        role: "admin" as const,
+        addedAt: m.joinedAt,
+        user: m.user,
+        isOrgAdmin: true,
+      }));
+
+    // Combine: org admins first, then explicit project members
+    const allMembers = [...adminMembers, ...members];
+
     // Also get assignable members if user can manage
     let assignableMembers = null;
     if (membership.role === "admin" || membership.role === "team_lead") {
@@ -94,7 +115,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       }
     }
 
-    return NextResponse.json({ members, assignableMembers });
+    return NextResponse.json({ members: allMembers, assignableMembers });
   } catch (error) {
     console.error("Error fetching project members:", error);
     return NextResponse.json(

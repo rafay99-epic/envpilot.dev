@@ -8,7 +8,7 @@ import { z } from "zod";
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
- * GET /api/users/me - Get current user's Convex ID and details
+ * GET /api/users/me/preferences - Get current user's preferences
  */
 export async function GET() {
   try {
@@ -18,33 +18,34 @@ export async function GET() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get or create the Convex user
     const convexUser = await getOrCreateConvexUser(convex, user);
-
-    return NextResponse.json({
-      convexUserId: convexUser._id,
-      workosId: user.id,
-      email: convexUser.email,
-      name: convexUser.name,
-      avatarUrl: convexUser.avatarUrl,
-      createdAt: user.createdAt,
+    const preferences = await convex.query(api.userPreferences.getByUserId, {
+      userId: convexUser._id,
     });
+
+    return NextResponse.json(preferences);
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.error("Error fetching preferences:", error);
     return NextResponse.json(
-      { error: "Failed to fetch user" },
+      { error: "Failed to fetch preferences" },
       { status: 500 }
     );
   }
 }
 
-const profileSchema = z.object({
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
+const preferencesSchema = z.object({
+  emailNotifications: z
+    .object({
+      variableChanges: z.boolean(),
+      memberUpdates: z.boolean(),
+      accessRequests: z.boolean(),
+      securityAlerts: z.boolean(),
+    })
+    .optional(),
 });
 
 /**
- * PATCH /api/users/me - Update current user's profile
+ * PATCH /api/users/me/preferences - Update current user's preferences
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validation = profileSchema.safeParse(body);
+    const validation = preferencesSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -64,22 +65,19 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { firstName, lastName } = validation.data;
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const name = `${firstName} ${lastName}`.trim();
-
-    await convex.mutation(api.users.updateProfile, {
+    await convex.mutation(api.userPreferences.upsert, {
       userId: convexUser._id,
       callerUserId: convexUser._id,
-      name,
+      emailNotifications: validation.data.emailNotifications,
     });
 
-    return NextResponse.json({ success: true, name });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating profile:", error);
+    console.error("Error updating preferences:", error);
     return NextResponse.json(
-      { error: "Failed to update profile" },
+      { error: "Failed to update preferences" },
       { status: 500 }
     );
   }

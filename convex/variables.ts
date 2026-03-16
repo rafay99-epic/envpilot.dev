@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { getTierLimits, MAX_BULK_IMPORT_SIZE } from "./tierLimits";
 import {
   createAuditLog,
@@ -8,6 +9,7 @@ import {
   logSecurityEvent,
 } from "./auditHelpers";
 import { rateLimiter } from "./rateLimits";
+import { authorizeVariableAccess } from "./authHelpers";
 
 /**
  * Environment Variable Queries and Mutations
@@ -343,6 +345,208 @@ export const search = query({
   },
 });
 
+export const globalSearchWithAccess = query({
+  args: {
+    userId: v.id("users"),
+    searchTerm: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Validate user exists
+    const user = await ctx.db.get(args.userId);
+    if (!user) return [];
+
+    const searchLower = args.searchTerm.toLowerCase();
+    const results: Array<{
+      _id: string;
+      key: string;
+      description?: string;
+      environments?: string[];
+      isSensitive?: boolean;
+      projectId: string;
+      projectName: string;
+      projectSlug: string;
+      projectIcon?: string;
+      projectColor?: string;
+      organizationId: string;
+      organizationName: string;
+      organizationSlug: string;
+    }> = [];
+
+    // Get all org memberships for this user
+    const memberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    // Pre-fetch project memberships once (used for non-admin/non-team-lead roles)
+    const allProjectMemberships = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    // Group project memberships by org (resolved lazily)
+    const projectMembershipsByOrg = new Map<
+      string,
+      Array<{ projectId: Id<"projects">; role: string }>
+    >();
+    const resolvedProjects = new Map<
+      string,
+      {
+        _id: Id<"projects">;
+        name: string;
+        slug: string;
+        icon?: string;
+        color?: string;
+        organizationId: string;
+        deletedAt?: number;
+      }
+    >();
+
+    for (const pm of allProjectMemberships) {
+      if (!resolvedProjects.has(pm.projectId)) {
+        const project = await ctx.db.get(pm.projectId);
+        if (project) {
+          resolvedProjects.set(pm.projectId, {
+            _id: project._id,
+            name: project.name,
+            slug: project.slug,
+            icon: project.icon,
+            color: project.color,
+            organizationId: project.organizationId,
+            deletedAt: project.deletedAt,
+          });
+        }
+      }
+      const project = resolvedProjects.get(pm.projectId);
+      if (project && !project.deletedAt) {
+        const orgId = project.organizationId;
+        if (!projectMembershipsByOrg.has(orgId)) {
+          projectMembershipsByOrg.set(orgId, []);
+        }
+        projectMembershipsByOrg.get(orgId)!.push({
+          projectId: pm.projectId,
+          role: pm.role,
+        });
+      }
+    }
+
+    for (const membership of memberships) {
+      const org = await ctx.db.get(membership.organizationId);
+      if (!org) continue;
+
+      const isAdmin = membership.role === "admin";
+      const isTeamLead = membership.role === "team_lead";
+
+      // Get projects accessible to this user in this org
+      let projectsWithRole: Array<{
+        _id: Id<"projects">;
+        name: string;
+        slug: string;
+        icon?: string;
+        color?: string;
+        projectRole?: string;
+      }> = [];
+
+      if (isAdmin || isTeamLead) {
+        // Admins and team leads can see all projects
+        const projects = await ctx.db
+          .query("projects")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", membership.organizationId)
+          )
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect();
+        projectsWithRole = projects.map((p) => ({
+          _id: p._id,
+          name: p.name,
+          slug: p.slug,
+          icon: p.icon,
+          color: p.color,
+        }));
+      } else {
+        // Members: use pre-fetched project memberships
+        const orgPMs =
+          projectMembershipsByOrg.get(membership.organizationId) ?? [];
+        for (const pm of orgPMs) {
+          const project = resolvedProjects.get(pm.projectId);
+          if (project) {
+            projectsWithRole.push({
+              _id: project._id,
+              name: project.name,
+              slug: project.slug,
+              icon: project.icon,
+              color: project.color,
+              projectRole: pm.role,
+            });
+          }
+        }
+      }
+
+      for (const project of projectsWithRole) {
+        const variables = await ctx.db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect();
+
+        const matches = variables.filter(
+          (v) =>
+            v.key.toLowerCase().includes(searchLower) ||
+            v.description?.toLowerCase().includes(searchLower) ||
+            v.environments?.some((e) => e.toLowerCase().includes(searchLower))
+        );
+
+        for (const variable of matches) {
+          // RBAC: admins and team leads always have access
+          let hasAccess = isAdmin || isTeamLead;
+
+          if (!hasAccess) {
+            const role = project.projectRole;
+            if (role === "manager" || role === "developer") {
+              hasAccess = true;
+            } else if (role === "viewer") {
+              // Viewers need explicit per-variable permission
+              const perm = await ctx.db
+                .query("variablePermissions")
+                .withIndex("by_variable_and_user", (q) =>
+                  q.eq("variableId", variable._id).eq("userId", args.userId)
+                )
+                .filter((q) => q.eq(q.field("isActive"), true))
+                .first();
+              hasAccess =
+                !!perm && (!perm.expiresAt || perm.expiresAt > Date.now());
+            }
+          }
+
+          if (hasAccess) {
+            results.push({
+              _id: variable._id as string,
+              key: variable.key,
+              description: variable.description,
+              environments: variable.environments,
+              isSensitive: variable.isSensitive,
+              projectId: project._id as string,
+              projectName: project.name,
+              projectSlug: project.slug,
+              projectIcon: project.icon,
+              projectColor: project.color,
+              organizationId: org._id as string,
+              organizationName: org.name,
+              organizationSlug: org.slug,
+            });
+          }
+
+          if (results.length >= 50) break;
+        }
+        if (results.length >= 50) break;
+      }
+      if (results.length >= 50) break;
+    }
+
+    return results;
+  },
+});
+
 // ==========================================
 // MUTATIONS
 // ==========================================
@@ -356,14 +560,25 @@ export const create = mutation({
     projectId: v.id("projects"),
     isSensitive: v.optional(v.boolean()),
     createdBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: args.createdBy,
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager", "developer"],
+    });
 
     // Rate limit: prevent excessive variable creation
     await rateLimiter.limit(ctx, "variableCreate", {
@@ -377,7 +592,7 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
     if (limits.maxVariablesPerProject !== null) {
       const variableCount = await ctx.db
         .query("environmentVariables")
@@ -471,6 +686,15 @@ export const update = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: updatedBy,
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager", "developer"],
+    });
+
     const newVersion = variable.version + 1;
 
     const updateData: Record<string, unknown> = {
@@ -541,6 +765,15 @@ export const remove = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: args.deletedBy,
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager"],
+    });
+
     await ctx.db.patch(args.variableId, {
       deletedAt: now,
       updatedAt: now,
@@ -603,6 +836,15 @@ export const restore = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: args.restoredBy,
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager"],
+    });
+
     await ctx.db.patch(args.variableId, {
       deletedAt: undefined,
       updatedAt: now,
@@ -656,6 +898,14 @@ export const rollback = mutation({
     if (!project) {
       throw new Error("Project not found");
     }
+
+    // Authorization: admin only
+    await authorizeVariableAccess(ctx, {
+      userId: args.rolledBackBy,
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      requiredOrgRoles: ["admin"],
+    });
 
     const newVersion = variable.version + 1;
 
@@ -724,6 +974,15 @@ export const logAccess = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorization: any member with project access
+    await authorizeVariableAccess(ctx, {
+      userId: args.accessedBy,
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      requiredOrgRoles: ["admin", "team_lead", "member"],
+      requiredProjectRoles: ["manager", "developer", "viewer"],
+    });
+
     await logVariableAccess(ctx, {
       organizationId: project.organizationId,
       projectId: variable.projectId,
@@ -755,9 +1014,11 @@ export const bulkCreate = mutation({
       })
     ),
     createdBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Enforce maximum bulk import size to prevent DoS
     if (args.variables.length > MAX_BULK_IMPORT_SIZE) {
@@ -771,6 +1032,15 @@ export const bulkCreate = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: args.createdBy,
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager", "developer"],
+    });
+
     // Rate limit: bulk import is expensive
     await rateLimiter.limit(ctx, "bulkImport", {
       key: project.organizationId,
@@ -783,7 +1053,7 @@ export const bulkCreate = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
 
     // Check if bulk import is enabled for this tier
     if (!limits.bulkImportEnabled) {

@@ -106,11 +106,15 @@ export const upsert = mutation({
 export const updateProfile = mutation({
   args: {
     userId: v.id("users"),
+    callerUserId: v.id("users"),
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { userId, ...updates } = args;
+    if (args.callerUserId !== args.userId) {
+      throw new Error("You can only update your own profile");
+    }
+    const { userId, callerUserId: _caller, ...updates } = args;
 
     const user = await ctx.db.get(userId);
     if (!user) {
@@ -134,6 +138,77 @@ export const updateLastActive = mutation({
     await ctx.db.patch(args.userId, {
       lastActiveAt: Date.now(),
     });
+  },
+});
+
+export const getOwnSessions = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const cliTokens = await ctx.db
+      .query("cliTokens")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const extensionSessions = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    return {
+      cli: cliTokens.map((t) => ({
+        id: t._id,
+        type: "cli" as const,
+        deviceName: t.deviceName ?? "CLI",
+        lastUsedAt: t.lastUsedAt,
+        createdAt: t.createdAt,
+        expiresAt: t.expiresAt,
+      })),
+      extension: extensionSessions.map((s) => ({
+        id: s._id,
+        type: "extension" as const,
+        deviceName: s.deviceName ?? "VS Code Extension",
+        lastUsedAt: s.lastUsedAt,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+      })),
+    };
+  },
+});
+
+export const revokeOwnSessions = mutation({
+  args: { userId: v.id("users"), callerUserId: v.id("users") },
+  handler: async (ctx, args) => {
+    if (args.callerUserId !== args.userId) {
+      throw new Error("You can only revoke your own sessions");
+    }
+    const now = Date.now();
+    let count = 0;
+
+    const cliTokens = await ctx.db
+      .query("cliTokens")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    for (const token of cliTokens) {
+      await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
+      count++;
+    }
+
+    const extensionSessions = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    for (const session of extensionSessions) {
+      await ctx.db.patch(session._id, { isActive: false });
+      count++;
+    }
+
+    return { revoked: count };
   },
 });
 

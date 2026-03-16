@@ -44,6 +44,13 @@ export async function GET(request: Request) {
       organizationId: organizationId as Id<"organizations">,
     });
 
+    if (!usageData) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 }
+      );
+    }
+
     const enforcementEnabled = isTierEnforcementEnabled();
     const limits = getTierLimits(usageData.tier);
 

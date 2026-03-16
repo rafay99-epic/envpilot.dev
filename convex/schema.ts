@@ -28,6 +28,25 @@ export default defineSchema({
     .index("by_email", ["email"]),
 
   // ==========================================
+  // USER PREFERENCES
+  // ==========================================
+  userPreferences: defineTable({
+    // Reference to the user
+    userId: v.id("users"),
+    // Email notification preferences
+    emailNotifications: v.optional(
+      v.object({
+        variableChanges: v.boolean(),
+        memberUpdates: v.boolean(),
+        accessRequests: v.boolean(),
+        securityAlerts: v.boolean(),
+      })
+    ),
+    // Last updated
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // ==========================================
   // ORGANIZATIONS
   // ==========================================
   organizations: defineTable({
@@ -453,6 +472,7 @@ export default defineSchema({
       v.literal("org.member_added"),
       v.literal("org.member_removed"),
       v.literal("org.member_role_changed"),
+      v.literal("org.transferred"),
       // Project actions
       v.literal("project.created"),
       v.literal("project.updated"),
@@ -460,6 +480,7 @@ export default defineSchema({
       v.literal("project.member_added"),
       v.literal("project.member_removed"),
       v.literal("project.member_role_changed"),
+      v.literal("project.moved"),
       // Variable actions
       v.literal("variable.created"),
       v.literal("variable.updated"),
