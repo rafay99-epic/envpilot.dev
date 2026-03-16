@@ -3,7 +3,14 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import {
+  TerminalCard,
+  TerminalInput,
+  TerminalButton,
+  TerminalBadge,
+  TerminalButtonLink,
+  TerminalLoading,
+} from "@/components/dashboard/terminal-ui";
 
 interface Organization {
   _id: string;
@@ -17,6 +24,8 @@ interface Organization {
     teamLeadsCanCreateProjects: boolean;
   };
 }
+
+type OrgSettingsTab = "general" | "access" | "danger";
 
 export default function OrganizationSettingsPage({
   params,
@@ -45,6 +54,15 @@ export default function OrganizationSettingsPage({
   const [isTransferring, setIsTransferring] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [transferConfirmText, setTransferConfirmText] = useState("");
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<OrgSettingsTab>("general");
+
+  const tabs: { id: OrgSettingsTab; label: string }[] = [
+    { id: "general", label: "General" },
+    { id: "access", label: "Access Control" },
+    { id: "danger", label: "Danger Zone" },
+  ];
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -150,6 +168,39 @@ export default function OrganizationSettingsPage({
     }
   }
 
+  async function handleToggleAccess() {
+    const newValue = !teamLeadsCanCreateProjects;
+    setTeamLeadsCanCreateProjects(newValue);
+    setIsSavingSettings(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/organizations/${slug}/settings`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            settings: {
+              teamLeadsCanCreateProjects: newValue,
+            },
+          }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update settings");
+      }
+      setSuccessMessage("Access control settings updated");
+    } catch (err) {
+      setTeamLeadsCanCreateProjects(!newValue);
+      setError(
+        err instanceof Error ? err.message : "An error occurred"
+      );
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
   if (isLoading) {
     return <TerminalLoading />;
   }
@@ -157,15 +208,15 @@ export default function OrganizationSettingsPage({
   if (error && !organization) {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+        <TerminalCard className="border-red-500/30">
+          <p className="text-red-400">{error}</p>
           <Link
             href="/organizations"
-            className="mt-4 inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-red-400 hover:underline"
           >
             Back to Organizations
           </Link>
-        </div>
+        </TerminalCard>
       </div>
     );
   }
@@ -173,182 +224,245 @@ export default function OrganizationSettingsPage({
   if (organization?.role !== "admin") {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-900/20">
-          <h3 className="font-semibold text-amber-700 dark:text-amber-400">
-            Permission Denied
-          </h3>
-          <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+        <TerminalCard className="border-amber-500/30">
+          <h3 className="font-semibold text-amber-400">Permission Denied</h3>
+          <p className="mt-1 text-sm text-amber-400/80">
             Only organization admins can access settings.
           </p>
           <Link
             href={`/organizations/${slug}`}
-            className="mt-4 inline-flex items-center gap-1 text-sm text-amber-600 hover:underline dark:text-amber-400"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-amber-400 hover:underline"
           >
             Back to Organization
           </Link>
-        </div>
+        </TerminalCard>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <Link
-          href={`/organizations/${slug}`}
-          className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to {organization?.name}
-        </Link>
-        <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+        <h1 className="text-xl font-bold text-zinc-100">
           Organization Settings
         </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Manage your organization settings and preferences.
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-zinc-800">
+        <nav className="-mb-px flex space-x-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`border-b-2 py-3 text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "border-green-400 text-green-400"
+                  : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="max-w-2xl">
+        {activeTab === "general" && (
+          <GeneralOrgSettings
+            organization={organization!}
+            name={name}
+            setName={setName}
+            description={description}
+            setDescription={setDescription}
+            isSaving={isSaving}
+            handleSave={handleSave}
+            error={error}
+            successMessage={successMessage}
+          />
+        )}
+        {activeTab === "access" && (
+          <AccessControlSettings
+            teamLeadsCanCreateProjects={teamLeadsCanCreateProjects}
+            isSavingSettings={isSavingSettings}
+            onToggle={handleToggleAccess}
+          />
+        )}
+        {activeTab === "danger" && (
+          <DangerZoneSettings
+            organization={organization!}
+            transferEmail={transferEmail}
+            setTransferEmail={setTransferEmail}
+            showTransferConfirm={showTransferConfirm}
+            setShowTransferConfirm={setShowTransferConfirm}
+            transferConfirmText={transferConfirmText}
+            setTransferConfirmText={setTransferConfirmText}
+            isTransferring={isTransferring}
+            handleTransfer={handleTransfer}
+            showDeleteConfirm={showDeleteConfirm}
+            setShowDeleteConfirm={setShowDeleteConfirm}
+            deleteConfirmText={deleteConfirmText}
+            setDeleteConfirmText={setDeleteConfirmText}
+            isDeleting={isDeleting}
+            handleDelete={handleDelete}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// General Tab
+// ============================================================
+
+function GeneralOrgSettings({
+  organization,
+  name,
+  setName,
+  description,
+  setDescription,
+  isSaving,
+  handleSave,
+  error,
+  successMessage,
+}: {
+  organization: Organization;
+  name: string;
+  setName: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  isSaving: boolean;
+  handleSave: (e: React.FormEvent) => void;
+  error: string | null;
+  successMessage: string | null;
+}) {
+  return (
+    <div className="space-y-6">
       {successMessage && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-900/20">
-          <p className="text-sm text-green-600 dark:text-green-400">
-            {successMessage}
-          </p>
+        <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+          <p className="text-sm text-green-400">{successMessage}</p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
-      {/* General Settings */}
       <form onSubmit={handleSave}>
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            General
-          </h2>
-          <div className="mt-6 space-y-6">
+        <TerminalCard>
+          <h2 className="text-base font-semibold text-zinc-100">Profile</h2>
+          <div className="mt-6 space-y-4">
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-              >
+              <label className="block text-sm font-medium text-zinc-300">
                 Organization Name
               </label>
-              <input
+              <TerminalInput
                 type="text"
-                id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
                 maxLength={100}
-                className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                className="mt-1"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="slug"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-              >
+              <label className="block text-sm font-medium text-zinc-300">
                 URL Slug
               </label>
-              <input
+              <TerminalInput
                 type="text"
-                id="slug"
-                value={organization?.slug}
+                value={organization.slug}
                 disabled
-                className="mt-2 block w-full cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400"
+                className="mt-1 cursor-not-allowed opacity-50"
               />
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-zinc-600">
                 Slug cannot be changed after creation.
               </p>
             </div>
 
             <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-              >
+              <label className="block text-sm font-medium text-zinc-300">
                 Description
               </label>
               <textarea
-                id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 maxLength={500}
-                className="mt-2 block w-full resize-none rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                className="mt-1 w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
               />
             </div>
           </div>
 
           <div className="mt-6 flex justify-end">
-            <button
-              type="submit"
-              disabled={isSaving || !name}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
+            <TerminalButton type="submit" disabled={isSaving || !name}>
               {isSaving ? "Saving..." : "Save Changes"}
-            </button>
+            </TerminalButton>
           </div>
-        </div>
+        </TerminalCard>
       </form>
 
       {/* Plan Info */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Plan
-        </h2>
-        <div className="mt-4 flex items-center justify-between">
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">Plan</h2>
+        <div className="mt-4 flex items-start justify-between gap-4">
           <div>
-            <p className="font-medium text-zinc-900 dark:text-zinc-100">
+            <TerminalBadge color={organization.tier === "pro" ? "green" : "zinc"}>
               {organization.tier === "pro" ? "Pro Plan" : "Free Plan"}
-            </p>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              View your resource usage and available features on the Usage &
+            </TerminalBadge>
+            <p className="mt-2 text-sm text-zinc-500">
+              View your resource usage and available features on the Usage &amp;
               Plan page.
             </p>
           </div>
-          <a
-            href="/dashboard/usage"
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
+          <TerminalButtonLink href="/dashboard/usage" variant="secondary" className="shrink-0">
             View Usage
-          </a>
+          </TerminalButtonLink>
         </div>
-      </div>
+      </TerminalCard>
+    </div>
+  );
+}
 
-      {/* Access Control */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+// ============================================================
+// Access Control Tab
+// ============================================================
+
+function AccessControlSettings({
+  teamLeadsCanCreateProjects,
+  isSavingSettings,
+  onToggle,
+}: {
+  teamLeadsCanCreateProjects: boolean;
+  isSavingSettings: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">
           Access Control
         </h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Control what team leads can do in your organization.
         </p>
 
-        <div className="mt-6 space-y-4">
-          <label className="flex items-center justify-between">
+        <div className="mt-6">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              <p className="text-sm font-medium text-zinc-100">
                 Allow team leads to create projects
               </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-zinc-500">
                 When disabled, only admins can create new projects.
               </p>
             </div>
@@ -356,201 +470,203 @@ export default function OrganizationSettingsPage({
               type="button"
               role="switch"
               aria-checked={teamLeadsCanCreateProjects}
-              onClick={async () => {
-                const newValue = !teamLeadsCanCreateProjects;
-                setTeamLeadsCanCreateProjects(newValue);
-                setIsSavingSettings(true);
-                setError(null);
-                try {
-                  const response = await fetch(
-                    `/api/organizations/${slug}/settings`,
-                    {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        settings: {
-                          teamLeadsCanCreateProjects: newValue,
-                        },
-                      }),
-                    }
-                  );
-                  if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || "Failed to update settings");
-                  }
-                  setSuccessMessage("Access control settings updated");
-                } catch (err) {
-                  setTeamLeadsCanCreateProjects(!newValue);
-                  setError(
-                    err instanceof Error ? err.message : "An error occurred"
-                  );
-                } finally {
-                  setIsSavingSettings(false);
-                }
-              }}
+              onClick={onToggle}
               disabled={isSavingSettings}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                teamLeadsCanCreateProjects
-                  ? "bg-zinc-900 dark:bg-zinc-100"
-                  : "bg-zinc-200 dark:bg-zinc-700"
-              }`}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                teamLeadsCanCreateProjects ? "bg-green-500" : "bg-zinc-600"
+              } ${isSavingSettings ? "opacity-50" : ""}`}
             >
               <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out dark:bg-zinc-900 ${
-                  teamLeadsCanCreateProjects ? "translate-x-5" : "translate-x-0"
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  teamLeadsCanCreateProjects
+                    ? "translate-x-5"
+                    : "translate-x-0"
                 }`}
               />
             </button>
-          </label>
+          </div>
         </div>
-      </div>
+      </TerminalCard>
+    </div>
+  );
+}
 
+// ============================================================
+// Danger Zone Tab
+// ============================================================
+
+function DangerZoneSettings({
+  organization,
+  transferEmail,
+  setTransferEmail,
+  showTransferConfirm,
+  setShowTransferConfirm,
+  transferConfirmText,
+  setTransferConfirmText,
+  isTransferring,
+  handleTransfer,
+  showDeleteConfirm,
+  setShowDeleteConfirm,
+  deleteConfirmText,
+  setDeleteConfirmText,
+  isDeleting,
+  handleDelete,
+}: {
+  organization: Organization;
+  transferEmail: string;
+  setTransferEmail: (v: string) => void;
+  showTransferConfirm: boolean;
+  setShowTransferConfirm: (v: boolean) => void;
+  transferConfirmText: string;
+  setTransferConfirmText: (v: string) => void;
+  isTransferring: boolean;
+  handleTransfer: () => void;
+  showDeleteConfirm: boolean;
+  setShowDeleteConfirm: (v: boolean) => void;
+  deleteConfirmText: string;
+  setDeleteConfirmText: (v: string) => void;
+  isDeleting: boolean;
+  handleDelete: () => void;
+}) {
+  return (
+    <div className="space-y-6">
       {/* Transfer Ownership */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">
           Transfer Ownership
         </h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-zinc-500">
           Transfer this organization to another user. They will become the admin
           and all current members will be removed.
         </p>
 
         <div className="mt-6 space-y-4">
           <div>
-            <label
-              htmlFor="transferEmail"
-              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-            >
+            <label className="block text-sm font-medium text-zinc-300">
               New Owner&apos;s Email
             </label>
-            <input
+            <TerminalInput
               type="email"
-              id="transferEmail"
               value={transferEmail}
               onChange={(e) => setTransferEmail(e.target.value)}
               placeholder="Enter new owner's email"
-              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              className="mt-1"
             />
           </div>
 
           {showTransferConfirm && transferEmail ? (
-            <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
-              <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                <p className="font-medium text-red-600 dark:text-red-400">
+            <div className="space-y-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+              <div className="text-sm">
+                <p className="font-medium text-red-400">
                   This action cannot be undone.
                 </p>
-                <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-600 dark:text-zinc-400">
+                <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-400">
                   <li>New owner becomes admin</li>
                   <li>You will be removed from the organization</li>
                   <li>All other members retain their roles and access</li>
                   <li>All projects, variables, and settings stay intact</li>
                 </ul>
               </div>
-              <p className="text-sm text-zinc-900 dark:text-zinc-100">
+              <p className="text-sm text-zinc-100">
                 Type{" "}
                 <span className="font-mono font-semibold">
-                  {organization?.name}
+                  {organization.name}
                 </span>{" "}
                 to confirm:
               </p>
-              <input
+              <TerminalInput
                 type="text"
                 value={transferConfirmText}
                 onChange={(e) => setTransferConfirmText(e.target.value)}
                 placeholder="Organization name"
-                className="block w-full rounded-lg border border-red-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-red-700 dark:bg-zinc-800 dark:text-zinc-100"
               />
               <div className="flex gap-3">
-                <button
+                <TerminalButton
+                  variant="secondary"
                   onClick={() => {
                     setShowTransferConfirm(false);
                     setTransferConfirmText("");
                   }}
-                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
                   Cancel
-                </button>
-                <button
+                </TerminalButton>
+                <TerminalButton
+                  variant="danger"
                   onClick={handleTransfer}
                   disabled={
-                    transferConfirmText !== organization?.name || isTransferring
+                    transferConfirmText !== organization.name || isTransferring
                   }
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isTransferring
-                    ? "Transferring..."
-                    : "Transfer Ownership"}
-                </button>
+                  {isTransferring ? "Transferring..." : "Transfer Ownership"}
+                </TerminalButton>
               </div>
             </div>
           ) : (
-            <button
+            <TerminalButton
+              variant="danger"
               onClick={() => setShowTransferConfirm(true)}
               disabled={!transferEmail}
-              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
             >
               Transfer Ownership
-            </button>
+            </TerminalButton>
           )}
         </div>
-      </div>
+      </TerminalCard>
 
-      {/* Danger Zone */}
-      <div className="rounded-xl border border-red-200 bg-white p-6 dark:border-red-900/50 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-red-600 dark:text-red-400">
-          Danger Zone
-        </h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      {/* Delete Organization */}
+      <TerminalCard className="border-red-500/30">
+        <h2 className="text-base font-semibold text-red-400">Danger Zone</h2>
+        <p className="mt-2 text-sm text-zinc-500">
           Once you delete an organization, there is no going back. All projects,
           environment variables, and team data will be permanently removed.
         </p>
 
         {showDeleteConfirm ? (
           <div className="mt-4 space-y-4">
-            <p className="text-sm text-zinc-900 dark:text-zinc-100">
+            <p className="text-sm text-zinc-100">
               Type{" "}
               <span className="font-mono font-semibold">
-                {organization?.name}
+                {organization.name}
               </span>{" "}
               to confirm deletion:
             </p>
-            <input
+            <TerminalInput
               type="text"
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder="Organization name"
-              className="block w-full rounded-lg border border-red-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:border-red-700 dark:bg-zinc-800 dark:text-zinc-100"
             />
             <div className="flex gap-3">
-              <button
+              <TerminalButton
+                variant="secondary"
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteConfirmText("");
                 }}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               >
                 Cancel
-              </button>
-              <button
+              </TerminalButton>
+              <TerminalButton
+                variant="danger"
                 onClick={handleDelete}
                 disabled={
-                  deleteConfirmText !== organization?.name || isDeleting
+                  deleteConfirmText !== organization.name || isDeleting
                 }
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isDeleting ? "Deleting..." : "Delete Organization"}
-              </button>
+              </TerminalButton>
             </div>
           </div>
         ) : (
-          <button
+          <TerminalButton
+            variant="danger"
             onClick={() => setShowDeleteConfirm(true)}
-            className="mt-4 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+            className="mt-4"
           >
             Delete Organization
-          </button>
+          </TerminalButton>
         )}
-      </div>
+      </TerminalCard>
     </div>
   );
 }

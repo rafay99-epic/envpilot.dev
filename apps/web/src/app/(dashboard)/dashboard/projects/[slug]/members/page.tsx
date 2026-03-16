@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
@@ -12,7 +11,7 @@ interface ProjectMember {
   _id: string;
   projectId: string;
   userId: string;
-  role: "viewer" | "developer" | "manager";
+  role: "viewer" | "developer" | "manager" | "admin";
   addedAt: number;
   user: {
     _id: string;
@@ -24,6 +23,7 @@ interface ProjectMember {
     name?: string;
     email: string;
   };
+  isOrgAdmin?: boolean;
 }
 
 interface AssignableMember {
@@ -42,6 +42,7 @@ interface Project {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  admin: "Org Admin",
   viewer: "Viewer",
   developer: "Developer",
   manager: "Manager",
@@ -215,15 +216,9 @@ export default function ProjectMembersPage({
   if (error && !project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-lg font-semibold text-zinc-100">
           {error}
         </h2>
-        <Link
-          href="/dashboard/projects"
-          className="mt-4 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
-        >
-          Back to Projects
-        </Link>
       </div>
     );
   }
@@ -232,33 +227,13 @@ export default function ProjectMembersPage({
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/dashboard/projects/${slug}`}
-            className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-              Project Members
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage who has access to {project?.name}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-xl font-bold text-zinc-100">
+            Project Members
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Manage who has access to {project?.name}
+          </p>
         </div>
 
         {assignableMembers && assignableMembers.length > 0 && (
@@ -300,10 +275,10 @@ export default function ProjectMembersPage({
       )}
 
       {/* Info banner */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-        <p className="text-sm text-blue-700 dark:text-blue-400">
-          Organization admins have implicit access to all projects and are not
-          listed here.
+      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+        <p className="text-sm text-blue-400">
+          Organization admins have implicit access to all projects. Their
+          access cannot be removed at the project level.
         </p>
       </div>
 
@@ -349,40 +324,51 @@ export default function ProjectMembersPage({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <select
-                      value={member.role}
-                      onChange={(e) =>
-                        handleUpdateRole(
-                          member.userId,
-                          e.target.value as "viewer" | "developer" | "manager"
-                        )
-                      }
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                    >
-                      <option value="viewer">Viewer</option>
-                      <option value="developer">Developer</option>
-                      <option value="manager">Manager</option>
-                    </select>
+                    {member.isOrgAdmin ? (
+                      <span className="inline-flex items-center rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
+                        Org Admin
+                      </span>
+                    ) : (
+                      <>
+                        <select
+                          value={member.role}
+                          onChange={(e) =>
+                            handleUpdateRole(
+                              member.userId,
+                              e.target.value as
+                                | "viewer"
+                                | "developer"
+                                | "manager"
+                            )
+                          }
+                          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        >
+                          <option value="viewer">Viewer</option>
+                          <option value="developer">Developer</option>
+                          <option value="manager">Manager</option>
+                        </select>
 
-                    <button
-                      onClick={() => handleRemoveMember(member.userId)}
-                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                      title="Remove from project"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
+                        <button
+                          onClick={() => handleRemoveMember(member.userId)}
+                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          title="Remove from project"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

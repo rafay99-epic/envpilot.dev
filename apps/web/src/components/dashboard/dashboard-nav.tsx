@@ -3,9 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
 import { UserButton, OrganizationSwitcher } from "@/components/auth";
 import { useAuthContext } from "@/components/auth";
 import {
@@ -19,7 +16,6 @@ import {
   Menu,
   X,
   Terminal,
-  ArrowLeft,
 } from "lucide-react";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 
@@ -31,10 +27,15 @@ interface NavItem {
 
 function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname();
+  // For project base URLs (e.g. /dashboard/projects/slug), use exact match
+  // to avoid highlighting "Variables" when on /settings or /members
+  const isProjectBase = /^\/dashboard\/projects\/[^/]+$/.test(item.href);
   const isActive =
     item.href === "/dashboard"
       ? pathname === "/dashboard"
-      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+      : isProjectBase
+        ? pathname === item.href
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
   return (
     <Link
@@ -60,8 +61,6 @@ export function DashboardNav() {
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
 
-  const orgId = organization?.id as Id<"organizations"> | undefined;
-
   // Detect project context from pathname
   const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
   const projectSlug =
@@ -69,14 +68,6 @@ export function DashboardNav() {
       ? projectSlugMatch[1]
       : null;
   const isProjectContext = !!projectSlug;
-
-  // Fetch project name when in project context
-  const project = useQuery(
-    api.projects.getBySlug,
-    isProjectContext && orgId
-      ? { organizationId: orgId, slug: projectSlug! }
-      : "skip"
-  );
 
   // Org-level settings href
   const orgSettingsHref = organization?.slug
@@ -122,11 +113,6 @@ export function DashboardNav() {
     ? [
         {
           href: `/dashboard/projects/${projectSlug}`,
-          label: "Overview",
-          icon: <LayoutDashboard className="h-4 w-4" />,
-        },
-        {
-          href: `/dashboard/projects/${projectSlug}`,
           label: "Variables",
           icon: <Key className="h-4 w-4" />,
         },
@@ -148,7 +134,7 @@ export function DashboardNav() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="relative z-20 hidden w-60 flex-shrink-0 border-r border-zinc-800 bg-[#0f172a] md:block">
+      <aside className="relative z-20 hidden w-60 shrink-0 border-r border-zinc-800 bg-[#0f172a] md:block">
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-14 items-center border-b border-zinc-800 px-5">
@@ -169,22 +155,6 @@ export function DashboardNav() {
               currentOrgId={organization?.id ?? undefined}
             />
           </div>
-
-          {/* Project Context Header */}
-          {isProjectContext && (
-            <div className="border-b border-zinc-800 px-3 py-2">
-              <Link
-                href="/dashboard/projects"
-                className="flex items-center gap-2 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                <span>Back to Projects</span>
-              </Link>
-              <p className="mt-1 truncate pl-[22px] text-sm font-medium text-zinc-100">
-                {project?.name || projectSlug}
-              </p>
-            </div>
-          )}
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-3">
@@ -239,23 +209,6 @@ export function DashboardNav() {
                   currentOrgId={organization?.id ?? undefined}
                 />
               </div>
-
-              {/* Project Context Header (Mobile) */}
-              {isProjectContext && (
-                <div className="border-b border-zinc-800 px-3 py-2">
-                  <Link
-                    href="/dashboard/projects"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    <span>Back to Projects</span>
-                  </Link>
-                  <p className="mt-1 truncate pl-[22px] text-sm font-medium text-zinc-100">
-                    {project?.name || projectSlug}
-                  </p>
-                </div>
-              )}
 
               {/* Navigation */}
               <nav className="flex-1 space-y-1 p-3">

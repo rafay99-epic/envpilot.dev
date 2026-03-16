@@ -15,6 +15,7 @@ import type * as cliSessions from "../cliSessions.js";
 import type * as contactMessages from "../contactMessages.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as emails from "../emails.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as helpers from "../helpers.js";
 import type * as invitations from "../invitations.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   contactMessages: typeof contactMessages;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  emails: typeof emails;
   featureRequests: typeof featureRequests;
   helpers: typeof helpers;
   invitations: typeof invitations;

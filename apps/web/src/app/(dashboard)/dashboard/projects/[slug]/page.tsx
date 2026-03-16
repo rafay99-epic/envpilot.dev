@@ -549,24 +549,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard/projects"
-            className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-          </Link>
           <div
             className="flex h-12 w-12 items-center justify-center rounded-lg"
             style={{ backgroundColor: project.color || DEFAULT_PROJECT_COLOR }}
