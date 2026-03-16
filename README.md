@@ -1,143 +1,249 @@
-# Envpilot
+<p align="center">
+  <img src="assets/logo.png" alt="Envpilot" width="120" />
+</p>
 
-Secure environment variable management for teams. Envpilot provides a centralized platform for managing, sharing, and syncing environment variables across your development team and deployment environments.
+<h1 align="center">Envpilot</h1>
 
-## Features
+<p align="center">
+  Secure environment variable management for teams.
+  <br />
+  <a href="https://www.envpilot.dev">Website</a> &middot; <a href="./docs/DEVELOPMENT.md">Development Guide</a> &middot; <a href="./docs/DEPLOYMENT.md">Deployment Guide</a>
+</p>
 
-- **Secure Variable Storage**: Environment variables encrypted and stored securely using WorkOS Vault
-- **Real-Time Sync**: Changes propagate instantly across your team via Convex real-time database
-- **Team Management**: Invite team members, assign roles, and control access
-- **Organization Support**: Manage multiple organizations with separate projects
-- **Granular Permissions**: Control who can view, edit, or manage each variable
-- **Audit Logging**: Track all changes and access to environment variables
-- **VS Code Extension Support**: Sync variables directly to your development environment
+---
+
+## Overview
+
+Envpilot is a centralized platform for managing, sharing, and syncing environment variables across development teams and deployment environments. It ships as three client surfaces — a **web dashboard**, a **CLI**, and a **VS Code extension** — backed by a real-time database and encrypted vault storage.
+
+## Key Features
+
+- **Encrypted Storage** — Secret values are encrypted at rest in WorkOS Vault. The database stores only vault reference IDs, never plaintext.
+- **Real-Time Sync** — Changes propagate instantly to every connected client via Convex subscriptions.
+- **Role-Based Access Control** — Three-tier RBAC (Admin, Team Lead, Member) with granular per-variable permissions.
+- **Organization & Project Hierarchy** — Manage multiple organizations, each with isolated projects and environments.
+- **Audit Logging** — Every read, write, and permission change is recorded for compliance.
+- **CLI & VS Code Extension** — Pull, push, and diff variables directly from your terminal or editor.
+- **Billing & Tier Limits** — Optional Stripe integration with enforceable Free / Pro tier caps.
 
 ## Tech Stack
 
-- **Frontend**: [Next.js 16](https://nextjs.org/) with React 19 and the React Compiler
-- **Backend**: [Convex](https://convex.dev/) real-time database
-- **Authentication**: [WorkOS AuthKit](https://workos.com/docs/user-management)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Testing**: [Playwright](https://playwright.dev/)
-- **Language**: TypeScript with strict mode
+| Layer              | Technology                                                      |
+| ------------------ | --------------------------------------------------------------- |
+| **Web App**        | Next.js 16, React 19, React Compiler, Tailwind CSS v4          |
+| **Backend**        | Convex (real-time database), WorkOS Vault (secrets)             |
+| **Authentication** | WorkOS AuthKit (email, OAuth, SAML)                             |
+| **Billing**        | Stripe (optional)                                               |
+| **Email**          | Resend (optional)                                               |
+| **CLI**            | Commander.js, Zod v4, tsup                                     |
+| **VS Code Ext.**   | VS Code Extension API, esbuild                                 |
+| **Monorepo**       | Bun workspaces, Turborepo                                      |
+| **Testing**        | Playwright (E2E), Vitest (unit)                                 |
+| **Language**       | TypeScript (strict mode)                                        |
+
+## Prerequisites
+
+- [Bun](https://bun.sh/) v1.3.10 or later
+- [Node.js](https://nodejs.org/) 18.x or later (for CLI compatibility)
+- A [Convex](https://convex.dev/) project
+- A [WorkOS](https://workos.com/) account (API key + Client ID)
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18.x or later
-- npm 9.x or later
-
-### Quick Start
-
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd envpilot
+# 1. Clone the repository
+git clone https://github.com/rafay99-epic/envpilot.dev.git
+cd envpilot.dev
 
-# Install dependencies
-npm install
+# 2. Install dependencies
+bun install
 
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your configuration
+# 3. Create environment files and symlinks
+bun run setup
 
-# Start development servers
-npm run dev
+# 4. Edit .env.local with your credentials (see Environment Variables below)
+
+# 5. Start development servers (Next.js + Convex)
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Open [http://localhost:3000](http://localhost:3000) to view the web dashboard.
 
-### Environment Variables
+## Environment Variables
 
-Copy `.env.example` to `.env.local` and configure:
+Copy `.env.example` to `.env.local` at the monorepo root. The web app reads it via a symlink.
 
-| Variable                 | Description                       |
-| ------------------------ | --------------------------------- |
-| `NEXT_PUBLIC_CONVEX_URL` | Your Convex deployment URL        |
-| `WORKOS_API_KEY`         | WorkOS API key                    |
-| `WORKOS_CLIENT_ID`       | WorkOS client ID                  |
-| `WORKOS_COOKIE_PASSWORD` | Cookie encryption key (32+ chars) |
-| `NEXT_PUBLIC_APP_URL`    | Application URL                   |
+### Required
 
-See the [Development Guide](./docs/DEVELOPMENT.md) for detailed setup instructions.
+| Variable                   | Description                                |
+| -------------------------- | ------------------------------------------ |
+| `NEXT_PUBLIC_CONVEX_URL`   | Convex deployment URL                      |
+| `CONVEX_DEPLOYMENT`        | Convex deployment identifier               |
+| `WORKOS_API_KEY`           | WorkOS API key                             |
+| `WORKOS_CLIENT_ID`         | WorkOS client ID                           |
+| `WORKOS_COOKIE_PASSWORD`   | Cookie encryption key (32+ characters)     |
+| `NEXT_PUBLIC_APP_URL`      | Application URL (e.g. `http://localhost:3000`) |
+| `WORKOS_REDIRECT_URI`      | OAuth redirect URI                         |
+
+### Optional
+
+| Variable                          | Description                        |
+| --------------------------------- | ---------------------------------- |
+| `STRIPE_SECRET_KEY`               | Stripe secret key                  |
+| `STRIPE_WEBHOOK_SECRET`           | Stripe webhook signing secret      |
+| `STRIPE_PRO_PRICE_ID`            | Stripe price ID for Pro tier       |
+| `NEXT_PUBLIC_PAYMENTS_ENABLED`    | Set `true` to enable billing       |
+| `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` | Set `true` to enforce tier caps    |
+| `RESEND_API_KEY`                  | Resend API key for transactional email |
+| `FROM_EMAIL`                      | Sender address for outbound email  |
 
 ## Available Scripts
 
-| Command                 | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `npm run dev`           | Start Next.js and Convex development servers |
-| `npm run build`         | Build for production                         |
-| `npm run start`         | Start production server                      |
-| `npm run lint`          | Run ESLint                                   |
-| `npm run test:e2e`      | Run Playwright E2E tests                     |
-| `npm run convex:deploy` | Deploy Convex functions                      |
+All commands are run from the monorepo root with `bun run`.
+
+### Development
+
+| Command               | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `bun run dev`         | Start Next.js + Convex dev servers in parallel   |
+| `bun run dev:web`     | Start Next.js only                               |
+| `bun run dev:convex`  | Start Convex only                                |
+| `bun run dev:cli`     | CLI watch mode                                   |
+| `bun run dev:extension` | VS Code extension watch mode                   |
+
+### Build
+
+| Command                  | Description               |
+| ------------------------ | ------------------------- |
+| `bun run build`          | Build all apps            |
+| `bun run build:web`      | Build web app only        |
+| `bun run build:cli`      | Build CLI only            |
+| `bun run build:extension`| Build & package extension |
+
+### Quality
+
+| Command               | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `bun run lint`        | ESLint across all workspaces                         |
+| `bun run typecheck`   | TypeScript type-check all workspaces                 |
+| `bun run format:check`| Prettier check                                       |
+| `bun run format:fix`  | Prettier auto-fix                                    |
+| `bun run check:all`   | Full CI pipeline (lint + typecheck + build + format) |
+
+### Testing
+
+| Command              | Description                          |
+| -------------------- | ------------------------------------ |
+| `bun run test:e2e`   | Playwright E2E tests (Chromium)      |
+| `bun run test:cli`   | Vitest unit tests for CLI            |
+
+### Deployment
+
+| Command                   | Description                          |
+| ------------------------- | ------------------------------------ |
+| `bun run convex:deploy`   | Deploy Convex functions to production|
+| `bun run publish:cli`     | Publish CLI to npm                   |
+| `bun run publish:extension`| Publish extension to VS Code marketplace |
 
 ## Project Structure
 
 ```
-├── convex/              # Convex backend functions and schema
-├── src/
-│   ├── app/             # Next.js App Router pages
-│   │   ├── (auth)/      # Authentication routes
-│   │   ├── (dashboard)/ # Dashboard routes
-│   │   └── api/         # API routes
-│   ├── components/      # React components
-│   ├── hooks/           # Custom React hooks
-│   └── lib/             # Utility libraries
-├── docs/                # Documentation
-├── public/              # Static assets
-└── tests/               # E2E tests
+envpilot/
+├── convex/                        # Convex backend functions & schema
+│   ├── schema.ts                  # Database schema definition
+│   └── *.ts                       # Queries, mutations, actions
+│
+├── apps/
+│   ├── web/                       # Next.js web dashboard
+│   │   ├── src/
+│   │   │   ├── app/               # App Router (pages + API routes)
+│   │   │   ├── components/        # React components
+│   │   │   ├── hooks/             # Custom hooks (Convex wrappers)
+│   │   │   ├── lib/               # Auth, vault, stripe, email, tier-limits
+│   │   │   └── stores/            # Zustand state stores
+│   │   └── tests/e2e/             # Playwright test specs
+│   │
+│   ├── cli/                       # CLI npm package (@envpilot/cli)
+│   │   └── src/
+│   │       ├── commands/          # CLI commands
+│   │       └── lib/               # CLI utilities
+│   │
+│   └── vscode-extension/          # VS Code extension (envpilot)
+│       └── src/
+│           ├── providers/         # Tree view providers
+│           ├── services/          # Extension services
+│           └── ui/                # VS Code UI components
+│
+├── packages/                      # Shared configuration
+│   ├── tsconfig/                  # TypeScript base configs
+│   ├── eslint-config/             # ESLint shared config
+│   └── prettier-config/           # Prettier shared config
+│
+├── docs/                          # Documentation
+│   ├── DEVELOPMENT.md             # Local development guide
+│   └── DEPLOYMENT.md              # Production deployment guide
+│
+├── turbo.json                     # Turborepo pipeline config
+├── package.json                   # Root workspace config
+└── .env.example                   # Environment variable template
 ```
-
-## Documentation
-
-- [Development Guide](./docs/DEVELOPMENT.md) - Local development setup and workflow
-- [Deployment Guide](./docs/DEPLOYMENT.md) - Production deployment instructions
 
 ## Architecture
 
-### Authentication Flow
-
-1. User initiates sign-in via WorkOS AuthKit
-2. WorkOS handles authentication (email, OAuth, SAML)
-3. Callback route creates session and syncs user to Convex
-4. Protected routes verify session via middleware
-
 ### Data Flow
 
-1. Frontend components use Convex React hooks
-2. Convex provides real-time subscriptions
-3. Sensitive values stored in WorkOS Vault
-4. Audit logs track all operations
+```
+Browser / CLI / Extension
+        │
+        ▼
+  Next.js API Routes
+        │
+        ├──▶ Convex (real-time database)
+        ├──▶ WorkOS Vault (encrypted secrets)
+        ├──▶ WorkOS AuthKit (authentication)
+        ├──▶ Stripe (billing)
+        └──▶ Resend (email)
+```
 
-### Database Schema
+### Authentication
 
-Key entities:
+1. User signs in via WorkOS AuthKit (email, OAuth, or SAML).
+2. Callback route creates a session and syncs the user record to Convex.
+3. Middleware protects all routes except explicitly public paths.
 
-- **Users**: Synced from WorkOS
-- **Organizations**: Team containers
-- **Projects**: Logical groupings of variables
-- **Environment Variables**: Key-value pairs with vault references
-- **Permissions**: Granular access control
-- **Audit Logs**: Complete activity history
+### Database
+
+Convex serves as the real-time database. Sensitive values are **never** stored in Convex — only vault reference IDs. Actual secrets live in WorkOS Vault, encrypted at rest.
+
+### Roles & Permissions
+
+| Role          | Capabilities                                                    |
+| ------------- | --------------------------------------------------------------- |
+| **Admin**     | Full access: manage org, projects, variables, rollback, permissions |
+| **Team Lead** | Manage projects and variables, grant/revoke per-variable access |
+| **Member**    | Read-only project access; variable access requires explicit grant |
+
+## Documentation
+
+- [Development Guide](./docs/DEVELOPMENT.md) — Local setup, conventions, and workflow
+- [Deployment Guide](./docs/DEPLOYMENT.md) — Production deployment instructions
 
 ## Security
 
-- All sensitive values encrypted via WorkOS Vault
-- Role-based access control (Admin, Team Lead, Member)
-- Variable-level permissions
-- Session management with secure cookies
-- Comprehensive audit logging
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm run test:e2e`
-5. Submit a pull request
+- All secret values encrypted at rest via WorkOS Vault
+- Role-based access control with per-variable granularity
+- Secure session management with encrypted cookies
+- Comprehensive audit logging for compliance
+- No plaintext secrets in the database
 
 ## License
 
-Private - All rights reserved
+This project is proprietary software. See [LICENSE](./LICENSE) for details.
+
+---
+
+<p align="center">
+  Built by the Envpilot team &middot; <a href="https://www.envpilot.dev">envpilot.dev</a>
+  <br />
+  <sub>Developed at <a href="https://syntaxlabtechnology.com">Syntax Lab Technology</a> &middot; Lead dev <a href="https://rafay99.com">rafay99.com</a></sub>
+</p>

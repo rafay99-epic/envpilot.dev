@@ -10,6 +10,7 @@
 
 import type * as auditHelpers from "../auditHelpers.js";
 import type * as auditLogs from "../auditLogs.js";
+import type * as authHelpers from "../authHelpers.js";
 import type * as changelog from "../changelog.js";
 import type * as cliSessions from "../cliSessions.js";
 import type * as contactMessages from "../contactMessages.js";
@@ -48,6 +49,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auditHelpers: typeof auditHelpers;
   auditLogs: typeof auditLogs;
+  authHelpers: typeof authHelpers;
   changelog: typeof changelog;
   cliSessions: typeof cliSessions;
   contactMessages: typeof contactMessages;
