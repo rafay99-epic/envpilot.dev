@@ -144,7 +144,8 @@ export default function ProjectSettingsPage({
         throw new Error(data.error || "Failed to transfer project");
       }
 
-      router.push("/dashboard");
+      router.refresh();
+      router.push("/dashboard/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsTransferring(false);

@@ -142,6 +142,7 @@ export default function OrganizationSettingsPage({
         throw new Error(data.error || "Failed to transfer organization");
       }
 
+      router.refresh();
       router.push("/organizations");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -440,10 +441,9 @@ export default function OrganizationSettingsPage({
                 </p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-600 dark:text-zinc-400">
                   <li>New owner becomes admin</li>
-                  <li>All current members will be removed</li>
-                  <li>All projects and variables stay intact</li>
-                  <li>All active sessions will be revoked</li>
-                  <li>Notification emails will be sent</li>
+                  <li>You will be removed from the organization</li>
+                  <li>All other members retain their roles and access</li>
+                  <li>All projects, variables, and settings stay intact</li>
                 </ul>
               </div>
               <p className="text-sm text-zinc-900 dark:text-zinc-100">

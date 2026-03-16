@@ -110,6 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
       movedBy: convexUser._id,
+      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     // Send notification email to target org admins (non-blocking)

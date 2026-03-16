@@ -370,7 +370,7 @@ export async function sendOrgTransferEmail({
                 <strong>${safePreviousOwner}</strong> has transferred ownership of <strong>${safeOrgName}</strong> to you. You are now the admin.
               </p>
               <p style="margin: 12px 0 0 0; font-size: 14px; line-height: 1.5; color: #71717a;">
-                All previous members have been removed and will need to be re-invited.
+                All existing members, projects, and settings remain intact.
               </p>
             </td>
           </tr>
@@ -401,7 +401,7 @@ You Are Now the Owner of ${organizationName}
 
 ${previousOwnerName} has transferred ownership of ${organizationName} to you. You are now the admin.
 
-All previous members have been removed and will need to be re-invited.
+All existing members, projects, and settings remain intact.
 
 Go to your organization: ${orgUrl}
 
@@ -439,20 +439,27 @@ If you didn't expect this transfer, please contact support.
   }
 }
 
-interface OrgTransferNotificationEmailParams {
+interface OrgTransferConfirmationEmailParams {
   to: string;
   organizationName: string;
+  newOwnerEmail: string;
+  orgSlug: string;
 }
 
-export async function sendOrgTransferNotificationEmail({
+export async function sendOrgTransferConfirmationEmail({
   to,
   organizationName,
-}: OrgTransferNotificationEmailParams): Promise<{
+  newOwnerEmail,
+  orgSlug,
+}: OrgTransferConfirmationEmailParams): Promise<{
   success: boolean;
   error?: string;
 }> {
   const safeOrgName = escapeHtml(organizationName);
+  const safeNewOwner = escapeHtml(newOwnerEmail);
   const safeOrgInitial = escapeHtml(organizationName.charAt(0).toUpperCase());
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const orgUrl = `${appUrl}/organizations/${orgSlug}`;
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -460,7 +467,7 @@ export async function sendOrgTransferNotificationEmail({
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organization Transferred - ${safeOrgName}</title>
+  <title>Ownership Transferred - ${safeOrgName}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -469,7 +476,7 @@ export async function sendOrgTransferNotificationEmail({
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
           <tr>
             <td style="padding: 40px 40px 20px 40px; text-align: center;">
-              <div style="display: inline-block; width: 64px; height: 64px; background-color: #dc2626; border-radius: 12px; line-height: 64px; text-align: center;">
+              <div style="display: inline-block; width: 64px; height: 64px; background-color: #18181b; border-radius: 12px; line-height: 64px; text-align: center;">
                 <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${safeOrgInitial}</span>
               </div>
             </td>
@@ -477,24 +484,24 @@ export async function sendOrgTransferNotificationEmail({
           <tr>
             <td style="padding: 0 40px 20px 40px; text-align: center;">
               <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
-                Organization Transferred
+                Ownership Transferred
               </h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 0 40px 30px 40px; text-align: center;">
               <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #52525b;">
-                <strong>${safeOrgName}</strong> has been transferred to a new owner. Your membership and access have been revoked.
+                You have successfully transferred ownership of <strong>${safeOrgName}</strong> to <strong>${safeNewOwner}</strong>.
               </p>
               <p style="margin: 12px 0 0 0; font-size: 14px; line-height: 1.5; color: #71717a;">
-                Contact the new owner if you need to be re-invited.
+                All other members, projects, and settings remain intact. You have been removed from the organization.
               </p>
             </td>
           </tr>
           <tr>
             <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
-                If you believe this was done in error, please contact support.
+                If you didn't initiate this transfer, please contact support immediately.
               </p>
             </td>
           </tr>
@@ -507,13 +514,13 @@ export async function sendOrgTransferNotificationEmail({
 `;
 
   const textContent = `
-Organization Transferred - ${organizationName}
+Ownership Transferred - ${organizationName}
 
-${organizationName} has been transferred to a new owner. Your membership and access have been revoked.
+You have successfully transferred ownership of ${organizationName} to ${newOwnerEmail}.
 
-Contact the new owner if you need to be re-invited.
+All other members, projects, and settings remain intact. You have been removed from the organization.
 
-If you believe this was done in error, please contact support.
+If you didn't initiate this transfer, please contact support immediately.
 `;
 
   try {
@@ -526,7 +533,7 @@ If you believe this was done in error, please contact support.
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: `Organization ${organizationName} has been transferred`,
+      subject: `Ownership of ${organizationName} has been transferred`,
       html: htmlContent,
       text: textContent,
     });
@@ -536,7 +543,7 @@ If you believe this was done in error, please contact support.
       return { success: false, error: error.message };
     }
 
-    console.log("[EMAIL] Transfer notification email sent:", JSON.stringify(data));
+    console.log("[EMAIL] Transfer confirmation email sent:", JSON.stringify(data));
     return { success: true };
   } catch (err) {
     console.error("[EMAIL] Exception sending email:", err);

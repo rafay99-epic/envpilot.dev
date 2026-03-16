@@ -121,6 +121,7 @@ export const create = mutation({
     ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Rate limit: prevent invitation spam
@@ -130,6 +131,7 @@ export const create = mutation({
     });
 
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Validate expiration days
     const expiresInDays = args.expiresInDays ?? 7;
@@ -144,7 +146,7 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
     if (limits.maxTeamMembers !== null) {
       const members = await ctx.db
         .query("organizationMembers")

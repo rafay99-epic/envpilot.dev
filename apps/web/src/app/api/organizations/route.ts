@@ -12,6 +12,7 @@ import {
   isTierLimitError,
   handleApiError,
 } from "@/lib/api-errors";
+import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
       slug,
       description,
       createdBy: convexUser._id,
+      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const organization = await convex.query(api.organizations.getById, {

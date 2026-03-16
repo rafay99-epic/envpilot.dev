@@ -9,7 +9,7 @@ import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 import {
   sendOrgTransferEmail,
-  sendOrgTransferNotificationEmail,
+  sendOrgTransferConfirmationEmail,
 } from "@/lib/email";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -105,11 +105,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Get org details and member list for email notifications
+    // Get org details for email notifications
     const org = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
-    const members = await convex.query(api.organizations.getMembers, {
       organizationId,
     });
 
@@ -118,6 +115,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       organizationId,
       targetUserId: targetUser._id,
       transferredBy: convexUser._id,
+      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const orgName = org?.name || "the organization";
@@ -138,24 +136,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       console.warn("[EMAIL] Failed to send transfer email to new owner:", emailErr);
     }
 
-    // Send notification to removed members (non-blocking)
-    const removedMembers = members.filter(
-      (m) => m && m.userId !== targetUser._id
-    );
-    for (const member of removedMembers) {
-      if (member?.user?.email) {
-        try {
-          await sendOrgTransferNotificationEmail({
-            to: member.user.email,
-            organizationName: orgName,
-          });
-        } catch (emailErr) {
-          console.warn(
-            "[EMAIL] Failed to send removal notification:",
-            emailErr
-          );
-        }
-      }
+    // Send confirmation to previous owner (non-blocking)
+    try {
+      await sendOrgTransferConfirmationEmail({
+        to: user.email,
+        organizationName: orgName,
+        newOwnerEmail: targetUserEmail,
+        orgSlug: slug,
+      });
+    } catch (emailErr) {
+      console.warn("[EMAIL] Failed to send transfer confirmation to previous owner:", emailErr);
     }
 
     return NextResponse.json({

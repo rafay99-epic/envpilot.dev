@@ -124,6 +124,7 @@ export const create = mutation({
     logoUrl: v.optional(v.string()),
     createdBy: v.id("users"),
     workosOrgId: v.optional(v.string()),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Rate limit: prevent excessive org creation
@@ -133,6 +134,7 @@ export const create = mutation({
     });
 
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Check organization creation limits based on user's tier
     const userMemberships = await ctx.db
@@ -152,7 +154,7 @@ export const create = mutation({
     }
 
     const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = getTierLimits(effectiveTier);
+    const limits = getTierLimits(effectiveTier, enforce);
 
     if (limits.maxOrganizations !== null) {
       if (userMemberships.length >= limits.maxOrganizations) {
@@ -475,9 +477,11 @@ export const addMember = mutation({
       v.literal("member")
     ),
     invitedBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const enforce = args.enforceTierLimits ?? true;
 
     // Check tier limits for adding team members
     const org = await ctx.db.get(args.organizationId);
@@ -485,7 +489,7 @@ export const addMember = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
     if (limits.maxTeamMembers !== null) {
       const currentMembers = await ctx.db
         .query("organizationMembers")
@@ -1132,17 +1136,19 @@ export const revokeAllMemberSessions = mutation({
 
 /**
  * Transfer organization ownership to another user.
- * All existing members are removed (must be re-invited by new owner).
+ * All members, projects, variables, and settings remain intact.
+ * Only the owner (createdBy) changes and the new owner gets admin role.
  */
 export const transferOwnership = mutation({
   args: {
     organizationId: v.id("organizations"),
     targetUserId: v.id("users"),
     transferredBy: v.id("users"),
+    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
+    const enforce = args.enforceTierLimits ?? true;
 
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
@@ -1169,43 +1175,32 @@ export const transferOwnership = mutation({
       throw new Error("Target user not found");
     }
 
+    // Cannot transfer to yourself
+    if (args.targetUserId === args.transferredBy) {
+      throw new Error("Cannot transfer ownership to yourself");
+    }
+
     // Tier check
-    const limits = getTierLimits(org.tier);
+    const limits = getTierLimits(org.tier, enforce);
     if (limits.maxProjects !== null && org.tier !== "pro") {
       throw new Error(
         "Organization must be on the Pro plan to transfer ownership"
       );
     }
 
-    // Get all current members
-    const members = await ctx.db
+    // Add or promote target user to admin
+    const targetMembership = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_org_and_user", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("userId", args.targetUserId)
       )
-      .collect();
-
-    // Get all non-deleted projects for cleanup
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
-
-    const orgProjectIds = new Set(projects.map((p) => p._id));
-
-    // Check if target is already a member
-    const targetMembership = members.find(
-      (m) => m.userId === args.targetUserId
-    );
+      .first();
 
     if (targetMembership) {
-      // Promote to admin
       await ctx.db.patch(targetMembership._id, { role: "admin" });
     } else {
-      // Add as new admin member
       await ctx.db.insert("organizationMembers", {
         organizationId: args.organizationId,
         userId: args.targetUserId,
@@ -1215,84 +1210,8 @@ export const transferOwnership = mutation({
       });
     }
 
-    // Remove ALL members except target user
-    let removedMemberCount = 0;
-    for (const member of members) {
-      if (member.userId === args.targetUserId) continue;
-
-      // Revoke project access tokens for this user
-      for (const project of projects) {
-        const tokens = await ctx.db
-          .query("projectAccess")
-          .withIndex("by_project_and_user", (q) =>
-            q.eq("projectId", project._id).eq("userId", member.userId)
-          )
-          .filter((q) => q.eq(q.field("isActive"), true))
-          .collect();
-
-        for (const token of tokens) {
-          await ctx.db.patch(token._id, { isActive: false });
-          await ctx.db.insert("permissionRevocationEvents", {
-            accessToken: token.accessToken,
-            projectId: project._id,
-            userId: member.userId,
-            reason: "Organization ownership transferred",
-            revokedBy: args.transferredBy,
-            revokedAt: now,
-            acknowledged: false,
-            expiresAt: revocationExpiresAt,
-          });
-        }
-
-        // Delete project members for this user
-        const projectMemberships = await ctx.db
-          .query("projectMembers")
-          .withIndex("by_project_and_user", (q) =>
-            q.eq("projectId", project._id).eq("userId", member.userId)
-          )
-          .collect();
-        for (const pm of projectMemberships) {
-          await ctx.db.delete(pm._id);
-        }
-      }
-
-      // Deactivate variable permissions for this user (only org's variables)
-      const userPermissions = await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_user_active", (q) =>
-          q.eq("userId", member.userId).eq("isActive", true)
-        )
-        .collect();
-
-      for (const perm of userPermissions) {
-        const variable = await ctx.db.get(perm.variableId);
-        if (variable && orgProjectIds.has(variable.projectId)) {
-          await ctx.db.patch(perm._id, {
-            isActive: false,
-            revokedAt: now,
-            revokedBy: args.transferredBy,
-          });
-        }
-      }
-
-      // Revoke CLI tokens for this user
-      const cliTokens = await ctx.db
-        .query("cliTokens")
-        .withIndex("by_user_active", (q) =>
-          q.eq("userId", member.userId).eq("isActive", true)
-        )
-        .collect();
-      for (const cliToken of cliTokens) {
-        await ctx.db.patch(cliToken._id, {
-          isActive: false,
-          revokedAt: now,
-        });
-      }
-
-      // Delete org membership
-      await ctx.db.delete(member._id);
-      removedMemberCount++;
-    }
+    // Remove previous owner from the organization
+    await ctx.db.delete(callerMembership._id);
 
     // Update org creator
     await ctx.db.patch(args.organizationId, {
@@ -1307,8 +1226,6 @@ export const transferOwnership = mutation({
       details: JSON.stringify({
         transferredFrom: args.transferredBy,
         transferredTo: args.targetUserId,
-        removedMemberCount,
-        projectCount: projects.length,
       }),
       createdAt: now,
     });

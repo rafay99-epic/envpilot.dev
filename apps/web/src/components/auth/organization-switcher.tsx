@@ -34,22 +34,30 @@ export function OrganizationSwitcher({
     organizations.find((org) => org._id === currentOrgId) || organizations[0];
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchOrganizations() {
       try {
         const response = await fetch("/api/organizations");
-        if (response.ok) {
+        if (response.ok && !cancelled) {
           const data = await response.json();
           setOrganizations(data.organizations || []);
         }
       } catch {
         // Silently fail - organizations will be empty
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 
     fetchOrganizations();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
