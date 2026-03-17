@@ -2,7 +2,8 @@ import chalk from "chalk";
 import Conf from "conf";
 import { getApiUrl } from "./config.js";
 
-const CLI_VERSION = "1.3.1";
+declare const __CLI_VERSION__: string;
+const CLI_VERSION = typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0";
 const CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 // Lazy-init so --help / --version don't pay disk I/O cost
