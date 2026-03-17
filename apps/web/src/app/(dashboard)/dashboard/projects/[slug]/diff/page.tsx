@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useMemo } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
 import {
@@ -21,12 +22,64 @@ import {
   CheckCircle2,
   XCircle,
   ArrowLeft,
-  ChevronDown,
   ChevronRight,
   Lock,
   Copy,
   Check,
 } from "lucide-react";
+
+// ─── Animation Variants ─────────────────────────────────────────────
+
+const fadeIn = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: "easeOut" as const },
+  },
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.04, delayChildren: 0.1 },
+  },
+};
+
+const rowVariant = {
+  hidden: { opacity: 0, x: -8 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.25, ease: "easeOut" as const },
+  },
+  exit: {
+    opacity: 0,
+    x: 8,
+    transition: { duration: 0.15 },
+  },
+};
+
+const expandVariant = {
+  collapsed: { height: 0, opacity: 0 },
+  expanded: {
+    height: "auto",
+    opacity: 1,
+    transition: {
+      height: { duration: 0.3, ease: "easeOut" as const },
+      opacity: { duration: 0.25, delay: 0.05 },
+    },
+  },
+  exit: {
+    height: 0,
+    opacity: 0,
+    transition: {
+      opacity: { duration: 0.15 },
+      height: { duration: 0.25, ease: "easeIn" as const },
+    },
+  },
+};
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -457,146 +510,192 @@ export default function EnvironmentDiffPage({
 
       {/* Summary + Search */}
       {!isLoadingVars && variables.length > 0 && (
-        <TerminalWindow title={`diff-summary — ${summary.total} variables`}>
-          <div className="space-y-3 p-4">
-            <div className="flex flex-wrap items-center gap-3 font-mono text-sm sm:gap-5">
-              {(["all", "matching", "changed", "missing"] as const).map((f) => {
-                const count = f === "all" ? summary.total : summary[f];
-                const active = statusFilter === f;
-                const cfg = f === "all" ? null : STATUS_CFG[f];
-                return (
-                  <button
-                    key={f}
-                    onClick={() =>
-                      setStatusFilter(active && f !== "all" ? "all" : f)
-                    }
-                    className={`flex items-center gap-1.5 transition-colors ${
-                      active
-                        ? cfg
-                          ? cfg.color
-                          : "text-zinc-100"
-                        : "text-zinc-600 hover:text-zinc-400"
-                    }`}
-                  >
-                    {cfg && <cfg.icon className="h-3.5 w-3.5" />}
-                    <span>
-                      {count} {f}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {summary.total > 0 && (
-              <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                {summary.matching > 0 && (
-                  <div
-                    className="bg-green-500 transition-all"
-                    style={{
-                      width: `${(summary.matching / summary.total) * 100}%`,
-                    }}
-                  />
-                )}
-                {summary.changed > 0 && (
-                  <div
-                    className="bg-amber-500 transition-all"
-                    style={{
-                      width: `${(summary.changed / summary.total) * 100}%`,
-                    }}
-                  />
-                )}
-                {summary.missing > 0 && (
-                  <div
-                    className="bg-red-500 transition-all"
-                    style={{
-                      width: `${(summary.missing / summary.total) * 100}%`,
-                    }}
-                  />
+        <motion.div variants={fadeIn} initial="hidden" animate="visible">
+          <TerminalWindow title={`diff-summary — ${summary.total} variables`}>
+            <div className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center gap-3 font-mono text-sm sm:gap-5">
+                {(["all", "matching", "changed", "missing"] as const).map(
+                  (f) => {
+                    const count = f === "all" ? summary.total : summary[f];
+                    const active = statusFilter === f;
+                    const cfg = f === "all" ? null : STATUS_CFG[f];
+                    return (
+                      <button
+                        key={f}
+                        onClick={() =>
+                          setStatusFilter(active && f !== "all" ? "all" : f)
+                        }
+                        className={`flex items-center gap-1.5 transition-colors ${
+                          active
+                            ? cfg
+                              ? cfg.color
+                              : "text-zinc-100"
+                            : "text-zinc-600 hover:text-zinc-400"
+                        }`}
+                      >
+                        {cfg && <cfg.icon className="h-3.5 w-3.5" />}
+                        <span>
+                          {count} {f}
+                        </span>
+                      </button>
+                    );
+                  }
                 )}
               </div>
-            )}
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-              <input
-                type="text"
-                placeholder="grep variables..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-9 pr-4 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/30 focus:outline-none focus:ring-1 focus:ring-green-500/20"
-              />
+              {summary.total > 0 && (
+                <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                  {summary.matching > 0 && (
+                    <motion.div
+                      className="bg-green-500"
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${(summary.matching / summary.total) * 100}%`,
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.2,
+                      }}
+                    />
+                  )}
+                  {summary.changed > 0 && (
+                    <motion.div
+                      className="bg-amber-500"
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${(summary.changed / summary.total) * 100}%`,
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.35,
+                      }}
+                    />
+                  )}
+                  {summary.missing > 0 && (
+                    <motion.div
+                      className="bg-red-500"
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${(summary.missing / summary.total) * 100}%`,
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.5,
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
+                <input
+                  type="text"
+                  placeholder="grep variables..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-9 pr-4 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/30 focus:outline-none focus:ring-1 focus:ring-green-500/20"
+                />
+              </div>
             </div>
-          </div>
-        </TerminalWindow>
+          </TerminalWindow>
+        </motion.div>
       )}
 
       {/* Diff Output */}
       {!isLoadingVars && variables.length > 0 && (
-        <TerminalWindow title="diff-output">
-          {filteredRows.length === 0 ? (
-            <TerminalEmptyState
-              command={`envpilot diff --filter ${statusFilter}${searchQuery ? ` --grep "${searchQuery}"` : ""}`}
-              message={
-                rows.length === 0
-                  ? "No variables found in the selected environments."
-                  : "No variables match your filters."
-              }
-            />
-          ) : (
-            <div>
-              {/* Desktop column header */}
-              <div className="hidden border-b border-zinc-800/50 bg-zinc-800/20 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-zinc-600 lg:flex">
-                <div className="w-7 shrink-0" />
-                <div className="min-w-[160px] flex-1">Key</div>
-                {selectedEnvs.map((env) => (
-                  <div
-                    key={env}
-                    className={`flex-1 min-w-[140px] ${ENV_META[env].text}`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${ENV_META[env].dot}`}
-                      />
-                      {env}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        <motion.div
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          transition={{ delay: 0.1 }}
+        >
+          <TerminalWindow title="diff-output">
+            {filteredRows.length === 0 ? (
+              <TerminalEmptyState
+                command={`envpilot diff --filter ${statusFilter}${searchQuery ? ` --grep "${searchQuery}"` : ""}`}
+                message={
+                  rows.length === 0
+                    ? "No variables found in the selected environments."
+                    : "No variables match your filters."
+                }
+              />
+            ) : (
+              <div>
+                {/* Desktop column header */}
+                <div className="hidden border-b border-zinc-800/50 bg-zinc-800/20 px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-zinc-600 lg:flex">
+                  <div className="w-7 shrink-0" />
+                  <div className="min-w-[160px] flex-1">Key</div>
+                  {selectedEnvs.map((env) => (
+                    <div
+                      key={env}
+                      className={`flex-1 min-w-[140px] ${ENV_META[env].text}`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${ENV_META[env].dot}`}
+                        />
+                        {env}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-              <div className="divide-y divide-zinc-800/30">
-                {filteredRows.map((row) => (
-                  <DiffRowItem
-                    key={row.key}
-                    row={row}
-                    envs={selectedEnvs}
-                    globalReveal={globalReveal}
-                    revealedValues={revealedValues}
-                    revealingRefs={revealingRefs}
-                    isExpanded={expandedKey === row.key}
-                    onToggleExpand={() =>
-                      setExpandedKey((p) => (p === row.key ? null : row.key))
-                    }
-                    onRevealRow={() => revealRow(row)}
-                    onRevealRef={revealValue}
-                    copiedRef={copiedRef}
-                    onCopy={copyValue}
-                  />
-                ))}
+                <motion.div
+                  className="divide-y divide-zinc-800/30"
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {filteredRows.map((row) => (
+                      <motion.div
+                        key={row.key}
+                        variants={rowVariant}
+                        exit="exit"
+                        layout
+                      >
+                        <DiffRowItem
+                          row={row}
+                          envs={selectedEnvs}
+                          globalReveal={globalReveal}
+                          revealedValues={revealedValues}
+                          revealingRefs={revealingRefs}
+                          isExpanded={expandedKey === row.key}
+                          onToggleExpand={() =>
+                            setExpandedKey((p) =>
+                              p === row.key ? null : row.key
+                            )
+                          }
+                          onRevealRow={() => revealRow(row)}
+                          onRevealRef={revealValue}
+                          copiedRef={copiedRef}
+                          onCopy={copyValue}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
               </div>
-            </div>
-          )}
-        </TerminalWindow>
+            )}
+          </TerminalWindow>
+        </motion.div>
       )}
 
       {!isLoadingVars && variables.length === 0 && !error && (
-        <TerminalEmptyState
-          command="envpilot diff"
-          message="No variables in this project yet."
-          action={{
-            label: "Go to Variables",
-            href: `/dashboard/projects/${project.slug}`,
-          }}
-        />
+        <motion.div variants={fadeIn} initial="hidden" animate="visible">
+          <TerminalEmptyState
+            command="envpilot diff"
+            message="No variables in this project yet."
+            action={{
+              label: "Go to Variables",
+              href: `/dashboard/projects/${project.slug}`,
+            }}
+          />
+        </motion.div>
       )}
     </div>
   );
@@ -678,11 +777,14 @@ function DiffRowItem({
       >
         {/* Chevron */}
         <div className="w-7 shrink-0">
-          {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
-          )}
+          <motion.div
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <ChevronRight
+              className={`h-3.5 w-3.5 ${isExpanded ? "text-zinc-500" : "text-zinc-600"}`}
+            />
+          </motion.div>
         </div>
 
         {/* Key */}
@@ -741,11 +843,14 @@ function DiffRowItem({
         onClick={onToggleExpand}
       >
         <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
-          )}
+          <motion.div
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            <ChevronRight
+              className={`h-3.5 w-3.5 ${isExpanded ? "text-zinc-500" : "text-zinc-600"}`}
+            />
+          </motion.div>
           <code className="font-mono text-sm font-medium text-zinc-200">
             {row.key}
           </code>
@@ -775,123 +880,144 @@ function DiffRowItem({
       </div>
 
       {/* ── Expanded Detail Panel ── */}
-      {isExpanded && (
-        <div className="border-t border-zinc-800/30 bg-zinc-900/50 px-4 py-3 lg:ml-7">
-          {row.description && (
-            <p className="mb-3 font-mono text-xs text-zinc-500">
-              # {row.description}
-            </p>
-          )}
+      <AnimatePresence initial={false}>
+        {isExpanded && (
+          <motion.div
+            variants={expandVariant}
+            initial="collapsed"
+            animate="expanded"
+            exit="exit"
+            className="overflow-hidden"
+          >
+            <div className="border-t border-zinc-800/30 bg-zinc-900/50 px-4 py-3 lg:ml-7">
+              {row.description && (
+                <p className="mb-3 font-mono text-xs text-zinc-500">
+                  # {row.description}
+                </p>
+              )}
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {envs.map((env) => {
-              const slot = row.slots[env];
-              const meta = ENV_META[env];
-              const revealed = slot ? revealedValues[slot.vaultRef] : undefined;
-              const isRevealing = slot
-                ? revealingRefs.has(slot.vaultRef)
-                : false;
-              const isDiff = diffHighlight.has(env);
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {envs.map((env, i) => {
+                  const slot = row.slots[env];
+                  const meta = ENV_META[env];
+                  const revealed = slot
+                    ? revealedValues[slot.vaultRef]
+                    : undefined;
+                  const isRevealing = slot
+                    ? revealingRefs.has(slot.vaultRef)
+                    : false;
+                  const isDiff = diffHighlight.has(env);
 
-              return (
-                <div
-                  key={env}
-                  className={`rounded-lg border p-3 ${
-                    !slot
-                      ? "border-dashed border-red-500/20 bg-red-500/5"
-                      : isDiff
-                        ? "border-amber-500/30 bg-amber-500/5"
-                        : "border-zinc-800 bg-zinc-900/80"
-                  }`}
-                >
-                  {/* Env label */}
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`flex items-center gap-1.5 font-mono text-xs font-medium ${meta.text}`}
+                  return (
+                    <motion.div
+                      key={env}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{
+                        duration: 0.2,
+                        delay: i * 0.06,
+                        ease: "easeOut",
+                      }}
+                      className={`rounded-lg border p-3 ${
+                        !slot
+                          ? "border-dashed border-red-500/20 bg-red-500/5"
+                          : isDiff
+                            ? "border-amber-500/30 bg-amber-500/5"
+                            : "border-zinc-800 bg-zinc-900/80"
+                      }`}
                     >
-                      <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                      {env}
-                    </span>
-                    {slot && (
-                      <span className="font-mono text-[10px] text-zinc-600">
-                        v{slot.variable.version} ·{" "}
-                        {formatDate(slot.variable.updatedAt)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Value */}
-                  <div className="mt-2">
-                    {!slot ? (
-                      <div className="flex items-center gap-2 px-2 py-1.5">
-                        <XCircle className="h-3 w-3 text-red-500/60" />
-                        <span className="font-mono text-xs text-red-400/60">
-                          not defined in this environment
-                        </span>
-                      </div>
-                    ) : revealed ? (
-                      <div className="group/val relative">
-                        <code className="block break-all rounded bg-zinc-800 px-2 py-1.5 font-mono text-xs text-green-400">
-                          {revealed}
-                        </code>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCopy(revealed, slot.vaultRef);
-                          }}
-                          className="absolute right-1 top-1 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-zinc-300 group-hover/val:opacity-100"
-                          title="Copy"
+                      {/* Env label */}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`flex items-center gap-1.5 font-mono text-xs font-medium ${meta.text}`}
                         >
-                          {copiedRef === slot.vaultRef ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRevealRef(slot.vaultRef);
-                        }}
-                        disabled={isRevealing}
-                        className="flex w-full items-center gap-2 rounded bg-zinc-800/50 px-2 py-1.5 font-mono text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
-                      >
-                        {isRevealing ? (
-                          <>
-                            <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-300" />
-                            decrypting...
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3 w-3" />
-                            click to reveal
-                          </>
+                          <span
+                            className={`h-2 w-2 rounded-full ${meta.dot}`}
+                          />
+                          {env}
+                        </span>
+                        {slot && (
+                          <span className="font-mono text-[10px] text-zinc-600">
+                            v{slot.variable.version} ·{" "}
+                            {formatDate(slot.variable.updatedAt)}
+                          </span>
                         )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      </div>
 
-          {/* Mobile reveal all */}
-          <div className="mt-2 lg:hidden">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRevealRow();
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
-            >
-              <Eye className="h-3 w-3" />
-              Reveal all values
-            </button>
-          </div>
-        </div>
-      )}
+                      {/* Value */}
+                      <div className="mt-2">
+                        {!slot ? (
+                          <div className="flex items-center gap-2 px-2 py-1.5">
+                            <XCircle className="h-3 w-3 text-red-500/60" />
+                            <span className="font-mono text-xs text-red-400/60">
+                              not defined in this environment
+                            </span>
+                          </div>
+                        ) : revealed ? (
+                          <div className="group/val relative">
+                            <code className="block break-all rounded bg-zinc-800 px-2 py-1.5 font-mono text-xs text-green-400">
+                              {revealed}
+                            </code>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCopy(revealed, slot.vaultRef);
+                              }}
+                              className="absolute right-1 top-1 rounded p-0.5 text-zinc-600 opacity-0 transition-opacity hover:text-zinc-300 group-hover/val:opacity-100"
+                              title="Copy"
+                            >
+                              {copiedRef === slot.vaultRef ? (
+                                <Check className="h-3 w-3 text-green-500" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRevealRef(slot.vaultRef);
+                            }}
+                            disabled={isRevealing}
+                            className="flex w-full items-center gap-2 rounded bg-zinc-800/50 px-2 py-1.5 font-mono text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:opacity-50"
+                          >
+                            {isRevealing ? (
+                              <>
+                                <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-300" />
+                                decrypting...
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-3 w-3" />
+                                click to reveal
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Mobile reveal all */}
+              <div className="mt-2 lg:hidden">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRevealRow();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+                >
+                  <Eye className="h-3 w-3" />
+                  Reveal all values
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
