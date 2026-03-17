@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useHotkeys } from "react-hotkeys-hook";
+import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
+import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Lock, X } from "lucide-react";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
 import { ENVIRONMENTS } from "@/constants/project";
+import { useKeyboardStore } from "@/stores/keyboard-store";
+import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "open-command-palette";
 
@@ -69,9 +72,15 @@ export function CommandPalette() {
     setIsOpen(false);
   }
 
-  // Global hotkey
-  useHotkeys(
-    "mod+k",
+  // Global hotkey — respects custom bindings
+  const customBindings = useKeyboardStore((s) => s.customBindings);
+  const cmdPaletteKeys = customBindings.COMMAND_PALETTE ?? SHORTCUTS.COMMAND_PALETTE.keys;
+  const cmdPaletteBinding = parseBinding(cmdPaletteKeys);
+
+  useHotkey(
+    cmdPaletteBinding.type === "single"
+      ? (cmdPaletteBinding.hotkey as Hotkey)
+      : ("F24" as Hotkey),
     (e) => {
       e.preventDefault();
       if (isOpen) {
@@ -80,7 +89,21 @@ export function CommandPalette() {
         openPalette();
       }
     },
-    { enableOnFormTags: true }
+    { enabled: cmdPaletteBinding.type === "single" }
+  );
+
+  useHotkeySequence(
+    cmdPaletteBinding.type === "sequence"
+      ? (cmdPaletteBinding.keys as unknown as HotkeySequence)
+      : (["Unidentified", "Unidentified"] as unknown as HotkeySequence),
+    () => {
+      if (isOpen) {
+        closePalette();
+      } else {
+        openPalette();
+      }
+    },
+    { enabled: cmdPaletteBinding.type === "sequence" }
   );
 
   // Listen for custom open event (from search trigger button)

@@ -21,10 +21,20 @@ import {
   Users,
   KeyRound,
   ShieldAlert,
+  Keyboard,
+  RotateCcw,
+  Pencil,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { useKeyboardStore } from "@/stores/keyboard-store";
+import {
+  SHORTCUTS,
+  getEffectiveShortcuts,
+} from "@/hooks/useKeyboardShortcuts";
+import { validateBinding } from "@/lib/shortcut-validation";
 
-type SettingsTab = "general" | "notifications" | "integrations" | "security";
+type SettingsTab = "general" | "notifications" | "integrations" | "security" | "customization";
 
 export default function SettingsPage() {
   const { user } = useAuthContext();
@@ -35,6 +45,7 @@ export default function SettingsPage() {
     { id: "notifications", label: "Notifications" },
     { id: "integrations", label: "Integrations" },
     { id: "security", label: "Security" },
+    { id: "customization", label: "Customization" },
   ];
 
   return (
@@ -72,6 +83,7 @@ export default function SettingsPage() {
         {activeTab === "notifications" && <NotificationSettings />}
         {activeTab === "integrations" && <IntegrationsSettings />}
         {activeTab === "security" && <SecuritySettings />}
+        {activeTab === "customization" && <CustomizationSettings />}
       </div>
     </div>
   );
@@ -718,6 +730,347 @@ function SecuritySettings() {
           </div>
         )}
       </TerminalCard>
+    </div>
+  );
+}
+
+// ============================================================
+// Customization Settings (Keyboard Shortcuts)
+// ============================================================
+
+const shortcutCategories = [
+  { key: "navigation" as const, label: "Navigation" },
+  { key: "actions" as const, label: "Actions" },
+  { key: "selection" as const, label: "Selection" },
+];
+
+function CustomizationSettings() {
+  const customBindings = useKeyboardStore((s) => s.customBindings);
+  const updateBinding = useKeyboardStore((s) => s.updateBinding);
+  const removeBinding = useKeyboardStore((s) => s.removeBinding);
+  const resetAllBindings = useKeyboardStore((s) => s.resetAllBindings);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
+  const [isRecordingSequence, setIsRecordingSequence] = useState(false);
+  const [sequenceStep, setSequenceStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const effectiveShortcuts = getEffectiveShortcuts(customBindings);
+  const hasCustomBindings = Object.keys(customBindings).length > 0;
+
+  function startEditing(shortcutId: string) {
+    setEditingId(shortcutId);
+    setRecordedKeys([]);
+    setIsRecordingSequence(false);
+    setSequenceStep(0);
+    setError(null);
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setRecordedKeys([]);
+    setIsRecordingSequence(false);
+    setSequenceStep(0);
+    setError(null);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!editingId) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const key = e.key;
+    if (key === "Escape") {
+      cancelEditing();
+      return;
+    }
+
+    // Ignore standalone modifier keys
+    if (["Control", "Shift", "Alt", "Meta"].includes(key)) return;
+
+    const parts: string[] = [];
+    if (e.metaKey || e.ctrlKey) parts.push("Mod");
+    if (e.shiftKey) parts.push("Shift");
+    if (e.altKey) parts.push("Alt");
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+
+    const binding = parts.join("+");
+
+    if (isRecordingSequence && sequenceStep === 1) {
+      // Second key of sequence
+      const fullBinding = `${recordedKeys[0]} then ${binding}`;
+      const validation = validateBinding(customBindings, editingId, fullBinding);
+      if (!validation.valid) {
+        setError(validation.reason ?? "Invalid binding");
+        return;
+      }
+      saveBinding(editingId, fullBinding);
+      return;
+    }
+
+    // Single key press — check if it's a simple letter (potential sequence start)
+    if (
+      parts.length === 1 &&
+      key.length === 1 &&
+      /^[A-Z]$/i.test(key) &&
+      !isRecordingSequence
+    ) {
+      // Start sequence recording
+      setIsRecordingSequence(true);
+      setSequenceStep(1);
+      setRecordedKeys([binding]);
+      return;
+    }
+
+    // Regular single shortcut
+    const validation = validateBinding(customBindings, editingId, binding);
+    if (!validation.valid) {
+      setError(validation.reason ?? "Invalid binding");
+      return;
+    }
+    saveBinding(editingId, binding);
+  }
+
+  async function saveBinding(shortcutId: string, binding: string) {
+    setIsSaving(true);
+    const newBindings = { ...customBindings, [shortcutId]: binding };
+    updateBinding(shortcutId, binding);
+
+    try {
+      await fetch("/api/users/me/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyboardShortcuts: newBindings }),
+      });
+      setSaveMessage("Saved");
+      setTimeout(() => setSaveMessage(null), 2000);
+    } catch {
+      // Revert on error
+      removeBinding(shortcutId);
+    } finally {
+      setIsSaving(false);
+      setEditingId(null);
+      setRecordedKeys([]);
+      setIsRecordingSequence(false);
+      setSequenceStep(0);
+      setError(null);
+    }
+  }
+
+  async function handleRemoveBinding(shortcutId: string) {
+    removeBinding(shortcutId);
+    const { [shortcutId]: _, ...rest } = customBindings;
+    try {
+      await fetch("/api/users/me/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyboardShortcuts: rest }),
+      });
+    } catch {
+      // Revert
+      updateBinding(shortcutId, customBindings[shortcutId]);
+    }
+  }
+
+  async function handleResetAll() {
+    resetAllBindings();
+    try {
+      await fetch("/api/users/me/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyboardShortcuts: {} }),
+      });
+      setSaveMessage("All shortcuts reset to defaults");
+      setTimeout(() => setSaveMessage(null), 2000);
+    } catch {
+      // Silently fail
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <TerminalCard>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/10">
+              <Keyboard className="h-4 w-4 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Keyboard Shortcuts
+              </h2>
+              <p className="text-sm text-zinc-500">
+                Customize shortcuts to match your workflow
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {saveMessage && (
+              <span className="text-xs text-green-400">{saveMessage}</span>
+            )}
+            {hasCustomBindings && (
+              <TerminalButton
+                variant="secondary"
+                onClick={handleResetAll}
+                disabled={isSaving}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset All
+              </TerminalButton>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-6">
+          {shortcutCategories.map((category) => {
+            const items = Object.entries(effectiveShortcuts).filter(
+              ([, def]) => def.category === category.key
+            );
+            if (items.length === 0) return null;
+
+            return (
+              <div key={category.key}>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  {category.label}
+                </h3>
+                <div className="space-y-1">
+                  {items.map(([id, def]) => {
+                    const isEditing = editingId === id;
+                    const isCustomized = id in customBindings;
+
+                    return (
+                      <div
+                        key={id}
+                        className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${
+                          isEditing
+                            ? "border-purple-500/50 bg-purple-500/5"
+                            : "border-zinc-700/50 bg-zinc-800/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-zinc-300">
+                            {def.description}
+                          </span>
+                          {isCustomized && !isEditing && (
+                            <span className="rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-400">
+                              custom
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isEditing ? (
+                            <div
+                              className="flex items-center gap-2"
+                              onKeyDown={handleKeyDown}
+                              tabIndex={0}
+                              autoFocus
+                            >
+                              <div className="flex items-center rounded border border-purple-500/30 bg-zinc-900 px-3 py-1.5">
+                                {isRecordingSequence && sequenceStep === 1 ? (
+                                  <span className="font-mono text-xs text-amber-400">
+                                    {recordedKeys[0]} then ...
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-xs text-zinc-500">
+                                    Press keys...
+                                  </span>
+                                )}
+                              </div>
+                              {error && (
+                                <span className="text-xs text-red-400">
+                                  {error}
+                                </span>
+                              )}
+                              <button
+                                onClick={cancelEditing}
+                                className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <ShortcutKeyDisplay keys={def.keys} />
+                              <button
+                                onClick={() => startEditing(id)}
+                                className="rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+                                title="Edit shortcut"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              {isCustomized && (
+                                <button
+                                  onClick={() => handleRemoveBinding(id)}
+                                  className="rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-700 hover:text-amber-400"
+                                  title="Reset to default"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 rounded-lg border border-zinc-700/50 bg-zinc-800/30 p-4">
+          <p className="text-xs text-zinc-500">
+            Click the pencil icon to edit a shortcut. Press a key combination to
+            set it, or press a single letter followed by another key for a
+            sequence (e.g., G then P). Press <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 font-mono text-[10px]">Esc</kbd> to cancel.
+            Your shortcuts sync across all your devices.
+          </p>
+        </div>
+      </TerminalCard>
+    </div>
+  );
+}
+
+function ShortcutKeyDisplay({ keys }: { keys: string }) {
+  const isSequence = keys.includes(" then ");
+
+  if (isSequence) {
+    return (
+      <div className="flex items-center gap-1">
+        {keys.split(" then ").map((k, i) => (
+          <span key={i} className="flex items-center gap-1">
+            {i > 0 && <span className="text-[10px] text-zinc-600">then</span>}
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+              {k.trim()}
+            </kbd>
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {keys.split("+").map((key, i) => (
+        <span key={i} className="flex items-center gap-1">
+          {i > 0 && <span className="text-[10px] text-zinc-600">+</span>}
+          <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
+            {key.trim() === "Mod"
+              ? typeof navigator !== "undefined" &&
+                /Mac/.test(navigator.userAgent)
+                ? "\u2318"
+                : "Ctrl"
+              : key.trim() === "Shift"
+                ? "\u21E7"
+                : key.trim()}
+          </kbd>
+        </span>
+      ))}
     </div>
   );
 }

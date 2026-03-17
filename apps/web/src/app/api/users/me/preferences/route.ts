@@ -42,6 +42,7 @@ const preferencesSchema = z.object({
       securityAlerts: z.boolean(),
     })
     .optional(),
+  keyboardShortcuts: z.record(z.string(), z.string()).optional(),
 });
 
 /**
@@ -71,6 +72,7 @@ export async function PATCH(request: NextRequest) {
       userId: convexUser._id,
       callerUserId: convexUser._id,
       emailNotifications: validation.data.emailNotifications,
+      keyboardShortcuts: validation.data.keyboardShortcuts,
     });
 
     return NextResponse.json({ success: true });

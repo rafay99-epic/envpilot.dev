@@ -816,6 +816,100 @@ export const remove = mutation({
   },
 });
 
+export const bulkDelete = mutation({
+  args: {
+    variableIds: v.array(v.id("environmentVariables")),
+    deletedBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    if (args.variableIds.length === 0) {
+      throw new Error("No variables specified");
+    }
+    if (args.variableIds.length > MAX_BULK_IMPORT_SIZE) {
+      throw new Error(
+        `Cannot bulk delete more than ${MAX_BULK_IMPORT_SIZE} variables at once`
+      );
+    }
+
+    // Look up the first variable to determine project/org for authorization
+    const firstVariable = await ctx.db.get(args.variableIds[0]);
+    if (!firstVariable || firstVariable.deletedAt) {
+      throw new Error("Variable not found");
+    }
+
+    const project = await ctx.db.get(firstVariable.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Authorization: verify caller has permission
+    await authorizeVariableAccess(ctx, {
+      userId: args.deletedBy,
+      organizationId: project.organizationId,
+      projectId: firstVariable.projectId,
+      requiredOrgRoles: ["admin", "team_lead"],
+      requiredProjectRoles: ["manager"],
+    });
+
+    let deletedCount = 0;
+    const deletedKeys: string[] = [];
+
+    for (const variableId of args.variableIds) {
+      const variable = await ctx.db.get(variableId);
+      if (!variable || variable.deletedAt) continue;
+
+      // Ensure all variables belong to the same project
+      if (variable.projectId !== firstVariable.projectId) {
+        throw new Error("All variables must belong to the same project");
+      }
+
+      // Soft delete
+      await ctx.db.patch(variableId, {
+        deletedAt: now,
+        updatedAt: now,
+      });
+
+      // Revoke active permissions
+      const permissions = await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_variable", (q) => q.eq("variableId", variableId))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+
+      for (const perm of permissions) {
+        await ctx.db.patch(perm._id, {
+          isActive: false,
+          revokedAt: now,
+          revokedBy: args.deletedBy,
+        });
+      }
+
+      deletedKeys.push(variable.key);
+      deletedCount++;
+    }
+
+    // Audit log
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: firstVariable.projectId,
+      userId: args.deletedBy,
+      action: "variable.deleted",
+      details: {
+        bulkOperation: true,
+        deletedCount,
+        deletedKeys,
+        projectName: project.name,
+      },
+      resourceType: "variable",
+      severity: "warning",
+    });
+
+    return { deletedCount };
+  },
+});
+
 export const restore = mutation({
   args: {
     variableId: v.id("environmentVariables"),

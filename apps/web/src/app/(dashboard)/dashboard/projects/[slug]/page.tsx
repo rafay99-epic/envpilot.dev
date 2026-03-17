@@ -3,7 +3,11 @@
 import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import type { Id } from "@convex/_generated/dataModel";
-import { useHotkeys } from "react-hotkeys-hook";
+import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
+import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
+import { useVariableSelectionStore } from "@/stores/variable-selection-store";
+import { useKeyboardStore } from "@/stores/keyboard-store";
+import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
@@ -95,16 +99,48 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const enforcing = isTierEnforcementEnabled();
   const versionHistoryAllowed = !enforcing || tierFeatures.versionHistory;
 
-  // Keyboard shortcut: Cmd/Ctrl+Shift+K to open Add Variable drawer
-  useHotkeys(
-    "mod+shift+k",
+  // Variable selection store for bulk operations
+  const {
+    selectedIds,
+    isSelectionMode,
+    isBulkDeleting,
+    showConfirmDialog: showBulkDeleteConfirm,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    exitSelectionMode,
+    setBulkDeleting,
+    setShowConfirmDialog: setShowBulkDeleteConfirm,
+  } = useVariableSelectionStore();
+
+  // Keyboard shortcut: Cmd/Ctrl+Shift+K to open Add Variable drawer (respects custom bindings)
+  const customBindings = useKeyboardStore((s) => s.customBindings);
+  const addVarKeys = customBindings.ADD_VARIABLE ?? SHORTCUTS.ADD_VARIABLE.keys;
+  const addVarBinding = parseBinding(addVarKeys);
+
+  useHotkey(
+    addVarBinding.type === "single"
+      ? (addVarBinding.hotkey as Hotkey)
+      : ("F24" as Hotkey),
     (e) => {
       e.preventDefault();
       if (canCreateVariable || canRequestVariable) {
         setShowCreateModal(true);
       }
     },
-    { enableOnFormTags: false }
+    { enabled: addVarBinding.type === "single" }
+  );
+
+  useHotkeySequence(
+    addVarBinding.type === "sequence"
+      ? (addVarBinding.keys as unknown as HotkeySequence)
+      : (["Unidentified", "Unidentified"] as unknown as HotkeySequence),
+    () => {
+      if (canCreateVariable || canRequestVariable) {
+        setShowCreateModal(true);
+      }
+    },
+    { enabled: addVarBinding.type === "sequence" }
   );
 
   const [project, setProject] = useState<Project | null>(null);
@@ -235,6 +271,43 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const refreshProjectData = async () => {
     await Promise.all([fetchVariables(), fetchRequests()]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || !project) return;
+
+    setBulkDeleting(true);
+    setNotice(null);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/variables/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variableIds: Array.from(selectedIds),
+          projectId: project._id,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to delete variables");
+      }
+
+      setNotice(
+        `Successfully deleted ${result.deletedCount} variable${result.deletedCount !== 1 ? "s" : ""}.`
+      );
+      exitSelectionMode();
+      await refreshProjectData();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete variables"
+      );
+    } finally {
+      setBulkDeleting(false);
+      setShowBulkDeleteConfirm(false);
+    }
   };
 
   const handleExport = async (
@@ -823,6 +896,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     canEdit={canUpdateVariable}
                     canDelete={canDeleteVariable}
                     permissionLevel={variable.permission ?? null}
+                    showCheckbox={canDeleteVariable}
+                    isSelected={selectedIds.has(variable._id)}
+                    onToggleSelect={() => toggleSelect(variable._id)}
                   />
                 ))}
               </AnimatedList>
@@ -987,6 +1063,52 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         confirmText="Delete"
         variant="danger"
       />
+
+      {/* Bulk Delete Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title="Bulk Delete Variables"
+        message={`Are you sure you want to delete ${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}? This action cannot be undone.`}
+        confirmText={isBulkDeleting ? "Deleting..." : "Delete All"}
+        variant="danger"
+      />
+
+      {/* Floating Bulk Action Bar */}
+      {isSelectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 shadow-2xl">
+            <span className="text-sm font-medium text-zinc-300">
+              {selectedIds.size} variable{selectedIds.size !== 1 ? "s" : ""}{" "}
+              selected
+            </span>
+            <button
+              onClick={() =>
+                selectAll(
+                  filteredVariables.map((v) => v._id)
+                )
+              }
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              Select All
+            </button>
+            <button
+              onClick={clearSelection}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              disabled={isBulkDeleting}
+              className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            >
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
 
       {historyVariable && (
         <VariableHistory

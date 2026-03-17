@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/auth";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { CommandPalette } from "@/components/command-palette";
 import { UpdateBanner } from "@/components/dashboard/update-banner";
+import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortcuts-provider";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getPermissionsForMembershipRole } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -107,8 +108,11 @@ export default async function DashboardLayout({
           </div>
         </main>
 
-        {/* Global Search Command Palette */}
-        <CommandPalette />
+        {/* Global Keyboard Shortcuts */}
+        <KeyboardShortcutsProvider>
+          {/* Global Search Command Palette */}
+          <CommandPalette />
+        </KeyboardShortcutsProvider>
 
         {/* Update Available Notification */}
         <UpdateBanner />

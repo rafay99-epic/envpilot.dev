@@ -27,6 +27,9 @@ interface VariableListItemProps {
   canDelete?: boolean;
   canManagePermissions?: boolean;
   permissionLevel?: "read" | "write" | "admin" | null;
+  showCheckbox?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export function VariableListItem({
@@ -42,6 +45,9 @@ export function VariableListItem({
   canDelete = false,
   canManagePermissions = false,
   permissionLevel,
+  showCheckbox = false,
+  isSelected = false,
+  onToggleSelect,
 }: VariableListItemProps) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -74,9 +80,22 @@ export function VariableListItem({
   };
 
   return (
-    <div className="px-6 py-4">
+    <div
+      className={`px-6 py-4 ${isSelected ? "bg-green-500/5 border-l-2 border-green-500" : ""}`}
+    >
       <div className="flex items-center justify-between">
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          {showCheckbox && (
+            <label className="mt-1 flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelect}
+                className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500/20"
+              />
+            </label>
+          )}
+          <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {variable.key}
@@ -129,6 +148,7 @@ export function VariableListItem({
               Updated {formatDate(variable.updatedAt)}
             </span>
           </div>
+        </div>
         </div>
 
         <div className="flex items-center gap-1">
