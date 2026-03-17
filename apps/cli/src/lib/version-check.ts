@@ -3,7 +3,8 @@ import Conf from "conf";
 import { getApiUrl } from "./config.js";
 
 declare const __CLI_VERSION__: string;
-const CLI_VERSION = typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0";
+const CLI_VERSION =
+  typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0";
 const CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 
 // Lazy-init so --help / --version don't pay disk I/O cost
