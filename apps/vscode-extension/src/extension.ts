@@ -67,15 +67,18 @@ let requestVariableDialog: RequestVariableDialog;
 
 /** Update context flags used by menu when-clauses and welcome views */
 async function updateContextFlags(): Promise<void> {
-  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
+  const linkedProjects = await syncService.getAllLinkedProjectsV2();
+  const hasLinked = linkedProjects.length > 0;
   vscode.commands.executeCommand(
     "setContext",
     "envpilot.hasLinkedProject",
-    !!linkedProject
+    hasLinked
   );
-  if (linkedProject) {
-    const role = apiService.getUserRole(linkedProject.projectId);
-    const projectRole = apiService.getProjectRole(linkedProject.projectId);
+  if (hasLinked) {
+    // Use first project's role for context flags
+    const firstProject = linkedProjects[0];
+    const role = apiService.getUserRole(firstProject.projectId);
+    const projectRole = apiService.getProjectRole(firstProject.projectId);
     vscode.commands.executeCommand(
       "setContext",
       "envpilot.userRole",
@@ -495,11 +498,11 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
     organization = orgPick.organization;
   }
 
-  // Check if project is already linked
+  // Check if this specific project is already linked
   const existingProject = await storageService.getLinkedProjectV2(projectId);
 
   if (existingProject) {
-    // Show option to add another directory
+    // Same project — offer to add another directory
     const choice = await vscode.window.showInformationMessage(
       `"${projectName}" is already linked. Add another directory?`,
       "Add Directory",
@@ -528,6 +531,25 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
       }
     }
     return;
+  }
+
+  // Check if other projects are already linked — enforce role-based limit
+  const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
+  if (allLinkedProjects.length > 0) {
+    // Fetch variables for the new project's org to populate role cache,
+    // then check if user is admin or team_lead in ANY linked org.
+    // This avoids order-dependent bugs where role from the wrong org is used.
+    const canLinkMultiple = allLinkedProjects.some((p) => {
+      const role = apiService.getUserRole(p.projectId);
+      return role === "admin" || role === "team_lead";
+    });
+
+    if (!canLinkMultiple) {
+      vscode.window.showWarningMessage(
+        "Only admins and team leads can link multiple projects. Unlink your current project first."
+      );
+      return;
+    }
   }
 
   // Show link dialog for new project
@@ -702,13 +724,28 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  // Get the linked project
-  const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
-  if (!linkedProject) {
+  // Get linked projects
+  const linkedProjects = await syncService.getAllLinkedProjectsV2();
+  if (linkedProjects.length === 0) {
     vscode.window.showWarningMessage(
       'No project linked. Use "Envpilot: Link Project" first.'
     );
     return;
+  }
+
+  // Pick project if multiple are linked
+  let linkedProject = linkedProjects[0];
+  if (linkedProjects.length > 1) {
+    const pick = await vscode.window.showQuickPick(
+      linkedProjects.map((p) => ({
+        label: p.projectName,
+        description: p.organizationName,
+        project: p,
+      })),
+      { placeHolder: "Select a project to request a variable for" }
+    );
+    if (!pick) return;
+    linkedProject = pick.project;
   }
 
   // Check role — only members should use this
@@ -752,13 +789,31 @@ async function handleRequestVariable(): Promise<void> {
 
 async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
   // Try V2 first
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
+  const allLinkedV2 = await syncService.getAllLinkedProjectsV2();
 
-  if (linkedProjectV2) {
-    const projectId = item?.project?._id || linkedProjectV2.projectId;
+  if (allLinkedV2.length > 0) {
+    let targetProject = item?.project?._id
+      ? allLinkedV2.find((p) => p.projectId === item.project!._id) || null
+      : null;
+
+    // If no tree item context and multiple projects, show picker
+    if (!targetProject && allLinkedV2.length > 1) {
+      const pick = await vscode.window.showQuickPick(
+        allLinkedV2.map((p) => ({
+          label: p.projectName,
+          description: `${p.organizationName} · ${p.directories.length} director${p.directories.length === 1 ? "y" : "ies"}`,
+          project: p,
+        })),
+        { placeHolder: "Select a project to unlink" }
+      );
+      if (!pick) return;
+      targetProject = pick.project;
+    } else if (!targetProject) {
+      targetProject = allLinkedV2[0];
+    }
 
     const confirm = await vscode.window.showWarningMessage(
-      `Unlink "${linkedProjectV2.projectName}"? This will remove all synced .env files (${linkedProjectV2.directories.length} director${linkedProjectV2.directories.length === 1 ? "y" : "ies"}).`,
+      `Unlink "${targetProject.projectName}"? This will remove all synced .env files (${targetProject.directories.length} director${targetProject.directories.length === 1 ? "y" : "ies"}).`,
       "Unlink",
       "Cancel"
     );
@@ -769,11 +824,14 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
 
     try {
       const deviceInfo = await getDeviceInfo(storageService.getContext());
-      await apiService.unlinkExtension(projectId, deviceInfo.deviceId);
+      await apiService.unlinkExtension(
+        targetProject.projectId,
+        deviceInfo.deviceId
+      );
 
       // Clean up all directories
-      await syncService.cleanupAllDirectories(linkedProjectV2);
-      await storageService.removeLinkedProjectV2(projectId);
+      await syncService.cleanupAllDirectories(targetProject);
+      await storageService.removeLinkedProjectV2(targetProject.projectId);
 
       vscode.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
@@ -838,23 +896,33 @@ async function handlePullVariables(): Promise<void> {
       statusBarProvider.setSyncing(true);
       dashboardPanelProvider.notifySyncStarted();
 
-      // Try V2 first
-      const linkedProjectV2 =
-        await syncService.getLinkedProjectV2ForWorkspace();
-      if (linkedProjectV2) {
-        const results = await syncService.syncAllDirectories(linkedProjectV2);
+      // Sync all linked projects (V2)
+      const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
+      if (allLinkedProjects.length > 0) {
+        let totalSuccessful = 0;
+        let totalDirs = 0;
+
+        for (const project of allLinkedProjects) {
+          const results = await syncService.syncAllDirectories(project);
+          if (results) {
+            totalSuccessful += results.filter((r) => r.success).length;
+            totalDirs += results.length;
+          }
+        }
+
         statusBarProvider.setSyncing(false);
 
-        if (results) {
-          const successful = results.filter((r) => r.success).length;
-          const total = results.length;
-          if (successful === total) {
+        if (totalDirs > 0) {
+          const projectCount = allLinkedProjects.length;
+          const projectLabel =
+            projectCount > 1 ? ` across ${projectCount} projects` : "";
+          if (totalSuccessful === totalDirs) {
             vscode.window.showInformationMessage(
-              `Synced ${successful} director${successful === 1 ? "y" : "ies"}`
+              `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
             );
           } else {
             vscode.window.showWarningMessage(
-              `Synced ${successful}/${total} directories. Some failed.`
+              `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
             );
           }
           variablesTreeProvider.refresh();
@@ -906,8 +974,8 @@ async function handleShowStatus(): Promise<void> {
 
   const user = await authService.getCurrentUser();
 
-  // Try V2 first
-  const linkedProjectV2 = await syncService.getLinkedProjectV2ForWorkspace();
+  // Get all linked projects (V2)
+  const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
 
   const items: vscode.QuickPickItem[] = [
     {
@@ -917,28 +985,33 @@ async function handleShowStatus(): Promise<void> {
     },
   ];
 
-  if (linkedProjectV2) {
-    items.push(
-      { kind: vscode.QuickPickItemKind.Separator, label: "Linked Project" },
-      {
-        label: "$(folder) Project",
-        description: linkedProjectV2.projectName,
-      },
-      {
-        label: "$(organization) Organization",
-        description: linkedProjectV2.organizationName,
-      },
-      {
-        label: "$(file-directory) Directories",
-        description: `${linkedProjectV2.directories.length} linked`,
-      }
-    );
+  if (allLinkedProjects.length > 0) {
+    for (const linkedProjectV2 of allLinkedProjects) {
+      items.push(
+        {
+          kind: vscode.QuickPickItemKind.Separator,
+          label: `Linked: ${linkedProjectV2.projectName}`,
+        },
+        {
+          label: "$(folder) Project",
+          description: linkedProjectV2.projectName,
+        },
+        {
+          label: "$(organization) Organization",
+          description: linkedProjectV2.organizationName,
+        },
+        {
+          label: "$(file-directory) Directories",
+          description: `${linkedProjectV2.directories.length} linked`,
+        }
+      );
 
-    for (const dir of linkedProjectV2.directories) {
-      items.push({
-        label: `  $(folder-opened) ${dir.displayName || getDisplayPath(dir.directoryPath)}`,
-        description: `${dir.environments.join(", ")} -> ${dir.targetFile}`,
-      });
+      for (const dir of linkedProjectV2.directories) {
+        items.push({
+          label: `  $(folder-opened) ${dir.displayName || getDisplayPath(dir.directoryPath)}`,
+          description: `${dir.environments.join(", ")} -> ${dir.targetFile}`,
+        });
+      }
     }
   } else {
     // Fallback to V1
@@ -980,14 +1053,20 @@ async function handleShowStatus(): Promise<void> {
       description: "Sync variables now",
     },
     {
-      label: linkedProjectV2 ? "$(add) Add Directory" : "$(link) Link Project",
-      description: linkedProjectV2
-        ? "Add another directory"
-        : "Connect to a project",
+      label:
+        allLinkedProjects.length > 0
+          ? "$(add) Add Directory"
+          : "$(link) Link Project",
+      description:
+        allLinkedProjects.length > 0
+          ? "Add another directory"
+          : "Connect to a project",
     },
     {
-      label: linkedProjectV2 ? "$(link-external) Unlink Project" : "",
-      description: linkedProjectV2 ? "Disconnect from project" : "",
+      label:
+        allLinkedProjects.length > 0 ? "$(link-external) Unlink Project" : "",
+      description:
+        allLinkedProjects.length > 0 ? "Disconnect from project" : "",
     },
     {
       label: "$(globe) Open Dashboard",

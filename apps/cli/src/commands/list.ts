@@ -12,7 +12,11 @@ import {
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getRole } from "../lib/config.js";
-import { readProjectConfig } from "../lib/project-config.js";
+import {
+  readProjectConfig,
+  readProjectConfigV2,
+} from "../lib/project-config.js";
+import { getEnvPathForEnvironment } from "../lib/env-file.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization, Project, Variable } from "../types/index.js";
 
@@ -20,7 +24,7 @@ export const listCommand = new Command("list")
   .description("List resources")
   .argument(
     "[resource]",
-    "Resource type: projects, organizations, variables",
+    "Resource type: projects, organizations, variables, linked",
     "projects"
   )
   .option("-o, --organization <id>", "Organization ID (for projects/variables)")
@@ -30,7 +34,6 @@ export const listCommand = new Command("list")
   .option("--json", "Output as JSON")
   .action(async (resource, options) => {
     try {
-      // Check authentication
       if (!isAuthenticated()) {
         throw notAuthenticated();
       }
@@ -53,6 +56,10 @@ export const listCommand = new Command("list")
           await listVariables(api, projectConfig, options);
           break;
 
+        case "linked":
+          listLinked();
+          break;
+
         default:
           error(`Unknown resource: ${resource}`);
           console.log();
@@ -62,12 +69,47 @@ export const listCommand = new Command("list")
             "  projects              List projects in an organization"
           );
           console.log("  variables (vars)      List variables in a project");
+          console.log(
+            "  linked                List projects linked in this directory"
+          );
           process.exit(1);
       }
     } catch (err) {
       await handleError(err);
     }
   });
+
+function listLinked(): void {
+  const configV2 = readProjectConfigV2();
+  if (!configV2) {
+    info("No projects linked. Run `envpilot init` to get started.");
+    return;
+  }
+
+  header(`Linked Projects (${configV2.projects.length})`);
+  console.log();
+
+  for (const project of configV2.projects) {
+    const isActive = project.projectId === configV2.activeProjectId;
+    const marker = isActive ? chalk.green("*") : " ";
+    const envFile = getEnvPathForEnvironment(project.environment);
+    console.log(
+      `  ${marker} ${chalk.bold(project.projectName || project.projectId)} ${chalk.dim(`(${project.organizationName || project.organizationId})`)}`
+    );
+    console.log(`    ${project.environment} ${chalk.dim("→")} ${envFile}`);
+    console.log();
+  }
+
+  if (configV2.projects.length > 1) {
+    console.log(chalk.dim("  (* = active project)"));
+    console.log();
+    console.log(
+      chalk.dim(
+        '  Use `envpilot switch --active "<name>"` to change the active project'
+      )
+    );
+  }
+}
 
 async function listOrganizations(
   api: ReturnType<typeof createAPIClient>,
@@ -118,11 +160,9 @@ async function listProjects(
   projectConfig: ReturnType<typeof readProjectConfig>,
   options: { organization?: string; json?: boolean }
 ) {
-  // Determine organization
   let organizationId = options.organization || projectConfig?.organizationId;
 
   if (!organizationId) {
-    // Fetch organizations and use the first one
     const organizations = await withSpinner(
       "Fetching organizations...",
       async () => {
@@ -247,7 +287,6 @@ async function listVariables(
   }
 
   if (options.json) {
-    // For JSON output, optionally mask values
     const output = variables.map((v) => ({
       ...v,
       value: options.showValues ? v.value : maskValue(v.value),

@@ -418,7 +418,7 @@ function VariableRow({
   const handleCopy = async () => {
     if (!revealedValue) return;
     try {
-      await navigator.clipboard.writeText(revealedValue);
+      await navigator.clipboard.writeText(`${variable.key}=${revealedValue}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -488,7 +488,7 @@ function VariableRow({
               onClick={handleCopy}
               disabled={!revealedValue}
               className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-30"
-              title={copied ? "Copied!" : "Copy value"}
+              title={copied ? "Copied!" : "Copy key=value"}
             >
               {copied ? (
                 <Check className="h-4 w-4 text-green-400" />

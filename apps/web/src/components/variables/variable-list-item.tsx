@@ -65,7 +65,7 @@ export function VariableListItem({
   const handleCopy = async () => {
     if (!revealedValue) return;
     try {
-      await navigator.clipboard.writeText(revealedValue);
+      await navigator.clipboard.writeText(`${variable.key}=${revealedValue}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -154,7 +154,7 @@ export function VariableListItem({
             <button
               onClick={handleCopy}
               className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              title={copied ? "Copied!" : "Copy value"}
+              title={copied ? "Copied!" : "Copy key=value"}
             >
               {copied ? (
                 <Check className="h-4 w-4 text-green-500" />

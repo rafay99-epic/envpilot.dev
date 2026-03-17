@@ -94,6 +94,24 @@ export const projectConfigSchema = z.object({
 
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;
 
+// Project entry within multi-project .envpilot config
+export const projectEntrySchema = z.object({
+  projectId: z.string(),
+  organizationId: z.string(),
+  projectName: z.string().default(""),
+  organizationName: z.string().default(""),
+  environment: environmentSchema.default("development"),
+});
+export type ProjectEntry = z.infer<typeof projectEntrySchema>;
+
+// Multi-project config (.envpilot file)
+export const projectConfigV2Schema = z.object({
+  version: z.literal(1),
+  activeProjectId: z.string(),
+  projects: z.array(projectEntrySchema).min(1),
+});
+export type ProjectConfigV2 = z.infer<typeof projectConfigV2Schema>;
+
 // Auth session types
 export interface AuthSession {
   code: string;

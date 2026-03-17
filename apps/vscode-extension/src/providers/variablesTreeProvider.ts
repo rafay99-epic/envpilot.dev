@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
-import type { EnvironmentVariable, LinkedProject } from "../types";
+import type { EnvironmentVariable, LinkedProjectV2 } from "../types";
 
 export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<
@@ -11,7 +11,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
   private api: ApiService;
   private storage: StorageService;
-  private variables: EnvironmentVariable[] = [];
 
   constructor(api: ApiService, storage: StorageService) {
     this.api = api;
@@ -27,36 +26,68 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
   }
 
   async getChildren(element?: VariableTreeItem): Promise<VariableTreeItem[]> {
+    // Expanding a project node — show its variables
+    if (element && element.type === "project" && element.linkedProject) {
+      return this.getVariablesForProject(element.linkedProject);
+    }
+
+    // Expanding any other node — no children
     if (element) {
       return [];
     }
 
-    const linkedProject = await this.getLinkedProject();
-    if (!linkedProject) {
+    // Root level
+    const linkedProjects = await this.storage.getLinkedProjectsV2();
+
+    if (linkedProjects.length === 0) {
       return [];
     }
 
+    // Single project — flat display (backward compatible)
+    if (linkedProjects.length === 1) {
+      return this.getVariablesForProject(linkedProjects[0]);
+    }
+
+    // Multiple projects — show collapsible project nodes
+    return linkedProjects.map(
+      (project) =>
+        new VariableTreeItem(
+          project.projectName,
+          vscode.TreeItemCollapsibleState.Collapsed,
+          "project",
+          undefined,
+          `${project.organizationName} · ${project.directories.length} dir${project.directories.length !== 1 ? "s" : ""}`,
+          project
+        )
+    );
+  }
+
+  private async getVariablesForProject(
+    linkedProject: LinkedProjectV2
+  ): Promise<VariableTreeItem[]> {
+    const env = linkedProject.defaultEnvironment || "development";
+
     try {
-      this.variables = await this.api.getVariables(
+      const variables = await this.api.getVariables(
         linkedProject.projectId,
-        linkedProject.environment,
+        env,
         linkedProject.accessToken
       );
 
-      if (this.variables.length === 0) {
+      if (variables.length === 0) {
         return [
           new VariableTreeItem(
             "No variables",
             vscode.TreeItemCollapsibleState.None,
             "message",
             undefined,
-            `No variables for ${linkedProject.environment}`
+            `No variables for ${env}`
           ),
         ];
       }
 
-      const regularVars = this.variables.filter((v) => !v.isSensitive);
-      const sensitiveVars = this.variables.filter((v) => v.isSensitive);
+      const regularVars = variables.filter((v) => !v.isSensitive);
+      const sensitiveVars = variables.filter((v) => v.isSensitive);
 
       const items: VariableTreeItem[] = [];
 
@@ -80,11 +111,11 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
       items.push(
         new VariableTreeItem(
-          linkedProject.environment,
+          env,
           vscode.TreeItemCollapsibleState.None,
           "header",
           undefined,
-          `${this.variables.length} variable${this.variables.length !== 1 ? "s" : ""}${roleLabel}`
+          `${variables.length} variable${variables.length !== 1 ? "s" : ""}${roleLabel}`
         )
       );
 
@@ -169,22 +200,6 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
     }
   }
 
-  private async getLinkedProject(): Promise<LinkedProject | null> {
-    const workspacePath = this.getCurrentWorkspacePath();
-    if (!workspacePath) {
-      return null;
-    }
-    return await this.storage.getLinkedProjectForWorkspace(workspacePath);
-  }
-
-  private getCurrentWorkspacePath(): string | null {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) {
-      return null;
-    }
-    return folders[0].uri.fsPath;
-  }
-
   dispose(): void {
     this._onDidChangeTreeData.dispose();
   }
@@ -197,25 +212,38 @@ type VariableTreeItemType =
   | "separator"
   | "message"
   | "error"
-  | "request";
+  | "request"
+  | "project";
 
 export class VariableTreeItem extends vscode.TreeItem {
   type: VariableTreeItemType;
   variable?: EnvironmentVariable;
+  linkedProject?: LinkedProjectV2;
 
   constructor(
     label: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
     type: VariableTreeItemType,
     variable?: EnvironmentVariable,
-    description?: string
+    description?: string,
+    linkedProject?: LinkedProjectV2
   ) {
     super(label, collapsibleState);
     this.type = type;
     this.variable = variable;
+    this.linkedProject = linkedProject;
     this.contextValue = type;
 
     switch (type) {
+      case "project": {
+        this.iconPath = new vscode.ThemeIcon(
+          "folder-library",
+          new vscode.ThemeColor("charts.green")
+        );
+        this.description = description;
+        break;
+      }
+
       case "variable": {
         this.iconPath = new vscode.ThemeIcon("symbol-variable");
         const valueStr = this.truncateValue(variable?.value || "");

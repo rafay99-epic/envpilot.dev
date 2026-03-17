@@ -1255,6 +1255,13 @@ export class SyncService {
   }
 
   /**
+   * Get all linked projects V2
+   */
+  async getAllLinkedProjectsV2(): Promise<LinkedProjectV2[]> {
+    return this.storage.getLinkedProjectsV2();
+  }
+
+  /**
    * Sync current workspace using V2 format
    */
   async syncCurrentWorkspaceV2(): Promise<SyncResult[] | null> {
