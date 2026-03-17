@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, use } from "react";
 import Link from "next/link";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
@@ -27,21 +27,25 @@ import {
 import { useTierFeatures } from "@/hooks/useTierLimits";
 import { isTierEnforcementEnabled } from "@/lib/tier-limits";
 import { ProOnlyBadge } from "@/components/tier/FeatureGate";
+import { ApiError } from "@/lib/api-client";
+import {
+  useProjectBySlug,
+  useVariablesList,
+  useVariableHistory,
+  useCreateVariable,
+  useUpdateVariable,
+  useDeleteVariable,
+  useBulkDeleteVariables,
+  useRollbackVariable,
+  useCurrentUser,
+} from "@/hooks/queries";
+import {
+  useVariableRequestsList,
+  useResolveVariableRequest,
+} from "@/hooks/queries";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
-}
-
-interface Project {
-  _id: Id<"projects">;
-  name: string;
-  slug: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  organizationId: Id<"organizations">;
-  createdAt: number;
-  updatedAt: number;
 }
 
 interface Variable {
@@ -55,24 +59,6 @@ interface Variable {
   updatedAt: number;
   vaultRef?: string;
   permission?: "read" | "write" | "admin" | null;
-}
-
-interface VariableRequest {
-  _id: Id<"environmentVariableRequests">;
-  key: string;
-  description?: string;
-  environments: string[];
-  isSensitive: boolean;
-  status: "pending" | "approved" | "rejected" | "canceled";
-  reviewReason?: string;
-  requestedBy: Id<"users">;
-  reviewedBy?: Id<"users">;
-  reviewedAt?: number;
-  createdVariableId?: Id<"environmentVariables">;
-  createdAt: number;
-  updatedAt: number;
-  requester: { _id: Id<"users">; email: string; name?: string } | null;
-  reviewer: { _id: Id<"users">; email: string; name?: string } | null;
 }
 
 interface VersionRecord {
@@ -143,13 +129,36 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     { enabled: addVarBinding.type === "sequence" }
   );
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [variables, setVariables] = useState<Variable[]>([]);
-  const [requests, setRequests] = useState<VariableRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingVariables, setIsLoadingVariables] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // --- TanStack Query: data fetching ---
+  const { data: currentUser } = useCurrentUser();
+  const convexUserId = (currentUser?.convexUserId as Id<"users">) ?? null;
+
+  const {
+    data: project,
+    isLoading,
+    error: projectError,
+  } = useProjectBySlug(orgId, slug);
+
+  const projectId = project?._id as Id<"projects"> | undefined;
+
+  const { data: variablesData, isLoading: isLoadingVariables } =
+    useVariablesList(projectId);
+  const variables = (variablesData?.variables ?? []) as Variable[];
+
+  const { data: requestsData } = useVariableRequestsList(projectId);
+  const requests = requestsData?.requests ?? [];
+
+  // --- TanStack Query: mutations ---
+  const createVariable = useCreateVariable();
+  const updateVariable = useUpdateVariable();
+  const deleteVariable = useDeleteVariable();
+  const bulkDelete = useBulkDeleteVariables();
+  const rollbackVariable = useRollbackVariable();
+  const resolveRequest = useResolveVariableRequest();
+
+  // --- Local UI state ---
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
 
   // Modal states
@@ -160,13 +169,21 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
   );
-  const [historyVariable, setHistoryVariable] = useState<Variable | null>(null);
-  const [variableHistory, setVariableHistory] = useState<VersionRecord[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
 
-  // User state (for request cancellation)
-  const [convexUserId, setConvexUserId] = useState<Id<"users"> | null>(null);
+  // History modal state
+  const [historyVariableId, setHistoryVariableId] = useState<string | null>(
+    null
+  );
+  const [historyVariableKey, setHistoryVariableKey] = useState<string>("");
+  const [historyVariableVersion, setHistoryVariableVersion] =
+    useState<number>(0);
+  const {
+    data: historyData,
+    isLoading: isLoadingHistory,
+    error: historyQueryError,
+  } = useVariableHistory(historyVariableId ?? undefined, {
+    enabled: !!historyVariableId,
+  });
 
   // Reveal value state
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
@@ -174,132 +191,23 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   );
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const response = await fetch("/api/users/me");
-        const data = await response.json();
-        if (data.convexUserId) {
-          setConvexUserId(data.convexUserId);
-        }
-      } catch {
-        // No-op
-      }
-    }
-    fetchUser();
-  }, []);
-
-  useEffect(() => {
-    async function fetchProject() {
-      try {
-        if (!organization?.id) {
-          setError("No organization found");
-          setIsLoading(false);
-          return;
-        }
-
-        const projectsResponse = await fetch(
-          `/api/projects?organizationId=${organization.id}`
-        );
-        const projectsData = await projectsResponse.json();
-        const foundProject = projectsData.projects?.find(
-          (p: Project) => p.slug === slug
-        );
-
-        if (!foundProject) {
-          setError("Project not found");
-        } else {
-          setProject(foundProject);
-        }
-      } catch {
-        setError("Failed to load project");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchProject();
-  }, [organization?.id, slug]);
-
-  const fetchVariables = useCallback(async () => {
-    if (!project) return;
-
-    setIsLoadingVariables(true);
-    try {
-      const params = new URLSearchParams({ projectId: project._id });
-
-      const response = await fetch(`/api/variables?${params.toString()}`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to load variables");
-      }
-
-      setVariables(data.variables || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load variables");
-    } finally {
-      setIsLoadingVariables(false);
-    }
-  }, [project]);
-
-  const fetchRequests = useCallback(async () => {
-    if (!project) return;
-
-    try {
-      const response = await fetch(
-        `/api/variable-requests?projectId=${project._id}`
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to load variable requests");
-      }
-      setRequests(data.requests || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load variable requests"
-      );
-    }
-  }, [project]);
-
-  useEffect(() => {
-    fetchVariables();
-  }, [fetchVariables]);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  const refreshProjectData = async () => {
-    await Promise.all([fetchVariables(), fetchRequests()]);
-  };
-
   const handleBulkDelete = async () => {
-    if (selectedIds.size === 0 || !project) return;
+    if (selectedIds.size === 0 || !projectId) return;
 
     setBulkDeleting(true);
     setNotice(null);
     setError(null);
 
     try {
-      const response = await fetch("/api/variables/bulk-delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          variableIds: Array.from(selectedIds),
-          projectId: project._id,
-        }),
+      const result = await bulkDelete.mutateAsync({
+        variableIds: Array.from(selectedIds),
+        projectId,
       });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to delete variables");
-      }
 
       setNotice(
         `Successfully deleted ${result.deletedCount} variable${result.deletedCount !== 1 ? "s" : ""}.`
       );
       exitSelectionMode();
-      await refreshProjectData();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to delete variables"
@@ -314,7 +222,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     environment: string | undefined,
     format: "env" | "json"
   ) => {
-    if (!project) return;
+    if (!projectId) return;
     setIsExporting(true);
     setShowExportMenu(false);
 
@@ -323,7 +231,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       if (environment) params.set("environment", environment);
 
       const response = await fetch(
-        `/api/projects/${project._id}/export?${params.toString()}`
+        `/api/projects/${projectId}/export?${params.toString()}`
       );
 
       if (!response.ok) {
@@ -356,44 +264,32 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   };
 
   const handleCreateVariable = async (data: VariableFormData) => {
-    if (!project) return;
+    if (!projectId) return;
     setNotice(null);
     setError(null);
 
     try {
-      const response = await fetch("/api/variables", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: data.key,
-          value: data.value,
-          description: data.description || undefined,
-          environments: data.environments,
-          projectId: project._id,
-          isSensitive: data.isSensitive,
-        }),
+      const result = await createVariable.mutateAsync({
+        key: data.key,
+        value: data.value,
+        description: data.description || undefined,
+        environments: data.environments,
+        projectId,
+        isSensitive: data.isSensitive,
       });
 
-      const result = await response.json();
-      if (!response.ok && response.status !== 202) {
-        if (result.code === "TIER_LIMIT_REACHED") {
-          throw new Error(
-            "Variable limit reached. Upgrade to Pro for unlimited variables."
-          );
-        }
-        throw new Error(result.error || "Failed to create variable");
-      }
-
-      if (response.status === 202 || result.requested) {
+      if (result.requested) {
         setNotice("Variable request submitted for admin approval.");
       } else {
         setNotice("Variable created successfully.");
       }
-
-      await refreshProjectData();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to create variable";
+        err instanceof ApiError && err.code === "TIER_LIMIT_REACHED"
+          ? "Variable limit reached. Upgrade to Pro for unlimited variables."
+          : err instanceof Error
+            ? err.message
+            : "Failed to create variable";
       setError(message);
       throw err;
     }
@@ -403,29 +299,22 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     variableId: Id<"environmentVariables">,
     data: VariableFormData
   ) => {
+    if (!projectId) return;
     setNotice(null);
     setError(null);
 
     try {
-      const response = await fetch(`/api/variables/${variableId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          value: data.value || undefined,
-          description: data.description || undefined,
-          environments: data.environments,
-          isSensitive: data.isSensitive,
-          changeReason: "Updated via dashboard",
-        }),
+      await updateVariable.mutateAsync({
+        variableId,
+        projectId,
+        value: data.value || undefined,
+        description: data.description || undefined,
+        environments: data.environments,
+        isSensitive: data.isSensitive,
+        changeReason: "Updated via dashboard",
       });
 
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to update variable");
-      }
-
       setNotice("Variable updated successfully.");
-      await refreshProjectData();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
@@ -435,23 +324,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   };
 
   const handleDeleteVariable = async () => {
-    if (!deletingVariable) return;
+    if (!deletingVariable || !projectId) return;
 
     setNotice(null);
     setError(null);
     try {
-      const response = await fetch(`/api/variables/${deletingVariable._id}`, {
-        method: "DELETE",
+      await deleteVariable.mutateAsync({
+        variableId: deletingVariable._id,
+        projectId,
       });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to delete variable");
-      }
 
       setDeletingVariable(null);
       setNotice("Variable deleted successfully.");
-      await refreshProjectData();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
@@ -460,50 +344,27 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
-  const handleViewHistory = async (variable: Variable) => {
-    setHistoryVariable(variable);
-    setIsLoadingHistory(true);
-    setHistoryError(null);
-    try {
-      const response = await fetch(`/api/variables/${variable._id}/history`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch history: ${response.status}`);
-      }
-      const data = await response.json();
-      setVariableHistory(data.history || []);
-    } catch (err) {
-      setHistoryError("Failed to load version history. Please try again.");
-      setVariableHistory([]);
-      console.error("History fetch error:", err);
-    } finally {
-      setIsLoadingHistory(false);
-    }
+  const handleViewHistory = (variable: Variable) => {
+    setHistoryVariableId(variable._id);
+    setHistoryVariableKey(variable.key);
+    setHistoryVariableVersion(variable.version);
   };
 
   const handleRollback = async (targetVersion: number) => {
-    if (!historyVariable) return;
+    if (!historyVariableId || !projectId) return;
 
     try {
-      const response = await fetch(
-        `/api/variables/${historyVariable._id}/rollback`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targetVersion }),
-        }
-      );
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to rollback variable");
-      }
+      await rollbackVariable.mutateAsync({
+        variableId: historyVariableId,
+        projectId,
+        targetVersion,
+      });
 
       setNotice(
-        `Rolled back ${historyVariable.key} to version ${targetVersion}.`
+        `Rolled back ${historyVariableKey} to version ${targetVersion}.`
       );
-      await refreshProjectData();
-      await handleViewHistory(historyVariable);
     } catch (err) {
-      setHistoryError(
+      setError(
         err instanceof Error ? err.message : "Failed to rollback variable"
       );
     }
@@ -513,18 +374,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     requestId: Id<"environmentVariableRequests">,
     action: "approve" | "reject" | "cancel"
   ) => {
+    if (!projectId) return;
     setNotice(null);
     setError(null);
     try {
-      const response = await fetch(`/api/variable-requests/${requestId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+      await resolveRequest.mutateAsync({
+        requestId,
+        projectId,
+        action,
       });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to ${action} request`);
-      }
 
       setNotice(
         action === "approve"
@@ -533,7 +391,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             ? "Request rejected."
             : "Request canceled."
       );
-      await refreshProjectData();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : `Failed to ${action} request`
@@ -585,7 +442,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     return <TerminalLoading />;
   }
 
-  if (error && !project) {
+  if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
@@ -604,7 +461,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           </svg>
         </div>
         <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          {error || "Project not found"}
+          {projectError instanceof Error
+            ? projectError.message
+            : "Project not found"}
         </h2>
         <Link
           href="/dashboard/projects"
@@ -615,8 +474,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       </div>
     );
   }
-
-  if (!project) return null;
 
   return (
     <div className="space-y-8">
@@ -986,7 +843,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                           <>
                             <button
                               onClick={() =>
-                                updateRequestStatus(request._id, "approve")
+                                updateRequestStatus(
+                                  request._id as Id<"environmentVariableRequests">,
+                                  "approve"
+                                )
                               }
                               className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
                             >
@@ -994,7 +854,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                             </button>
                             <button
                               onClick={() =>
-                                updateRequestStatus(request._id, "reject")
+                                updateRequestStatus(
+                                  request._id as Id<"environmentVariableRequests">,
+                                  "reject"
+                                )
                               }
                               className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
                             >
@@ -1008,7 +871,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                           request.requestedBy === convexUserId && (
                             <button
                               onClick={() =>
-                                updateRequestStatus(request._id, "cancel")
+                                updateRequestStatus(
+                                  request._id as Id<"environmentVariableRequests">,
+                                  "cancel"
+                                )
                               }
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                             >
@@ -1106,21 +972,25 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
       )}
 
-      {historyVariable && (
+      {historyVariableId && (
         <VariableHistory
-          isOpen={!!historyVariable}
+          isOpen={!!historyVariableId}
           onClose={() => {
-            setHistoryVariable(null);
-            setVariableHistory([]);
-            setHistoryError(null);
+            setHistoryVariableId(null);
+            setHistoryVariableKey("");
+            setHistoryVariableVersion(0);
           }}
-          variableKey={historyVariable.key}
-          currentVersion={historyVariable.version}
-          history={variableHistory}
+          variableKey={historyVariableKey}
+          currentVersion={historyVariableVersion}
+          history={(historyData?.history ?? []) as VersionRecord[]}
           onRollback={handleRollback}
           canRollback={hasPermission(PERMISSIONS.VARIABLE_ROLLBACK)}
           isLoading={isLoadingHistory}
-          error={historyError}
+          error={
+            historyQueryError
+              ? "Failed to load version history. Please try again."
+              : null
+          }
         />
       )}
     </div>
