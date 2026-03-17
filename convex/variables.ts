@@ -222,11 +222,13 @@ export const listWithAccess = query({
           hasAccess = true;
           roleAccess = true;
           canManagePermissions = true;
+          effectivePermission = "admin";
         } else if (projectRole === "manager") {
           // Project managers: full read/write + manage permissions
           hasAccess = true;
           roleAccess = true;
           canManagePermissions = true;
+          effectivePermission = "admin";
         } else if (projectRole === "developer") {
           // Developers: can read all variables
           hasAccess = true;

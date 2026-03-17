@@ -9,7 +9,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
-import { createSecret } from "@/lib/vault";
+import { updateSecret } from "@/lib/vault";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -183,13 +183,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { value, description, environments, isSensitive, changeReason } =
       validation.data;
 
-    // If value is being updated, write a new encrypted value to Vault.
+    // If value is being updated, update the existing encrypted value in Vault.
     let vaultRef: string | undefined;
     if (value !== undefined) {
-      const vaultResult = await createSecret(variable.key, value, {
-        organizationId,
-        projectId: variable.projectId,
-      });
+      const vaultResult = await updateSecret(variable.vaultRef, value);
       vaultRef = vaultResult.id;
     }
 
@@ -218,9 +215,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
 
     return NextResponse.json({ variable: updatedVariable });
-  } catch {
+  } catch (error) {
+    console.error("[PATCH /api/variables/[id]]", error);
     return NextResponse.json(
-      { error: "Failed to update variable" },
+      {
+        error: "Failed to update variable",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
