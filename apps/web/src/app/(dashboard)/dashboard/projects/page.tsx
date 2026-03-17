@@ -208,7 +208,9 @@ function ProjectCard({
             />
           </button>
         )}
-        <ChevronRight className={`${onToggleFavorite ? "" : "ml-auto"} h-3 w-3 text-zinc-600 transition-colors group-hover:text-green-400`} />
+        <ChevronRight
+          className={`${onToggleFavorite ? "" : "ml-auto"} h-3 w-3 text-zinc-600 transition-colors group-hover:text-green-400`}
+        />
       </div>
       <div className="flex-1 p-4">
         <h3 className="font-mono text-sm font-semibold text-zinc-100 group-hover:text-green-400">

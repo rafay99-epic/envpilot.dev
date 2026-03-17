@@ -74,7 +74,8 @@ export function CommandPalette() {
 
   // Global hotkey — respects custom bindings
   const customBindings = useKeyboardStore((s) => s.customBindings);
-  const cmdPaletteKeys = customBindings.COMMAND_PALETTE ?? SHORTCUTS.COMMAND_PALETTE.keys;
+  const cmdPaletteKeys =
+    customBindings.COMMAND_PALETTE ?? SHORTCUTS.COMMAND_PALETTE.keys;
   const cmdPaletteBinding = parseBinding(cmdPaletteKeys);
 
   useHotkey(

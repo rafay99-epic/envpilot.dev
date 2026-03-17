@@ -70,7 +70,10 @@ type ParsedBinding =
 
 export function parseBinding(keys: string): ParsedBinding {
   if (keys.includes(" then ")) {
-    return { type: "sequence", keys: keys.split(" then ").map((k) => k.trim()) };
+    return {
+      type: "sequence",
+      keys: keys.split(" then ").map((k) => k.trim()),
+    };
   }
   return { type: "single", hotkey: keys };
 }
@@ -89,7 +92,10 @@ export function getEffectiveShortcuts(
 }
 
 // Dummy values that will never match real keypresses
-const DEAD_SEQUENCE: HotkeySequence = ["Unidentified", "Unidentified"] as unknown as HotkeySequence;
+const DEAD_SEQUENCE: HotkeySequence = [
+  "Unidentified",
+  "Unidentified",
+] as unknown as HotkeySequence;
 const DEAD_HOTKEY = "F24" as Hotkey;
 
 function useShortcut(

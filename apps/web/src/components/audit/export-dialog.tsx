@@ -44,7 +44,12 @@ export function AuditExportDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Export Audit Logs" size="md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Export Audit Logs"
+      size="md"
+    >
       <div className="space-y-5">
         {/* Date Range */}
         <div>

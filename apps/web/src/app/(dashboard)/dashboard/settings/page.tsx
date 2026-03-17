@@ -28,13 +28,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useKeyboardStore } from "@/stores/keyboard-store";
-import {
-  SHORTCUTS,
-  getEffectiveShortcuts,
-} from "@/hooks/useKeyboardShortcuts";
+import { SHORTCUTS, getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
 
-type SettingsTab = "general" | "notifications" | "integrations" | "security" | "customization";
+type SettingsTab =
+  | "general"
+  | "notifications"
+  | "integrations"
+  | "security"
+  | "customization";
 
 export default function SettingsPage() {
   const { user } = useAuthContext();
@@ -802,7 +804,11 @@ function CustomizationSettings() {
     if (isRecordingSequence && sequenceStep === 1) {
       // Second key of sequence
       const fullBinding = `${recordedKeys[0]} then ${binding}`;
-      const validation = validateBinding(customBindings, editingId, fullBinding);
+      const validation = validateBinding(
+        customBindings,
+        editingId,
+        fullBinding
+      );
       if (!validation.valid) {
         setError(validation.reason ?? "Invalid binding");
         return;
@@ -1027,8 +1033,11 @@ function CustomizationSettings() {
           <p className="text-xs text-zinc-500">
             Click the pencil icon to edit a shortcut. Press a key combination to
             set it, or press a single letter followed by another key for a
-            sequence (e.g., G then P). Press <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 font-mono text-[10px]">Esc</kbd> to cancel.
-            Your shortcuts sync across all your devices.
+            sequence (e.g., G then P). Press{" "}
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1 font-mono text-[10px]">
+              Esc
+            </kbd>{" "}
+            to cancel. Your shortcuts sync across all your devices.
           </p>
         </div>
       </TerminalCard>

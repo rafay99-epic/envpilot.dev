@@ -1084,11 +1084,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               selected
             </span>
             <button
-              onClick={() =>
-                selectAll(
-                  filteredVariables.map((v) => v._id)
-                )
-              }
+              onClick={() => selectAll(filteredVariables.map((v) => v._id))}
               className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
             >
               Select All
