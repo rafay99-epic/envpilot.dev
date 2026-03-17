@@ -510,39 +510,37 @@ export default function EnvironmentDiffPage({
 
       {/* Summary + Search */}
       {!isLoadingVars && variables.length > 0 && (
-        <motion.div
-          variants={fadeIn}
-          initial="hidden"
-          animate="visible"
-        >
+        <motion.div variants={fadeIn} initial="hidden" animate="visible">
           <TerminalWindow title={`diff-summary — ${summary.total} variables`}>
             <div className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-3 font-mono text-sm sm:gap-5">
-                {(["all", "matching", "changed", "missing"] as const).map((f) => {
-                  const count = f === "all" ? summary.total : summary[f];
-                  const active = statusFilter === f;
-                  const cfg = f === "all" ? null : STATUS_CFG[f];
-                  return (
-                    <button
-                      key={f}
-                      onClick={() =>
-                        setStatusFilter(active && f !== "all" ? "all" : f)
-                      }
-                      className={`flex items-center gap-1.5 transition-colors ${
-                        active
-                          ? cfg
-                            ? cfg.color
-                            : "text-zinc-100"
-                          : "text-zinc-600 hover:text-zinc-400"
-                      }`}
-                    >
-                      {cfg && <cfg.icon className="h-3.5 w-3.5" />}
-                      <span>
-                        {count} {f}
-                      </span>
-                    </button>
-                  );
-                })}
+                {(["all", "matching", "changed", "missing"] as const).map(
+                  (f) => {
+                    const count = f === "all" ? summary.total : summary[f];
+                    const active = statusFilter === f;
+                    const cfg = f === "all" ? null : STATUS_CFG[f];
+                    return (
+                      <button
+                        key={f}
+                        onClick={() =>
+                          setStatusFilter(active && f !== "all" ? "all" : f)
+                        }
+                        className={`flex items-center gap-1.5 transition-colors ${
+                          active
+                            ? cfg
+                              ? cfg.color
+                              : "text-zinc-100"
+                            : "text-zinc-600 hover:text-zinc-400"
+                        }`}
+                      >
+                        {cfg && <cfg.icon className="h-3.5 w-3.5" />}
+                        <span>
+                          {count} {f}
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
               </div>
 
               {summary.total > 0 && (
@@ -554,7 +552,11 @@ export default function EnvironmentDiffPage({
                       animate={{
                         width: `${(summary.matching / summary.total) * 100}%`,
                       }}
-                      transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.2,
+                      }}
                     />
                   )}
                   {summary.changed > 0 && (
@@ -564,7 +566,11 @@ export default function EnvironmentDiffPage({
                       animate={{
                         width: `${(summary.changed / summary.total) * 100}%`,
                       }}
-                      transition={{ duration: 0.6, ease: "easeOut", delay: 0.35 }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.35,
+                      }}
                     />
                   )}
                   {summary.missing > 0 && (
@@ -574,7 +580,11 @@ export default function EnvironmentDiffPage({
                       animate={{
                         width: `${(summary.missing / summary.total) * 100}%`,
                       }}
-                      transition={{ duration: 0.6, ease: "easeOut", delay: 0.5 }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                        delay: 0.5,
+                      }}
                     />
                   )}
                 </div>
