@@ -90,8 +90,13 @@ export async function createSecret(
   try {
     const workos = getWorkOSClient();
 
+    // Use a unique vault object name to avoid conflicts when the same key
+    // exists in multiple projects or is re-created after deletion.
+    // Only the returned `id` (vaultRef) is used for subsequent reads/updates.
+    const uniqueName = `${name}:${context.projectId}:${Date.now()}`;
+
     const result = await workos.vault.createObject({
-      name,
+      name: uniqueName,
       value,
       context: {
         organizationId: context.organizationId,
