@@ -13,6 +13,8 @@ import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getRole } from "../lib/config.js";
 import {
   readProjectConfig,
+  readProjectConfigV2,
+  resolveProject,
   getTrackedEnvFiles,
 } from "../lib/project-config.js";
 import {
@@ -40,17 +42,45 @@ export const pushCommand = new Command("push")
   .option("--replace", "Replace all existing variables")
   .option("--dry-run", "Show what would be uploaded without making changes")
   .option("--force", "Skip confirmation")
+  .option("--project <name-or-id>", "Push to a specific linked project")
   .action(async (options) => {
     try {
-      // Check authentication
       if (!isAuthenticated()) {
         throw notAuthenticated();
       }
 
-      // Check initialization
-      const projectConfig = readProjectConfig();
-      if (!projectConfig) {
-        throw notInitialized();
+      // Resolve project config
+      let projectId: string;
+      let organizationId: string;
+      let defaultEnvironment: string;
+
+      if (options.project) {
+        const configV2 = readProjectConfigV2();
+        if (!configV2) throw notInitialized();
+
+        const resolved = resolveProject(configV2, options.project);
+        if (!resolved) {
+          error(`Project not found: ${options.project}`);
+          console.log();
+          console.log("Linked projects:");
+          for (const p of configV2.projects) {
+            console.log(
+              `  ${p.projectName || p.projectId} (${p.environment})`
+            );
+          }
+          process.exit(1);
+        }
+
+        projectId = resolved.projectId;
+        organizationId = resolved.organizationId;
+        defaultEnvironment = resolved.environment;
+      } else {
+        const projectConfig = readProjectConfig();
+        if (!projectConfig) throw notInitialized();
+
+        projectId = projectConfig.projectId;
+        organizationId = projectConfig.organizationId;
+        defaultEnvironment = projectConfig.environment;
       }
 
       // Check for .env files tracked by git
@@ -80,9 +110,9 @@ export const pushCommand = new Command("push")
       const projects = await api.get<{
         success: boolean;
         data: Array<{ _id: string; projectRole?: string | null }>;
-      }>("/api/cli/projects", { organizationId: projectConfig.organizationId });
+      }>("/api/cli/projects", { organizationId });
       const currentProject = projects.data?.find(
-        (p) => p._id === projectConfig.projectId
+        (p) => p._id === projectId
       );
       const projectRole = currentProject?.projectRole;
 
@@ -120,7 +150,7 @@ export const pushCommand = new Command("push")
       }
 
       const environment =
-        options.env || projectConfig.environment || "development";
+        options.env || defaultEnvironment || "development";
       const inputPath = options.file || getEnvPathForEnvironment(environment);
       const mode = options.replace ? "replace" : "merge";
 
@@ -156,11 +186,11 @@ export const pushCommand = new Command("push")
         "Fetching current variables...",
         async () => {
           const params: Record<string, string> = {
-            projectId: projectConfig.projectId,
+            projectId,
             environment,
           };
-          if (projectConfig.organizationId) {
-            params.organizationId = projectConfig.organizationId;
+          if (organizationId) {
+            params.organizationId = organizationId;
           }
           const response = await api.get<{
             success: boolean;
@@ -193,7 +223,6 @@ export const pushCommand = new Command("push")
       console.log(chalk.bold("Changes to push:"));
       console.log();
 
-      // For merge mode, don't show removed as they won't be deleted
       const removedToShow = mode === "replace" ? diffResult.removed : {};
       showDiff(diffResult.added, removedToShow, diffResult.changed);
 
@@ -263,16 +292,14 @@ export const pushCommand = new Command("push")
               skipped?: number;
             };
           }>("/api/cli/variables/bulk", {
-            projectId: projectConfig.projectId,
+            projectId,
             environment,
             variables: Object.entries(valid).map(([key, value]) => ({
               key,
               value,
             })),
             mode,
-            ...(projectConfig.organizationId && {
-              organizationId: projectConfig.organizationId,
-            }),
+            ...(organizationId && { organizationId }),
           });
           return response.data;
         }

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -219,7 +219,7 @@ export function writeEnvFile(
  * Get the default .env file path
  */
 export function getDefaultEnvPath(directory: string = process.cwd()): string {
-  return join(directory, ".env");
+  return join(directory, ".env.local");
 }
 
 /**
@@ -230,7 +230,30 @@ export function getEnvPathForEnvironment(
   directory: string = process.cwd()
 ): string {
   if (environment === "development") {
-    return join(directory, ".env");
+    return join(directory, ".env.local");
   }
   return join(directory, `.env.${environment}`);
+}
+
+/**
+ * Apply role-based file protection after sync.
+ * Makes files read-only for non-admin/non-team-lead roles.
+ */
+export function applyFileProtection(
+  filePath: string,
+  role?: string,
+  projectRole?: string | null
+): void {
+  if (!existsSync(filePath)) return;
+
+  const isWritable =
+    role === "admin" ||
+    role === "team_lead" ||
+    projectRole === "manager";
+
+  if (isWritable) {
+    chmodSync(filePath, 0o644); // read-write
+  } else {
+    chmodSync(filePath, 0o444); // read-only
+  }
 }

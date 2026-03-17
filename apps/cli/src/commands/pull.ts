@@ -13,6 +13,8 @@ import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
 import {
   readProjectConfig,
+  readProjectConfigV2,
+  resolveProject,
   getTrackedEnvFiles,
 } from "../lib/project-config.js";
 import {
@@ -20,13 +22,15 @@ import {
   writeEnvFile,
   getEnvPathForEnvironment,
   diffEnvVars,
+  applyFileProtection,
 } from "../lib/env-file.js";
+import { getRole } from "../lib/config.js";
 import {
   notAuthenticated,
   notInitialized,
   handleError,
 } from "../lib/errors.js";
-import type { Variable } from "../types/index.js";
+import type { Variable, ProjectEntry } from "../types/index.js";
 
 export const pullCommand = new Command("pull")
   .description("Download environment variables to local .env file")
@@ -38,170 +42,317 @@ export const pullCommand = new Command("pull")
   .option("--force", "Overwrite without confirmation")
   .option("--format <format>", "Output format: env, json", "env")
   .option("--dry-run", "Show what would be downloaded without writing")
+  .option("--project <name-or-id>", "Pull a specific linked project")
+  .option("--all", "Pull all linked projects")
   .action(async (options) => {
     try {
-      // Check authentication
       if (!isAuthenticated()) {
         throw notAuthenticated();
       }
 
-      // Check initialization
-      const projectConfig = readProjectConfig();
-      if (!projectConfig) {
-        throw notInitialized();
+      // --all: pull every linked project
+      if (options.all) {
+        if (options.env || options.file) {
+          error("Cannot use --env or --file with --all.");
+          process.exit(1);
+        }
+        await pullAllProjects(options);
+        return;
       }
 
-      // Check for .env files tracked by git
-      const trackedFiles = getTrackedEnvFiles();
-      if (trackedFiles.length > 0) {
-        error("Security risk: .env files are tracked by git!");
-        console.log();
-        for (const file of trackedFiles) {
-          console.log(chalk.red(`  tracked: ${file}`));
+      // --project: pull specific project
+      if (options.project) {
+        const configV2 = readProjectConfigV2();
+        if (!configV2) throw notInitialized();
+
+        const project = resolveProject(configV2, options.project);
+        if (!project) {
+          error(`Project not found: ${options.project}`);
+          console.log();
+          console.log("Linked projects:");
+          for (const p of configV2.projects) {
+            console.log(
+              `  ${p.projectName || p.projectId} (${p.environment})`
+            );
+          }
+          process.exit(1);
         }
-        console.log();
-        console.log(
-          chalk.yellow(
-            "  Run the following to untrack them (without deleting the files):"
-          )
-        );
-        for (const file of trackedFiles) {
-          console.log(chalk.cyan(`    git rm --cached ${file}`));
-        }
-        console.log();
-        process.exit(1);
+
+        await pullSingleProject(project, options);
+        return;
       }
+
+      // Default: pull active project (V1 compat path)
+      const projectConfig = readProjectConfig();
+      if (!projectConfig) throw notInitialized();
+
+      // Check for .env files tracked by git
+      checkTrackedFiles();
 
       const environment =
         options.env || projectConfig.environment || "development";
       const outputPath = options.file || getEnvPathForEnvironment(environment);
 
-      const api = createAPIClient();
-
-      // Fetch variables
-      let metaProjectRole: string | null | undefined;
-
-      const variables = await withSpinner(
-        `Fetching ${chalk.bold(environment)} variables...`,
-        async () => {
-          const response = await api.get<{
-            success: boolean;
-            data: Variable[];
-            meta: {
-              total: number;
-              environment: string;
-              role?: string;
-              projectRole?: string | null;
-            };
-          }>("/api/cli/variables", {
-            projectId: projectConfig.projectId,
-            environment,
-            ...(projectConfig.organizationId && {
-              organizationId: projectConfig.organizationId,
-            }),
-          });
-          metaProjectRole = response.meta?.projectRole;
-          return response.data || [];
-        }
-      );
-
-      if (variables.length === 0) {
-        warning(`No variables found for ${environment} environment.`);
-        return;
-      }
-
-      // Convert to key-value object
-      const remoteVars: Record<string, string> = {};
-      for (const variable of variables) {
-        remoteVars[variable.key] = variable.value;
-      }
-
-      // Read existing local file
-      const localVars = readEnvFile(outputPath) || {};
-
-      // Calculate diff
-      const diffResult = diffEnvVars(remoteVars, localVars);
-      const hasChanges =
-        Object.keys(diffResult.added).length > 0 ||
-        Object.keys(diffResult.removed).length > 0 ||
-        Object.keys(diffResult.changed).length > 0;
-
-      if (!hasChanges) {
-        success("Local file is up to date.");
-        return;
-      }
-
-      // Show diff
-      console.log();
-      console.log(chalk.bold("Changes:"));
-      console.log();
-      showDiff(diffResult.added, diffResult.removed, diffResult.changed);
-      console.log();
-
-      // Dry run
-      if (options.dryRun) {
-        info("Dry run - no changes written.");
-        return;
-      }
-
-      // Confirm unless --force
-      if (!options.force && Object.keys(localVars).length > 0) {
-        const { proceed } = await inquirer.prompt([
-          {
-            type: "confirm",
-            name: "proceed",
-            message: `Overwrite ${outputPath}?`,
-            default: true,
-          },
-        ]);
-
-        if (!proceed) {
-          info("Pull cancelled.");
-          return;
-        }
-      }
-
-      // Write file based on format
-      if (options.format === "json") {
-        const fs = await import("node:fs");
-        fs.writeFileSync(
-          outputPath,
-          JSON.stringify(remoteVars, null, 2) + "\n"
-        );
-      } else {
-        // Build comments from variable descriptions
-        const comments: Record<string, string> = {};
-        for (const variable of variables) {
-          if (variable.description) {
-            comments[variable.key] = variable.description;
-          }
-        }
-
-        writeEnvFile(outputPath, remoteVars, { sort: true, comments });
-      }
-
-      success(
-        `Downloaded ${variables.length} variables to ${chalk.bold(outputPath)}`
-      );
-
-      if (metaProjectRole === "viewer") {
-        info(
-          "You have Viewer access to this project. You may only see variables you have been explicitly granted access to."
-        );
-      }
-
-      // Show summary
-      console.log();
-      console.log(
-        chalk.dim(`  Added:   ${Object.keys(diffResult.added).length}`)
-      );
-      console.log(
-        chalk.dim(`  Changed: ${Object.keys(diffResult.changed).length}`)
-      );
-      console.log(
-        chalk.dim(`  Removed: ${Object.keys(diffResult.removed).length}`)
+      await pullProject(
+        {
+          projectId: projectConfig.projectId,
+          organizationId: projectConfig.organizationId,
+          environment,
+        },
+        outputPath,
+        options
       );
     } catch (err) {
       await handleError(err);
     }
   });
+
+async function pullAllProjects(options: {
+  force?: boolean;
+  format?: string;
+  dryRun?: boolean;
+}): Promise<void> {
+  const configV2 = readProjectConfigV2();
+  if (!configV2) throw notInitialized();
+
+  checkTrackedFiles();
+
+  let totalPulled = 0;
+  let totalFailed = 0;
+
+  for (const project of configV2.projects) {
+    const outputPath = getEnvPathForEnvironment(project.environment);
+    const displayName = project.projectName || project.projectId;
+
+    console.log();
+    console.log(
+      chalk.bold(
+        `Pulling "${displayName}" (${project.environment}) → ${outputPath}`
+      )
+    );
+
+    try {
+      await pullProject(
+        {
+          projectId: project.projectId,
+          organizationId: project.organizationId,
+          environment: project.environment,
+        },
+        outputPath,
+        options
+      );
+      totalPulled++;
+    } catch (err) {
+      totalFailed++;
+      if (err instanceof Error) {
+        error(`  Failed: ${err.message}`);
+      }
+    }
+  }
+
+  console.log();
+  if (totalFailed === 0) {
+    success(`Pulled ${totalPulled} project${totalPulled !== 1 ? "s" : ""}`);
+  } else {
+    warning(
+      `Pulled ${totalPulled}/${totalPulled + totalFailed} projects. ${totalFailed} failed.`
+    );
+  }
+}
+
+async function pullSingleProject(
+  project: ProjectEntry,
+  options: {
+    env?: string;
+    file?: string;
+    force?: boolean;
+    format?: string;
+    dryRun?: boolean;
+  }
+): Promise<void> {
+  checkTrackedFiles();
+
+  const environment = options.env || project.environment;
+  const outputPath = options.file || getEnvPathForEnvironment(environment);
+
+  await pullProject(
+    {
+      projectId: project.projectId,
+      organizationId: project.organizationId,
+      environment,
+    },
+    outputPath,
+    options
+  );
+}
+
+async function pullProject(
+  project: {
+    projectId: string;
+    organizationId: string;
+    environment: string;
+  },
+  outputPath: string,
+  options: {
+    force?: boolean;
+    format?: string;
+    dryRun?: boolean;
+  }
+): Promise<void> {
+  const api = createAPIClient();
+
+  let metaProjectRole: string | null | undefined;
+
+  const variables = await withSpinner(
+    `Fetching ${chalk.bold(project.environment)} variables...`,
+    async () => {
+      const response = await api.get<{
+        success: boolean;
+        data: Variable[];
+        meta: {
+          total: number;
+          environment: string;
+          role?: string;
+          projectRole?: string | null;
+        };
+      }>("/api/cli/variables", {
+        projectId: project.projectId,
+        environment: project.environment,
+        ...(project.organizationId && {
+          organizationId: project.organizationId,
+        }),
+      });
+      metaProjectRole = response.meta?.projectRole;
+      return response.data || [];
+    }
+  );
+
+  if (variables.length === 0) {
+    warning(`No variables found for ${project.environment} environment.`);
+    return;
+  }
+
+  const remoteVars: Record<string, string> = {};
+  for (const variable of variables) {
+    remoteVars[variable.key] = variable.value;
+  }
+
+  const localVars = readEnvFile(outputPath) || {};
+
+  const diffResult = diffEnvVars(remoteVars, localVars);
+  const hasChanges =
+    Object.keys(diffResult.added).length > 0 ||
+    Object.keys(diffResult.removed).length > 0 ||
+    Object.keys(diffResult.changed).length > 0;
+
+  if (!hasChanges) {
+    success("Local file is up to date.");
+    return;
+  }
+
+  console.log();
+  console.log(chalk.bold("Changes:"));
+  console.log();
+  showDiff(diffResult.added, diffResult.removed, diffResult.changed);
+  console.log();
+
+  if (options.dryRun) {
+    info("Dry run - no changes written.");
+    return;
+  }
+
+  if (!options.force && Object.keys(localVars).length > 0) {
+    const { proceed } = await inquirer.prompt([
+      {
+        type: "confirm",
+        name: "proceed",
+        message: `Overwrite ${outputPath}?`,
+        default: true,
+      },
+    ]);
+
+    if (!proceed) {
+      info("Pull cancelled.");
+      return;
+    }
+  }
+
+  // Make file writable before writing (may be read-only from previous pull)
+  try {
+    const fs = await import("node:fs");
+    if (fs.existsSync(outputPath)) {
+      fs.chmodSync(outputPath, 0o644);
+    }
+  } catch {
+    // Ignore — file may not exist yet
+  }
+
+  if (options.format === "json") {
+    const fs = await import("node:fs");
+    fs.writeFileSync(
+      outputPath,
+      JSON.stringify(remoteVars, null, 2) + "\n"
+    );
+  } else {
+    const comments: Record<string, string> = {};
+    for (const variable of variables) {
+      if (variable.description) {
+        comments[variable.key] = variable.description;
+      }
+    }
+    writeEnvFile(outputPath, remoteVars, { sort: true, comments });
+  }
+
+  // Apply role-based file protection (matches extension behavior)
+  const role = getRole();
+  applyFileProtection(outputPath, role, metaProjectRole);
+
+  success(
+    `Downloaded ${variables.length} variables to ${chalk.bold(outputPath)}`
+  );
+
+  if (metaProjectRole === "viewer") {
+    info(
+      "You have Viewer access to this project. You may only see variables you have been explicitly granted access to."
+    );
+  }
+
+  // Show protection status
+  const isProtected = role !== "admin" && role !== "team_lead" && metaProjectRole !== "manager";
+  if (isProtected) {
+    info(`File is read-only (your role: ${role || metaProjectRole || "member"}).`);
+  }
+
+  console.log();
+  console.log(
+    chalk.dim(`  Added:   ${Object.keys(diffResult.added).length}`)
+  );
+  console.log(
+    chalk.dim(`  Changed: ${Object.keys(diffResult.changed).length}`)
+  );
+  console.log(
+    chalk.dim(`  Removed: ${Object.keys(diffResult.removed).length}`)
+  );
+}
+
+function checkTrackedFiles(): void {
+  const trackedFiles = getTrackedEnvFiles();
+  if (trackedFiles.length > 0) {
+    error("Security risk: .env files are tracked by git!");
+    console.log();
+    for (const file of trackedFiles) {
+      console.log(chalk.red(`  tracked: ${file}`));
+    }
+    console.log();
+    console.log(
+      chalk.yellow(
+        "  Run the following to untrack them (without deleting the files):"
+      )
+    );
+    for (const file of trackedFiles) {
+      console.log(chalk.cyan(`    git rm --cached ${file}`));
+    }
+    console.log();
+    process.exit(1);
+  }
+}

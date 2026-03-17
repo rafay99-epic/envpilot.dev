@@ -12,6 +12,8 @@ import { switchCommand } from "./commands/switch.js";
 import { listCommand } from "./commands/list.js";
 import { configCommand } from "./commands/config.js";
 import { logoutCommand } from "./commands/logout.js";
+import { unlinkCommand } from "./commands/unlink.js";
+import { syncCommand } from "./commands/sync.js";
 import { usageCommand } from "./commands/usage.js";
 import { checkForUpdate } from "./lib/version-check.js";
 
@@ -20,7 +22,7 @@ const program = new Command();
 program
   .name("envpilot")
   .description("Envpilot CLI - Sync, secure, and share environment variables")
-  .version("1.3.1");
+  .version("1.3.2");
 
 // Add all commands
 program.addCommand(loginCommand);
@@ -31,6 +33,8 @@ program.addCommand(pushCommand);
 program.addCommand(switchCommand);
 program.addCommand(listCommand);
 program.addCommand(configCommand);
+program.addCommand(unlinkCommand);
+program.addCommand(syncCommand);
 program.addCommand(usageCommand);
 
 // Check for updates after each command (non-blocking)
