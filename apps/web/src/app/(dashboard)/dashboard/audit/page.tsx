@@ -28,6 +28,7 @@ import {
   Lock,
   Search,
 } from "lucide-react";
+import { AuditExportDialog } from "@/components/audit/export-dialog";
 
 const PAGE_SIZE = 10;
 
@@ -105,6 +106,8 @@ export default function AuditPage() {
   const [dateRange, setDateRange] = useState("30d");
   const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "json">("json");
   const [exportRange, setExportRange] = useState<{
     start: number;
     end: number;
@@ -154,65 +157,74 @@ export default function AuditPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleExportJSON = () => {
-    const now = Date.now();
-    setExportRange({
-      start: now - (dateRangeMs[dateRange] ?? dateRangeMs["30d"]),
-      end: now,
-    });
+  const handleExport = (params: {
+    startTime: number;
+    endTime: number;
+    format: "csv" | "json";
+  }) => {
+    setExportFormat(params.format);
+    setExportRange({ start: params.startTime, end: params.endTime });
     setIsExporting(true);
+    setShowExportDialog(false);
   };
 
   // Trigger download once export data is ready
   if (isExporting && exportData) {
-    const blob = new Blob([JSON.stringify(exportData.data, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-logs-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const dateStr = new Date().toISOString().split("T")[0];
+
+    if (exportFormat === "json") {
+      const blob = new Blob([JSON.stringify(exportData.data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-logs-${dateStr}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // CSV from full export data
+      const exportLogs = exportData.data as unknown as Array<{
+        createdAt: number;
+        action: string;
+        userName: string;
+        userEmail: string;
+        severity?: string;
+        ipAddress?: string;
+      }>;
+      const headers = [
+        "Timestamp",
+        "Action",
+        "User",
+        "Email",
+        "Severity",
+        "IP Address",
+      ];
+      const rows = exportLogs.map((log) => [
+        new Date(log.createdAt).toISOString(),
+        actionLabels[log.action] ?? log.action,
+        log.userName,
+        log.userEmail,
+        log.severity ?? "info",
+        log.ipAddress ?? "",
+      ]);
+      const csvContent = [headers, ...rows]
+        .map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+        )
+        .join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-logs-${dateStr}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
     setIsExporting(false);
     setExportRange(null);
   }
-
-  const handleExportCSV = () => {
-    if (!logs || logs.length === 0) return;
-
-    const allLogs = filteredLogs;
-    const headers = [
-      "Timestamp",
-      "Action",
-      "User",
-      "Email",
-      "Severity",
-      "IP Address",
-    ];
-    const rows = allLogs.map((log) => [
-      new Date(log.createdAt).toISOString(),
-      actionLabels[log.action] ?? log.action,
-      log.userName,
-      log.userEmail,
-      log.severity ?? "info",
-      log.ipAddress ?? "",
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-logs-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
@@ -228,20 +240,14 @@ export default function AuditPage() {
             Track all activity across your organization
           </p>
         </div>
-        <div className="flex gap-2">
-          <TerminalButton variant="secondary" onClick={handleExportCSV}>
-            <Download className="h-4 w-4" />
-            CSV
-          </TerminalButton>
-          <TerminalButton
-            variant="secondary"
-            onClick={handleExportJSON}
-            disabled={isExporting}
-          >
-            <Download className="h-4 w-4" />
-            {isExporting ? "Preparing..." : "JSON"}
-          </TerminalButton>
-        </div>
+        <TerminalButton
+          variant="secondary"
+          onClick={() => setShowExportDialog(true)}
+          disabled={isExporting}
+        >
+          <Download className="h-4 w-4" />
+          {isExporting ? "Exporting..." : "Export"}
+        </TerminalButton>
       </div>
 
       {/* Summary Cards */}
@@ -373,6 +379,14 @@ export default function AuditPage() {
           />
         </TerminalWindow>
       )}
+
+      {/* Export Dialog */}
+      <AuditExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        onExport={handleExport}
+        isExporting={isExporting}
+      />
 
       {/* Compliance Info */}
       <TerminalCard>

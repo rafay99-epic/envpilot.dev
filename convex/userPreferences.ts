@@ -19,11 +19,13 @@ export const getByUserId = query({
     if (!prefs) {
       return {
         emailNotifications: DEFAULT_NOTIFICATIONS,
+        keyboardShortcuts: {},
       };
     }
 
     return {
       emailNotifications: prefs.emailNotifications ?? DEFAULT_NOTIFICATIONS,
+      keyboardShortcuts: prefs.keyboardShortcuts ?? {},
     };
   },
 });
@@ -39,11 +41,13 @@ export const getByUserIdInternal = internalQuery({
     if (!prefs) {
       return {
         emailNotifications: DEFAULT_NOTIFICATIONS,
+        keyboardShortcuts: {},
       };
     }
 
     return {
       emailNotifications: prefs.emailNotifications ?? DEFAULT_NOTIFICATIONS,
+      keyboardShortcuts: prefs.keyboardShortcuts ?? {},
     };
   },
 });
@@ -60,6 +64,7 @@ export const upsert = mutation({
         securityAlerts: v.boolean(),
       })
     ),
+    keyboardShortcuts: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
     if (args.callerUserId !== args.userId) {
@@ -76,6 +81,9 @@ export const upsert = mutation({
       if (args.emailNotifications !== undefined) {
         updates.emailNotifications = args.emailNotifications;
       }
+      if (args.keyboardShortcuts !== undefined) {
+        updates.keyboardShortcuts = args.keyboardShortcuts;
+      }
       await ctx.db.patch(existing._id, updates);
       return existing._id;
     }
@@ -83,6 +91,7 @@ export const upsert = mutation({
     return await ctx.db.insert("userPreferences", {
       userId: args.userId,
       emailNotifications: args.emailNotifications,
+      keyboardShortcuts: args.keyboardShortcuts,
       updatedAt: now,
     });
   },

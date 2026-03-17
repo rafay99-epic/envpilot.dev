@@ -42,6 +42,8 @@ export default defineSchema({
         securityAlerts: v.boolean(),
       })
     ),
+    // Custom keyboard shortcut overrides (shortcut ID → binding string)
+    keyboardShortcuts: v.optional(v.record(v.string(), v.string())),
     // Last updated
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
@@ -129,6 +131,18 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_org_and_slug", ["organizationId", "slug"])
     .index("by_created_by", ["createdBy"]),
+
+  // ==========================================
+  // FAVORITE PROJECTS
+  // ==========================================
+  favoriteProjects: defineTable({
+    userId: v.id("users"),
+    projectId: v.id("projects"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_project", ["userId", "projectId"])
+    .index("by_project", ["projectId"]),
 
   // ==========================================
   // PROJECT MEMBERS (Project-level access control)

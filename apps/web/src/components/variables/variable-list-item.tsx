@@ -27,6 +27,9 @@ interface VariableListItemProps {
   canDelete?: boolean;
   canManagePermissions?: boolean;
   permissionLevel?: "read" | "write" | "admin" | null;
+  showCheckbox?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export function VariableListItem({
@@ -42,6 +45,9 @@ export function VariableListItem({
   canDelete = false,
   canManagePermissions = false,
   permissionLevel,
+  showCheckbox = false,
+  isSelected = false,
+  onToggleSelect,
 }: VariableListItemProps) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -74,60 +80,74 @@ export function VariableListItem({
   };
 
   return (
-    <div className="px-6 py-4">
+    <div
+      className={`px-6 py-4 ${isSelected ? "bg-green-500/5 border-l-2 border-green-500" : ""}`}
+    >
       <div className="flex items-center justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              {variable.key}
-            </code>
-            {variable.isSensitive && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                Sensitive
-              </span>
-            )}
-            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-              v{variable.version}
-            </span>
-            {permissionLevel && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  permissionLevel === "admin"
-                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                    : permissionLevel === "write"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                }`}
-              >
-                {permissionLevel}
-              </span>
-            )}
-          </div>
-          {variable.description && (
-            <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
-              {variable.description}
-            </p>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          {showCheckbox && (
+            <label className="mt-1 flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelect}
+                className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500/20"
+              />
+            </label>
           )}
-          <div className="mt-2 flex items-center gap-3">
-            <div className="flex flex-wrap gap-1">
-              {variable.environments.map((env) => (
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3">
+              <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                {variable.key}
+              </code>
+              {variable.isSensitive && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  Sensitive
+                </span>
+              )}
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                v{variable.version}
+              </span>
+              {permissionLevel && (
                 <span
-                  key={env}
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    env === "production"
-                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      : env === "staging"
-                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    permissionLevel === "admin"
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                      : permissionLevel === "write"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}
                 >
-                  {env}
+                  {permissionLevel}
                 </span>
-              ))}
+              )}
             </div>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              Updated {formatDate(variable.updatedAt)}
-            </span>
+            {variable.description && (
+              <p className="mt-1 truncate text-sm text-zinc-600 dark:text-zinc-400">
+                {variable.description}
+              </p>
+            )}
+            <div className="mt-2 flex items-center gap-3">
+              <div className="flex flex-wrap gap-1">
+                {variable.environments.map((env) => (
+                  <span
+                    key={env}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      env === "production"
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        : env === "staging"
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    }`}
+                  >
+                    {env}
+                  </span>
+                ))}
+              </div>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                Updated {formatDate(variable.updatedAt)}
+              </span>
+            </div>
           </div>
         </div>
 

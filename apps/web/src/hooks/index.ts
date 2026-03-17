@@ -101,6 +101,9 @@ export {
   useAssignableProjectMembers,
 } from "./useProjectMembers";
 
+// Favorite hooks
+export { useFavoriteProjects, useToggleFavorite } from "./useFavorites";
+
 // Audit log hooks
 export {
   useOrganizationAuditLogs,

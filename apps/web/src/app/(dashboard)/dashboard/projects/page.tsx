@@ -1,7 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useProjects, useConvexUser, usePagination } from "@/hooks";
+import {
+  useProjects,
+  useConvexUser,
+  usePagination,
+  useFavoriteProjects,
+  useToggleFavorite,
+} from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
@@ -13,7 +20,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedGrid } from "@/components/dashboard/animated-list";
-import { Plus, Clock, ChevronRight } from "lucide-react";
+import { Plus, Clock, ChevronRight, Star } from "lucide-react";
 
 export default function ProjectsPage() {
   const { hasPermission, organization, user } = useAuthContext();
@@ -26,7 +33,22 @@ export default function ProjectsPage() {
     convexUserId
   );
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
-  const pagination = usePagination(projects, { pageSize: 9 });
+
+  // Favorites
+  const { favoriteProjectIds } = useFavoriteProjects(convexUserId);
+  const { toggle: toggleFavorite } = useToggleFavorite();
+  const [showFavoritesFirst, setShowFavoritesFirst] = useState(true);
+
+  // Sort favorites first if enabled
+  const sortedProjects = showFavoritesFirst
+    ? [...projects].sort((a, b) => {
+        const aFav = favoriteProjectIds.has(a._id) ? 1 : 0;
+        const bFav = favoriteProjectIds.has(b._id) ? 1 : 0;
+        return bFav - aFav;
+      })
+    : projects;
+
+  const pagination = usePagination(sortedProjects, { pageSize: 9 });
 
   if (!organization) {
     return (
@@ -54,12 +76,30 @@ export default function ProjectsPage() {
             Organize your environment variables by project
           </p>
         </div>
-        {canCreateProject && (
-          <TerminalButtonLink href="/dashboard/projects/new">
-            <Plus className="h-4 w-4" />
-            New Project
-          </TerminalButtonLink>
-        )}
+        <div className="flex items-center gap-2">
+          {projects.length > 0 && (
+            <button
+              onClick={() => setShowFavoritesFirst(!showFavoritesFirst)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                showFavoritesFirst
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                  : "border-zinc-700/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+              }`}
+            >
+              <Star
+                className="h-3.5 w-3.5"
+                fill={showFavoritesFirst ? "currentColor" : "none"}
+              />
+              Favorites first
+            </button>
+          )}
+          {canCreateProject && (
+            <TerminalButtonLink href="/dashboard/projects/new">
+              <Plus className="h-4 w-4" />
+              New Project
+            </TerminalButtonLink>
+          )}
+        </div>
       </div>
 
       {/* Projects Grid */}
@@ -84,7 +124,20 @@ export default function ProjectsPage() {
             pageKey={pagination.currentPage}
           >
             {pagination.pageItems.map((project) => (
-              <ProjectCard key={project._id} project={project} />
+              <ProjectCard
+                key={project._id}
+                project={project}
+                isFavorite={favoriteProjectIds.has(project._id)}
+                onToggleFavorite={
+                  convexUserId
+                    ? () =>
+                        toggleFavorite(
+                          convexUserId,
+                          project._id as Id<"projects">
+                        )
+                    : undefined
+                }
+              />
             ))}
           </AnimatedGrid>
           <Pagination
@@ -115,7 +168,15 @@ interface Project {
   createdAt: number;
 }
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({
+  project,
+  isFavorite = false,
+  onToggleFavorite,
+}: {
+  project: Project;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+}) {
   return (
     <Link
       href={`/dashboard/projects/${project.slug}`}
@@ -128,7 +189,28 @@ function ProjectCard({ project }: { project: Project }) {
         <span className="ml-2 truncate text-xs text-zinc-500">
           {project.slug}
         </span>
-        <ChevronRight className="ml-auto h-3 w-3 text-zinc-600 transition-colors group-hover:text-green-400" />
+        {onToggleFavorite && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            className="ml-auto p-0.5 transition-colors"
+            title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${
+                isFavorite
+                  ? "fill-amber-400 text-amber-400"
+                  : "text-zinc-600 hover:text-amber-400"
+              }`}
+            />
+          </button>
+        )}
+        <ChevronRight
+          className={`${onToggleFavorite ? "" : "ml-auto"} h-3 w-3 text-zinc-600 transition-colors group-hover:text-green-400`}
+        />
       </div>
       <div className="flex-1 p-4">
         <h3 className="font-mono text-sm font-semibold text-zinc-100 group-hover:text-green-400">
