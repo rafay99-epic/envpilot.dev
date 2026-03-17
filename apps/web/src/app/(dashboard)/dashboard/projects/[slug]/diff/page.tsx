@@ -161,8 +161,14 @@ function buildDiff(variables: Variable[], selectedEnvs: string[]) {
     rows.push({ key, status, isSensitive, description, slots });
   }
 
-  const order: Record<DiffStatus, number> = { missing: 0, changed: 1, matching: 2 };
-  rows.sort((a, b) => order[a.status] - order[b.status] || a.key.localeCompare(b.key));
+  const order: Record<DiffStatus, number> = {
+    missing: 0,
+    changed: 1,
+    matching: 2,
+  };
+  rows.sort(
+    (a, b) => order[a.status] - order[b.status] || a.key.localeCompare(b.key)
+  );
 
   return {
     rows,
@@ -207,7 +213,9 @@ export default function EnvironmentDiffPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [globalReveal, setGlobalReveal] = useState(false);
-  const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
+  const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
+    {}
+  );
   const [revealingRefs, setRevealingRefs] = useState<Set<string>>(new Set());
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
@@ -221,7 +229,9 @@ export default function EnvironmentDiffPage({
     }
     (async () => {
       try {
-        const res = await fetch(`/api/projects?organizationId=${organization.id}`);
+        const res = await fetch(
+          `/api/projects?organizationId=${organization.id}`
+        );
         const data = await res.json();
         const found = data.projects?.find((p: Project) => p.slug === slug);
         if (found) setProject(found);
@@ -247,7 +257,9 @@ export default function EnvironmentDiffPage({
         setVariables(data.variables || []);
         setElapsedMs(Math.round(performance.now() - t0));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch variables");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch variables"
+        );
       } finally {
         setIsLoadingVars(false);
       }
@@ -264,7 +276,10 @@ export default function EnvironmentDiffPage({
     () =>
       rows.filter((r) => {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
-        if (searchQuery && !r.key.toLowerCase().includes(searchQuery.toLowerCase()))
+        if (
+          searchQuery &&
+          !r.key.toLowerCase().includes(searchQuery.toLowerCase())
+        )
           return false;
         return true;
       }),
@@ -274,14 +289,20 @@ export default function EnvironmentDiffPage({
   // Environment toggle
   const toggleEnv = (env: string) => {
     setSelectedEnvs((prev) => {
-      if (prev.includes(env)) return prev.length <= 2 ? prev : prev.filter((e) => e !== env);
+      if (prev.includes(env))
+        return prev.length <= 2 ? prev : prev.filter((e) => e !== env);
       return [...prev, env];
     });
   };
 
   // Reveal a single vault ref via existing /api/vault endpoint
   const revealValue = async (vaultRef: string) => {
-    if (revealedValues[vaultRef] || revealingRefs.has(vaultRef) || !organization?.id) return;
+    if (
+      revealedValues[vaultRef] ||
+      revealingRefs.has(vaultRef) ||
+      !organization?.id
+    )
+      return;
 
     setRevealingRefs((prev) => new Set(prev).add(vaultRef));
     try {
@@ -375,7 +396,9 @@ export default function EnvironmentDiffPage({
             </p>
             <div className="mt-0.5 flex items-center gap-2">
               <GitCompareArrows className="h-4 w-4 text-green-400" />
-              <h1 className="text-lg font-bold text-zinc-100">Environment Diff</h1>
+              <h1 className="text-lg font-bold text-zinc-100">
+                Environment Diff
+              </h1>
               {elapsedMs !== null && !isLoadingVars && (
                 <span className="text-xs text-zinc-600">({elapsedMs}ms)</span>
               )}
@@ -389,7 +412,11 @@ export default function EnvironmentDiffPage({
             onClick={handleGlobalReveal}
             className="self-start sm:self-auto"
           >
-            {globalReveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {globalReveal ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
             {globalReveal ? "Hide Values" : "Reveal All"}
           </TerminalButton>
         )}
@@ -411,7 +438,9 @@ export default function EnvironmentDiffPage({
                   : "border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400"
               }`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${isOn ? meta.dot : "bg-zinc-700"}`} />
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${isOn ? meta.dot : "bg-zinc-700"}`}
+              />
               {meta.short}
             </button>
           );
@@ -438,13 +467,21 @@ export default function EnvironmentDiffPage({
                 return (
                   <button
                     key={f}
-                    onClick={() => setStatusFilter(active && f !== "all" ? "all" : f)}
+                    onClick={() =>
+                      setStatusFilter(active && f !== "all" ? "all" : f)
+                    }
                     className={`flex items-center gap-1.5 transition-colors ${
-                      active ? (cfg ? cfg.color : "text-zinc-100") : "text-zinc-600 hover:text-zinc-400"
+                      active
+                        ? cfg
+                          ? cfg.color
+                          : "text-zinc-100"
+                        : "text-zinc-600 hover:text-zinc-400"
                     }`}
                   >
                     {cfg && <cfg.icon className="h-3.5 w-3.5" />}
-                    <span>{count} {f}</span>
+                    <span>
+                      {count} {f}
+                    </span>
                   </button>
                 );
               })}
@@ -453,13 +490,28 @@ export default function EnvironmentDiffPage({
             {summary.total > 0 && (
               <div className="flex h-1.5 overflow-hidden rounded-full bg-zinc-800">
                 {summary.matching > 0 && (
-                  <div className="bg-green-500 transition-all" style={{ width: `${(summary.matching / summary.total) * 100}%` }} />
+                  <div
+                    className="bg-green-500 transition-all"
+                    style={{
+                      width: `${(summary.matching / summary.total) * 100}%`,
+                    }}
+                  />
                 )}
                 {summary.changed > 0 && (
-                  <div className="bg-amber-500 transition-all" style={{ width: `${(summary.changed / summary.total) * 100}%` }} />
+                  <div
+                    className="bg-amber-500 transition-all"
+                    style={{
+                      width: `${(summary.changed / summary.total) * 100}%`,
+                    }}
+                  />
                 )}
                 {summary.missing > 0 && (
-                  <div className="bg-red-500 transition-all" style={{ width: `${(summary.missing / summary.total) * 100}%` }} />
+                  <div
+                    className="bg-red-500 transition-all"
+                    style={{
+                      width: `${(summary.missing / summary.total) * 100}%`,
+                    }}
+                  />
                 )}
               </div>
             )}
@@ -484,7 +536,11 @@ export default function EnvironmentDiffPage({
           {filteredRows.length === 0 ? (
             <TerminalEmptyState
               command={`envpilot diff --filter ${statusFilter}${searchQuery ? ` --grep "${searchQuery}"` : ""}`}
-              message={rows.length === 0 ? "No variables found in the selected environments." : "No variables match your filters."}
+              message={
+                rows.length === 0
+                  ? "No variables found in the selected environments."
+                  : "No variables match your filters."
+              }
             />
           ) : (
             <div>
@@ -493,9 +549,14 @@ export default function EnvironmentDiffPage({
                 <div className="w-7 shrink-0" />
                 <div className="min-w-[160px] flex-1">Key</div>
                 {selectedEnvs.map((env) => (
-                  <div key={env} className={`flex-1 min-w-[140px] ${ENV_META[env].text}`}>
+                  <div
+                    key={env}
+                    className={`flex-1 min-w-[140px] ${ENV_META[env].text}`}
+                  >
                     <span className="flex items-center gap-1.5">
-                      <span className={`h-1.5 w-1.5 rounded-full ${ENV_META[env].dot}`} />
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${ENV_META[env].dot}`}
+                      />
                       {env}
                     </span>
                   </div>
@@ -512,7 +573,9 @@ export default function EnvironmentDiffPage({
                     revealedValues={revealedValues}
                     revealingRefs={revealingRefs}
                     isExpanded={expandedKey === row.key}
-                    onToggleExpand={() => setExpandedKey((p) => (p === row.key ? null : row.key))}
+                    onToggleExpand={() =>
+                      setExpandedKey((p) => (p === row.key ? null : row.key))
+                    }
                     onRevealRow={() => revealRow(row)}
                     onRevealRef={revealValue}
                     copiedRef={copiedRef}
@@ -529,7 +592,10 @@ export default function EnvironmentDiffPage({
         <TerminalEmptyState
           command="envpilot diff"
           message="No variables in this project yet."
-          action={{ label: "Go to Variables", href: `/dashboard/projects/${project.slug}` }}
+          action={{
+            label: "Go to Variables",
+            href: `/dashboard/projects/${project.slug}`,
+          }}
         />
       )}
     </div>
@@ -621,7 +687,9 @@ function DiffRowItem({
 
         {/* Key */}
         <div className="flex min-w-[160px] flex-1 items-center gap-2">
-          <code className="font-mono text-sm font-medium text-zinc-200">{row.key}</code>
+          <code className="font-mono text-sm font-medium text-zinc-200">
+            {row.key}
+          </code>
           {row.isSensitive && <Lock className="h-3 w-3 text-amber-500/60" />}
           <TerminalBadge color={cfg.badge}>{row.status}</TerminalBadge>
         </div>
@@ -646,7 +714,9 @@ function DiffRowItem({
               }`}
             >
               {!slot ? (
-                <span className="font-mono text-xs text-red-500/50">— not set</span>
+                <span className="font-mono text-xs text-red-500/50">
+                  — not set
+                </span>
               ) : isRevealing ? (
                 <span className="flex items-center gap-1 font-mono text-xs text-zinc-500">
                   <span className="h-3 w-3 animate-spin rounded-full border border-zinc-600 border-t-zinc-400" />
@@ -656,7 +726,9 @@ function DiffRowItem({
                   {revealed}
                 </code>
               ) : (
-                <code className={`font-mono text-xs opacity-40 ${meta.text}`}>••••••••</code>
+                <code className={`font-mono text-xs opacity-40 ${meta.text}`}>
+                  ••••••••
+                </code>
               )}
             </div>
           );
@@ -674,7 +746,9 @@ function DiffRowItem({
           ) : (
             <ChevronRight className="h-3.5 w-3.5 text-zinc-600" />
           )}
-          <code className="font-mono text-sm font-medium text-zinc-200">{row.key}</code>
+          <code className="font-mono text-sm font-medium text-zinc-200">
+            {row.key}
+          </code>
           {row.isSensitive && <Lock className="h-3 w-3 text-amber-500/60" />}
           <TerminalBadge color={cfg.badge}>{row.status}</TerminalBadge>
         </div>
@@ -689,7 +763,9 @@ function DiffRowItem({
                 key={env}
                 className={`flex items-center gap-1 font-mono text-[10px] ${slot ? meta.text : "text-zinc-700"}`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${slot ? meta.dot : "bg-zinc-800"}`} />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${slot ? meta.dot : "bg-zinc-800"}`}
+                />
                 {meta.short}
                 {!slot && <span className="text-red-500/50">✗</span>}
               </span>
@@ -702,7 +778,9 @@ function DiffRowItem({
       {isExpanded && (
         <div className="border-t border-zinc-800/30 bg-zinc-900/50 px-4 py-3 lg:ml-7">
           {row.description && (
-            <p className="mb-3 font-mono text-xs text-zinc-500"># {row.description}</p>
+            <p className="mb-3 font-mono text-xs text-zinc-500">
+              # {row.description}
+            </p>
           )}
 
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -710,7 +788,9 @@ function DiffRowItem({
               const slot = row.slots[env];
               const meta = ENV_META[env];
               const revealed = slot ? revealedValues[slot.vaultRef] : undefined;
-              const isRevealing = slot ? revealingRefs.has(slot.vaultRef) : false;
+              const isRevealing = slot
+                ? revealingRefs.has(slot.vaultRef)
+                : false;
               const isDiff = diffHighlight.has(env);
 
               return (
@@ -726,13 +806,16 @@ function DiffRowItem({
                 >
                   {/* Env label */}
                   <div className="flex items-center justify-between">
-                    <span className={`flex items-center gap-1.5 font-mono text-xs font-medium ${meta.text}`}>
+                    <span
+                      className={`flex items-center gap-1.5 font-mono text-xs font-medium ${meta.text}`}
+                    >
                       <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
                       {env}
                     </span>
                     {slot && (
                       <span className="font-mono text-[10px] text-zinc-600">
-                        v{slot.variable.version} · {formatDate(slot.variable.updatedAt)}
+                        v{slot.variable.version} ·{" "}
+                        {formatDate(slot.variable.updatedAt)}
                       </span>
                     )}
                   </div>
@@ -742,7 +825,9 @@ function DiffRowItem({
                     {!slot ? (
                       <div className="flex items-center gap-2 px-2 py-1.5">
                         <XCircle className="h-3 w-3 text-red-500/60" />
-                        <span className="font-mono text-xs text-red-400/60">not defined in this environment</span>
+                        <span className="font-mono text-xs text-red-400/60">
+                          not defined in this environment
+                        </span>
                       </div>
                     ) : revealed ? (
                       <div className="group/val relative">
