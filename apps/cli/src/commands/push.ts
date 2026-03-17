@@ -64,9 +64,7 @@ export const pushCommand = new Command("push")
           console.log();
           console.log("Linked projects:");
           for (const p of configV2.projects) {
-            console.log(
-              `  ${p.projectName || p.projectId} (${p.environment})`
-            );
+            console.log(`  ${p.projectName || p.projectId} (${p.environment})`);
           }
           process.exit(1);
         }
@@ -111,9 +109,7 @@ export const pushCommand = new Command("push")
         success: boolean;
         data: Array<{ _id: string; projectRole?: string | null }>;
       }>("/api/cli/projects", { organizationId });
-      const currentProject = projects.data?.find(
-        (p) => p._id === projectId
-      );
+      const currentProject = projects.data?.find((p) => p._id === projectId);
       const projectRole = currentProject?.projectRole;
 
       // Hard-block viewers from push
@@ -149,8 +145,7 @@ export const pushCommand = new Command("push")
         }
       }
 
-      const environment =
-        options.env || defaultEnvironment || "development";
+      const environment = options.env || defaultEnvironment || "development";
       const inputPath = options.file || getEnvPathForEnvironment(environment);
       const mode = options.replace ? "replace" : "merge";
 

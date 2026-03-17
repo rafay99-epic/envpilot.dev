@@ -3,11 +3,7 @@ import chalk from "chalk";
 import { hostname } from "node:os";
 import { createAPIClient } from "./api.js";
 import { createSpinner, success, info } from "./ui.js";
-import {
-  setAccessToken,
-  setRefreshToken,
-  setUser,
-} from "./config.js";
+import { setAccessToken, setRefreshToken, setUser } from "./config.js";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 150; // 5 minutes

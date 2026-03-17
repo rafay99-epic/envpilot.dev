@@ -107,9 +107,7 @@ export function writeProjectConfigV2(
 
 // ── V2 Helpers ───────────────────────────────────────────────────────
 
-export function getActiveProject(
-  config: ProjectConfigV2
-): ProjectEntry | null {
+export function getActiveProject(config: ProjectConfigV2): ProjectEntry | null {
   return (
     config.projects.find((p) => p.projectId === config.activeProjectId) ||
     config.projects[0] ||
@@ -206,15 +204,11 @@ export function writeProjectConfig(
   const existing = readProjectConfigV2(directory);
   if (existing) {
     // Update/replace the active project entry
-    const updated = updateProjectInConfig(
-      existing,
-      existing.activeProjectId,
-      {
-        projectId: config.projectId,
-        organizationId: config.organizationId,
-        environment: config.environment,
-      }
-    );
+    const updated = updateProjectInConfig(existing, existing.activeProjectId, {
+      projectId: config.projectId,
+      organizationId: config.organizationId,
+      environment: config.environment,
+    });
     // Also update activeProjectId in case it changed
     writeProjectConfigV2(
       { ...updated, activeProjectId: config.projectId },

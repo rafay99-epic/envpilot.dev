@@ -247,9 +247,7 @@ export function applyFileProtection(
   if (!existsSync(filePath)) return;
 
   const isWritable =
-    role === "admin" ||
-    role === "team_lead" ||
-    projectRole === "manager";
+    role === "admin" || role === "team_lead" || projectRole === "manager";
 
   if (isWritable) {
     chmodSync(filePath, 0o644); // read-write

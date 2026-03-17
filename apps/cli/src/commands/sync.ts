@@ -83,7 +83,12 @@ export const syncCommand = new Command("sync")
 
       const existingConfig = readProjectConfigV2();
 
-      if (existingConfig && !options.organization && !options.project && !options.env) {
+      if (
+        existingConfig &&
+        !options.organization &&
+        !options.project &&
+        !options.env
+      ) {
         // Already initialized — use active project
         const active = getActiveProject(existingConfig);
         if (active) {

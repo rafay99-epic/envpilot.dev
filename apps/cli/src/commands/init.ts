@@ -142,8 +142,7 @@ async function addProject(
     });
 
     const freshRole = orgs.find(
-      (o) =>
-        o._id === existingConfig.projects[0]?.organizationId
+      (o) => o._id === existingConfig.projects[0]?.organizationId
     )?.role;
 
     if (freshRole) {
@@ -218,9 +217,7 @@ async function addProject(
   console.log();
   success(`Added "${selectedProject.name}" to linked projects!`);
   console.log(
-    chalk.dim(
-      `  ${existingConfig.projects.length + 1} projects now linked`
-    )
+    chalk.dim(`  ${existingConfig.projects.length + 1} projects now linked`)
   );
   console.log();
   console.log("Next steps:");
@@ -269,8 +266,7 @@ export async function selectOrgProjectEnv(options: {
 
   if (options.organization) {
     const org = organizations.find(
-      (o) =>
-        o._id === options.organization || o.slug === options.organization
+      (o) => o._id === options.organization || o.slug === options.organization
     );
     if (!org) {
       error(`Organization not found: ${options.organization}`);

@@ -69,9 +69,7 @@ export const switchCommand = new Command("switch")
           console.log("Linked projects:");
           for (const p of configV2.projects) {
             const mark =
-              p.projectId === configV2.activeProjectId
-                ? chalk.green(" *")
-                : "";
+              p.projectId === configV2.activeProjectId ? chalk.green(" *") : "";
             console.log(
               `  ${p.projectName || p.projectId} (${p.environment})${mark}`
             );
@@ -157,8 +155,7 @@ export const switchCommand = new Command("switch")
           const linked = configV2.projects.find(
             (p) =>
               p.projectId === projectIdentifier ||
-              p.projectName.toLowerCase() ===
-                projectIdentifier.toLowerCase()
+              p.projectName.toLowerCase() === projectIdentifier.toLowerCase()
           );
           if (linked) {
             // Already linked — just set as active
@@ -221,20 +218,16 @@ export const switchCommand = new Command("switch")
           }
         }
 
-        const projects = await withSpinner(
-          "Fetching projects...",
-          async () => {
-            const response = await api.get<{
-              success: boolean;
-              data: Project[];
-            }>("/api/cli/projects", { organizationId: organizationId! });
-            return response.data || [];
-          }
-        );
+        const projects = await withSpinner("Fetching projects...", async () => {
+          const response = await api.get<{
+            success: boolean;
+            data: Project[];
+          }>("/api/cli/projects", { organizationId: organizationId! });
+          return response.data || [];
+        });
 
         const project = projects.find(
-          (p) =>
-            p._id === projectIdentifier || p.slug === projectIdentifier
+          (p) => p._id === projectIdentifier || p.slug === projectIdentifier
         );
 
         if (!project) {
@@ -279,8 +272,7 @@ export const switchCommand = new Command("switch")
         !options.active
       ) {
         const configV2 = readProjectConfigV2();
-        const hasMultipleProjects =
-          configV2 && configV2.projects.length > 1;
+        const hasMultipleProjects = configV2 && configV2.projects.length > 1;
 
         const choices = [];
         if (hasMultipleProjects) {
@@ -311,8 +303,7 @@ export const switchCommand = new Command("switch")
               name: "projectId",
               message: "Select active project:",
               choices: configV2.projects.map((p) => {
-                const isActive =
-                  p.projectId === configV2.activeProjectId;
+                const isActive = p.projectId === configV2.activeProjectId;
                 return {
                   name: `${p.projectName || p.projectId} (${p.environment})${isActive ? chalk.green(" *current") : ""}`,
                   value: p.projectId,

@@ -71,9 +71,7 @@ export const pullCommand = new Command("pull")
           console.log();
           console.log("Linked projects:");
           for (const p of configV2.projects) {
-            console.log(
-              `  ${p.projectName || p.projectId} (${p.environment})`
-            );
+            console.log(`  ${p.projectName || p.projectId} (${p.environment})`);
           }
           process.exit(1);
         }
@@ -289,10 +287,7 @@ async function pullProject(
 
   if (options.format === "json") {
     const fs = await import("node:fs");
-    fs.writeFileSync(
-      outputPath,
-      JSON.stringify(remoteVars, null, 2) + "\n"
-    );
+    fs.writeFileSync(outputPath, JSON.stringify(remoteVars, null, 2) + "\n");
   } else {
     const comments: Record<string, string> = {};
     for (const variable of variables) {
@@ -318,15 +313,16 @@ async function pullProject(
   }
 
   // Show protection status
-  const isProtected = role !== "admin" && role !== "team_lead" && metaProjectRole !== "manager";
+  const isProtected =
+    role !== "admin" && role !== "team_lead" && metaProjectRole !== "manager";
   if (isProtected) {
-    info(`File is read-only (your role: ${role || metaProjectRole || "member"}).`);
+    info(
+      `File is read-only (your role: ${role || metaProjectRole || "member"}).`
+    );
   }
 
   console.log();
-  console.log(
-    chalk.dim(`  Added:   ${Object.keys(diffResult.added).length}`)
-  );
+  console.log(chalk.dim(`  Added:   ${Object.keys(diffResult.added).length}`));
   console.log(
     chalk.dim(`  Changed: ${Object.keys(diffResult.changed).length}`)
   );

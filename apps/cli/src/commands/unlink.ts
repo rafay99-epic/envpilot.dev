@@ -61,9 +61,7 @@ export const unlinkCommand = new Command("unlink")
             }),
           },
         ]);
-        targetProject = config.projects.find(
-          (p) => p.projectId === projectId
-        )!;
+        targetProject = config.projects.find((p) => p.projectId === projectId)!;
       } else {
         targetProject = config.projects[0];
       }
@@ -105,10 +103,7 @@ export const unlinkCommand = new Command("unlink")
         }
 
         success(`Unlinked "${displayName}".`);
-        if (
-          config.activeProjectId === targetProject.projectId &&
-          newActive
-        ) {
+        if (config.activeProjectId === targetProject.projectId && newActive) {
           info(
             `Active project switched to "${newActive.projectName || newActive.projectId}".`
           );

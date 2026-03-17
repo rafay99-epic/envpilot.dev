@@ -205,11 +205,9 @@ export function removeCommitGuard(repoRoot?: string): boolean {
     }
 
     const startIdx = content.indexOf(HOOK_START_MARKER);
-    const endIdx =
-      content.indexOf(HOOK_END_MARKER) + HOOK_END_MARKER.length;
+    const endIdx = content.indexOf(HOOK_END_MARKER) + HOOK_END_MARKER.length;
 
-    let cleaned =
-      content.substring(0, startIdx) + content.substring(endIdx);
+    let cleaned = content.substring(0, startIdx) + content.substring(endIdx);
     cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
 
     if (cleaned === "#!/bin/sh" || cleaned === "") {

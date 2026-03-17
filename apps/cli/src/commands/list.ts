@@ -96,9 +96,7 @@ function listLinked(): void {
     console.log(
       `  ${marker} ${chalk.bold(project.projectName || project.projectId)} ${chalk.dim(`(${project.organizationName || project.organizationId})`)}`
     );
-    console.log(
-      `    ${project.environment} ${chalk.dim("→")} ${envFile}`
-    );
+    console.log(`    ${project.environment} ${chalk.dim("→")} ${envFile}`);
     console.log();
   }
 
