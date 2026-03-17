@@ -45,11 +45,10 @@ export class StatusBarProvider {
       return;
     }
 
+    const allLinkedProjects = await this.syncService.getAllLinkedProjectsV2();
     const linkedProject = await this.syncService.getLinkedProject();
-    const linkedProjectV2 =
-      await this.syncService.getLinkedProjectV2ForWorkspace();
 
-    if (!linkedProject && !linkedProjectV2) {
+    if (allLinkedProjects.length === 0 && !linkedProject) {
       this.statusBarItem.text = "$(shield) Envpilot";
       this.statusBarItem.tooltip =
         "Signed in \u2014 no project linked\nClick to link a project";
@@ -62,17 +61,25 @@ export class StatusBarProvider {
     this.statusBarItem.command = "envpilot.showStatus";
 
     if (this.isSyncing) {
-      const name = linkedProjectV2?.projectName || linkedProject?.projectName;
+      const name =
+        allLinkedProjects.length > 0
+          ? allLinkedProjects[0].projectName
+          : linkedProject?.projectName;
       this.statusBarItem.text = `$(sync~spin) ${name}`;
       this.statusBarItem.tooltip = "Syncing variables\u2026";
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
 
-    // Build tooltip for V2 (multi-directory) or V1
-    if (linkedProjectV2) {
-      this.statusBarItem.text = `$(shield) ${linkedProjectV2.projectName}`;
-      this.statusBarItem.tooltip = this.buildV2Tooltip(linkedProjectV2);
+    // Build tooltip for V2 (multi-project / multi-directory) or V1
+    if (allLinkedProjects.length > 1) {
+      // Multiple projects linked
+      this.statusBarItem.text = `$(shield) Envpilot: ${allLinkedProjects.length} projects`;
+      this.statusBarItem.tooltip =
+        this.buildMultiProjectTooltip(allLinkedProjects);
+    } else if (allLinkedProjects.length === 1) {
+      this.statusBarItem.text = `$(shield) ${allLinkedProjects[0].projectName}`;
+      this.statusBarItem.tooltip = this.buildV2Tooltip(allLinkedProjects[0]);
     } else if (linkedProject) {
       const syncInfo = linkedProject.lastSyncedAt
         ? `Synced ${this.formatTime(linkedProject.lastSyncedAt)}`
@@ -102,6 +109,30 @@ export class StatusBarProvider {
     if (!this.errorClearTimer) {
       this.statusBarItem.backgroundColor = undefined;
     }
+  }
+
+  private buildMultiProjectTooltip(
+    projects: LinkedProjectV2[]
+  ): vscode.MarkdownString {
+    const lines: string[] = [
+      `### $(shield) Envpilot — ${projects.length} Projects Linked`,
+      "",
+    ];
+
+    for (const project of projects) {
+      lines.push(
+        "---",
+        "",
+        `**$(folder-library) ${project.projectName}**`,
+        `$(organization) ${project.organizationName}`,
+        `$(file-directory) ${project.directories.length} director${project.directories.length !== 1 ? "ies" : "y"}`,
+        ""
+      );
+    }
+
+    const md = new vscode.MarkdownString(lines.join("\n"));
+    md.supportThemeIcons = true;
+    return md;
   }
 
   private buildV2Tooltip(project: LinkedProjectV2): vscode.MarkdownString {
