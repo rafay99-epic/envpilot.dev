@@ -9,7 +9,8 @@ const buttonVariants = cva(
       variant: {
         default: "bg-emerald-600 text-white hover:bg-emerald-700",
         destructive: "bg-red-600 text-white hover:bg-red-700",
-        outline: "border border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-800",
+        outline:
+          "border border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-800",
         ghost: "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
       },
       size: {
@@ -26,11 +27,15 @@ const buttonVariants = cva(
 );
 
 interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
+  extends
+    ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {}
 
 export function Button({ className, variant, size, ...props }: ButtonProps) {
   return (
-    <button className={cn(buttonVariants({ variant, size, className }))} {...props} />
+    <button
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
   );
 }

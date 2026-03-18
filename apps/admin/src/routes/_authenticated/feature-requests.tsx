@@ -54,7 +54,9 @@ function statusBadgeVariant(status: string) {
 function FeatureRequestsPage() {
   const requests = useAdminQuery(api.admin.listFeatureRequests, {});
   const updateStatus = useAdminMutation(api.admin.updateFeatureRequestStatus);
-  const updateNotes = useAdminMutation(api.admin.updateFeatureRequestAdminNotes);
+  const updateNotes = useAdminMutation(
+    api.admin.updateFeatureRequestAdminNotes
+  );
   const deleteRequest = useAdminMutation(api.admin.deleteFeatureRequest);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -82,7 +84,9 @@ function FeatureRequestsPage() {
   if (requests.length === 0)
     return (
       <div>
-        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Feature Requests</h1>
+        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+          Feature Requests
+        </h1>
         <EmptyState
           icon={<Lightbulb className="h-8 w-8" />}
           title="No feature requests"
@@ -92,7 +96,9 @@ function FeatureRequestsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Feature Requests</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+        Feature Requests
+      </h1>
 
       <div className="overflow-x-auto rounded-lg border border-zinc-800">
         <table className="w-full text-left text-sm">
@@ -133,7 +139,10 @@ function FeatureRequestsPage() {
                       {req.title}
                     </div>
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td
+                    className="px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <select
                       value={req.status}
                       onChange={(e) => {
@@ -154,8 +163,12 @@ function FeatureRequestsPage() {
                   <td className="px-4 py-3">
                     <Badge variant="purple">{req.category ?? "general"}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-zinc-300">{req.voteCount ?? 0}</td>
-                  <td className="px-4 py-3 text-zinc-400">{req.submitterName ?? req.submitterEmail ?? "Anonymous"}</td>
+                  <td className="px-4 py-3 text-zinc-300">
+                    {req.voteCount ?? 0}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-400">
+                    {req.submitterName ?? req.submitterEmail ?? "Anonymous"}
+                  </td>
                   <td className="px-4 py-3 text-zinc-400">
                     {formatDate(req._creationTime)}
                   </td>
@@ -205,7 +218,9 @@ function FeatureRequestsPage() {
                             disabled={savingNotes === req._id}
                           >
                             <Save className="h-3 w-3" />
-                            {savingNotes === req._id ? "Saving..." : "Save Notes"}
+                            {savingNotes === req._id
+                              ? "Saving..."
+                              : "Save Notes"}
                           </Button>
                         </div>
                       </div>

@@ -1,4 +1,8 @@
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useSearch,
+  useNavigate,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
@@ -21,7 +25,10 @@ const BROWSABLE_TABLES = [
   { value: "favoriteProjects", label: "favoriteProjects" },
   { value: "projectMembers", label: "projectMembers" },
   { value: "environmentVariables", label: "environmentVariables" },
-  { value: "environmentVariableRequests", label: "environmentVariableRequests" },
+  {
+    value: "environmentVariableRequests",
+    label: "environmentVariableRequests",
+  },
   { value: "variableVersions", label: "variableVersions" },
   { value: "variablePermissions", label: "variablePermissions" },
   { value: "projectAccess", label: "projectAccess" },
@@ -131,7 +138,9 @@ function DataBrowserPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Data Browser</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+        Data Browser
+      </h1>
 
       <div className="mb-6 w-64">
         <Select
@@ -172,7 +181,10 @@ function DataBrowserPage() {
             <tbody className="divide-y divide-zinc-800/50">
               {(rows as Record<string, unknown>[]).map(
                 (row: Record<string, unknown>, i: number) => (
-                  <tr key={(row._id as string) ?? i} className="hover:bg-zinc-800/30">
+                  <tr
+                    key={(row._id as string) ?? i}
+                    className="hover:bg-zinc-800/30"
+                  >
                     {orderedKeys.map((key) => (
                       <td
                         key={key}

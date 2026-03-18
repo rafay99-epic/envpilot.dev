@@ -112,10 +112,7 @@ export async function isEnforcementEnabledFromDb(
  * Get a tier definition from the database by name.
  * Returns null if not found.
  */
-export async function getTierDefinition(
-  db: DatabaseReader,
-  tierName: string
-) {
+export async function getTierDefinition(db: DatabaseReader, tierName: string) {
   return await db
     .query("tierDefinitions")
     .withIndex("by_name", (q) => q.eq("name", tierName))
@@ -126,9 +123,7 @@ export async function getTierDefinition(
  * Get the default tier name from the database.
  * Falls back to "free" if no default tier is defined.
  */
-export async function getDefaultTierName(
-  db: DatabaseReader
-): Promise<string> {
+export async function getDefaultTierName(db: DatabaseReader): Promise<string> {
   const allTiers = await db.query("tierDefinitions").collect();
   const defaultTier = allTiers.find((t) => t.isDefault);
   return defaultTier?.name ?? "free";
@@ -162,7 +157,8 @@ function tierDefinitionToLimits(tierDef: {
     apiAccessEnabled: tierDef.features.apiAccessEnabled,
     extensionAccessEnabled: tierDef.features.extensionAccessEnabled,
     granularPermissionsEnabled: tierDef.features.granularPermissionsEnabled,
-    variableVersionHistoryEnabled: tierDef.features.variableVersionHistoryEnabled,
+    variableVersionHistoryEnabled:
+      tierDef.features.variableVersionHistoryEnabled,
     bulkImportEnabled: tierDef.features.bulkImportEnabled,
   };
 }

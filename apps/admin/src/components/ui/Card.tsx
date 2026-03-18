@@ -7,7 +7,12 @@ interface CardProps {
 
 export function Card({ children, className }: CardProps) {
   return (
-    <div className={cn("rounded-lg border border-zinc-800 bg-zinc-900 p-6", className)}>
+    <div
+      className={cn(
+        "rounded-lg border border-zinc-800 bg-zinc-900 p-6",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -21,7 +26,13 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ title, value, icon, trend, className }: StatCardProps) {
+export function StatCard({
+  title,
+  value,
+  icon,
+  trend,
+  className,
+}: StatCardProps) {
   return (
     <Card className={cn("flex items-start justify-between", className)}>
       <div>

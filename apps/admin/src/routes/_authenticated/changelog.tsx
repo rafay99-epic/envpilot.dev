@@ -19,7 +19,12 @@ export const Route = createFileRoute("/_authenticated/changelog")({
   component: ChangelogPage,
 });
 
-type ChangelogType = "feature" | "improvement" | "fix" | "security" | "breaking";
+type ChangelogType =
+  | "feature"
+  | "improvement"
+  | "fix"
+  | "security"
+  | "breaking";
 
 const TYPE_OPTIONS = [
   { value: "feature", label: "Feature" },
@@ -157,7 +162,9 @@ function ChangelogPage() {
                   {entry.version && (
                     <Badge variant="default">v{entry.version}</Badge>
                   )}
-                  <Badge variant={typeBadgeVariant(entry.type)}>{entry.type}</Badge>
+                  <Badge variant={typeBadgeVariant(entry.type)}>
+                    {entry.type}
+                  </Badge>
                   <Badge variant={entry.isPublished ? "success" : "warning"}>
                     {entry.isPublished ? "Published" : "Draft"}
                   </Badge>
@@ -236,7 +243,9 @@ function ChangelogPage() {
               id="changelog-type"
               options={TYPE_OPTIONS}
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as ChangelogType })}
+              onChange={(e) =>
+                setForm({ ...form, type: e.target.value as ChangelogType })
+              }
             />
           </div>
           {!editingId && (
@@ -244,7 +253,9 @@ function ChangelogPage() {
               <input
                 type="checkbox"
                 checked={form.isPublished}
-                onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, isPublished: e.target.checked })
+                }
                 className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
               />
               Publish immediately
@@ -261,7 +272,10 @@ function ChangelogPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || !form.title.trim()}>
+            <Button
+              onClick={handleSave}
+              disabled={saving || !form.title.trim()}
+            >
               {saving ? "Saving..." : editingId ? "Update" : "Create"}
             </Button>
           </div>

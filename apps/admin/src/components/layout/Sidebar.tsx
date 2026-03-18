@@ -38,7 +38,9 @@ export function Sidebar() {
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-xs font-bold text-white">
           E
         </div>
-        <span className="text-sm font-semibold text-zinc-100">Envpilot Admin</span>
+        <span className="text-sm font-semibold text-zinc-100">
+          Envpilot Admin
+        </span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3">

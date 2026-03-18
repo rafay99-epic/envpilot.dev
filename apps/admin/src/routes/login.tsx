@@ -24,7 +24,9 @@ function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await convex.query(api.admin.verifySecret, { secret: password });
+      const result = await convex.query(api.admin.verifySecret, {
+        secret: password,
+      });
       if (result.valid) {
         login(password);
         navigate({ to: "/" });
@@ -45,8 +47,12 @@ function LoginPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-lg font-bold text-white">
             E
           </div>
-          <h1 className="text-xl font-semibold text-zinc-100">Envpilot Admin</h1>
-          <p className="mt-1 text-sm text-zinc-500">Enter your admin secret to continue</p>
+          <h1 className="text-xl font-semibold text-zinc-100">
+            Envpilot Admin
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">
+            Enter your admin secret to continue
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,7 +64,11 @@ function LoginPage() {
             autoFocus
           />
           {error && <p className="text-sm text-red-400">{error}</p>}
-          <Button type="submit" className="w-full" disabled={isLoading || !password}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading || !password}
+          >
             {isLoading ? "Verifying..." : "Sign In"}
           </Button>
         </form>

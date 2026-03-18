@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { scaleLinear, niceAxisTicks, formatCompact, CHART_COLORS } from "./utils";
+import {
+  scaleLinear,
+  niceAxisTicks,
+  formatCompact,
+  CHART_COLORS,
+} from "./utils";
 
 interface BarChartDatum {
   label: string;
@@ -35,8 +40,7 @@ export function BarChart({
   if (data.length === 0) return null;
 
   // Check if labels need rotation (more than 5 items or any label > 6 chars)
-  const needsRotation =
-    data.length > 5 || data.some((d) => d.label.length > 8);
+  const needsRotation = data.length > 5 || data.some((d) => d.label.length > 8);
   const bottomPadding = needsRotation ? 72 : 28;
 
   const viewHeight = height + (needsRotation ? 44 : 0);
@@ -65,9 +69,7 @@ export function BarChart({
         {showGrid &&
           ticks.map((tick) => {
             const y =
-              PADDING.top +
-              chartH -
-              scaleLinear(tick, [0, yMax], [0, chartH]);
+              PADDING.top + chartH - scaleLinear(tick, [0, yMax], [0, chartH]);
             return (
               <g key={tick}>
                 <line
@@ -141,9 +143,7 @@ export function BarChart({
                   fontSize={10}
                   transform={`rotate(-45, ${labelX}, ${labelY})`}
                 >
-                  {d.label.length > 16
-                    ? d.label.slice(0, 14) + "…"
-                    : d.label}
+                  {d.label.length > 16 ? d.label.slice(0, 14) + "…" : d.label}
                 </text>
               ) : (
                 <text

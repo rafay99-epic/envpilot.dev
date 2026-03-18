@@ -67,20 +67,21 @@ export function DataTable<T extends Record<string, unknown>>({
                 key={col.key}
                 className={cn(
                   "px-4 py-3 font-medium text-zinc-400",
-                  col.sortable && "cursor-pointer select-none hover:text-zinc-200",
+                  col.sortable &&
+                    "cursor-pointer select-none hover:text-zinc-200",
                   col.className
                 )}
                 onClick={() => col.sortable && handleSort(col.key)}
               >
                 <span className="inline-flex items-center gap-1">
                   {col.header}
-                  {col.sortable && sortKey === col.key && (
-                    sortDir === "asc" ? (
+                  {col.sortable &&
+                    sortKey === col.key &&
+                    (sortDir === "asc" ? (
                       <ChevronUp className="h-3 w-3" />
                     ) : (
                       <ChevronDown className="h-3 w-3" />
-                    )
-                  )}
+                    ))}
                 </span>
               </th>
             ))}
@@ -97,8 +98,13 @@ export function DataTable<T extends Record<string, unknown>>({
               onClick={() => onRowClick?.(row)}
             >
               {columns.map((col) => (
-                <td key={col.key} className={cn("px-4 py-3 text-zinc-300", col.className)}>
-                  {col.render ? col.render(row) : String(row[col.key] ?? "\u2014")}
+                <td
+                  key={col.key}
+                  className={cn("px-4 py-3 text-zinc-300", col.className)}
+                >
+                  {col.render
+                    ? col.render(row)
+                    : String(row[col.key] ?? "\u2014")}
                 </td>
               ))}
             </tr>

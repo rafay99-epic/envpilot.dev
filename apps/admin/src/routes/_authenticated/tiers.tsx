@@ -88,7 +88,9 @@ function TiersPage() {
   const tierEnforcement = settings?.tierEnforcement === "true";
 
   const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<Id<"tierDefinitions"> | null>(null);
+  const [editingId, setEditingId] = useState<Id<"tierDefinitions"> | null>(
+    null
+  );
   const [form, setForm] = useState<TierFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -120,7 +122,8 @@ function TiersPage() {
       apiAccessEnabled: tier.features.apiAccessEnabled,
       extensionAccessEnabled: tier.features.extensionAccessEnabled,
       granularPermissionsEnabled: tier.features.granularPermissionsEnabled,
-      variableVersionHistoryEnabled: tier.features.variableVersionHistoryEnabled,
+      variableVersionHistoryEnabled:
+        tier.features.variableVersionHistoryEnabled,
       bulkImportEnabled: tier.features.bulkImportEnabled,
     });
     setShowModal(true);
@@ -239,9 +242,7 @@ function TiersPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">
-          Tiers & Limits
-        </h1>
+        <h1 className="text-2xl font-semibold text-zinc-100">Tiers & Limits</h1>
 
         <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
           <Shield className="h-4 w-4 text-zinc-400" />
@@ -317,9 +318,7 @@ function TiersPage() {
                     <h3 className="font-semibold text-zinc-100">
                       {tier.displayName}
                     </h3>
-                    <Badge
-                      variant={tier.name === "pro" ? "purple" : "default"}
-                    >
+                    <Badge variant={tier.name === "pro" ? "purple" : "default"}>
                       {tier.name}
                     </Badge>
                     {tier.isDefault && (
@@ -447,198 +446,185 @@ function TiersPage() {
         onClose={() => setShowModal(false)}
         className="max-w-2xl"
       >
-          <div className="space-y-4">
-            {!editingId && (
-              <Input
-                label="Tier Name (slug)"
-                id="tier-name"
-                value={form.name}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
-                }
-                placeholder="e.g. enterprise"
-              />
-            )}
+        <div className="space-y-4">
+          {!editingId && (
             <Input
-              label="Display Name"
-              id="tier-display-name"
-              value={form.displayName}
+              label="Tier Name (slug)"
+              id="tier-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. enterprise"
+            />
+          )}
+          <Input
+            label="Display Name"
+            id="tier-display-name"
+            value={form.displayName}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, displayName: e.target.value }))
+            }
+            placeholder="e.g. Enterprise"
+          />
+          <Input
+            label="Description"
+            id="tier-description"
+            value={form.description}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, description: e.target.value }))
+            }
+            placeholder="Brief description of the tier"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Sort Order"
+              id="tier-sort-order"
+              type="number"
+              value={form.sortOrder.toString()}
               onChange={(e) =>
-                setForm((f) => ({ ...f, displayName: e.target.value }))
+                setForm((f) => ({
+                  ...f,
+                  sortOrder: parseInt(e.target.value, 10) || 0,
+                }))
               }
-              placeholder="e.g. Enterprise"
             />
             <Input
-              label="Description"
-              id="tier-description"
-              value={form.description}
+              label="Color (hex)"
+              id="tier-color"
+              value={form.color}
               onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
+                setForm((f) => ({ ...f, color: e.target.value }))
               }
-              placeholder="Brief description of the tier"
+              placeholder="#a855f7"
             />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Sort Order"
-                id="tier-sort-order"
-                type="number"
-                value={form.sortOrder.toString()}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    sortOrder: parseInt(e.target.value, 10) || 0,
-                  }))
-                }
-              />
-              <Input
-                label="Color (hex)"
-                id="tier-color"
-                value={form.color}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, color: e.target.value }))
-                }
-                placeholder="#a855f7"
-              />
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={form.isDefault}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, isDefault: e.target.checked }))
-                }
-                className="rounded border-zinc-600 bg-zinc-800"
-              />
-              Set as default tier (assigned to new organizations)
-            </label>
-
-            <h3 className="pt-2 text-sm font-semibold text-zinc-200">
-              Limits
-            </h3>
-            <p className="text-xs text-zinc-500">
-              Enter a number or "unlimited" for no limit.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Max Projects"
-                id="tier-max-projects"
-                value={form.maxProjects}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, maxProjects: e.target.value }))
-                }
-                placeholder="unlimited"
-              />
-              <Input
-                label="Max Vars/Project"
-                id="tier-max-vars"
-                value={form.maxVariablesPerProject}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    maxVariablesPerProject: e.target.value,
-                  }))
-                }
-                placeholder="unlimited"
-              />
-              <Input
-                label="Max Team Members"
-                id="tier-max-members"
-                value={form.maxTeamMembers}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, maxTeamMembers: e.target.value }))
-                }
-                placeholder="unlimited"
-              />
-              <Input
-                label="Max Organizations"
-                id="tier-max-orgs"
-                value={form.maxOrganizations}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    maxOrganizations: e.target.value,
-                  }))
-                }
-                placeholder="unlimited"
-              />
-              <Input
-                label="Audit Retention (days)"
-                id="tier-audit-days"
-                type="number"
-                value={form.auditLogRetentionDays}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    auditLogRetentionDays: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <h3 className="pt-2 text-sm font-semibold text-zinc-200">
-              Features
-            </h3>
-            <div className="space-y-2">
-              {[
-                {
-                  key: "apiAccessEnabled" as const,
-                  label: "API Access",
-                },
-                {
-                  key: "extensionAccessEnabled" as const,
-                  label: "Extension Access",
-                },
-                {
-                  key: "granularPermissionsEnabled" as const,
-                  label: "Granular Permissions",
-                },
-                {
-                  key: "variableVersionHistoryEnabled" as const,
-                  label: "Variable Version History",
-                },
-                {
-                  key: "bulkImportEnabled" as const,
-                  label: "Bulk Import",
-                },
-              ].map((feat) => (
-                <label
-                  key={feat.key}
-                  className="flex items-center gap-2 text-sm text-zinc-300"
-                >
-                  <input
-                    type="checkbox"
-                    checked={form[feat.key]}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        [feat.key]: e.target.checked,
-                      }))
-                    }
-                    className="rounded border-zinc-600 bg-zinc-800"
-                  />
-                  {feat.label}
-                </label>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving
-                  ? "Saving..."
-                  : editingId
-                    ? "Update Tier"
-                    : "Create Tier"}
-              </Button>
-            </div>
           </div>
-        </Modal>
+
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={form.isDefault}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, isDefault: e.target.checked }))
+              }
+              className="rounded border-zinc-600 bg-zinc-800"
+            />
+            Set as default tier (assigned to new organizations)
+          </label>
+
+          <h3 className="pt-2 text-sm font-semibold text-zinc-200">Limits</h3>
+          <p className="text-xs text-zinc-500">
+            Enter a number or "unlimited" for no limit.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Max Projects"
+              id="tier-max-projects"
+              value={form.maxProjects}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, maxProjects: e.target.value }))
+              }
+              placeholder="unlimited"
+            />
+            <Input
+              label="Max Vars/Project"
+              id="tier-max-vars"
+              value={form.maxVariablesPerProject}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  maxVariablesPerProject: e.target.value,
+                }))
+              }
+              placeholder="unlimited"
+            />
+            <Input
+              label="Max Team Members"
+              id="tier-max-members"
+              value={form.maxTeamMembers}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, maxTeamMembers: e.target.value }))
+              }
+              placeholder="unlimited"
+            />
+            <Input
+              label="Max Organizations"
+              id="tier-max-orgs"
+              value={form.maxOrganizations}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  maxOrganizations: e.target.value,
+                }))
+              }
+              placeholder="unlimited"
+            />
+            <Input
+              label="Audit Retention (days)"
+              id="tier-audit-days"
+              type="number"
+              value={form.auditLogRetentionDays}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  auditLogRetentionDays: e.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <h3 className="pt-2 text-sm font-semibold text-zinc-200">Features</h3>
+          <div className="space-y-2">
+            {[
+              {
+                key: "apiAccessEnabled" as const,
+                label: "API Access",
+              },
+              {
+                key: "extensionAccessEnabled" as const,
+                label: "Extension Access",
+              },
+              {
+                key: "granularPermissionsEnabled" as const,
+                label: "Granular Permissions",
+              },
+              {
+                key: "variableVersionHistoryEnabled" as const,
+                label: "Variable Version History",
+              },
+              {
+                key: "bulkImportEnabled" as const,
+                label: "Bulk Import",
+              },
+            ].map((feat) => (
+              <label
+                key={feat.key}
+                className="flex items-center gap-2 text-sm text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={form[feat.key]}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      [feat.key]: e.target.checked,
+                    }))
+                  }
+                  className="rounded border-zinc-600 bg-zinc-800"
+                />
+                {feat.label}
+              </label>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={() => setShowModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : editingId ? "Update Tier" : "Create Tier"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

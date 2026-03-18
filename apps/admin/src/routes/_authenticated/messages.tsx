@@ -25,14 +25,21 @@ function MessagesPage() {
   if (messages.length === 0)
     return (
       <div>
-        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Contact Messages</h1>
-        <EmptyState icon={<Mail className="h-8 w-8" />} title="No messages yet" />
+        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+          Contact Messages
+        </h1>
+        <EmptyState
+          icon={<Mail className="h-8 w-8" />}
+          title="No messages yet"
+        />
       </div>
     );
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Contact Messages</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+        Contact Messages
+      </h1>
 
       <div className="overflow-x-auto rounded-lg border border-zinc-800">
         <table className="w-full text-left text-sm">
@@ -101,7 +108,9 @@ function MessagesPage() {
                 {expandedId === msg._id && (
                   <tr key={`${msg._id}-body`}>
                     <td colSpan={6} className="bg-zinc-900/30 px-6 py-4">
-                      <p className="mb-1 text-xs font-medium text-zinc-400">Message</p>
+                      <p className="mb-1 text-xs font-medium text-zinc-400">
+                        Message
+                      </p>
                       <p className="whitespace-pre-wrap text-sm text-zinc-300">
                         {msg.message}
                       </p>

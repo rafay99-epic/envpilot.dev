@@ -85,7 +85,9 @@ export function AreaChart({
                     s.color ?? CHART_COLORS[i % CHART_COLORS.length],
                 }}
               />
-              <span className="text-zinc-400">{s.label ?? `Series ${i + 1}`}</span>
+              <span className="text-zinc-400">
+                {s.label ?? `Series ${i + 1}`}
+              </span>
             </div>
           ))}
         </div>
@@ -147,8 +149,7 @@ export function AreaChart({
         {/* X-axis labels */}
         {labels.map((label, i) => {
           if (i % labelSkip !== 0 && i !== labels.length - 1) return null;
-          const x =
-            PADDING.left + (labels.length > 1 ? i * xStep : chartW / 2);
+          const x = PADDING.left + (labels.length > 1 ? i * xStep : chartW / 2);
           return (
             <text
               key={i}
@@ -194,9 +195,7 @@ export function AreaChart({
 
           return (
             <g key={si}>
-              {showArea && (
-                <path d={areaPath} fill={`url(#area-grad-${si})`} />
-              )}
+              {showArea && <path d={areaPath} fill={`url(#area-grad-${si})`} />}
               <path
                 d={linePath}
                 fill="none"
@@ -243,9 +242,7 @@ export function AreaChart({
             transform: "translateX(-50%)",
           }}
         >
-          <p className="mb-1 font-medium text-zinc-300">
-            {labels[hoveredIdx]}
-          </p>
+          <p className="mb-1 font-medium text-zinc-300">{labels[hoveredIdx]}</p>
           {series.map((s, si) => (
             <div key={si} className="flex items-center gap-1.5">
               <div

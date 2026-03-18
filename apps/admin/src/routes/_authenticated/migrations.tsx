@@ -31,14 +31,15 @@ function MigrationsPage() {
   const handleRun = async (name: string) => {
     setRunningName(name);
     try {
-      const result = await runMigration({ name }) as MigrationResult;
+      const result = (await runMigration({ name })) as MigrationResult;
       setResults((prev) => ({
         ...prev,
         [name]: {
           success: !!result?.success,
-          message: result?.total != null
-            ? `Total: ${result.total}, Migrated: ${result.migrated}, Skipped: ${result.skipped}`
-            : "Migration completed",
+          message:
+            result?.total != null
+              ? `Total: ${result.total}, Migrated: ${result.migrated}, Skipped: ${result.skipped}`
+              : "Migration completed",
         },
       }));
     } catch (err) {
@@ -58,7 +59,9 @@ function MigrationsPage() {
   if (migrations.length === 0)
     return (
       <div>
-        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Migrations</h1>
+        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+          Migrations
+        </h1>
         <EmptyState
           icon={<ArrowUpDown className="h-8 w-8" />}
           title="No migrations available"
@@ -73,7 +76,10 @@ function MigrationsPage() {
 
       <div className="space-y-4">
         {migrations.map((migration) => (
-          <Card key={migration.name} className="flex items-start justify-between">
+          <Card
+            key={migration.name}
+            className="flex items-start justify-between"
+          >
             <div className="flex-1">
               <div className="mb-1 flex items-center gap-2">
                 <h3 className="font-medium text-zinc-100">{migration.name}</h3>

@@ -6,11 +6,20 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: { value: string; label: string }[];
 }
 
-export function Select({ className, label, id, options, ...props }: SelectProps) {
+export function Select({
+  className,
+  label,
+  id,
+  options,
+  ...props
+}: SelectProps) {
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-zinc-300">
+        <label
+          htmlFor={id}
+          className="mb-1.5 block text-sm font-medium text-zinc-300"
+        >
           {label}
         </label>
       )}

@@ -79,14 +79,17 @@ function TicketsPage() {
   const tickets = allTickets
     ? allTickets.filter((t) => {
         if (statusFilter !== "all" && t.status !== statusFilter) return false;
-        if (categoryFilter !== "all" && t.category !== categoryFilter) return false;
+        if (categoryFilter !== "all" && t.category !== categoryFilter)
+          return false;
         return true;
       })
     : allTickets;
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Support Tickets</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+        Support Tickets
+      </h1>
 
       <div className="mb-4 flex gap-4">
         <div className="w-48">
@@ -108,7 +111,10 @@ function TicketsPage() {
       {!tickets ? (
         <Spinner />
       ) : tickets.length === 0 ? (
-        <EmptyState icon={<Ticket className="h-8 w-8" />} title="No tickets found" />
+        <EmptyState
+          icon={<Ticket className="h-8 w-8" />}
+          title="No tickets found"
+        />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-zinc-800">
           <table className="w-full text-left text-sm">
@@ -116,9 +122,13 @@ function TicketsPage() {
               <tr>
                 <th className="px-4 py-3 font-medium text-zinc-400">Name</th>
                 <th className="px-4 py-3 font-medium text-zinc-400">Email</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Category</th>
+                <th className="px-4 py-3 font-medium text-zinc-400">
+                  Category
+                </th>
                 <th className="px-4 py-3 font-medium text-zinc-400">Subject</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Priority</th>
+                <th className="px-4 py-3 font-medium text-zinc-400">
+                  Priority
+                </th>
                 <th className="px-4 py-3 font-medium text-zinc-400">Status</th>
                 <th className="px-4 py-3 font-medium text-zinc-400">Date</th>
               </tr>
@@ -129,7 +139,9 @@ function TicketsPage() {
                   <tr
                     className="cursor-pointer transition-colors hover:bg-zinc-800/30"
                     onClick={() =>
-                      setExpandedId(expandedId === ticket._id ? null : ticket._id)
+                      setExpandedId(
+                        expandedId === ticket._id ? null : ticket._id
+                      )
                     }
                   >
                     <td className="px-4 py-3 text-zinc-300">{ticket.name}</td>
@@ -137,7 +149,9 @@ function TicketsPage() {
                     <td className="px-4 py-3">
                       <Badge variant="purple">{ticket.category}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-zinc-300">{ticket.subject}</td>
+                    <td className="px-4 py-3 text-zinc-300">
+                      {ticket.subject}
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={priorityBadgeVariant(ticket.priority)}>
                         {ticket.priority}
@@ -169,7 +183,9 @@ function TicketsPage() {
                   {expandedId === ticket._id && (
                     <tr key={`${ticket._id}-body`}>
                       <td colSpan={7} className="bg-zinc-900/30 px-6 py-4">
-                        <p className="mb-1 text-xs font-medium text-zinc-400">Message</p>
+                        <p className="mb-1 text-xs font-medium text-zinc-400">
+                          Message
+                        </p>
                         <p className="whitespace-pre-wrap text-sm text-zinc-300">
                           {ticket.message}
                         </p>

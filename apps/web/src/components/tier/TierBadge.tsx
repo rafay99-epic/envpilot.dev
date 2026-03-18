@@ -46,7 +46,7 @@ export function TierBadge({
           />
         </svg>
       )}
-      {showLabel && (tier.charAt(0).toUpperCase() + tier.slice(1))}
+      {showLabel && tier.charAt(0).toUpperCase() + tier.slice(1)}
     </span>
   );
 }

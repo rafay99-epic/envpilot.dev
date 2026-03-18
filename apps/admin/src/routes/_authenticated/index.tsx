@@ -73,9 +73,7 @@ function DashboardPage() {
           value={stats.totalUsers}
           icon={<Users className="h-5 w-5" />}
           trend={
-            analytics
-              ? `+${analytics.recent30d.users} this month`
-              : undefined
+            analytics ? `+${analytics.recent30d.users} this month` : undefined
           }
         />
         <StatCard
@@ -108,9 +106,7 @@ function DashboardPage() {
           value={stats.openTickets}
           icon={<Ticket className="h-5 w-5" />}
           trend={
-            analytics
-              ? `+${analytics.recent30d.tickets} this month`
-              : undefined
+            analytics ? `+${analytics.recent30d.tickets} this month` : undefined
           }
         />
         <StatCard

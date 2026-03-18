@@ -1,6 +1,10 @@
 import { useQuery, useMutation } from "convex/react";
 import { useAuthStore } from "@/stores/auth-store";
-import type { FunctionReference, FunctionArgs, FunctionReturnType } from "convex/server";
+import type {
+  FunctionReference,
+  FunctionArgs,
+  FunctionReturnType,
+} from "convex/server";
 
 export function useAdminQuery<F extends FunctionReference<"query">>(
   query: F,
@@ -8,9 +12,9 @@ export function useAdminQuery<F extends FunctionReference<"query">>(
 ): FunctionReturnType<F> | undefined {
   const secret = useAuthStore((s) => s.secret);
   const shouldSkip = !secret || args === "skip";
-  const queryArgs = (
-    shouldSkip ? "skip" : { ...args, secret }
-  ) as FunctionArgs<F> | "skip";
+  const queryArgs = (shouldSkip ? "skip" : { ...args, secret }) as
+    | FunctionArgs<F>
+    | "skip";
   return useQuery(query, queryArgs) as FunctionReturnType<F> | undefined;
 }
 

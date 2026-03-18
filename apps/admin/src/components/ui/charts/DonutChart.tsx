@@ -93,7 +93,14 @@ export function DonutChart({
           {slices.map((slice) => (
             <path
               key={slice.index}
-              d={arcPath(cx, cy, outerR, innerR, slice.startAngle, slice.endAngle)}
+              d={arcPath(
+                cx,
+                cy,
+                outerR,
+                innerR,
+                slice.startAngle,
+                slice.endAngle
+              )}
               fill={slice.color}
               stroke="#18181b"
               strokeWidth={2}

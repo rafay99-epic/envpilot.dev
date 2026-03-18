@@ -165,7 +165,9 @@ export const updateOrganizationTier = mutation({
       .first();
 
     if (!tierDef) {
-      throw new Error(`Invalid tier: "${args.newTier}". No tier definition found with that name.`);
+      throw new Error(
+        `Invalid tier: "${args.newTier}". No tier definition found with that name.`
+      );
     }
 
     const tierRecord = await ctx.db
@@ -368,23 +370,17 @@ export const listOrganizations = query({
     for (const org of organizations) {
       const members = await ctx.db
         .query("organizationMembers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", org._id)
-        )
+        .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
         .collect();
 
       const projects = await ctx.db
         .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", org._id)
-        )
+        .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
         .collect();
 
       const tierRecord = await ctx.db
         .query("organizationTiers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", org._id)
-        )
+        .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
         .first();
 
       results.push({
@@ -730,7 +726,9 @@ export const deleteTierDefinition = mutation({
 
     // Prevent deleting the default tier
     if (tierDef.isDefault) {
-      throw new Error("Cannot delete the default tier. Set another tier as default first.");
+      throw new Error(
+        "Cannot delete the default tier. Set another tier as default first."
+      );
     }
 
     // Check if any organizations use this tier
@@ -768,16 +766,20 @@ export const seedDefaultTiers = mutation({
         color: "#71717a",
         limits: {
           maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
-          maxVariablesPerProject: SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
+          maxVariablesPerProject:
+            SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
           maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
           maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
           auditLogRetentionDays: SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
         },
         features: {
           apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
-          extensionAccessEnabled: SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
-          granularPermissionsEnabled: SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
-          variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
+          extensionAccessEnabled:
+            SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
+          granularPermissionsEnabled:
+            SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
+          variableVersionHistoryEnabled:
+            SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
           bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
         },
       },
@@ -798,8 +800,10 @@ export const seedDefaultTiers = mutation({
         features: {
           apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
           extensionAccessEnabled: SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
-          granularPermissionsEnabled: SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
-          variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
+          granularPermissionsEnabled:
+            SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
+          variableVersionHistoryEnabled:
+            SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
           bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
         },
       },
@@ -813,7 +817,10 @@ export const seedDefaultTiers = mutation({
       });
     }
 
-    return { seeded: true, message: "Created default free and pro tier definitions" };
+    return {
+      seeded: true,
+      message: "Created default free and pro tier definitions",
+    };
   },
 });
 
@@ -879,9 +886,7 @@ export const deleteFeatureRequest = mutation({
     // Delete all associated votes first
     const votes = await ctx.db
       .query("featureVotes")
-      .withIndex("by_feature_request", (q) =>
-        q.eq("featureRequestId", args.id)
-      )
+      .withIndex("by_feature_request", (q) => q.eq("featureRequestId", args.id))
       .collect();
 
     for (const vote of votes) {
@@ -922,7 +927,12 @@ export const runMigration = mutation({
     if (args.name === "seed-tier-definitions") {
       const existing = await ctx.db.query("tierDefinitions").collect();
       if (existing.length > 0) {
-        return { success: true, total: existing.length, migrated: 0, skipped: existing.length };
+        return {
+          success: true,
+          total: existing.length,
+          migrated: 0,
+          skipped: existing.length,
+        };
       }
 
       const now = Date.now();
@@ -936,16 +946,21 @@ export const runMigration = mutation({
           color: "#71717a",
           limits: {
             maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
-            maxVariablesPerProject: SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
+            maxVariablesPerProject:
+              SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
             maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
             maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
-            auditLogRetentionDays: SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
+            auditLogRetentionDays:
+              SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
           },
           features: {
             apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
-            extensionAccessEnabled: SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
-            granularPermissionsEnabled: SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
-            variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
+            extensionAccessEnabled:
+              SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
+            granularPermissionsEnabled:
+              SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
+            variableVersionHistoryEnabled:
+              SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
             bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
           },
         },
@@ -958,16 +973,20 @@ export const runMigration = mutation({
           color: "#a855f7",
           limits: {
             maxProjects: SEED_TIER_DEFAULTS.pro.maxProjects,
-            maxVariablesPerProject: SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
+            maxVariablesPerProject:
+              SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
             maxTeamMembers: SEED_TIER_DEFAULTS.pro.maxTeamMembers,
             maxOrganizations: SEED_TIER_DEFAULTS.pro.maxOrganizations,
             auditLogRetentionDays: SEED_TIER_DEFAULTS.pro.auditLogRetentionDays,
           },
           features: {
             apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
-            extensionAccessEnabled: SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
-            granularPermissionsEnabled: SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
-            variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
+            extensionAccessEnabled:
+              SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
+            granularPermissionsEnabled:
+              SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
+            variableVersionHistoryEnabled:
+              SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
             bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
           },
         },
@@ -1001,7 +1020,9 @@ export const browseTable = query({
     verifyAdmin(args.secret);
 
     if (
-      !BROWSABLE_TABLES.includes(args.tableName as (typeof BROWSABLE_TABLES)[number])
+      !BROWSABLE_TABLES.includes(
+        args.tableName as (typeof BROWSABLE_TABLES)[number]
+      )
     ) {
       throw new Error(`Table "${args.tableName}" is not browsable`);
     }
@@ -1025,7 +1046,9 @@ export const updateTableRow = mutation({
     verifyAdmin(args.secret);
 
     if (
-      !BROWSABLE_TABLES.includes(args.tableName as (typeof BROWSABLE_TABLES)[number])
+      !BROWSABLE_TABLES.includes(
+        args.tableName as (typeof BROWSABLE_TABLES)[number]
+      )
     ) {
       throw new Error(`Table "${args.tableName}" is not browsable`);
     }
@@ -1050,7 +1073,9 @@ export const deleteTableRow = mutation({
     verifyAdmin(args.secret);
 
     if (
-      !BROWSABLE_TABLES.includes(args.tableName as (typeof BROWSABLE_TABLES)[number])
+      !BROWSABLE_TABLES.includes(
+        args.tableName as (typeof BROWSABLE_TABLES)[number]
+      )
     ) {
       throw new Error(`Table "${args.tableName}" is not browsable`);
     }
@@ -1193,8 +1218,7 @@ export const getAnalytics = query({
     // Ticket status distribution
     const ticketStatusCounts: Record<string, number> = {};
     for (const t of supportTickets) {
-      ticketStatusCounts[t.status] =
-        (ticketStatusCounts[t.status] || 0) + 1;
+      ticketStatusCounts[t.status] = (ticketStatusCounts[t.status] || 0) + 1;
     }
 
     // Feature request status distribution

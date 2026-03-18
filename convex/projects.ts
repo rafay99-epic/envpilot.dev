@@ -718,7 +718,10 @@ export const move = mutation({
     );
     const sourceLimits = await getTierLimitsFromDb(ctx.db, sourceTier);
     const targetLimits = await getTierLimitsFromDb(ctx.db, targetTier);
-    if (sourceLimits.maxProjects !== null || targetLimits.maxProjects !== null) {
+    if (
+      sourceLimits.maxProjects !== null ||
+      targetLimits.maxProjects !== null
+    ) {
       // Check if target org has room for another project
       const targetProjects = await ctx.db
         .query("projects")

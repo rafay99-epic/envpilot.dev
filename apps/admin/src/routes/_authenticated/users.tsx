@@ -30,7 +30,10 @@ function UsersPage() {
   const banUser = useAdminMutation(api.admin.banUser);
   const unbanUser = useAdminMutation(api.admin.unbanUser);
 
-  const [banModal, setBanModal] = useState<{ userId: Id<"users">; name: string } | null>(null);
+  const [banModal, setBanModal] = useState<{
+    userId: Id<"users">;
+    name: string;
+  } | null>(null);
   const [banReason, setBanReason] = useState("");
   const [isBanning, setIsBanning] = useState(false);
 
@@ -138,8 +141,8 @@ function UsersPage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-zinc-400">
-            This will prevent the user from accessing the platform. Provide a reason for
-            the ban.
+            This will prevent the user from accessing the platform. Provide a
+            reason for the ban.
           </p>
           <Textarea
             label="Reason"

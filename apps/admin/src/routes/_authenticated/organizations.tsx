@@ -50,7 +50,9 @@ function OrganizationsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Organizations</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+        Organizations
+      </h1>
       <DataTable
         columns={columns}
         data={organizations as unknown as Record<string, unknown>[] | undefined}
