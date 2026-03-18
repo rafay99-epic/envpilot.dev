@@ -17,7 +17,14 @@ import {
   DEFAULT_PROJECT_ICON,
   DEFAULT_PROJECT_COLOR,
 } from "@/constants/project";
-import { ProjectIcon } from "@/components/ui";
+import { ProjectIcon, FrameworkLogo } from "@/components/ui";
+import { PROJECT_TYPES } from "@/constants/templates";
+import {
+  isFrameworkIcon,
+  parseFrameworkType,
+  toFrameworkIcon,
+  FRAMEWORK_ICON_TYPES,
+} from "@/constants/framework-logos";
 
 interface ProjectSettingsPageProps {
   params: Promise<{ slug: string }>;
@@ -374,6 +381,21 @@ function GeneralProjectSettings({
   error: string | null;
   successMessage: string | null;
 }) {
+  const [iconMode, setIconMode] = useState<"framework" | "custom">(
+    isFrameworkIcon(formData.icon) ? "framework" : "custom"
+  );
+
+  const handleIconModeSwitch = (mode: "framework" | "custom") => {
+    setIconMode(mode);
+    if (mode === "custom" && isFrameworkIcon(formData.icon)) {
+      setFormData((prev) => ({
+        ...prev,
+        icon: DEFAULT_PROJECT_ICON,
+        color: DEFAULT_PROJECT_COLOR,
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -401,9 +423,16 @@ function GeneralProjectSettings({
               <div className="mt-3 flex items-center gap-4">
                 <div
                   className="flex h-12 w-12 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: formData.color }}
+                  style={{
+                    backgroundColor: isFrameworkIcon(formData.icon)
+                      ? "transparent"
+                      : formData.color,
+                  }}
                 >
-                  <ProjectIcon icon={formData.icon} size={24} />
+                  <ProjectIcon
+                    icon={formData.icon}
+                    size={isFrameworkIcon(formData.icon) ? 36 : 24}
+                  />
                 </div>
                 <div>
                   <p className="font-semibold text-zinc-100">
@@ -450,58 +479,121 @@ function GeneralProjectSettings({
               />
             </div>
 
-            {/* Icon */}
+            {/* Icon Mode Toggle */}
             <div>
               <label className="block text-sm font-medium text-zinc-300">
                 Icon
               </label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {PROJECT_ICONS.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, icon }))}
-                    className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-                      formData.icon === icon
-                        ? "bg-green-500/20 ring-1 ring-green-500/50"
-                        : "bg-zinc-800 hover:bg-zinc-700"
-                    }`}
-                  >
-                    <ProjectIcon
-                      icon={icon}
-                      size={18}
-                      className={
-                        formData.icon === icon
-                          ? "text-green-400"
-                          : "text-zinc-400"
-                      }
-                    />
-                  </button>
-                ))}
+              <div className="mt-2 mb-3 flex gap-1 rounded-lg bg-zinc-800 p-1">
+                <button
+                  type="button"
+                  onClick={() => handleIconModeSwitch("framework")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    iconMode === "framework"
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  Framework Logo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleIconModeSwitch("custom")}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    iconMode === "custom"
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  Custom Icon
+                </button>
               </div>
+
+              {iconMode === "framework" ? (
+                <div className="grid max-h-[280px] grid-cols-4 gap-2 overflow-y-auto">
+                  {FRAMEWORK_ICON_TYPES.map((type) => {
+                    const isSelected = formData.icon === toFrameworkIcon(type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            icon: toFrameworkIcon(type),
+                          }))
+                        }
+                        className={`flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all ${
+                          isSelected
+                            ? "bg-green-500/20 ring-1 ring-green-500/50"
+                            : "bg-zinc-800 hover:bg-zinc-700"
+                        }`}
+                      >
+                        <FrameworkLogo projectType={type} size={20} />
+                        <span
+                          className={`truncate text-[10px] ${
+                            isSelected ? "text-green-400" : "text-zinc-400"
+                          }`}
+                        >
+                          {PROJECT_TYPES[type]?.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {PROJECT_ICONS.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, icon }))}
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
+                        formData.icon === icon
+                          ? "bg-green-500/20 ring-1 ring-green-500/50"
+                          : "bg-zinc-800 hover:bg-zinc-700"
+                      }`}
+                    >
+                      <ProjectIcon
+                        icon={icon}
+                        size={18}
+                        className={
+                          formData.icon === icon
+                            ? "text-green-400"
+                            : "text-zinc-400"
+                        }
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Color */}
-            <div>
-              <label className="block text-sm font-medium text-zinc-300">
-                Background Color
-              </label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {PROJECT_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, color }))}
-                    className={`h-8 w-8 rounded-lg transition-all ${
-                      formData.color === color
-                        ? "ring-2 ring-green-400 ring-offset-2 ring-offset-zinc-900"
-                        : ""
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
+            {/* Color -- hidden when using framework logo */}
+            {!isFrameworkIcon(formData.icon) && (
+              <div>
+                <label className="block text-sm font-medium text-zinc-300">
+                  Background Color
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {PROJECT_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, color }))
+                      }
+                      className={`h-8 w-8 rounded-lg transition-all ${
+                        formData.color === color
+                          ? "ring-2 ring-green-400 ring-offset-2 ring-offset-zinc-900"
+                          : ""
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="mt-6 flex justify-end">

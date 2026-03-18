@@ -1,1 +1,4 @@
-export { TemplateSelector } from "./template-selector";
+export {
+  TemplateSelector,
+  TemplateVariablesPreview,
+} from "./template-selector";

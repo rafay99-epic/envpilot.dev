@@ -4,3 +4,4 @@ export { ConfirmDialog } from "./confirm-dialog";
 export { PromptDialog } from "./prompt-dialog";
 export { Toast } from "./toast";
 export { ProjectIcon } from "./project-icon";
+export { FrameworkLogo } from "./framework-logo";

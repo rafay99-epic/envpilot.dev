@@ -18,6 +18,11 @@ import {
   DEFAULT_PROJECT_ICON,
   type ProjectIcon as ProjectIconName,
 } from "@/constants/project";
+import {
+  isFrameworkIcon,
+  parseFrameworkType,
+} from "@/constants/framework-logos";
+import { FrameworkLogo } from "./framework-logo";
 
 const ICON_COMPONENTS: Record<ProjectIconName, React.FC<LucideProps>> = {
   folder: Folder,
@@ -41,14 +46,30 @@ interface ProjectIconProps {
 }
 
 /**
- * Renders a Lucide icon for a project. Handles legacy emoji icons
- * by mapping them to their Lucide equivalents.
+ * Renders a project icon. Supports:
+ * - Framework logos via "framework:<type>" prefix (renders SVGL CDN image)
+ * - Lucide icon names (renders Lucide component)
+ * - Legacy emoji icons (mapped to Lucide equivalents)
  */
 export function ProjectIcon({
   icon,
   size = 20,
   className = "text-zinc-700",
 }: ProjectIconProps) {
+  // Framework logo icon (e.g., "framework:nextjs")
+  if (icon && isFrameworkIcon(icon)) {
+    const projectType = parseFrameworkType(icon);
+    if (projectType) {
+      return (
+        <FrameworkLogo
+          projectType={projectType}
+          size={size}
+          className={className}
+        />
+      );
+    }
+  }
+
   const resolved = resolveIcon(icon);
   const Component = ICON_COMPONENTS[resolved] ?? Folder;
   return <Component size={size} className={className} />;

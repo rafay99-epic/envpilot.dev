@@ -16,9 +16,18 @@ import {
   DEFAULT_PROJECT_ICON,
   DEFAULT_PROJECT_COLOR,
 } from "@/constants/project";
-import { ProjectIcon } from "@/components/ui";
-import { TemplateSelector } from "@/components/templates";
+import { ProjectIcon, FrameworkLogo } from "@/components/ui";
+import {
+  TemplateSelector,
+  TemplateVariablesPreview,
+} from "@/components/templates";
 import type { EnvironmentTemplate } from "@/constants/templates";
+import { PROJECT_TYPES } from "@/constants/templates";
+import {
+  isFrameworkIcon,
+  parseFrameworkType,
+  toFrameworkIcon,
+} from "@/constants/framework-logos";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -28,9 +37,9 @@ export default function NewProjectPage() {
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();
 
-  const [step, setStep] = useState<"template" | "details">("template");
   const [selectedTemplate, setSelectedTemplate] =
     useState<EnvironmentTemplate | null>(null);
+  const [fromScratch, setFromScratch] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -68,24 +77,27 @@ export default function NewProjectPage() {
   };
 
   const handleTemplateSelect = (template: EnvironmentTemplate | null) => {
-    setSelectedTemplate(template);
-    // Auto-populate icon and color from template if selected
-    if (template) {
+    if (template === null) {
+      // "Start from Scratch"
+      setSelectedTemplate(null);
+      setFromScratch(true);
       setFormData((prev) => ({
         ...prev,
-        icon: template.icon || prev.icon,
-        color: template.color || prev.color,
+        icon: DEFAULT_PROJECT_ICON,
+        color: DEFAULT_PROJECT_COLOR,
+      }));
+    } else {
+      setSelectedTemplate(template);
+      setFromScratch(false);
+      setFormData((prev) => ({
+        ...prev,
+        icon: toFrameworkIcon(template.projectType),
+        color: DEFAULT_PROJECT_COLOR,
       }));
     }
   };
 
-  const handleContinue = () => {
-    setStep("details");
-  };
-
-  const handleBack = () => {
-    setStep("template");
-  };
+  const hasSelection = selectedTemplate !== null || fromScratch;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,12 +111,9 @@ export default function NewProjectPage() {
         return;
       }
 
-      // Create the project
       const response = await fetch("/api/projects", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           organizationId: organization.id,
@@ -126,12 +135,10 @@ export default function NewProjectPage() {
       const projectId = data.project._id;
       const projectSlug = data.project.slug;
 
-      // If a template was selected, create the environment variables from it
       if (selectedTemplate) {
         const variablePromises = selectedTemplate.variables.map(
           async (variable) => {
             try {
-              // Create placeholder values for the variables
               const placeholderValue =
                 variable.defaultValue ||
                 variable.placeholder ||
@@ -139,9 +146,7 @@ export default function NewProjectPage() {
 
               await fetch("/api/variables", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   key: variable.key,
                   value: placeholderValue,
@@ -168,7 +173,7 @@ export default function NewProjectPage() {
     }
   };
 
-  // Tier limit check — block only when enforcement is enabled
+  // Tier limit block
   if (enforcing && !tierCheck.isLoading && !tierCheck.allowed) {
     return (
       <div className="mx-auto max-w-lg py-12">
@@ -222,7 +227,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link
@@ -247,14 +252,9 @@ export default function NewProjectPage() {
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Create New Project
           </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {step === "template"
-              ? "Choose a template to get started quickly"
-              : "Configure your project details"}
-          </p>
           {organization && (
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Creating in{" "}
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              in{" "}
               <span className="font-medium text-zinc-700 dark:text-zinc-300">
                 {organization.name}
               </span>
@@ -263,33 +263,7 @@ export default function NewProjectPage() {
         </div>
       </div>
 
-      {/* Steps Indicator */}
-      <div className="flex items-center gap-2">
-        <div
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-            step === "template"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
-          }`}
-        >
-          1
-        </div>
-        <div className="h-0.5 w-8 bg-zinc-200 dark:bg-zinc-700" />
-        <div
-          className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-            step === "details"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-400"
-          }`}
-        >
-          2
-        </div>
-        <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400">
-          {step === "template" ? "Select Template" : "Project Details"}
-        </span>
-      </div>
-
-      {/* Tier limit warning when approaching limit */}
+      {/* Tier limit warning */}
       {enforcing &&
         tierCheck.current !== undefined &&
         tierCheck.limit !== undefined && (
@@ -306,283 +280,289 @@ export default function NewProjectPage() {
         </div>
       )}
 
-      {/* Step 1: Template Selection */}
-      {step === "template" && (
-        <div className="space-y-6">
-          <TemplateSelector
-            selectedTemplateId={selectedTemplate?.id || null}
-            onSelectTemplate={handleTemplateSelect}
-          />
-
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <Link
-              href="/dashboard/projects"
-              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              Cancel
-            </Link>
-            <button
-              type="button"
-              onClick={handleContinue}
-              className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              Continue
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                />
-              </svg>
-            </button>
+      {/* Master-Detail Layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Left: Template Selector */}
+        <div className="lg:col-span-3">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Choose a template
+            </p>
+            <TemplateSelector
+              selectedTemplateId={
+                fromScratch ? null : selectedTemplate?.id || undefined
+              }
+              onSelectTemplate={handleTemplateSelect}
+            />
           </div>
         </div>
-      )}
 
-      {/* Step 2: Project Details */}
-      {step === "details" && (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Template Badge */}
-          {selectedTemplate && (
-            <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-lg"
-                style={{ backgroundColor: selectedTemplate.color + "20" }}
-              >
-                {selectedTemplate.icon}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  Using {selectedTemplate.name} template
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {selectedTemplate.variables.length} variables will be created
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleBack}
-                className="text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                Change
-              </button>
-            </div>
-          )}
-
-          {/* Preview */}
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Preview
-            </p>
-            <div className="mt-4 flex items-center gap-4">
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-lg"
-                style={{ backgroundColor: formData.color }}
-              >
-                <ProjectIcon icon={formData.icon} size={24} />
-              </div>
-              <div>
-                <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {formData.name || "Project Name"}
-                </p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {formData.slug || "project-slug"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Name */}
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        {/* Right: Project Details Form (sticky) */}
+        <div className="lg:col-span-2">
+          <div className="lg:sticky lg:top-6">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              Project Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400"
-              placeholder="My Awesome Project"
-              required
-            />
-          </div>
+              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Project Details
+              </p>
 
-          {/* Slug */}
-          <div>
-            <label
-              htmlFor="slug"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Slug
-            </label>
-            <div className="mt-1 flex rounded-lg border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-              <span className="flex items-center px-3 text-sm text-zinc-500 dark:text-zinc-400">
-                /projects/
-              </span>
-              <input
-                type="text"
-                id="slug"
-                value={formData.slug}
-                onChange={(e) => handleSlugChange(e.target.value)}
-                className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-2 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500"
-                placeholder="my-awesome-project"
-                required
-              />
-            </div>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              URL-friendly identifier. Only lowercase letters, numbers, and
-              hyphens.
-            </p>
-          </div>
+              {/* Template Badge */}
+              {selectedTemplate && (
+                <div className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded"
+                    style={{
+                      backgroundColor: selectedTemplate.color + "20",
+                    }}
+                  >
+                    <FrameworkLogo
+                      projectType={selectedTemplate.projectType}
+                      size={16}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-zinc-900 dark:text-zinc-100">
+                      {selectedTemplate.name}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                      {selectedTemplate.variables.length} variables included
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          {/* Description */}
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Description <span className="text-zinc-400">(optional)</span>
-            </label>
-            <textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              rows={3}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-zinc-400 dark:focus:ring-zinc-400"
-              placeholder="A brief description of your project..."
-            />
-          </div>
-
-          {/* Icon */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Icon
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PROJECT_ICONS.map((icon) => (
-                <button
-                  key={icon}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, icon }))}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${
-                    formData.icon === icon
-                      ? "bg-zinc-900 dark:bg-zinc-100"
-                      : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
-                  }`}
+              {/* Preview */}
+              <div className="flex items-center gap-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor: isFrameworkIcon(formData.icon)
+                      ? "transparent"
+                      : formData.color,
+                  }}
                 >
                   <ProjectIcon
-                    icon={icon}
-                    size={18}
-                    className={
-                      formData.icon === icon
-                        ? "text-white dark:text-zinc-900"
-                        : "text-zinc-600 dark:text-zinc-400"
-                    }
+                    icon={formData.icon}
+                    size={isFrameworkIcon(formData.icon) ? 32 : 20}
                   />
-                </button>
-              ))}
-            </div>
-          </div>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    {formData.name || "Project Name"}
+                  </p>
+                  <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    {formData.slug || "project-slug"}
+                  </p>
+                </div>
+              </div>
 
-          {/* Color */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Background Color
-            </label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PROJECT_COLORS.map((color) => (
+              {/* Name */}
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+                  placeholder="My Awesome Project"
+                  required
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label
+                  htmlFor="slug"
+                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Slug
+                </label>
+                <div className="mt-1 flex rounded-lg border border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800">
+                  <span className="flex items-center px-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    /projects/
+                  </span>
+                  <input
+                    type="text"
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => handleSlugChange(e.target.value)}
+                    className="block w-full rounded-r-lg border-0 bg-transparent px-0 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-100 dark:placeholder-zinc-500"
+                    placeholder="my-awesome-project"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label
+                  htmlFor="description"
+                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  Description <span className="text-zinc-400">(optional)</span>
+                </label>
+                <textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={2}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+                  placeholder="A brief description..."
+                />
+              </div>
+
+              {/* Icon & Color -- hidden when using framework logo */}
+              {isFrameworkIcon(formData.icon) ? (
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+                  <div className="flex items-center gap-2">
+                    <ProjectIcon icon={formData.icon} size={18} />
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                      Using{" "}
+                      {PROJECT_TYPES[parseFrameworkType(formData.icon)!]
+                        ?.label ?? "framework"}{" "}
+                      logo
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        icon: DEFAULT_PROJECT_ICON,
+                        color: DEFAULT_PROJECT_COLOR,
+                      }))
+                    }
+                    className="text-[10px] font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  >
+                    Switch to custom icon
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Icon */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Icon
+                    </label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {PROJECT_ICONS.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({ ...prev, icon }))
+                          }
+                          className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
+                            formData.icon === icon
+                              ? "bg-zinc-900 dark:bg-zinc-100"
+                              : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+                          }`}
+                        >
+                          <ProjectIcon
+                            icon={icon}
+                            size={14}
+                            className={
+                              formData.icon === icon
+                                ? "text-white dark:text-zinc-900"
+                                : "text-zinc-600 dark:text-zinc-400"
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Color */}
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Color
+                    </label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {PROJECT_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({ ...prev, color }))
+                          }
+                          className={`h-7 w-7 rounded-lg transition-all ${
+                            formData.color === color
+                              ? "ring-2 ring-zinc-900 ring-offset-1 dark:ring-zinc-100"
+                              : ""
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Template Variables Preview */}
+              {selectedTemplate && (
+                <TemplateVariablesPreview template={selectedTemplate} />
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 pt-2">
+                <Link
+                  href="/dashboard/projects"
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </Link>
                 <button
-                  key={color}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, color }))}
-                  className={`h-8 w-8 rounded-lg transition-all ${
-                    formData.color === color
-                      ? "ring-2 ring-zinc-900 ring-offset-2 dark:ring-zinc-100"
-                      : ""
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
+                  type="submit"
+                  disabled={
+                    isSubmitting ||
+                    !formData.name ||
+                    !formData.slug ||
+                    !hasSelection
+                  }
+                  className="ml-auto flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Create Project
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-between gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Back
-            </button>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard/projects"
-                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </Link>
-              <button
-                type="submit"
-                disabled={isSubmitting || !formData.name || !formData.slug}
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent dark:border-zinc-900 dark:border-t-transparent" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Create Project
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

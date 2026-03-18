@@ -21,7 +21,13 @@ const createProjectSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
   description: z.string().max(500).optional(),
   organizationId: z.string().min(1, "Organization ID is required"),
-  icon: z.string().optional(),
+  icon: z
+    .string()
+    .refine(
+      (val) => !val || val.startsWith("framework:") || /^[a-z0-9-]+$/.test(val),
+      "Invalid icon value"
+    )
+    .optional(),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex code")
