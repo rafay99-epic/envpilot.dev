@@ -108,6 +108,24 @@ export function useTeamMembersQuickView(
 }
 
 /**
+ * Hook for dashboard analytics data
+ */
+export function useAnalytics(
+  organizationId: Id<"organizations"> | undefined,
+  daysBack?: number
+) {
+  const analytics = useQuery(
+    api.dashboard.getAnalytics,
+    organizationId ? { organizationId, daysBack } : "skip"
+  );
+
+  return {
+    analytics: analytics ?? null,
+    isLoading: organizationId ? analytics === undefined : false,
+  };
+}
+
+/**
  * Hook for onboarding status
  */
 export function useOnboardingStatus(
