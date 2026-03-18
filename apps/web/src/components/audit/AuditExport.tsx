@@ -191,7 +191,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   value="csv"
                   checked={format === "csv"}
                   onChange={() => setFormat("csv")}
-                  className="h-4 w-4 border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                  className="h-4 w-4"
                 />
                 <span className="text-sm text-zinc-700 dark:text-zinc-300">
                   CSV
@@ -204,7 +204,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                   value="json"
                   checked={format === "json"}
                   onChange={() => setFormat("json")}
-                  className="h-4 w-4 border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                  className="h-4 w-4"
                 />
                 <span className="text-sm text-zinc-700 dark:text-zinc-300">
                   JSON
@@ -220,7 +220,7 @@ export function AuditExport({ organizationId, userId }: AuditExportProps) {
                 type="checkbox"
                 checked={includeDetails}
                 onChange={(e) => setIncludeDetails(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                className="h-4 w-4"
               />
               <span className="text-sm text-zinc-700 dark:text-zinc-300">
                 Include detailed event data

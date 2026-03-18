@@ -11,6 +11,7 @@ import {
   VaultErrorCode,
   isVaultConfigured,
 } from "@/lib/vault";
+import { verifyNotBot } from "@/lib/botid";
 
 /**
  * Vault API Routes
@@ -137,6 +138,9 @@ async function verifyOwnership(
  */
 export async function POST(request: NextRequest) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
     }
@@ -245,6 +249,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
     }
@@ -302,6 +309,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
     }

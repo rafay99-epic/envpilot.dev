@@ -6,6 +6,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -74,6 +75,9 @@ const revokeSchema = z.object({
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

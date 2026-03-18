@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { updateSecret } from "@/lib/vault";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -122,6 +123,9 @@ export async function GET(request: Request, context: RouteContext) {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
 
     if (!user) {
@@ -232,6 +236,9 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
 
     if (!user) {

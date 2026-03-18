@@ -439,7 +439,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }).format(new Date(timestamp));
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return <TerminalLoading fullPage />;
   }
 
   if (!project) {

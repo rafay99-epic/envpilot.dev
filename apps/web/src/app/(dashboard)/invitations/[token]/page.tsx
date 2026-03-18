@@ -118,7 +118,7 @@ export default function InvitationAcceptPage({
   }
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return <TerminalLoading fullPage />;
   }
 
   if (status === "expired") {

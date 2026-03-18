@@ -35,5 +35,5 @@ export default function TeamPage() {
     );
   }
 
-  return <TerminalLoading />;
+  return <TerminalLoading fullPage />;
 }

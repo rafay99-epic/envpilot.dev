@@ -4,6 +4,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -48,6 +49,9 @@ const profileSchema = z.object({
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
 
     if (!user) {

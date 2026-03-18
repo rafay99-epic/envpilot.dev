@@ -78,7 +78,7 @@ export default function OrganizationsPage() {
   }, []);
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return <TerminalLoading fullPage />;
   }
 
   if (error) {

@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -25,6 +26,9 @@ interface RouteContext {
  */
 export async function POST(request: Request, context: RouteContext) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
 
     if (!user) {

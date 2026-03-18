@@ -210,7 +210,7 @@ export default function ProjectMembersPage({
   const membersPagination = usePagination(members, { pageSize: 10 });
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return <TerminalLoading fullPage />;
   }
 
   if (error && !project) {
@@ -439,7 +439,7 @@ export default function ProjectMembersPage({
                         value={role}
                         checked={selectedRole === role}
                         onChange={() => setSelectedRole(role)}
-                        className="mt-0.5"
+                        className="mt-0.5 h-4 w-4"
                       />
                       <div>
                         <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
