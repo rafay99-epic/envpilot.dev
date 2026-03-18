@@ -11,7 +11,6 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -194,7 +193,6 @@ export async function POST(request: Request) {
       projectId: projectId as Id<"projects">,
       isSensitive,
       createdBy: convexUser._id,
-      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const variable = await convex.query(api.variables.getById, { variableId });

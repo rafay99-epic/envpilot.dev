@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, internalQuery } from "./_generated/server";
+import type { DatabaseReader } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
 /**
@@ -8,9 +9,9 @@ import { Id } from "./_generated/dataModel";
  * Defines limits for each subscription tier.
  * Free tier has sensible defaults, Pro tier is unlimited.
  *
- * Enforcement is controlled by the NEXT_PUBLIC_ENFORCE_TIER_LIMITS env var
- * on the client/API layer. When enforcement is disabled (pre-alpha mode),
- * the UI still displays tier info but no actions are blocked.
+ * Enforcement is controlled by the ENFORCE_TIER_LIMITS Convex env var
+ * (server-side only). When disabled (pre-alpha mode), all tiers get
+ * unlimited access. No client input can affect enforcement.
  */
 
 export type Tier = "free" | "pro";
@@ -80,17 +81,23 @@ export function isValidTier(tier: string): tier is Tier {
 }
 
 /**
- * Get tier limits with validation.
- * When enforce is false (pre-alpha mode), returns unlimited config for all tiers.
+ * Check if tier enforcement is enabled (server-side only).
+ * Reads from Convex env var ENFORCE_TIER_LIMITS.
+ * Defaults to true (enforce) — set to "false" for pre-alpha mode.
  */
-export function getTierLimits(
-  tier: string,
-  enforce: boolean = true
-): TierLimits {
+export function isEnforcementEnabledServer(): boolean {
+  return process.env.ENFORCE_TIER_LIMITS !== "false";
+}
+
+/**
+ * Get tier limits with validation.
+ * Reads enforcement toggle from Convex server env var — no client input.
+ */
+export function getTierLimits(tier: string): TierLimits {
   if (!isValidTier(tier)) {
     throw new Error(`Invalid tier: ${tier}`);
   }
-  if (!enforce) {
+  if (!isEnforcementEnabledServer()) {
     return UNLIMITED_LIMITS;
   }
   return TIER_LIMITS[tier];
@@ -102,8 +109,37 @@ export function getTierLimits(
 export const MAX_BULK_IMPORT_SIZE = 100;
 
 // ==========================================
+// HELPERS
+// ==========================================
+
+/**
+ * Read an organization's tier from the organizationTiers table.
+ * Falls back to "free" if no tier record exists.
+ */
+export async function getOrganizationTier(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<Tier> {
+  const tierRecord = await db
+    .query("organizationTiers")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .first();
+  return tierRecord?.tier ?? "free";
+}
+
+// ==========================================
 // QUERIES
 // ==========================================
+
+/**
+ * Check if tier enforcement is enabled (for UI display)
+ */
+export const isEnforcementEnabled = query({
+  args: {},
+  handler: async () => {
+    return isEnforcementEnabledServer();
+  },
+});
 
 /**
  * Get tier limits configuration for an organization
@@ -115,9 +151,10 @@ export const getOrganizationLimits = query({
     if (!org) {
       throw new Error("Organization not found");
     }
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
     return {
-      tier: org.tier,
-      limits: TIER_LIMITS[org.tier],
+      tier,
+      limits: getTierLimits(tier),
     };
   },
 });
@@ -132,6 +169,8 @@ export const getOrganizationUsage = query({
     if (!org) {
       return null;
     }
+
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
 
     // Parallel fetch: projects, members, pending invitations
     const [projects, members, pendingInvitations] = await Promise.all([
@@ -183,8 +222,8 @@ export const getOrganizationUsage = query({
     }
 
     return {
-      tier: org.tier,
-      limits: TIER_LIMITS[org.tier],
+      tier,
+      limits: getTierLimits(tier),
       usage: {
         projects: projects.length,
         teamMembers: members.length,
@@ -214,6 +253,8 @@ export const getProjectVariableCount = query({
       throw new Error("Organization not found");
     }
 
+    const tier = await getOrganizationTier(ctx.db, project.organizationId);
+
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -221,8 +262,8 @@ export const getProjectVariableCount = query({
       .collect();
 
     return {
-      tier: org.tier,
-      limits: TIER_LIMITS[org.tier],
+      tier,
+      limits: getTierLimits(tier),
       usage: {
         variables: variables.length,
       },
@@ -242,29 +283,33 @@ export const getUserOrganizationCount = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Get organizations details to check which are free tier (for creating new orgs)
+    // Get organizations details to check which are pro tier
     const orgsWithRoles = await Promise.all(
       memberships.map(async (membership) => {
         const org = await ctx.db.get(membership.organizationId);
-        return org ? { org, role: membership.role } : null;
+        if (!org) return null;
+        const tier = await getOrganizationTier(
+          ctx.db,
+          membership.organizationId
+        );
+        return { org, role: membership.role, tier };
       })
     );
 
-    const validOrgs = orgsWithRoles.filter(Boolean) as {
-      org: NonNullable<(typeof orgsWithRoles)[0]>["org"];
-      role: string;
-    }[];
+    const validOrgs = orgsWithRoles.filter(Boolean) as NonNullable<
+      (typeof orgsWithRoles)[0]
+    >[];
 
     // For organization creation limits, we count orgs where user is admin (owner)
     const ownedOrgs = validOrgs.filter((o) => o.role === "admin");
 
     // Get the user's "primary" tier (highest tier among owned orgs, or free if none)
-    const hasPro = ownedOrgs.some((o) => o.org.tier === "pro");
+    const hasPro = ownedOrgs.some((o) => o.tier === "pro");
     const effectiveTier: Tier = hasPro ? "pro" : "free";
 
     return {
       effectiveTier,
-      limits: TIER_LIMITS[effectiveTier],
+      limits: getTierLimits(effectiveTier),
       usage: {
         ownedOrganizations: ownedOrgs.length,
         totalMemberships: memberships.length,
@@ -297,7 +342,8 @@ export const checkTierLimit = query({
       return { allowed: false, reason: "Organization not found" };
     }
 
-    const limits = TIER_LIMITS[org.tier];
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
 
     switch (args.action) {
       case "create_project": {
@@ -438,7 +484,8 @@ export const _checkProjectLimit = internalQuery({
       return { allowed: false, reason: "Organization not found" };
     }
 
-    const limits = TIER_LIMITS[org.tier];
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxProjects === null) {
       return { allowed: true };
     }
@@ -481,7 +528,8 @@ export const _checkVariableLimit = internalQuery({
       return { allowed: false, reason: "Organization not found" };
     }
 
-    const limits = TIER_LIMITS[org.tier];
+    const tier = await getOrganizationTier(ctx.db, project.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxVariablesPerProject === null) {
       return { allowed: true };
     }
@@ -517,7 +565,8 @@ export const _checkTeamMemberLimit = internalQuery({
       return { allowed: false, reason: "Organization not found" };
     }
 
-    const limits = TIER_LIMITS[org.tier];
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxTeamMembers === null) {
       return { allowed: true };
     }
@@ -569,15 +618,15 @@ export const _checkOrganizationLimit = internalQuery({
     // Check if any owned org is Pro tier
     let hasPro = false;
     for (const membership of memberships) {
-      const org = await ctx.db.get(membership.organizationId);
-      if (org?.tier === "pro") {
+      const tier = await getOrganizationTier(ctx.db, membership.organizationId);
+      if (tier === "pro") {
         hasPro = true;
         break;
       }
     }
 
     const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = TIER_LIMITS[effectiveTier];
+    const limits = getTierLimits(effectiveTier);
 
     if (limits.maxOrganizations === null) {
       return { allowed: true };
@@ -617,7 +666,8 @@ export const _checkFeatureEnabled = internalQuery({
       return { allowed: false, reason: "Organization not found" };
     }
 
-    const limits = TIER_LIMITS[org.tier];
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
 
     switch (args.feature) {
       case "api":

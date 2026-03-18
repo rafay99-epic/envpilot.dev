@@ -25,7 +25,7 @@ import {
   type VariableFormData,
 } from "@/components/variables";
 import { useTierFeatures } from "@/hooks/useTierLimits";
-import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { ProOnlyBadge } from "@/components/tier/FeatureGate";
 import { ApiError } from "@/lib/api-client";
 import {
@@ -82,7 +82,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { features: tierFeatures } = useTierFeatures(orgId);
-  const enforcing = isTierEnforcementEnabled();
+  const enforcing = useEnforcementEnabled();
   const versionHistoryAllowed = !enforcing || tierFeatures.versionHistory;
 
   // Variable selection store for bulk operations

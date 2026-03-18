@@ -24,11 +24,21 @@ export function useTierStoreSync() {
     orgId ? { organizationId: orgId } : "skip"
   );
 
+  const enforcementEnabled = useQuery(api.tierLimits.isEnforcementEnabled);
+
   const {
     setUsageData,
     clearUsageData,
+    setEnforcementEnabled,
     organizationId: storedOrgId,
   } = useTierStore();
+
+  // Sync enforcement status from Convex server env var
+  useEffect(() => {
+    if (enforcementEnabled !== undefined) {
+      setEnforcementEnabled(enforcementEnabled);
+    }
+  }, [enforcementEnabled, setEnforcementEnabled]);
 
   // Sync Convex data into Zustand store
   useEffect(() => {

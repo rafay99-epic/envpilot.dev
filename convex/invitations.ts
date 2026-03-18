@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { getTierLimits } from "./tierLimits";
+import { getTierLimits, getOrganizationTier } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 import { batchGetUsers } from "./helpers";
 
@@ -121,7 +121,6 @@ export const create = mutation({
     ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Rate limit: prevent invitation spam
@@ -131,7 +130,6 @@ export const create = mutation({
     });
 
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     // Validate expiration days
     const expiresInDays = args.expiresInDays ?? 7;
@@ -146,7 +144,8 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxTeamMembers !== null) {
       const members = await ctx.db
         .query("organizationMembers")

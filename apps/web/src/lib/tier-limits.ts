@@ -2,10 +2,8 @@
  * Client-side tier limits helper
  *
  * This mirrors the tier configuration from convex/tierLimits.ts
- * for use in API routes and client-side code.
- *
- * Enforcement is controlled by NEXT_PUBLIC_ENFORCE_TIER_LIMITS env var.
- * When disabled (default), the UI shows tier info but no actions are blocked.
+ * for UI display purposes only. All enforcement happens server-side
+ * in Convex mutations.
  */
 
 export type Tier = "free" | "pro";
@@ -22,22 +20,6 @@ export interface TierLimits {
   variableVersionHistoryEnabled: boolean;
   bulkImportEnabled: boolean;
 }
-
-/**
- * Unlimited tier config used when enforcement is disabled (pre-alpha mode).
- */
-const UNLIMITED_LIMITS: TierLimits = {
-  maxProjects: null,
-  maxVariablesPerProject: null,
-  maxTeamMembers: null,
-  maxOrganizations: null,
-  auditLogRetentionDays: 730,
-  apiAccessEnabled: true,
-  extensionAccessEnabled: true,
-  granularPermissionsEnabled: true,
-  variableVersionHistoryEnabled: true,
-  bulkImportEnabled: true,
-};
 
 export const TIER_LIMITS: Record<Tier, TierLimits> = {
   free: {
@@ -66,28 +48,17 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
 };
 
-/**
- * Check if tier limit enforcement is enabled
- */
-export function isTierEnforcementEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_ENFORCE_TIER_LIMITS === "true";
-}
-
 export function isValidTier(tier: string): tier is Tier {
   return tier === "free" || tier === "pro";
 }
 
 /**
- * Get tier limits with validation.
- * When enforce is false (pre-alpha mode), returns unlimited config for all tiers.
+ * Get tier limits for UI display.
+ * Enforcement happens server-side in Convex mutations.
  */
-export function getTierLimits(tier: string, enforce?: boolean): TierLimits {
+export function getTierLimits(tier: string): TierLimits {
   if (!isValidTier(tier)) {
     throw new Error(`Invalid tier: ${tier}`);
-  }
-  const shouldEnforce = enforce ?? isTierEnforcementEnabled();
-  if (!shouldEnforce) {
-    return UNLIMITED_LIMITS;
   }
   return TIER_LIMITS[tier];
 }

@@ -7,7 +7,7 @@ import { BulkPasteForm } from "./bulk-paste-form";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { ProOnlyBadge, LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
-import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
 
 interface VariableCreateDrawerProps {
@@ -36,7 +36,7 @@ export function VariableCreateDrawer({
 
   const orgId = organizationId as Id<"organizations"> | undefined;
   const projId = projectId as Id<"projects"> | undefined;
-  const enforcing = isTierEnforcementEnabled();
+  const enforcing = useEnforcementEnabled();
 
   const varCheck = useTierLimitCheck(orgId, "create_variable", projId);
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");

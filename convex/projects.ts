@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getTierLimits } from "./tierLimits";
+import { getTierLimits, getOrganizationTier } from "./tierLimits";
 
 /**
  * Project Queries and Mutations
@@ -203,11 +203,9 @@ export const create = mutation({
     icon: v.optional(v.string()),
     color: v.optional(v.string()),
     createdBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     // Check tier limits for project creation
     const org = await ctx.db.get(args.organizationId);
@@ -233,7 +231,8 @@ export const create = mutation({
       }
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxProjects !== null) {
       const projectCount = await ctx.db
         .query("projects")
@@ -505,11 +504,9 @@ export const duplicate = mutation({
     newSlug: v.string(),
     createdBy: v.id("users"),
     includeVariables: v.optional(v.boolean()),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     const sourceProject = await ctx.db.get(args.projectId);
     if (!sourceProject || sourceProject.deletedAt) {
@@ -522,7 +519,11 @@ export const duplicate = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(
+      ctx.db,
+      sourceProject.organizationId
+    );
+    const limits = getTierLimits(tier);
     if (limits.maxProjects !== null) {
       const projectCount = await ctx.db
         .query("projects")
@@ -654,12 +655,10 @@ export const move = mutation({
     projectId: v.id("projects"),
     targetOrganizationId: v.id("organizations"),
     movedBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
-    const enforce = args.enforceTierLimits ?? true;
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
@@ -709,11 +708,19 @@ export const move = mutation({
     }
 
     // Tier check: both orgs must be pro
-    const limits = getTierLimits(sourceOrg.tier, enforce);
-    const targetLimits = getTierLimits(targetOrg.tier, enforce);
+    const sourceTier = await getOrganizationTier(
+      ctx.db,
+      project.organizationId
+    );
+    const targetTier = await getOrganizationTier(
+      ctx.db,
+      args.targetOrganizationId
+    );
+    const limits = getTierLimits(sourceTier);
+    const targetLimits = getTierLimits(targetTier);
     if (limits.maxProjects !== null || targetLimits.maxProjects !== null) {
       // If either org has limits, check pro tier
-      if (sourceOrg.tier !== "pro" || targetOrg.tier !== "pro") {
+      if (sourceTier !== "pro" || targetTier !== "pro") {
         throw new Error(
           "Both organizations must be on the Pro plan to transfer projects"
         );

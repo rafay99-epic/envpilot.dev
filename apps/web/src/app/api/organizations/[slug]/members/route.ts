@@ -8,7 +8,6 @@ import { z } from "zod";
 
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -177,7 +176,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       projectIds: projectIds as Id<"projects">[] | undefined,
       projectRole,
       invitedBy: convexUser._id,
-      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     console.log(

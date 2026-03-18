@@ -7,7 +7,7 @@ import {
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/cli-auth";
-import { getTierLimits, isTierEnforcementEnabled } from "@/lib/tier-limits";
+import { getTierLimits } from "@/lib/tier-limits";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -56,11 +56,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const enforcementEnabled = isTierEnforcementEnabled();
-    const limits = getTierLimits(org.tier);
+    // Get tier from organizationTiers table
+    const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
+      organizationId: organizationId as Id<"organizations">,
+    });
+    const tier = tierData?.tier ?? "free";
+
+    const enforcementEnabled = await convex.query(
+      api.tierLimits.isEnforcementEnabled,
+      {}
+    );
+    const limits = getTierLimits(tier);
 
     return NextResponse.json({
-      tier: org.tier,
+      tier,
       enforcementEnabled,
       apiAccessEnabled: limits.apiAccessEnabled,
       limits: {

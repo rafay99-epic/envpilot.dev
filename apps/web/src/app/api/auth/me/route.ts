@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getPermissionsForMembershipRole } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -65,26 +66,42 @@ export async function GET(request: Request) {
       updatedAt: new Date(user.updatedAt),
     };
 
+    // Get tier for active organization from organizationTiers table
+    const activeTierData = activeOrganization
+      ? await convex.query(api.tierLimits.getOrganizationLimits, {
+          organizationId: activeOrganization._id as Id<"organizations">,
+        })
+      : null;
+
     const organization: Organization | null = activeOrganization
       ? {
           id: activeOrganization._id,
           name: activeOrganization.name,
           slug: activeOrganization.slug,
-          tier: activeOrganization.tier,
+          tier: activeTierData?.tier ?? "free",
           role: activeOrganization.role,
           createdAt: new Date(activeOrganization.createdAt),
           updatedAt: new Date(activeOrganization.updatedAt),
         }
       : null;
 
+    // Get tiers for all organizations
+    const orgTiers = await Promise.all(
+      organizations.map((org) =>
+        convex.query(api.tierLimits.getOrganizationLimits, {
+          organizationId: org._id as Id<"organizations">,
+        })
+      )
+    );
+
     return NextResponse.json({
       user: authUser,
       organization,
-      organizations: organizations.map((org) => ({
+      organizations: organizations.map((org, index) => ({
         id: org._id,
         name: org.name,
         slug: org.slug,
-        tier: org.tier,
+        tier: orgTiers[index]?.tier ?? "free",
         role: org.role,
       })),
       accessToken,

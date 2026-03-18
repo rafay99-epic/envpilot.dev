@@ -21,6 +21,7 @@ import type * as favorites from "../favorites.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as helpers from "../helpers.js";
 import type * as invitations from "../invitations.js";
+import type * as migrations from "../migrations.js";
 import type * as organizations from "../organizations.js";
 import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
 import type * as permissions from "../permissions.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   featureRequests: typeof featureRequests;
   helpers: typeof helpers;
   invitations: typeof invitations;
+  migrations: typeof migrations;
   organizations: typeof organizations;
   permissionRevocationEvents: typeof permissionRevocationEvents;
   permissions: typeof permissions;

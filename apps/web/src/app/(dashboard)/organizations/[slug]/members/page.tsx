@@ -7,7 +7,8 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
-import { isTierEnforcementEnabled, TIER_LIMITS } from "@/lib/tier-limits";
+import { TIER_LIMITS } from "@/lib/tier-limits";
+import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 
 interface Member {
@@ -125,7 +126,7 @@ export default function OrganizationMembersPage({
     onConfirm: () => void;
   }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
-  const enforcing = isTierEnforcementEnabled();
+  const enforcing = useEnforcementEnabled();
   const tierLimits =
     organization?.tier === "pro" ? TIER_LIMITS.pro : TIER_LIMITS.free;
   const totalMemberSlots = members.length + invitations.length;

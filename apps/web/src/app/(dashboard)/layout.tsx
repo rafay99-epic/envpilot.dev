@@ -73,12 +73,29 @@ export default async function DashboardLayout({
     updatedAt: new Date(user.updatedAt),
   };
 
+  // Look up the tier from the organizationTiers table
+  let orgTier: "free" | "pro" = "free";
+  if (activeOrganization) {
+    try {
+      const tierData = await convex.query(
+        api.tierLimits.getOrganizationLimits,
+        {
+          organizationId:
+            activeOrganization._id as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
+        }
+      );
+      orgTier = (tierData?.tier as "free" | "pro") ?? "free";
+    } catch {
+      // Fall back to free tier if query fails
+    }
+  }
+
   const organization: Organization | null = activeOrganization
     ? {
         id: activeOrganization._id,
         name: activeOrganization.name,
         slug: activeOrganization.slug,
-        tier: activeOrganization.tier,
+        tier: orgTier,
         role: activeOrganization.role,
         createdAt: new Date(activeOrganization.createdAt),
         updatedAt: new Date(activeOrganization.updatedAt),

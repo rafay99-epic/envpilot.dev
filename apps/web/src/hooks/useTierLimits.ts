@@ -33,6 +33,14 @@ export type TierAction =
   | "bulk_import";
 
 /**
+ * Hook to check if tier enforcement is enabled (reads from Convex server env var)
+ */
+export function useEnforcementEnabled(): boolean {
+  const data = useQuery(api.tierLimits.isEnforcementEnabled);
+  return data ?? true; // Default to enforcing while loading
+}
+
+/**
  * Hook to get organization tier limits and current usage
  */
 export function useOrganizationTierLimits(

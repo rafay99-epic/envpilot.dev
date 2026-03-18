@@ -136,10 +136,16 @@ export async function checkCLIAccess(
     return { allowed: false, tier: "free" };
   }
 
+  // Look up the tier from the organizationTiers table
+  const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
+    organizationId: org._id,
+  });
+  const tier = (tierData?.tier as "free" | "pro") ?? "free";
+
   // Pre-alpha mode: CLI access is enabled for all tiers.
   return {
     allowed: true,
-    tier: org.tier,
+    tier,
   };
 }
 

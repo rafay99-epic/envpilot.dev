@@ -5,7 +5,6 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -84,32 +83,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Tier enforcement check
-    if (isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS)) {
-      const sourceOrg = await convex.query(api.organizations.getById, {
-        organizationId: project.organizationId,
-      });
-      const targetOrg = await convex.query(api.organizations.getById, {
-        organizationId: targetOrganizationId as Id<"organizations">,
-      });
-
-      if (sourceOrg?.tier !== "pro" || targetOrg?.tier !== "pro") {
-        return NextResponse.json(
-          {
-            error:
-              "Both organizations must be on the Pro plan to transfer projects",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Execute the move
+    // Execute the move (tier enforcement is handled server-side in the mutation)
     await convex.mutation(api.projects.move, {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
       movedBy: convexUser._id,
-      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     // Send notification email to target org admins (non-blocking)

@@ -60,8 +60,6 @@ export default defineSchema({
     description: v.optional(v.string()),
     // Organization logo URL
     logoUrl: v.optional(v.string()),
-    // Subscription tier: "free" or "pro"
-    tier: v.union(v.literal("free"), v.literal("pro")),
     // Organization-level settings for access control
     settings: v.optional(
       v.object({
@@ -76,6 +74,9 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
+    // DEPRECATED: Tier field kept temporarily for migration compatibility.
+    // After running migrations:migrateTierToSeparateTable, remove this field.
+    tier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
   })
     .index("by_slug", ["slug"])
     .index("by_workos_org_id", ["workosOrgId"])
@@ -598,6 +599,22 @@ export default defineSchema({
     .index("by_severity", ["severity"])
     .index("by_resource_type", ["resourceType"])
     .index("by_session", ["sessionId"]),
+
+  // ==========================================
+  // ORGANIZATION TIERS (locked-down, internal-only writes)
+  // ==========================================
+  organizationTiers: defineTable({
+    // Reference to the organization
+    organizationId: v.id("organizations"),
+    // Subscription tier
+    tier: v.union(v.literal("free"), v.literal("pro")),
+    // Last updated timestamp
+    updatedAt: v.number(),
+    // Who triggered the change (user or system)
+    updatedBy: v.optional(v.id("users")),
+    // Reason for the tier change
+    reason: v.optional(v.string()),
+  }).index("by_organization", ["organizationId"]),
 
   // ==========================================
   // SUBSCRIPTIONS (Stripe Integration)
