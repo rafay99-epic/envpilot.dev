@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
@@ -13,6 +14,14 @@ import { Lightbulb, Trash2, ChevronDown, ChevronUp, Save } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/feature-requests")({
   component: FeatureRequestsPage,
 });
+
+type FeatureRequestStatus =
+  | "submitted"
+  | "under_review"
+  | "planned"
+  | "in_progress"
+  | "completed"
+  | "declined";
 
 const STATUS_OPTIONS = [
   { value: "submitted", label: "Submitted" },
@@ -52,11 +61,11 @@ function FeatureRequestsPage() {
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
   const [savingNotes, setSavingNotes] = useState<string | null>(null);
 
-  const handleSaveNotes = async (requestId: string) => {
+  const handleSaveNotes = async (requestId: Id<"featureRequests">) => {
     setSavingNotes(requestId);
     try {
       await updateNotes({
-        id: requestId as any,
+        id: requestId,
         adminNotes: editingNotes[requestId] ?? "",
       });
     } finally {
@@ -64,9 +73,9 @@ function FeatureRequestsPage() {
     }
   };
 
-  const handleDelete = async (requestId: string) => {
+  const handleDelete = async (requestId: Id<"featureRequests">) => {
     if (!confirm("Delete this feature request?")) return;
-    await deleteRequest({ id: requestId as any });
+    await deleteRequest({ id: requestId });
   };
 
   if (!requests) return <Spinner />;
@@ -129,8 +138,8 @@ function FeatureRequestsPage() {
                       value={req.status}
                       onChange={(e) => {
                         updateStatus({
-                          id: req._id as any,
-                          status: e.target.value as any,
+                          id: req._id,
+                          status: e.target.value as FeatureRequestStatus,
                         });
                       }}
                       className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"

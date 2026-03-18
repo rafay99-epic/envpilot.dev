@@ -4,9 +4,10 @@
  * This mirrors the tier configuration from convex/tierLimits.ts
  * for UI display purposes only. All enforcement happens server-side
  * in Convex mutations.
+ *
+ * Tier names are dynamic (stored in DB), but we keep seed defaults
+ * here for client-side fallback display when DB data hasn't loaded.
  */
-
-export type Tier = "free" | "pro";
 
 export interface TierLimits {
   maxProjects: number | null;
@@ -21,7 +22,11 @@ export interface TierLimits {
   bulkImportEnabled: boolean;
 }
 
-export const TIER_LIMITS: Record<Tier, TierLimits> = {
+/**
+ * Seed defaults for client-side fallback display.
+ * The actual tier definitions come from the tierDefinitions table via Convex queries.
+ */
+export const SEED_TIER_DEFAULTS: Record<string, TierLimits> = {
   free: {
     maxProjects: 3,
     maxVariablesPerProject: 50,
@@ -48,19 +53,32 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
   },
 };
 
-export function isValidTier(tier: string): tier is Tier {
-  return tier === "free" || tier === "pro";
-}
+/**
+ * @deprecated Use SEED_TIER_DEFAULTS instead. Kept for backward compatibility.
+ */
+export const TIER_LIMITS = SEED_TIER_DEFAULTS;
 
 /**
- * Get tier limits for UI display.
+ * Get tier limits for UI display (fallback to seed defaults).
  * Enforcement happens server-side in Convex mutations.
  */
 export function getTierLimits(tier: string): TierLimits {
-  if (!isValidTier(tier)) {
-    throw new Error(`Invalid tier: ${tier}`);
+  if (tier in SEED_TIER_DEFAULTS) {
+    return SEED_TIER_DEFAULTS[tier];
   }
-  return TIER_LIMITS[tier];
+  // Unknown tier — return unlimited as safe default
+  return {
+    maxProjects: null,
+    maxVariablesPerProject: null,
+    maxTeamMembers: null,
+    maxOrganizations: null,
+    auditLogRetentionDays: 365,
+    apiAccessEnabled: true,
+    extensionAccessEnabled: true,
+    granularPermissionsEnabled: true,
+    variableVersionHistoryEnabled: true,
+    bulkImportEnabled: true,
+  };
 }
 
 type BooleanLimitKey = {
@@ -74,11 +92,7 @@ export function checkTierLimit(
   tier: string,
   feature: BooleanLimitKey
 ): { allowed: boolean; message?: string } {
-  if (!isValidTier(tier)) {
-    return { allowed: false, message: "Invalid tier" };
-  }
-
-  const limits = TIER_LIMITS[tier];
+  const limits = getTierLimits(tier);
   const isEnabled = limits[feature];
 
   if (isEnabled) {

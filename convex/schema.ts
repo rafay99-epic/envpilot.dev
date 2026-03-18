@@ -608,8 +608,8 @@ export default defineSchema({
   organizationTiers: defineTable({
     // Reference to the organization
     organizationId: v.id("organizations"),
-    // Subscription tier
-    tier: v.union(v.literal("free"), v.literal("pro")),
+    // Subscription tier name (matches tierDefinitions.name)
+    tier: v.string(),
     // Last updated timestamp
     updatedAt: v.number(),
     // Who triggered the change (user or system)
@@ -908,18 +908,42 @@ export default defineSchema({
   }).index("by_key", ["key"]),
 
   // ==========================================
-  // TIER CONFIG (Admin-configurable tier limits)
+  // TIER DEFINITIONS (Dynamic, admin-managed tiers)
   // ==========================================
-  tierConfig: defineTable({
-    // Which tier this config applies to
-    tier: v.union(v.literal("free"), v.literal("pro")),
-    // Overridable limits (null = unlimited, undefined = use default)
-    maxProjects: v.optional(v.union(v.number(), v.null())),
-    maxVariablesPerProject: v.optional(v.union(v.number(), v.null())),
-    maxTeamMembers: v.optional(v.union(v.number(), v.null())),
-    maxOrganizations: v.optional(v.union(v.number(), v.null())),
-    auditLogRetentionDays: v.optional(v.number()),
+  tierDefinitions: defineTable({
+    // Unique tier identifier (e.g., "free", "pro", "enterprise")
+    name: v.string(),
+    // Human-readable display name
+    displayName: v.string(),
+    // Optional description
+    description: v.optional(v.string()),
+    // Sort order for UI display
+    sortOrder: v.number(),
+    // Whether this is the default tier for new organizations
+    isDefault: v.boolean(),
+    // Badge color (hex code)
+    color: v.optional(v.string()),
+    // Tier limits
+    limits: v.object({
+      maxProjects: v.union(v.number(), v.null()),
+      maxVariablesPerProject: v.union(v.number(), v.null()),
+      maxTeamMembers: v.union(v.number(), v.null()),
+      maxOrganizations: v.union(v.number(), v.null()),
+      auditLogRetentionDays: v.number(),
+    }),
+    // Feature flags
+    features: v.object({
+      apiAccessEnabled: v.boolean(),
+      extensionAccessEnabled: v.boolean(),
+      granularPermissionsEnabled: v.boolean(),
+      variableVersionHistoryEnabled: v.boolean(),
+      bulkImportEnabled: v.boolean(),
+      prioritySupport: v.optional(v.boolean()),
+      customBranding: v.optional(v.boolean()),
+      ssoEnabled: v.optional(v.boolean()),
+    }),
     // Timestamps
+    createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_tier", ["tier"]),
+  }).index("by_name", ["name"]),
 });

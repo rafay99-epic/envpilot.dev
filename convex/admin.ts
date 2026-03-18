@@ -12,6 +12,8 @@ function verifyAdmin(secret: string) {
   }
 }
 
+import { SEED_TIER_DEFAULTS } from "./tierLimits";
+
 const BROWSABLE_TABLES = [
   "users",
   "userPreferences",
@@ -40,7 +42,7 @@ const BROWSABLE_TABLES = [
   "permissionRevocationEvents",
   "supportTickets",
   "contactMessages",
-  "tierConfig",
+  "tierDefinitions",
   "adminSettings",
 ] as const;
 
@@ -87,10 +89,9 @@ export const getStats = query({
     }
 
     const orgTiers = await ctx.db.query("organizationTiers").collect();
-    const tierDistribution = { free: 0, pro: 0 };
+    const tierDistribution: Record<string, number> = {};
     for (const ot of orgTiers) {
-      if (ot.tier === "free") tierDistribution.free++;
-      else if (ot.tier === "pro") tierDistribution.pro++;
+      tierDistribution[ot.tier] = (tierDistribution[ot.tier] || 0) + 1;
     }
 
     return {
@@ -152,10 +153,20 @@ export const updateOrganizationTier = mutation({
   args: {
     secret: v.string(),
     organizationId: v.id("organizations"),
-    newTier: v.union(v.literal("free"), v.literal("pro")),
+    newTier: v.string(),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
+
+    // Validate tier exists in tierDefinitions
+    const tierDef = await ctx.db
+      .query("tierDefinitions")
+      .withIndex("by_name", (q) => q.eq("name", args.newTier))
+      .first();
+
+    if (!tierDef) {
+      throw new Error(`Invalid tier: "${args.newTier}". No tier definition found with that name.`);
+    }
 
     const tierRecord = await ctx.db
       .query("organizationTiers")
@@ -559,69 +570,250 @@ export const deleteChangelog = mutation({
 });
 
 // ==========================================
-// TIER CONFIG
+// TIER DEFINITIONS (Dynamic tier management)
 // ==========================================
 
-export const getTierConfig = query({
+export const listTierDefinitions = query({
   args: { secret: v.string() },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const freeConfig = await ctx.db
-      .query("tierConfig")
-      .withIndex("by_tier", (q) => q.eq("tier", "free"))
-      .first();
-
-    const proConfig = await ctx.db
-      .query("tierConfig")
-      .withIndex("by_tier", (q) => q.eq("tier", "pro"))
-      .first();
-
-    return {
-      free: freeConfig ?? null,
-      pro: proConfig ?? null,
-    };
+    const tiers = await ctx.db.query("tierDefinitions").collect();
+    // Sort by sortOrder
+    return tiers.sort((a, b) => a.sortOrder - b.sortOrder);
   },
 });
 
-export const updateTierConfig = mutation({
+export const createTierDefinition = mutation({
   args: {
     secret: v.string(),
-    tier: v.union(v.literal("free"), v.literal("pro")),
-    maxProjects: v.optional(v.union(v.number(), v.null())),
-    maxVariablesPerProject: v.optional(v.union(v.number(), v.null())),
-    maxTeamMembers: v.optional(v.union(v.number(), v.null())),
-    maxOrganizations: v.optional(v.union(v.number(), v.null())),
-    auditLogRetentionDays: v.optional(v.number()),
+    name: v.string(),
+    displayName: v.string(),
+    description: v.optional(v.string()),
+    sortOrder: v.number(),
+    isDefault: v.boolean(),
+    color: v.optional(v.string()),
+    limits: v.object({
+      maxProjects: v.union(v.number(), v.null()),
+      maxVariablesPerProject: v.union(v.number(), v.null()),
+      maxTeamMembers: v.union(v.number(), v.null()),
+      maxOrganizations: v.union(v.number(), v.null()),
+      auditLogRetentionDays: v.number(),
+    }),
+    features: v.object({
+      apiAccessEnabled: v.boolean(),
+      extensionAccessEnabled: v.boolean(),
+      granularPermissionsEnabled: v.boolean(),
+      variableVersionHistoryEnabled: v.boolean(),
+      bulkImportEnabled: v.boolean(),
+      prioritySupport: v.optional(v.boolean()),
+      customBranding: v.optional(v.boolean()),
+      ssoEnabled: v.optional(v.boolean()),
+    }),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
+    // Validate unique name
     const existing = await ctx.db
-      .query("tierConfig")
-      .withIndex("by_tier", (q) => q.eq("tier", args.tier))
+      .query("tierDefinitions")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
       .first();
 
-    const data: Record<string, unknown> = { updatedAt: Date.now() };
-    if (args.maxProjects !== undefined) data.maxProjects = args.maxProjects;
-    if (args.maxVariablesPerProject !== undefined)
-      data.maxVariablesPerProject = args.maxVariablesPerProject;
-    if (args.maxTeamMembers !== undefined)
-      data.maxTeamMembers = args.maxTeamMembers;
-    if (args.maxOrganizations !== undefined)
-      data.maxOrganizations = args.maxOrganizations;
-    if (args.auditLogRetentionDays !== undefined)
-      data.auditLogRetentionDays = args.auditLogRetentionDays;
-
     if (existing) {
-      await ctx.db.patch(existing._id, data);
-    } else {
-      await ctx.db.insert("tierConfig", {
-        tier: args.tier,
-        ...data,
-        updatedAt: Date.now(),
-      } as any);
+      throw new Error(`A tier with name "${args.name}" already exists.`);
     }
+
+    const now = Date.now();
+
+    // If this tier is set as default, unset other defaults
+    if (args.isDefault) {
+      const allTiers = await ctx.db.query("tierDefinitions").collect();
+      for (const t of allTiers) {
+        if (t.isDefault) {
+          await ctx.db.patch(t._id, { isDefault: false, updatedAt: now });
+        }
+      }
+    }
+
+    return await ctx.db.insert("tierDefinitions", {
+      name: args.name,
+      displayName: args.displayName,
+      description: args.description,
+      sortOrder: args.sortOrder,
+      isDefault: args.isDefault,
+      color: args.color,
+      limits: args.limits,
+      features: args.features,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const updateTierDefinition = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("tierDefinitions"),
+    displayName: v.optional(v.string()),
+    description: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
+    isDefault: v.optional(v.boolean()),
+    color: v.optional(v.string()),
+    limits: v.optional(
+      v.object({
+        maxProjects: v.union(v.number(), v.null()),
+        maxVariablesPerProject: v.union(v.number(), v.null()),
+        maxTeamMembers: v.union(v.number(), v.null()),
+        maxOrganizations: v.union(v.number(), v.null()),
+        auditLogRetentionDays: v.number(),
+      })
+    ),
+    features: v.optional(
+      v.object({
+        apiAccessEnabled: v.boolean(),
+        extensionAccessEnabled: v.boolean(),
+        granularPermissionsEnabled: v.boolean(),
+        variableVersionHistoryEnabled: v.boolean(),
+        bulkImportEnabled: v.boolean(),
+        prioritySupport: v.optional(v.boolean()),
+        customBranding: v.optional(v.boolean()),
+        ssoEnabled: v.optional(v.boolean()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error("Tier definition not found");
+    }
+
+    const now = Date.now();
+
+    // If setting as default, unset other defaults
+    if (args.isDefault === true) {
+      const allTiers = await ctx.db.query("tierDefinitions").collect();
+      for (const t of allTiers) {
+        if (t.isDefault && t._id !== args.id) {
+          await ctx.db.patch(t._id, { isDefault: false, updatedAt: now });
+        }
+      }
+    }
+
+    const updates: Record<string, unknown> = { updatedAt: now };
+    if (args.displayName !== undefined) updates.displayName = args.displayName;
+    if (args.description !== undefined) updates.description = args.description;
+    if (args.sortOrder !== undefined) updates.sortOrder = args.sortOrder;
+    if (args.isDefault !== undefined) updates.isDefault = args.isDefault;
+    if (args.color !== undefined) updates.color = args.color;
+    if (args.limits !== undefined) updates.limits = args.limits;
+    if (args.features !== undefined) updates.features = args.features;
+
+    await ctx.db.patch(args.id, updates);
+  },
+});
+
+export const deleteTierDefinition = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("tierDefinitions"),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const tierDef = await ctx.db.get(args.id);
+    if (!tierDef) {
+      throw new Error("Tier definition not found");
+    }
+
+    // Prevent deleting the default tier
+    if (tierDef.isDefault) {
+      throw new Error("Cannot delete the default tier. Set another tier as default first.");
+    }
+
+    // Check if any organizations use this tier
+    const orgTiers = await ctx.db.query("organizationTiers").collect();
+    const usedBy = orgTiers.filter((ot) => ot.tier === tierDef.name);
+    if (usedBy.length > 0) {
+      throw new Error(
+        `Cannot delete tier "${tierDef.name}": ${usedBy.length} organization(s) are using it. Reassign them first.`
+      );
+    }
+
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const seedDefaultTiers = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const existing = await ctx.db.query("tierDefinitions").collect();
+    if (existing.length > 0) {
+      return { seeded: false, message: "Tier definitions already exist" };
+    }
+
+    const now = Date.now();
+
+    const seedData = [
+      {
+        name: "free",
+        displayName: "Free",
+        description: "Basic tier with limited resources",
+        sortOrder: 0,
+        isDefault: true,
+        color: "#71717a",
+        limits: {
+          maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
+          maxVariablesPerProject: SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
+          maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
+          maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
+          auditLogRetentionDays: SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
+        },
+        features: {
+          apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
+          extensionAccessEnabled: SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
+          granularPermissionsEnabled: SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
+          variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
+          bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
+        },
+      },
+      {
+        name: "pro",
+        displayName: "Pro",
+        description: "Professional tier with unlimited resources",
+        sortOrder: 1,
+        isDefault: false,
+        color: "#a855f7",
+        limits: {
+          maxProjects: SEED_TIER_DEFAULTS.pro.maxProjects,
+          maxVariablesPerProject: SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
+          maxTeamMembers: SEED_TIER_DEFAULTS.pro.maxTeamMembers,
+          maxOrganizations: SEED_TIER_DEFAULTS.pro.maxOrganizations,
+          auditLogRetentionDays: SEED_TIER_DEFAULTS.pro.auditLogRetentionDays,
+        },
+        features: {
+          apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
+          extensionAccessEnabled: SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
+          granularPermissionsEnabled: SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
+          variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
+          bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
+        },
+      },
+    ];
+
+    for (const tier of seedData) {
+      await ctx.db.insert("tierDefinitions", {
+        ...tier,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { seeded: true, message: "Created default free and pro tier definitions" };
   },
 });
 
@@ -709,7 +901,13 @@ export const listMigrations = query({
   args: { secret: v.string() },
   handler: async (_ctx, args) => {
     verifyAdmin(args.secret);
-    return [] as Array<{ name: string; description: string }>;
+    return [
+      {
+        name: "seed-tier-definitions",
+        description:
+          "Seeds default 'free' and 'pro' tier definitions if none exist. Safe to run multiple times.",
+      },
+    ] as Array<{ name: string; description: string }>;
   },
 });
 
@@ -718,8 +916,74 @@ export const runMigration = mutation({
     secret: v.string(),
     name: v.string(),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     verifyAdmin(args.secret);
+
+    if (args.name === "seed-tier-definitions") {
+      const existing = await ctx.db.query("tierDefinitions").collect();
+      if (existing.length > 0) {
+        return { success: true, total: existing.length, migrated: 0, skipped: existing.length };
+      }
+
+      const now = Date.now();
+      const seedData = [
+        {
+          name: "free",
+          displayName: "Free",
+          description: "Basic tier with limited resources",
+          sortOrder: 0,
+          isDefault: true,
+          color: "#71717a",
+          limits: {
+            maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
+            maxVariablesPerProject: SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
+            maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
+            maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
+            auditLogRetentionDays: SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
+          },
+          features: {
+            apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
+            extensionAccessEnabled: SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
+            granularPermissionsEnabled: SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
+            variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
+            bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
+          },
+        },
+        {
+          name: "pro",
+          displayName: "Pro",
+          description: "Professional tier with unlimited resources",
+          sortOrder: 1,
+          isDefault: false,
+          color: "#a855f7",
+          limits: {
+            maxProjects: SEED_TIER_DEFAULTS.pro.maxProjects,
+            maxVariablesPerProject: SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
+            maxTeamMembers: SEED_TIER_DEFAULTS.pro.maxTeamMembers,
+            maxOrganizations: SEED_TIER_DEFAULTS.pro.maxOrganizations,
+            auditLogRetentionDays: SEED_TIER_DEFAULTS.pro.auditLogRetentionDays,
+          },
+          features: {
+            apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
+            extensionAccessEnabled: SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
+            granularPermissionsEnabled: SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
+            variableVersionHistoryEnabled: SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
+            bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
+          },
+        },
+      ];
+
+      for (const tier of seedData) {
+        await ctx.db.insert("tierDefinitions", {
+          ...tier,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      return { success: true, total: 2, migrated: 2, skipped: 0 };
+    }
+
     throw new Error(`Unknown migration: ${args.name}`);
   },
 });
@@ -947,11 +1211,10 @@ export const getAnalytics = query({
         (ticketCategoryCounts[t.category] || 0) + 1;
     }
 
-    // Tier distribution
-    const tierDistribution = { free: 0, pro: 0 };
+    // Tier distribution (dynamic)
+    const tierDistribution: Record<string, number> = {};
     for (const ot of orgTiers) {
-      if (ot.tier === "free") tierDistribution.free++;
-      else if (ot.tier === "pro") tierDistribution.pro++;
+      tierDistribution[ot.tier] = (tierDistribution[ot.tier] || 0) + 1;
     }
 
     // Messages read/unread

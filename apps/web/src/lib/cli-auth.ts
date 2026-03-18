@@ -129,7 +129,7 @@ export function tierLimitResponse(
 export async function checkCLIAccess(
   convex: ConvexHttpClient,
   organizationId: Id<"organizations">
-): Promise<{ allowed: boolean; tier: "free" | "pro" }> {
+): Promise<{ allowed: boolean; tier: string }> {
   const org = await convex.query(api.organizations.getById, { organizationId });
 
   if (!org) {
@@ -140,7 +140,7 @@ export async function checkCLIAccess(
   const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
     organizationId: org._id,
   });
-  const tier = (tierData?.tier as "free" | "pro") ?? "free";
+  const tier = (tierData?.tier as string) ?? "free";
 
   // Pre-alpha mode: CLI access is enabled for all tiers.
   return {

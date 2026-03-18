@@ -8,10 +8,10 @@ export function useAdminQuery<F extends FunctionReference<"query">>(
 ): FunctionReturnType<F> | undefined {
   const secret = useAuthStore((s) => s.secret);
   const shouldSkip = !secret || args === "skip";
-  return useQuery(
-    query,
-    shouldSkip ? "skip" : ({ ...args, secret } as any)
-  ) as FunctionReturnType<F> | undefined;
+  const queryArgs = (
+    shouldSkip ? "skip" : { ...args, secret }
+  ) as FunctionArgs<F> | "skip";
+  return useQuery(query, queryArgs) as FunctionReturnType<F> | undefined;
 }
 
 export function useAdminMutation<F extends FunctionReference<"mutation">>(
@@ -21,6 +21,6 @@ export function useAdminMutation<F extends FunctionReference<"mutation">>(
   const mutate = useMutation(mutation);
   return (args: Omit<FunctionArgs<F>, "secret">) => {
     if (!secret) throw new Error("Not authenticated");
-    return mutate({ ...args, secret } as any);
+    return mutate({ ...args, secret } as FunctionArgs<F>);
   };
 }

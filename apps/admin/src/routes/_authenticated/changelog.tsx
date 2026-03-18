@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +18,8 @@ import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/changelog")({
   component: ChangelogPage,
 });
+
+type ChangelogType = "feature" | "improvement" | "fix" | "security" | "breaking";
 
 const TYPE_OPTIONS = [
   { value: "feature", label: "Feature" },
@@ -47,7 +50,7 @@ interface ChangelogForm {
   title: string;
   content: string;
   version: string;
-  type: string;
+  type: ChangelogType;
   isPublished: boolean;
 }
 
@@ -67,7 +70,7 @@ function ChangelogPage() {
   const togglePublish = useAdminMutation(api.admin.toggleChangelogPublish);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<Id<"changelog"> | null>(null);
   const [form, setForm] = useState<ChangelogForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -77,14 +80,14 @@ function ChangelogPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (entry: Record<string, unknown>) => {
-    setEditingId(entry._id as string);
+  const openEdit = (entry: NonNullable<typeof entries>[number]) => {
+    setEditingId(entry._id);
     setForm({
-      title: (entry.title as string) ?? "",
-      content: (entry.content as string) ?? "",
-      version: (entry.version as string) ?? "",
-      type: (entry.type as string) ?? "feature",
-      isPublished: (entry.isPublished as boolean) ?? false,
+      title: entry.title ?? "",
+      content: entry.content ?? "",
+      version: entry.version ?? "",
+      type: (entry.type as ChangelogType) ?? "feature",
+      isPublished: entry.isPublished ?? false,
     });
     setModalOpen(true);
   };
@@ -94,18 +97,18 @@ function ChangelogPage() {
     try {
       if (editingId) {
         await updateEntry({
-          id: editingId as any,
+          id: editingId,
           title: form.title,
           content: form.content,
           version: form.version,
-          type: form.type as any,
+          type: form.type,
         });
       } else {
         await createEntry({
           title: form.title,
           content: form.content,
           version: form.version,
-          type: form.type as any,
+          type: form.type,
           isPublished: form.isPublished,
         });
       }
@@ -117,13 +120,13 @@ function ChangelogPage() {
     }
   };
 
-  const handleTogglePublish = async (entryId: string) => {
-    await togglePublish({ id: entryId as any });
+  const handleTogglePublish = async (entryId: Id<"changelog">) => {
+    await togglePublish({ id: entryId });
   };
 
-  const handleDelete = async (entryId: string) => {
+  const handleDelete = async (entryId: Id<"changelog">) => {
     if (!confirm("Delete this changelog entry?")) return;
-    await deleteEntry({ id: entryId as any });
+    await deleteEntry({ id: entryId });
   };
 
   return (
@@ -178,7 +181,7 @@ function ChangelogPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => openEdit(entry as unknown as Record<string, unknown>)}
+                  onClick={() => openEdit(entry)}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -233,7 +236,7 @@ function ChangelogPage() {
               id="changelog-type"
               options={TYPE_OPTIONS}
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              onChange={(e) => setForm({ ...form, type: e.target.value as ChangelogType })}
             />
           </div>
           {!editingId && (

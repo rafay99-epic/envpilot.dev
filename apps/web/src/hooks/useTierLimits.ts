@@ -7,7 +7,8 @@ import { Id } from "@convex/_generated/dataModel";
 /**
  * Tier types matching the backend
  */
-export type Tier = "free" | "pro";
+/** Tier name — dynamic, not limited to "free" | "pro" */
+export type Tier = string;
 
 export interface TierLimits {
   maxProjects: number | null;

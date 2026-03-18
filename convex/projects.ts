@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getTierLimits, getOrganizationTier } from "./tierLimits";
+import { getTierLimitsFromDb, getOrganizationTier } from "./tierLimits";
 
 /**
  * Project Queries and Mutations
@@ -232,7 +232,7 @@ export const create = mutation({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxProjects !== null) {
       const projectCount = await ctx.db
         .query("projects")
@@ -523,7 +523,7 @@ export const duplicate = mutation({
       ctx.db,
       sourceProject.organizationId
     );
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxProjects !== null) {
       const projectCount = await ctx.db
         .query("projects")
@@ -716,13 +716,24 @@ export const move = mutation({
       ctx.db,
       args.targetOrganizationId
     );
-    const limits = getTierLimits(sourceTier);
-    const targetLimits = getTierLimits(targetTier);
-    if (limits.maxProjects !== null || targetLimits.maxProjects !== null) {
-      // If either org has limits, check pro tier
-      if (sourceTier !== "pro" || targetTier !== "pro") {
+    const sourceLimits = await getTierLimitsFromDb(ctx.db, sourceTier);
+    const targetLimits = await getTierLimitsFromDb(ctx.db, targetTier);
+    if (sourceLimits.maxProjects !== null || targetLimits.maxProjects !== null) {
+      // Check if target org has room for another project
+      const targetProjects = await ctx.db
+        .query("projects")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.targetOrganizationId)
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect();
+
+      if (
+        targetLimits.maxProjects !== null &&
+        targetProjects.length >= targetLimits.maxProjects
+      ) {
         throw new Error(
-          "Both organizations must be on the Pro plan to transfer projects"
+          `Target organization has reached its project limit (${targetProjects.length}/${targetLimits.maxProjects}). Upgrade its tier first.`
         );
       }
     }

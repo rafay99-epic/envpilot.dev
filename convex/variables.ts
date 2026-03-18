@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
-  getTierLimits,
+  getTierLimitsFromDb,
   getOrganizationTier,
   MAX_BULK_IMPORT_SIZE,
 } from "./tierLimits";
@@ -597,7 +597,7 @@ export const create = mutation({
     }
 
     const tier = await getOrganizationTier(ctx.db, project.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxVariablesPerProject !== null) {
       const variableCount = await ctx.db
         .query("environmentVariables")
@@ -1151,12 +1151,12 @@ export const bulkCreate = mutation({
     }
 
     const tier = await getOrganizationTier(ctx.db, project.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
 
     // Check if bulk import is enabled for this tier
     if (!limits.bulkImportEnabled) {
       throw new Error(
-        "Bulk import requires Pro tier. Upgrade to import variables in bulk."
+        "Bulk import requires a higher tier. Upgrade to import variables in bulk."
       );
     }
 

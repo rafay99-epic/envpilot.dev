@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -14,12 +15,22 @@ export const Route = createFileRoute("/_authenticated/users")({
   component: UsersPage,
 });
 
+interface UserRow extends Record<string, unknown> {
+  _id: Id<"users">;
+  name: string | null;
+  email: string;
+  organizationCount: number;
+  lastActiveAt: number | null;
+  isBanned: boolean;
+  banReason?: string;
+}
+
 function UsersPage() {
   const users = useAdminQuery(api.admin.listUsers, {});
   const banUser = useAdminMutation(api.admin.banUser);
   const unbanUser = useAdminMutation(api.admin.unbanUser);
 
-  const [banModal, setBanModal] = useState<{ userId: string; name: string } | null>(null);
+  const [banModal, setBanModal] = useState<{ userId: Id<"users">; name: string } | null>(null);
   const [banReason, setBanReason] = useState("");
   const [isBanning, setIsBanning] = useState(false);
 
@@ -27,7 +38,7 @@ function UsersPage() {
     if (!banModal) return;
     setIsBanning(true);
     try {
-      await banUser({ userId: banModal.userId as any, banReason });
+      await banUser({ userId: banModal.userId, banReason });
       setBanModal(null);
       setBanReason("");
     } finally {
@@ -35,19 +46,19 @@ function UsersPage() {
     }
   };
 
-  const handleUnban = async (userId: string) => {
+  const handleUnban = async (userId: Id<"users">) => {
     if (!confirm("Are you sure you want to unban this user?")) return;
-    await unbanUser({ userId: userId as any });
+    await unbanUser({ userId });
   };
 
-  const columns: Column<Record<string, unknown>>[] = [
+  const columns: Column<UserRow>[] = [
     { key: "name", header: "Name", sortable: true },
     { key: "email", header: "Email", sortable: true },
     {
       key: "organizationCount",
       header: "Orgs",
       sortable: true,
-      render: (row) => <span>{(row.organizationCount as number) ?? 0}</span>,
+      render: (row) => <span>{row.organizationCount ?? 0}</span>,
     },
     {
       key: "lastActiveAt",
@@ -55,7 +66,7 @@ function UsersPage() {
       sortable: true,
       render: (row) =>
         row.lastActiveAt ? (
-          <span className="text-zinc-400">{timeAgo(row.lastActiveAt as number)}</span>
+          <span className="text-zinc-400">{timeAgo(row.lastActiveAt)}</span>
         ) : (
           <span className="text-zinc-600">Never</span>
         ),
@@ -80,7 +91,7 @@ function UsersPage() {
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              handleUnban(row._id as string);
+              handleUnban(row._id);
             }}
           >
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
@@ -93,8 +104,8 @@ function UsersPage() {
             onClick={(e) => {
               e.stopPropagation();
               setBanModal({
-                userId: row._id as string,
-                name: (row.name as string) ?? "User",
+                userId: row._id,
+                name: row.name ?? "User",
               });
             }}
           >
@@ -111,9 +122,9 @@ function UsersPage() {
 
       <DataTable
         columns={columns}
-        data={users as unknown as Record<string, unknown>[] | undefined}
+        data={users as unknown as UserRow[] | undefined}
         isLoading={!users}
-        rowKey={(row) => row._id as string}
+        rowKey={(row) => row._id}
         emptyMessage="No users found"
       />
 

@@ -13,6 +13,8 @@ export const Route = createFileRoute("/_authenticated/tickets")({
   component: TicketsPage,
 });
 
+type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
 const STATUS_OPTIONS = [
   { value: "all", label: "All Statuses" },
   { value: "open", label: "Open" },
@@ -147,8 +149,8 @@ function TicketsPage() {
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
                           updateStatus({
-                            id: ticket._id as any,
-                            status: e.target.value as any,
+                            id: ticket._id,
+                            status: e.target.value as TicketStatus,
                           });
                         }}
                         className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"

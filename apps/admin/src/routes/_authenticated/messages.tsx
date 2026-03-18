@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -72,7 +73,7 @@ function MessagesPage() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleRead({ id: msg._id as any, isRead: !msg.isRead });
+                          toggleRead({ id: msg._id, isRead: !msg.isRead });
                         }}
                         title={msg.isRead ? "Mark unread" : "Mark read"}
                       >
@@ -88,7 +89,7 @@ function MessagesPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm("Delete this message?")) {
-                            deleteMessage({ id: msg._id as any });
+                            deleteMessage({ id: msg._id });
                           }
                         }}
                       >

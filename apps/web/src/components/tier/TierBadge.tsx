@@ -1,15 +1,23 @@
 "use client";
 
-import { Tier } from "@/hooks/useTierLimits";
-
 interface TierBadgeProps {
-  tier: Tier;
+  tier: string;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
 }
 
+const DEFAULT_TIER_STYLES: Record<string, string> = {
+  free: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
+  pro: "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm",
+};
+
+const FALLBACK_STYLE =
+  "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm";
+
 /**
- * Badge component to display the organization's subscription tier
+ * Badge component to display the organization's subscription tier.
+ * Supports dynamic tier names — known tiers get specific styling,
+ * unknown tiers get a default gradient.
  */
 export function TierBadge({
   tier,
@@ -22,16 +30,14 @@ export function TierBadge({
     lg: "text-base px-3 py-1",
   };
 
-  const tierStyles = {
-    free: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
-    pro: "bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm",
-  };
+  const style = DEFAULT_TIER_STYLES[tier] ?? FALLBACK_STYLE;
+  const isSpecial = tier !== "free";
 
   return (
     <span
-      className={`inline-flex items-center font-medium rounded-full ${sizeClasses[size]} ${tierStyles[tier]}`}
+      className={`inline-flex items-center font-medium rounded-full ${sizeClasses[size]} ${style}`}
     >
-      {tier === "pro" && (
+      {isSpecial && (
         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
           <path
             fillRule="evenodd"
@@ -40,7 +46,7 @@ export function TierBadge({
           />
         </svg>
       )}
-      {showLabel && (tier === "pro" ? "Pro" : "Free")}
+      {showLabel && (tier.charAt(0).toUpperCase() + tier.slice(1))}
     </span>
   );
 }

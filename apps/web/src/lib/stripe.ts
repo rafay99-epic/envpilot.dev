@@ -91,7 +91,7 @@ export const getStripeConfigStatus = () => {
  */
 export const mapSubscriptionStatusToTier = (
   status: Stripe.Subscription.Status
-): "free" | "pro" => {
+): string => {
   // Active and trialing subscriptions get Pro tier
   if (status === "active" || status === "trialing") {
     return "pro";

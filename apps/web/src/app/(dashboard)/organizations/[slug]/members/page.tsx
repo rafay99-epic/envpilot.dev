@@ -40,7 +40,7 @@ interface Organization {
   _id: string;
   name: string;
   role: "admin" | "team_lead" | "member";
-  tier?: "free" | "pro";
+  tier?: string;
 }
 
 interface SearchUser {

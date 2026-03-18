@@ -118,18 +118,15 @@ function DashboardPage() {
           value={stats.totalFeatureRequests}
           icon={<Lightbulb className="h-5 w-5" />}
         />
-        <StatCard
-          title="Free Tier"
-          value={stats.tierDistribution.free}
-          icon={<Crown className="h-5 w-5" />}
-          trend="organizations"
-        />
-        <StatCard
-          title="Pro Tier"
-          value={stats.tierDistribution.pro}
-          icon={<Crown className="h-5 w-5" />}
-          trend="organizations"
-        />
+        {Object.entries(stats.tierDistribution).map(([tierName, count]) => (
+          <StatCard
+            key={tierName}
+            title={`${tierName.charAt(0).toUpperCase() + tierName.slice(1)} Tier`}
+            value={count}
+            icon={<Crown className="h-5 w-5" />}
+            trend="organizations"
+          />
+        ))}
       </div>
 
       {/* Charts section */}
@@ -200,18 +197,12 @@ function DashboardPage() {
                 Tier Distribution
               </h2>
               <DonutChart
-                data={[
-                  {
-                    label: "Free",
-                    value: analytics.tierDistribution.free,
-                    color: "#71717a",
-                  },
-                  {
-                    label: "Pro",
-                    value: analytics.tierDistribution.pro,
-                    color: "#a855f7",
-                  },
-                ]}
+                data={Object.entries(analytics.tierDistribution).map(
+                  ([label, value]) => ({
+                    label: label.charAt(0).toUpperCase() + label.slice(1),
+                    value,
+                  })
+                )}
                 size={160}
                 totalLabel="Orgs"
               />

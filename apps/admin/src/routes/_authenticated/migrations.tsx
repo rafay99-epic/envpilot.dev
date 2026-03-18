@@ -4,7 +4,6 @@ import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ArrowUpDown, Play, CheckCircle, XCircle, Loader2 } from "lucide-react";
@@ -12,6 +11,13 @@ import { ArrowUpDown, Play, CheckCircle, XCircle, Loader2 } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/migrations")({
   component: MigrationsPage,
 });
+
+interface MigrationResult {
+  success: boolean;
+  total?: number;
+  migrated?: number;
+  skipped?: number;
+}
 
 function MigrationsPage() {
   const migrations = useAdminQuery(api.admin.listMigrations, {});
@@ -25,7 +31,7 @@ function MigrationsPage() {
   const handleRun = async (name: string) => {
     setRunningName(name);
     try {
-      const result: any = await runMigration({ name });
+      const result = await runMigration({ name }) as MigrationResult;
       setResults((prev) => ({
         ...prev,
         [name]: {

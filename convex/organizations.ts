@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getTierLimits, getOrganizationTier, Tier } from "./tierLimits";
+import { getTierLimitsFromDb, getOrganizationTier, getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 
 /**
@@ -141,25 +141,31 @@ export const create = mutation({
       .filter((q) => q.eq(q.field("role"), "admin"))
       .collect();
 
-    // Check if user has any Pro tier organizations
-    let hasPro = false;
+    // Find the most permissive org limit among owned orgs
+    let bestOrgLimit: number | null = 0;
     for (const membership of userMemberships) {
       const tier = await getOrganizationTier(ctx.db, membership.organizationId);
-      if (tier === "pro") {
-        hasPro = true;
+      const limits = await getTierLimitsFromDb(ctx.db, tier);
+      if (limits.maxOrganizations === null) {
+        bestOrgLimit = null;
         break;
+      }
+      if (bestOrgLimit !== null && limits.maxOrganizations > bestOrgLimit) {
+        bestOrgLimit = limits.maxOrganizations;
       }
     }
 
-    const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = getTierLimits(effectiveTier);
+    // If no owned orgs yet, use default tier limits
+    if (userMemberships.length === 0) {
+      const defaultTier = await getDefaultTierName(ctx.db);
+      const defaultLimits = await getTierLimitsFromDb(ctx.db, defaultTier);
+      bestOrgLimit = defaultLimits.maxOrganizations;
+    }
 
-    if (limits.maxOrganizations !== null) {
-      if (userMemberships.length >= limits.maxOrganizations) {
-        throw new Error(
-          `Organization limit reached (${userMemberships.length}/${limits.maxOrganizations}). Upgrade to Pro for unlimited organizations.`
-        );
-      }
+    if (bestOrgLimit !== null && userMemberships.length >= bestOrgLimit) {
+      throw new Error(
+        `Organization limit reached (${userMemberships.length}/${bestOrgLimit}). Upgrade your tier for more organizations.`
+      );
     }
 
     const existingOrg = await ctx.db
@@ -182,10 +188,11 @@ export const create = mutation({
       updatedAt: now,
     });
 
-    // Create tier record in the locked-down organizationTiers table
+    // Create tier record using the default tier from tierDefinitions
+    const defaultTier = await getDefaultTierName(ctx.db);
     await ctx.db.insert("organizationTiers", {
       organizationId,
-      tier: "free",
+      tier: defaultTier,
       updatedAt: now,
       updatedBy: args.createdBy,
       reason: "org_created",
@@ -449,7 +456,7 @@ export const addMember = mutation({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxTeamMembers !== null) {
       const currentMembers = await ctx.db
         .query("organizationMembers")
@@ -460,7 +467,7 @@ export const addMember = mutation({
 
       if (currentMembers.length >= limits.maxTeamMembers) {
         throw new Error(
-          `Team member limit reached (${currentMembers.length}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`
+          `Team member limit reached (${currentMembers.length}/${limits.maxTeamMembers}). Upgrade your tier for more team members.`
         );
       }
     }
@@ -1138,14 +1145,8 @@ export const transferOwnership = mutation({
       throw new Error("Cannot transfer ownership to yourself");
     }
 
-    // Tier check
-    const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
-    if (limits.maxProjects !== null && tier !== "pro") {
-      throw new Error(
-        "Organization must be on the Pro plan to transfer ownership"
-      );
-    }
+    // Tier check — ownership transfer is allowed for all tiers
+    // (removed hardcoded pro-only restriction)
 
     // Add or promote target user to admin
     const targetMembership = await ctx.db

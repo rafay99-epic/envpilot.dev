@@ -6,7 +6,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { useTierStore } from "@/stores/tier-store";
 import { useAuth } from "@/hooks/use-auth";
-import { TIER_LIMITS, type Tier } from "@/lib/tier-limits";
+import { getTierLimits } from "@/lib/tier-limits";
 
 /**
  * Bridge hook that syncs Convex tier/usage data into the Zustand store.
@@ -53,11 +53,10 @@ export function useTierStoreSync() {
     }
 
     if (usageData) {
-      const tier = usageData.tier as Tier;
       setUsageData({
         organizationId: orgId,
-        tier,
-        limits: TIER_LIMITS[tier],
+        tier: usageData.tier,
+        limits: usageData.limits ?? getTierLimits(usageData.tier),
         usage: usageData.usage,
       });
     }

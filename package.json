@@ -16,7 +16,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names web,convex --prefix-colors blue,green \"turbo dev --filter=@envpilot/web\" \"convex dev\"",
+    "dev": "concurrently --names web,convex,admin --prefix-colors blue,green,magenta \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\"",
     "dev:cli": "turbo dev --filter=@envpilot/cli",
     "dev:admin": "turbo dev --filter=@envpilot/admin",
     "dev:extension": "turbo dev --filter=envpilot",

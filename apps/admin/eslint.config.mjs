@@ -1,3 +1,3 @@
-import baseConfig from "@envpilot/eslint-config/base";
+import { baseConfig } from "@envpilot/eslint-config/base";
 
 export default [...baseConfig];

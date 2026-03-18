@@ -38,7 +38,7 @@ export default function OrganizationPage({
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"
   );
-  const orgTier = (tierData?.tier as "free" | "pro") ?? "free";
+  const orgTier = (tierData?.tier as string) ?? "free";
 
   useEffect(() => {
     async function fetchOrganization() {

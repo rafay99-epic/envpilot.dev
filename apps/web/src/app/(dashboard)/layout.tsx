@@ -113,7 +113,7 @@ export default async function DashboardLayout({
   };
 
   // Look up the tier from the organizationTiers table
-  let orgTier: "free" | "pro" = "free";
+  let orgTier: string = "free";
   if (activeOrganization) {
     try {
       const tierData = await convex.query(
@@ -123,7 +123,7 @@ export default async function DashboardLayout({
             activeOrganization._id as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
         }
       );
-      orgTier = (tierData?.tier as "free" | "pro") ?? "free";
+      orgTier = (tierData?.tier as string) ?? "free";
     } catch {
       // Fall back to free tier if query fails
     }
