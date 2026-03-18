@@ -9,7 +9,6 @@ import {
   forbiddenResponse,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -206,7 +205,6 @@ export async function POST(request: NextRequest) {
           projectId: projectId as Id<"projects">,
           isSensitive: variable.isSensitive ?? false,
           createdBy: authResult.userId,
-          enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
         });
 
         created++;

@@ -3,6 +3,9 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 
@@ -12,7 +15,6 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  tier: "free" | "pro";
   role: "admin" | "team_lead" | "member";
   createdAt: number;
   updatedAt: number;
@@ -29,6 +31,14 @@ export default function OrganizationPage({
   const [memberCount, setMemberCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const tierData = useQuery(
+    api.tierLimits.getOrganizationLimits,
+    organization?._id
+      ? { organizationId: organization._id as Id<"organizations"> }
+      : "skip"
+  );
+  const orgTier = (tierData?.tier as "free" | "pro") ?? "free";
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -131,7 +141,7 @@ export default function OrganizationPage({
               <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                 {organization.name}
               </h1>
-              {organization.tier === "pro" && (
+              {orgTier === "pro" && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   Pro
                 </span>
@@ -328,7 +338,7 @@ export default function OrganizationPage({
           <div className="flex justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800">
             <dt className="text-sm text-zinc-500 dark:text-zinc-400">Plan</dt>
             <dd className="text-sm text-zinc-900 dark:text-zinc-100">
-              {organization.tier === "pro" ? "Pro Plan" : "Free Plan"}
+              {orgTier === "pro" ? "Pro Plan" : "Free Plan"}
             </dd>
           </div>
           <div className="flex justify-between">

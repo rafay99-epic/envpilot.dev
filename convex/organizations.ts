@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getTierLimits, isValidTier, Tier } from "./tierLimits";
+import { getTierLimits, getOrganizationTier, Tier } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 
 /**
@@ -124,7 +124,6 @@ export const create = mutation({
     logoUrl: v.optional(v.string()),
     createdBy: v.id("users"),
     workosOrgId: v.optional(v.string()),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Rate limit: prevent excessive org creation
@@ -134,7 +133,6 @@ export const create = mutation({
     });
 
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     // Check organization creation limits based on user's tier
     const userMemberships = await ctx.db
@@ -146,15 +144,15 @@ export const create = mutation({
     // Check if user has any Pro tier organizations
     let hasPro = false;
     for (const membership of userMemberships) {
-      const org = await ctx.db.get(membership.organizationId);
-      if (org?.tier === "pro") {
+      const tier = await getOrganizationTier(ctx.db, membership.organizationId);
+      if (tier === "pro") {
         hasPro = true;
         break;
       }
     }
 
     const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = getTierLimits(effectiveTier, enforce);
+    const limits = getTierLimits(effectiveTier);
 
     if (limits.maxOrganizations !== null) {
       if (userMemberships.length >= limits.maxOrganizations) {
@@ -178,11 +176,19 @@ export const create = mutation({
       slug: args.slug,
       description: args.description,
       logoUrl: args.logoUrl,
-      tier: "free",
       workosOrgId: args.workosOrgId,
       createdBy: args.createdBy,
       createdAt: now,
       updatedAt: now,
+    });
+
+    // Create tier record in the locked-down organizationTiers table
+    await ctx.db.insert("organizationTiers", {
+      organizationId,
+      tier: "free",
+      updatedAt: now,
+      updatedBy: args.createdBy,
+      reason: "org_created",
     });
 
     await ctx.db.insert("organizationMembers", {
@@ -241,62 +247,6 @@ export const update = mutation({
     });
 
     return organizationId;
-  },
-});
-
-/**
- * Update organization tier
- *
- * NOTE: In production, this should be called from a payment provider webhook
- * (e.g., Stripe) to ensure tier changes are properly authorized.
- * Direct calls should be restricted to internal/admin operations only.
- */
-export const updateTier = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-    tier: v.union(v.literal("free"), v.literal("pro")),
-    updatedBy: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    // Verify the user is an admin of the organization
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.updatedBy)
-      )
-      .first();
-
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only organization admins can update the tier");
-    }
-
-    const org = await ctx.db.get(args.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const previousTier = org.tier;
-
-    await ctx.db.patch(args.organizationId, {
-      tier: args.tier,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("auditLogs", {
-      organizationId: args.organizationId,
-      userId: args.updatedBy,
-      action: "org.updated",
-      details: JSON.stringify({
-        tier: args.tier,
-        previousTier,
-        action: "tier_change",
-      }),
-      createdAt: now,
-    });
-
-    return args.organizationId;
   },
 });
 
@@ -446,6 +396,17 @@ export const remove = mutation({
       await ctx.db.delete(sc._id);
     }
 
+    // Delete organization tier record
+    const tierRecord = await ctx.db
+      .query("organizationTiers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .first();
+    if (tierRecord) {
+      await ctx.db.delete(tierRecord._id);
+    }
+
     // Delete org members
     const members = await ctx.db
       .query("organizationMembers")
@@ -477,11 +438,9 @@ export const addMember = mutation({
       v.literal("member")
     ),
     invitedBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     // Check tier limits for adding team members
     const org = await ctx.db.get(args.organizationId);
@@ -489,7 +448,8 @@ export const addMember = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxTeamMembers !== null) {
       const currentMembers = await ctx.db
         .query("organizationMembers")
@@ -1144,11 +1104,9 @@ export const transferOwnership = mutation({
     organizationId: v.id("organizations"),
     targetUserId: v.id("users"),
     transferredBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
@@ -1181,8 +1139,9 @@ export const transferOwnership = mutation({
     }
 
     // Tier check
-    const limits = getTierLimits(org.tier, enforce);
-    if (limits.maxProjects !== null && org.tier !== "pro") {
+    const tier = await getOrganizationTier(ctx.db, args.organizationId);
+    const limits = getTierLimits(tier);
+    if (limits.maxProjects !== null && tier !== "pro") {
       throw new Error(
         "Organization must be on the Pro plan to transfer ownership"
       );

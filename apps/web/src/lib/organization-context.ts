@@ -7,7 +7,6 @@ export interface OrganizationWithMembershipRole {
   _id: string;
   name: string;
   slug: string;
-  tier: "free" | "pro";
   role: MembershipRole;
   createdAt: number;
   updatedAt: number;

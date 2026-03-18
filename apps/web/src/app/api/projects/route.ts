@@ -9,7 +9,6 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -150,7 +149,6 @@ export async function POST(request: Request) {
       icon,
       color,
       createdBy: convexUser._id,
-      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const project = await convex.query(api.projects.getById, {

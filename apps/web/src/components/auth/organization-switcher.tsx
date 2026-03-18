@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 
 interface Organization {
@@ -10,8 +13,19 @@ interface Organization {
   name: string;
   slug: string;
   logoUrl?: string;
-  tier: "free" | "pro";
   role: "admin" | "team_lead" | "member";
+}
+
+function OrgProBadge({ orgId }: { orgId: string }) {
+  const tierData = useQuery(api.tierLimits.getOrganizationLimits, {
+    organizationId: orgId as Id<"organizations">,
+  });
+  if (tierData?.tier !== "pro") return null;
+  return (
+    <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+      Pro
+    </span>
+  );
 }
 
 interface OrganizationSwitcherProps {
@@ -240,11 +254,7 @@ export function OrganizationSwitcher({
                     <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {org.name}
                     </p>
-                    {org.tier === "pro" && (
-                      <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        Pro
-                      </span>
-                    )}
+                    <OrgProBadge orgId={org._id} />
                   </div>
                   <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                     {formatRole(org.role)}

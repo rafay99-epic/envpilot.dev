@@ -1,7 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getTierLimits, MAX_BULK_IMPORT_SIZE } from "./tierLimits";
+import {
+  getTierLimits,
+  getOrganizationTier,
+  MAX_BULK_IMPORT_SIZE,
+} from "./tierLimits";
 import {
   createAuditLog,
   logVariableAccess,
@@ -562,11 +566,9 @@ export const create = mutation({
     projectId: v.id("projects"),
     isSensitive: v.optional(v.boolean()),
     createdBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
@@ -594,7 +596,8 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(ctx.db, project.organizationId);
+    const limits = getTierLimits(tier);
     if (limits.maxVariablesPerProject !== null) {
       const variableCount = await ctx.db
         .query("environmentVariables")
@@ -1110,11 +1113,9 @@ export const bulkCreate = mutation({
       })
     ),
     createdBy: v.id("users"),
-    enforceTierLimits: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const enforce = args.enforceTierLimits ?? true;
 
     // Enforce maximum bulk import size to prevent DoS
     if (args.variables.length > MAX_BULK_IMPORT_SIZE) {
@@ -1149,7 +1150,8 @@ export const bulkCreate = mutation({
       throw new Error("Organization not found");
     }
 
-    const limits = getTierLimits(org.tier, enforce);
+    const tier = await getOrganizationTier(ctx.db, project.organizationId);
+    const limits = getTierLimits(tier);
 
     // Check if bulk import is enabled for this tier
     if (!limits.bulkImportEnabled) {

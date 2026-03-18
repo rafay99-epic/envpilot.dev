@@ -6,7 +6,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { isFeatureEnabled, FEATURE_FLAGS } from "@/lib/feature-flags";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -65,22 +64,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Tier enforcement
-    if (isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS)) {
-      const org = await convex.query(api.organizations.getById, {
-        organizationId,
-      });
-
-      if (org?.tier !== "pro") {
-        return NextResponse.json(
-          {
-            error: "Organization must be on the Pro plan to transfer ownership",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
     // Look up target user by email
     const targetUser = await convex.query(api.users.getByEmail, {
       email: targetUserEmail,
@@ -110,7 +93,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       organizationId,
       targetUserId: targetUser._id,
       transferredBy: convexUser._id,
-      enforceTierLimits: isFeatureEnabled(FEATURE_FLAGS.TIER_LIMITS),
     });
 
     const orgName = org?.name || "the organization";

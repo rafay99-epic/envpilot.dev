@@ -47,10 +47,8 @@ export const useTierStore = create<TierStore>((set) => ({
   usage: null,
   isLoading: true,
   lastRefreshedAt: null,
-  enforcementEnabled:
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_ENFORCE_TIER_LIMITS === "true"
-      : false,
+  // Defaults to true; hydrated from server via api.tierLimits.isEnforcementEnabled
+  enforcementEnabled: true,
 
   setUsageData: (data) =>
     set({

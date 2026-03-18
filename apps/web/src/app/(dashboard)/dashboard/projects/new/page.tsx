@@ -8,7 +8,7 @@ import { PERMISSIONS } from "@/lib/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
-import { isTierEnforcementEnabled } from "@/lib/tier-limits";
+import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   PROJECT_ICONS,
@@ -26,7 +26,7 @@ export default function NewProjectPage() {
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const tierCheck = useTierLimitCheck(orgId, "create_project");
-  const enforcing = isTierEnforcementEnabled();
+  const enforcing = useEnforcementEnabled();
 
   const [step, setStep] = useState<"template" | "details">("template");
   const [selectedTemplate, setSelectedTemplate] =

@@ -92,15 +92,15 @@ export const VARIABLE_CATEGORIES: Record<
   TemplateVariableCategory,
   { label: string; icon: string }
 > = {
-  database: { label: "Database", icon: "🗄️" },
-  authentication: { label: "Authentication", icon: "🔐" },
-  api: { label: "API & Services", icon: "🔌" },
-  storage: { label: "Storage", icon: "📦" },
-  email: { label: "Email", icon: "📧" },
-  monitoring: { label: "Monitoring", icon: "📊" },
-  payment: { label: "Payment", icon: "💳" },
-  general: { label: "General", icon: "⚙️" },
-  deployment: { label: "Deployment", icon: "🚀" },
+  database: { label: "Database", icon: "database" },
+  authentication: { label: "Authentication", icon: "shield-check" },
+  api: { label: "API & Services", icon: "plug" },
+  storage: { label: "Storage", icon: "hard-drive" },
+  email: { label: "Email", icon: "mail" },
+  monitoring: { label: "Monitoring", icon: "bar-chart-3" },
+  payment: { label: "Payment", icon: "credit-card" },
+  general: { label: "General", icon: "settings" },
+  deployment: { label: "Deployment", icon: "rocket" },
 } as const;
 
 /**

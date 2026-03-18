@@ -2,10 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { usePagination } from "@/hooks";
-import { isTierEnforcementEnabled, TIER_LIMITS } from "@/lib/tier-limits";
+import { TIER_LIMITS } from "@/lib/tier-limits";
+import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 
 interface Organization {
@@ -14,9 +18,20 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  tier: "free" | "pro";
   role: "admin" | "team_lead" | "member";
   createdAt: number;
+}
+
+function OrgProBadge({ orgId }: { orgId: string }) {
+  const tierData = useQuery(api.tierLimits.getOrganizationLimits, {
+    organizationId: orgId as Id<"organizations">,
+  });
+  if (tierData?.tier !== "pro") return null;
+  return (
+    <span className="flex-shrink-0 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-400">
+      Pro
+    </span>
+  );
 }
 
 export default function OrganizationsPage() {
@@ -24,11 +39,19 @@ export default function OrganizationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const pagination = usePagination(organizations, { pageSize: 9 });
-  const enforcing = isTierEnforcementEnabled();
+  const enforcing = useEnforcementEnabled();
 
-  // Check if org creation is blocked (free tier: max 1 org)
+  // Check if org creation is blocked based on tier limits.
+  // Query the tier of the first owned org to determine effective limits.
   const ownedOrgs = organizations.filter((o) => o.role === "admin");
-  const hasPro = ownedOrgs.some((o) => o.tier === "pro");
+  const firstOwnedOrgId = ownedOrgs[0]?._id;
+  const firstOwnedOrgTier = useQuery(
+    api.tierLimits.getOrganizationLimits,
+    firstOwnedOrgId
+      ? { organizationId: firstOwnedOrgId as Id<"organizations"> }
+      : "skip"
+  );
+  const hasPro = firstOwnedOrgTier?.tier === "pro";
   const maxOrgs = hasPro
     ? TIER_LIMITS.pro.maxOrganizations
     : TIER_LIMITS.free.maxOrganizations;
@@ -144,11 +167,7 @@ export default function OrganizationsPage() {
                       <h3 className="truncate font-semibold text-zinc-100">
                         {org.name}
                       </h3>
-                      {org.tier === "pro" && (
-                        <span className="flex-shrink-0 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-400">
-                          Pro
-                        </span>
-                      )}
+                      <OrgProBadge orgId={org._id} />
                     </div>
                     <p className="mt-0.5 truncate text-sm text-zinc-500">
                       {org.slug}

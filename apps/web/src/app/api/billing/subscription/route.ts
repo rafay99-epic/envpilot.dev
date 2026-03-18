@@ -87,8 +87,13 @@ export async function GET(request: Request) {
       }
     );
 
+    // Get tier from organizationTiers table
+    const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
+      organizationId: organizationId as Id<"organizations">,
+    });
+
     return NextResponse.json({
-      tier: organization.tier,
+      tier: tierData?.tier ?? "free",
       subscription: subscription
         ? {
             status: subscription.status,

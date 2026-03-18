@@ -3,6 +3,9 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalCard,
   TerminalInput,
@@ -18,7 +21,6 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  tier: "free" | "pro";
   role: "admin" | "team_lead" | "member";
   settings?: {
     teamLeadsCanCreateProjects: boolean;
@@ -57,6 +59,15 @@ export default function OrganizationSettingsPage({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<OrgSettingsTab>("general");
+
+  // Look up tier from organizationTiers table
+  const tierData = useQuery(
+    api.tierLimits.getOrganizationLimits,
+    organization?._id
+      ? { organizationId: organization._id as Id<"organizations"> }
+      : "skip"
+  );
+  const orgTier = (tierData?.tier as "free" | "pro") ?? "free";
 
   const tabs: { id: OrgSettingsTab; label: string }[] = [
     { id: "general", label: "General" },
@@ -271,6 +282,7 @@ export default function OrganizationSettingsPage({
         {activeTab === "general" && (
           <GeneralOrgSettings
             organization={organization!}
+            orgTier={orgTier}
             name={name}
             setName={setName}
             description={description}
@@ -318,6 +330,7 @@ export default function OrganizationSettingsPage({
 
 function GeneralOrgSettings({
   organization,
+  orgTier,
   name,
   setName,
   description,
@@ -328,6 +341,7 @@ function GeneralOrgSettings({
   successMessage,
 }: {
   organization: Organization;
+  orgTier: "free" | "pro";
   name: string;
   setName: (v: string) => void;
   description: string;
@@ -411,10 +425,8 @@ function GeneralOrgSettings({
         <h2 className="text-base font-semibold text-zinc-100">Plan</h2>
         <div className="mt-4 flex items-start justify-between gap-4">
           <div>
-            <TerminalBadge
-              color={organization.tier === "pro" ? "green" : "zinc"}
-            >
-              {organization.tier === "pro" ? "Pro Plan" : "Free Plan"}
+            <TerminalBadge color={orgTier === "pro" ? "green" : "zinc"}>
+              {orgTier === "pro" ? "Pro Plan" : "Free Plan"}
             </TerminalBadge>
             <p className="mt-2 text-sm text-zinc-500">
               View your resource usage and available features on the Usage &amp;

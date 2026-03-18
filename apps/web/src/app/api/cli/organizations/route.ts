@@ -24,13 +24,22 @@ export async function GET(request: NextRequest) {
   try {
     const organizations = await getUserOrganizations(convex, authResult.userId);
 
+    // Get tiers for all organizations from organizationTiers table
+    const orgTiers = await Promise.all(
+      organizations.map((org) =>
+        convex.query(api.tierLimits.getOrganizationLimits, {
+          organizationId: org._id,
+        })
+      )
+    );
+
     return NextResponse.json({
       success: true,
-      data: organizations.map((org) => ({
+      data: organizations.map((org, index) => ({
         _id: org._id,
         name: org.name,
         slug: org.slug,
-        tier: org.tier,
+        tier: orgTiers[index]?.tier ?? "free",
         role: org.role,
         description: org.description,
         logoUrl: org.logoUrl,

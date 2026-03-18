@@ -28,13 +28,22 @@ export async function GET(request: Request) {
       (org): org is NonNullable<typeof org> => org !== null
     );
 
+    // Get tiers for all organizations from organizationTiers table
+    const orgTiers = await Promise.all(
+      validOrgs.map((org) =>
+        convex.query(api.tierLimits.getOrganizationLimits, {
+          organizationId: org!._id,
+        })
+      )
+    );
+
     return NextResponse.json({
       data: {
-        organizations: validOrgs.map((org) => ({
+        organizations: validOrgs.map((org, index) => ({
           _id: org!._id,
           name: org!.name,
           slug: org!.slug,
-          tier: org!.tier,
+          tier: orgTiers[index]?.tier ?? "free",
           role: org!.role || "member",
         })),
       },
