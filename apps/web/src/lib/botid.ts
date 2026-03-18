@@ -11,7 +11,7 @@ export async function verifyNotBot(): Promise<NextResponse | null> {
   if (verification.isBot) {
     return NextResponse.json(
       { error: "Access denied: bot detected" },
-      { status: 403 },
+      { status: 403 }
     );
   }
 

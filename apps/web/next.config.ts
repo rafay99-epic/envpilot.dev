@@ -48,5 +48,5 @@ export default withBotId(
         removeDebugLogging: true,
       },
     },
-  }),
+  })
 );
