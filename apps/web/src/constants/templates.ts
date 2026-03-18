@@ -43,6 +43,62 @@ export type TemplateVariableCategory =
   | "deployment";
 
 /**
+ * Template categories for organizing templates in the UI
+ */
+export type TemplateCategory =
+  | "frontend"
+  | "backend"
+  | "full-stack"
+  | "mobile"
+  | "database-baas"
+  | "devops"
+  | "analytics";
+
+/**
+ * Template category display information
+ */
+export const TEMPLATE_CATEGORIES: Record<
+  TemplateCategory,
+  { label: string; icon: string; description: string }
+> = {
+  frontend: {
+    label: "Frontend",
+    icon: "layout",
+    description: "SPAs and static sites",
+  },
+  backend: {
+    label: "Backend",
+    icon: "server",
+    description: "APIs and microservices",
+  },
+  "full-stack": {
+    label: "Full Stack",
+    icon: "layers",
+    description: "End-to-end frameworks",
+  },
+  mobile: {
+    label: "Mobile",
+    icon: "smartphone",
+    description: "iOS, Android, cross-platform",
+  },
+  "database-baas": {
+    label: "Database & BaaS",
+    icon: "database",
+    description: "Databases and backend services",
+  },
+  devops: {
+    label: "DevOps & Infra",
+    icon: "container",
+    description: "Docker, serverless, CI/CD",
+  },
+  analytics: {
+    label: "Analytics",
+    icon: "bar-chart-3",
+    description: "Monitoring and product analytics",
+  },
+};
+
+/**
  * Project type categories
  */
 export type ProjectType =
@@ -56,6 +112,28 @@ export type ProjectType =
   | "rails"
   | "laravel"
   | "fastapi"
+  | "nuxtjs"
+  | "sveltekit"
+  | "remix"
+  | "astro"
+  | "nestjs"
+  | "go"
+  | "rust"
+  | "spring"
+  | "supabase"
+  | "convex"
+  | "firebase"
+  | "appwrite"
+  | "postgresql"
+  | "redis"
+  | "mongodb"
+  | "docker"
+  | "flutter"
+  | "t3"
+  | "turborepo"
+  | "aws-lambda"
+  | "vercel"
+  | "posthog"
   | "custom";
 
 /**
@@ -71,7 +149,7 @@ export interface EnvironmentTemplate {
   description: string;
   /** The project type this template is designed for */
   projectType: ProjectType;
-  /** Icon for visual identification */
+  /** Icon for visual identification (Lucide icon name, used as fallback) */
   icon: string;
   /** Color for visual identification */
   color: string;
@@ -83,6 +161,10 @@ export interface EnvironmentTemplate {
   tags: string[];
   /** Whether this is a built-in template or user-created */
   isBuiltIn: boolean;
+  /** Template category for UI grouping */
+  category: TemplateCategory;
+  /** Whether this template is featured in the "Popular" section */
+  isPopular?: boolean;
 }
 
 /**
@@ -105,42 +187,73 @@ export const VARIABLE_CATEGORIES: Record<
 
 /**
  * Project type display information
+ * Icons are Lucide icon names used as fallback when SVGL logos fail to load
  */
 export const PROJECT_TYPES: Record<
   ProjectType,
   { label: string; icon: string; color: string }
 > = {
-  nextjs: { label: "Next.js", icon: "▲", color: "#000000" },
-  express: { label: "Express.js", icon: "⚡", color: "#000000" },
-  "react-native": { label: "React Native", icon: "📱", color: "#61DAFB" },
-  react: { label: "React", icon: "⚛️", color: "#61DAFB" },
-  nodejs: { label: "Node.js", icon: "🟢", color: "#339933" },
-  django: { label: "Django", icon: "🐍", color: "#092E20" },
-  flask: { label: "Flask", icon: "🧪", color: "#000000" },
-  rails: { label: "Ruby on Rails", icon: "💎", color: "#CC0000" },
-  laravel: { label: "Laravel", icon: "🔺", color: "#FF2D20" },
-  fastapi: { label: "FastAPI", icon: "⚡", color: "#009688" },
-  custom: { label: "Custom", icon: "🔧", color: "#6B7280" },
+  nextjs: { label: "Next.js", icon: "triangle", color: "#000000" },
+  express: { label: "Express.js", icon: "zap", color: "#000000" },
+  "react-native": {
+    label: "React Native",
+    icon: "smartphone",
+    color: "#61DAFB",
+  },
+  react: { label: "React", icon: "circle-dot", color: "#61DAFB" },
+  nodejs: { label: "Node.js", icon: "hexagon", color: "#339933" },
+  django: { label: "Django", icon: "code", color: "#092E20" },
+  flask: { label: "Flask", icon: "flask-conical", color: "#000000" },
+  rails: { label: "Ruby on Rails", icon: "diamond", color: "#CC0000" },
+  laravel: { label: "Laravel", icon: "triangle", color: "#FF2D20" },
+  fastapi: { label: "FastAPI", icon: "zap", color: "#009688" },
+  nuxtjs: { label: "Nuxt.js", icon: "triangle", color: "#00DC82" },
+  sveltekit: { label: "SvelteKit", icon: "flame", color: "#FF3E00" },
+  remix: { label: "Remix", icon: "disc", color: "#000000" },
+  astro: { label: "Astro", icon: "rocket", color: "#BC52EE" },
+  nestjs: { label: "NestJS", icon: "box", color: "#E0234E" },
+  go: { label: "Go", icon: "terminal", color: "#00ADD8" },
+  rust: { label: "Rust", icon: "cog", color: "#000000" },
+  spring: { label: "Spring Boot", icon: "leaf", color: "#6DB33F" },
+  supabase: { label: "Supabase", icon: "database", color: "#3FCF8E" },
+  convex: { label: "Convex", icon: "database", color: "#F3B01C" },
+  firebase: { label: "Firebase", icon: "flame", color: "#FFCA28" },
+  appwrite: { label: "Appwrite", icon: "box", color: "#FD366E" },
+  postgresql: { label: "PostgreSQL", icon: "database", color: "#4169E1" },
+  redis: { label: "Redis", icon: "database", color: "#DC382D" },
+  mongodb: { label: "MongoDB", icon: "database", color: "#47A248" },
+  docker: { label: "Docker", icon: "container", color: "#2496ED" },
+  flutter: { label: "Flutter", icon: "smartphone", color: "#02569B" },
+  t3: { label: "T3 Stack", icon: "layers", color: "#7C3AED" },
+  turborepo: { label: "Turborepo", icon: "wind", color: "#EF4444" },
+  "aws-lambda": { label: "AWS Lambda", icon: "cloud", color: "#FF9900" },
+  vercel: { label: "Vercel", icon: "triangle", color: "#000000" },
+  posthog: { label: "PostHog", icon: "bar-chart-3", color: "#1D4AFF" },
+  custom: { label: "Custom", icon: "wrench", color: "#6B7280" },
 } as const;
 
 /**
  * Built-in environment templates for common project types
  */
 export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
-  // Next.js Full Stack Template
+  // ==========================================
+  // FULL-STACK
+  // ==========================================
+
   {
     id: "nextjs-full-stack",
     name: "Next.js Full Stack",
     description:
       "Complete Next.js application with authentication, database, and common integrations",
     projectType: "nextjs",
-    icon: "▲",
+    icon: "triangle",
     color: "#000000",
     version: "14+",
     tags: ["nextjs", "react", "full-stack", "vercel", "prisma"],
     isBuiltIn: true,
+    category: "full-stack",
+    isPopular: true,
     variables: [
-      // Database
       {
         key: "DATABASE_URL",
         description: "Primary database connection string",
@@ -160,7 +273,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "database",
       },
-      // Authentication
       {
         key: "NEXTAUTH_URL",
         description: "Canonical URL of your application",
@@ -198,7 +310,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "authentication",
       },
-      // API
       {
         key: "NEXT_PUBLIC_API_URL",
         description: "Public API base URL",
@@ -209,7 +320,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "api",
       },
-      // General
       {
         key: "NODE_ENV",
         description: "Node.js environment mode",
@@ -223,20 +333,19 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
     ],
   },
 
-  // Next.js with Vercel Template
   {
     id: "nextjs-vercel",
     name: "Next.js + Vercel",
     description:
       "Next.js optimized for Vercel deployment with KV, Postgres, and Blob storage",
     projectType: "nextjs",
-    icon: "▲",
+    icon: "triangle",
     color: "#000000",
     version: "14+",
     tags: ["nextjs", "vercel", "kv", "postgres", "blob"],
     isBuiltIn: true,
+    category: "full-stack",
     variables: [
-      // Vercel Postgres
       {
         key: "POSTGRES_URL",
         description: "Vercel Postgres connection string",
@@ -264,7 +373,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "database",
       },
-      // Vercel KV
       {
         key: "KV_URL",
         description: "Vercel KV Redis connection URL",
@@ -292,7 +400,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "database",
       },
-      // Vercel Blob
       {
         key: "BLOB_READ_WRITE_TOKEN",
         description: "Vercel Blob storage read/write token",
@@ -302,7 +409,6 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         isRequired: false,
         category: "storage",
       },
-      // Authentication
       {
         key: "AUTH_SECRET",
         description: "Auth.js (NextAuth v5) secret",
@@ -315,43 +421,22 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
     ],
   },
 
-  // Express.js API Template
   {
-    id: "express-api",
-    name: "Express.js API",
+    id: "t3-stack",
+    name: "T3 Stack",
     description:
-      "REST API built with Express.js including database and authentication",
-    projectType: "express",
-    icon: "⚡",
-    color: "#000000",
-    tags: ["express", "nodejs", "api", "rest", "backend"],
+      "Next.js + tRPC + Prisma + NextAuth -- the full typesafe stack",
+    projectType: "t3",
+    icon: "layers",
+    color: "#7C3AED",
+    tags: ["t3", "nextjs", "trpc", "prisma", "nextauth", "typescript"],
     isBuiltIn: true,
+    category: "full-stack",
+    isPopular: true,
     variables: [
-      // Server
-      {
-        key: "PORT",
-        description: "Server port number",
-        defaultValue: "3000",
-        placeholder: "3000",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "NODE_ENV",
-        description: "Node.js environment mode",
-        defaultValue: "development",
-        placeholder: "development | staging | production",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      // Database
       {
         key: "DATABASE_URL",
-        description: "Primary database connection string",
+        description: "Prisma database connection string",
         placeholder: "postgresql://user:password@host:5432/dbname",
         environments: ["development", "staging", "production"],
         isSensitive: true,
@@ -359,412 +444,8 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         category: "database",
       },
       {
-        key: "REDIS_URL",
-        description: "Redis connection URL for caching/sessions",
-        placeholder: "redis://localhost:6379",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "database",
-      },
-      // Authentication
-      {
-        key: "JWT_SECRET",
-        description: "Secret key for JWT token signing",
-        placeholder: "your-jwt-secret-key",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: true,
-        category: "authentication",
-      },
-      {
-        key: "JWT_EXPIRES_IN",
-        description: "JWT token expiration time",
-        defaultValue: "7d",
-        placeholder: "7d | 24h | 3600s",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "authentication",
-      },
-      // API
-      {
-        key: "CORS_ORIGIN",
-        description: "Allowed CORS origins",
-        defaultValue: "http://localhost:3000",
-        placeholder: "https://your-frontend.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "api",
-      },
-      {
-        key: "API_RATE_LIMIT",
-        description: "Maximum requests per minute",
-        defaultValue: "100",
-        placeholder: "100",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "api",
-      },
-    ],
-  },
-
-  // React Native Mobile App Template
-  {
-    id: "react-native-app",
-    name: "React Native App",
-    description:
-      "Mobile application with common services and push notifications",
-    projectType: "react-native",
-    icon: "📱",
-    color: "#61DAFB",
-    tags: ["react-native", "mobile", "ios", "android", "expo"],
-    isBuiltIn: true,
-    variables: [
-      // API
-      {
-        key: "API_BASE_URL",
-        description: "Backend API base URL",
-        defaultValue: "http://localhost:3000/api",
-        placeholder: "https://api.your-app.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "api",
-      },
-      // Firebase
-      {
-        key: "FIREBASE_API_KEY",
-        description: "Firebase API key",
-        placeholder: "AIza...",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "api",
-      },
-      {
-        key: "FIREBASE_AUTH_DOMAIN",
-        description: "Firebase auth domain",
-        placeholder: "your-app.firebaseapp.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "authentication",
-      },
-      {
-        key: "FIREBASE_PROJECT_ID",
-        description: "Firebase project ID",
-        placeholder: "your-firebase-project",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "api",
-      },
-      {
-        key: "FIREBASE_STORAGE_BUCKET",
-        description: "Firebase storage bucket",
-        placeholder: "your-app.appspot.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "storage",
-      },
-      {
-        key: "FIREBASE_MESSAGING_SENDER_ID",
-        description: "Firebase Cloud Messaging sender ID",
-        placeholder: "123456789",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "api",
-      },
-      // App Config
-      {
-        key: "APP_ENV",
-        description: "Application environment",
-        defaultValue: "development",
-        placeholder: "development | staging | production",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      // Analytics
-      {
-        key: "SENTRY_DSN",
-        description: "Sentry error tracking DSN",
-        placeholder: "https://...@sentry.io/...",
-        environments: ["staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "monitoring",
-      },
-    ],
-  },
-
-  // React SPA Template
-  {
-    id: "react-spa",
-    name: "React SPA",
-    description: "Single Page Application with Vite and common integrations",
-    projectType: "react",
-    icon: "⚛️",
-    color: "#61DAFB",
-    tags: ["react", "vite", "spa", "frontend"],
-    isBuiltIn: true,
-    variables: [
-      // API
-      {
-        key: "VITE_API_URL",
-        description: "Backend API URL (Vite public env)",
-        defaultValue: "http://localhost:3001/api",
-        placeholder: "https://api.your-app.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "api",
-      },
-      {
-        key: "VITE_APP_NAME",
-        description: "Application name for display",
-        defaultValue: "My React App",
-        placeholder: "Your App Name",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "general",
-      },
-      // Authentication
-      {
-        key: "VITE_AUTH0_DOMAIN",
-        description: "Auth0 tenant domain",
-        placeholder: "your-tenant.auth0.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "authentication",
-      },
-      {
-        key: "VITE_AUTH0_CLIENT_ID",
-        description: "Auth0 application client ID",
-        placeholder: "your-client-id",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "authentication",
-      },
-      // Analytics
-      {
-        key: "VITE_GA_TRACKING_ID",
-        description: "Google Analytics tracking ID",
-        placeholder: "G-XXXXXXXXXX",
-        environments: ["production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "monitoring",
-      },
-      // Feature Flags
-      {
-        key: "VITE_ENABLE_DEBUG",
-        description: "Enable debug mode",
-        defaultValue: "true",
-        placeholder: "true | false",
-        environments: ["development"],
-        isSensitive: false,
-        isRequired: false,
-        category: "general",
-      },
-    ],
-  },
-
-  // Node.js Generic Template
-  {
-    id: "nodejs-generic",
-    name: "Node.js Generic",
-    description: "Basic Node.js application with essential configuration",
-    projectType: "nodejs",
-    icon: "🟢",
-    color: "#339933",
-    tags: ["nodejs", "backend", "javascript"],
-    isBuiltIn: true,
-    variables: [
-      {
-        key: "NODE_ENV",
-        description: "Node.js environment mode",
-        defaultValue: "development",
-        placeholder: "development | staging | production",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "PORT",
-        description: "Application port",
-        defaultValue: "3000",
-        placeholder: "3000",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "LOG_LEVEL",
-        description: "Logging verbosity level",
-        defaultValue: "info",
-        placeholder: "debug | info | warn | error",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "general",
-      },
-      {
-        key: "DATABASE_URL",
-        description: "Database connection string",
-        placeholder: "postgresql://user:password@host:5432/dbname",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "database",
-      },
-    ],
-  },
-
-  // Django Template
-  {
-    id: "django-web",
-    name: "Django Web App",
-    description:
-      "Django application with database, caching, and common services",
-    projectType: "django",
-    icon: "🐍",
-    color: "#092E20",
-    tags: ["django", "python", "web", "backend"],
-    isBuiltIn: true,
-    variables: [
-      {
-        key: "DJANGO_SECRET_KEY",
-        description: "Django secret key for cryptographic signing",
-        placeholder: "your-super-secret-key",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "DJANGO_DEBUG",
-        description: "Enable Django debug mode",
-        defaultValue: "True",
-        placeholder: "True | False",
-        environments: ["development"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "DJANGO_ALLOWED_HOSTS",
-        description: "Comma-separated list of allowed hosts",
-        defaultValue: "localhost,127.0.0.1",
-        placeholder: "localhost,your-domain.com",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "DATABASE_URL",
-        description: "Database connection URL (dj-database-url format)",
-        placeholder: "postgres://user:pass@localhost:5432/dbname",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: true,
-        category: "database",
-      },
-      {
-        key: "REDIS_URL",
-        description: "Redis URL for caching and Celery",
-        placeholder: "redis://localhost:6379/0",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "database",
-      },
-      {
-        key: "AWS_ACCESS_KEY_ID",
-        description: "AWS access key for S3 storage",
-        placeholder: "AKIA...",
-        environments: ["staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "storage",
-      },
-      {
-        key: "AWS_SECRET_ACCESS_KEY",
-        description: "AWS secret key for S3 storage",
-        placeholder: "your-secret-key",
-        environments: ["staging", "production"],
-        isSensitive: true,
-        isRequired: false,
-        category: "storage",
-      },
-      {
-        key: "AWS_STORAGE_BUCKET_NAME",
-        description: "S3 bucket name for file storage",
-        placeholder: "your-bucket-name",
-        environments: ["staging", "production"],
-        isSensitive: false,
-        isRequired: false,
-        category: "storage",
-      },
-    ],
-  },
-
-  // FastAPI Template
-  {
-    id: "fastapi-api",
-    name: "FastAPI API",
-    description:
-      "Modern Python API with FastAPI, async database, and authentication",
-    projectType: "fastapi",
-    icon: "⚡",
-    color: "#009688",
-    tags: ["fastapi", "python", "api", "async"],
-    isBuiltIn: true,
-    variables: [
-      {
-        key: "APP_ENV",
-        description: "Application environment",
-        defaultValue: "development",
-        placeholder: "development | staging | production",
-        environments: ["development", "staging", "production"],
-        isSensitive: false,
-        isRequired: true,
-        category: "general",
-      },
-      {
-        key: "DEBUG",
-        description: "Enable debug mode",
-        defaultValue: "true",
-        placeholder: "true | false",
-        environments: ["development"],
-        isSensitive: false,
-        isRequired: false,
-        category: "general",
-      },
-      {
-        key: "DATABASE_URL",
-        description: "Async database connection string",
-        placeholder: "postgresql+asyncpg://user:pass@localhost:5432/dbname",
-        environments: ["development", "staging", "production"],
-        isSensitive: true,
-        isRequired: true,
-        category: "database",
-      },
-      {
-        key: "SECRET_KEY",
-        description: "Application secret key",
+        key: "NEXTAUTH_SECRET",
+        description: "NextAuth.js secret for session encryption",
         placeholder: "your-secret-key-min-32-chars",
         environments: ["development", "staging", "production"],
         isSensitive: true,
@@ -772,39 +453,208 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
         category: "authentication",
       },
       {
-        key: "ACCESS_TOKEN_EXPIRE_MINUTES",
-        description: "JWT access token expiration in minutes",
-        defaultValue: "30",
-        placeholder: "30",
+        key: "NEXTAUTH_URL",
+        description: "Canonical URL of your app",
+        defaultValue: "http://localhost:3000",
+        placeholder: "https://your-app.vercel.app",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "DISCORD_CLIENT_ID",
+        description: "Discord OAuth client ID",
+        placeholder: "123456789",
         environments: ["development", "staging", "production"],
         isSensitive: false,
         isRequired: false,
         category: "authentication",
       },
       {
-        key: "CORS_ORIGINS",
-        description: "Allowed CORS origins (JSON array)",
-        defaultValue: '["http://localhost:3000"]',
-        placeholder: '["https://your-frontend.com"]',
+        key: "DISCORD_CLIENT_SECRET",
+        description: "Discord OAuth client secret",
+        placeholder: "your-discord-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "NODE_ENV",
+        description: "Node.js environment mode",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+    ],
+  },
+
+  {
+    id: "nuxtjs-app",
+    name: "Nuxt.js App",
+    description:
+      "Full-stack Vue.js framework with auto-imports and file-based routing",
+    projectType: "nuxtjs",
+    icon: "triangle",
+    color: "#00DC82",
+    version: "3+",
+    tags: ["nuxtjs", "vue", "full-stack", "ssr"],
+    isBuiltIn: true,
+    category: "full-stack",
+    variables: [
+      {
+        key: "NUXT_PUBLIC_API_BASE",
+        description: "Public API base URL",
+        defaultValue: "http://localhost:3000/api",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "NUXT_SESSION_SECRET",
+        description: "Session encryption secret",
+        placeholder: "your-session-secret-min-32-chars",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "NUXT_PUBLIC_APP_NAME",
+        description: "Public application name",
+        defaultValue: "My Nuxt App",
+        placeholder: "Your App Name",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+    ],
+  },
+
+  {
+    id: "sveltekit-app",
+    name: "SvelteKit App",
+    description:
+      "Full-stack Svelte framework with server-side rendering and API routes",
+    projectType: "sveltekit",
+    icon: "flame",
+    color: "#FF3E00",
+    tags: ["sveltekit", "svelte", "full-stack", "ssr", "vite"],
+    isBuiltIn: true,
+    category: "full-stack",
+    isPopular: true,
+    variables: [
+      {
+        key: "DATABASE_URL",
+        description: "Database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "AUTH_SECRET",
+        description: "Authentication secret key",
+        placeholder: "your-auth-secret-min-32-chars",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "PUBLIC_API_URL",
+        description: "Public API base URL",
+        defaultValue: "http://localhost:5173/api",
+        placeholder: "https://api.your-app.com",
         environments: ["development", "staging", "production"],
         isSensitive: false,
         isRequired: false,
         category: "api",
       },
+      {
+        key: "ORIGIN",
+        description: "Application origin for CSRF protection",
+        defaultValue: "http://localhost:5173",
+        placeholder: "https://your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
     ],
   },
 
-  // Ruby on Rails Template
+  {
+    id: "remix-app",
+    name: "Remix App",
+    description:
+      "Full-stack web framework focused on web standards and modern UX",
+    projectType: "remix",
+    icon: "disc",
+    color: "#000000",
+    tags: ["remix", "react", "full-stack", "ssr"],
+    isBuiltIn: true,
+    category: "full-stack",
+    variables: [
+      {
+        key: "DATABASE_URL",
+        description: "Database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "SESSION_SECRET",
+        description: "Cookie session secret",
+        placeholder: "your-session-secret-min-32-chars",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "NODE_ENV",
+        description: "Node.js environment mode",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+    ],
+  },
+
   {
     id: "rails-web",
     name: "Ruby on Rails",
     description:
       "Full Rails application with common services and deployment config",
     projectType: "rails",
-    icon: "💎",
+    icon: "diamond",
     color: "#CC0000",
     tags: ["rails", "ruby", "web", "full-stack"],
     isBuiltIn: true,
+    category: "full-stack",
     variables: [
       {
         key: "RAILS_ENV",
@@ -865,17 +715,17 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
     ],
   },
 
-  // Laravel Template
   {
     id: "laravel-web",
     name: "Laravel Web App",
     description:
       "Laravel application with queue, mail, and storage configuration",
     projectType: "laravel",
-    icon: "🔺",
+    icon: "triangle",
     color: "#FF2D20",
     tags: ["laravel", "php", "web", "full-stack"],
     isBuiltIn: true,
+    category: "full-stack",
     variables: [
       {
         key: "APP_NAME",
@@ -1014,6 +864,1574 @@ export const BUILT_IN_TEMPLATES: EnvironmentTemplate[] = [
       },
     ],
   },
+
+  // ==========================================
+  // FRONTEND
+  // ==========================================
+
+  {
+    id: "react-spa",
+    name: "React SPA",
+    description: "Single Page Application with Vite and common integrations",
+    projectType: "react",
+    icon: "circle-dot",
+    color: "#61DAFB",
+    tags: ["react", "vite", "spa", "frontend"],
+    isBuiltIn: true,
+    category: "frontend",
+    variables: [
+      {
+        key: "VITE_API_URL",
+        description: "Backend API URL (Vite public env)",
+        defaultValue: "http://localhost:3001/api",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "VITE_APP_NAME",
+        description: "Application name for display",
+        defaultValue: "My React App",
+        placeholder: "Your App Name",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+      {
+        key: "VITE_AUTH0_DOMAIN",
+        description: "Auth0 tenant domain",
+        placeholder: "your-tenant.auth0.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "VITE_AUTH0_CLIENT_ID",
+        description: "Auth0 application client ID",
+        placeholder: "your-client-id",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "VITE_GA_TRACKING_ID",
+        description: "Google Analytics tracking ID",
+        placeholder: "G-XXXXXXXXXX",
+        environments: ["production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "monitoring",
+      },
+      {
+        key: "VITE_ENABLE_DEBUG",
+        description: "Enable debug mode",
+        defaultValue: "true",
+        placeholder: "true | false",
+        environments: ["development"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+    ],
+  },
+
+  {
+    id: "astro-site",
+    name: "Astro Site",
+    description:
+      "Content-focused static site with optional server-side rendering",
+    projectType: "astro",
+    icon: "rocket",
+    color: "#BC52EE",
+    tags: ["astro", "static", "content", "ssg", "ssr"],
+    isBuiltIn: true,
+    category: "frontend",
+    variables: [
+      {
+        key: "PUBLIC_SITE_URL",
+        description: "Public site URL",
+        defaultValue: "http://localhost:4321",
+        placeholder: "https://your-site.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "PUBLIC_API_URL",
+        description: "Public API URL for client-side fetches",
+        placeholder: "https://api.your-site.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "CMS_API_KEY",
+        description: "Headless CMS API key",
+        placeholder: "your-cms-api-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "PUBLIC_GA_TRACKING_ID",
+        description: "Google Analytics tracking ID",
+        placeholder: "G-XXXXXXXXXX",
+        environments: ["production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "monitoring",
+      },
+    ],
+  },
+
+  // ==========================================
+  // BACKEND
+  // ==========================================
+
+  {
+    id: "express-api",
+    name: "Express.js API",
+    description:
+      "REST API built with Express.js including database and authentication",
+    projectType: "express",
+    icon: "zap",
+    color: "#000000",
+    tags: ["express", "nodejs", "api", "rest", "backend"],
+    isBuiltIn: true,
+    category: "backend",
+    isPopular: true,
+    variables: [
+      {
+        key: "PORT",
+        description: "Server port number",
+        defaultValue: "3000",
+        placeholder: "3000",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "NODE_ENV",
+        description: "Node.js environment mode",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Primary database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "REDIS_URL",
+        description: "Redis connection URL for caching/sessions",
+        placeholder: "redis://localhost:6379",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "JWT_SECRET",
+        description: "Secret key for JWT token signing",
+        placeholder: "your-jwt-secret-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "JWT_EXPIRES_IN",
+        description: "JWT token expiration time",
+        defaultValue: "7d",
+        placeholder: "7d | 24h | 3600s",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "CORS_ORIGIN",
+        description: "Allowed CORS origins",
+        defaultValue: "http://localhost:3000",
+        placeholder: "https://your-frontend.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "API_RATE_LIMIT",
+        description: "Maximum requests per minute",
+        defaultValue: "100",
+        placeholder: "100",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+    ],
+  },
+
+  {
+    id: "nestjs-api",
+    name: "NestJS API",
+    description:
+      "Progressive Node.js framework with TypeScript, DI, and modular architecture",
+    projectType: "nestjs",
+    icon: "box",
+    color: "#E0234E",
+    tags: ["nestjs", "nodejs", "typescript", "api", "backend"],
+    isBuiltIn: true,
+    category: "backend",
+    isPopular: true,
+    variables: [
+      {
+        key: "PORT",
+        description: "Server port number",
+        defaultValue: "3000",
+        placeholder: "3000",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "NODE_ENV",
+        description: "Node.js environment mode",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "TypeORM/Prisma database connection",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "JWT_SECRET",
+        description: "JWT signing secret for Passport.js",
+        placeholder: "your-jwt-secret-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "JWT_EXPIRATION",
+        description: "JWT token TTL",
+        defaultValue: "3600s",
+        placeholder: "3600s | 7d",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "REDIS_HOST",
+        description: "Redis host for caching/queues",
+        defaultValue: "localhost",
+        placeholder: "localhost",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "REDIS_PORT",
+        description: "Redis port",
+        defaultValue: "6379",
+        placeholder: "6379",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "database",
+      },
+    ],
+  },
+
+  {
+    id: "nodejs-generic",
+    name: "Node.js Generic",
+    description: "Basic Node.js application with essential configuration",
+    projectType: "nodejs",
+    icon: "hexagon",
+    color: "#339933",
+    tags: ["nodejs", "backend", "javascript"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "NODE_ENV",
+        description: "Node.js environment mode",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "PORT",
+        description: "Application port",
+        defaultValue: "3000",
+        placeholder: "3000",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "LOG_LEVEL",
+        description: "Logging verbosity level",
+        defaultValue: "info",
+        placeholder: "debug | info | warn | error",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+    ],
+  },
+
+  {
+    id: "django-web",
+    name: "Django Web App",
+    description:
+      "Django application with database, caching, and common services",
+    projectType: "django",
+    icon: "code",
+    color: "#092E20",
+    tags: ["django", "python", "web", "backend"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "DJANGO_SECRET_KEY",
+        description: "Django secret key for cryptographic signing",
+        placeholder: "your-super-secret-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DJANGO_DEBUG",
+        description: "Enable Django debug mode",
+        defaultValue: "True",
+        placeholder: "True | False",
+        environments: ["development"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DJANGO_ALLOWED_HOSTS",
+        description: "Comma-separated list of allowed hosts",
+        defaultValue: "localhost,127.0.0.1",
+        placeholder: "localhost,your-domain.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Database connection URL (dj-database-url format)",
+        placeholder: "postgres://user:pass@localhost:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "REDIS_URL",
+        description: "Redis URL for caching and Celery",
+        placeholder: "redis://localhost:6379/0",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "AWS_ACCESS_KEY_ID",
+        description: "AWS access key for S3 storage",
+        placeholder: "AKIA...",
+        environments: ["staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "storage",
+      },
+      {
+        key: "AWS_SECRET_ACCESS_KEY",
+        description: "AWS secret key for S3 storage",
+        placeholder: "your-secret-key",
+        environments: ["staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "storage",
+      },
+      {
+        key: "AWS_STORAGE_BUCKET_NAME",
+        description: "S3 bucket name for file storage",
+        placeholder: "your-bucket-name",
+        environments: ["staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "storage",
+      },
+    ],
+  },
+
+  {
+    id: "fastapi-api",
+    name: "FastAPI API",
+    description:
+      "Modern Python API with FastAPI, async database, and authentication",
+    projectType: "fastapi",
+    icon: "zap",
+    color: "#009688",
+    tags: ["fastapi", "python", "api", "async"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "APP_ENV",
+        description: "Application environment",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DEBUG",
+        description: "Enable debug mode",
+        defaultValue: "true",
+        placeholder: "true | false",
+        environments: ["development"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Async database connection string",
+        placeholder: "postgresql+asyncpg://user:pass@localhost:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "SECRET_KEY",
+        description: "Application secret key",
+        placeholder: "your-secret-key-min-32-chars",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "ACCESS_TOKEN_EXPIRE_MINUTES",
+        description: "JWT access token expiration in minutes",
+        defaultValue: "30",
+        placeholder: "30",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "CORS_ORIGINS",
+        description: "Allowed CORS origins (JSON array)",
+        defaultValue: '["http://localhost:3000"]',
+        placeholder: '["https://your-frontend.com"]',
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+    ],
+  },
+
+  {
+    id: "go-api",
+    name: "Go API (Gin)",
+    description: "High-performance REST API with Go and the Gin framework",
+    projectType: "go",
+    icon: "terminal",
+    color: "#00ADD8",
+    tags: ["go", "golang", "gin", "api", "backend"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "PORT",
+        description: "Server port",
+        defaultValue: "8080",
+        placeholder: "8080",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "GIN_MODE",
+        description: "Gin framework mode",
+        defaultValue: "debug",
+        placeholder: "debug | release | test",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "PostgreSQL connection string",
+        placeholder:
+          "postgres://user:pass@localhost:5432/dbname?sslmode=disable",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "REDIS_URL",
+        description: "Redis connection URL",
+        placeholder: "redis://localhost:6379",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "JWT_SECRET",
+        description: "JWT signing key",
+        placeholder: "your-jwt-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+    ],
+  },
+
+  {
+    id: "rust-api",
+    name: "Rust API (Actix)",
+    description: "Blazing-fast web API with Rust and Actix Web",
+    projectType: "rust",
+    icon: "cog",
+    color: "#000000",
+    tags: ["rust", "actix", "api", "backend", "performance"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "HOST",
+        description: "Server bind address",
+        defaultValue: "127.0.0.1",
+        placeholder: "0.0.0.0",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "PORT",
+        description: "Server port",
+        defaultValue: "8080",
+        placeholder: "8080",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "PostgreSQL connection string (diesel/sqlx)",
+        placeholder: "postgres://user:pass@localhost:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "RUST_LOG",
+        description: "Logging filter directive",
+        defaultValue: "info",
+        placeholder: "debug | info | warn | error",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+      {
+        key: "JWT_SECRET",
+        description: "JWT signing secret",
+        placeholder: "your-jwt-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+    ],
+  },
+
+  {
+    id: "spring-boot-api",
+    name: "Spring Boot API",
+    description: "Enterprise Java/Kotlin API with Spring Boot and JPA",
+    projectType: "spring",
+    icon: "leaf",
+    color: "#6DB33F",
+    tags: ["spring", "java", "kotlin", "api", "enterprise"],
+    isBuiltIn: true,
+    category: "backend",
+    variables: [
+      {
+        key: "SERVER_PORT",
+        description: "Server port",
+        defaultValue: "8080",
+        placeholder: "8080",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "SPRING_PROFILES_ACTIVE",
+        description: "Active Spring profiles",
+        defaultValue: "dev",
+        placeholder: "dev | staging | prod",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "SPRING_DATASOURCE_URL",
+        description: "JDBC database URL",
+        placeholder: "jdbc:postgresql://localhost:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "SPRING_DATASOURCE_USERNAME",
+        description: "Database username",
+        placeholder: "postgres",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "SPRING_DATASOURCE_PASSWORD",
+        description: "Database password",
+        placeholder: "your-password",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "JWT_SECRET",
+        description: "JWT signing secret",
+        placeholder: "your-jwt-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+    ],
+  },
+
+  // ==========================================
+  // MOBILE
+  // ==========================================
+
+  {
+    id: "react-native-app",
+    name: "React Native App",
+    description:
+      "Mobile application with common services and push notifications",
+    projectType: "react-native",
+    icon: "smartphone",
+    color: "#61DAFB",
+    tags: ["react-native", "mobile", "ios", "android", "expo"],
+    isBuiltIn: true,
+    category: "mobile",
+    variables: [
+      {
+        key: "API_BASE_URL",
+        description: "Backend API base URL",
+        defaultValue: "http://localhost:3000/api",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_API_KEY",
+        description: "Firebase API key",
+        placeholder: "AIza...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_AUTH_DOMAIN",
+        description: "Firebase auth domain",
+        placeholder: "your-app.firebaseapp.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "authentication",
+      },
+      {
+        key: "FIREBASE_PROJECT_ID",
+        description: "Firebase project ID",
+        placeholder: "your-firebase-project",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_STORAGE_BUCKET",
+        description: "Firebase storage bucket",
+        placeholder: "your-app.appspot.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "storage",
+      },
+      {
+        key: "FIREBASE_MESSAGING_SENDER_ID",
+        description: "Firebase Cloud Messaging sender ID",
+        placeholder: "123456789",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "APP_ENV",
+        description: "Application environment",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "SENTRY_DSN",
+        description: "Sentry error tracking DSN",
+        placeholder: "https://...@sentry.io/...",
+        environments: ["staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "monitoring",
+      },
+    ],
+  },
+
+  {
+    id: "react-native-firebase",
+    name: "React Native + Firebase",
+    description: "React Native mobile app with full Firebase integration",
+    projectType: "react-native",
+    icon: "smartphone",
+    color: "#FFCA28",
+    tags: ["react-native", "firebase", "mobile", "auth", "firestore"],
+    isBuiltIn: true,
+    category: "mobile",
+    variables: [
+      {
+        key: "API_BASE_URL",
+        description: "Backend API base URL",
+        defaultValue: "http://localhost:3000/api",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_API_KEY",
+        description: "Firebase API key",
+        placeholder: "AIza...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_AUTH_DOMAIN",
+        description: "Firebase auth domain",
+        placeholder: "your-app.firebaseapp.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "FIREBASE_PROJECT_ID",
+        description: "Firebase project ID",
+        placeholder: "your-firebase-project",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_STORAGE_BUCKET",
+        description: "Firebase storage bucket",
+        placeholder: "your-app.appspot.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "storage",
+      },
+      {
+        key: "FIREBASE_MESSAGING_SENDER_ID",
+        description: "Firebase Cloud Messaging sender ID",
+        placeholder: "123456789",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_APP_ID",
+        description: "Firebase app ID",
+        placeholder: "1:123456789:web:abc123",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "GOOGLE_SERVICES_JSON",
+        description: "Path to google-services.json (Android)",
+        defaultValue: "./google-services.json",
+        placeholder: "./google-services.json",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+    ],
+  },
+
+  {
+    id: "react-native-supabase",
+    name: "React Native + Supabase",
+    description: "React Native mobile app with Supabase backend",
+    projectType: "react-native",
+    icon: "smartphone",
+    color: "#3FCF8E",
+    tags: ["react-native", "supabase", "mobile", "auth", "postgres"],
+    isBuiltIn: true,
+    category: "mobile",
+    variables: [
+      {
+        key: "SUPABASE_URL",
+        description: "Supabase project URL",
+        placeholder: "https://your-project.supabase.co",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "SUPABASE_ANON_KEY",
+        description: "Supabase anonymous/public key",
+        placeholder: "eyJ...",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "API_BASE_URL",
+        description: "Custom backend API URL (if any)",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "APP_ENV",
+        description: "Application environment",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "SENTRY_DSN",
+        description: "Sentry error tracking DSN",
+        placeholder: "https://...@sentry.io/...",
+        environments: ["staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "monitoring",
+      },
+    ],
+  },
+
+  {
+    id: "flutter-app",
+    name: "Flutter App",
+    description: "Cross-platform mobile and web app with Dart and Flutter",
+    projectType: "flutter",
+    icon: "smartphone",
+    color: "#02569B",
+    tags: ["flutter", "dart", "mobile", "ios", "android", "cross-platform"],
+    isBuiltIn: true,
+    category: "mobile",
+    isPopular: true,
+    variables: [
+      {
+        key: "API_BASE_URL",
+        description: "Backend API base URL",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_API_KEY",
+        description: "Firebase API key (if using Firebase)",
+        placeholder: "AIza...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_PROJECT_ID",
+        description: "Firebase project ID",
+        placeholder: "your-firebase-project",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "APP_ENV",
+        description: "Application environment",
+        defaultValue: "development",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "SENTRY_DSN",
+        description: "Sentry error tracking DSN",
+        placeholder: "https://...@sentry.io/...",
+        environments: ["staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "monitoring",
+      },
+    ],
+  },
+
+  // ==========================================
+  // DATABASE & BaaS
+  // ==========================================
+
+  {
+    id: "supabase-project",
+    name: "Supabase Project",
+    description:
+      "Open-source Firebase alternative with Postgres, Auth, and Realtime",
+    projectType: "supabase",
+    icon: "database",
+    color: "#3FCF8E",
+    tags: ["supabase", "postgres", "auth", "realtime", "baas"],
+    isBuiltIn: true,
+    category: "database-baas",
+    isPopular: true,
+    variables: [
+      {
+        key: "SUPABASE_URL",
+        description: "Supabase project URL",
+        placeholder: "https://your-project.supabase.co",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "SUPABASE_ANON_KEY",
+        description: "Supabase anonymous/public key",
+        placeholder: "eyJ...",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "SUPABASE_SERVICE_ROLE_KEY",
+        description: "Supabase service role key (server-side only)",
+        placeholder: "eyJ...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "SUPABASE_DB_URL",
+        description: "Direct Postgres connection string",
+        placeholder:
+          "postgresql://postgres:password@db.your-project.supabase.co:5432/postgres",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "SUPABASE_JWT_SECRET",
+        description: "JWT secret for custom token verification",
+        placeholder: "your-jwt-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "authentication",
+      },
+    ],
+  },
+
+  {
+    id: "convex-project",
+    name: "Convex Project",
+    description:
+      "Reactive backend-as-a-service with real-time queries and mutations",
+    projectType: "convex",
+    icon: "database",
+    color: "#F3B01C",
+    tags: ["convex", "baas", "realtime", "typescript", "serverless"],
+    isBuiltIn: true,
+    category: "database-baas",
+    variables: [
+      {
+        key: "CONVEX_DEPLOYMENT",
+        description: "Convex deployment identifier",
+        placeholder: "your-deployment-name",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "NEXT_PUBLIC_CONVEX_URL",
+        description: "Convex public deployment URL",
+        placeholder: "https://your-deployment.convex.cloud",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "CONVEX_ADMIN_KEY",
+        description: "Convex admin key for backend operations",
+        placeholder: "your-admin-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "authentication",
+      },
+    ],
+  },
+
+  {
+    id: "firebase-project",
+    name: "Firebase Project",
+    description:
+      "Google Firebase with Auth, Firestore, Storage, and Cloud Functions",
+    projectType: "firebase",
+    icon: "flame",
+    color: "#FFCA28",
+    tags: ["firebase", "google", "baas", "auth", "firestore"],
+    isBuiltIn: true,
+    category: "database-baas",
+    variables: [
+      {
+        key: "FIREBASE_API_KEY",
+        description: "Firebase Web API key",
+        placeholder: "AIza...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_AUTH_DOMAIN",
+        description: "Firebase Auth domain",
+        placeholder: "your-app.firebaseapp.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "FIREBASE_PROJECT_ID",
+        description: "Firebase project ID",
+        placeholder: "your-firebase-project",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_STORAGE_BUCKET",
+        description: "Firebase Storage bucket",
+        placeholder: "your-app.appspot.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "storage",
+      },
+      {
+        key: "FIREBASE_MESSAGING_SENDER_ID",
+        description: "Firebase Cloud Messaging sender ID",
+        placeholder: "123456789",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_APP_ID",
+        description: "Firebase app ID",
+        placeholder: "1:123456789:web:abc123",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "FIREBASE_ADMIN_SERVICE_ACCOUNT",
+        description: "Path to service account JSON (server-side)",
+        placeholder: "./service-account.json",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "authentication",
+      },
+    ],
+  },
+
+  {
+    id: "appwrite-project",
+    name: "Appwrite Project",
+    description: "Self-hosted BaaS with Auth, Database, Storage, and Functions",
+    projectType: "appwrite",
+    icon: "box",
+    color: "#FD366E",
+    tags: ["appwrite", "baas", "self-hosted", "auth", "database"],
+    isBuiltIn: true,
+    category: "database-baas",
+    variables: [
+      {
+        key: "APPWRITE_ENDPOINT",
+        description: "Appwrite API endpoint",
+        placeholder: "https://cloud.appwrite.io/v1",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "APPWRITE_PROJECT_ID",
+        description: "Appwrite project ID",
+        placeholder: "your-project-id",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "APPWRITE_API_KEY",
+        description: "Appwrite API key (server-side)",
+        placeholder: "your-api-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "APPWRITE_DATABASE_ID",
+        description: "Default database ID",
+        placeholder: "your-database-id",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "APPWRITE_BUCKET_ID",
+        description: "Default storage bucket ID",
+        placeholder: "your-bucket-id",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "storage",
+      },
+    ],
+  },
+
+  {
+    id: "postgresql-service",
+    name: "PostgreSQL Service",
+    description: "Standalone PostgreSQL database configuration",
+    projectType: "postgresql",
+    icon: "database",
+    color: "#4169E1",
+    tags: ["postgresql", "postgres", "database", "sql"],
+    isBuiltIn: true,
+    category: "database-baas",
+    variables: [
+      {
+        key: "PGHOST",
+        description: "PostgreSQL server host",
+        defaultValue: "localhost",
+        placeholder: "localhost",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "PGPORT",
+        description: "PostgreSQL server port",
+        defaultValue: "5432",
+        placeholder: "5432",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "PGDATABASE",
+        description: "Database name",
+        placeholder: "your_database",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "PGUSER",
+        description: "Database user",
+        defaultValue: "postgres",
+        placeholder: "postgres",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "PGPASSWORD",
+        description: "Database password",
+        placeholder: "your-password",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Full connection string (alternative to individual vars)",
+        placeholder: "postgresql://user:pass@localhost:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+    ],
+  },
+
+  // ==========================================
+  // DEVOPS & INFRA
+  // ==========================================
+
+  {
+    id: "docker-app",
+    name: "Docker Containerized App",
+    description:
+      "Containerized application with Docker Compose-friendly env vars",
+    projectType: "docker",
+    icon: "container",
+    color: "#2496ED",
+    tags: ["docker", "container", "devops", "compose"],
+    isBuiltIn: true,
+    category: "devops",
+    variables: [
+      {
+        key: "APP_PORT",
+        description: "Application port (mapped from container)",
+        defaultValue: "3000",
+        placeholder: "3000",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "DATABASE_URL",
+        description: "Database connection (use Docker service name as host)",
+        placeholder: "postgresql://user:pass@db:5432/myapp",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "REDIS_URL",
+        description: "Redis connection (use Docker service name as host)",
+        placeholder: "redis://redis:6379",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "NODE_ENV",
+        description: "Application environment",
+        defaultValue: "production",
+        placeholder: "development | staging | production",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "general",
+      },
+      {
+        key: "LOG_LEVEL",
+        description: "Container log level",
+        defaultValue: "info",
+        placeholder: "debug | info | warn | error",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "general",
+      },
+    ],
+  },
+
+  {
+    id: "aws-lambda-serverless",
+    name: "AWS Lambda Serverless",
+    description: "Serverless functions on AWS Lambda with API Gateway",
+    projectType: "aws-lambda",
+    icon: "cloud",
+    color: "#FF9900",
+    tags: ["aws", "lambda", "serverless", "api-gateway"],
+    isBuiltIn: true,
+    category: "devops",
+    variables: [
+      {
+        key: "AWS_REGION",
+        description: "AWS deployment region",
+        defaultValue: "us-east-1",
+        placeholder: "us-east-1",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "deployment",
+      },
+      {
+        key: "AWS_ACCESS_KEY_ID",
+        description: "AWS access key ID (for deployment)",
+        placeholder: "AKIA...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "deployment",
+      },
+      {
+        key: "AWS_SECRET_ACCESS_KEY",
+        description: "AWS secret access key",
+        placeholder: "your-secret-key",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "deployment",
+      },
+      {
+        key: "DYNAMODB_TABLE",
+        description: "DynamoDB table name",
+        placeholder: "my-app-table",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "database",
+      },
+      {
+        key: "S3_BUCKET",
+        description: "S3 bucket for assets/uploads",
+        placeholder: "my-app-assets",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "storage",
+      },
+    ],
+  },
+
+  {
+    id: "turborepo-monorepo",
+    name: "Turborepo Monorepo",
+    description: "Monorepo with shared env vars across packages and apps",
+    projectType: "turborepo",
+    icon: "wind",
+    color: "#EF4444",
+    tags: ["turborepo", "monorepo", "workspace", "build"],
+    isBuiltIn: true,
+    category: "devops",
+    variables: [
+      {
+        key: "DATABASE_URL",
+        description: "Shared database connection string",
+        placeholder: "postgresql://user:password@host:5432/dbname",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "database",
+      },
+      {
+        key: "NEXT_PUBLIC_API_URL",
+        description: "Shared public API URL (Next.js apps)",
+        defaultValue: "http://localhost:3000/api",
+        placeholder: "https://api.your-app.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "api",
+      },
+      {
+        key: "AUTH_SECRET",
+        description: "Shared auth secret across apps",
+        placeholder: "your-auth-secret",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: true,
+        category: "authentication",
+      },
+      {
+        key: "TURBO_TOKEN",
+        description: "Turborepo remote cache token",
+        placeholder: "your-turbo-token",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "deployment",
+      },
+      {
+        key: "TURBO_TEAM",
+        description: "Turborepo team slug for remote cache",
+        placeholder: "your-team-slug",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: false,
+        category: "deployment",
+      },
+    ],
+  },
+
+  // ==========================================
+  // ANALYTICS
+  // ==========================================
+
+  {
+    id: "posthog-analytics",
+    name: "PostHog Analytics",
+    description: "Product analytics, session recording, and feature flags",
+    projectType: "posthog",
+    icon: "bar-chart-3",
+    color: "#1D4AFF",
+    tags: ["posthog", "analytics", "feature-flags", "session-recording"],
+    isBuiltIn: true,
+    category: "analytics",
+    variables: [
+      {
+        key: "NEXT_PUBLIC_POSTHOG_KEY",
+        description: "PostHog project API key",
+        placeholder: "phc_...",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "NEXT_PUBLIC_POSTHOG_HOST",
+        description: "PostHog instance URL",
+        defaultValue: "https://us.i.posthog.com",
+        placeholder: "https://us.i.posthog.com",
+        environments: ["development", "staging", "production"],
+        isSensitive: false,
+        isRequired: true,
+        category: "api",
+      },
+      {
+        key: "POSTHOG_PERSONAL_API_KEY",
+        description: "PostHog personal API key (server-side)",
+        placeholder: "phx_...",
+        environments: ["development", "staging", "production"],
+        isSensitive: true,
+        isRequired: false,
+        category: "api",
+      },
+    ],
+  },
 ];
 
 /**
@@ -1032,6 +2450,24 @@ export function getTemplatesByProjectType(
   return BUILT_IN_TEMPLATES.filter(
     (template) => template.projectType === projectType
   );
+}
+
+/**
+ * Get templates by category
+ */
+export function getTemplatesByCategory(
+  category: TemplateCategory
+): EnvironmentTemplate[] {
+  return BUILT_IN_TEMPLATES.filter(
+    (template) => template.category === category
+  );
+}
+
+/**
+ * Get popular/featured templates
+ */
+export function getPopularTemplates(): EnvironmentTemplate[] {
+  return BUILT_IN_TEMPLATES.filter((template) => template.isPopular);
 }
 
 /**

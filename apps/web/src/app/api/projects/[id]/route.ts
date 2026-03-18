@@ -15,7 +15,13 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 const updateProjectSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
   description: z.string().max(500).optional(),
-  icon: z.string().optional(),
+  icon: z
+    .string()
+    .refine(
+      (val) => !val || val.startsWith("framework:") || /^[a-z0-9-]+$/.test(val),
+      "Invalid icon value"
+    )
+    .optional(),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex code")
