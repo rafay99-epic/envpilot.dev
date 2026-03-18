@@ -18,10 +18,12 @@
   "scripts": {
     "dev": "concurrently --names web,convex --prefix-colors blue,green \"turbo dev --filter=@envpilot/web\" \"convex dev\"",
     "dev:cli": "turbo dev --filter=@envpilot/cli",
+    "dev:admin": "turbo dev --filter=@envpilot/admin",
     "dev:extension": "turbo dev --filter=envpilot",
     "build": "turbo build",
     "build:web": "turbo build --filter=@envpilot/web",
     "build:cli": "turbo build --filter=@envpilot/cli",
+    "build:admin": "turbo build --filter=@envpilot/admin",
     "build:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce package --no-dependencies",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

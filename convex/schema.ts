@@ -23,6 +23,11 @@ export default defineSchema({
     createdAt: v.number(),
     // Last activity timestamp
     lastActiveAt: v.optional(v.number()),
+    // Ban status
+    isBanned: v.optional(v.boolean()),
+    bannedAt: v.optional(v.number()),
+    bannedBy: v.optional(v.string()),
+    banReason: v.optional(v.string()),
   })
     .index("by_workos_id", ["workosId"])
     .index("by_email", ["email"]),
@@ -74,9 +79,6 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-    // DEPRECATED: Tier field kept temporarily for migration compatibility.
-    // After running migrations:migrateTierToSeparateTable, remove this field.
-    tier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
   })
     .index("by_slug", ["slug"])
     .index("by_workos_org_id", ["workosOrgId"])
@@ -892,4 +894,32 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_is_read", ["isRead"])
     .index("by_created_at", ["createdAt"]),
+
+  // ==========================================
+  // ADMIN SETTINGS (Platform-wide configuration)
+  // ==========================================
+  adminSettings: defineTable({
+    // Setting key (e.g., "tierEnforcement")
+    key: v.string(),
+    // Setting value (JSON string for flexibility)
+    value: v.string(),
+    // Last updated timestamp
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  // ==========================================
+  // TIER CONFIG (Admin-configurable tier limits)
+  // ==========================================
+  tierConfig: defineTable({
+    // Which tier this config applies to
+    tier: v.union(v.literal("free"), v.literal("pro")),
+    // Overridable limits (null = unlimited, undefined = use default)
+    maxProjects: v.optional(v.union(v.number(), v.null())),
+    maxVariablesPerProject: v.optional(v.union(v.number(), v.null())),
+    maxTeamMembers: v.optional(v.union(v.number(), v.null())),
+    maxOrganizations: v.optional(v.union(v.number(), v.null())),
+    auditLogRetentionDays: v.optional(v.number()),
+    // Timestamps
+    updatedAt: v.number(),
+  }).index("by_tier", ["tier"]),
 });

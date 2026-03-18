@@ -82,15 +82,37 @@ export function isValidTier(tier: string): tier is Tier {
 
 /**
  * Check if tier enforcement is enabled (server-side only).
- * Reads from Convex env var ENFORCE_TIER_LIMITS.
- * Defaults to true (enforce) — set to "false" for pre-alpha mode.
+ * Reads from Convex env var ENFORCE_TIER_LIMITS as a fallback.
+ * The primary source of truth is the adminSettings table (key: "tierEnforcement").
+ * Use isEnforcementEnabledFromDb() when you have DB access.
  */
 export function isEnforcementEnabledServer(): boolean {
-  return process.env.ENFORCE_TIER_LIMITS !== "false";
+  // Only enforce if explicitly set to "true". Missing env var = disabled (pre-alpha safe).
+  return process.env.ENFORCE_TIER_LIMITS === "true";
 }
 
 /**
- * Get tier limits with validation.
+ * Check if tier enforcement is enabled from the database.
+ * Falls back to env var if no DB setting exists.
+ */
+export async function isEnforcementEnabledFromDb(
+  db: DatabaseReader
+): Promise<boolean> {
+  const setting = await db
+    .query("adminSettings")
+    .withIndex("by_key", (q) => q.eq("key", "tierEnforcement"))
+    .first();
+
+  if (setting) {
+    return setting.value === "true";
+  }
+
+  // Fallback to env var
+  return isEnforcementEnabledServer();
+}
+
+/**
+ * Get tier limits with validation (hardcoded only, no DB).
  * Reads enforcement toggle from Convex server env var — no client input.
  */
 export function getTierLimits(tier: string): TierLimits {
@@ -101,6 +123,61 @@ export function getTierLimits(tier: string): TierLimits {
     return UNLIMITED_LIMITS;
   }
   return TIER_LIMITS[tier];
+}
+
+/**
+ * Get tier limits with DB overrides from the tierConfig table.
+ * Merges hardcoded defaults with any admin-configured overrides.
+ * Falls back to hardcoded defaults if no tierConfig record exists.
+ */
+export async function getTierLimitsFromDb(
+  db: DatabaseReader,
+  tier: string
+): Promise<TierLimits> {
+  if (!isValidTier(tier)) {
+    throw new Error(`Invalid tier: ${tier}`);
+  }
+  const enforced = await isEnforcementEnabledFromDb(db);
+  if (!enforced) {
+    return UNLIMITED_LIMITS;
+  }
+
+  const defaults = TIER_LIMITS[tier];
+
+  const config = await db
+    .query("tierConfig")
+    .withIndex("by_tier", (q) => q.eq("tier", tier))
+    .first();
+
+  if (!config) {
+    return defaults;
+  }
+
+  return {
+    maxProjects:
+      config.maxProjects !== undefined ? config.maxProjects : defaults.maxProjects,
+    maxVariablesPerProject:
+      config.maxVariablesPerProject !== undefined
+        ? config.maxVariablesPerProject
+        : defaults.maxVariablesPerProject,
+    maxTeamMembers:
+      config.maxTeamMembers !== undefined
+        ? config.maxTeamMembers
+        : defaults.maxTeamMembers,
+    maxOrganizations:
+      config.maxOrganizations !== undefined
+        ? config.maxOrganizations
+        : defaults.maxOrganizations,
+    auditLogRetentionDays:
+      config.auditLogRetentionDays !== undefined
+        ? config.auditLogRetentionDays
+        : defaults.auditLogRetentionDays,
+    apiAccessEnabled: defaults.apiAccessEnabled,
+    extensionAccessEnabled: defaults.extensionAccessEnabled,
+    granularPermissionsEnabled: defaults.granularPermissionsEnabled,
+    variableVersionHistoryEnabled: defaults.variableVersionHistoryEnabled,
+    bulkImportEnabled: defaults.bulkImportEnabled,
+  };
 }
 
 /**
@@ -136,8 +213,8 @@ export async function getOrganizationTier(
  */
 export const isEnforcementEnabled = query({
   args: {},
-  handler: async () => {
-    return isEnforcementEnabledServer();
+  handler: async (ctx) => {
+    return isEnforcementEnabledFromDb(ctx.db);
   },
 });
 

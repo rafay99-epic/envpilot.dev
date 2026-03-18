@@ -81,6 +81,15 @@ export const upsert = mutation({
       .first();
 
     if (existingUser) {
+      if (existingUser.isBanned) {
+        throw new Error(
+          "Your account has been suspended." +
+            (existingUser.banReason
+              ? ` Reason: ${existingUser.banReason}`
+              : " Please contact support for more information.")
+        );
+      }
+
       await ctx.db.patch(existingUser._id, {
         email: args.email,
         name: args.name,
