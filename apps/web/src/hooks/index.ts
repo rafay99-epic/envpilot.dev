@@ -42,6 +42,7 @@ export {
   useRecentProjects,
   useTeamMembersQuickView,
   useOnboardingStatus,
+  useAnalytics,
 } from "./useDashboard";
 
 // Vault hooks (WorkOS Vault integration)

@@ -11,6 +11,11 @@
   --terminal-green: #22c55e;
   --terminal-amber: #fbbf24;
   --terminal-red: #ef5350;
+  --chart-1: 142 71% 45%;
+  --chart-2: 217 91% 60%;
+  --chart-3: 45 93% 47%;
+  --chart-4: 270 76% 55%;
+  --chart-5: 0 84% 60%;
 }
 
 @theme inline {

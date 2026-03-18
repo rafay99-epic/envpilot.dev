@@ -11,6 +11,7 @@ import {
   Key,
   Users,
   ClipboardList,
+  BarChart3,
   Gauge,
   Settings,
   Menu,
@@ -20,6 +21,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { PERMISSIONS } from "@/lib/auth";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/components/command-palette";
 
@@ -72,10 +74,13 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization } = useAuthContext();
+  const { organization, hasPermission } = useAuthContext();
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
+
+  // Analytics is restricted to admin/team_lead
+  const canViewAnalytics = hasPermission(PERMISSIONS.PROJECT_CREATE);
 
   // Detect project context from pathname
   const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
@@ -112,6 +117,16 @@ export function DashboardNav() {
       label: "Audit Logs",
       icon: <ClipboardList className="h-4 w-4" />,
     },
+    // Analytics visible only to admin/team_lead
+    ...(canViewAnalytics
+      ? [
+          {
+            href: "/dashboard/analytics",
+            label: "Analytics",
+            icon: <BarChart3 className="h-4 w-4" />,
+          },
+        ]
+      : []),
     {
       href: "/dashboard/usage",
       label: "Usage & Plan",
