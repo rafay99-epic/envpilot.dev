@@ -91,7 +91,7 @@ export function VariableListItem({
                 type="checkbox"
                 checked={isSelected}
                 onChange={onToggleSelect}
-                className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500/20"
+                className="h-4 w-4"
               />
             </label>
           )}

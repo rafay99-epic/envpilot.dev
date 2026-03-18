@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getStripeClient, isPaymentsEnabled } from "@/lib/stripe";
 import type { Id } from "@convex/_generated/dataModel";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -19,6 +20,9 @@ const portalSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     // Check if payments are enabled
     if (!isPaymentsEnabled()) {
       return NextResponse.json(

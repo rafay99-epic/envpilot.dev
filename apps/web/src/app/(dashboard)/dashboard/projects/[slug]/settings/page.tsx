@@ -232,7 +232,7 @@ export default function ProjectSettingsPage({
   };
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return <TerminalLoading fullPage />;
   }
 
   if (error && !project) {

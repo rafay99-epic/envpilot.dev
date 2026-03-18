@@ -1185,7 +1185,7 @@ export default function OrganizationMembersPage({
                                 );
                               }
                             }}
-                            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 dark:border-zinc-600"
+                            className="h-4 w-4"
                           />
                           <div className="flex items-center gap-2">
                             <span

@@ -6,6 +6,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -20,6 +21,9 @@ type RouteParams = { params: Promise<{ slug: string }> };
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const botResponse = await verifyNotBot();
+    if (botResponse) return botResponse;
+
     const { user } = await withAuth();
 
     if (!user) {

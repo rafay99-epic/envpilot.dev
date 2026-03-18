@@ -419,7 +419,7 @@ export default function EnvironmentDiffPage({
     setTimeout(() => setCopiedRef(null), 1500);
   };
 
-  if (isLoadingProject) return <TerminalLoading />;
+  if (isLoadingProject) return <TerminalLoading fullPage />;
   if (error && !project) {
     return (
       <TerminalEmptyState

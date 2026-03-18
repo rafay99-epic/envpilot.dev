@@ -175,9 +175,15 @@ export function TerminalEmptyState({
   );
 }
 
-export function TerminalLoading() {
+export function TerminalLoading({ fullPage = false }: { fullPage?: boolean }) {
   return (
-    <div className="flex items-center justify-center py-8">
+    <div
+      className={
+        fullPage
+          ? "flex min-h-[60vh] items-center justify-center"
+          : "flex items-center justify-center py-8"
+      }
+    >
       <span className="font-mono text-sm text-green-400">
         <span className="text-zinc-500">$</span> loading
         <span
