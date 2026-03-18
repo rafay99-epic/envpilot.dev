@@ -23,6 +23,11 @@ export default defineSchema({
     createdAt: v.number(),
     // Last activity timestamp
     lastActiveAt: v.optional(v.number()),
+    // Ban status
+    isBanned: v.optional(v.boolean()),
+    bannedAt: v.optional(v.number()),
+    bannedBy: v.optional(v.string()),
+    banReason: v.optional(v.string()),
   })
     .index("by_workos_id", ["workosId"])
     .index("by_email", ["email"]),
@@ -74,9 +79,6 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-    // DEPRECATED: Tier field kept temporarily for migration compatibility.
-    // After running migrations:migrateTierToSeparateTable, remove this field.
-    tier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
   })
     .index("by_slug", ["slug"])
     .index("by_workos_org_id", ["workosOrgId"])
@@ -606,8 +608,8 @@ export default defineSchema({
   organizationTiers: defineTable({
     // Reference to the organization
     organizationId: v.id("organizations"),
-    // Subscription tier
-    tier: v.union(v.literal("free"), v.literal("pro")),
+    // Subscription tier name (matches tierDefinitions.name)
+    tier: v.string(),
     // Last updated timestamp
     updatedAt: v.number(),
     // Who triggered the change (user or system)
@@ -892,4 +894,56 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_is_read", ["isRead"])
     .index("by_created_at", ["createdAt"]),
+
+  // ==========================================
+  // ADMIN SETTINGS (Platform-wide configuration)
+  // ==========================================
+  adminSettings: defineTable({
+    // Setting key (e.g., "tierEnforcement")
+    key: v.string(),
+    // Setting value (JSON string for flexibility)
+    value: v.string(),
+    // Last updated timestamp
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
+  // ==========================================
+  // TIER DEFINITIONS (Dynamic, admin-managed tiers)
+  // ==========================================
+  tierDefinitions: defineTable({
+    // Unique tier identifier (e.g., "free", "pro", "enterprise")
+    name: v.string(),
+    // Human-readable display name
+    displayName: v.string(),
+    // Optional description
+    description: v.optional(v.string()),
+    // Sort order for UI display
+    sortOrder: v.number(),
+    // Whether this is the default tier for new organizations
+    isDefault: v.boolean(),
+    // Badge color (hex code)
+    color: v.optional(v.string()),
+    // Tier limits
+    limits: v.object({
+      maxProjects: v.union(v.number(), v.null()),
+      maxVariablesPerProject: v.union(v.number(), v.null()),
+      maxTeamMembers: v.union(v.number(), v.null()),
+      maxOrganizations: v.union(v.number(), v.null()),
+      auditLogRetentionDays: v.number(),
+    }),
+    // Feature flags
+    features: v.object({
+      apiAccessEnabled: v.boolean(),
+      extensionAccessEnabled: v.boolean(),
+      granularPermissionsEnabled: v.boolean(),
+      variableVersionHistoryEnabled: v.boolean(),
+      bulkImportEnabled: v.boolean(),
+      prioritySupport: v.optional(v.boolean()),
+      customBranding: v.optional(v.boolean()),
+      ssoEnabled: v.optional(v.boolean()),
+    }),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_name", ["name"]),
 });

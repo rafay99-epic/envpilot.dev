@@ -31,6 +31,7 @@ jobs:
           echo "web=$(jq -r '.version' apps/web/package.json)" >> "$GITHUB_OUTPUT"
           echo "cli=$(jq -r '.version' apps/cli/package.json)" >> "$GITHUB_OUTPUT"
           echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
+          echo "admin=$(jq -r '.version' apps/admin/package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Read base versions
         id: base
@@ -39,6 +40,7 @@ jobs:
           echo "web=$(jq -r '.version' base/apps/web/package.json)" >> "$GITHUB_OUTPUT"
           echo "cli=$(jq -r '.version' base/apps/cli/package.json)" >> "$GITHUB_OUTPUT"
           echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
+          echo "admin=$(jq -r '.version // "0.0.0"' base/apps/admin/package.json 2>/dev/null || echo '0.0.0')" >> "$GITHUB_OUTPUT"
 
       - name: Detect version changes and bump types
         id: changes
@@ -64,6 +66,7 @@ jobs:
           web_bump=$(classify_bump "${{ steps.base.outputs.web }}" "${{ steps.current.outputs.web }}")
           cli_bump=$(classify_bump "${{ steps.base.outputs.cli }}" "${{ steps.current.outputs.cli }}")
           ext_bump=$(classify_bump "${{ steps.base.outputs.extension }}" "${{ steps.current.outputs.extension }}")
+          admin_bump=$(classify_bump "${{ steps.base.outputs.admin }}" "${{ steps.current.outputs.admin }}")
 
           if [ "$root_bump" != "none" ]; then
             changed="${changed}root,"
@@ -95,6 +98,14 @@ jobs:
             summary="${summary}| **VS Code Extension** | \`${{ steps.base.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | :arrow_up: ${ext_bump} |\n"
           else
             summary="${summary}| **VS Code Extension** | \`${{ steps.current.outputs.extension }}\` | \`${{ steps.current.outputs.extension }}\` | -- |\n"
+          fi
+
+          if [ "$admin_bump" != "none" ]; then
+            changed="${changed}admin,"
+            bump_types="${bump_types}${admin_bump},"
+            summary="${summary}| **Admin Dashboard** | \`${{ steps.base.outputs.admin }}\` | \`${{ steps.current.outputs.admin }}\` | :arrow_up: ${admin_bump} |\n"
+          else
+            summary="${summary}| **Admin Dashboard** | \`${{ steps.current.outputs.admin }}\` | \`${{ steps.current.outputs.admin }}\` | -- |\n"
           fi
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
@@ -165,6 +176,7 @@ jobs:
               apps/web/*) echo "web" >> /tmp/touched_packages ;;
               apps/cli/*) echo "cli" >> /tmp/touched_packages ;;
               apps/vscode-extension/*) echo "extension" >> /tmp/touched_packages ;;
+              apps/admin/*) echo "admin" >> /tmp/touched_packages ;;
               convex/*) echo "convex" >> /tmp/touched_packages ;;
               .github/*) echo "ci" >> /tmp/touched_packages ;;
             esac
@@ -196,6 +208,7 @@ jobs:
               'scope:cli':         { color: 'a371f7', description: 'PR touches the CLI' },
               'scope:extension':   { color: 'd4a72c', description: 'PR touches the VS Code extension' },
               'scope:convex':      { color: 'e8912d', description: 'PR touches Convex backend functions' },
+              'scope:admin':       { color: 'f472b6', description: 'PR touches the admin dashboard' },
               'scope:ci':          { color: '656d76', description: 'PR touches CI/CD workflows' },
             };
 
@@ -207,7 +220,7 @@ jobs:
             else if (bumpTypes.includes('patch')) labelsToAdd.add('semver:patch');
 
             // Scope labels based on file changes
-            const scopeMap = { web: 'scope:web', cli: 'scope:cli', extension: 'scope:extension', convex: 'scope:convex', ci: 'scope:ci' };
+            const scopeMap = { web: 'scope:web', cli: 'scope:cli', extension: 'scope:extension', admin: 'scope:admin', convex: 'scope:convex', ci: 'scope:ci' };
             for (const key of packagesChanged) {
               if (scopeMap[key]) labelsToAdd.add(scopeMap[key]);
             }
@@ -268,6 +281,7 @@ jobs:
           echo "  Web App:           ${{ steps.current.outputs.web }}"
           echo "  CLI:               ${{ steps.current.outputs.cli }}"
           echo "  VS Code Extension: ${{ steps.current.outputs.extension }}"
+          echo "  Admin Dashboard:   ${{ steps.current.outputs.admin }}"
           echo "============================="
           if [ -n "${{ steps.changes.outputs.changed }}" ]; then
             echo "  Changed: ${{ steps.changes.outputs.changed }}"

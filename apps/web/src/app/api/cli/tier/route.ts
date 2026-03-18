@@ -61,12 +61,12 @@ export async function GET(request: NextRequest) {
       organizationId: organizationId as Id<"organizations">,
     });
     const tier = tierData?.tier ?? "free";
+    const limits = tierData?.limits ?? getTierLimits(tier);
 
     const enforcementEnabled = await convex.query(
       api.tierLimits.isEnforcementEnabled,
       {}
     );
-    const limits = getTierLimits(tier);
 
     return NextResponse.json({
       tier,

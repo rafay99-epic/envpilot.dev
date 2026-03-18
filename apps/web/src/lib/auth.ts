@@ -25,7 +25,7 @@ export interface Organization {
   id: string;
   name: string;
   slug: string | null;
-  tier?: "free" | "pro" | null;
+  tier?: string | null;
   role?: MembershipRole | null;
   createdAt: Date;
   updatedAt: Date;

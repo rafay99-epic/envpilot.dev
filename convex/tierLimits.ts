@@ -6,15 +6,15 @@ import { Id } from "./_generated/dataModel";
 /**
  * Tier Limits Configuration
  *
- * Defines limits for each subscription tier.
- * Free tier has sensible defaults, Pro tier is unlimited.
+ * Defines limits for each subscription tier. Tier definitions are stored
+ * in the `tierDefinitions` table and managed via the admin panel.
  *
- * Enforcement is controlled by the ENFORCE_TIER_LIMITS Convex env var
- * (server-side only). When disabled (pre-alpha mode), all tiers get
- * unlimited access. No client input can affect enforcement.
+ * The hardcoded SEED_TIER_DEFAULTS are used only as fallbacks when
+ * no tier definitions exist in the database yet.
+ *
+ * Enforcement is controlled by the admin panel toggle (adminSettings
+ * key: "tierEnforcement") with env var ENFORCE_TIER_LIMITS as fallback.
  */
-
-export type Tier = "free" | "pro";
 
 export interface TierLimits {
   maxProjects: number | null; // null = unlimited
@@ -46,7 +46,11 @@ const UNLIMITED_LIMITS: TierLimits = {
   bulkImportEnabled: true,
 };
 
-export const TIER_LIMITS: Record<Tier, TierLimits> = {
+/**
+ * Seed defaults used when no tierDefinitions exist in the database.
+ * These match the original hardcoded "free" and "pro" tiers.
+ */
+export const SEED_TIER_DEFAULTS: Record<string, TierLimits> = {
   free: {
     maxProjects: 3,
     maxVariablesPerProject: 50,
@@ -74,33 +78,133 @@ export const TIER_LIMITS: Record<Tier, TierLimits> = {
 };
 
 /**
- * Type guard to validate tier values
- */
-export function isValidTier(tier: string): tier is Tier {
-  return tier === "free" || tier === "pro";
-}
-
-/**
  * Check if tier enforcement is enabled (server-side only).
- * Reads from Convex env var ENFORCE_TIER_LIMITS.
- * Defaults to true (enforce) — set to "false" for pre-alpha mode.
+ * Reads from Convex env var ENFORCE_TIER_LIMITS as a fallback.
+ * The primary source of truth is the adminSettings table (key: "tierEnforcement").
+ * Use isEnforcementEnabledFromDb() when you have DB access.
  */
 export function isEnforcementEnabledServer(): boolean {
-  return process.env.ENFORCE_TIER_LIMITS !== "false";
+  // Only enforce if explicitly set to "true". Missing env var = disabled (pre-alpha safe).
+  return process.env.ENFORCE_TIER_LIMITS === "true";
 }
 
 /**
- * Get tier limits with validation.
- * Reads enforcement toggle from Convex server env var — no client input.
+ * Check if tier enforcement is enabled from the database.
+ * Falls back to env var if no DB setting exists.
+ */
+export async function isEnforcementEnabledFromDb(
+  db: DatabaseReader
+): Promise<boolean> {
+  const setting = await db
+    .query("adminSettings")
+    .withIndex("by_key", (q) => q.eq("key", "tierEnforcement"))
+    .first();
+
+  if (setting) {
+    return setting.value === "true";
+  }
+
+  // Fallback to env var
+  return isEnforcementEnabledServer();
+}
+
+/**
+ * Get a tier definition from the database by name.
+ * Returns null if not found.
+ */
+export async function getTierDefinition(db: DatabaseReader, tierName: string) {
+  return await db
+    .query("tierDefinitions")
+    .withIndex("by_name", (q) => q.eq("name", tierName))
+    .first();
+}
+
+/**
+ * Get the default tier name from the database.
+ * Falls back to "free" if no default tier is defined.
+ */
+export async function getDefaultTierName(db: DatabaseReader): Promise<string> {
+  const allTiers = await db.query("tierDefinitions").collect();
+  const defaultTier = allTiers.find((t) => t.isDefault);
+  return defaultTier?.name ?? "free";
+}
+
+/**
+ * Convert a tier definition's limits + features into a TierLimits object.
+ */
+function tierDefinitionToLimits(tierDef: {
+  limits: {
+    maxProjects: number | null;
+    maxVariablesPerProject: number | null;
+    maxTeamMembers: number | null;
+    maxOrganizations: number | null;
+    auditLogRetentionDays: number;
+  };
+  features: {
+    apiAccessEnabled: boolean;
+    extensionAccessEnabled: boolean;
+    granularPermissionsEnabled: boolean;
+    variableVersionHistoryEnabled: boolean;
+    bulkImportEnabled: boolean;
+  };
+}): TierLimits {
+  return {
+    maxProjects: tierDef.limits.maxProjects,
+    maxVariablesPerProject: tierDef.limits.maxVariablesPerProject,
+    maxTeamMembers: tierDef.limits.maxTeamMembers,
+    maxOrganizations: tierDef.limits.maxOrganizations,
+    auditLogRetentionDays: tierDef.limits.auditLogRetentionDays,
+    apiAccessEnabled: tierDef.features.apiAccessEnabled,
+    extensionAccessEnabled: tierDef.features.extensionAccessEnabled,
+    granularPermissionsEnabled: tierDef.features.granularPermissionsEnabled,
+    variableVersionHistoryEnabled:
+      tierDef.features.variableVersionHistoryEnabled,
+    bulkImportEnabled: tierDef.features.bulkImportEnabled,
+  };
+}
+
+/**
+ * Get tier limits from the database for a given tier name.
+ * Reads from tierDefinitions table. Falls back to seed defaults
+ * if no tier definition exists for the given name.
+ */
+export async function getTierLimitsFromDb(
+  db: DatabaseReader,
+  tier: string
+): Promise<TierLimits> {
+  const enforced = await isEnforcementEnabledFromDb(db);
+  if (!enforced) {
+    return UNLIMITED_LIMITS;
+  }
+
+  // Try to get tier definition from DB
+  const tierDef = await getTierDefinition(db, tier);
+  if (tierDef) {
+    return tierDefinitionToLimits(tierDef);
+  }
+
+  // Fallback to seed defaults
+  if (tier in SEED_TIER_DEFAULTS) {
+    return SEED_TIER_DEFAULTS[tier];
+  }
+
+  // Unknown tier — return unlimited (safe fallback)
+  return UNLIMITED_LIMITS;
+}
+
+/**
+ * Get tier limits with validation (uses seed defaults, no DB).
+ * For server-side use when DB is not available.
  */
 export function getTierLimits(tier: string): TierLimits {
-  if (!isValidTier(tier)) {
-    throw new Error(`Invalid tier: ${tier}`);
-  }
   if (!isEnforcementEnabledServer()) {
     return UNLIMITED_LIMITS;
   }
-  return TIER_LIMITS[tier];
+  if (tier in SEED_TIER_DEFAULTS) {
+    return SEED_TIER_DEFAULTS[tier];
+  }
+  // Unknown tier — return unlimited (safe fallback)
+  return UNLIMITED_LIMITS;
 }
 
 /**
@@ -114,17 +218,20 @@ export const MAX_BULK_IMPORT_SIZE = 100;
 
 /**
  * Read an organization's tier from the organizationTiers table.
- * Falls back to "free" if no tier record exists.
+ * Falls back to the default tier if no tier record exists.
  */
 export async function getOrganizationTier(
   db: DatabaseReader,
   organizationId: Id<"organizations">
-): Promise<Tier> {
+): Promise<string> {
   const tierRecord = await db
     .query("organizationTiers")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
     .first();
-  return tierRecord?.tier ?? "free";
+  if (tierRecord) {
+    return tierRecord.tier;
+  }
+  return await getDefaultTierName(db);
 }
 
 // ==========================================
@@ -136,8 +243,8 @@ export async function getOrganizationTier(
  */
 export const isEnforcementEnabled = query({
   args: {},
-  handler: async () => {
-    return isEnforcementEnabledServer();
+  handler: async (ctx) => {
+    return isEnforcementEnabledFromDb(ctx.db);
   },
 });
 
@@ -154,7 +261,7 @@ export const getOrganizationLimits = query({
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
     return {
       tier,
-      limits: getTierLimits(tier),
+      limits: await getTierLimitsFromDb(ctx.db, tier),
     };
   },
 });
@@ -221,9 +328,11 @@ export const getOrganizationUsage = query({
       }
     }
 
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
+
     return {
       tier,
-      limits: getTierLimits(tier),
+      limits,
       usage: {
         projects: projects.length,
         teamMembers: members.length,
@@ -261,9 +370,11 @@ export const getProjectVariableCount = query({
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
+
     return {
       tier,
-      limits: getTierLimits(tier),
+      limits,
       usage: {
         variables: variables.length,
       },
@@ -283,7 +394,7 @@ export const getUserOrganizationCount = query({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Get organizations details to check which are pro tier
+    // Get organizations details to determine effective tier
     const orgsWithRoles = await Promise.all(
       memberships.map(async (membership) => {
         const org = await ctx.db.get(membership.organizationId);
@@ -303,13 +414,28 @@ export const getUserOrganizationCount = query({
     // For organization creation limits, we count orgs where user is admin (owner)
     const ownedOrgs = validOrgs.filter((o) => o.role === "admin");
 
-    // Get the user's "primary" tier (highest tier among owned orgs, or free if none)
-    const hasPro = ownedOrgs.some((o) => o.tier === "pro");
-    const effectiveTier: Tier = hasPro ? "pro" : "free";
+    // Get the user's "effective" tier — the highest tier among owned orgs
+    // We check each tier's maxOrganizations limit and pick the most permissive
+    let effectiveTier = await getDefaultTierName(ctx.db);
+    let bestOrgLimit: number | null = 0;
+
+    for (const o of ownedOrgs) {
+      const limits = await getTierLimitsFromDb(ctx.db, o.tier);
+      if (limits.maxOrganizations === null) {
+        // Unlimited — this is the best possible
+        effectiveTier = o.tier;
+        bestOrgLimit = null;
+        break;
+      }
+      if (bestOrgLimit !== null && limits.maxOrganizations > bestOrgLimit) {
+        bestOrgLimit = limits.maxOrganizations;
+        effectiveTier = o.tier;
+      }
+    }
 
     return {
       effectiveTier,
-      limits: getTierLimits(effectiveTier),
+      limits: await getTierLimitsFromDb(ctx.db, effectiveTier),
       usage: {
         ownedOrganizations: ownedOrgs.length,
         totalMemberships: memberships.length,
@@ -343,7 +469,7 @@ export const checkTierLimit = query({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
 
     switch (args.action) {
       case "create_project": {
@@ -364,7 +490,7 @@ export const checkTierLimit = query({
           limit: limits.maxProjects,
           reason: isAllowed
             ? undefined
-            : `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`,
+            : `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade your tier for more projects.`,
         };
       }
 
@@ -387,7 +513,7 @@ export const checkTierLimit = query({
           limit: limits.maxVariablesPerProject,
           reason: isAllowed
             ? undefined
-            : `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade to Pro for unlimited variables.`,
+            : `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade your tier for more variables.`,
         };
       }
 
@@ -416,7 +542,7 @@ export const checkTierLimit = query({
           limit: limits.maxTeamMembers,
           reason: isAllowed
             ? undefined
-            : `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`,
+            : `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade your tier for more team members.`,
         };
       }
 
@@ -425,7 +551,7 @@ export const checkTierLimit = query({
           allowed: limits.apiAccessEnabled,
           reason: limits.apiAccessEnabled
             ? undefined
-            : "API access requires Pro tier. Upgrade to unlock API access.",
+            : "API access requires a higher tier.",
         };
 
       case "use_extension":
@@ -433,7 +559,7 @@ export const checkTierLimit = query({
           allowed: limits.extensionAccessEnabled,
           reason: limits.extensionAccessEnabled
             ? undefined
-            : "Extension access requires Pro tier. Upgrade to unlock VS Code/IDE extension.",
+            : "Extension access requires a higher tier.",
         };
 
       case "use_granular_permissions":
@@ -441,7 +567,7 @@ export const checkTierLimit = query({
           allowed: limits.granularPermissionsEnabled,
           reason: limits.granularPermissionsEnabled
             ? undefined
-            : "Granular permissions require Pro tier. Upgrade to set per-variable access controls.",
+            : "Granular permissions require a higher tier.",
         };
 
       case "view_version_history":
@@ -449,7 +575,7 @@ export const checkTierLimit = query({
           allowed: limits.variableVersionHistoryEnabled,
           reason: limits.variableVersionHistoryEnabled
             ? undefined
-            : "Version history requires Pro tier. Upgrade to access full variable history.",
+            : "Version history requires a higher tier.",
         };
 
       case "bulk_import":
@@ -457,7 +583,7 @@ export const checkTierLimit = query({
           allowed: limits.bulkImportEnabled,
           reason: limits.bulkImportEnabled
             ? undefined
-            : "Bulk import requires Pro tier. Upgrade to import variables in bulk.",
+            : "Bulk import requires a higher tier.",
         };
 
       default:
@@ -485,7 +611,7 @@ export const _checkProjectLimit = internalQuery({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxProjects === null) {
       return { allowed: true };
     }
@@ -501,7 +627,7 @@ export const _checkProjectLimit = internalQuery({
     if (projectCount.length >= limits.maxProjects) {
       return {
         allowed: false,
-        reason: `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`,
+        reason: `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade your tier for more projects.`,
       };
     }
 
@@ -529,7 +655,7 @@ export const _checkVariableLimit = internalQuery({
     }
 
     const tier = await getOrganizationTier(ctx.db, project.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxVariablesPerProject === null) {
       return { allowed: true };
     }
@@ -543,7 +669,7 @@ export const _checkVariableLimit = internalQuery({
     if (variableCount.length >= limits.maxVariablesPerProject) {
       return {
         allowed: false,
-        reason: `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade to Pro for unlimited variables.`,
+        reason: `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade your tier for more variables.`,
       };
     }
 
@@ -566,7 +692,7 @@ export const _checkTeamMemberLimit = internalQuery({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxTeamMembers === null) {
       return { allowed: true };
     }
@@ -591,7 +717,7 @@ export const _checkTeamMemberLimit = internalQuery({
     if (totalMembers >= limits.maxTeamMembers) {
       return {
         allowed: false,
-        reason: `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`,
+        reason: `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade your tier for more team members.`,
       };
     }
 
@@ -615,27 +741,37 @@ export const _checkOrganizationLimit = internalQuery({
       .filter((q) => q.eq(q.field("role"), "admin"))
       .collect();
 
-    // Check if any owned org is Pro tier
-    let hasPro = false;
+    // Find the most permissive tier among owned orgs
+    let bestOrgLimit: number | null = 0;
     for (const membership of memberships) {
       const tier = await getOrganizationTier(ctx.db, membership.organizationId);
-      if (tier === "pro") {
-        hasPro = true;
-        break;
+      const limits = await getTierLimitsFromDb(ctx.db, tier);
+      if (limits.maxOrganizations === null) {
+        return { allowed: true };
+      }
+      if (bestOrgLimit !== null && limits.maxOrganizations > bestOrgLimit) {
+        bestOrgLimit = limits.maxOrganizations;
       }
     }
 
-    const effectiveTier: Tier = hasPro ? "pro" : "free";
-    const limits = getTierLimits(effectiveTier);
-
-    if (limits.maxOrganizations === null) {
+    if (bestOrgLimit === null) {
       return { allowed: true };
     }
 
-    if (memberships.length >= limits.maxOrganizations) {
+    // If no owned orgs, use default tier limits
+    if (memberships.length === 0) {
+      const defaultTier = await getDefaultTierName(ctx.db);
+      const limits = await getTierLimitsFromDb(ctx.db, defaultTier);
+      bestOrgLimit = limits.maxOrganizations ?? 0;
+      if (limits.maxOrganizations === null) {
+        return { allowed: true };
+      }
+    }
+
+    if (memberships.length >= bestOrgLimit) {
       return {
         allowed: false,
-        reason: `Organization limit reached (${memberships.length}/${limits.maxOrganizations}). Upgrade to Pro for unlimited organizations.`,
+        reason: `Organization limit reached (${memberships.length}/${bestOrgLimit}). Upgrade your tier for more organizations.`,
       };
     }
 
@@ -667,7 +803,7 @@ export const _checkFeatureEnabled = internalQuery({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
 
     switch (args.feature) {
       case "api":
@@ -675,35 +811,35 @@ export const _checkFeatureEnabled = internalQuery({
           allowed: limits.apiAccessEnabled,
           reason: limits.apiAccessEnabled
             ? undefined
-            : "API access requires Pro tier.",
+            : "API access requires a higher tier.",
         };
       case "extension":
         return {
           allowed: limits.extensionAccessEnabled,
           reason: limits.extensionAccessEnabled
             ? undefined
-            : "Extension access requires Pro tier.",
+            : "Extension access requires a higher tier.",
         };
       case "granular_permissions":
         return {
           allowed: limits.granularPermissionsEnabled,
           reason: limits.granularPermissionsEnabled
             ? undefined
-            : "Granular permissions require Pro tier.",
+            : "Granular permissions require a higher tier.",
         };
       case "version_history":
         return {
           allowed: limits.variableVersionHistoryEnabled,
           reason: limits.variableVersionHistoryEnabled
             ? undefined
-            : "Version history requires Pro tier.",
+            : "Version history requires a higher tier.",
         };
       case "bulk_import":
         return {
           allowed: limits.bulkImportEnabled,
           reason: limits.bulkImportEnabled
             ? undefined
-            : "Bulk import requires Pro tier.",
+            : "Bulk import requires a higher tier.",
         };
       default:
         return { allowed: false, reason: "Unknown feature" };

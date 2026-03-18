@@ -306,7 +306,7 @@ export const deleteSubscription = internalMutation({
 export const syncOrganizationTier = internalMutation({
   args: {
     organizationId: v.id("organizations"),
-    tier: v.union(v.literal("free"), v.literal("pro")),
+    tier: v.string(),
     userId: v.id("users"),
     action: v.union(
       v.literal("billing.tier_upgraded"),

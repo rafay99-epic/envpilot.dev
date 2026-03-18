@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { getTierLimits, getOrganizationTier } from "./tierLimits";
+import { getTierLimitsFromDb, getOrganizationTier } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 import { batchGetUsers } from "./helpers";
 
@@ -145,7 +145,7 @@ export const create = mutation({
     }
 
     const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = getTierLimits(tier);
+    const limits = await getTierLimitsFromDb(ctx.db, tier);
     if (limits.maxTeamMembers !== null) {
       const members = await ctx.db
         .query("organizationMembers")

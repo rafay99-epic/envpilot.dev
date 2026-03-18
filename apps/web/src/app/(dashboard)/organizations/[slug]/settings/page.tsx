@@ -67,7 +67,7 @@ export default function OrganizationSettingsPage({
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"
   );
-  const orgTier = (tierData?.tier as "free" | "pro") ?? "free";
+  const orgTier = (tierData?.tier as string) ?? "free";
 
   const tabs: { id: OrgSettingsTab; label: string }[] = [
     { id: "general", label: "General" },
@@ -341,7 +341,7 @@ function GeneralOrgSettings({
   successMessage,
 }: {
   organization: Organization;
-  orgTier: "free" | "pro";
+  orgTier: string;
   name: string;
   setName: (v: string) => void;
   description: string;

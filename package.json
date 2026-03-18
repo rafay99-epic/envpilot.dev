@@ -1,6 +1,6 @@
 {
   "name": "envpilot-monorepo",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Envpilot — secure environment variable management for teams",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -16,12 +16,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names web,convex --prefix-colors blue,green \"turbo dev --filter=@envpilot/web\" \"convex dev\"",
+    "dev": "concurrently --names web,convex,admin --prefix-colors blue,green,magenta \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\"",
     "dev:cli": "turbo dev --filter=@envpilot/cli",
+    "dev:admin": "turbo dev --filter=@envpilot/admin",
     "dev:extension": "turbo dev --filter=envpilot",
     "build": "turbo build",
     "build:web": "turbo build --filter=@envpilot/web",
     "build:cli": "turbo build --filter=@envpilot/cli",
+    "build:admin": "turbo build --filter=@envpilot/admin",
     "build:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce package --no-dependencies",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

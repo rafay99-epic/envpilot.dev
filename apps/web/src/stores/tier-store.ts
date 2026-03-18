@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Tier, TierLimits } from "@/lib/tier-limits";
+import type { TierLimits } from "@/lib/tier-limits";
 
 export interface ProjectVariableCount {
   projectId: string;
@@ -19,7 +19,7 @@ export interface TierUsage {
 
 interface TierState {
   organizationId: string | null;
-  tier: Tier | null;
+  tier: string | null;
   limits: TierLimits | null;
   usage: TierUsage | null;
   isLoading: boolean;
@@ -30,7 +30,7 @@ interface TierState {
 interface TierActions {
   setUsageData: (data: {
     organizationId: string;
-    tier: Tier;
+    tier: string;
     limits: TierLimits;
     usage: TierUsage;
   }) => void;

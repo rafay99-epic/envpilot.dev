@@ -1,0 +1,39 @@
+{
+  "name": "@envpilot/admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.120.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "convex": "^1.32.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.0.2",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
+    "@tailwindcss/vite": "^4.1.7",
+    "@tanstack/router-plugin": "^1.120.3",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "eslint": "^9.28.0",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
