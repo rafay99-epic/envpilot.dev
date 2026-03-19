@@ -2376,17 +2376,17 @@ export const listRotationVariables = query({
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const variables = await ctx.db
+    // Fetch all non-deleted variables and filter in JS —
+    // Convex filters on optional fields can be unreliable with undefined checks
+    const allVariables = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_expires_at")
-      .filter((q) =>
-        q.and(
-          q.neq(q.field("rotationFrequencyDays"), undefined),
-          q.gt(q.field("rotationFrequencyDays"), 0),
-          q.eq(q.field("deletedAt"), undefined)
-        )
-      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+
+    const variables = allVariables.filter(
+      (v) =>
+        v.rotationFrequencyDays !== undefined && v.rotationFrequencyDays > 0
+    );
 
     const results = [];
     for (const variable of variables) {

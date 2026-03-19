@@ -1553,18 +1553,19 @@ export const processRotationExpiry = internalMutation({
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const oneDay = 24 * 60 * 60 * 1000;
 
-    // Use the by_expires_at index to only fetch variables with rotation enabled
-    const rotatingVariables = await ctx.db
+    // Fetch all non-deleted variables and filter in JS —
+    // Convex filters on optional fields can miss documents where the field doesn't exist
+    const allVars = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_expires_at")
-      .filter((q) =>
-        q.and(
-          q.neq(q.field("expiresAt"), undefined),
-          q.eq(q.field("deletedAt"), undefined),
-          q.neq(q.field("rotationFrequencyDays"), undefined)
-        )
-      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+
+    const rotatingVariables = allVars.filter(
+      (v) =>
+        v.expiresAt !== undefined &&
+        v.rotationFrequencyDays !== undefined &&
+        v.rotationFrequencyDays > 0
+    );
 
     let expired = 0;
     let expiringSoon = 0;

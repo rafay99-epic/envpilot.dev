@@ -361,16 +361,12 @@ export async function countRotationEnabledVariables(
     const vars = await db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("deletedAt"), undefined),
-          q.neq(q.field("rotationFrequencyDays"), undefined),
-          q.gt(q.field("rotationFrequencyDays"), 0)
-        )
-      )
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
     for (const v of vars) {
+      if (v.rotationFrequencyDays === undefined || v.rotationFrequencyDays <= 0)
+        continue;
       if (excludeVariableId && v._id === excludeVariableId) continue;
       count++;
     }
