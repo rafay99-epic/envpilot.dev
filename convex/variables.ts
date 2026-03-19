@@ -619,6 +619,13 @@ export const create = mutation({
       throw new Error(varCheck.reason!);
     }
 
+    // Validate rotation frequency bounds
+    if (args.rotationFrequencyDays !== undefined) {
+      if (args.rotationFrequencyDays < 0 || args.rotationFrequencyDays > 3650) {
+        throw new Error("Rotation frequency must be between 0 and 3650 days");
+      }
+    }
+
     // If rotation is requested, check feature gate
     if (args.rotationFrequencyDays && args.rotationFrequencyDays > 0) {
       const rotationCheck = await checkBooleanFeature(
@@ -742,6 +749,13 @@ export const update = mutation({
       requiredOrgRoles: ["admin", "team_lead"],
       requiredProjectRoles: ["manager", "developer"],
     });
+
+    // Validate rotation frequency bounds
+    if (rotationFrequencyDays !== undefined) {
+      if (rotationFrequencyDays < 0 || rotationFrequencyDays > 3650) {
+        throw new Error("Rotation frequency must be between 0 and 3650 days");
+      }
+    }
 
     // If rotation is being set/changed, check feature gate
     if (rotationFrequencyDays !== undefined && rotationFrequencyDays > 0) {
