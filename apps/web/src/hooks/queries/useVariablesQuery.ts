@@ -13,6 +13,9 @@ interface Variable {
   updatedAt: number;
   vaultRef?: string;
   permission?: "read" | "write" | "admin" | null;
+  rotationFrequencyDays?: number;
+  expiresAt?: number;
+  rotationStatus?: "active" | "expiring_soon" | "expired";
 }
 
 interface VersionRecord {
@@ -73,6 +76,7 @@ export function useCreateVariable() {
       environments: string[];
       projectId: string;
       isSensitive: boolean;
+      rotationFrequencyDays?: number;
     }) =>
       api.post<{
         variable?: Variable;
@@ -107,6 +111,7 @@ export function useUpdateVariable() {
       environments?: string[];
       isSensitive?: boolean;
       changeReason?: string;
+      rotationFrequencyDays?: number;
     }) =>
       api.patch<{ variable: Variable }>(`/api/variables/${variableId}`, data),
     onSuccess: (_, variables) => {

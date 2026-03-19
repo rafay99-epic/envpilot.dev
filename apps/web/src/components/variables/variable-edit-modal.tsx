@@ -11,6 +11,7 @@ interface Variable {
   description?: string;
   environments: string[];
   isSensitive: boolean;
+  rotationFrequencyDays?: number;
 }
 
 interface VariableEditModalProps {
@@ -21,6 +22,7 @@ interface VariableEditModalProps {
     variableId: Id<"environmentVariables">,
     data: VariableFormData
   ) => Promise<void>;
+  showRotation?: boolean;
 }
 
 export function VariableEditModal({
@@ -28,6 +30,7 @@ export function VariableEditModal({
   onClose,
   variable,
   onSave,
+  showRotation = false,
 }: VariableEditModalProps) {
   const initialData: Partial<VariableFormData> | undefined = variable
     ? {
@@ -36,6 +39,7 @@ export function VariableEditModal({
         description: variable.description || "",
         environments: variable.environments as Environment[],
         isSensitive: variable.isSensitive,
+        rotationFrequencyDays: variable.rotationFrequencyDays,
       }
     : undefined;
 
@@ -54,6 +58,7 @@ export function VariableEditModal({
           onCancel={onClose}
           submitLabel="Update Variable"
           isEditing
+          showRotation={showRotation}
         />
       )}
     </DrawerPanel>

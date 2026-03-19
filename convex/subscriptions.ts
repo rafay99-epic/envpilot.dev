@@ -8,7 +8,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { DatabaseReader } from "./_generated/server";
-import { getDefaultTierName } from "./tierLimits";
+import { getDefaultTierName, isCronPaused } from "./tierLimits";
 import { getUserTier } from "./featureRegistry";
 
 /**
@@ -518,6 +518,8 @@ export const _clearGracePeriod = internalMutation({
  */
 export const expireGracePeriods = internalMutation({
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_expire_grace_periods")) return;
+
     const active = await ctx.db
       .query("subscriptionGracePeriods")
       .withIndex("by_active", (q) => q.eq("isActive", true))

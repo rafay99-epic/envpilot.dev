@@ -277,6 +277,7 @@ interface NotificationPrefs {
   memberUpdates: boolean;
   accessRequests: boolean;
   securityAlerts: boolean;
+  rotationReminders: boolean;
 }
 
 function NotificationSettings() {
@@ -285,6 +286,7 @@ function NotificationSettings() {
     memberUpdates: true,
     accessRequests: true,
     securityAlerts: true,
+    rotationReminders: true,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -361,6 +363,13 @@ function NotificationSettings() {
       description: "Session revocations and suspicious activity",
       icon: ShieldAlert,
       activeColor: "text-red-400",
+    },
+    {
+      key: "rotationReminders",
+      label: "Rotation reminders",
+      description: "When secrets are approaching expiry",
+      icon: RotateCcw,
+      activeColor: "text-orange-400",
     },
   ];
 

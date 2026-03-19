@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Textarea";
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { timeAgo } from "@/lib/utils";
 import { ShieldBan, ShieldCheck } from "lucide-react";
 import { useConfirmStore } from "@/stores/confirm-store";
@@ -31,6 +32,19 @@ function UsersPage() {
   const banUser = useAdminMutation(api.admin.banUser);
   const unbanUser = useAdminMutation(api.admin.unbanUser);
   const { confirm } = useConfirmStore();
+
+  const [search, setSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return undefined;
+    if (!search.trim()) return users;
+    const term = search.toLowerCase();
+    return (users as UserRow[]).filter(
+      (u) =>
+        (u.name && u.name.toLowerCase().includes(term)) ||
+        (u.email && u.email.toLowerCase().includes(term))
+    );
+  }, [users, search]);
 
   const [banModal, setBanModal] = useState<{
     userId: Id<"users">;
@@ -136,9 +150,26 @@ function UsersPage() {
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-zinc-100">Users</h1>
 
+      <div className="mb-4">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name or email..."
+          className="w-72"
+        />
+      </div>
+
+      {users && (
+        <p className="mb-3 text-xs text-zinc-500">
+          {search.trim()
+            ? `${filteredUsers?.length ?? 0} of ${users.length} users match`
+            : `${users.length} users`}
+        </p>
+      )}
+
       <DataTable
         columns={columns}
-        data={users as unknown as UserRow[] | undefined}
+        data={filteredUsers as unknown as UserRow[] | undefined}
         isLoading={!users}
         rowKey={(row) => row._id}
         emptyMessage="No users found"

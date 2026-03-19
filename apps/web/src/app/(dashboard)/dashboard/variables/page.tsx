@@ -6,6 +6,7 @@ import {
   useProjects,
   useConvexUser,
   usePagination,
+  useFeatureGate,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
@@ -39,6 +40,7 @@ import {
   Trash2,
   Check,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 
 interface Variable {
@@ -52,6 +54,9 @@ interface Variable {
   projectName?: string;
   vaultRef?: string;
   version: number;
+  rotationFrequencyDays?: number;
+  rotationStatus?: "active" | "expiring_soon" | "expired";
+  expiresAt?: number;
 }
 
 export default function VariablesPage() {
@@ -65,6 +70,10 @@ export default function VariablesPage() {
   const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE);
   const canUpdateVariable = hasPermission(PERMISSIONS.VARIABLE_UPDATE);
   const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
+  const { allowed: showRotation } = useFeatureGate(
+    activeOrganizationId,
+    "secret_rotation"
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("all");
@@ -152,6 +161,7 @@ export default function VariablesPage() {
           description: data.description || undefined,
           environments: data.environments,
           isSensitive: data.isSensitive,
+          rotationFrequencyDays: data.rotationFrequencyDays,
           changeReason: "Updated via dashboard",
         }),
       });
@@ -370,6 +380,7 @@ export default function VariablesPage() {
         onClose={() => setEditingVariable(null)}
         variable={editingVariable}
         onSave={handleUpdateVariable}
+        showRotation={showRotation}
       />
 
       {/* Delete Confirmation */}
@@ -461,6 +472,21 @@ function VariableRow({
                 {env}
               </TerminalBadge>
             ))}
+            {variable.rotationStatus === "expiring_soon" && (
+              <TerminalBadge color="amber">expiring</TerminalBadge>
+            )}
+            {variable.rotationStatus === "expired" && (
+              <TerminalBadge color="red">expired</TerminalBadge>
+            )}
+            {variable.rotationFrequencyDays &&
+              variable.rotationFrequencyDays > 0 &&
+              variable.rotationStatus !== "expiring_soon" &&
+              variable.rotationStatus !== "expired" && (
+                <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                  <RotateCcw className="h-3 w-3" />
+                  {variable.rotationFrequencyDays}d
+                </span>
+              )}
           </div>
         </td>
         <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">

@@ -1,6 +1,6 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
@@ -554,5 +554,95 @@ export const sendAccessRequestEmail = action({
       html,
       text
     );
+  },
+});
+
+// ============================================================
+// Rotation Reminder Emails
+// ============================================================
+
+export const sendRotationReminderEmail = internalAction({
+  args: {
+    variableName: v.string(),
+    projectName: v.string(),
+    organizationId: v.id("organizations"),
+    expiresAt: v.number(),
+    reminderType: v.union(
+      v.literal("7_days"),
+      v.literal("1_day"),
+      v.literal("expired")
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Get all org members to notify
+    const members = await ctx.runQuery(
+      internal.organizations.getMembersInternal,
+      { organizationId: args.organizationId }
+    );
+
+    if (!members || members.length === 0) return;
+
+    const safeVar = escapeHtml(args.variableName);
+    const safeProject = escapeHtml(args.projectName);
+
+    const expirationDate = new Date(args.expiresAt).toLocaleDateString(
+      "en-US",
+      { year: "numeric", month: "long", day: "numeric" }
+    );
+
+    const isExpired = args.reminderType === "expired";
+    const daysText =
+      args.reminderType === "7_days"
+        ? "7 days"
+        : args.reminderType === "1_day"
+          ? "1 day"
+          : "";
+
+    const heading = isExpired ? "Secret Expired" : "Secret Expiring Soon";
+
+    const description = isExpired
+      ? `The secret <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong> has expired and should be rotated immediately.`
+      : `The secret <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong> will expire in <strong>${daysText}</strong> (${expirationDate}).`;
+
+    const subject = isExpired
+      ? `Secret ${args.variableName} has expired in ${args.projectName}`
+      : `Secret ${args.variableName} expires in ${daysText} - ${args.projectName}`;
+
+    const bgColor = isExpired ? "#dc2626" : "#f59e0b";
+
+    const html = emailWrapper(
+      heading,
+      [
+        iconRow(args.projectName.charAt(0).toUpperCase(), bgColor),
+        headingRow(heading),
+        paragraphRow(description),
+        paragraphRow(
+          "Please rotate this secret to maintain security.",
+          "font-size: 14px; line-height: 1.5; color: #71717a;"
+        ),
+        footerRow(
+          'You received this because rotation reminders are enabled. <a href="#" style="color: #71717a;">Manage preferences</a>'
+        ),
+      ].join("")
+    );
+
+    const text = `${heading}\n\n${isExpired ? `The secret ${args.variableName} in ${args.projectName} has expired.` : `The secret ${args.variableName} in ${args.projectName} will expire in ${daysText} (${expirationDate}).`}\n\nPlease rotate this secret to maintain security.`;
+
+    for (const member of members) {
+      if (!member?.user?.email) continue;
+      // Only notify admins and team leads — they can act on rotation
+      if (member.role !== "admin" && member.role !== "team_lead") continue;
+
+      // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
+      const prefs = await ctx.runQuery(
+        internal.userPreferences.getByUserIdInternal,
+        { userId: member.user._id }
+      );
+      if (prefs?.emailNotifications?.rotationReminders === false) continue;
+
+      await sendEmail(member.user.email, subject, html, text).catch((err) =>
+        console.warn("[EMAIL] Rotation reminder failed:", err)
+      );
+    }
   },
 });

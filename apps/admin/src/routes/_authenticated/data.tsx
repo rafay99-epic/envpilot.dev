@@ -4,16 +4,30 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useState } from "react";
-import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
+import {
+  useAdminMutation,
+  useAdminPaginatedQuery,
+} from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Textarea } from "@/components/ui/Textarea";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Database, Pencil, Trash2 } from "lucide-react";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { KebabMenu, type KebabMenuItem } from "@/components/ui/KebabMenu";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+import { CellValue } from "@/components/data-browser/CellValue";
+import { RowEditDrawer } from "@/components/data-browser/RowEditDrawer";
 import { useConfirmStore } from "@/stores/confirm-store";
+import {
+  Database,
+  Pencil,
+  Copy,
+  Trash2,
+  Columns3,
+  RefreshCw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const BROWSABLE_TABLES = [
   { value: "", label: "Select a table..." },
@@ -44,12 +58,17 @@ const BROWSABLE_TABLES = [
   { value: "cliTokens", label: "cliTokens" },
   { value: "environmentTemplates", label: "environmentTemplates" },
   { value: "templateVariables", label: "templateVariables" },
-  { value: "permissionRevocationEvents", label: "permissionRevocationEvents" },
+  {
+    value: "permissionRevocationEvents",
+    label: "permissionRevocationEvents",
+  },
   { value: "supportTickets", label: "supportTickets" },
   { value: "contactMessages", label: "contactMessages" },
-  { value: "tierConfig", label: "tierConfig" },
+  { value: "tierDefinitions", label: "tierDefinitions" },
   { value: "adminSettings", label: "adminSettings" },
 ];
+
+const PAGE_SIZE = 50;
 
 type SearchParams = { table?: string };
 
@@ -63,62 +82,103 @@ export const Route = createFileRoute("/_authenticated/data")({
 function DataBrowserPage() {
   const { table } = useSearch({ from: "/_authenticated/data" });
   const navigate = useNavigate();
+  const { confirm } = useConfirmStore();
 
-  const tableData = useAdminQuery(
-    api.admin.browseTable,
-    table ? { tableName: table } : "skip"
+  // Paginated data fetch
+  const {
+    results: rows,
+    status,
+    loadMore,
+  } = useAdminPaginatedQuery(
+    api.admin.browseTablePaginated,
+    table ? { tableName: table } : "skip",
+    { initialNumItems: PAGE_SIZE }
   );
 
   const updateRow = useAdminMutation(api.admin.updateTableRow);
   const deleteRow = useAdminMutation(api.admin.deleteTableRow);
-  const { confirm } = useConfirmStore();
 
-  const [editModal, setEditModal] = useState<{
-    id: string;
-    data: string;
-  } | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  // Reset state when table changes
   const handleTableChange = (newTable: string) => {
+    setSearch("");
+    setHiddenColumns(new Set());
+    setSortKey(null);
+    setEditRow(null);
+    setShowColumnPicker(false);
     navigate({
       to: "/data",
       search: newTable ? { table: newTable } : {},
     });
   };
 
-  const handleEdit = (row: Record<string, unknown>) => {
-    setEditModal({
-      id: row._id as string,
-      data: JSON.stringify(row, null, 2),
-    });
-  };
+  // Build ordered column keys from all loaded rows
+  const allKeys = new Set<string>();
+  if (rows) {
+    for (const row of rows as Record<string, unknown>[]) {
+      for (const k of Object.keys(row)) {
+        allKeys.add(k);
+      }
+    }
+  }
+  const columnKeys = Array.from(allKeys)
+    .filter((k) => k !== "_id" && k !== "_creationTime")
+    .sort();
+  const orderedKeys = ["_id", ...columnKeys, "_creationTime"];
 
-  const handleSave = async () => {
-    if (!editModal || !table) return;
-    setSaving(true);
-    try {
-      // Validate JSON
-      JSON.parse(editModal.data);
-      await updateRow({
-        tableName: table,
-        id: editModal.id,
-        fields: editModal.data,
-      });
-      setEditModal(null);
-    } catch (err) {
-      alert(
-        err instanceof SyntaxError
-          ? "Invalid JSON"
-          : err instanceof Error
-            ? err.message
-            : "Failed to save"
+  // Visible columns
+  const visibleKeys = orderedKeys.filter((k) => !hiddenColumns.has(k));
+
+  // Client-side search filter
+  let displayRows: Record<string, unknown>[] = [];
+  if (rows) {
+    if (!search.trim()) {
+      displayRows = rows as Record<string, unknown>[];
+    } else {
+      const term = search.toLowerCase();
+      displayRows = (rows as Record<string, unknown>[]).filter((row) =>
+        Object.values(row).some(
+          (v) => typeof v === "string" && v.toLowerCase().includes(term)
+        )
       );
-    } finally {
-      setSaving(false);
+    }
+  }
+
+  // Client-side sorting
+  if (sortKey && displayRows.length > 0) {
+    displayRows = [...displayRows].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
     }
   };
 
-  const handleDelete = async (rowId: string) => {
+  const handleSave = async (id: string, fields: string) => {
+    if (!table) return;
+    await updateRow({ tableName: table, id, fields });
+  };
+
+  const handleDelete = async (id: string) => {
     if (!table) return;
     const ok = await confirm({
       title: "Delete Row",
@@ -127,22 +187,43 @@ function DataBrowserPage() {
       variant: "danger",
     });
     if (!ok) return;
-    await deleteRow({ tableName: table, id: rowId });
+    await deleteRow({ tableName: table, id });
   };
 
-  // Build columns dynamically from data
-  const rows = table ? tableData : undefined;
-  const allKeys = new Set<string>();
-  if (rows && Array.isArray(rows)) {
-    rows.forEach((row: Record<string, unknown>) => {
-      Object.keys(row).forEach((k) => allKeys.add(k));
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const getRowActions = (row: Record<string, unknown>): KebabMenuItem[] => [
+    {
+      label: "Edit",
+      icon: <Pencil className="h-3.5 w-3.5" />,
+      onClick: () => setEditRow(row),
+    },
+    {
+      label: "Copy ID",
+      icon: <Copy className="h-3.5 w-3.5" />,
+      onClick: () => copyToClipboard(row._id as string),
+    },
+    {
+      label: "Delete",
+      icon: <Trash2 className="h-3.5 w-3.5" />,
+      onClick: () => handleDelete(row._id as string),
+      variant: "danger",
+    },
+  ];
+
+  const toggleColumn = (key: string) => {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
     });
-  }
-  const columnKeys = Array.from(allKeys).filter(
-    (k) => k !== "_id" && k !== "_creationTime"
-  );
-  // Put _id first, then sorted keys, then _creationTime last
-  const orderedKeys = ["_id", ...columnKeys.sort(), "_creationTime"];
+  };
 
   return (
     <div>
@@ -150,117 +231,202 @@ function DataBrowserPage() {
         Data Browser
       </h1>
 
-      <div className="mb-6 w-64">
-        <Select
-          label="Table"
-          id="table-select"
-          options={BROWSABLE_TABLES}
-          value={table ?? ""}
-          onChange={(e) => handleTableChange(e.target.value)}
-        />
+      {/* Command bar */}
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="w-64">
+          <Select
+            label="Table"
+            id="table-select"
+            options={BROWSABLE_TABLES}
+            value={table ?? ""}
+            onChange={(e) => handleTableChange(e.target.value)}
+          />
+        </div>
+
+        {table && (
+          <>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Filter loaded rows..."
+              className="w-64"
+            />
+
+            {/* Column visibility */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowColumnPicker(!showColumnPicker)}
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+              </Button>
+              {showColumnPicker && (
+                <ColumnPicker
+                  allKeys={Array.from(allKeys)}
+                  hiddenColumns={hiddenColumns}
+                  onToggle={toggleColumn}
+                  onClose={() => setShowColumnPicker(false)}
+                />
+              )}
+            </div>
+
+            {/* Refresh */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleTableChange(table)}
+              title="Refresh"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
       </div>
 
+      {/* Row count summary */}
+      {table && rows && (
+        <p className="mb-3 text-xs text-zinc-500">
+          {search.trim()
+            ? `${displayRows.length} of ${rows.length} loaded rows match filter`
+            : `${rows.length} rows loaded`}
+          {status === "Exhausted" && " (all loaded)"}
+        </p>
+      )}
+
+      {/* Table */}
       {!table ? (
         <EmptyState
           icon={<Database className="h-8 w-8" />}
           title="Select a table to browse"
           description="Choose a table from the dropdown above to view its data."
         />
-      ) : !rows ? (
+      ) : status === "LoadingFirstPage" ? (
         <Spinner />
-      ) : !Array.isArray(rows) || rows.length === 0 ? (
+      ) : !rows || rows.length === 0 ? (
         <EmptyState title={`No rows in ${table}`} />
+      ) : displayRows.length === 0 ? (
+        <EmptyState
+          title="No matching rows"
+          description="Try adjusting your search filter or load more rows."
+        />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-800 bg-zinc-900/50">
-              <tr>
-                {orderedKeys.map((key) => (
-                  <th
-                    key={key}
-                    className="whitespace-nowrap px-3 py-2 font-medium text-zinc-400"
-                  >
-                    {key}
-                  </th>
-                ))}
-                <th className="px-3 py-2 font-medium text-zinc-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {(rows as Record<string, unknown>[]).map(
-                (row: Record<string, unknown>, i: number) => (
+        <>
+          <div className="max-h-[calc(100vh-280px)] overflow-auto rounded-lg border border-zinc-800">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900">
+                <tr>
+                  {visibleKeys.map((key) => (
+                    <th
+                      key={key}
+                      className="cursor-pointer select-none whitespace-nowrap px-3 py-2.5 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+                      onClick={() => handleSort(key)}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {key}
+                        {sortKey === key && (
+                          <span className="text-emerald-400">
+                            {sortDir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="sticky right-0 w-10 bg-zinc-900 px-2 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/50">
+                {displayRows.map((row, i) => (
                   <tr
                     key={(row._id as string) ?? i}
-                    className="hover:bg-zinc-800/30"
+                    className="cursor-pointer transition-colors hover:bg-zinc-800/30"
+                    onClick={() => setEditRow(row)}
                   >
-                    {orderedKeys.map((key) => (
+                    {visibleKeys.map((key) => (
                       <td
                         key={key}
-                        className="max-w-[200px] truncate whitespace-nowrap px-3 py-2 text-zinc-300"
-                        title={String(row[key] ?? "")}
+                        className="max-w-[240px] whitespace-nowrap px-3 py-2 text-sm text-zinc-300"
                       >
-                        {row[key] === null || row[key] === undefined
-                          ? "\u2014"
-                          : typeof row[key] === "object"
-                            ? JSON.stringify(row[key])
-                            : String(row[key])}
+                        <CellValue value={row[key]} fieldKey={key} />
                       </td>
                     ))}
-                    <td className="whitespace-nowrap px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(row)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(row._id as string)}
-                        >
-                          <Trash2 className="h-3 w-3 text-red-400" />
-                        </Button>
-                      </div>
+                    <td className="sticky right-0 bg-zinc-950 px-2 py-2">
+                      <KebabMenu items={getRowActions(row)} />
                     </td>
                   </tr>
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <PaginationControls
+            status={status}
+            loadMore={loadMore}
+            numItems={PAGE_SIZE}
+            loadedCount={rows.length}
+          />
+        </>
       )}
 
-      <Modal
-        isOpen={!!editModal}
-        onClose={() => setEditModal(null)}
-        title="Edit Row"
-        className="max-w-2xl"
-      >
-        <div className="space-y-4">
-          <Textarea
-            label="JSON Data"
-            id="edit-row-data"
-            value={editModal?.data ?? ""}
-            onChange={(e) =>
-              setEditModal((prev) =>
-                prev ? { ...prev, data: e.target.value } : null
-              )
-            }
-            rows={15}
-            className="font-mono text-xs"
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setEditModal(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Edit drawer */}
+      <RowEditDrawer
+        isOpen={!!editRow}
+        onClose={() => setEditRow(null)}
+        row={editRow}
+        tableName={table ?? ""}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
     </div>
+  );
+}
+
+// ─── Column Picker Dropdown ─────────────────────────────
+
+function ColumnPicker({
+  allKeys,
+  hiddenColumns,
+  onToggle,
+  onClose,
+}: {
+  allKeys: string[];
+  hiddenColumns: Set<string>;
+  onToggle: (key: string) => void;
+  onClose: () => void;
+}) {
+  // Sort: _id first, _creationTime last, rest alphabetical
+  const sorted = [...allKeys].sort((a, b) => {
+    if (a === "_id") return -1;
+    if (b === "_id") return 1;
+    if (a === "_creationTime") return 1;
+    if (b === "_creationTime") return -1;
+    return a.localeCompare(b);
+  });
+
+  return (
+    <>
+      {/* Backdrop to close */}
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+        {sorted.map((key) => (
+          <label
+            key={key}
+            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
+          >
+            <input
+              type="checkbox"
+              checked={!hiddenColumns.has(key)}
+              onChange={() => onToggle(key)}
+              className="rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+            />
+            <span className={cn(hiddenColumns.has(key) && "text-zinc-500")}>
+              {key}
+            </span>
+          </label>
+        ))}
+      </div>
+    </>
   );
 }

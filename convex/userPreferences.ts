@@ -7,6 +7,7 @@ const DEFAULT_NOTIFICATIONS = {
   memberUpdates: true,
   accessRequests: true,
   securityAlerts: true,
+  rotationReminders: true,
 };
 
 export const getByUserId = query({
@@ -63,6 +64,7 @@ export const upsert = mutation({
         memberUpdates: v.boolean(),
         accessRequests: v.boolean(),
         securityAlerts: v.boolean(),
+        rotationReminders: v.optional(v.boolean()),
       })
     ),
     keyboardShortcuts: v.optional(v.record(v.string(), v.string())),

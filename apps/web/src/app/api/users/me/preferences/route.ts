@@ -41,6 +41,7 @@ const preferencesSchema = z.object({
       memberUpdates: z.boolean(),
       accessRequests: z.boolean(),
       securityAlerts: z.boolean(),
+      rotationReminders: z.boolean().optional(),
     })
     .optional(),
   keyboardShortcuts: z.record(z.string(), z.string()).optional(),

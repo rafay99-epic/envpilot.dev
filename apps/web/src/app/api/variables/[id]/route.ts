@@ -23,6 +23,7 @@ const updateVariableSchema = z.object({
     .optional(),
   isSensitive: z.boolean().optional(),
   changeReason: z.string().max(200).optional(),
+  rotationFrequencyDays: z.number().int().min(0).max(3650).optional(),
 });
 
 interface RouteContext {
@@ -184,8 +185,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const { value, description, environments, isSensitive, changeReason } =
-      validation.data;
+    const {
+      value,
+      description,
+      environments,
+      isSensitive,
+      changeReason,
+      rotationFrequencyDays,
+    } = validation.data;
 
     // If value is being updated, update the existing encrypted value in Vault.
     let vaultRef: string | undefined;
@@ -202,6 +209,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       isSensitive,
       updatedBy: convexUser._id,
       changeReason,
+      rotationFrequencyDays,
     });
 
     const updatedVariable = await convex.query(api.variables.getById, {

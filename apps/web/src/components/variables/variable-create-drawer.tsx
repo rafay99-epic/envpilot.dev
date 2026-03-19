@@ -8,6 +8,7 @@ import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { ProOnlyBadge, LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
 
 interface VariableCreateDrawerProps {
@@ -40,6 +41,7 @@ export function VariableCreateDrawer({
 
   const varCheck = useTierLimitCheck(orgId, "create_variable", projId);
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
+  const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
 
   const bulkBlocked = enforcing && !bulkCheck.isLoading && !bulkCheck.allowed;
   const varBlocked = enforcing && !varCheck.isLoading && !varCheck.allowed;
@@ -141,6 +143,7 @@ export function VariableCreateDrawer({
             onSubmit={handleSingleSubmit}
             onCancel={handleClose}
             submitLabel={submitLabel}
+            showRotation={showRotation}
           />
         )
       ) : bulkBlocked ? (

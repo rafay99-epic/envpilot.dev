@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useState } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/utils";
 import { useConfirmStore } from "@/stores/confirm-store";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Mail, Eye, EyeOff, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/messages")({
@@ -21,7 +22,20 @@ function MessagesPage() {
   const deleteMessage = useAdminMutation(api.admin.deleteContactMessage);
   const { confirm } = useConfirmStore();
 
+  const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const filteredMessages = useMemo(() => {
+    if (!messages) return undefined;
+    if (!search.trim()) return messages;
+    const term = search.toLowerCase();
+    return messages.filter(
+      (m) =>
+        (m.name && m.name.toLowerCase().includes(term)) ||
+        (m.email && m.email.toLowerCase().includes(term)) ||
+        (m.subject && m.subject.toLowerCase().includes(term))
+    );
+  }, [messages, search]);
 
   if (!messages) return <Spinner />;
   if (messages.length === 0)
@@ -43,6 +57,20 @@ function MessagesPage() {
         Contact Messages
       </h1>
 
+      <div className="mb-4 flex items-center gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search messages..."
+          className="w-72"
+        />
+        <span className="text-xs text-zinc-500">
+          {search.trim()
+            ? `${filteredMessages?.length ?? 0} of ${messages.length} messages`
+            : `${messages.length} messages`}
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-zinc-800">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-800 bg-zinc-900/50">
@@ -56,7 +84,7 @@ function MessagesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/50">
-            {messages.map((msg) => (
+            {filteredMessages?.map((msg) => (
               <Fragment key={msg._id}>
                 <tr
                   className="cursor-pointer transition-colors hover:bg-zinc-800/30"

@@ -345,6 +345,35 @@ export async function countMembersAndPendingInvites(
   return members.length + invites.length;
 }
 
+export async function countRotationEnabledVariables(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  excludeVariableId?: Id<"environmentVariables">
+): Promise<number> {
+  const projects = await db
+    .query("projects")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .filter((q) => q.eq(q.field("deletedAt"), undefined))
+    .collect();
+
+  let count = 0;
+  for (const project of projects) {
+    const vars = await db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .filter((q) => q.eq(q.field("deletedAt"), undefined))
+      .collect();
+
+    for (const v of vars) {
+      if (v.rotationFrequencyDays === undefined || v.rotationFrequencyDays <= 0)
+        continue;
+      if (excludeVariableId && v._id === excludeVariableId) continue;
+      count++;
+    }
+  }
+  return count;
+}
+
 // ==========================================
 // QUERIES (exposed to client)
 // ==========================================
@@ -735,6 +764,24 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "secret_rotation",
+    displayName: "Secret Rotation & Expiry",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
+    key: "secret_rotation_limit",
+    displayName: "Max Rotation-Enabled Variables",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 4,
+  },
 
   // Customization
   {
@@ -867,6 +914,8 @@ export const seedDefaultTierFeatures = internalMutation({
         granular_permissions: "true",
         audit_log_retention_days: "7",
         sso_enabled: "false",
+        secret_rotation: "false",
+        secret_rotation_limit: "7",
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
@@ -887,6 +936,8 @@ export const seedDefaultTierFeatures = internalMutation({
         granular_permissions: "true",
         audit_log_retention_days: "365",
         sso_enabled: "false",
+        secret_rotation: "true",
+        secret_rotation_limit: "null",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",

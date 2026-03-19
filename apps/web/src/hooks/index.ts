@@ -103,6 +103,9 @@ export {
 // Favorite hooks
 export { useFavoriteProjects, useToggleFavorite } from "./useFavorites";
 
+// Expiring variables hook
+export { useExpiringVariables } from "./useExpiringVariables";
+
 // Audit log hooks
 export {
   useOrganizationAuditLogs,
