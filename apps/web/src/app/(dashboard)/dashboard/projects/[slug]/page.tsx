@@ -25,6 +25,7 @@ import {
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { ApiError } from "@/lib/api-client";
 import {
   useProjectBySlug,
@@ -57,6 +58,9 @@ interface Variable {
   updatedAt: number;
   vaultRef?: string;
   permission?: "read" | "write" | "admin" | null;
+  rotationFrequencyDays?: number;
+  expiresAt?: number;
+  rotationStatus?: "active" | "expiring_soon" | "expired";
 }
 
 interface VersionRecord {
@@ -79,6 +83,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canRequestVariable = organization?.role === "member";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
+  const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
 
   // Variable selection store for bulk operations
   const {
@@ -911,6 +916,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onClose={() => setEditingVariable(null)}
         variable={editingVariable}
         onSave={handleUpdateVariable}
+        showRotation={showRotation}
       />
 
       <ConfirmDialog

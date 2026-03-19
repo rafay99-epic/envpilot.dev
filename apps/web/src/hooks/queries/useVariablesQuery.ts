@@ -13,6 +13,9 @@ interface Variable {
   updatedAt: number;
   vaultRef?: string;
   permission?: "read" | "write" | "admin" | null;
+  rotationFrequencyDays?: number;
+  expiresAt?: number;
+  rotationStatus?: "active" | "expiring_soon" | "expired";
 }
 
 interface VersionRecord {
