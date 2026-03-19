@@ -11,12 +11,14 @@ import {
   Database,
   ArrowUpDown,
   LogOut,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/web-traffic", label: "Web Traffic", icon: Globe },
   { to: "/tiers", label: "Tiers & Limits", icon: Crown },
   { to: "/messages", label: "Messages", icon: Mail },
   { to: "/tickets", label: "Tickets", icon: Ticket },

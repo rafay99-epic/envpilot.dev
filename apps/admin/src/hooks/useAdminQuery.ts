@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { useAuthStore } from "@/stores/auth-store";
 import type {
   FunctionReference,
@@ -26,5 +26,16 @@ export function useAdminMutation<F extends FunctionReference<"mutation">>(
   return (args: Omit<FunctionArgs<F>, "secret">) => {
     if (!secret) throw new Error("Not authenticated");
     return mutate({ ...args, secret } as FunctionArgs<F>);
+  };
+}
+
+export function useAdminAction<F extends FunctionReference<"action">>(
+  actionRef: F
+) {
+  const secret = useAuthStore((s) => s.secret);
+  const act = useAction(actionRef);
+  return (args: Omit<FunctionArgs<F>, "secret">) => {
+    if (!secret) throw new Error("Not authenticated");
+    return act({ ...args, secret } as FunctionArgs<F>);
   };
 }
