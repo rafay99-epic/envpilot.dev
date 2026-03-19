@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { checkOrganizationMembership } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
@@ -38,9 +39,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Check extension_access via dynamic feature registry
+    const extCheck = await convex.query(api.featureRegistry.checkFeature, {
+      organizationId: organizationId as Id<"organizations">,
+      featureKey: "extension_access",
+    });
+
     return NextResponse.json({
       data: {
-        enabled: true,
+        enabled: extCheck.allowed,
+        tier: extCheck.tierName,
+        reason: extCheck.allowed
+          ? undefined
+          : "VS Code extension access is not available on your current tier.",
       },
     });
   } catch (error) {

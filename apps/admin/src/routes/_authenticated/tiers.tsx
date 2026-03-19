@@ -10,11 +10,24 @@ import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { DataTable, type Column } from "@/components/ui/DataTable";
-import { Crown, Shield, Plus, Pencil, Trash2, Star } from "lucide-react";
+import {
+  Crown,
+  Shield,
+  Plus,
+  Pencil,
+  Trash2,
+  Star,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/tiers")({
   component: TiersPage,
 });
+
+// ==========================================
+// TYPES
+// ==========================================
 
 interface TierFormData {
   name: string;
@@ -23,16 +36,7 @@ interface TierFormData {
   sortOrder: number;
   isDefault: boolean;
   color: string;
-  maxProjects: string;
-  maxVariablesPerProject: string;
-  maxTeamMembers: string;
-  maxOrganizations: string;
-  auditLogRetentionDays: string;
-  apiAccessEnabled: boolean;
-  extensionAccessEnabled: boolean;
-  granularPermissionsEnabled: boolean;
-  variableVersionHistoryEnabled: boolean;
-  bulkImportEnabled: boolean;
+  stripePriceId: string;
 }
 
 const EMPTY_FORM: TierFormData = {
@@ -42,48 +46,42 @@ const EMPTY_FORM: TierFormData = {
   sortOrder: 0,
   isDefault: false,
   color: "#71717a",
-  maxProjects: "3",
-  maxVariablesPerProject: "50",
-  maxTeamMembers: "3",
-  maxOrganizations: "1",
-  auditLogRetentionDays: "7",
-  apiAccessEnabled: true,
-  extensionAccessEnabled: true,
-  granularPermissionsEnabled: false,
-  variableVersionHistoryEnabled: false,
-  bulkImportEnabled: false,
+  stripePriceId: "",
 };
 
-function parseLimitValue(val: string): number | null {
-  if (val === "" || val === "null" || val === "unlimited") return null;
-  const n = parseInt(val, 10);
-  return isNaN(n) ? null : n;
-}
-
-function limitToString(val: number | null): string {
-  return val === null ? "unlimited" : val.toString();
-}
-
-interface OrgTierRow extends Record<string, unknown> {
+interface UserTierRow extends Record<string, unknown> {
   _id: string;
-  organizationId: Id<"organizations">;
-  organizationName: string;
-  organizationSlug: string | null;
-  memberCount: number;
-  projectCount: number;
+  userId: Id<"users">;
+  userName: string;
+  userEmail: string;
   tier: string;
+  ownedOrgCount: number;
+  graceActive: boolean;
+  gracePeriodEnd?: number;
 }
+
+// ==========================================
+// MAIN PAGE
+// ==========================================
 
 function TiersPage() {
   const tierDefs = useAdminQuery(api.admin.listTierDefinitions, {});
-  const orgTiers = useAdminQuery(api.admin.listOrganizationTiers, {});
   const settings = useAdminQuery(api.admin.getAdminSettings, {});
+  const featureRegistry = useAdminQuery(api.admin.listFeatureRegistry, {});
+  const tierFeatures = useAdminQuery(api.admin.listTierFeatures, {});
+  const userTiers = useAdminQuery(api.admin.listUserTiers, {});
+
   const createTier = useAdminMutation(api.admin.createTierDefinition);
   const updateTier = useAdminMutation(api.admin.updateTierDefinition);
   const deleteTier = useAdminMutation(api.admin.deleteTierDefinition);
   const seedTiers = useAdminMutation(api.admin.seedDefaultTiers);
-  const updateOrgTier = useAdminMutation(api.admin.updateOrganizationTier);
   const updateSetting = useAdminMutation(api.admin.updateAdminSetting);
+  const setTierFeatureValue = useAdminMutation(api.admin.setTierFeatureValue);
+  const removeTierFeatureOverride = useAdminMutation(
+    api.admin.removeTierFeatureOverride
+  );
+  const toggleFeatureActive = useAdminMutation(api.admin.toggleFeatureActive);
+  const updateUserTier = useAdminMutation(api.admin.updateUserTier);
 
   const tierEnforcement = settings?.tierEnforcement === "true";
 
@@ -95,6 +93,13 @@ function TiersPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<
+    Record<string, boolean>
+  >({});
+
+  // ==========================================
+  // TIER DEFINITION CRUD
+  // ==========================================
 
   const openCreate = () => {
     setEditingId(null);
@@ -114,17 +119,7 @@ function TiersPage() {
       sortOrder: tier.sortOrder,
       isDefault: tier.isDefault,
       color: tier.color ?? "#71717a",
-      maxProjects: limitToString(tier.limits.maxProjects),
-      maxVariablesPerProject: limitToString(tier.limits.maxVariablesPerProject),
-      maxTeamMembers: limitToString(tier.limits.maxTeamMembers),
-      maxOrganizations: limitToString(tier.limits.maxOrganizations),
-      auditLogRetentionDays: tier.limits.auditLogRetentionDays.toString(),
-      apiAccessEnabled: tier.features.apiAccessEnabled,
-      extensionAccessEnabled: tier.features.extensionAccessEnabled,
-      granularPermissionsEnabled: tier.features.granularPermissionsEnabled,
-      variableVersionHistoryEnabled:
-        tier.features.variableVersionHistoryEnabled,
-      bulkImportEnabled: tier.features.bulkImportEnabled,
+      stripePriceId: tier.stripePriceId ?? "",
     });
     setShowModal(true);
   };
@@ -132,21 +127,6 @@ function TiersPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const limits = {
-        maxProjects: parseLimitValue(form.maxProjects),
-        maxVariablesPerProject: parseLimitValue(form.maxVariablesPerProject),
-        maxTeamMembers: parseLimitValue(form.maxTeamMembers),
-        maxOrganizations: parseLimitValue(form.maxOrganizations),
-        auditLogRetentionDays: parseInt(form.auditLogRetentionDays, 10) || 7,
-      };
-      const features = {
-        apiAccessEnabled: form.apiAccessEnabled,
-        extensionAccessEnabled: form.extensionAccessEnabled,
-        granularPermissionsEnabled: form.granularPermissionsEnabled,
-        variableVersionHistoryEnabled: form.variableVersionHistoryEnabled,
-        bulkImportEnabled: form.bulkImportEnabled,
-      };
-
       if (editingId) {
         await updateTier({
           id: editingId,
@@ -155,8 +135,7 @@ function TiersPage() {
           sortOrder: form.sortOrder,
           isDefault: form.isDefault,
           color: form.color,
-          limits,
-          features,
+          stripePriceId: form.stripePriceId || undefined,
         });
       } else {
         await createTier({
@@ -166,8 +145,7 @@ function TiersPage() {
           sortOrder: form.sortOrder,
           isDefault: form.isDefault,
           color: form.color,
-          limits,
-          features,
+          stripePriceId: form.stripePriceId || undefined,
         });
       }
       setShowModal(false);
@@ -201,19 +179,88 @@ function TiersPage() {
     }
   };
 
-  // Count how many orgs use each tier
+  // Count how many users are on each tier
   const tierUsageCounts: Record<string, number> = {};
-  if (orgTiers) {
-    for (const ot of orgTiers) {
-      tierUsageCounts[ot.tier] = (tierUsageCounts[ot.tier] || 0) + 1;
+  if (userTiers) {
+    for (const ut of userTiers as Array<{ tier: string }>) {
+      tierUsageCounts[ut.tier] = (tierUsageCounts[ut.tier] || 0) + 1;
     }
   }
 
-  const orgColumns: Column<OrgTierRow>[] = [
-    { key: "organizationName", header: "Organization", sortable: true },
-    { key: "organizationSlug", header: "Slug" },
-    { key: "memberCount", header: "Members", sortable: true },
-    { key: "projectCount", header: "Projects", sortable: true },
+  // ==========================================
+  // FEATURE MATRIX HELPERS
+  // ==========================================
+
+  // Build a lookup: tierName -> featureKey -> value
+  const tierFeatureMap: Record<string, Record<string, string>> = {};
+  if (tierFeatures) {
+    for (const tf of tierFeatures) {
+      if (!tierFeatureMap[tf.tierName]) tierFeatureMap[tf.tierName] = {};
+      tierFeatureMap[tf.tierName][tf.featureKey] = tf.value;
+    }
+  }
+
+  const getOverrideValue = (
+    tierName: string,
+    featureKey: string
+  ): string | undefined => {
+    return tierFeatureMap[tierName]?.[featureKey];
+  };
+
+  const getEffectiveValue = (
+    tierName: string,
+    featureKey: string,
+    defaultValue: string
+  ): string => {
+    return getOverrideValue(tierName, featureKey) ?? defaultValue;
+  };
+
+  // Group features by category
+  const featuresByCategory: Record<
+    string,
+    NonNullable<typeof featureRegistry>
+  > = {};
+  if (featureRegistry) {
+    for (const f of featureRegistry) {
+      if (!featuresByCategory[f.category]) featuresByCategory[f.category] = [];
+      featuresByCategory[f.category].push(f);
+    }
+  }
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [cat]: !prev[cat],
+    }));
+  };
+
+  const handleMatrixChange = async (
+    tierName: string,
+    featureKey: string,
+    value: string,
+    defaultValue: string
+  ) => {
+    try {
+      if (value === defaultValue) {
+        // Revert to default — remove override
+        await removeTierFeatureOverride({ tierName, featureKey });
+      } else {
+        await setTierFeatureValue({ tierName, featureKey, value });
+      }
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to update feature value"
+      );
+    }
+  };
+
+  // ==========================================
+  // USER TIER COLUMNS
+  // ==========================================
+
+  const userTierColumns: Column<UserTierRow>[] = [
+    { key: "userName", header: "User", sortable: true },
+    { key: "userEmail", header: "Email", sortable: true },
     {
       key: "tier",
       header: "Tier",
@@ -222,10 +269,17 @@ function TiersPage() {
           value={row.tier}
           onClick={(e) => e.stopPropagation()}
           onChange={async (e) => {
-            await updateOrgTier({
-              organizationId: row.organizationId,
-              newTier: e.target.value,
-            });
+            try {
+              await updateUserTier({
+                userId: row.userId,
+                tier: e.target.value,
+                reason: "admin.manual_reassignment",
+              });
+            } catch (err) {
+              alert(
+                err instanceof Error ? err.message : "Failed to update tier"
+              );
+            }
           }}
           className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
         >
@@ -237,12 +291,34 @@ function TiersPage() {
         </select>
       ),
     },
+    { key: "ownedOrgCount", header: "Owned Orgs", sortable: true },
+    {
+      key: "graceActive",
+      header: "Grace Period",
+      render: (row) =>
+        row.graceActive ? (
+          <Badge variant="default">
+            {Math.ceil(
+              ((row.gracePeriodEnd ?? 0) - Date.now()) / (1000 * 60 * 60 * 24)
+            )}
+            d left
+          </Badge>
+        ) : (
+          <span className="text-zinc-500">—</span>
+        ),
+    },
   ];
+
+  // ==========================================
+  // RENDER
+  // ==========================================
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-100">Tiers & Limits</h1>
+        <h1 className="text-2xl font-semibold text-zinc-100">
+          Tiers & Features
+        </h1>
 
         <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
           <Shield className="h-4 w-4 text-zinc-400" />
@@ -272,7 +348,9 @@ function TiersPage() {
         </div>
       </div>
 
-      {/* Tier Definitions */}
+      {/* ==========================================
+          SECTION 1: TIER DEFINITIONS
+          ========================================== */}
       <div className="mb-8">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-100">
@@ -301,8 +379,8 @@ function TiersPage() {
         ) : tierDefs.length === 0 ? (
           <Card>
             <p className="text-center text-sm text-zinc-400">
-              No tier definitions yet. Click "Seed Defaults" to create the
-              standard free and pro tiers, or add a custom tier.
+              No tier definitions yet. Click &quot;Seed Defaults&quot; to create
+              the standard free and pro tiers, or add a custom tier.
             </p>
           </Card>
         ) : (
@@ -347,7 +425,7 @@ function TiersPage() {
                         tier.isDefault
                           ? "Cannot delete the default tier"
                           : (tierUsageCounts[tier.name] ?? 0) > 0
-                            ? `${tierUsageCounts[tier.name]} org(s) use this tier`
+                            ? `${tierUsageCounts[tier.name]} user(s) on this tier`
                             : "Delete tier"
                       }
                     >
@@ -362,61 +440,11 @@ function TiersPage() {
                   </p>
                 )}
 
-                <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-                  <div className="text-zinc-400">
-                    Projects:{" "}
-                    <span className="text-zinc-200">
-                      {tier.limits.maxProjects ?? "Unlimited"}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Vars/Project:{" "}
-                    <span className="text-zinc-200">
-                      {tier.limits.maxVariablesPerProject ?? "Unlimited"}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Team Members:{" "}
-                    <span className="text-zinc-200">
-                      {tier.limits.maxTeamMembers ?? "Unlimited"}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Organizations:{" "}
-                    <span className="text-zinc-200">
-                      {tier.limits.maxOrganizations ?? "Unlimited"}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Audit Retention:{" "}
-                    <span className="text-zinc-200">
-                      {tier.limits.auditLogRetentionDays}d
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Orgs using:{" "}
-                    <span className="text-zinc-200">
-                      {tierUsageCounts[tier.name] ?? 0}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1">
-                  {tier.features.apiAccessEnabled && (
-                    <Badge variant="success">API</Badge>
-                  )}
-                  {tier.features.extensionAccessEnabled && (
-                    <Badge variant="success">Extension</Badge>
-                  )}
-                  {tier.features.granularPermissionsEnabled && (
-                    <Badge variant="success">Permissions</Badge>
-                  )}
-                  {tier.features.variableVersionHistoryEnabled && (
-                    <Badge variant="success">History</Badge>
-                  )}
-                  {tier.features.bulkImportEnabled && (
-                    <Badge variant="success">Bulk Import</Badge>
-                  )}
+                <div className="text-xs text-zinc-400">
+                  Users:{" "}
+                  <span className="text-zinc-200">
+                    {tierUsageCounts[tier.name] ?? 0}
+                  </span>
                 </div>
               </Card>
             ))}
@@ -424,22 +452,276 @@ function TiersPage() {
         )}
       </div>
 
-      {/* Organization Tier Assignments */}
-      <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-        Organization Tiers
-      </h2>
-      {!orgTiers ? (
-        <Spinner />
-      ) : (
-        <DataTable
-          columns={orgColumns}
-          data={orgTiers as unknown as OrgTierRow[]}
-          rowKey={(row) => row._id}
-          emptyMessage="No organizations found"
-        />
-      )}
+      {/* ==========================================
+          SECTION 2: FEATURE CONFIGURATION MATRIX
+          ========================================== */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+          Feature Configuration Matrix
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          Configure the value of each feature per tier. Bold values are
+          tier-specific overrides; gray values use the feature&apos;s default.
+        </p>
 
-      {/* Create/Edit Tier Modal */}
+        {!featureRegistry || !tierDefs || !tierFeatures ? (
+          <Spinner />
+        ) : featureRegistry.length === 0 ? (
+          <Card>
+            <p className="text-center text-sm text-zinc-400">
+              No features registered. Run the seed function to populate the
+              feature registry.
+            </p>
+          </Card>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400">
+                    Feature
+                  </th>
+                  {tierDefs.map((td) => (
+                    <th
+                      key={td.name}
+                      className="px-4 py-3 text-center text-xs font-medium text-zinc-400"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div
+                          className="h-2 w-2 rounded-full"
+                          style={{
+                            backgroundColor: td.color ?? "#71717a",
+                          }}
+                        />
+                        {td.displayName}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(featuresByCategory).map(
+                  ([category, features]) => (
+                    <>
+                      {/* Category header row */}
+                      <tr
+                        key={`cat-${category}`}
+                        className="cursor-pointer border-b border-zinc-800/50 bg-zinc-900/30 hover:bg-zinc-800/30"
+                        onClick={() => toggleCategory(category)}
+                      >
+                        <td
+                          colSpan={1 + (tierDefs?.length ?? 0)}
+                          className="px-4 py-2"
+                        >
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
+                            {collapsedCategories[category] ? (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                            {category}
+                            <span className="font-normal text-zinc-500">
+                              ({features.length})
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Feature rows */}
+                      {!collapsedCategories[category] &&
+                        features.map((feature) => (
+                          <tr
+                            key={feature._id}
+                            className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
+                          >
+                            <td className="px-4 py-2.5">
+                              <div className="text-xs text-zinc-300">
+                                {feature.displayName}
+                              </div>
+                              <div className="text-[10px] text-zinc-500">
+                                {feature.key}{" "}
+                                <span className="text-zinc-600">
+                                  ({feature.valueType})
+                                </span>
+                              </div>
+                            </td>
+                            {tierDefs.map((td) => {
+                              const override = getOverrideValue(
+                                td.name,
+                                feature.key
+                              );
+                              const effective = getEffectiveValue(
+                                td.name,
+                                feature.key,
+                                feature.defaultValue
+                              );
+                              const hasOverride = override !== undefined;
+
+                              return (
+                                <td
+                                  key={td.name}
+                                  className="px-4 py-2.5 text-center"
+                                >
+                                  {feature.valueType === "boolean" ? (
+                                    <BooleanCell
+                                      value={effective === "true"}
+                                      hasOverride={hasOverride}
+                                      onChange={(val) =>
+                                        handleMatrixChange(
+                                          td.name,
+                                          feature.key,
+                                          val ? "true" : "false",
+                                          feature.defaultValue
+                                        )
+                                      }
+                                    />
+                                  ) : (
+                                    <NumericCell
+                                      value={effective}
+                                      hasOverride={hasOverride}
+                                      onChange={(val) =>
+                                        handleMatrixChange(
+                                          td.name,
+                                          feature.key,
+                                          val,
+                                          feature.defaultValue
+                                        )
+                                      }
+                                    />
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                    </>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ==========================================
+          SECTION 3: USER TIER ASSIGNMENTS
+          ========================================== */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+          User Tier Assignments
+        </h2>
+        {!userTiers ? (
+          <Spinner />
+        ) : userTiers.length === 0 ? (
+          <Card>
+            <p className="text-center text-sm text-zinc-400">
+              No user tier assignments yet. Users will be assigned tiers when
+              they subscribe or are manually assigned.
+            </p>
+          </Card>
+        ) : (
+          <DataTable
+            columns={userTierColumns}
+            data={userTiers as unknown as UserTierRow[]}
+            rowKey={(row) => row._id}
+            emptyMessage="No user tiers found"
+          />
+        )}
+      </div>
+
+      {/* ==========================================
+          SECTION 4: FEATURE REGISTRY (read-only)
+          ========================================== */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+          Feature Registry
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          Features are developer-seeded. Admin can only toggle active/inactive.
+        </p>
+        {!featureRegistry ? (
+          <Spinner />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Key
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Display Name
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Type
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Category
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Default
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-400">
+                    Active
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {featureRegistry.map((f) => (
+                  <tr
+                    key={f._id}
+                    className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
+                  >
+                    <td className="px-4 py-2 font-mono text-xs text-zinc-300">
+                      {f.key}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-300">
+                      {f.displayName}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Badge
+                        variant={
+                          f.valueType === "boolean" ? "default" : "purple"
+                        }
+                      >
+                        {f.valueType}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {f.category}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {f.defaultValue === "null" ? "unlimited" : f.defaultValue}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <button
+                        onClick={() =>
+                          toggleFeatureActive({
+                            featureId: f._id,
+                            isActive: !f.isActive,
+                          })
+                        }
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          f.isActive ? "bg-emerald-600" : "bg-zinc-700"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${
+                            f.isActive ? "translate-x-5" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ==========================================
+          TIER CREATE/EDIT MODAL
+          ========================================== */}
       <Modal
         isOpen={showModal}
         title={editingId ? "Edit Tier" : "Create Tier"}
@@ -474,7 +756,7 @@ function TiersPage() {
             }
             placeholder="Brief description of the tier"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Input
               label="Sort Order"
               id="tier-sort-order"
@@ -496,6 +778,15 @@ function TiersPage() {
               }
               placeholder="#a855f7"
             />
+            <Input
+              label="Stripe Price ID"
+              id="tier-stripe-price"
+              value={form.stripePriceId}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, stripePriceId: e.target.value }))
+              }
+              placeholder="price_..."
+            />
           </div>
 
           <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -507,113 +798,8 @@ function TiersPage() {
               }
               className="rounded border-zinc-600 bg-zinc-800"
             />
-            Set as default tier (assigned to new organizations)
+            Set as default tier (assigned to new users)
           </label>
-
-          <h3 className="pt-2 text-sm font-semibold text-zinc-200">Limits</h3>
-          <p className="text-xs text-zinc-500">
-            Enter a number or "unlimited" for no limit.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Max Projects"
-              id="tier-max-projects"
-              value={form.maxProjects}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, maxProjects: e.target.value }))
-              }
-              placeholder="unlimited"
-            />
-            <Input
-              label="Max Vars/Project"
-              id="tier-max-vars"
-              value={form.maxVariablesPerProject}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  maxVariablesPerProject: e.target.value,
-                }))
-              }
-              placeholder="unlimited"
-            />
-            <Input
-              label="Max Team Members"
-              id="tier-max-members"
-              value={form.maxTeamMembers}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, maxTeamMembers: e.target.value }))
-              }
-              placeholder="unlimited"
-            />
-            <Input
-              label="Max Organizations"
-              id="tier-max-orgs"
-              value={form.maxOrganizations}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  maxOrganizations: e.target.value,
-                }))
-              }
-              placeholder="unlimited"
-            />
-            <Input
-              label="Audit Retention (days)"
-              id="tier-audit-days"
-              type="number"
-              value={form.auditLogRetentionDays}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  auditLogRetentionDays: e.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <h3 className="pt-2 text-sm font-semibold text-zinc-200">Features</h3>
-          <div className="space-y-2">
-            {[
-              {
-                key: "apiAccessEnabled" as const,
-                label: "API Access",
-              },
-              {
-                key: "extensionAccessEnabled" as const,
-                label: "Extension Access",
-              },
-              {
-                key: "granularPermissionsEnabled" as const,
-                label: "Granular Permissions",
-              },
-              {
-                key: "variableVersionHistoryEnabled" as const,
-                label: "Variable Version History",
-              },
-              {
-                key: "bulkImportEnabled" as const,
-                label: "Bulk Import",
-              },
-            ].map((feat) => (
-              <label
-                key={feat.key}
-                className="flex items-center gap-2 text-sm text-zinc-300"
-              >
-                <input
-                  type="checkbox"
-                  checked={form[feat.key]}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      [feat.key]: e.target.checked,
-                    }))
-                  }
-                  className="rounded border-zinc-600 bg-zinc-800"
-                />
-                {feat.label}
-              </label>
-            ))}
-          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={() => setShowModal(false)}>
@@ -625,6 +811,90 @@ function TiersPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// ==========================================
+// MATRIX CELL COMPONENTS
+// ==========================================
+
+function BooleanCell({
+  value,
+  hasOverride,
+  onChange,
+}: {
+  value: boolean;
+  hasOverride: boolean;
+  onChange: (val: boolean) => void;
+}) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      className={`inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+        value ? "bg-emerald-600" : "bg-zinc-700"
+      }`}
+      title={hasOverride ? "Tier override" : "Using default"}
+    >
+      <span
+        className={`inline-block h-3 w-3 rounded-full transition-transform ${
+          hasOverride ? "bg-white" : "bg-zinc-400"
+        } ${value ? "translate-x-5" : "translate-x-1"}`}
+      />
+    </button>
+  );
+}
+
+function NumericCell({
+  value,
+  hasOverride,
+  onChange,
+}: {
+  value: string;
+  hasOverride: boolean;
+  onChange: (val: string) => void;
+}) {
+  const isUnlimited = value === "null";
+  const displayVal = isUnlimited ? "" : value;
+
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <input
+        type="text"
+        value={isUnlimited ? "" : displayVal}
+        placeholder="∞"
+        onChange={(e) => {
+          const v = e.target.value.trim();
+          if (v === "" || v === "∞") {
+            onChange("null");
+          } else {
+            const n = parseInt(v, 10);
+            if (!isNaN(n) && n >= 0) {
+              onChange(n.toString());
+            }
+          }
+        }}
+        className={`w-16 rounded border px-2 py-1 text-center text-xs ${
+          hasOverride
+            ? "border-emerald-600/50 bg-zinc-800 font-semibold text-zinc-100"
+            : "border-zinc-700 bg-zinc-900 text-zinc-400"
+        } focus:border-emerald-500 focus:outline-none`}
+      />
+      <label className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+        <input
+          type="checkbox"
+          checked={isUnlimited}
+          onChange={(e) => {
+            if (e.target.checked) {
+              onChange("null");
+            } else {
+              onChange("0");
+            }
+          }}
+          className="h-3 w-3 rounded border-zinc-600 bg-zinc-800"
+        />
+        ∞
+      </label>
     </div>
   );
 }

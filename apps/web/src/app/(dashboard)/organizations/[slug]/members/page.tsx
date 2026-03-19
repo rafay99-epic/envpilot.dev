@@ -7,9 +7,10 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
-import { TIER_LIMITS } from "@/lib/tier-limits";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
+import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface Member {
   _id: string;
@@ -127,13 +128,15 @@ export default function OrganizationMembersPage({
   }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
   const enforcing = useEnforcementEnabled();
-  const tierLimits =
-    organization?.tier === "pro" ? TIER_LIMITS.pro : TIER_LIMITS.free;
   const totalMemberSlots = members.length + invitations.length;
-  const memberLimitReached =
-    enforcing &&
-    tierLimits.maxTeamMembers !== null &&
-    totalMemberSlots >= tierLimits.maxTeamMembers;
+  const memberLimitGate = useFeatureGate(
+    organization?._id ? (organization._id as Id<"organizations">) : undefined,
+    "max_team_members",
+    { currentCount: totalMemberSlots }
+  );
+  const memberLimitReached = enforcing && !memberLimitGate.allowed;
+  const memberLimit =
+    typeof memberLimitGate.limit === "number" ? memberLimitGate.limit : null;
 
   useEffect(() => {
     fetchData();
@@ -511,7 +514,7 @@ export default function OrganizationMembersPage({
             disabled={memberLimitReached}
             title={
               memberLimitReached
-                ? `Team member limit reached (${totalMemberSlots}/${tierLimits.maxTeamMembers}). Upgrade to Pro for unlimited members.`
+                ? `Team member limit reached (${totalMemberSlots}/${memberLimit}). Upgrade to Pro for unlimited members.`
                 : undefined
             }
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
@@ -539,10 +542,10 @@ export default function OrganizationMembersPage({
       </div>
 
       {/* Member limit warning */}
-      {enforcing && tierLimits.maxTeamMembers !== null && (
+      {enforcing && memberLimit !== null && (
         <LimitWarning
           current={totalMemberSlots}
-          limit={tierLimits.maxTeamMembers}
+          limit={memberLimit}
           resourceName="team members"
         />
       )}

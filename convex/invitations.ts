@@ -1,6 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { getTierLimitsFromDb, getOrganizationTier } from "./tierLimits";
+import {
+  checkNumericLimit,
+  countMembersAndPendingInvites,
+} from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
 import { batchGetUsers } from "./helpers";
 
@@ -139,40 +142,41 @@ export const create = mutation({
     const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
 
     // Check tier limits for team member invitations
-    const org = await ctx.db.get(args.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
+    const totalMembers = await countMembersAndPendingInvites(
+      ctx.db,
+      args.organizationId
+    );
+    const memberCheck = await checkNumericLimit(
+      ctx.db,
+      args.organizationId,
+      "max_team_members",
+      totalMembers
+    );
+    if (!memberCheck.allowed) {
+      throw new Error(memberCheck.reason!);
     }
 
-    const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-    if (limits.maxTeamMembers !== null) {
-      const members = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
+    // Check pending invitation limit separately
+    const pendingInvites = await ctx.db
+      .query("invitations")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("status"), "pending"),
+          q.gt(q.field("expiresAt"), now)
         )
-        .collect();
-
-      const pendingInvitations = await ctx.db
-        .query("invitations")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
-        )
-        .filter((q) => q.eq(q.field("status"), "pending"))
-        .collect();
-
-      const validPendingInvitations = pendingInvitations.filter(
-        (inv) => inv.expiresAt > now
-      );
-
-      const totalMembers = members.length + validPendingInvitations.length;
-
-      if (totalMembers >= limits.maxTeamMembers) {
-        throw new Error(
-          `Team member limit reached (${totalMembers}/${limits.maxTeamMembers}). Upgrade to Pro for unlimited team members.`
-        );
-      }
+      )
+      .collect();
+    const inviteCheck = await checkNumericLimit(
+      ctx.db,
+      args.organizationId,
+      "max_invitations",
+      pendingInvites.length
+    );
+    if (!inviteCheck.allowed) {
+      throw new Error(inviteCheck.reason!);
     }
 
     const existingUser = await ctx.db

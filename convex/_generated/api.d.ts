@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as analytics from "../analytics.js";
 import type * as auditHelpers from "../auditHelpers.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as authHelpers from "../authHelpers.js";
@@ -19,6 +20,7 @@ import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as emails from "../emails.js";
 import type * as favorites from "../favorites.js";
+import type * as featureRegistry from "../featureRegistry.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as helpers from "../helpers.js";
 import type * as invitations from "../invitations.js";
@@ -50,6 +52,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  analytics: typeof analytics;
   auditHelpers: typeof auditHelpers;
   auditLogs: typeof auditLogs;
   authHelpers: typeof authHelpers;
@@ -60,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   emails: typeof emails;
   favorites: typeof favorites;
+  featureRegistry: typeof featureRegistry;
   featureRequests: typeof featureRequests;
   helpers: typeof helpers;
   invitations: typeof invitations;

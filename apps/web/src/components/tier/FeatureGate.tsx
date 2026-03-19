@@ -1,9 +1,15 @@
 "use client";
 
 import { ReactNode } from "react";
-import { useTierLimitCheck, Tier, TierAction } from "@/hooks/useTierLimits";
+import {
+  useTierLimitCheck,
+  type Tier,
+  type TierAction,
+} from "@/hooks/useTierLimits";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
+import { ACTION_TO_FEATURE_KEY } from "@/lib/feature-keys";
 import { UpgradePrompt } from "./UpgradePrompt";
-import { Id } from "@convex/_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface FeatureGateProps {
   /**
@@ -11,11 +17,19 @@ interface FeatureGateProps {
    */
   organizationId: Id<"organizations"> | undefined;
   /**
-   * The action/feature to check
+   * Dynamic feature key (new — preferred)
    */
-  action: TierAction;
+  featureKey?: string;
   /**
-   * Optional project ID (required for create_variable)
+   * Legacy action name (still supported, maps to featureKey internally)
+   */
+  action?: TierAction;
+  /**
+   * Current count for numeric features
+   */
+  currentCount?: number;
+  /**
+   * Optional project ID (required for create_variable with legacy action)
    */
   projectId?: Id<"projects">;
   /**
@@ -41,12 +55,15 @@ interface FeatureGateProps {
 }
 
 /**
- * Component that gates features based on tier limits
- * Renders children if allowed, fallback if not
+ * Component that gates features based on tier limits.
+ * Supports both the new `featureKey` prop and the legacy `action` prop.
+ * Renders children if allowed, fallback if not.
  */
 export function FeatureGate({
   organizationId,
+  featureKey,
   action,
+  currentCount,
   projectId,
   children,
   fallback,
@@ -54,13 +71,29 @@ export function FeatureGate({
   fallbackVariant = "inline",
   currentTier = "free",
 }: FeatureGateProps) {
-  const { isLoading, allowed, reason } = useTierLimitCheck(
-    organizationId,
-    action,
+  // Resolve to feature key: prefer explicit featureKey, then map from action
+  const resolvedKey =
+    featureKey ?? (action ? ACTION_TO_FEATURE_KEY[action] : undefined);
+
+  // Use the new universal hook if we have a feature key
+  const featureGate = useFeatureGate(
+    resolvedKey ? organizationId : undefined,
+    resolvedKey ?? "",
+    { currentCount }
+  );
+
+  // Fallback to legacy hook if using action prop without a feature key mapping
+  const legacyCheck = useTierLimitCheck(
+    !resolvedKey && action ? organizationId : undefined,
+    action ?? "create_project",
     projectId
   );
 
-  // While loading, don't render anything or show a subtle loader
+  const isLoading = resolvedKey ? featureGate.isLoading : legacyCheck.isLoading;
+  const allowed = resolvedKey ? featureGate.allowed : legacyCheck.allowed;
+  const reason = resolvedKey ? featureGate.reason : legacyCheck.reason;
+
+  // While loading, show a subtle loader
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -131,7 +164,7 @@ export function ProOnlyBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white ${sizeClasses[size]}`}
+      className={`inline-flex items-center gap-0.5 font-medium rounded-full bg-linear-to-r from-purple-500 to-indigo-500 text-white ${sizeClasses[size]}`}
       title={showTooltip ? tooltipText : undefined}
     >
       <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -187,7 +220,7 @@ export function LimitWarning({
     return (
       <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
         <svg
-          className="w-4 h-4 flex-shrink-0"
+          className="w-4 h-4 shrink-0"
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -209,11 +242,7 @@ export function LimitWarning({
 
   return (
     <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-lg">
-      <svg
-        className="w-4 h-4 flex-shrink-0"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-      >
+      <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
         <path
           fillRule="evenodd"
           d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"

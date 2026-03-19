@@ -4,7 +4,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { checkOrganizationMembership } from "@/lib/convex-helpers";
-import { getTierLimits } from "@/lib/tier-limits";
+import { checkExtensionAccess } from "@/lib/cli-auth";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -40,6 +40,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Check extension access feature gate
+    const extAccess = await checkExtensionAccess(
+      convex,
+      organizationId as Id<"organizations">
+    );
+    if (!extAccess.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            extAccess.reason ??
+            "Extension access is not available on your current tier.",
+          code: "PAYMENT_REQUIRED",
+        },
+        { status: 402 }
+      );
+    }
+
     const usageData = await convex.query(api.tierLimits.getOrganizationUsage, {
       organizationId: organizationId as Id<"organizations">,
     });
@@ -55,25 +72,42 @@ export async function GET(request: Request) {
       api.tierLimits.isEnforcementEnabled,
       {}
     );
-    const limits = getTierLimits(usageData.tier);
+
+    const resolvedFeatures = await convex.query(
+      api.featureRegistry.getResolvedFeatures,
+      {
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     return NextResponse.json({
       data: {
-        tier: usageData.tier,
+        tier: resolvedFeatures?.tierName ?? usageData.tier,
         enforcementEnabled,
+        // Legacy format for older extension versions
         limits: {
-          projects: limits.maxProjects,
-          variablesPerProject: limits.maxVariablesPerProject,
-          teamMembers: limits.maxTeamMembers,
+          projects: resolvedFeatures?.features?.max_projects?.value ?? null,
+          variablesPerProject:
+            resolvedFeatures?.features?.max_variables_per_project?.value ??
+            null,
+          teamMembers:
+            resolvedFeatures?.features?.max_team_members?.value ?? null,
         },
         usage: usageData.usage,
         features: {
-          versionHistory: limits.variableVersionHistoryEnabled,
-          bulkImport: limits.bulkImportEnabled,
-          extensionAccess: limits.extensionAccessEnabled,
-          granularPermissions: limits.granularPermissionsEnabled,
-          auditLogRetentionDays: limits.auditLogRetentionDays,
+          versionHistory:
+            resolvedFeatures?.features?.variable_version_history?.value ??
+            false,
+          bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
+          extensionAccess:
+            resolvedFeatures?.features?.extension_access?.value ?? true,
+          granularPermissions:
+            resolvedFeatures?.features?.granular_permissions?.value ?? false,
+          auditLogRetentionDays:
+            resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
         },
+        // New dynamic format
+        resolvedFeatures: resolvedFeatures?.features ?? {},
       },
     });
   } catch (error) {

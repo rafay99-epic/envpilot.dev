@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { MAX_BULK_IMPORT_SIZE } from "./tierLimits";
 import {
-  getTierLimitsFromDb,
-  getOrganizationTier,
-  MAX_BULK_IMPORT_SIZE,
-} from "./tierLimits";
+  checkNumericLimit,
+  checkBooleanFeature,
+  countActiveVariables,
+} from "./featureRegistry";
 import {
   createAuditLog,
   logVariableAccess,
@@ -111,6 +112,20 @@ export const getVersionHistory = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Check if version history is enabled for this org
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable) return [];
+    const project = await ctx.db.get(variable.projectId);
+    if (!project) return [];
+    const versionHistoryCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "variable_version_history"
+    );
+    if (!versionHistoryCheck.allowed) {
+      return [];
+    }
+
     const versions = await ctx.db
       .query("variableVersions")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
@@ -591,25 +606,15 @@ export const create = mutation({
     });
 
     // Check tier limits for variable creation
-    const org = await ctx.db.get(project.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const tier = await getOrganizationTier(ctx.db, project.organizationId);
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-    if (limits.maxVariablesPerProject !== null) {
-      const variableCount = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      if (variableCount.length >= limits.maxVariablesPerProject) {
-        throw new Error(
-          `Variable limit reached (${variableCount.length}/${limits.maxVariablesPerProject}). Upgrade to Pro for unlimited variables.`
-        );
-      }
+    const varCount = await countActiveVariables(ctx.db, args.projectId);
+    const varCheck = await checkNumericLimit(
+      ctx.db,
+      project.organizationId,
+      "max_variables_per_project",
+      varCount
+    );
+    if (!varCheck.allowed) {
+      throw new Error(varCheck.reason!);
     }
 
     const existingVariable = await ctx.db
@@ -855,6 +860,16 @@ export const bulkDelete = mutation({
       requiredOrgRoles: ["admin", "team_lead"],
       requiredProjectRoles: ["manager"],
     });
+
+    // Check bulk_delete feature gate
+    const bulkDeleteCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "bulk_delete"
+    );
+    if (!bulkDeleteCheck.allowed) {
+      throw new Error("Bulk delete is not available on your current tier.");
+    }
 
     let deletedCount = 0;
     const deletedKeys: string[] = [];
@@ -1145,37 +1160,33 @@ export const bulkCreate = mutation({
     });
 
     // Check tier limits for bulk import feature
-    const org = await ctx.db.get(project.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const tier = await getOrganizationTier(ctx.db, project.organizationId);
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-
-    // Check if bulk import is enabled for this tier
-    if (!limits.bulkImportEnabled) {
+    const bulkCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "bulk_import"
+    );
+    if (!bulkCheck.allowed) {
       throw new Error(
         "Bulk import requires a higher tier. Upgrade to import variables in bulk."
       );
     }
 
     // Check variable count limits (if applicable)
-    if (limits.maxVariablesPerProject !== null) {
-      const existingVariables = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      const newVariablesCount = args.variables.length;
-      const totalAfterImport = existingVariables.length + newVariablesCount;
-
-      if (totalAfterImport > limits.maxVariablesPerProject) {
-        throw new Error(
-          `Cannot import ${newVariablesCount} variables. Limit is ${limits.maxVariablesPerProject}, you have ${existingVariables.length}. Upgrade to Pro for unlimited variables.`
-        );
-      }
+    const existingVarCount = await countActiveVariables(ctx.db, args.projectId);
+    // checkNumericLimit uses `currentCount < limit` (pre-action semantics).
+    // For bulk import, pass totalAfterImport - 1 so that exactly filling
+    // the quota is allowed (e.g., 10 existing + 5 import vs limit 15 → ok).
+    const totalAfterImport = existingVarCount + args.variables.length;
+    const varLimitCheck = await checkNumericLimit(
+      ctx.db,
+      project.organizationId,
+      "max_variables_per_project",
+      totalAfterImport - 1
+    );
+    if (!varLimitCheck.allowed) {
+      throw new Error(
+        `Cannot import ${args.variables.length} variables. ${varLimitCheck.reason}`
+      );
     }
 
     const createdIds = [];

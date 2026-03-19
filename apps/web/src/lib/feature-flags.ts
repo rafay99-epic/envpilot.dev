@@ -3,6 +3,9 @@
  *
  * Centralized feature flag management for enabling/disabling features.
  * Features can be toggled via environment variables.
+ *
+ * NOTE: API_ACCESS and EXTENSION flags have been removed — they are now
+ * tier-gated dynamically via the feature registry (api_access, extension_access).
  */
 
 /**
@@ -11,22 +14,10 @@
 export const FEATURE_FLAGS = {
   /**
    * Payment System (Stripe Integration)
-   * When enabled, users can upgrade to Pro tier via Stripe checkout.
+   * When enabled, users can upgrade via Stripe checkout.
    * Set NEXT_PUBLIC_PAYMENTS_ENABLED=true to enable.
    */
   PAYMENTS: "payments",
-
-  /**
-   * API Access (for Pro tier)
-   * Allows organizations to generate API keys for programmatic access.
-   */
-  API_ACCESS: "api_access",
-
-  /**
-   * VS Code Extension Integration
-   * Allows linking VS Code extension for syncing env variables.
-   */
-  EXTENSION: "extension",
 } as const;
 
 export type FeatureFlag = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
@@ -39,14 +30,6 @@ export function isFeatureEnabled(flag: FeatureFlag): boolean {
     case FEATURE_FLAGS.PAYMENTS:
       return process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
-    case FEATURE_FLAGS.API_ACCESS:
-      // API access is always available (gated by tier, not feature flag)
-      return true;
-
-    case FEATURE_FLAGS.EXTENSION:
-      // Extension is always available (gated by tier, not feature flag)
-      return true;
-
     default:
       return false;
   }
@@ -58,8 +41,6 @@ export function isFeatureEnabled(flag: FeatureFlag): boolean {
 export function getFeatureFlagStates(): Record<FeatureFlag, boolean> {
   return {
     [FEATURE_FLAGS.PAYMENTS]: isFeatureEnabled(FEATURE_FLAGS.PAYMENTS),
-    [FEATURE_FLAGS.API_ACCESS]: isFeatureEnabled(FEATURE_FLAGS.API_ACCESS),
-    [FEATURE_FLAGS.EXTENSION]: isFeatureEnabled(FEATURE_FLAGS.EXTENSION),
   };
 }
 

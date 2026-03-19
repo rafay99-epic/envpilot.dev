@@ -70,11 +70,7 @@ export {
 
 // Tier limits hooks and utilities
 export {
-  useOrganizationTierLimits,
-  useProjectVariableLimits,
-  useUserOrganizationLimits,
   useTierLimitCheck,
-  useTierFeatures,
   // Utility functions (kept with "use" prefix for backwards compatibility)
   useLimitDescription,
   useLimitPercentage,
@@ -82,9 +78,11 @@ export {
   getLimitDescription,
   calculateLimitPercentage,
   type Tier,
-  type TierLimits,
   type TierAction,
 } from "./useTierLimits";
+
+// Dynamic feature gate hooks (new — preferred)
+export { useFeatureGate, useUserTier, useAllFeatures } from "./useFeatureGate";
 
 // Global search hook
 export { useGlobalSearch } from "./useGlobalSearch";

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import {
   Shield,
   Users,
@@ -51,6 +53,151 @@ function useTypingEffect(texts: string[], typingSpeed = 60, pauseTime = 2000) {
   }, [charIndex, isDeleting, textIndex, texts, typingSpeed, pauseTime]);
 
   return texts[textIndex].substring(0, charIndex);
+}
+
+/**
+ * Generate human-readable feature lines from resolved feature data.
+ * Used as fallback when highlightFeatures is not seeded yet.
+ */
+function generateFeatureLines(
+  features: Array<{
+    key: string;
+    displayName: string;
+    valueType: string;
+    value: boolean | number | null;
+  }>
+): string[] {
+  const lines: string[] = [];
+  for (const f of features) {
+    if (f.valueType === "numeric") {
+      if (f.value === null)
+        lines.push(
+          `Unlimited ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
+        );
+      else if (typeof f.value === "number")
+        lines.push(
+          `${f.value} ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
+        );
+    } else if (f.valueType === "boolean" && f.value === true) {
+      lines.push(f.displayName);
+    }
+  }
+  return lines.slice(0, 8); // cap at 8 for the card
+}
+
+function DynamicPricingCards() {
+  const pricingData = useQuery(api.featureRegistry.getPricingData);
+
+  if (!pricingData) {
+    return (
+      <div className="mt-12 grid gap-6 md:grid-cols-2">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="h-80 rounded-lg border border-zinc-700/50 bg-zinc-900/90 animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      className="mt-12 grid gap-6 md:grid-cols-2"
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true }}
+      variants={stagger}
+    >
+      {pricingData.tiers.map((tier) => {
+        const isComingSoon = tier.isComingSoon;
+        const isDefault = tier.isDefault;
+        const price = tier.monthlyPrice ?? 0;
+        const badge = tier.badge;
+        const badgeColor = tier.badgeColor;
+        const highlights =
+          tier.highlightFeatures.length > 0
+            ? tier.highlightFeatures
+            : generateFeatureLines(tier.features);
+        const cta =
+          tier.ctaText ||
+          (isComingSoon
+            ? "Coming Soon"
+            : isDefault
+              ? "Get Started Free"
+              : "Upgrade");
+        const ctaHref = tier.ctaLink || "/sign-up";
+
+        const badgeColorClass =
+          badgeColor === "amber"
+            ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
+            : badgeColor === "green"
+              ? "border-green-500/20 bg-green-500/5 text-green-400"
+              : "border-zinc-700 bg-zinc-800/50 text-zinc-500";
+        const dotColorClass =
+          badgeColor === "amber"
+            ? "bg-amber-400"
+            : badgeColor === "green"
+              ? "bg-green-400"
+              : "bg-zinc-500";
+
+        return (
+          <motion.div key={tier.name} variants={fadeInUp}>
+            <TerminalWindow
+              title={`plan \u2014 ${tier.name}${isComingSoon ? " (coming soon)" : ""}`}
+              className="h-full"
+            >
+              <div className="flex items-baseline gap-2">
+                <span
+                  className={`text-3xl font-bold ${isComingSoon ? "text-zinc-400" : "text-green-400"}`}
+                >
+                  ${price}
+                </span>
+                <span className="text-xs text-zinc-600">
+                  / month / organization
+                </span>
+              </div>
+              {badge && (
+                <div
+                  className={`mt-1 inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] ${badgeColorClass}`}
+                >
+                  <span className={`h-1 w-1 rounded-full ${dotColorClass}`} />
+                  {badge}
+                </div>
+              )}
+              <div className="mt-5 space-y-2 text-xs">
+                {highlights.map((item: string) => (
+                  <p
+                    key={item}
+                    className={`flex items-center gap-2 ${isComingSoon ? "text-zinc-500" : "text-zinc-400"}`}
+                  >
+                    <Check
+                      className={`h-3 w-3 shrink-0 ${isComingSoon ? "text-zinc-600" : "text-green-400"}`}
+                    />
+                    {item}
+                  </p>
+                ))}
+              </div>
+              <div className="mt-6">
+                {isComingSoon ? (
+                  <span className="block rounded border border-zinc-700 px-4 py-2.5 text-center text-xs text-zinc-600 cursor-not-allowed">
+                    {cta}
+                  </span>
+                ) : (
+                  <Link
+                    href={ctaHref}
+                    className="block rounded border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-center text-xs text-green-400 transition-all hover:bg-green-500/20"
+                  >
+                    {cta}
+                  </Link>
+                )}
+              </div>
+            </TerminalWindow>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
 }
 
 function TerminalWindow({
@@ -657,105 +804,7 @@ export default function TerminalLanding() {
               </h2>
             </motion.div>
 
-            <motion.div
-              className="mt-12 grid gap-6 md:grid-cols-2"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={stagger}
-            >
-              {/* Free Plan */}
-              <motion.div variants={fadeInUp}>
-                <TerminalWindow title="plan — free" className="h-full">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-green-400">
-                      $0
-                    </span>
-                    <span className="text-xs text-zinc-600">
-                      / month / organization
-                    </span>
-                  </div>
-                  <div className="mt-1 inline-flex items-center gap-1.5 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-0.5 text-[10px] text-amber-400">
-                    <span className="h-1 w-1 rounded-full bg-amber-400" />
-                    Alpha &middot; Free during early access
-                  </div>
-                  <div className="mt-5 space-y-2 text-xs">
-                    {[
-                      "Up to 3 projects",
-                      "50 variables per project",
-                      "Up to 3 team members",
-                      "CLI + VS Code Extension",
-                      "Web Dashboard",
-                      "AES-256 encrypted vault",
-                      "Role-based access control",
-                      "7-day audit log retention",
-                    ].map((item) => (
-                      <p
-                        key={item}
-                        className="flex items-center gap-2 text-zinc-400"
-                      >
-                        <Check className="h-3 w-3 shrink-0 text-green-400" />
-                        {item}
-                      </p>
-                    ))}
-                  </div>
-                  <div className="mt-6">
-                    <Link
-                      href="/sign-up"
-                      className="block rounded border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-center text-xs text-green-400 transition-all hover:bg-green-500/20"
-                    >
-                      Get Started Free
-                    </Link>
-                  </div>
-                </TerminalWindow>
-              </motion.div>
-
-              {/* Pro Plan */}
-              <motion.div variants={fadeInUp}>
-                <TerminalWindow
-                  title="plan — pro (coming soon)"
-                  className="h-full"
-                >
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-zinc-400">
-                      $15
-                    </span>
-                    <span className="text-xs text-zinc-600">
-                      / month / organization
-                    </span>
-                  </div>
-                  <div className="mt-1 inline-flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-800/50 px-2 py-0.5 text-[10px] text-zinc-500">
-                    <span className="h-1 w-1 rounded-full bg-zinc-500" />
-                    Coming soon
-                  </div>
-                  <div className="mt-5 space-y-2 text-xs">
-                    {[
-                      "Unlimited projects",
-                      "Unlimited variables",
-                      "Unlimited team members",
-                      "Version history & rollback",
-                      "Bulk .env import",
-                      "Granular permissions",
-                      "365-day audit retention",
-                      "Priority support",
-                    ].map((item) => (
-                      <p
-                        key={item}
-                        className="flex items-center gap-2 text-zinc-500"
-                      >
-                        <Check className="h-3 w-3 shrink-0 text-zinc-600" />
-                        {item}
-                      </p>
-                    ))}
-                  </div>
-                  <div className="mt-6">
-                    <span className="block rounded border border-zinc-700 px-4 py-2.5 text-center text-xs text-zinc-600 cursor-not-allowed">
-                      Coming Soon
-                    </span>
-                  </div>
-                </TerminalWindow>
-              </motion.div>
-            </motion.div>
+            <DynamicPricingCards />
           </div>
         </section>
 

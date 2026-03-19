@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { usePagination } from "@/hooks";
-import { TIER_LIMITS } from "@/lib/tier-limits";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
+import { useFeatureGate } from "@/hooks";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 
 interface Organization {
@@ -23,10 +21,11 @@ interface Organization {
 }
 
 function OrgProBadge({ orgId }: { orgId: string }) {
-  const tierData = useQuery(api.tierLimits.getOrganizationLimits, {
-    organizationId: orgId as Id<"organizations">,
-  });
-  if (tierData?.tier !== "pro") return null;
+  const { tierName } = useFeatureGate(
+    orgId as Id<"organizations">,
+    "max_projects"
+  );
+  if (tierName !== "pro") return null;
   return (
     <span className="flex-shrink-0 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-400">
       Pro
@@ -42,21 +41,16 @@ export default function OrganizationsPage() {
   const enforcing = useEnforcementEnabled();
 
   // Check if org creation is blocked based on tier limits.
-  // Query the tier of the first owned org to determine effective limits.
   const ownedOrgs = organizations.filter((o) => o.role === "admin");
   const firstOwnedOrgId = ownedOrgs[0]?._id;
-  const firstOwnedOrgTier = useQuery(
-    api.tierLimits.getOrganizationLimits,
-    firstOwnedOrgId
-      ? { organizationId: firstOwnedOrgId as Id<"organizations"> }
-      : "skip"
+  const orgLimitGate = useFeatureGate(
+    firstOwnedOrgId ? (firstOwnedOrgId as Id<"organizations">) : undefined,
+    "max_organizations",
+    { currentCount: ownedOrgs.length }
   );
-  const hasPro = firstOwnedOrgTier?.tier === "pro";
-  const maxOrgs = hasPro
-    ? TIER_LIMITS.pro.maxOrganizations
-    : TIER_LIMITS.free.maxOrganizations;
-  const orgLimitReached =
-    enforcing && maxOrgs !== null && ownedOrgs.length >= maxOrgs;
+  const maxOrgs =
+    typeof orgLimitGate.limit === "number" ? orgLimitGate.limit : null;
+  const orgLimitReached = enforcing && !orgLimitGate.allowed;
 
   useEffect(() => {
     async function fetchOrganizations() {

@@ -1,5 +1,7 @@
 import { Outlet } from "@tanstack/react-router";
 import { Sidebar } from "./Sidebar";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { ToastContainer } from "@/components/ui/Toast";
 
 export function Layout() {
   return (
@@ -7,9 +9,12 @@ export function Layout() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-7xl px-6 py-8">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
+      <ToastContainer />
     </div>
   );
 }

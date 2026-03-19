@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
+import { resolveFeatureForUser } from "./featureRegistry";
 
 const DEFAULT_NOTIFICATIONS = {
   variableChanges: true,
@@ -70,6 +71,21 @@ export const upsert = mutation({
     if (args.callerUserId !== args.userId) {
       throw new Error("You can only update your own preferences");
     }
+
+    // If keyboard shortcuts are being updated, check feature gate
+    if (args.keyboardShortcuts !== undefined) {
+      const shortcutCheck = await resolveFeatureForUser(
+        ctx.db,
+        args.userId,
+        "keyboard_shortcuts_custom"
+      );
+      if (shortcutCheck.value !== true) {
+        throw new Error(
+          "Custom keyboard shortcuts are not available on your current tier."
+        );
+      }
+    }
+
     const now = Date.now();
     const existing = await ctx.db
       .query("userPreferences")

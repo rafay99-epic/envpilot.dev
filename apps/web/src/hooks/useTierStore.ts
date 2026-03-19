@@ -6,7 +6,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { useTierStore } from "@/stores/tier-store";
 import { useAuth } from "@/hooks/use-auth";
-import { getTierLimits } from "@/lib/tier-limits";
+import { useConvexUser } from "@/hooks/useConvexUser";
 
 /**
  * Bridge hook that syncs Convex tier/usage data into the Zustand store.
@@ -16,8 +16,9 @@ import { getTierLimits } from "@/lib/tier-limits";
  * creating additional Convex WebSocket subscriptions.
  */
 export function useTierStoreSync() {
-  const { organization } = useAuth();
+  const { user, organization } = useAuth();
   const orgId = organization?.id as Id<"organizations"> | undefined;
+  const { convexUserId } = useConvexUser(user?.id);
 
   const usageData = useQuery(
     api.tierLimits.getOrganizationUsage,
@@ -26,10 +27,24 @@ export function useTierStoreSync() {
 
   const enforcementEnabled = useQuery(api.tierLimits.isEnforcementEnabled);
 
+  // Hydrate user-level tier info
+  const userTierInfo = useQuery(
+    api.featureRegistry.getUserTierInfo,
+    convexUserId ? { userId: convexUserId } : "skip"
+  );
+
+  // Hydrate resolved features for the current org
+  const resolvedFeatures = useQuery(
+    api.featureRegistry.getResolvedFeatures,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+
   const {
     setUsageData,
     clearUsageData,
     setEnforcementEnabled,
+    setUserTier,
+    setFeatures,
     organizationId: storedOrgId,
   } = useTierStore();
 
@@ -39,6 +54,24 @@ export function useTierStoreSync() {
       setEnforcementEnabled(enforcementEnabled);
     }
   }, [enforcementEnabled, setEnforcementEnabled]);
+
+  // Sync user-level tier info
+  useEffect(() => {
+    if (userTierInfo) {
+      setUserTier({
+        userTier: userTierInfo.tier,
+        graceActive: userTierInfo.graceActive,
+        gracePeriodEnd: userTierInfo.gracePeriodEnd ?? null,
+      });
+    }
+  }, [userTierInfo, setUserTier]);
+
+  // Sync resolved features
+  useEffect(() => {
+    if (resolvedFeatures?.features) {
+      setFeatures(resolvedFeatures.features);
+    }
+  }, [resolvedFeatures, setFeatures]);
 
   // Sync Convex data into Zustand store
   useEffect(() => {
@@ -56,7 +89,6 @@ export function useTierStoreSync() {
       setUsageData({
         organizationId: orgId,
         tier: usageData.tier,
-        limits: usageData.limits ?? getTierLimits(usageData.tier),
         usage: usageData.usage,
       });
     }
@@ -75,11 +107,11 @@ export function useCachedTierData() {
   return {
     isLoading: store.isLoading,
     tier: store.tier,
-    limits: store.limits,
     usage: store.usage,
     isPro: store.tier === "pro",
     isFree: store.tier === "free",
     enforcementEnabled: store.enforcementEnabled,
+    features: store.features,
     lastRefreshedAt: store.lastRefreshedAt,
   };
 }

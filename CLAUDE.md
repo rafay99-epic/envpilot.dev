@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Rules
+
+### Development Server
+
+- **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
+- **Verify work using built-in checks only**: `bun run typecheck`, `bun run lint`, `bun run format:check`, or `bun run check:all` (runs all three).
+
+### Feature Registry & Tier Gating (CRITICAL)
+
+Every gatable feature in the platform is managed through the **dynamic feature registry** (`convex/featureRegistry.ts`). When implementing any new feature that should be tier-gated:
+
+1. **Add the feature to `SEED_FEATURES`** in `convex/featureRegistry.ts` with key, displayName, valueType, category, defaultValue, resettable, sortOrder.
+2. **Add tier overrides** to `seedDefaultTierFeatures` in the same file (free/pro values).
+3. **Mirror the seed data** in `convex/admin.ts` → `runMigration` → `seed-feature-registry` and `seed-tier-features` handlers.
+4. **Enforce on the backend** using `checkBooleanFeature(db, orgId, key)` or `checkNumericLimit(db, orgId, key, count)` from `convex/featureRegistry.ts` in the relevant mutation/query.
+5. **Enforce on the frontend** by wrapping UI with `<FeatureGate organizationId={orgId} featureKey="key_name" featureName="Display Name">`.
+6. **For API routes** (CLI/extension), use `api.featureRegistry.checkFeature` query via ConvexHttpClient.
+
+The seed functions use an **upsert pattern** — running them multiple times is safe. Existing features get updated if properties changed, new features get inserted, nothing duplicates.
+
+All enforcement is automatically **bypassed when the Tier Enforcement admin toggle is OFF** (pre-alpha mode). The resolver returns `true` for booleans and `null` (unlimited) for numerics when enforcement is disabled.
+
+### Versioning
+
+- When making changes to the **CLI** (`apps/cli/`), bump the version in `apps/cli/package.json`.
+- When making changes to the **VS Code extension** (`apps/vscode-extension/`), bump the version in `apps/vscode-extension/package.json`.
+- Both currently at version `1.3.4`. Use semver: patch for fixes, minor for features, major for breaking changes.
+
 ## Commands
 
 ```bash

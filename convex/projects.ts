@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getTierLimitsFromDb, getOrganizationTier } from "./tierLimits";
+import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
 
 /**
  * Project Queries and Mutations
@@ -231,22 +231,16 @@ export const create = mutation({
       }
     }
 
-    const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-    if (limits.maxProjects !== null) {
-      const projectCount = await ctx.db
-        .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
-        )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      if (projectCount.length >= limits.maxProjects) {
-        throw new Error(
-          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`
-        );
-      }
+    // Check tier limits for project creation
+    const projectCount = await countActiveProjects(ctx.db, args.organizationId);
+    const projectCheck = await checkNumericLimit(
+      ctx.db,
+      args.organizationId,
+      "max_projects",
+      projectCount
+    );
+    if (!projectCheck.allowed) {
+      throw new Error(projectCheck.reason!);
     }
 
     const existingProject = await ctx.db
@@ -513,31 +507,19 @@ export const duplicate = mutation({
       throw new Error("Source project not found");
     }
 
-    // Check tier limits for project creation
-    const org = await ctx.db.get(sourceProject.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const tier = await getOrganizationTier(
+    // Check tier limits for project creation (duplicate)
+    const dupProjectCount = await countActiveProjects(
       ctx.db,
       sourceProject.organizationId
     );
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-    if (limits.maxProjects !== null) {
-      const projectCount = await ctx.db
-        .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", sourceProject.organizationId)
-        )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      if (projectCount.length >= limits.maxProjects) {
-        throw new Error(
-          `Project limit reached (${projectCount.length}/${limits.maxProjects}). Upgrade to Pro for unlimited projects.`
-        );
-      }
+    const dupProjectCheck = await checkNumericLimit(
+      ctx.db,
+      sourceProject.organizationId,
+      "max_projects",
+      dupProjectCount
+    );
+    if (!dupProjectCheck.allowed) {
+      throw new Error(dupProjectCheck.reason!);
     }
 
     const existingProject = await ctx.db
@@ -707,38 +689,21 @@ export const move = mutation({
       throw new Error("You must be an admin of the target organization");
     }
 
-    // Tier check: both orgs must be pro
-    const sourceTier = await getOrganizationTier(
-      ctx.db,
-      project.organizationId
-    );
-    const targetTier = await getOrganizationTier(
+    // Check if target org has room for another project
+    const targetProjectCount = await countActiveProjects(
       ctx.db,
       args.targetOrganizationId
     );
-    const sourceLimits = await getTierLimitsFromDb(ctx.db, sourceTier);
-    const targetLimits = await getTierLimitsFromDb(ctx.db, targetTier);
-    if (
-      sourceLimits.maxProjects !== null ||
-      targetLimits.maxProjects !== null
-    ) {
-      // Check if target org has room for another project
-      const targetProjects = await ctx.db
-        .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.targetOrganizationId)
-        )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      if (
-        targetLimits.maxProjects !== null &&
-        targetProjects.length >= targetLimits.maxProjects
-      ) {
-        throw new Error(
-          `Target organization has reached its project limit (${targetProjects.length}/${targetLimits.maxProjects}). Upgrade its tier first.`
-        );
-      }
+    const moveCheck = await checkNumericLimit(
+      ctx.db,
+      args.targetOrganizationId,
+      "max_projects",
+      targetProjectCount
+    );
+    if (!moveCheck.allowed) {
+      throw new Error(
+        `Target organization has reached its project limit. ${moveCheck.reason}`
+      );
     }
 
     // Check slug uniqueness in target org
@@ -756,23 +721,6 @@ export const move = mutation({
       throw new Error(
         `A project with slug "${project.slug}" already exists in the target organization`
       );
-    }
-
-    // Check target org project count
-    if (targetLimits.maxProjects !== null) {
-      const targetProjects = await ctx.db
-        .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.targetOrganizationId)
-        )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
-
-      if (targetProjects.length >= targetLimits.maxProjects) {
-        throw new Error(
-          `Target organization has reached its project limit (${targetLimits.maxProjects})`
-        );
-      }
     }
 
     // Move the project

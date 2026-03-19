@@ -549,7 +549,10 @@ export default defineSchema({
       v.literal("billing.tier_downgraded"),
       // Audit log actions (meta)
       v.literal("audit.exported"),
-      v.literal("audit.viewed")
+      v.literal("audit.viewed"),
+      // System-level admin actions
+      v.literal("system.enforcement_toggled"),
+      v.literal("system.setting_changed")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -603,11 +606,13 @@ export default defineSchema({
     .index("by_session", ["sessionId"]),
 
   // ==========================================
-  // ORGANIZATION TIERS (locked-down, internal-only writes)
+  // USER TIERS (Replaces organizationTiers)
+  // Tier assignment is per-USER. The org owner's tier
+  // determines what all their owned organizations get.
   // ==========================================
-  organizationTiers: defineTable({
-    // Reference to the organization
-    organizationId: v.id("organizations"),
+  userTiers: defineTable({
+    // Reference to the user
+    userId: v.id("users"),
     // Subscription tier name (matches tierDefinitions.name)
     tier: v.string(),
     // Last updated timestamp
@@ -616,14 +621,113 @@ export default defineSchema({
     updatedBy: v.optional(v.id("users")),
     // Reason for the tier change
     reason: v.optional(v.string()),
-  }).index("by_organization", ["organizationId"]),
+  }).index("by_user", ["userId"]),
+
+  // ==========================================
+  // FEATURE REGISTRY (Developer-seeded feature definitions)
+  // Defines every gatable feature in the system.
+  // Features are added via seed functions, NOT via admin UI.
+  // ==========================================
+  featureRegistry: defineTable({
+    // Unique machine key (e.g., "max_projects", "bulk_import", "cli_access")
+    key: v.string(),
+    // Human-readable name for admin UI
+    displayName: v.string(),
+    // Optional longer description
+    description: v.optional(v.string()),
+    // Feature value type
+    valueType: v.union(
+      v.literal("boolean"), // enabled/disabled
+      v.literal("numeric") // number or null (unlimited)
+    ),
+    // Category for admin UI grouping (e.g., "Resources", "Tools", "Security")
+    category: v.string(),
+    // Default value when no tier-specific override exists
+    // Stored as JSON string: "true", "false", "50", "null" (null = unlimited)
+    defaultValue: v.string(),
+    // Whether usage resets on billing cycle (consumption counter vs persistent resource)
+    resettable: v.boolean(),
+    // Sort order within category for UI display
+    sortOrder: v.number(),
+    // Whether this feature is currently active in the registry
+    isActive: v.boolean(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_category", ["category"])
+    .index("by_active", ["isActive"]),
+
+  // ==========================================
+  // TIER FEATURES (Per-tier value overrides)
+  // Maps each tier to its configured value for each feature.
+  // Managed by admin via the tier configuration UI.
+  // ==========================================
+  tierFeatures: defineTable({
+    // Tier name (matches tierDefinitions.name)
+    tierName: v.string(),
+    // Feature key (matches featureRegistry.key)
+    featureKey: v.string(),
+    // The value for this tier. JSON string: "true", "false", "50", "null"
+    value: v.string(),
+    // Timestamp
+    updatedAt: v.number(),
+  })
+    .index("by_tier", ["tierName"])
+    .index("by_feature", ["featureKey"])
+    .index("by_tier_and_feature", ["tierName", "featureKey"]),
+
+  // ==========================================
+  // USAGE COUNTERS (Consumption-based metrics per user)
+  // Tracks counters that reset on billing cycle.
+  // NOT for persistent resources (projects, variables, members).
+  // ==========================================
+  usageCounters: defineTable({
+    // Reference to the user
+    userId: v.id("users"),
+    // Feature key (matches featureRegistry.key)
+    featureKey: v.string(),
+    // Current consumption count
+    count: v.number(),
+    // Billing period boundaries
+    periodStart: v.number(),
+    periodEnd: v.number(),
+    // When last reset occurred
+    resetAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_feature", ["userId", "featureKey"]),
+
+  // ==========================================
+  // SUBSCRIPTION GRACE PERIODS
+  // Tracks grace periods after subscription cancellation.
+  // During grace period, user retains their previous tier.
+  // After expiry, downgraded to default (free) tier.
+  // ==========================================
+  subscriptionGracePeriods: defineTable({
+    // Reference to the user
+    userId: v.id("users"),
+    // Tier the user had before subscription expired
+    previousTier: v.string(),
+    // When the grace period ends
+    gracePeriodEnd: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    // Whether this grace period is currently active
+    isActive: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_active", ["isActive"]),
 
   // ==========================================
   // SUBSCRIPTIONS (Stripe Integration)
   // ==========================================
   subscriptions: defineTable({
-    // Reference to the organization
+    // Legacy reference, kept for backward compat queries
     organizationId: v.id("organizations"),
+    // Reference to the user (billing is per-user, optional until migration backfills)
+    userId: v.optional(v.id("users")),
     // Stripe customer ID
     stripeCustomerId: v.string(),
     // Stripe subscription ID
@@ -655,16 +759,19 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_user", ["userId"])
     .index("by_stripe_customer", ["stripeCustomerId"])
     .index("by_stripe_subscription", ["stripeSubscriptionId"])
     .index("by_status", ["status"]),
 
   // ==========================================
-  // STRIPE CUSTOMERS (Maps organizations to Stripe)
+  // STRIPE CUSTOMERS (Maps users to Stripe)
   // ==========================================
   stripeCustomers: defineTable({
-    // Reference to the organization
+    // Legacy reference, kept for backward compat queries
     organizationId: v.id("organizations"),
+    // Reference to the user (billing is per-user, optional until migration backfills)
+    userId: v.optional(v.id("users")),
     // Stripe customer ID
     stripeCustomerId: v.string(),
     // Email used for Stripe
@@ -674,6 +781,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_organization", ["organizationId"])
+    .index("by_user", ["userId"])
     .index("by_stripe_customer", ["stripeCustomerId"]),
 
   // ==========================================
@@ -910,6 +1018,15 @@ export default defineSchema({
   // ==========================================
   // TIER DEFINITIONS (Dynamic, admin-managed tiers)
   // ==========================================
+  // DEPRECATED: Will be removed after migration clears remaining records.
+  organizationTiers: defineTable({
+    organizationId: v.id("organizations"),
+    tier: v.string(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+    reason: v.optional(v.string()),
+  }).index("by_organization", ["organizationId"]),
+
   tierDefinitions: defineTable({
     // Unique tier identifier (e.g., "free", "pro", "enterprise")
     name: v.string(),
@@ -923,25 +1040,41 @@ export default defineSchema({
     isDefault: v.boolean(),
     // Badge color (hex code)
     color: v.optional(v.string()),
-    // Tier limits
-    limits: v.object({
-      maxProjects: v.union(v.number(), v.null()),
-      maxVariablesPerProject: v.union(v.number(), v.null()),
-      maxTeamMembers: v.union(v.number(), v.null()),
-      maxOrganizations: v.union(v.number(), v.null()),
-      auditLogRetentionDays: v.number(),
-    }),
-    // Feature flags
-    features: v.object({
-      apiAccessEnabled: v.boolean(),
-      extensionAccessEnabled: v.boolean(),
-      granularPermissionsEnabled: v.boolean(),
-      variableVersionHistoryEnabled: v.boolean(),
-      bulkImportEnabled: v.boolean(),
-      prioritySupport: v.optional(v.boolean()),
-      customBranding: v.optional(v.boolean()),
-      ssoEnabled: v.optional(v.boolean()),
-    }),
+    // Stripe price ID for this tier (for multi-tier billing)
+    stripePriceId: v.optional(v.string()),
+    // Pricing & marketing fields for the public pricing page
+    monthlyPrice: v.optional(v.number()),
+    yearlyPrice: v.optional(v.number()),
+    badge: v.optional(v.string()),
+    badgeColor: v.optional(v.string()),
+    ctaText: v.optional(v.string()),
+    ctaLink: v.optional(v.string()),
+    isComingSoon: v.optional(v.boolean()),
+    highlightFeatures: v.optional(v.array(v.string())),
+    // DEPRECATED: These will be stripped by migration, then removed from schema.
+    dynamicFeatures: v.optional(v.any()),
+    limits: v.optional(
+      v.object({
+        maxProjects: v.union(v.number(), v.null()),
+        maxVariablesPerProject: v.union(v.number(), v.null()),
+        maxTeamMembers: v.union(v.number(), v.null()),
+        maxOrganizations: v.union(v.number(), v.null()),
+        auditLogRetentionDays: v.number(),
+      })
+    ),
+    features: v.optional(
+      v.object({
+        apiAccessEnabled: v.boolean(),
+        extensionAccessEnabled: v.boolean(),
+        granularPermissionsEnabled: v.boolean(),
+        variableVersionHistoryEnabled: v.boolean(),
+        bulkImportEnabled: v.boolean(),
+        prioritySupport: v.optional(v.boolean()),
+        customBranding: v.optional(v.boolean()),
+        ssoEnabled: v.optional(v.boolean()),
+        secretRotationEnabled: v.optional(v.boolean()),
+      })
+    ),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),

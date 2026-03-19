@@ -1,7 +1,7 @@
 "use client";
 
-import { Tier } from "@/hooks/useTierLimits";
-import { Sparkles, ArrowRight, Check, X } from "lucide-react";
+import type { Tier } from "@/hooks/useTierLimits";
+import { Sparkles, ArrowRight, Check } from "lucide-react";
 
 interface UpgradePromptProps {
   /**
@@ -17,6 +17,10 @@ interface UpgradePromptProps {
    */
   currentTier: Tier;
   /**
+   * Target tier name to upgrade to (dynamic — defaults to "Pro")
+   */
+  targetTierName?: string;
+  /**
    * Optional callback when user clicks upgrade
    */
   onUpgradeClick?: () => void;
@@ -31,16 +35,21 @@ interface UpgradePromptProps {
 }
 
 /**
- * Component to prompt users to upgrade their subscription tier
+ * Component to prompt users to upgrade their subscription tier.
+ * Supports dynamic tier names — shows the target tier name instead
+ * of hardcoded "Pro".
  */
 export function UpgradePrompt({
   reason,
   feature,
   currentTier,
+  targetTierName,
   onUpgradeClick,
   variant = "inline",
   className = "",
 }: UpgradePromptProps) {
+  const upgradeName = targetTierName ?? "Pro";
+
   const handleUpgradeClick = () => {
     if (onUpgradeClick) {
       onUpgradeClick();
@@ -54,13 +63,13 @@ export function UpgradePrompt({
       <div
         className={`flex items-center gap-2 rounded-lg border border-amber-600/30 bg-amber-900/10 px-3 py-2 text-sm text-amber-400 ${className}`}
       >
-        <Sparkles className="h-4 w-4 flex-shrink-0" />
+        <Sparkles className="h-4 w-4 shrink-0" />
         <span className="flex-1">{reason}</span>
         <button
           onClick={handleUpgradeClick}
           className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-green-400 transition-colors hover:text-green-300"
         >
-          Upgrade to Pro
+          Upgrade to {upgradeName}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -73,21 +82,21 @@ export function UpgradePrompt({
         className={`rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-4 ${className}`}
       >
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10">
               <Sparkles className="h-5 w-5 text-green-400" />
             </div>
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-zinc-100">
-              {feature ? `Unlock ${feature}` : "Upgrade to Pro"}
+              {feature ? `Unlock ${feature}` : `Upgrade to ${upgradeName}`}
             </h3>
             <p className="mt-1 text-sm text-zinc-400">{reason}</p>
             <button
               onClick={handleUpgradeClick}
               className="mt-3 inline-flex items-center gap-2 rounded-md border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-all hover:border-green-500/50 hover:bg-green-500/20"
             >
-              Upgrade to Pro
+              Upgrade to {upgradeName}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -105,7 +114,7 @@ export function UpgradePrompt({
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-green-400" />
             <h3 className="text-base font-semibold text-zinc-100">
-              Upgrade to Pro
+              Upgrade to {upgradeName}
             </h3>
           </div>
         </div>
@@ -123,7 +132,7 @@ export function UpgradePrompt({
                 key={item}
                 className="flex items-center gap-2 text-sm text-zinc-300"
               >
-                <Check className="h-4 w-4 flex-shrink-0 text-green-400" />
+                <Check className="h-4 w-4 shrink-0 text-green-400" />
                 {item}
               </li>
             ))}
@@ -154,7 +163,7 @@ export function UpgradePrompt({
             <Sparkles className="h-8 w-8 text-green-400" />
           </div>
           <h2 className="text-xl font-bold text-zinc-100">
-            {feature ? `Unlock ${feature}` : "Upgrade to Pro"}
+            {feature ? `Unlock ${feature}` : `Upgrade to ${upgradeName}`}
           </h2>
           <p className="mt-2 text-sm text-zinc-400">
             Get unlimited access to all features

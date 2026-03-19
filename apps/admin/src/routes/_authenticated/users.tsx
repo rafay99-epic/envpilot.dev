@@ -51,7 +51,11 @@ function UsersPage() {
 
   const handleUnban = async (userId: Id<"users">) => {
     if (!confirm("Are you sure you want to unban this user?")) return;
-    await unbanUser({ userId });
+    try {
+      await unbanUser({ userId });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to unban user");
+    }
   };
 
   const columns: Column<UserRow>[] = [

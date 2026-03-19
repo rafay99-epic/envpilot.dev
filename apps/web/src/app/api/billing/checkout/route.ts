@@ -16,13 +16,17 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const checkoutSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
+  tierName: z.string().optional(), // Dynamic tier selection (new)
   successUrl: z.string().url("Success URL must be a valid URL"),
   cancelUrl: z.string().url("Cancel URL must be a valid URL"),
 });
 
 /**
  * POST /api/billing/checkout
- * Create a Stripe Checkout session for upgrading to Pro tier
+ * Create a Stripe Checkout session for upgrading to a paid tier.
+ *
+ * Supports dynamic tier selection via `tierName` param.
+ * Falls back to STRIPE_PRO_PRICE_ID for backward compat if no tierName given.
  */
 export async function POST(request: Request) {
   try {
@@ -38,9 +42,8 @@ export async function POST(request: Request) {
     }
 
     const stripe = getStripeClient();
-    const proPriceId = getProPriceId();
 
-    if (!stripe || !proPriceId) {
+    if (!stripe) {
       return NextResponse.json(
         { error: "Payment system is not properly configured" },
         { status: 503 }
@@ -63,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { organizationId, successUrl, cancelUrl } = validation.data;
+    const { organizationId, tierName, successUrl, cancelUrl } = validation.data;
 
     // Get Convex user
     let convexUser = await convex.query(api.users.getByWorkosId, {
@@ -87,6 +90,35 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Failed to sync user" },
         { status: 500 }
+      );
+    }
+
+    // Resolve price ID: dynamic tier lookup or legacy fallback
+    let priceId: string | null = null;
+    let resolvedTierName = tierName;
+
+    if (tierName) {
+      // Dynamic: look up stripePriceId from tierDefinitions
+      const tierDef = await convex.query(api.featureRegistry.getTierByName, {
+        name: tierName,
+      });
+      if (!tierDef?.stripePriceId) {
+        return NextResponse.json(
+          { error: `Tier "${tierName}" has no associated price` },
+          { status: 400 }
+        );
+      }
+      priceId = tierDef.stripePriceId;
+    } else {
+      // Legacy fallback: use STRIPE_PRO_PRICE_ID env var
+      priceId = getProPriceId();
+      resolvedTierName = "pro";
+    }
+
+    if (!priceId) {
+      return NextResponse.json(
+        { error: "Payment system is not properly configured" },
+        { status: 503 }
       );
     }
 
@@ -117,7 +149,7 @@ export async function POST(request: Request) {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: proPriceId,
+          price: priceId,
           quantity: 1,
         },
       ],
@@ -127,11 +159,13 @@ export async function POST(request: Request) {
         organizationId,
         userId: convexUser._id,
         organizationName: organization.name,
+        tierName: resolvedTierName || "pro",
       },
       subscription_data: {
         metadata: {
           organizationId,
           userId: convexUser._id,
+          tierName: resolvedTierName || "pro",
         },
       },
       allow_promotion_codes: true,
@@ -160,7 +194,10 @@ export async function POST(request: Request) {
         : "Failed to create checkout session";
 
     // Check for specific error types
-    if (message.includes("already has an active subscription")) {
+    if (
+      message.includes("already has an active subscription") ||
+      message.includes("You already have an active subscription")
+    ) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
 

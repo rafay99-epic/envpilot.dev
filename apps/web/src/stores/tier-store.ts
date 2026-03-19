@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import type { TierLimits } from "@/lib/tier-limits";
 
 export interface ProjectVariableCount {
   projectId: string;
@@ -17,25 +16,43 @@ export interface TierUsage {
   variablesPerProject: ProjectVariableCount[];
 }
 
+/** Resolved feature value from the dynamic feature registry */
+export interface ResolvedFeature {
+  value: boolean | number | null;
+  valueType: string;
+  displayName: string;
+  category: string;
+}
+
 interface TierState {
   organizationId: string | null;
   tier: string | null;
-  limits: TierLimits | null;
   usage: TierUsage | null;
   isLoading: boolean;
   lastRefreshedAt: number | null;
   enforcementEnabled: boolean;
+  // New: user-level tier info
+  userTier: string | null;
+  graceActive: boolean;
+  gracePeriodEnd: number | null;
+  // New: dynamic features from feature registry
+  features: Record<string, ResolvedFeature>;
 }
 
 interface TierActions {
   setUsageData: (data: {
     organizationId: string;
     tier: string;
-    limits: TierLimits;
     usage: TierUsage;
   }) => void;
   clearUsageData: () => void;
   setEnforcementEnabled: (enabled: boolean) => void;
+  setUserTier: (data: {
+    userTier: string;
+    graceActive: boolean;
+    gracePeriodEnd: number | null;
+  }) => void;
+  setFeatures: (features: Record<string, ResolvedFeature>) => void;
 }
 
 export type TierStore = TierState & TierActions;
@@ -43,18 +60,19 @@ export type TierStore = TierState & TierActions;
 export const useTierStore = create<TierStore>((set) => ({
   organizationId: null,
   tier: null,
-  limits: null,
   usage: null,
   isLoading: true,
   lastRefreshedAt: null,
-  // Defaults to true; hydrated from server via api.tierLimits.isEnforcementEnabled
   enforcementEnabled: true,
+  userTier: null,
+  graceActive: false,
+  gracePeriodEnd: null,
+  features: {},
 
   setUsageData: (data) =>
     set({
       organizationId: data.organizationId,
       tier: data.tier,
-      limits: data.limits,
       usage: data.usage,
       isLoading: false,
       lastRefreshedAt: Date.now(),
@@ -64,11 +82,23 @@ export const useTierStore = create<TierStore>((set) => ({
     set({
       organizationId: null,
       tier: null,
-      limits: null,
       usage: null,
       isLoading: true,
       lastRefreshedAt: null,
+      userTier: null,
+      graceActive: false,
+      gracePeriodEnd: null,
+      features: {},
     }),
 
   setEnforcementEnabled: (enabled) => set({ enforcementEnabled: enabled }),
+
+  setUserTier: (data) =>
+    set({
+      userTier: data.userTier,
+      graceActive: data.graceActive,
+      gracePeriodEnd: data.gracePeriodEnd,
+    }),
+
+  setFeatures: (features) => set({ features }),
 }));
