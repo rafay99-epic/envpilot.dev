@@ -66,11 +66,13 @@ Add a `count*` helper in `convex/featureRegistry.ts` for each limited feature (e
 ### Versioning
 
 Semver policy across all packages:
+
 - **Minor bump** (1.X.0): Every new feature added to the package
 - **Patch bump** (1.0.X): Optimizations, bug fixes, patches
 - **Major bump** (X.0.0): Major rewrites or major UI overhauls (reserved, not used lightly)
 
 Package versions to bump when making changes:
+
 - **Web app** (`apps/web/`): bump `apps/web/package.json`
 - **Admin panel** (`apps/admin/`): bump `apps/admin/package.json`
 - **CLI** (`apps/cli/`): bump `apps/cli/package.json`
