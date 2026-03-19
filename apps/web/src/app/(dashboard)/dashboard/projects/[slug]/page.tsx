@@ -271,6 +271,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         environments: data.environments,
         projectId,
         isSensitive: data.isSensitive,
+        rotationFrequencyDays: data.rotationFrequencyDays,
       });
 
       if (result.requested) {
@@ -307,6 +308,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         environments: data.environments,
         isSensitive: data.isSensitive,
         changeReason: "Updated via dashboard",
+        rotationFrequencyDays: data.rotationFrequencyDays,
       });
 
       setNotice("Variable updated successfully.");
