@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     // Get tiers for all organizations from organizationTiers table
     const orgTiers = await Promise.all(
       organizations.map((org) =>
-        convex.query(api.tierLimits.getOrganizationLimits, {
+        convex.query(api.featureRegistry.getResolvedFeatures, {
           organizationId: org._id,
         })
       )
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         _id: org._id,
         name: org.name,
         slug: org.slug,
-        tier: orgTiers[index]?.tier ?? "free",
+        tier: orgTiers[index]?.tierName ?? "free",
         role: org.role,
         description: org.description,
         logoUrl: org.logoUrl,

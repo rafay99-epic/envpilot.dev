@@ -24,9 +24,7 @@ import {
   VariableListItem,
   type VariableFormData,
 } from "@/components/variables";
-import { useTierFeatures } from "@/hooks/useTierLimits";
-import { useEnforcementEnabled } from "@/hooks/useTierLimits";
-import { ProOnlyBadge } from "@/components/tier/FeatureGate";
+import { FeatureGate } from "@/components/tier/FeatureGate";
 import { ApiError } from "@/lib/api-client";
 import {
   useProjectBySlug,
@@ -81,9 +79,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canRequestVariable = organization?.role === "member";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
-  const { features: tierFeatures } = useTierFeatures(orgId);
-  const enforcing = useEnforcementEnabled();
-  const versionHistoryAllowed = !enforcing || tierFeatures.versionHistory;
 
   // Variable selection store for bulk operations
   const {
@@ -742,11 +737,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     variable={variable}
                     onEdit={() => setEditingVariable(variable)}
                     onDelete={() => setDeletingVariable(variable)}
-                    onViewHistory={
-                      versionHistoryAllowed
-                        ? () => handleViewHistory(variable)
-                        : undefined
-                    }
+                    onViewHistory={() => handleViewHistory(variable)}
                     onReveal={() => handleRevealValue(variable)}
                     revealedValue={revealedValues[variable._id] ?? null}
                     isRevealing={revealingIds.has(variable._id)}
@@ -943,55 +934,69 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
       {/* Floating Bulk Action Bar */}
       {isSelectionMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-          <div className="flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 shadow-2xl">
-            <span className="text-sm font-medium text-zinc-300">
-              {selectedIds.size} variable{selectedIds.size !== 1 ? "s" : ""}{" "}
-              selected
-            </span>
-            <button
-              onClick={() => selectAll(filteredVariables.map((v) => v._id))}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              Select All
-            </button>
-            <button
-              onClick={clearSelection}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => setShowBulkDeleteConfirm(true)}
-              disabled={isBulkDeleting}
-              className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-            >
-              Delete Selected
-            </button>
+        <FeatureGate
+          organizationId={orgId}
+          featureKey="bulk_delete"
+          featureName="Bulk Delete"
+          fallbackVariant="inline"
+        >
+          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
+            <div className="flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 shadow-2xl">
+              <span className="text-sm font-medium text-zinc-300">
+                {selectedIds.size} variable{selectedIds.size !== 1 ? "s" : ""}{" "}
+                selected
+              </span>
+              <button
+                onClick={() => selectAll(filteredVariables.map((v) => v._id))}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                Select All
+              </button>
+              <button
+                onClick={clearSelection}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                disabled={isBulkDeleting}
+                className="rounded-lg bg-red-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                Delete Selected
+              </button>
+            </div>
           </div>
-        </div>
+        </FeatureGate>
       )}
 
       {historyVariableId && (
-        <VariableHistory
-          isOpen={!!historyVariableId}
-          onClose={() => {
-            setHistoryVariableId(null);
-            setHistoryVariableKey("");
-            setHistoryVariableVersion(0);
-          }}
-          variableKey={historyVariableKey}
-          currentVersion={historyVariableVersion}
-          history={(historyData?.history ?? []) as VersionRecord[]}
-          onRollback={handleRollback}
-          canRollback={hasPermission(PERMISSIONS.VARIABLE_ROLLBACK)}
-          isLoading={isLoadingHistory}
-          error={
-            historyQueryError
-              ? "Failed to load version history. Please try again."
-              : null
-          }
-        />
+        <FeatureGate
+          organizationId={orgId}
+          featureKey="variable_version_history"
+          featureName="Version History"
+          fallbackVariant="inline"
+        >
+          <VariableHistory
+            isOpen={!!historyVariableId}
+            onClose={() => {
+              setHistoryVariableId(null);
+              setHistoryVariableKey("");
+              setHistoryVariableVersion(0);
+            }}
+            variableKey={historyVariableKey}
+            currentVersion={historyVariableVersion}
+            history={(historyData?.history ?? []) as VersionRecord[]}
+            onRollback={handleRollback}
+            canRollback={hasPermission(PERMISSIONS.VARIABLE_ROLLBACK)}
+            isLoading={isLoadingHistory}
+            error={
+              historyQueryError
+                ? "Failed to load version history. Please try again."
+                : null
+            }
+          />
+        </FeatureGate>
       )}
     </div>
   );

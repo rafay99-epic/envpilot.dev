@@ -6,8 +6,9 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  checkCLIAccess,
+  tierLimitResponse,
 } from "@/lib/cli-auth";
-import { getTierLimits } from "@/lib/tier-limits";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -44,6 +45,12 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
+    // Check CLI access feature gate
+    const cliAccess = await checkCLIAccess(convex, organizationId as Id<"organizations">);
+    if (!cliAccess.allowed) {
+      return tierLimitResponse(cliAccess.reason ?? "CLI access is not available on your current tier.");
+    }
+
     // Get organization
     const org = await convex.query(api.organizations.getById, {
       organizationId: organizationId as Id<"organizations">,
@@ -56,34 +63,34 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get tier from organizationTiers table
-    const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
-      organizationId: organizationId as Id<"organizations">,
-    });
-    const tier = tierData?.tier ?? "free";
-    const limits = tierData?.limits ?? getTierLimits(tier);
-
     const enforcementEnabled = await convex.query(
       api.tierLimits.isEnforcementEnabled,
       {}
     );
 
+    const resolvedFeatures = await convex.query(api.featureRegistry.getResolvedFeatures, {
+      organizationId: organizationId as Id<"organizations">,
+    });
+
     return NextResponse.json({
-      tier,
+      tier: resolvedFeatures?.tierName ?? "free",
       enforcementEnabled,
-      apiAccessEnabled: limits.apiAccessEnabled,
+      // Legacy format for older CLI versions
+      apiAccessEnabled: resolvedFeatures?.features?.api_access?.value ?? true,
       limits: {
-        projects: limits.maxProjects,
-        variablesPerProject: limits.maxVariablesPerProject,
-        teamMembers: limits.maxTeamMembers,
+        projects: resolvedFeatures?.features?.max_projects?.value ?? null,
+        variablesPerProject: resolvedFeatures?.features?.max_variables_per_project?.value ?? null,
+        teamMembers: resolvedFeatures?.features?.max_team_members?.value ?? null,
       },
       features: {
-        versionHistory: limits.variableVersionHistoryEnabled,
-        bulkImport: limits.bulkImportEnabled,
-        extensionAccess: limits.extensionAccessEnabled,
-        granularPermissions: limits.granularPermissionsEnabled,
-        auditLogRetentionDays: limits.auditLogRetentionDays,
+        versionHistory: resolvedFeatures?.features?.variable_version_history?.value ?? false,
+        bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
+        extensionAccess: resolvedFeatures?.features?.extension_access?.value ?? true,
+        granularPermissions: resolvedFeatures?.features?.granular_permissions?.value ?? false,
+        auditLogRetentionDays: resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
       },
+      // New dynamic format
+      resolvedFeatures: resolvedFeatures?.features ?? {},
     });
   } catch (error) {
     console.error("CLI tier error:", error);

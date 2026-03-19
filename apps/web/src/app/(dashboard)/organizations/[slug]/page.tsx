@@ -33,12 +33,12 @@ export default function OrganizationPage({
   const [error, setError] = useState<string | null>(null);
 
   const tierData = useQuery(
-    api.tierLimits.getOrganizationLimits,
+    api.featureRegistry.getResolvedFeatures,
     organization?._id
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"
   );
-  const orgTier = (tierData?.tier as string) ?? "free";
+  const orgTier = (tierData?.tierName as string) ?? "free";
 
   useEffect(() => {
     async function fetchOrganization() {

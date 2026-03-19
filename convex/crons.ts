@@ -44,4 +44,11 @@ crons.daily(
   internal.permissions.cleanupExpired
 );
 
+// Expire grace periods and downgrade users whose grace has ended
+crons.interval(
+  "expire grace periods",
+  { hours: 1 },
+  internal.subscriptions.expireGracePeriods
+);
+
 export default crons;

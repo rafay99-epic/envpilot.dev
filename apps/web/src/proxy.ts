@@ -20,6 +20,7 @@ export default authkitMiddleware({
       "/terms",
       "/support",
       "/contact",
+      "/pricing",
       "/sitemap.xml",
       "/robots.txt",
       "/api/health",

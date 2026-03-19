@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
-  getTierLimitsFromDb,
-  getOrganizationTier,
-  getDefaultTierName,
-} from "./tierLimits";
+  checkBooleanFeature,
+  checkNumericLimit,
+  countMembersAndPendingInvites,
+  resolveFeatureForUser,
+} from "./featureRegistry";
+import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 
 /**
@@ -145,30 +147,16 @@ export const create = mutation({
       .filter((q) => q.eq(q.field("role"), "admin"))
       .collect();
 
-    // Find the most permissive org limit among owned orgs
-    let bestOrgLimit: number | null = 0;
-    for (const membership of userMemberships) {
-      const tier = await getOrganizationTier(ctx.db, membership.organizationId);
-      const limits = await getTierLimitsFromDb(ctx.db, tier);
-      if (limits.maxOrganizations === null) {
-        bestOrgLimit = null;
-        break;
-      }
-      if (bestOrgLimit !== null && limits.maxOrganizations > bestOrgLimit) {
-        bestOrgLimit = limits.maxOrganizations;
-      }
-    }
+    const orgResolved = await resolveFeatureForUser(
+      ctx.db,
+      args.createdBy,
+      "max_organizations"
+    );
+    const orgLimit = orgResolved.value as number | null;
 
-    // If no owned orgs yet, use default tier limits
-    if (userMemberships.length === 0) {
-      const defaultTier = await getDefaultTierName(ctx.db);
-      const defaultLimits = await getTierLimitsFromDb(ctx.db, defaultTier);
-      bestOrgLimit = defaultLimits.maxOrganizations;
-    }
-
-    if (bestOrgLimit !== null && userMemberships.length >= bestOrgLimit) {
+    if (orgLimit !== null && userMemberships.length >= orgLimit) {
       throw new Error(
-        `Organization limit reached (${userMemberships.length}/${bestOrgLimit}). Upgrade your tier for more organizations.`
+        `Organization limit reached (${userMemberships.length}/${orgLimit}). Upgrade your tier for more organizations.`
       );
     }
 
@@ -192,15 +180,20 @@ export const create = mutation({
       updatedAt: now,
     });
 
-    // Create tier record using the default tier from tierDefinitions
+    // Ensure the org owner has a user tier record
     const defaultTier = await getDefaultTierName(ctx.db);
-    await ctx.db.insert("organizationTiers", {
-      organizationId,
-      tier: defaultTier,
-      updatedAt: now,
-      updatedBy: args.createdBy,
-      reason: "org_created",
-    });
+    const existingUserTier = await ctx.db
+      .query("userTiers")
+      .withIndex("by_user", (q) => q.eq("userId", args.createdBy))
+      .first();
+    if (!existingUserTier) {
+      await ctx.db.insert("userTiers", {
+        userId: args.createdBy,
+        tier: defaultTier,
+        updatedAt: now,
+        reason: "org_created",
+      });
+    }
 
     await ctx.db.insert("organizationMembers", {
       organizationId,
@@ -239,6 +232,18 @@ export const update = mutation({
     const org = await ctx.db.get(organizationId);
     if (!org) {
       throw new Error("Organization not found");
+    }
+
+    // If logoUrl is being set, check custom_branding feature gate
+    if (updates.logoUrl !== undefined) {
+      const brandingCheck = await checkBooleanFeature(
+        ctx.db,
+        organizationId,
+        "custom_branding"
+      );
+      if (!brandingCheck.allowed) {
+        throw new Error("Custom branding is not available on your current tier.");
+      }
     }
 
     const updateData: Record<string, unknown> = { updatedAt: now };
@@ -407,16 +412,8 @@ export const remove = mutation({
       await ctx.db.delete(sc._id);
     }
 
-    // Delete organization tier record
-    const tierRecord = await ctx.db
-      .query("organizationTiers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .first();
-    if (tierRecord) {
-      await ctx.db.delete(tierRecord._id);
-    }
+    // Note: userTiers records are kept even when orgs are deleted
+    // (the user may own other orgs or re-create one later)
 
     // Delete org members
     const members = await ctx.db
@@ -454,26 +451,18 @@ export const addMember = mutation({
     const now = Date.now();
 
     // Check tier limits for adding team members
-    const org = await ctx.db.get(args.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const tier = await getOrganizationTier(ctx.db, args.organizationId);
-    const limits = await getTierLimitsFromDb(ctx.db, tier);
-    if (limits.maxTeamMembers !== null) {
-      const currentMembers = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
-        )
-        .collect();
-
-      if (currentMembers.length >= limits.maxTeamMembers) {
-        throw new Error(
-          `Team member limit reached (${currentMembers.length}/${limits.maxTeamMembers}). Upgrade your tier for more team members.`
-        );
-      }
+    const currentMemberCount = await countMembersAndPendingInvites(
+      ctx.db,
+      args.organizationId
+    );
+    const memberCheck = await checkNumericLimit(
+      ctx.db,
+      args.organizationId,
+      "max_team_members",
+      currentMemberCount
+    );
+    if (!memberCheck.allowed) {
+      throw new Error(memberCheck.reason!);
     }
 
     const existingMembership = await ctx.db

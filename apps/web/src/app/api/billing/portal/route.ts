@@ -80,13 +80,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get Stripe customer for this organization
-    const stripeCustomer = await convex.query(
-      api.subscriptions.getStripeCustomer,
-      {
-        organizationId: organizationId as Id<"organizations">,
-      }
+    // Get Stripe customer — try user-level first, fallback to org-level
+    let stripeCustomer = await convex.query(
+      api.subscriptions.getStripeCustomerByUser,
+      { userId: convexUser._id }
     );
+
+    if (!stripeCustomer) {
+      stripeCustomer = await convex.query(
+        api.subscriptions.getStripeCustomer,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
+    }
 
     if (!stripeCustomer) {
       return NextResponse.json(

@@ -75,6 +75,21 @@ export type VaultErrorCode =
   | "NOT_FOUND";
 
 /**
+ * Build a clean key context object, omitting undefined fields
+ * to avoid WorkOS Vault API rejecting requests with invalid parameters.
+ */
+function buildKeyContext(context: VaultKeyContext): Record<string, string> {
+  const keyContext: Record<string, string> = {
+    organizationId: context.organizationId,
+    projectId: context.projectId,
+  };
+  if (context.environment) {
+    keyContext.environment = context.environment;
+  }
+  return keyContext;
+}
+
+/**
  * Creates an encrypted secret in WorkOS Vault
  *
  * @param name - Unique identifier for the secret (e.g., "DATABASE_URL_prod")
@@ -98,11 +113,7 @@ export async function createSecret(
     const result = await workos.vault.createObject({
       name: uniqueName,
       value,
-      context: {
-        organizationId: context.organizationId,
-        projectId: context.projectId,
-        environment: context.environment,
-      },
+      context: buildKeyContext(context),
     });
 
     return {
@@ -231,11 +242,7 @@ export async function encryptData(
 
     return await workos.vault.encrypt(
       data,
-      {
-        organizationId: context.organizationId,
-        projectId: context.projectId,
-        environment: context.environment,
-      },
+      buildKeyContext(context),
       associatedData
     );
   } catch (error) {
@@ -319,11 +326,7 @@ export async function createDataKey(context: VaultKeyContext) {
     const workos = getWorkOSClient();
 
     return await workos.vault.createDataKey({
-      context: {
-        organizationId: context.organizationId,
-        projectId: context.projectId,
-        environment: context.environment,
-      },
+      context: buildKeyContext(context),
     });
   } catch (error) {
     throw new VaultError("Failed to create data key", "CREATE_FAILED", error);

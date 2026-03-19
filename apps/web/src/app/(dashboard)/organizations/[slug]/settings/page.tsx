@@ -62,12 +62,12 @@ export default function OrganizationSettingsPage({
 
   // Look up tier from organizationTiers table
   const tierData = useQuery(
-    api.tierLimits.getOrganizationLimits,
+    api.featureRegistry.getResolvedFeatures,
     organization?._id
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"
   );
-  const orgTier = (tierData?.tier as string) ?? "free";
+  const orgTier = (tierData?.tierName as string) ?? "free";
 
   const tabs: { id: OrgSettingsTab; label: string }[] = [
     { id: "general", label: "General" },

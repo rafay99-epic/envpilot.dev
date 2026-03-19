@@ -68,7 +68,7 @@ export async function GET(request: Request) {
 
     // Get tier for active organization from organizationTiers table
     const activeTierData = activeOrganization
-      ? await convex.query(api.tierLimits.getOrganizationLimits, {
+      ? await convex.query(api.featureRegistry.getResolvedFeatures, {
           organizationId: activeOrganization._id as Id<"organizations">,
         })
       : null;
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
           id: activeOrganization._id,
           name: activeOrganization.name,
           slug: activeOrganization.slug,
-          tier: activeTierData?.tier ?? "free",
+          tier: activeTierData?.tierName ?? "free",
           role: activeOrganization.role,
           createdAt: new Date(activeOrganization.createdAt),
           updatedAt: new Date(activeOrganization.updatedAt),
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     // Get tiers for all organizations
     const orgTiers = await Promise.all(
       organizations.map((org) =>
-        convex.query(api.tierLimits.getOrganizationLimits, {
+        convex.query(api.featureRegistry.getResolvedFeatures, {
           organizationId: org._id as Id<"organizations">,
         })
       )
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
         id: org._id,
         name: org.name,
         slug: org.slug,
-        tier: orgTiers[index]?.tier ?? "free",
+        tier: orgTiers[index]?.tierName ?? "free",
         role: org.role,
       })),
       accessToken,

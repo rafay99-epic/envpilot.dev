@@ -6,8 +6,9 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  checkCLIAccess,
+  tierLimitResponse,
 } from "@/lib/cli-auth";
-import { getTierLimits } from "@/lib/tier-limits";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -42,6 +43,12 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
+    // Check CLI access feature gate
+    const cliAccess = await checkCLIAccess(convex, organizationId as Id<"organizations">);
+    if (!cliAccess.allowed) {
+      return tierLimitResponse(cliAccess.reason ?? "CLI access is not available on your current tier.");
+    }
+
     const usageData = await convex.query(api.tierLimits.getOrganizationUsage, {
       organizationId: organizationId as Id<"organizations">,
     });
@@ -57,24 +64,30 @@ export async function GET(request: NextRequest) {
       api.tierLimits.isEnforcementEnabled,
       {}
     );
-    const limits = getTierLimits(usageData.tier);
+
+    const resolvedFeatures = await convex.query(api.featureRegistry.getResolvedFeatures, {
+      organizationId: organizationId as Id<"organizations">,
+    });
 
     return NextResponse.json({
-      tier: usageData.tier,
+      tier: resolvedFeatures?.tierName ?? usageData.tier,
       enforcementEnabled,
+      // Legacy format for older CLI versions
       limits: {
-        projects: limits.maxProjects,
-        variablesPerProject: limits.maxVariablesPerProject,
-        teamMembers: limits.maxTeamMembers,
+        projects: resolvedFeatures?.features?.max_projects?.value ?? null,
+        variablesPerProject: resolvedFeatures?.features?.max_variables_per_project?.value ?? null,
+        teamMembers: resolvedFeatures?.features?.max_team_members?.value ?? null,
       },
       usage: usageData.usage,
       features: {
-        versionHistory: limits.variableVersionHistoryEnabled,
-        bulkImport: limits.bulkImportEnabled,
-        extensionAccess: limits.extensionAccessEnabled,
-        granularPermissions: limits.granularPermissionsEnabled,
-        auditLogRetentionDays: limits.auditLogRetentionDays,
+        versionHistory: resolvedFeatures?.features?.variable_version_history?.value ?? false,
+        bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
+        extensionAccess: resolvedFeatures?.features?.extension_access?.value ?? true,
+        granularPermissions: resolvedFeatures?.features?.granular_permissions?.value ?? false,
+        auditLogRetentionDays: resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
       },
+      // New dynamic format
+      resolvedFeatures: resolvedFeatures?.features ?? {},
     });
   } catch (error) {
     console.error("CLI usage error:", error);

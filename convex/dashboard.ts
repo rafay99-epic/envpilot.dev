@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers } from "./helpers";
+import { resolveFeatureValue } from "./featureRegistry";
 
 /**
  * Dashboard Statistics Queries
@@ -302,7 +303,20 @@ export const getAnalytics = query({
     daysBack: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const daysBack = args.daysBack ?? 30;
+    const requestedDays = args.daysBack ?? 30;
+
+    // Resolve analytics retention limit for this org
+    const retentionResolved = await resolveFeatureValue(
+      ctx.db,
+      args.organizationId,
+      "analytics_retention_days"
+    );
+    const maxRetentionDays = retentionResolved.value as number | null;
+    const effectiveDays = maxRetentionDays !== null
+      ? Math.min(requestedDays, maxRetentionDays)
+      : requestedDays;
+
+    const daysBack = effectiveDays;
     const startTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
 
     // Single audit log fetch for both summary + project breakdown
@@ -468,6 +482,8 @@ export const getAnalytics = query({
       sensitiveAccessCount,
       securityEventCount,
       periodDays: daysBack,
+      maxRetentionDays: maxRetentionDays ?? undefined,
+      effectiveDays,
       // Project breakdown data
       projectActivity,
       variableChangesByProject,

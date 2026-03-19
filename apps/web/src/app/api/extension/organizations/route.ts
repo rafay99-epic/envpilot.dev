@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // Get tiers for all organizations from organizationTiers table
     const orgTiers = await Promise.all(
       validOrgs.map((org) =>
-        convex.query(api.tierLimits.getOrganizationLimits, {
+        convex.query(api.featureRegistry.getResolvedFeatures, {
           organizationId: org!._id,
         })
       )
@@ -39,13 +39,17 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       data: {
-        organizations: validOrgs.map((org, index) => ({
-          _id: org!._id,
-          name: org!.name,
-          slug: org!.slug,
-          tier: orgTiers[index]?.tier ?? "free",
-          role: org!.role || "member",
-        })),
+        organizations: validOrgs.map((org, index) => {
+          const features = orgTiers[index]?.features ?? {};
+          return {
+            _id: org!._id,
+            name: org!.name,
+            slug: org!.slug,
+            tier: orgTiers[index]?.tierName ?? "free",
+            role: org!.role || "member",
+            extensionAccess: features.extension_access?.value === true,
+          };
+        }),
       },
     });
   } catch (error) {

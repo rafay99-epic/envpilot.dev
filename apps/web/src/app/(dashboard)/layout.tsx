@@ -117,13 +117,13 @@ export default async function DashboardLayout({
   if (activeOrganization) {
     try {
       const tierData = await convex.query(
-        api.tierLimits.getOrganizationLimits,
+        api.featureRegistry.getResolvedFeatures,
         {
           organizationId:
             activeOrganization._id as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
         }
       );
-      orgTier = (tierData?.tier as string) ?? "free";
+      orgTier = (tierData?.tierName as string) ?? "free";
     } catch {
       // Fall back to free tier if query fails
     }

@@ -26,10 +26,6 @@ const validateStripeConfig = () => {
     return { valid: false, reason: "STRIPE_WEBHOOK_SECRET is not configured" };
   }
 
-  if (!process.env.STRIPE_PRO_PRICE_ID) {
-    return { valid: false, reason: "STRIPE_PRO_PRICE_ID is not configured" };
-  }
-
   return { valid: true, reason: null };
 };
 
@@ -70,7 +66,8 @@ export const getStripeWebhookSecret = (): string | null => {
 };
 
 /**
- * Get the Pro tier price ID
+ * Get the Pro tier price ID (LEGACY — backward compat)
+ * New code should use dynamic tier lookup via featureRegistry.getTierByName
  */
 export const getProPriceId = (): string | null => {
   if (!isPaymentsEnabled()) {
@@ -85,28 +82,3 @@ export const getProPriceId = (): string | null => {
 export const getStripeConfigStatus = () => {
   return validateStripeConfig();
 };
-
-/**
- * Stripe subscription status mapping to our tier system
- */
-export const mapSubscriptionStatusToTier = (
-  status: Stripe.Subscription.Status
-): string => {
-  // Active and trialing subscriptions get Pro tier
-  if (status === "active" || status === "trialing") {
-    return "pro";
-  }
-
-  // All other statuses (incomplete, incomplete_expired, past_due, canceled, unpaid, paused)
-  // revert to free tier
-  return "free";
-};
-
-/**
- * Stripe price IDs (can be extended for multiple tiers in the future)
- */
-export const STRIPE_PRICE_IDS = {
-  pro: () => process.env.STRIPE_PRO_PRICE_ID || "",
-} as const;
-
-export type StripePriceTier = keyof typeof STRIPE_PRICE_IDS;

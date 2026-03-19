@@ -27,6 +27,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { FeatureGate } from "@/components/tier/FeatureGate";
+import type { Id } from "@convex/_generated/dataModel";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
@@ -39,7 +41,7 @@ type SettingsTab =
   | "customization";
 
 export default function SettingsPage() {
-  const { user } = useAuthContext();
+  const { user, organization } = useAuthContext();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
   const tabs: { id: SettingsTab; label: string }[] = [
@@ -85,7 +87,16 @@ export default function SettingsPage() {
         {activeTab === "notifications" && <NotificationSettings />}
         {activeTab === "integrations" && <IntegrationsSettings />}
         {activeTab === "security" && <SecuritySettings />}
-        {activeTab === "customization" && <CustomizationSettings />}
+        {activeTab === "customization" && (
+          <FeatureGate
+            organizationId={organization?.id as Id<"organizations"> | undefined}
+            featureKey="keyboard_shortcuts_custom"
+            featureName="Custom Keyboard Shortcuts"
+            fallbackVariant="card"
+          >
+            <CustomizationSettings />
+          </FeatureGate>
+        )}
       </div>
     </div>
   );

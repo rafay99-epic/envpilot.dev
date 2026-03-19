@@ -12,14 +12,11 @@ function verifyAdmin(secret: string) {
   }
 }
 
-import { SEED_TIER_DEFAULTS } from "./tierLimits";
-
 const BROWSABLE_TABLES = [
   "users",
   "userPreferences",
   "organizations",
   "organizationMembers",
-  "organizationTiers",
   "projects",
   "favoriteProjects",
   "projectMembers",
@@ -88,10 +85,10 @@ export const getStats = query({
         (featureRequestsByStatus[fr.status] || 0) + 1;
     }
 
-    const orgTiers = await ctx.db.query("organizationTiers").collect();
+    const userTiers = await ctx.db.query("userTiers").collect();
     const tierDistribution: Record<string, number> = {};
-    for (const ot of orgTiers) {
-      tierDistribution[ot.tier] = (tierDistribution[ot.tier] || 0) + 1;
+    for (const ut of userTiers) {
+      tierDistribution[ut.tier] = (tierDistribution[ut.tier] || 0) + 1;
     }
 
     return {
@@ -110,83 +107,6 @@ export const getStats = query({
 // ==========================================
 // TIERS
 // ==========================================
-
-export const listOrganizationTiers = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
-
-    const tiers = await ctx.db.query("organizationTiers").collect();
-
-    const results = [];
-    for (const tierRecord of tiers) {
-      const org = await ctx.db.get(tierRecord.organizationId);
-
-      const members = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", tierRecord.organizationId)
-        )
-        .collect();
-
-      const projects = await ctx.db
-        .query("projects")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", tierRecord.organizationId)
-        )
-        .collect();
-
-      results.push({
-        ...tierRecord,
-        organizationName: org?.name ?? "Unknown",
-        organizationSlug: org?.slug ?? "unknown",
-        memberCount: members.length,
-        projectCount: projects.length,
-      });
-    }
-
-    return results;
-  },
-});
-
-export const updateOrganizationTier = mutation({
-  args: {
-    secret: v.string(),
-    organizationId: v.id("organizations"),
-    newTier: v.string(),
-  },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
-
-    // Validate tier exists in tierDefinitions
-    const tierDef = await ctx.db
-      .query("tierDefinitions")
-      .withIndex("by_name", (q) => q.eq("name", args.newTier))
-      .first();
-
-    if (!tierDef) {
-      throw new Error(
-        `Invalid tier: "${args.newTier}". No tier definition found with that name.`
-      );
-    }
-
-    const tierRecord = await ctx.db
-      .query("organizationTiers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .first();
-
-    if (!tierRecord) {
-      throw new Error("Tier record not found for this organization");
-    }
-
-    await ctx.db.patch(tierRecord._id, {
-      tier: args.newTier,
-      updatedAt: Date.now(),
-    });
-  },
-});
 
 // ==========================================
 // MESSAGES
@@ -378,16 +298,17 @@ export const listOrganizations = query({
         .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
         .collect();
 
-      const tierRecord = await ctx.db
-        .query("organizationTiers")
-        .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
+      // Resolve tier from org owner's userTiers record
+      const ownerTier = await ctx.db
+        .query("userTiers")
+        .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
         .first();
 
       results.push({
         ...org,
         memberCount: members.length,
         projectCount: projects.length,
-        tier: tierRecord?.tier ?? "free",
+        tier: ownerTier?.tier ?? "free",
       });
     }
 
@@ -439,18 +360,17 @@ export const getOrganizationDetail = query({
       )
       .collect();
 
-    const tierRecord = await ctx.db
-      .query("organizationTiers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+    // Resolve tier from org owner's userTiers record
+    const ownerTier = await ctx.db
+      .query("userTiers")
+      .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
       .first();
 
     return {
       ...org,
       members,
       projects,
-      tier: tierRecord?.tier ?? "free",
+      tier: ownerTier?.tier ?? "free",
     };
   },
 });
@@ -589,23 +509,7 @@ export const createTierDefinition = mutation({
     sortOrder: v.number(),
     isDefault: v.boolean(),
     color: v.optional(v.string()),
-    limits: v.object({
-      maxProjects: v.union(v.number(), v.null()),
-      maxVariablesPerProject: v.union(v.number(), v.null()),
-      maxTeamMembers: v.union(v.number(), v.null()),
-      maxOrganizations: v.union(v.number(), v.null()),
-      auditLogRetentionDays: v.number(),
-    }),
-    features: v.object({
-      apiAccessEnabled: v.boolean(),
-      extensionAccessEnabled: v.boolean(),
-      granularPermissionsEnabled: v.boolean(),
-      variableVersionHistoryEnabled: v.boolean(),
-      bulkImportEnabled: v.boolean(),
-      prioritySupport: v.optional(v.boolean()),
-      customBranding: v.optional(v.boolean()),
-      ssoEnabled: v.optional(v.boolean()),
-    }),
+    stripePriceId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
@@ -639,8 +543,7 @@ export const createTierDefinition = mutation({
       sortOrder: args.sortOrder,
       isDefault: args.isDefault,
       color: args.color,
-      limits: args.limits,
-      features: args.features,
+      stripePriceId: args.stripePriceId,
       createdAt: now,
       updatedAt: now,
     });
@@ -656,27 +559,7 @@ export const updateTierDefinition = mutation({
     sortOrder: v.optional(v.number()),
     isDefault: v.optional(v.boolean()),
     color: v.optional(v.string()),
-    limits: v.optional(
-      v.object({
-        maxProjects: v.union(v.number(), v.null()),
-        maxVariablesPerProject: v.union(v.number(), v.null()),
-        maxTeamMembers: v.union(v.number(), v.null()),
-        maxOrganizations: v.union(v.number(), v.null()),
-        auditLogRetentionDays: v.number(),
-      })
-    ),
-    features: v.optional(
-      v.object({
-        apiAccessEnabled: v.boolean(),
-        extensionAccessEnabled: v.boolean(),
-        granularPermissionsEnabled: v.boolean(),
-        variableVersionHistoryEnabled: v.boolean(),
-        bulkImportEnabled: v.boolean(),
-        prioritySupport: v.optional(v.boolean()),
-        customBranding: v.optional(v.boolean()),
-        ssoEnabled: v.optional(v.boolean()),
-      })
-    ),
+    stripePriceId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
@@ -704,8 +587,8 @@ export const updateTierDefinition = mutation({
     if (args.sortOrder !== undefined) updates.sortOrder = args.sortOrder;
     if (args.isDefault !== undefined) updates.isDefault = args.isDefault;
     if (args.color !== undefined) updates.color = args.color;
-    if (args.limits !== undefined) updates.limits = args.limits;
-    if (args.features !== undefined) updates.features = args.features;
+    if (args.stripePriceId !== undefined)
+      updates.stripePriceId = args.stripePriceId;
 
     await ctx.db.patch(args.id, updates);
   },
@@ -731,13 +614,22 @@ export const deleteTierDefinition = mutation({
       );
     }
 
-    // Check if any organizations use this tier
-    const orgTiers = await ctx.db.query("organizationTiers").collect();
-    const usedBy = orgTiers.filter((ot) => ot.tier === tierDef.name);
+    // Check if any users are assigned this tier
+    const userTiers = await ctx.db.query("userTiers").collect();
+    const usedBy = userTiers.filter((ut) => ut.tier === tierDef.name);
     if (usedBy.length > 0) {
       throw new Error(
-        `Cannot delete tier "${tierDef.name}": ${usedBy.length} organization(s) are using it. Reassign them first.`
+        `Cannot delete tier "${tierDef.name}": ${usedBy.length} user(s) are using it. Reassign them first.`
       );
+    }
+
+    // Clean up any tierFeatures records that reference this tier
+    const tierFeatures = await ctx.db
+      .query("tierFeatures")
+      .withIndex("by_tier", (q) => q.eq("tierName", tierDef.name))
+      .collect();
+    for (const tf of tierFeatures) {
+      await ctx.db.delete(tf._id);
     }
 
     await ctx.db.delete(args.id);
@@ -750,11 +642,11 @@ export const seedDefaultTiers = mutation({
     verifyAdmin(args.secret);
 
     const existing = await ctx.db.query("tierDefinitions").collect();
-    if (existing.length > 0) {
-      return { seeded: false, message: "Tier definitions already exist" };
-    }
+    const existingByName = new Map(existing.map((t) => [t.name, t]));
 
     const now = Date.now();
+    let created = 0;
+    let updated = 0;
 
     const seedData = [
       {
@@ -764,24 +656,22 @@ export const seedDefaultTiers = mutation({
         sortOrder: 0,
         isDefault: true,
         color: "#71717a",
-        limits: {
-          maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
-          maxVariablesPerProject:
-            SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
-          maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
-          maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
-          auditLogRetentionDays: SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
-        },
-        features: {
-          apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
-          extensionAccessEnabled:
-            SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
-          granularPermissionsEnabled:
-            SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
-          variableVersionHistoryEnabled:
-            SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
-          bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
-        },
+        monthlyPrice: 0,
+        badge: "Alpha \u00b7 Free during early access",
+        badgeColor: "amber",
+        ctaText: "Get Started Free",
+        ctaLink: "/sign-up",
+        isComingSoon: false,
+        highlightFeatures: [
+          "Up to 3 projects",
+          "50 variables per project",
+          "Up to 3 team members",
+          "CLI + VS Code Extension",
+          "Web Dashboard",
+          "AES-256 encrypted vault",
+          "Role-based access control",
+          "7-day audit log retention",
+        ],
       },
       {
         name: "pro",
@@ -790,31 +680,42 @@ export const seedDefaultTiers = mutation({
         sortOrder: 1,
         isDefault: false,
         color: "#a855f7",
-        limits: {
-          maxProjects: SEED_TIER_DEFAULTS.pro.maxProjects,
-          maxVariablesPerProject: SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
-          maxTeamMembers: SEED_TIER_DEFAULTS.pro.maxTeamMembers,
-          maxOrganizations: SEED_TIER_DEFAULTS.pro.maxOrganizations,
-          auditLogRetentionDays: SEED_TIER_DEFAULTS.pro.auditLogRetentionDays,
-        },
-        features: {
-          apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
-          extensionAccessEnabled: SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
-          granularPermissionsEnabled:
-            SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
-          variableVersionHistoryEnabled:
-            SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
-          bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
-        },
+        monthlyPrice: 15,
+        badge: "Coming soon",
+        badgeColor: "zinc",
+        ctaText: "Coming Soon",
+        ctaLink: "/pricing",
+        isComingSoon: true,
+        highlightFeatures: [
+          "Unlimited projects",
+          "Unlimited variables",
+          "Unlimited team members",
+          "Version history & rollback",
+          "Bulk .env import",
+          "Granular permissions",
+          "365-day audit log retention",
+          "Priority support",
+        ],
       },
     ];
 
     for (const tier of seedData) {
-      await ctx.db.insert("tierDefinitions", {
-        ...tier,
-        createdAt: now,
-        updatedAt: now,
-      });
+      const existing = existingByName.get(tier.name);
+      if (existing) {
+        // Upsert: update existing tier with new/changed fields
+        await ctx.db.patch(existing._id, {
+          ...tier,
+          updatedAt: now,
+        });
+        updated++;
+      } else {
+        await ctx.db.insert("tierDefinitions", {
+          ...tier,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created++;
+      }
     }
 
     return {
@@ -912,6 +813,16 @@ export const listMigrations = query({
         description:
           "Seeds default 'free' and 'pro' tier definitions if none exist. Safe to run multiple times.",
       },
+      {
+        name: "seed-feature-registry",
+        description:
+          "Seeds all gatable features into the featureRegistry table. Idempotent — skips existing keys.",
+      },
+      {
+        name: "seed-tier-features",
+        description:
+          "Seeds default tier-feature overrides for free and pro tiers. Idempotent — skips existing overrides.",
+      },
     ] as Array<{ name: string; description: string }>;
   },
 });
@@ -926,16 +837,9 @@ export const runMigration = mutation({
 
     if (args.name === "seed-tier-definitions") {
       const existing = await ctx.db.query("tierDefinitions").collect();
-      if (existing.length > 0) {
-        return {
-          success: true,
-          total: existing.length,
-          migrated: 0,
-          skipped: existing.length,
-        };
-      }
-
+      const existingByName = new Map(existing.map((t) => [t.name, t]));
       const now = Date.now();
+
       const seedData = [
         {
           name: "free",
@@ -944,25 +848,22 @@ export const runMigration = mutation({
           sortOrder: 0,
           isDefault: true,
           color: "#71717a",
-          limits: {
-            maxProjects: SEED_TIER_DEFAULTS.free.maxProjects,
-            maxVariablesPerProject:
-              SEED_TIER_DEFAULTS.free.maxVariablesPerProject,
-            maxTeamMembers: SEED_TIER_DEFAULTS.free.maxTeamMembers,
-            maxOrganizations: SEED_TIER_DEFAULTS.free.maxOrganizations,
-            auditLogRetentionDays:
-              SEED_TIER_DEFAULTS.free.auditLogRetentionDays,
-          },
-          features: {
-            apiAccessEnabled: SEED_TIER_DEFAULTS.free.apiAccessEnabled,
-            extensionAccessEnabled:
-              SEED_TIER_DEFAULTS.free.extensionAccessEnabled,
-            granularPermissionsEnabled:
-              SEED_TIER_DEFAULTS.free.granularPermissionsEnabled,
-            variableVersionHistoryEnabled:
-              SEED_TIER_DEFAULTS.free.variableVersionHistoryEnabled,
-            bulkImportEnabled: SEED_TIER_DEFAULTS.free.bulkImportEnabled,
-          },
+          monthlyPrice: 0,
+          badge: "Alpha · Free during early access",
+          badgeColor: "amber",
+          ctaText: "Get Started Free",
+          ctaLink: "/sign-up",
+          isComingSoon: false,
+          highlightFeatures: [
+            "Up to 3 projects",
+            "50 variables per project",
+            "Up to 3 team members",
+            "CLI + VS Code Extension",
+            "Web Dashboard",
+            "AES-256 encrypted vault",
+            "Role-based access control",
+            "7-day audit log retention",
+          ],
         },
         {
           name: "pro",
@@ -971,36 +872,164 @@ export const runMigration = mutation({
           sortOrder: 1,
           isDefault: false,
           color: "#a855f7",
-          limits: {
-            maxProjects: SEED_TIER_DEFAULTS.pro.maxProjects,
-            maxVariablesPerProject:
-              SEED_TIER_DEFAULTS.pro.maxVariablesPerProject,
-            maxTeamMembers: SEED_TIER_DEFAULTS.pro.maxTeamMembers,
-            maxOrganizations: SEED_TIER_DEFAULTS.pro.maxOrganizations,
-            auditLogRetentionDays: SEED_TIER_DEFAULTS.pro.auditLogRetentionDays,
-          },
-          features: {
-            apiAccessEnabled: SEED_TIER_DEFAULTS.pro.apiAccessEnabled,
-            extensionAccessEnabled:
-              SEED_TIER_DEFAULTS.pro.extensionAccessEnabled,
-            granularPermissionsEnabled:
-              SEED_TIER_DEFAULTS.pro.granularPermissionsEnabled,
-            variableVersionHistoryEnabled:
-              SEED_TIER_DEFAULTS.pro.variableVersionHistoryEnabled,
-            bulkImportEnabled: SEED_TIER_DEFAULTS.pro.bulkImportEnabled,
-          },
+          monthlyPrice: 15,
+          badge: "Coming soon",
+          badgeColor: "zinc",
+          ctaText: "Coming Soon",
+          ctaLink: "/pricing",
+          isComingSoon: true,
+          highlightFeatures: [
+            "Unlimited projects",
+            "Unlimited variables",
+            "Unlimited team members",
+            "Version history & rollback",
+            "Bulk .env import",
+            "Granular permissions",
+            "365-day audit log retention",
+            "Priority support",
+          ],
         },
       ];
 
+      let created = 0;
+      let updated = 0;
       for (const tier of seedData) {
-        await ctx.db.insert("tierDefinitions", {
-          ...tier,
+        const found = existingByName.get(tier.name);
+        if (found) {
+          await ctx.db.patch(found._id, { ...tier, updatedAt: now });
+          updated++;
+        } else {
+          await ctx.db.insert("tierDefinitions", {
+            ...tier,
+            createdAt: now,
+            updatedAt: now,
+          });
+          created++;
+        }
+      }
+
+      return { success: true, total: seedData.length, migrated: created, updated, skipped: 0 };
+    }
+
+    if (args.name === "seed-feature-registry") {
+      const SEED_FEATURES = [
+        { key: "max_projects", displayName: "Max Projects", valueType: "numeric" as const, category: "Resources", defaultValue: "3", resettable: false, sortOrder: 0 },
+        { key: "max_variables_per_project", displayName: "Max Variables per Project", valueType: "numeric" as const, category: "Resources", defaultValue: "50", resettable: false, sortOrder: 1 },
+        { key: "max_organizations", displayName: "Max Organizations", valueType: "numeric" as const, category: "Resources", defaultValue: "1", resettable: false, sortOrder: 2 },
+        { key: "max_team_members", displayName: "Max Team Members", valueType: "numeric" as const, category: "Team", defaultValue: "3", resettable: false, sortOrder: 0 },
+        { key: "max_invitations", displayName: "Max Pending Invitations", valueType: "numeric" as const, category: "Team", defaultValue: "5", resettable: false, sortOrder: 1 },
+        { key: "variable_version_history", displayName: "Variable Version History", valueType: "boolean" as const, category: "Variables", defaultValue: "false", resettable: false, sortOrder: 0 },
+        { key: "bulk_import", displayName: "Bulk Import", valueType: "boolean" as const, category: "Variables", defaultValue: "false", resettable: false, sortOrder: 1 },
+        { key: "bulk_delete", displayName: "Bulk Delete", valueType: "boolean" as const, category: "Variables", defaultValue: "true", resettable: false, sortOrder: 2 },
+        { key: "api_access", displayName: "API Access", valueType: "boolean" as const, category: "Tools", defaultValue: "true", resettable: false, sortOrder: 0 },
+        { key: "extension_access", displayName: "VS Code Extension", valueType: "boolean" as const, category: "Tools", defaultValue: "false", resettable: false, sortOrder: 1 },
+        { key: "cli_access", displayName: "CLI Access", valueType: "boolean" as const, category: "Tools", defaultValue: "false", resettable: false, sortOrder: 2 },
+        { key: "granular_permissions", displayName: "Granular Permissions", valueType: "boolean" as const, category: "Security", defaultValue: "true", resettable: false, sortOrder: 0 },
+        { key: "audit_log_retention_days", displayName: "Audit Log Retention (days)", valueType: "numeric" as const, category: "Security", defaultValue: "7", resettable: false, sortOrder: 1 },
+        { key: "sso_enabled", displayName: "SSO", valueType: "boolean" as const, category: "Security", defaultValue: "false", resettable: false, sortOrder: 2 },
+        { key: "keyboard_shortcuts_custom", displayName: "Custom Keyboard Shortcuts", valueType: "boolean" as const, category: "Customization", defaultValue: "true", resettable: false, sortOrder: 0 },
+        { key: "custom_branding", displayName: "Custom Branding", valueType: "boolean" as const, category: "Customization", defaultValue: "false", resettable: false, sortOrder: 1 },
+        { key: "analytics_retention_days", displayName: "Analytics Retention (days)", valueType: "numeric" as const, category: "Analytics", defaultValue: "7", resettable: false, sortOrder: 0 },
+        { key: "priority_support", displayName: "Priority Support", valueType: "boolean" as const, category: "Support", defaultValue: "false", resettable: false, sortOrder: 0 },
+      ];
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const now = Date.now();
+
+      for (const f of SEED_FEATURES) {
+        const existing = await ctx.db
+          .query("featureRegistry")
+          .withIndex("by_key", (q: any) => q.eq("key", f.key))
+          .first();
+        if (existing) {
+          // Update if properties have drifted
+          const needsUpdate =
+            existing.displayName !== f.displayName ||
+            existing.valueType !== f.valueType ||
+            existing.category !== f.category ||
+            existing.defaultValue !== f.defaultValue ||
+            existing.resettable !== f.resettable ||
+            existing.sortOrder !== f.sortOrder;
+
+          if (needsUpdate) {
+            await ctx.db.patch(existing._id, {
+              displayName: f.displayName,
+              valueType: f.valueType,
+              category: f.category,
+              defaultValue: f.defaultValue,
+              resettable: f.resettable,
+              sortOrder: f.sortOrder,
+              updatedAt: now,
+            });
+            updated++;
+          } else {
+            skipped++;
+          }
+          continue;
+        }
+        await ctx.db.insert("featureRegistry", {
+          ...f,
+          description: undefined,
+          isActive: true,
           createdAt: now,
           updatedAt: now,
         });
+        created++;
       }
 
-      return { success: true, total: 2, migrated: 2, skipped: 0 };
+      return { success: true, total: SEED_FEATURES.length, migrated: created, updated, skipped };
+    }
+
+    if (args.name === "seed-tier-features") {
+      const tierConfigs: Record<string, Record<string, string>> = {
+        free: {
+          max_projects: "3", max_variables_per_project: "50", max_organizations: "1",
+          max_team_members: "3", max_invitations: "5", variable_version_history: "false",
+          bulk_import: "false", bulk_delete: "true", api_access: "true",
+          extension_access: "false", cli_access: "false", granular_permissions: "true",
+          audit_log_retention_days: "7", sso_enabled: "false",
+          keyboard_shortcuts_custom: "true", custom_branding: "false",
+          analytics_retention_days: "7", priority_support: "false",
+        },
+        pro: {
+          max_projects: "null", max_variables_per_project: "null", max_organizations: "null",
+          max_team_members: "null", max_invitations: "null", variable_version_history: "true",
+          bulk_import: "true", bulk_delete: "true", api_access: "true",
+          extension_access: "true", cli_access: "true", granular_permissions: "true",
+          audit_log_retention_days: "365", sso_enabled: "false",
+          keyboard_shortcuts_custom: "true", custom_branding: "true",
+          analytics_retention_days: "30", priority_support: "true",
+        },
+      };
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const [tierName, features] of Object.entries(tierConfigs)) {
+        for (const [featureKey, value] of Object.entries(features)) {
+          const existing = await ctx.db
+            .query("tierFeatures")
+            .withIndex("by_tier_and_feature", (q: any) =>
+              q.eq("tierName", tierName).eq("featureKey", featureKey)
+            )
+            .first();
+          if (existing) {
+            skipped++;
+            continue;
+          }
+          await ctx.db.insert("tierFeatures", {
+            tierName,
+            featureKey,
+            value,
+            updatedAt: Date.now(),
+          });
+          created++;
+        }
+      }
+
+      return { success: true, total: Object.values(tierConfigs).reduce((sum, f) => sum + Object.keys(f).length, 0), migrated: created, skipped };
     }
 
     throw new Error(`Unknown migration: ${args.name}`);
@@ -1121,6 +1150,8 @@ export const updateAdminSetting = mutation({
       .withIndex("by_key", (q) => q.eq("key", args.key))
       .first();
 
+    const previousValue = existing?.value ?? null;
+
     if (existing) {
       await ctx.db.patch(existing._id, {
         value: args.value,
@@ -1132,6 +1163,13 @@ export const updateAdminSetting = mutation({
         value: args.value,
         updatedAt: Date.now(),
       });
+    }
+
+    // Audit log for sensitive setting changes (e.g. tierEnforcement)
+    if (args.key === "tierEnforcement") {
+      console.warn(
+        `[SECURITY AUDIT] Tier enforcement toggled: key=${args.key}, value=${args.value}, previousValue=${previousValue}, timestamp=${new Date().toISOString()}`
+      );
     }
   },
 });
@@ -1156,9 +1194,6 @@ export const getAnalytics = query({
 
     // Feature requests
     const featureRequests = await ctx.db.query("featureRequests").collect();
-
-    // Tiers
-    const orgTiers = await ctx.db.query("organizationTiers").collect();
 
     // Build monthly growth data for last 12 months
     const now = Date.now();
@@ -1235,10 +1270,11 @@ export const getAnalytics = query({
         (ticketCategoryCounts[t.category] || 0) + 1;
     }
 
-    // Tier distribution (dynamic)
+    // Tier distribution — user-level
+    const userTiers = await ctx.db.query("userTiers").collect();
     const tierDistribution: Record<string, number> = {};
-    for (const ot of orgTiers) {
-      tierDistribution[ot.tier] = (tierDistribution[ot.tier] || 0) + 1;
+    for (const ut of userTiers) {
+      tierDistribution[ut.tier] = (tierDistribution[ut.tier] || 0) + 1;
     }
 
     // Messages read/unread
@@ -1293,5 +1329,340 @@ export const getAnalytics = query({
         tickets: recentTickets,
       },
     };
+  },
+});
+
+// ==========================================
+// FEATURE REGISTRY (read-only for admin)
+// ==========================================
+
+/** List all registered features (developer-seeded, admin can only toggle active) */
+export const listFeatureRegistry = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const features = await ctx.db.query("featureRegistry").collect();
+    return features.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+});
+
+/** Toggle a feature active/inactive */
+export const toggleFeatureActive = mutation({
+  args: {
+    secret: v.string(),
+    featureId: v.id("featureRegistry"),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    await ctx.db.patch(args.featureId, {
+      isActive: args.isActive,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+// ==========================================
+// TIER-FEATURE CONFIGURATION (the matrix)
+// ==========================================
+
+/** Get all tier-feature overrides, optionally filtered by tier */
+export const listTierFeatures = query({
+  args: { secret: v.string(), tierName: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    if (args.tierName) {
+      return await ctx.db
+        .query("tierFeatures")
+        .withIndex("by_tier", (q) => q.eq("tierName", args.tierName!))
+        .collect();
+    }
+    return await ctx.db.query("tierFeatures").collect();
+  },
+});
+
+/** Set a single tier-feature value (the core admin action) */
+export const setTierFeatureValue = mutation({
+  args: {
+    secret: v.string(),
+    tierName: v.string(),
+    featureKey: v.string(),
+    value: v.string(), // "true", "false", "50", "null"
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const now = Date.now();
+
+    // Validate feature exists
+    const feature = await ctx.db
+      .query("featureRegistry")
+      .withIndex("by_key", (q) => q.eq("key", args.featureKey))
+      .first();
+    if (!feature) {
+      throw new Error(`Feature "${args.featureKey}" not found in registry`);
+    }
+
+    // Validate tier exists
+    const tier = await ctx.db
+      .query("tierDefinitions")
+      .withIndex("by_name", (q) => q.eq("name", args.tierName))
+      .first();
+    if (!tier) {
+      throw new Error(`Tier "${args.tierName}" not found`);
+    }
+
+    // Validate value matches feature type
+    if (feature.valueType === "boolean") {
+      if (args.value !== "true" && args.value !== "false") {
+        throw new Error(
+          `Boolean feature "${args.featureKey}" requires "true" or "false"`
+        );
+      }
+    } else if (feature.valueType === "numeric") {
+      if (args.value !== "null") {
+        const n = parseInt(args.value, 10);
+        if (isNaN(n) || n < 0) {
+          throw new Error(
+            `Numeric feature "${args.featureKey}" requires a non-negative number or "null"`
+          );
+        }
+      }
+    }
+
+    // Upsert
+    const existing = await ctx.db
+      .query("tierFeatures")
+      .withIndex("by_tier_and_feature", (q) =>
+        q.eq("tierName", args.tierName).eq("featureKey", args.featureKey)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: args.value,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("tierFeatures", {
+        tierName: args.tierName,
+        featureKey: args.featureKey,
+        value: args.value,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/** Remove a tier-feature override (reverts to default from featureRegistry) */
+export const removeTierFeatureOverride = mutation({
+  args: {
+    secret: v.string(),
+    tierName: v.string(),
+    featureKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const existing = await ctx.db
+      .query("tierFeatures")
+      .withIndex("by_tier_and_feature", (q) =>
+        q.eq("tierName", args.tierName).eq("featureKey", args.featureKey)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+  },
+});
+
+// ==========================================
+// USER TIER MANAGEMENT (replaces org tier assignments)
+// ==========================================
+
+/** List all user tiers with user info and owned org count */
+export const listUserTiers = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const userTierRecords = await ctx.db.query("userTiers").collect();
+
+    return await Promise.all(
+      userTierRecords.map(async (ut) => {
+        const user = await ctx.db.get(ut.userId);
+        const ownedOrgs = await ctx.db
+          .query("organizationMembers")
+          .withIndex("by_user", (q) => q.eq("userId", ut.userId))
+          .filter((q) => q.eq(q.field("role"), "admin"))
+          .collect();
+
+        // Check grace period
+        const grace = await ctx.db
+          .query("subscriptionGracePeriods")
+          .withIndex("by_user", (q) => q.eq("userId", ut.userId))
+          .first();
+        const graceActive =
+          grace?.isActive === true && grace.gracePeriodEnd > Date.now();
+
+        return {
+          ...ut,
+          userName: user?.name ?? "Unknown",
+          userEmail: user?.email ?? "Unknown",
+          ownedOrgCount: ownedOrgs.length,
+          graceActive,
+          gracePeriodEnd: graceActive ? grace!.gracePeriodEnd : undefined,
+        };
+      })
+    );
+  },
+});
+
+/** Assign tier to a user */
+export const updateUserTier = mutation({
+  args: {
+    secret: v.string(),
+    userId: v.id("users"),
+    tier: v.string(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const now = Date.now();
+
+    // Validate tier exists
+    const tierDef = await ctx.db
+      .query("tierDefinitions")
+      .withIndex("by_name", (q) => q.eq("name", args.tier))
+      .first();
+    if (!tierDef) {
+      throw new Error(`Tier "${args.tier}" not found`);
+    }
+
+    // Upsert userTiers
+    const existing = await ctx.db
+      .query("userTiers")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        tier: args.tier,
+        updatedAt: now,
+        reason: args.reason ?? "admin.manual_assignment",
+      });
+    } else {
+      await ctx.db.insert("userTiers", {
+        userId: args.userId,
+        tier: args.tier,
+        updatedAt: now,
+        reason: args.reason ?? "admin.manual_assignment",
+      });
+    }
+  },
+});
+
+// ==========================================
+// PHASE 6 MIGRATION
+// ==========================================
+
+/**
+ * Migration: Clean up legacy data from the Phase 6 schema transition.
+ *
+ * 1. Strips `limits` and `features` from all tierDefinitions documents.
+ * 2. Migrates organizationTiers → userTiers (if not already migrated).
+ * 3. Deletes all organizationTiers records.
+ * 4. Backfills userId on subscriptions/stripeCustomers from org owner.
+ *
+ * Run this ONCE after deploying the Phase 6 schema.
+ * After running, redeploy with organizationTiers table + limits/features
+ * fields fully removed from schema.ts.
+ */
+export const migratePhase6 = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const now = Date.now();
+    const results = {
+      tierDefsCleanedLimits: 0,
+      tierDefsCleanedFeatures: 0,
+      orgTiersMigrated: 0,
+      orgTiersDeleted: 0,
+      subscriptionsBackfilled: 0,
+      stripeCustomersBackfilled: 0,
+    };
+
+    // 1. Strip limits/features from tierDefinitions
+    const tierDefs = await ctx.db.query("tierDefinitions").collect();
+    for (const td of tierDefs) {
+      const updates: Record<string, undefined> = {};
+      if ((td as Record<string, unknown>).limits !== undefined) {
+        updates.limits = undefined;
+        results.tierDefsCleanedLimits++;
+      }
+      if ((td as Record<string, unknown>).features !== undefined) {
+        updates.features = undefined;
+        results.tierDefsCleanedFeatures++;
+      }
+      if ((td as Record<string, unknown>).dynamicFeatures !== undefined) {
+        updates.dynamicFeatures = undefined;
+        results.tierDefsCleanedLimits++;
+      }
+      if (Object.keys(updates).length > 0) {
+        await ctx.db.patch(td._id, updates);
+      }
+    }
+
+    // 2. Migrate organizationTiers → userTiers
+    const orgTiers = await ctx.db.query("organizationTiers").collect();
+    for (const ot of orgTiers) {
+      const org = await ctx.db.get(ot.organizationId);
+      if (org) {
+        const existing = await ctx.db
+          .query("userTiers")
+          .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
+          .first();
+        if (!existing) {
+          await ctx.db.insert("userTiers", {
+            userId: org.createdBy,
+            tier: ot.tier,
+            updatedAt: now,
+            reason: "migration.phase6",
+          });
+          results.orgTiersMigrated++;
+        }
+      }
+    }
+
+    // 3. Delete all organizationTiers records
+    for (const ot of orgTiers) {
+      await ctx.db.delete(ot._id);
+      results.orgTiersDeleted++;
+    }
+
+    // 4. Backfill userId on subscriptions
+    const subs = await ctx.db.query("subscriptions").collect();
+    for (const sub of subs) {
+      if (!sub.userId) {
+        const org = await ctx.db.get(sub.organizationId);
+        if (org) {
+          await ctx.db.patch(sub._id, { userId: org.createdBy });
+          results.subscriptionsBackfilled++;
+        }
+      }
+    }
+
+    // 5. Backfill userId on stripeCustomers
+    const customers = await ctx.db.query("stripeCustomers").collect();
+    for (const sc of customers) {
+      if (!sc.userId) {
+        const org = await ctx.db.get(sc.organizationId);
+        if (org) {
+          await ctx.db.patch(sc._id, { userId: org.createdBy });
+          results.stripeCustomersBackfilled++;
+        }
+      }
+    }
+
+    return results;
   },
 });

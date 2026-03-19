@@ -124,29 +124,75 @@ export function tierLimitResponse(
 }
 
 /**
- * Check if organization has CLI/API access (Pro tier only)
+ * Check if organization has CLI/API access via dynamic feature registry
  */
 export async function checkCLIAccess(
   convex: ConvexHttpClient,
   organizationId: Id<"organizations">
-): Promise<{ allowed: boolean; tier: string }> {
+): Promise<{ allowed: boolean; tier: string; reason?: string }> {
   const org = await convex.query(api.organizations.getById, { organizationId });
 
   if (!org) {
-    return { allowed: false, tier: "free" };
+    return { allowed: false, tier: "free", reason: "Organization not found" };
   }
 
-  // Look up the tier from the organizationTiers table
-  const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
-    organizationId: org._id,
-  });
-  const tier = (tierData?.tier as string) ?? "free";
+  const [cliCheck, apiCheck] = await Promise.all([
+    convex.query(api.featureRegistry.checkFeature, {
+      organizationId: org._id,
+      featureKey: "cli_access",
+    }),
+    convex.query(api.featureRegistry.checkFeature, {
+      organizationId: org._id,
+      featureKey: "api_access",
+    }),
+  ]);
 
-  // Pre-alpha mode: CLI access is enabled for all tiers.
-  return {
-    allowed: true,
-    tier,
-  };
+  const tier = cliCheck.tierName ?? apiCheck.tierName ?? "free";
+
+  if (!apiCheck.allowed) {
+    return { allowed: false, tier, reason: "API access is not available on your current tier." };
+  }
+  if (!cliCheck.allowed) {
+    return { allowed: false, tier, reason: "CLI access is not available on your current tier." };
+  }
+
+  return { allowed: true, tier };
+}
+
+/**
+ * Check if organization has extension/API access via dynamic feature registry
+ */
+export async function checkExtensionAccess(
+  convex: ConvexHttpClient,
+  organizationId: Id<"organizations">
+): Promise<{ allowed: boolean; tier: string; reason?: string }> {
+  const org = await convex.query(api.organizations.getById, { organizationId });
+
+  if (!org) {
+    return { allowed: false, tier: "free", reason: "Organization not found" };
+  }
+
+  const [extCheck, apiCheck] = await Promise.all([
+    convex.query(api.featureRegistry.checkFeature, {
+      organizationId: org._id,
+      featureKey: "extension_access",
+    }),
+    convex.query(api.featureRegistry.checkFeature, {
+      organizationId: org._id,
+      featureKey: "api_access",
+    }),
+  ]);
+
+  const tier = extCheck.tierName ?? apiCheck.tierName ?? "free";
+
+  if (!apiCheck.allowed) {
+    return { allowed: false, tier, reason: "API access is not available on your current tier." };
+  }
+  if (!extCheck.allowed) {
+    return { allowed: false, tier, reason: "VS Code extension access is not available on your current tier." };
+  }
+
+  return { allowed: true, tier };
 }
 
 /**

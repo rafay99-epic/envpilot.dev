@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers, userInfo } from "./helpers";
+import { checkBooleanFeature } from "./featureRegistry";
 
 /**
  * Role hierarchy for permission management
@@ -572,6 +573,16 @@ export const grant = mutation({
       throw new Error("Team leads can only grant read or write permissions");
     }
 
+    // Check granular_permissions feature gate
+    const permCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "granular_permissions"
+    );
+    if (!permCheck.allowed) {
+      throw new Error("Granular permissions are not available on your current tier.");
+    }
+
     // Validate target user is part of the org
     const targetMembership = await ctx.db
       .query("organizationMembers")
@@ -690,6 +701,16 @@ export const update = mutation({
     const project = await ctx.db.get(variable.projectId);
     if (!project) {
       throw new Error("Project not found");
+    }
+
+    // Check granular_permissions feature gate
+    const updatePermCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "granular_permissions"
+    );
+    if (!updatePermCheck.allowed) {
+      throw new Error("Granular permissions are not available on your current tier.");
     }
 
     // Team leads can only update permissions for members
@@ -890,6 +911,16 @@ export const bulkGrant = mutation({
       args.permission === "admin"
     ) {
       throw new Error("Team leads can only grant read or write permissions");
+    }
+
+    // Check granular_permissions feature gate
+    const bulkPermCheck = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "granular_permissions"
+    );
+    if (!bulkPermCheck.allowed) {
+      throw new Error("Granular permissions are not available on your current tier.");
     }
 
     const grantedIds = [];

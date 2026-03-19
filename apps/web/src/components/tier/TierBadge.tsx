@@ -1,5 +1,8 @@
 "use client";
 
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+
 interface TierBadgeProps {
   tier: string;
   size?: "sm" | "md" | "lg";
@@ -16,26 +19,39 @@ const FALLBACK_STYLE =
 
 /**
  * Badge component to display the organization's subscription tier.
- * Supports dynamic tier names — known tiers get specific styling,
- * unknown tiers get a default gradient.
+ * Fetches dynamic tier definition for display name and color.
+ * Falls back to static styling for known tiers (free/pro).
  */
 export function TierBadge({
   tier,
   size = "md",
   showLabel = true,
 }: TierBadgeProps) {
+  // Fetch dynamic tier definition for display name and color
+  const tierDef = useQuery(api.featureRegistry.getTierByName, { name: tier });
+
   const sizeClasses = {
     sm: "text-xs px-1.5 py-0.5",
     md: "text-sm px-2 py-0.5",
     lg: "text-base px-3 py-1",
   };
 
-  const style = DEFAULT_TIER_STYLES[tier] ?? FALLBACK_STYLE;
+  // Use dynamic color from DB if available, else static styles
+  const dynamicStyle = tierDef?.color
+    ? { backgroundColor: tierDef.color, color: "#fff" }
+    : undefined;
+  const staticClass = !dynamicStyle
+    ? DEFAULT_TIER_STYLES[tier] ?? FALLBACK_STYLE
+    : "";
+
   const isSpecial = tier !== "free";
+  const displayName =
+    tierDef?.displayName ?? tier.charAt(0).toUpperCase() + tier.slice(1);
 
   return (
     <span
-      className={`inline-flex items-center font-medium rounded-full ${sizeClasses[size]} ${style}`}
+      className={`inline-flex items-center font-medium rounded-full ${sizeClasses[size]} ${staticClass}`}
+      style={dynamicStyle}
     >
       {isSpecial && (
         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -46,7 +62,7 @@ export function TierBadge({
           />
         </svg>
       )}
-      {showLabel && tier.charAt(0).toUpperCase() + tier.slice(1)}
+      {showLabel && displayName}
     </span>
   );
 }

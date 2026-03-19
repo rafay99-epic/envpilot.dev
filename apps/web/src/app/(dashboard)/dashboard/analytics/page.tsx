@@ -58,6 +58,8 @@ export default function AnalyticsPage() {
     daysBack
   );
 
+  const maxRetentionDays = (analytics?.maxRetentionDays as number | undefined) ?? null;
+
   if (!organization || !canViewAnalytics) {
     router.replace("/dashboard");
     return null;
@@ -66,7 +68,7 @@ export default function AnalyticsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Header daysBack={daysBack} setDaysBack={setDaysBack} />
+        <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
         <TerminalWindow title="loading-analytics">
           <TerminalLoading />
         </TerminalWindow>
@@ -77,7 +79,7 @@ export default function AnalyticsPage() {
   if (!analytics || analytics.totalEvents === 0) {
     return (
       <div className="space-y-6">
-        <Header daysBack={daysBack} setDaysBack={setDaysBack} />
+        <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
         <TerminalEmptyState
           command="envpilot analytics"
           message={`No activity data in the last ${daysBack} days. Start by creating a project and adding variables!`}
@@ -88,7 +90,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <Header daysBack={daysBack} setDaysBack={setDaysBack} />
+      <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
 
       {/* Row 1: Activity Overview */}
       <ActivityChart dailyCounts={analytics.dailyCounts} daysBack={daysBack} />
@@ -121,9 +123,11 @@ export default function AnalyticsPage() {
 function Header({
   daysBack,
   setDaysBack,
+  maxRetentionDays,
 }: {
   daysBack: TimeRange;
   setDaysBack: (v: TimeRange) => void;
+  maxRetentionDays: number | null;
 }) {
   const ranges: TimeRange[] = [7, 30, 90];
 
@@ -135,20 +139,34 @@ function Header({
         </p>
         <h1 className="mt-1 text-xl font-bold text-zinc-100">Analytics</h1>
       </div>
-      <div className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-900/50 p-1">
-        {ranges.map((range) => (
-          <button
-            key={range}
-            onClick={() => setDaysBack(range)}
-            className={`rounded-md px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
-              daysBack === range
-                ? "bg-green-500/15 text-green-400"
-                : "text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            {range}d
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-900/50 p-1">
+          {ranges.map((range) => {
+            const disabled = maxRetentionDays !== null && range > maxRetentionDays;
+            return (
+              <button
+                key={range}
+                onClick={() => !disabled && setDaysBack(range)}
+                disabled={disabled}
+                title={disabled ? "Upgrade for longer history" : undefined}
+                className={`rounded-md px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
+                  disabled
+                    ? "cursor-not-allowed text-zinc-700"
+                    : daysBack === range
+                      ? "bg-green-500/15 text-green-400"
+                      : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {range}d
+              </button>
+            );
+          })}
+        </div>
+        {maxRetentionDays !== null && (
+          <span className="text-[10px] text-zinc-600" title="Your plan limits analytics retention">
+            max {maxRetentionDays}d
+          </span>
+        )}
       </div>
     </div>
   );

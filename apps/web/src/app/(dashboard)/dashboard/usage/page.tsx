@@ -10,7 +10,8 @@ import {
   TerminalWindow,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
-import { TIER_LIMITS } from "@/lib/tier-limits";
+import { useAllFeatures } from "@/hooks";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   Check,
   Lock,
@@ -27,33 +28,33 @@ import {
   KeyRound,
 } from "lucide-react";
 
-const features = [
+const featureDisplayConfig = [
   {
-    key: "apiAccessEnabled" as const,
+    key: "api_access",
     label: "CLI Access",
     icon: Terminal,
     description: "Manage variables from the terminal",
   },
   {
-    key: "extensionAccessEnabled" as const,
+    key: "extension_access",
     label: "VS Code Extension",
     icon: Puzzle,
     description: "Sync variables in your editor",
   },
   {
-    key: "variableVersionHistoryEnabled" as const,
+    key: "variable_version_history",
     label: "Version History",
     icon: History,
     description: "Track and rollback variable changes",
   },
   {
-    key: "bulkImportEnabled" as const,
+    key: "bulk_import",
     label: "Bulk Import",
     icon: Upload,
     description: "Import variables from .env files",
   },
   {
-    key: "granularPermissionsEnabled" as const,
+    key: "granular_permissions",
     label: "Granular Permissions",
     icon: Shield,
     description: "Per-variable access controls",
@@ -62,7 +63,7 @@ const features = [
 
 export default function UsagePage() {
   const { organization } = useAuthContext();
-  const { isLoading, tier, limits, usage, isFree, enforcementEnabled } =
+  const { isLoading, tier, usage, isFree, enforcementEnabled } =
     useCachedTierData();
   const [orgCount, setOrgCount] = useState<number | null>(null);
 
@@ -101,7 +102,10 @@ export default function UsagePage() {
     );
   }
 
-  if (isLoading || !tier || !limits) {
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+  const { features: resolvedFeatures, isAllowed, getLimit } = useAllFeatures(orgId);
+
+  if (isLoading || !tier) {
     return (
       <div className="space-y-6">
         <div>
@@ -121,16 +125,18 @@ export default function UsagePage() {
     );
   }
 
-  const displayLimits = TIER_LIMITS[tier];
-
   // In pre-alpha: show unlimited (null) for all meters
-  // In enforcement mode: show real limits
+  // In enforcement mode: show real limits from dynamic features
   const meterLimits = {
-    orgs: enforcementEnabled ? displayLimits.maxOrganizations : null,
-    projects: enforcementEnabled ? displayLimits.maxProjects : null,
-    teamMembers: enforcementEnabled ? displayLimits.maxTeamMembers : null,
-    variables: enforcementEnabled ? displayLimits.maxVariablesPerProject : null,
-    auditDays: enforcementEnabled ? displayLimits.auditLogRetentionDays : 730,
+    orgs: enforcementEnabled ? (getLimit("max_organizations") ?? null) : null,
+    projects: enforcementEnabled ? (getLimit("max_projects") ?? null) : null,
+    teamMembers: enforcementEnabled ? (getLimit("max_team_members") ?? null) : null,
+    variables: enforcementEnabled ? (getLimit("max_variables_per_project") ?? null) : null,
+    auditDays: enforcementEnabled
+      ? (typeof resolvedFeatures?.audit_log_retention_days?.value === "number"
+          ? resolvedFeatures.audit_log_retention_days.value
+          : 7)
+      : 730,
   };
 
   return (
@@ -282,8 +288,8 @@ export default function UsagePage() {
       <TerminalWindow title="features — availability">
         <div className="p-6">
           <div className="space-y-3">
-            {features.map(({ key, label, icon: Icon, description }) => {
-              const enabled = !enforcementEnabled || displayLimits[key];
+            {featureDisplayConfig.map(({ key, label, icon: Icon, description }) => {
+              const enabled = !enforcementEnabled || isAllowed(key);
               return (
                 <div
                   key={key}

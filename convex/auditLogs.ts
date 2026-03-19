@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { batchGetUsers, userDisplay } from "./helpers";
+import { resolveFeatureValue } from "./featureRegistry";
 
 /**
  * Comprehensive Audit Log Queries
@@ -13,6 +14,21 @@ import { batchGetUsers, userDisplay } from "./helpers";
  * - Security event monitoring
  */
 
+
+
+/**
+ * Get the audit log retention cutoff timestamp for an organization.
+ * Returns null if no retention limit applies (unlimited).
+ */
+async function getRetentionCutoff(
+  db: any,
+  organizationId: Id<"organizations">
+): Promise<number | null> {
+  const resolved = await resolveFeatureValue(db, organizationId, "audit_log_retention_days");
+  const days = resolved.value as number | null;
+  if (days === null) return null; // unlimited
+  return Date.now() - days * 24 * 60 * 60 * 1000;
+}
 // ==========================================
 // BASIC QUERIES
 // ==========================================
@@ -37,11 +53,17 @@ export const listByOrganization = query({
     const offsetLogs = args.offset ? logs.slice(args.offset) : logs;
     const resultLogs = offsetLogs.slice(0, limit);
 
+    // Apply audit log retention cutoff
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const retainedLogs = cutoff
+      ? resultLogs.filter((log) => log.createdAt >= cutoff)
+      : resultLogs;
+
     const userMap = await batchGetUsers(
       ctx,
-      resultLogs.map((l) => l.userId)
+      retainedLogs.map((l) => l.userId)
     );
-    return resultLogs.map((log) => {
+    return retainedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
         ...log,
@@ -63,7 +85,9 @@ export const countByOrganization = query({
         q.eq("organizationId", args.organizationId)
       )
       .collect();
-    return logs.length;
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+    return retainedLogs.length;
   },
 });
 
@@ -79,11 +103,16 @@ export const listByProject = query({
       .order("desc")
       .take(args.limit ?? 50);
 
+    // Apply retention cutoff via project -> org
+    const project = await ctx.db.get(args.projectId);
+    const cutoff = project ? await getRetentionCutoff(ctx.db, project.organizationId) : null;
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+
     const userMap = await batchGetUsers(
       ctx,
-      logs.map((l) => l.userId)
+      retainedLogs.map((l) => l.userId)
     );
-    return logs.map((log) => {
+    return retainedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
         ...log,
@@ -106,11 +135,17 @@ export const listByVariable = query({
       .order("desc")
       .take(args.limit ?? 50);
 
+    // Apply retention cutoff via variable -> project -> org
+    const variable = await ctx.db.get(args.variableId);
+    const project = variable ? await ctx.db.get(variable.projectId) : null;
+    const cutoff = project ? await getRetentionCutoff(ctx.db, project.organizationId) : null;
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+
     const userMap = await batchGetUsers(
       ctx,
-      logs.map((l) => l.userId)
+      retainedLogs.map((l) => l.userId)
     );
-    return logs.map((log) => {
+    return retainedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
         ...log,
@@ -140,8 +175,15 @@ export const listByUser = query({
 
     const logs = await logsQuery.order("desc").take(args.limit ?? 50);
 
+    // Apply retention cutoff if org context available
+    let retainedLogs = logs;
+    if (args.organizationId) {
+      const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+      if (cutoff) retainedLogs = logs.filter((l) => l.createdAt >= cutoff);
+    }
+
     const logsWithDetails = await Promise.all(
-      logs.map(async (log) => {
+      retainedLogs.map(async (log) => {
         const org = await ctx.db.get(log.organizationId);
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
         return {
@@ -173,11 +215,14 @@ export const listByAction = query({
       .order("desc")
       .take(args.limit ?? 50);
 
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+
     const userMap = await batchGetUsers(
       ctx,
-      logs.map((l) => l.userId)
+      retainedLogs.map((l) => l.userId)
     );
-    return logs.map((log) => {
+    return retainedLogs.map((log) => {
       const u = userMap.get(log.userId.toString());
       return {
         ...log,
@@ -221,6 +266,8 @@ export const listSecurityEvents = query({
       "security.suspicious_activity",
     ];
 
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -229,7 +276,8 @@ export const listSecurityEvents = query({
       .order("desc")
       .take(1000);
 
-    let securityLogs = logs.filter((log) =>
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+    let securityLogs = retainedLogs.filter((log) =>
       securityActions.includes(log.action)
     );
 
@@ -275,6 +323,8 @@ export const listSensitiveDataAccess = query({
       "variable.copied",
     ];
 
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
     const logsQuery = ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -283,8 +333,9 @@ export const listSensitiveDataAccess = query({
       .order("desc");
 
     const logs = await logsQuery.take(2000);
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
 
-    const sensitiveAccessLogs = logs.filter((log) => {
+    const sensitiveAccessLogs = retainedLogs.filter((log) => {
       // Check if it's an access action
       if (!accessActions.includes(log.action)) return false;
 
@@ -376,6 +427,8 @@ export const listPermissionChanges = query({
       "permission.bulk_revoked",
     ];
 
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -384,7 +437,8 @@ export const listPermissionChanges = query({
       .order("desc")
       .take(2000);
 
-    const permissionLogs = logs.filter((log) => {
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+    const permissionLogs = retainedLogs.filter((log) => {
       if (!permissionActions.includes(log.action)) return false;
       if (args.startTime && log.createdAt < args.startTime) return false;
       if (args.endTime && log.createdAt > args.endTime) return false;
@@ -454,6 +508,9 @@ export const listByTimeRange = query({
     resourceTypeFilter: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const effectiveStartTime = cutoff ? Math.max(args.startTime, cutoff) : args.startTime;
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -461,7 +518,7 @@ export const listByTimeRange = query({
       )
       .filter((q) =>
         q.and(
-          q.gte(q.field("createdAt"), args.startTime),
+          q.gte(q.field("createdAt"), effectiveStartTime),
           q.lte(q.field("createdAt"), args.endTime)
         )
       )
@@ -517,7 +574,9 @@ export const getSummary = query({
   },
   handler: async (ctx, args) => {
     const daysBack = args.daysBack ?? 30;
-    const startTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const rawStartTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const startTime = cutoff ? Math.max(rawStartTime, cutoff) : rawStartTime;
 
     const logs = await ctx.db
       .query("auditLogs")
@@ -613,6 +672,9 @@ export const getComplianceReport = query({
     endTime: v.number(),
   },
   handler: async (ctx, args) => {
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const effectiveStartTime = cutoff ? Math.max(args.startTime, cutoff) : args.startTime;
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -620,7 +682,7 @@ export const getComplianceReport = query({
       )
       .filter((q) =>
         q.and(
-          q.gte(q.field("createdAt"), args.startTime),
+          q.gte(q.field("createdAt"), effectiveStartTime),
           q.lte(q.field("createdAt"), args.endTime)
         )
       )
@@ -711,6 +773,9 @@ export const getForExport = query({
     includeDetails: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const effectiveStartTime = cutoff ? Math.max(args.startTime, cutoff) : args.startTime;
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
@@ -718,7 +783,7 @@ export const getForExport = query({
       )
       .filter((q) =>
         q.and(
-          q.gte(q.field("createdAt"), args.startTime),
+          q.gte(q.field("createdAt"), effectiveStartTime),
           q.lte(q.field("createdAt"), args.endTime)
         )
       )
@@ -805,6 +870,7 @@ export const getRecentAlerts = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 10;
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
     const logs = await ctx.db
       .query("auditLogs")
@@ -814,7 +880,8 @@ export const getRecentAlerts = query({
       .order("desc")
       .take(500);
 
-    const alertLogs = logs.filter(
+    const retainedLogs = cutoff ? logs.filter((l) => l.createdAt >= cutoff) : logs;
+    const alertLogs = retainedLogs.filter(
       (log) => log.severity === "critical" || log.severity === "warning"
     );
 
@@ -845,13 +912,15 @@ export const getAlertCount = query({
   },
   handler: async (ctx, args) => {
     const sinceTime = args.since ?? Date.now() - 24 * 60 * 60 * 1000; // Last 24 hours by default
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+    const effectiveSince = cutoff ? Math.max(sinceTime, cutoff) : sinceTime;
 
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.gte(q.field("createdAt"), sinceTime))
+      .filter((q) => q.gte(q.field("createdAt"), effectiveSince))
       .collect();
 
     const criticalCount = logs.filter(

@@ -9,7 +9,9 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * GET /api/billing/subscription?organizationId=xxx
- * Get subscription status for an organization
+ * Get subscription status for an organization.
+ *
+ * Now returns user-level tier info alongside org-level subscription data.
  */
 export async function GET(request: Request) {
   try {
@@ -71,29 +73,45 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get subscription
-    const subscription = await convex.query(
-      api.subscriptions.getByOrganization,
-      {
-        organizationId: organizationId as Id<"organizations">,
-      }
+    // Get user-level tier info (primary source of truth)
+    const userTierInfo = await convex.query(
+      api.featureRegistry.getUserTierInfo,
+      { userId: organization.createdBy }
     );
 
-    // Get Stripe customer info
-    const stripeCustomer = await convex.query(
-      api.subscriptions.getStripeCustomer,
-      {
-        organizationId: organizationId as Id<"organizations">,
-      }
-    );
-
-    // Get tier from organizationTiers table
-    const tierData = await convex.query(api.tierLimits.getOrganizationLimits, {
-      organizationId: organizationId as Id<"organizations">,
+    // Get subscription — try user-level first, fallback to org-level
+    let subscription = await convex.query(api.subscriptions.getByUser, {
+      userId: organization.createdBy,
     });
 
+    if (!subscription) {
+      subscription = await convex.query(
+        api.subscriptions.getByOrganization,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
+    }
+
+    // Get Stripe customer — try user-level first, fallback to org-level
+    let stripeCustomer = await convex.query(
+      api.subscriptions.getStripeCustomerByUser,
+      { userId: organization.createdBy }
+    );
+
+    if (!stripeCustomer) {
+      stripeCustomer = await convex.query(
+        api.subscriptions.getStripeCustomer,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
+    }
+
     return NextResponse.json({
-      tier: tierData?.tier ?? "free",
+      tier: userTierInfo?.tier ?? "free",
+      graceActive: userTierInfo?.graceActive ?? false,
+      gracePeriodEnd: userTierInfo?.gracePeriodEnd ?? null,
       subscription: subscription
         ? {
             status: subscription.status,

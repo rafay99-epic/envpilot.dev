@@ -10,19 +10,6 @@ import { Id } from "@convex/_generated/dataModel";
 /** Tier name — dynamic, not limited to "free" | "pro" */
 export type Tier = string;
 
-export interface TierLimits {
-  maxProjects: number | null;
-  maxVariablesPerProject: number | null;
-  maxTeamMembers: number | null;
-  maxOrganizations: number | null;
-  auditLogRetentionDays: number;
-  apiAccessEnabled: boolean;
-  extensionAccessEnabled: boolean;
-  granularPermissionsEnabled: boolean;
-  variableVersionHistoryEnabled: boolean;
-  bulkImportEnabled: boolean;
-}
-
 export type TierAction =
   | "create_project"
   | "create_variable"
@@ -39,115 +26,6 @@ export type TierAction =
 export function useEnforcementEnabled(): boolean {
   const data = useQuery(api.tierLimits.isEnforcementEnabled);
   return data ?? true; // Default to enforcing while loading
-}
-
-/**
- * Hook to get organization tier limits and current usage
- */
-export function useOrganizationTierLimits(
-  organizationId: Id<"organizations"> | undefined
-) {
-  const limitsData = useQuery(
-    api.tierLimits.getOrganizationLimits,
-    organizationId ? { organizationId } : "skip"
-  );
-
-  const usageData = useQuery(
-    api.tierLimits.getOrganizationUsage,
-    organizationId ? { organizationId } : "skip"
-  );
-
-  return {
-    isLoading: limitsData === undefined || usageData === undefined,
-    tier: limitsData?.tier as Tier | undefined,
-    limits: limitsData?.limits as TierLimits | undefined,
-    usage: usageData?.usage,
-    isPro: limitsData?.tier === "pro",
-    isFree: limitsData?.tier === "free",
-  };
-}
-
-/**
- * Hook to get project variable count and limits
- */
-export function useProjectVariableLimits(
-  projectId: Id<"projects"> | undefined
-) {
-  const data = useQuery(
-    api.tierLimits.getProjectVariableCount,
-    projectId ? { projectId } : "skip"
-  );
-
-  if (!data) {
-    return {
-      isLoading: true,
-      tier: undefined,
-      limits: undefined,
-      usage: undefined,
-      canCreateVariable: false,
-      variablesRemaining: 0,
-    };
-  }
-
-  const canCreateVariable =
-    data.limits.maxVariablesPerProject === null ||
-    data.usage.variables < data.limits.maxVariablesPerProject;
-
-  const variablesRemaining =
-    data.limits.maxVariablesPerProject === null
-      ? Infinity
-      : Math.max(0, data.limits.maxVariablesPerProject - data.usage.variables);
-
-  return {
-    isLoading: false,
-    tier: data.tier as Tier,
-    limits: data.limits as TierLimits,
-    usage: data.usage,
-    canCreateVariable,
-    variablesRemaining,
-  };
-}
-
-/**
- * Hook to get user's organization limits
- */
-export function useUserOrganizationLimits(userId: Id<"users"> | undefined) {
-  const data = useQuery(
-    api.tierLimits.getUserOrganizationCount,
-    userId ? { userId } : "skip"
-  );
-
-  if (!data) {
-    return {
-      isLoading: true,
-      effectiveTier: undefined,
-      limits: undefined,
-      usage: undefined,
-      canCreateOrganization: false,
-      organizationsRemaining: 0,
-    };
-  }
-
-  const canCreateOrganization =
-    data.limits.maxOrganizations === null ||
-    data.usage.ownedOrganizations < data.limits.maxOrganizations;
-
-  const organizationsRemaining =
-    data.limits.maxOrganizations === null
-      ? Infinity
-      : Math.max(
-          0,
-          data.limits.maxOrganizations - data.usage.ownedOrganizations
-        );
-
-  return {
-    isLoading: false,
-    effectiveTier: data.effectiveTier as Tier,
-    limits: data.limits as TierLimits,
-    usage: data.usage,
-    canCreateOrganization,
-    organizationsRemaining,
-  };
 }
 
 /**
@@ -169,42 +47,16 @@ export function useTierLimitCheck(
       : "skip"
   );
 
+  const result = data as
+    | { allowed: boolean; reason?: string; tierName?: string; current?: number; limit?: number | null }
+    | undefined;
+
   return {
     isLoading: data === undefined,
-    allowed: data?.allowed ?? false,
-    reason: data?.reason,
-    current: data?.current,
-    limit: data?.limit,
-  };
-}
-
-/**
- * Helper hook to check multiple features at once
- */
-export function useTierFeatures(
-  organizationId: Id<"organizations"> | undefined
-) {
-  const { tier, limits, isLoading } = useOrganizationTierLimits(organizationId);
-
-  return {
-    isLoading,
-    tier,
-    isPro: tier === "pro",
-    isFree: tier === "free",
-    features: {
-      apiAccess: limits?.apiAccessEnabled ?? false,
-      extensionAccess: limits?.extensionAccessEnabled ?? false,
-      granularPermissions: limits?.granularPermissionsEnabled ?? false,
-      versionHistory: limits?.variableVersionHistoryEnabled ?? false,
-      bulkImport: limits?.bulkImportEnabled ?? false,
-    },
-    limits: {
-      maxProjects: limits?.maxProjects ?? null,
-      maxVariablesPerProject: limits?.maxVariablesPerProject ?? null,
-      maxTeamMembers: limits?.maxTeamMembers ?? null,
-      maxOrganizations: limits?.maxOrganizations ?? null,
-      auditLogRetentionDays: limits?.auditLogRetentionDays ?? 7,
-    },
+    allowed: result?.allowed ?? false,
+    reason: result?.reason,
+    current: result?.current,
+    limit: result?.limit,
   };
 }
 
