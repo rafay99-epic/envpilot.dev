@@ -1367,8 +1367,20 @@ export const bulkCreate = mutation({
  * List variables expiring within 7 days for the dashboard widget.
  */
 export const listExpiringVariables = query({
-  args: { organizationId: v.id("organizations") },
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
+    // Verify caller is a member of the organization
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
     const rotationCheck = await checkBooleanFeature(
       ctx.db,
       args.organizationId,
@@ -1425,8 +1437,26 @@ export const listExpiringVariables = query({
  * Get rotation history for a variable from audit logs.
  */
 export const getRotationHistory = query({
-  args: { variableId: v.id("environmentVariables") },
+  args: {
+    variableId: v.id("environmentVariables"),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
+    // Verify caller has access to the variable's organization
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable || variable.deletedAt) return [];
+
+    const project = await ctx.db.get(variable.projectId);
+    if (!project) return [];
+
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))

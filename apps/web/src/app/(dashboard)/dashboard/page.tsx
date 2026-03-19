@@ -9,6 +9,7 @@ import {
   useOnboardingStatus,
   useExpiringVariables,
   useFeatureGate,
+  useConvexUser,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
+  const { convexUserId } = useConvexUser(user?.id);
   const { stats, isLoading: statsLoading } =
     useDashboardStats(activeOrganizationId);
   const { activity, isLoading: activityLoading } =
@@ -39,7 +41,7 @@ export default function DashboardPage() {
   const { status: onboardingStatus, isLoading: onboardingLoading } =
     useOnboardingStatus(activeOrganizationId);
   const { variables: expiringVariables } =
-    useExpiringVariables(activeOrganizationId);
+    useExpiringVariables(activeOrganizationId, convexUserId);
   const { allowed: showRotation } = useFeatureGate(
     activeOrganizationId,
     "secret_rotation"
