@@ -913,29 +913,179 @@ export const runMigration = mutation({
         }
       }
 
-      return { success: true, total: seedData.length, migrated: created, updated, skipped: 0 };
+      return {
+        success: true,
+        total: seedData.length,
+        migrated: created,
+        updated,
+        skipped: 0,
+      };
     }
 
     if (args.name === "seed-feature-registry") {
       const SEED_FEATURES = [
-        { key: "max_projects", displayName: "Max Projects", valueType: "numeric" as const, category: "Resources", defaultValue: "3", resettable: false, sortOrder: 0 },
-        { key: "max_variables_per_project", displayName: "Max Variables per Project", valueType: "numeric" as const, category: "Resources", defaultValue: "50", resettable: false, sortOrder: 1 },
-        { key: "max_organizations", displayName: "Max Organizations", valueType: "numeric" as const, category: "Resources", defaultValue: "1", resettable: false, sortOrder: 2 },
-        { key: "max_team_members", displayName: "Max Team Members", valueType: "numeric" as const, category: "Team", defaultValue: "3", resettable: false, sortOrder: 0 },
-        { key: "max_invitations", displayName: "Max Pending Invitations", valueType: "numeric" as const, category: "Team", defaultValue: "5", resettable: false, sortOrder: 1 },
-        { key: "variable_version_history", displayName: "Variable Version History", valueType: "boolean" as const, category: "Variables", defaultValue: "false", resettable: false, sortOrder: 0 },
-        { key: "bulk_import", displayName: "Bulk Import", valueType: "boolean" as const, category: "Variables", defaultValue: "false", resettable: false, sortOrder: 1 },
-        { key: "bulk_delete", displayName: "Bulk Delete", valueType: "boolean" as const, category: "Variables", defaultValue: "true", resettable: false, sortOrder: 2 },
-        { key: "api_access", displayName: "API Access", valueType: "boolean" as const, category: "Tools", defaultValue: "true", resettable: false, sortOrder: 0 },
-        { key: "extension_access", displayName: "VS Code Extension", valueType: "boolean" as const, category: "Tools", defaultValue: "false", resettable: false, sortOrder: 1 },
-        { key: "cli_access", displayName: "CLI Access", valueType: "boolean" as const, category: "Tools", defaultValue: "false", resettable: false, sortOrder: 2 },
-        { key: "granular_permissions", displayName: "Granular Permissions", valueType: "boolean" as const, category: "Security", defaultValue: "true", resettable: false, sortOrder: 0 },
-        { key: "audit_log_retention_days", displayName: "Audit Log Retention (days)", valueType: "numeric" as const, category: "Security", defaultValue: "7", resettable: false, sortOrder: 1 },
-        { key: "sso_enabled", displayName: "SSO", valueType: "boolean" as const, category: "Security", defaultValue: "false", resettable: false, sortOrder: 2 },
-        { key: "keyboard_shortcuts_custom", displayName: "Custom Keyboard Shortcuts", valueType: "boolean" as const, category: "Customization", defaultValue: "true", resettable: false, sortOrder: 0 },
-        { key: "custom_branding", displayName: "Custom Branding", valueType: "boolean" as const, category: "Customization", defaultValue: "false", resettable: false, sortOrder: 1 },
-        { key: "analytics_retention_days", displayName: "Analytics Retention (days)", valueType: "numeric" as const, category: "Analytics", defaultValue: "7", resettable: false, sortOrder: 0 },
-        { key: "priority_support", displayName: "Priority Support", valueType: "boolean" as const, category: "Support", defaultValue: "false", resettable: false, sortOrder: 0 },
+        {
+          key: "max_projects",
+          displayName: "Max Projects",
+          valueType: "numeric" as const,
+          category: "Resources",
+          defaultValue: "3",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "max_variables_per_project",
+          displayName: "Max Variables per Project",
+          valueType: "numeric" as const,
+          category: "Resources",
+          defaultValue: "50",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "max_organizations",
+          displayName: "Max Organizations",
+          valueType: "numeric" as const,
+          category: "Resources",
+          defaultValue: "1",
+          resettable: false,
+          sortOrder: 2,
+        },
+        {
+          key: "max_team_members",
+          displayName: "Max Team Members",
+          valueType: "numeric" as const,
+          category: "Team",
+          defaultValue: "3",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "max_invitations",
+          displayName: "Max Pending Invitations",
+          valueType: "numeric" as const,
+          category: "Team",
+          defaultValue: "5",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "variable_version_history",
+          displayName: "Variable Version History",
+          valueType: "boolean" as const,
+          category: "Variables",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "bulk_import",
+          displayName: "Bulk Import",
+          valueType: "boolean" as const,
+          category: "Variables",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "bulk_delete",
+          displayName: "Bulk Delete",
+          valueType: "boolean" as const,
+          category: "Variables",
+          defaultValue: "true",
+          resettable: false,
+          sortOrder: 2,
+        },
+        {
+          key: "api_access",
+          displayName: "API Access",
+          valueType: "boolean" as const,
+          category: "Tools",
+          defaultValue: "true",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "extension_access",
+          displayName: "VS Code Extension",
+          valueType: "boolean" as const,
+          category: "Tools",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "cli_access",
+          displayName: "CLI Access",
+          valueType: "boolean" as const,
+          category: "Tools",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 2,
+        },
+        {
+          key: "granular_permissions",
+          displayName: "Granular Permissions",
+          valueType: "boolean" as const,
+          category: "Security",
+          defaultValue: "true",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "audit_log_retention_days",
+          displayName: "Audit Log Retention (days)",
+          valueType: "numeric" as const,
+          category: "Security",
+          defaultValue: "7",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "sso_enabled",
+          displayName: "SSO",
+          valueType: "boolean" as const,
+          category: "Security",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 2,
+        },
+        {
+          key: "keyboard_shortcuts_custom",
+          displayName: "Custom Keyboard Shortcuts",
+          valueType: "boolean" as const,
+          category: "Customization",
+          defaultValue: "true",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "custom_branding",
+          displayName: "Custom Branding",
+          valueType: "boolean" as const,
+          category: "Customization",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 1,
+        },
+        {
+          key: "analytics_retention_days",
+          displayName: "Analytics Retention (days)",
+          valueType: "numeric" as const,
+          category: "Analytics",
+          defaultValue: "7",
+          resettable: false,
+          sortOrder: 0,
+        },
+        {
+          key: "priority_support",
+          displayName: "Priority Support",
+          valueType: "boolean" as const,
+          category: "Support",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 0,
+        },
       ];
 
       let created = 0;
@@ -984,28 +1134,56 @@ export const runMigration = mutation({
         created++;
       }
 
-      return { success: true, total: SEED_FEATURES.length, migrated: created, updated, skipped };
+      return {
+        success: true,
+        total: SEED_FEATURES.length,
+        migrated: created,
+        updated,
+        skipped,
+      };
     }
 
     if (args.name === "seed-tier-features") {
       const tierConfigs: Record<string, Record<string, string>> = {
         free: {
-          max_projects: "3", max_variables_per_project: "50", max_organizations: "1",
-          max_team_members: "3", max_invitations: "5", variable_version_history: "false",
-          bulk_import: "false", bulk_delete: "true", api_access: "true",
-          extension_access: "false", cli_access: "false", granular_permissions: "true",
-          audit_log_retention_days: "7", sso_enabled: "false",
-          keyboard_shortcuts_custom: "true", custom_branding: "false",
-          analytics_retention_days: "7", priority_support: "false",
+          max_projects: "3",
+          max_variables_per_project: "50",
+          max_organizations: "1",
+          max_team_members: "3",
+          max_invitations: "5",
+          variable_version_history: "false",
+          bulk_import: "false",
+          bulk_delete: "true",
+          api_access: "true",
+          extension_access: "false",
+          cli_access: "false",
+          granular_permissions: "true",
+          audit_log_retention_days: "7",
+          sso_enabled: "false",
+          keyboard_shortcuts_custom: "true",
+          custom_branding: "false",
+          analytics_retention_days: "7",
+          priority_support: "false",
         },
         pro: {
-          max_projects: "null", max_variables_per_project: "null", max_organizations: "null",
-          max_team_members: "null", max_invitations: "null", variable_version_history: "true",
-          bulk_import: "true", bulk_delete: "true", api_access: "true",
-          extension_access: "true", cli_access: "true", granular_permissions: "true",
-          audit_log_retention_days: "365", sso_enabled: "false",
-          keyboard_shortcuts_custom: "true", custom_branding: "true",
-          analytics_retention_days: "30", priority_support: "true",
+          max_projects: "null",
+          max_variables_per_project: "null",
+          max_organizations: "null",
+          max_team_members: "null",
+          max_invitations: "null",
+          variable_version_history: "true",
+          bulk_import: "true",
+          bulk_delete: "true",
+          api_access: "true",
+          extension_access: "true",
+          cli_access: "true",
+          granular_permissions: "true",
+          audit_log_retention_days: "365",
+          sso_enabled: "false",
+          keyboard_shortcuts_custom: "true",
+          custom_branding: "true",
+          analytics_retention_days: "30",
+          priority_support: "true",
         },
       };
 
@@ -1034,7 +1212,15 @@ export const runMigration = mutation({
         }
       }
 
-      return { success: true, total: Object.values(tierConfigs).reduce((sum, f) => sum + Object.keys(f).length, 0), migrated: created, skipped };
+      return {
+        success: true,
+        total: Object.values(tierConfigs).reduce(
+          (sum, f) => sum + Object.keys(f).length,
+          0
+        ),
+        migrated: created,
+        skipped,
+      };
     }
 
     if (args.name === "migrate-phase6") {

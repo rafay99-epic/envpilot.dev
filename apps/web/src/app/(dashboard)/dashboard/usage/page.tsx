@@ -67,7 +67,11 @@ export default function UsagePage() {
     useCachedTierData();
   const [orgCount, setOrgCount] = useState<number | null>(null);
   const orgId = organization?.id as Id<"organizations"> | undefined;
-  const { features: resolvedFeatures, isAllowed, getLimit } = useAllFeatures(orgId);
+  const {
+    features: resolvedFeatures,
+    isAllowed,
+    getLimit,
+  } = useAllFeatures(orgId);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,12 +133,16 @@ export default function UsagePage() {
   const meterLimits = {
     orgs: enforcementEnabled ? (getLimit("max_organizations") ?? null) : null,
     projects: enforcementEnabled ? (getLimit("max_projects") ?? null) : null,
-    teamMembers: enforcementEnabled ? (getLimit("max_team_members") ?? null) : null,
-    variables: enforcementEnabled ? (getLimit("max_variables_per_project") ?? null) : null,
+    teamMembers: enforcementEnabled
+      ? (getLimit("max_team_members") ?? null)
+      : null,
+    variables: enforcementEnabled
+      ? (getLimit("max_variables_per_project") ?? null)
+      : null,
     auditDays: enforcementEnabled
-      ? (typeof resolvedFeatures?.audit_log_retention_days?.value === "number"
-          ? resolvedFeatures.audit_log_retention_days.value
-          : 7)
+      ? typeof resolvedFeatures?.audit_log_retention_days?.value === "number"
+        ? resolvedFeatures.audit_log_retention_days.value
+        : 7
       : 730,
   };
 
@@ -287,43 +295,45 @@ export default function UsagePage() {
       <TerminalWindow title="features — availability">
         <div className="p-6">
           <div className="space-y-3">
-            {featureDisplayConfig.map(({ key, label, icon: Icon, description }) => {
-              const enabled = !enforcementEnabled || isAllowed(key);
-              return (
-                <div
-                  key={key}
-                  className={`flex items-center justify-between rounded-lg border p-3 ${
-                    enabled
-                      ? "border-zinc-700/50 bg-zinc-800/30"
-                      : "border-zinc-700/30 bg-zinc-800/10 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon
-                      className={`h-4 w-4 ${enabled ? "text-green-400" : "text-zinc-500"}`}
-                    />
-                    <div>
-                      <span
-                        className={`text-sm font-medium ${enabled ? "text-zinc-200" : "text-zinc-400"}`}
-                      >
-                        {label}
-                      </span>
-                      <p className="text-xs text-zinc-500">{description}</p>
+            {featureDisplayConfig.map(
+              ({ key, label, icon: Icon, description }) => {
+                const enabled = !enforcementEnabled || isAllowed(key);
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center justify-between rounded-lg border p-3 ${
+                      enabled
+                        ? "border-zinc-700/50 bg-zinc-800/30"
+                        : "border-zinc-700/30 bg-zinc-800/10 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon
+                        className={`h-4 w-4 ${enabled ? "text-green-400" : "text-zinc-500"}`}
+                      />
+                      <div>
+                        <span
+                          className={`text-sm font-medium ${enabled ? "text-zinc-200" : "text-zinc-400"}`}
+                        >
+                          {label}
+                        </span>
+                        <p className="text-xs text-zinc-500">{description}</p>
+                      </div>
                     </div>
+                    {enabled ? (
+                      <Check className="h-4 w-4 text-green-400" />
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <Lock className="h-3.5 w-3.5 text-zinc-500" />
+                        <span className="text-xs font-medium text-amber-400">
+                          Pro
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {enabled ? (
-                    <Check className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <Lock className="h-3.5 w-3.5 text-zinc-500" />
-                      <span className="text-xs font-medium text-amber-400">
-                        Pro
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              }
+            )}
           </div>
         </div>
       </TerminalWindow>

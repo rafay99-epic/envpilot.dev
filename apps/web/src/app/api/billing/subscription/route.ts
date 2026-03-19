@@ -85,12 +85,9 @@ export async function GET(request: Request) {
     });
 
     if (!subscription) {
-      subscription = await convex.query(
-        api.subscriptions.getByOrganization,
-        {
-          organizationId: organizationId as Id<"organizations">,
-        }
-      );
+      subscription = await convex.query(api.subscriptions.getByOrganization, {
+        organizationId: organizationId as Id<"organizations">,
+      });
     }
 
     // Get Stripe customer — try user-level first, fallback to org-level
@@ -100,12 +97,9 @@ export async function GET(request: Request) {
     );
 
     if (!stripeCustomer) {
-      stripeCustomer = await convex.query(
-        api.subscriptions.getStripeCustomer,
-        {
-          organizationId: organizationId as Id<"organizations">,
-        }
-      );
+      stripeCustomer = await convex.query(api.subscriptions.getStripeCustomer, {
+        organizationId: organizationId as Id<"organizations">,
+      });
     }
 
     return NextResponse.json({

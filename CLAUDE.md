@@ -5,10 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Important Rules
 
 ### Development Server
+
 - **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
 - **Verify work using built-in checks only**: `bun run typecheck`, `bun run lint`, `bun run format:check`, or `bun run check:all` (runs all three).
 
 ### Feature Registry & Tier Gating (CRITICAL)
+
 Every gatable feature in the platform is managed through the **dynamic feature registry** (`convex/featureRegistry.ts`). When implementing any new feature that should be tier-gated:
 
 1. **Add the feature to `SEED_FEATURES`** in `convex/featureRegistry.ts` with key, displayName, valueType, category, defaultValue, resettable, sortOrder.
@@ -23,6 +25,7 @@ The seed functions use an **upsert pattern** — running them multiple times is 
 All enforcement is automatically **bypassed when the Tier Enforcement admin toggle is OFF** (pre-alpha mode). The resolver returns `true` for booleans and `null` (unlimited) for numerics when enforcement is disabled.
 
 ### Versioning
+
 - When making changes to the **CLI** (`apps/cli/`), bump the version in `apps/cli/package.json`.
 - When making changes to the **VS Code extension** (`apps/vscode-extension/`), bump the version in `apps/vscode-extension/package.json`.
 - Both currently at version `1.3.4`. Use semver: patch for fixes, minor for features, major for breaking changes.
@@ -117,5 +120,3 @@ All env vars live in `.env.local` at the **monorepo root**. The web app reads it
 
 Required: `NEXT_PUBLIC_CONVEX_URL`, `CONVEX_DEPLOYMENT`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_APP_URL`, `WORKOS_REDIRECT_URI`.
 Optional: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `RESEND_API_KEY`, `FROM_EMAIL`.
-
-

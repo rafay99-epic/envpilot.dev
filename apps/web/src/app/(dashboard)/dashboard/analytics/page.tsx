@@ -58,7 +58,8 @@ export default function AnalyticsPage() {
     daysBack
   );
 
-  const maxRetentionDays = (analytics?.maxRetentionDays as number | undefined) ?? null;
+  const maxRetentionDays =
+    (analytics?.maxRetentionDays as number | undefined) ?? null;
 
   if (!organization || !canViewAnalytics) {
     router.replace("/dashboard");
@@ -68,7 +69,11 @@ export default function AnalyticsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
+        <Header
+          daysBack={daysBack}
+          setDaysBack={setDaysBack}
+          maxRetentionDays={maxRetentionDays}
+        />
         <TerminalWindow title="loading-analytics">
           <TerminalLoading />
         </TerminalWindow>
@@ -79,7 +84,11 @@ export default function AnalyticsPage() {
   if (!analytics || analytics.totalEvents === 0) {
     return (
       <div className="space-y-6">
-        <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
+        <Header
+          daysBack={daysBack}
+          setDaysBack={setDaysBack}
+          maxRetentionDays={maxRetentionDays}
+        />
         <TerminalEmptyState
           command="envpilot analytics"
           message={`No activity data in the last ${daysBack} days. Start by creating a project and adding variables!`}
@@ -90,7 +99,11 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <Header daysBack={daysBack} setDaysBack={setDaysBack} maxRetentionDays={maxRetentionDays} />
+      <Header
+        daysBack={daysBack}
+        setDaysBack={setDaysBack}
+        maxRetentionDays={maxRetentionDays}
+      />
 
       {/* Row 1: Activity Overview */}
       <ActivityChart dailyCounts={analytics.dailyCounts} daysBack={daysBack} />
@@ -142,7 +155,8 @@ function Header({
       <div className="flex items-center gap-2">
         <div className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-900/50 p-1">
           {ranges.map((range) => {
-            const disabled = maxRetentionDays !== null && range > maxRetentionDays;
+            const disabled =
+              maxRetentionDays !== null && range > maxRetentionDays;
             return (
               <button
                 key={range}
@@ -163,7 +177,10 @@ function Header({
           })}
         </div>
         {maxRetentionDays !== null && (
-          <span className="text-[10px] text-zinc-600" title="Your plan limits analytics retention">
+          <span
+            className="text-[10px] text-zinc-600"
+            title="Your plan limits analytics retention"
+          >
             max {maxRetentionDays}d
           </span>
         )}

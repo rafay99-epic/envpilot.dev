@@ -135,7 +135,8 @@ export default function OrganizationMembersPage({
     { currentCount: totalMemberSlots }
   );
   const memberLimitReached = enforcing && !memberLimitGate.allowed;
-  const memberLimit = typeof memberLimitGate.limit === "number" ? memberLimitGate.limit : null;
+  const memberLimit =
+    typeof memberLimitGate.limit === "number" ? memberLimitGate.limit : null;
 
   useEffect(() => {
     fetchData();

@@ -48,7 +48,8 @@ export default function OrganizationsPage() {
     "max_organizations",
     { currentCount: ownedOrgs.length }
   );
-  const maxOrgs = typeof orgLimitGate.limit === "number" ? orgLimitGate.limit : null;
+  const maxOrgs =
+    typeof orgLimitGate.limit === "number" ? orgLimitGate.limit : null;
   const orgLimitReached = enforcing && !orgLimitGate.allowed;
 
   useEffect(() => {

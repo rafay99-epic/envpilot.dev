@@ -1172,10 +1172,7 @@ export const bulkCreate = mutation({
     }
 
     // Check variable count limits (if applicable)
-    const existingVarCount = await countActiveVariables(
-      ctx.db,
-      args.projectId
-    );
+    const existingVarCount = await countActiveVariables(ctx.db, args.projectId);
     // checkNumericLimit uses `currentCount < limit` (pre-action semantics).
     // For bulk import, pass totalAfterImport - 1 so that exactly filling
     // the quota is allowed (e.g., 10 existing + 5 import vs limit 15 → ok).

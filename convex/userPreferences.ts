@@ -80,7 +80,9 @@ export const upsert = mutation({
         "keyboard_shortcuts_custom"
       );
       if (shortcutCheck.value !== true) {
-        throw new Error("Custom keyboard shortcuts are not available on your current tier.");
+        throw new Error(
+          "Custom keyboard shortcuts are not available on your current tier."
+        );
       }
     }
 

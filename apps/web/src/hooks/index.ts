@@ -82,11 +82,7 @@ export {
 } from "./useTierLimits";
 
 // Dynamic feature gate hooks (new — preferred)
-export {
-  useFeatureGate,
-  useUserTier,
-  useAllFeatures,
-} from "./useFeatureGate";
+export { useFeatureGate, useUserTier, useAllFeatures } from "./useFeatureGate";
 
 // Global search hook
 export { useGlobalSearch } from "./useGlobalSearch";

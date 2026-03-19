@@ -1,9 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import {
-  checkNumericLimit,
-  countActiveProjects,
-} from "./featureRegistry";
+import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
 
 /**
  * Project Queries and Mutations

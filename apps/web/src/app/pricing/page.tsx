@@ -178,10 +178,7 @@ function ComparisonTable({
                   </td>
                 </tr>
                 {visibleFeatures.map((feature) => (
-                  <tr
-                    key={feature.key}
-                    className="border-b border-zinc-800/50"
-                  >
+                  <tr key={feature.key} className="border-b border-zinc-800/50">
                     <td className="py-2.5 pr-4 text-zinc-400">
                       {feature.displayName}
                       {feature.description && (
@@ -205,10 +202,7 @@ function ComparisonTable({
                         );
                       }
                       return (
-                        <td
-                          key={tier.name}
-                          className="py-2.5 px-4 text-center"
-                        >
+                        <td key={tier.name} className="py-2.5 px-4 text-center">
                           {formatFeatureValue(entry.value, entry.valueType)}
                         </td>
                       );
@@ -291,9 +285,7 @@ export default function PricingPage() {
                 key={item.label}
                 href={item.href}
                 className={`text-xs transition-colors hover:text-green-400 ${
-                  item.label === "Pricing"
-                    ? "text-green-400"
-                    : "text-zinc-500"
+                  item.label === "Pricing" ? "text-green-400" : "text-zinc-500"
                 }`}
               >
                 {item.label}

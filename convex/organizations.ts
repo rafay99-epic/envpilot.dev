@@ -242,7 +242,9 @@ export const update = mutation({
         "custom_branding"
       );
       if (!brandingCheck.allowed) {
-        throw new Error("Custom branding is not available on your current tier.");
+        throw new Error(
+          "Custom branding is not available on your current tier."
+        );
       }
     }
 

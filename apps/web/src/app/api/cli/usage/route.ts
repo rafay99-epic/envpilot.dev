@@ -44,9 +44,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Check CLI access feature gate
-    const cliAccess = await checkCLIAccess(convex, organizationId as Id<"organizations">);
+    const cliAccess = await checkCLIAccess(
+      convex,
+      organizationId as Id<"organizations">
+    );
     if (!cliAccess.allowed) {
-      return tierLimitResponse(cliAccess.reason ?? "CLI access is not available on your current tier.");
+      return tierLimitResponse(
+        cliAccess.reason ?? "CLI access is not available on your current tier."
+      );
     }
 
     const usageData = await convex.query(api.tierLimits.getOrganizationUsage, {
@@ -65,9 +70,12 @@ export async function GET(request: NextRequest) {
       {}
     );
 
-    const resolvedFeatures = await convex.query(api.featureRegistry.getResolvedFeatures, {
-      organizationId: organizationId as Id<"organizations">,
-    });
+    const resolvedFeatures = await convex.query(
+      api.featureRegistry.getResolvedFeatures,
+      {
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     return NextResponse.json({
       tier: resolvedFeatures?.tierName ?? usageData.tier,
@@ -75,16 +83,22 @@ export async function GET(request: NextRequest) {
       // Legacy format for older CLI versions
       limits: {
         projects: resolvedFeatures?.features?.max_projects?.value ?? null,
-        variablesPerProject: resolvedFeatures?.features?.max_variables_per_project?.value ?? null,
-        teamMembers: resolvedFeatures?.features?.max_team_members?.value ?? null,
+        variablesPerProject:
+          resolvedFeatures?.features?.max_variables_per_project?.value ?? null,
+        teamMembers:
+          resolvedFeatures?.features?.max_team_members?.value ?? null,
       },
       usage: usageData.usage,
       features: {
-        versionHistory: resolvedFeatures?.features?.variable_version_history?.value ?? false,
+        versionHistory:
+          resolvedFeatures?.features?.variable_version_history?.value ?? false,
         bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
-        extensionAccess: resolvedFeatures?.features?.extension_access?.value ?? true,
-        granularPermissions: resolvedFeatures?.features?.granular_permissions?.value ?? false,
-        auditLogRetentionDays: resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
+        extensionAccess:
+          resolvedFeatures?.features?.extension_access?.value ?? true,
+        granularPermissions:
+          resolvedFeatures?.features?.granular_permissions?.value ?? false,
+        auditLogRetentionDays:
+          resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
       },
       // New dynamic format
       resolvedFeatures: resolvedFeatures?.features ?? {},

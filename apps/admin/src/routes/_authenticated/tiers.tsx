@@ -396,9 +396,7 @@ function TiersPage() {
                     <h3 className="font-semibold text-zinc-100">
                       {tier.displayName}
                     </h3>
-                    <Badge
-                      variant={tier.name === "pro" ? "purple" : "default"}
-                    >
+                    <Badge variant={tier.name === "pro" ? "purple" : "default"}>
                       {tier.name}
                     </Badge>
                     {tier.isDefault && (
@@ -680,7 +678,11 @@ function TiersPage() {
                       {f.displayName}
                     </td>
                     <td className="px-4 py-2">
-                      <Badge variant={f.valueType === "boolean" ? "default" : "purple"}>
+                      <Badge
+                        variant={
+                          f.valueType === "boolean" ? "default" : "purple"
+                        }
+                      >
                         {f.valueType}
                       </Badge>
                     </td>
@@ -688,9 +690,7 @@ function TiersPage() {
                       {f.category}
                     </td>
                     <td className="px-4 py-2 text-xs text-zinc-400">
-                      {f.defaultValue === "null"
-                        ? "unlimited"
-                        : f.defaultValue}
+                      {f.defaultValue === "null" ? "unlimited" : f.defaultValue}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <button
@@ -734,9 +734,7 @@ function TiersPage() {
               label="Tier Name (slug)"
               id="tier-name"
               value={form.name}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, name: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. enterprise"
             />
           )}
@@ -808,11 +806,7 @@ function TiersPage() {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update Tier"
-                  : "Create Tier"}
+              {saving ? "Saving..." : editingId ? "Update Tier" : "Create Tier"}
             </Button>
           </div>
         </div>

@@ -48,7 +48,13 @@ export function useTierLimitCheck(
   );
 
   const result = data as
-    | { allowed: boolean; reason?: string; tierName?: string; current?: number; limit?: number | null }
+    | {
+        allowed: boolean;
+        reason?: string;
+        tierName?: string;
+        current?: number;
+        limit?: number | null;
+      }
     | undefined;
 
   return {

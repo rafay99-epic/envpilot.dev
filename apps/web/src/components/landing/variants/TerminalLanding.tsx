@@ -55,19 +55,29 @@ function useTypingEffect(texts: string[], typingSpeed = 60, pauseTime = 2000) {
   return texts[textIndex].substring(0, charIndex);
 }
 
-
 /**
  * Generate human-readable feature lines from resolved feature data.
  * Used as fallback when highlightFeatures is not seeded yet.
  */
 function generateFeatureLines(
-  features: Array<{ key: string; displayName: string; valueType: string; value: boolean | number | null }>
+  features: Array<{
+    key: string;
+    displayName: string;
+    valueType: string;
+    value: boolean | number | null;
+  }>
 ): string[] {
   const lines: string[] = [];
   for (const f of features) {
     if (f.valueType === "numeric") {
-      if (f.value === null) lines.push(`Unlimited ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`);
-      else if (typeof f.value === "number") lines.push(`${f.value} ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`);
+      if (f.value === null)
+        lines.push(
+          `Unlimited ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
+        );
+      else if (typeof f.value === "number")
+        lines.push(
+          `${f.value} ${f.displayName.toLowerCase().replace(/^max\s*/i, "")}`
+        );
     } else if (f.valueType === "boolean" && f.value === true) {
       lines.push(f.displayName);
     }
@@ -82,7 +92,10 @@ function DynamicPricingCards() {
     return (
       <div className="mt-12 grid gap-6 md:grid-cols-2">
         {[0, 1].map((i) => (
-          <div key={i} className="h-80 rounded-lg border border-zinc-700/50 bg-zinc-900/90 animate-pulse" />
+          <div
+            key={i}
+            className="h-80 rounded-lg border border-zinc-700/50 bg-zinc-900/90 animate-pulse"
+          />
         ))}
       </div>
     );
@@ -106,7 +119,13 @@ function DynamicPricingCards() {
           tier.highlightFeatures.length > 0
             ? tier.highlightFeatures
             : generateFeatureLines(tier.features);
-        const cta = tier.ctaText || (isComingSoon ? "Coming Soon" : isDefault ? "Get Started Free" : "Upgrade");
+        const cta =
+          tier.ctaText ||
+          (isComingSoon
+            ? "Coming Soon"
+            : isDefault
+              ? "Get Started Free"
+              : "Upgrade");
         const ctaHref = tier.ctaLink || "/sign-up";
 
         const badgeColorClass =
@@ -116,8 +135,10 @@ function DynamicPricingCards() {
               ? "border-green-500/20 bg-green-500/5 text-green-400"
               : "border-zinc-700 bg-zinc-800/50 text-zinc-500";
         const dotColorClass =
-          badgeColor === "amber" ? "bg-amber-400"
-            : badgeColor === "green" ? "bg-green-400"
+          badgeColor === "amber"
+            ? "bg-amber-400"
+            : badgeColor === "green"
+              ? "bg-green-400"
               : "bg-zinc-500";
 
         return (
@@ -127,21 +148,32 @@ function DynamicPricingCards() {
               className="h-full"
             >
               <div className="flex items-baseline gap-2">
-                <span className={`text-3xl font-bold ${isComingSoon ? "text-zinc-400" : "text-green-400"}`}>
+                <span
+                  className={`text-3xl font-bold ${isComingSoon ? "text-zinc-400" : "text-green-400"}`}
+                >
                   ${price}
                 </span>
-                <span className="text-xs text-zinc-600">/ month / organization</span>
+                <span className="text-xs text-zinc-600">
+                  / month / organization
+                </span>
               </div>
               {badge && (
-                <div className={`mt-1 inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] ${badgeColorClass}`}>
+                <div
+                  className={`mt-1 inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] ${badgeColorClass}`}
+                >
                   <span className={`h-1 w-1 rounded-full ${dotColorClass}`} />
                   {badge}
                 </div>
               )}
               <div className="mt-5 space-y-2 text-xs">
                 {highlights.map((item: string) => (
-                  <p key={item} className={`flex items-center gap-2 ${isComingSoon ? "text-zinc-500" : "text-zinc-400"}`}>
-                    <Check className={`h-3 w-3 shrink-0 ${isComingSoon ? "text-zinc-600" : "text-green-400"}`} />
+                  <p
+                    key={item}
+                    className={`flex items-center gap-2 ${isComingSoon ? "text-zinc-500" : "text-zinc-400"}`}
+                  >
+                    <Check
+                      className={`h-3 w-3 shrink-0 ${isComingSoon ? "text-zinc-600" : "text-green-400"}`}
+                    />
                     {item}
                   </p>
                 ))}

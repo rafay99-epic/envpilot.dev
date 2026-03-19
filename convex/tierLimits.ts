@@ -49,7 +49,6 @@ export async function isEnforcementEnabledFromDb(
   return isEnforcementEnabledServer();
 }
 
-
 /**
  * Get the default tier name from the database.
  * Falls back to "free" if no default tier is defined.

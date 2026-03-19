@@ -2,10 +2,7 @@ import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
 import type { DatabaseReader } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import {
-  isEnforcementEnabledFromDb,
-  getDefaultTierName,
-} from "./tierLimits";
+import { isEnforcementEnabledFromDb, getDefaultTierName } from "./tierLimits";
 
 /**
  * Dynamic Feature Registry
@@ -155,7 +152,11 @@ export async function resolveFeatureValue(
   const rawValue = override?.value ?? feature.defaultValue;
   const parsed = parseFeatureValue(rawValue, feature.valueType);
 
-  return { value: parsed, tierName: effectiveTier, valueType: feature.valueType };
+  return {
+    value: parsed,
+    tierName: effectiveTier,
+    valueType: feature.valueType,
+  };
 }
 
 /**
@@ -216,7 +217,11 @@ export async function resolveFeatureForUser(
   const rawValue = override?.value ?? feature.defaultValue;
   const parsed = parseFeatureValue(rawValue, feature.valueType);
 
-  return { value: parsed, tierName: effectiveTier, valueType: feature.valueType };
+  return {
+    value: parsed,
+    tierName: effectiveTier,
+    valueType: feature.valueType,
+  };
 }
 
 // ==========================================
@@ -264,7 +269,12 @@ export async function checkNumericLimit(
 
   if (limit === null) {
     // Unlimited
-    return { allowed: true, current: currentCount, limit: null, tierName: resolved.tierName };
+    return {
+      allowed: true,
+      current: currentCount,
+      limit: null,
+      tierName: resolved.tierName,
+    };
   }
 
   const allowed = currentCount < limit;
@@ -915,7 +925,6 @@ export const seedDefaultTierFeatures = internalMutation({
   },
 });
 
-
 /**
  * Get pricing data for the public pricing page.
  * Returns all tiers with their features, pricing, and marketing copy.
@@ -929,9 +938,7 @@ export const getPricingData = query({
     const sortedTiers = tiers.sort((a, b) => a.sortOrder - b.sortOrder);
 
     // 2. Get all feature registry entries (active only)
-    const allFeatures = await ctx.db
-      .query("featureRegistry")
-      .collect();
+    const allFeatures = await ctx.db.query("featureRegistry").collect();
     const activeFeatures = allFeatures
       .filter((f) => f.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -941,8 +948,12 @@ export const getPricingData = query({
 
     // 4. Build pricing data for each tier
     const pricingTiers = sortedTiers.map((tier) => {
-      const tierOverrides = allTierFeatures.filter((tf) => tf.tierName === tier.name);
-      const overrideMap = new Map(tierOverrides.map((tf) => [tf.featureKey, tf.value]));
+      const tierOverrides = allTierFeatures.filter(
+        (tf) => tf.tierName === tier.name
+      );
+      const overrideMap = new Map(
+        tierOverrides.map((tf) => [tf.featureKey, tf.value])
+      );
 
       // Resolve each feature for this tier
       const features = activeFeatures.map((feature) => {

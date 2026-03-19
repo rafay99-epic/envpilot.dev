@@ -49,7 +49,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       data: {
         enabled: extCheck.allowed,
         tier: extCheck.tierName,
-        reason: extCheck.allowed ? undefined : "VS Code extension access is not available on your current tier.",
+        reason: extCheck.allowed
+          ? undefined
+          : "VS Code extension access is not available on your current tier.",
       },
     });
   } catch (error) {

@@ -470,7 +470,7 @@ export const _createGracePeriod = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .first();
-    if (recentGrace && (now - recentGrace.createdAt) < 30 * 24 * 60 * 60 * 1000) {
+    if (recentGrace && now - recentGrace.createdAt < 30 * 24 * 60 * 60 * 1000) {
       // Previous grace period was created less than 30 days ago — skip
       return;
     }
@@ -551,7 +551,6 @@ export const expireGracePeriods = internalMutation({
             reason: "billing.grace_period_expired",
           });
         }
-
       }
     }
   },
@@ -654,10 +653,7 @@ export const processWebhookEvent = action({
         );
 
         if (!stripeCustomer) {
-          console.error(
-            "No customer found for Stripe customer:",
-            customerId
-          );
+          console.error("No customer found for Stripe customer:", customerId);
           return;
         }
 
@@ -676,7 +672,10 @@ export const processWebhookEvent = action({
         const resolvedUserId = stripeCustomer.userId ?? org?.createdBy;
 
         if (!resolvedUserId) {
-          console.error("Could not resolve user for subscription:", eventData.id);
+          console.error(
+            "Could not resolve user for subscription:",
+            eventData.id
+          );
           return;
         }
 
@@ -707,10 +706,7 @@ export const processWebhookEvent = action({
           { priceId }
         );
 
-        if (
-          eventData.status === "active" ||
-          eventData.status === "trialing"
-        ) {
+        if (eventData.status === "active" || eventData.status === "trialing") {
           // Primary: sync user tier
           await ctx.runMutation(internal.subscriptions._syncUserTier, {
             userId: resolvedUserId,
@@ -750,10 +746,7 @@ export const processWebhookEvent = action({
           );
 
           if (!stripeCustomer) {
-            console.error(
-              "No customer found for Stripe customer:",
-              customerId
-            );
+            console.error("No customer found for Stripe customer:", customerId);
             return;
           }
 
@@ -768,10 +761,14 @@ export const processWebhookEvent = action({
             internal.subscriptions._getOrgById,
             { organizationId: stripeCustomer.organizationId }
           );
-          const resolvedUserId = stripeCustomer.userId ?? fallbackOrg?.createdBy;
+          const resolvedUserId =
+            stripeCustomer.userId ?? fallbackOrg?.createdBy;
 
           if (!resolvedUserId) {
-            console.error("Could not resolve user for subscription:", eventData.id);
+            console.error(
+              "Could not resolve user for subscription:",
+              eventData.id
+            );
             return;
           }
 
@@ -869,15 +866,17 @@ export const processWebhookEvent = action({
           )?.createdBy;
 
         if (!resolvedUserId) {
-          console.error("Could not resolve user for subscription update:", eventData.id);
+          console.error(
+            "Could not resolve user for subscription update:",
+            eventData.id
+          );
           return;
         }
 
         // Check if status changed to active (renewal / reactivation)
         const wasActive =
           previousStatus === "active" || previousStatus === "trialing";
-        const isNowActive =
-          newStatus === "active" || newStatus === "trialing";
+        const isNowActive = newStatus === "active" || newStatus === "trialing";
 
         if (isNowActive && !wasActive) {
           // Reactivated — sync tier up, reset counters, clear grace
@@ -1009,7 +1008,10 @@ export const processWebhookEvent = action({
           });
 
           // On successful payment, reset usage counters
-          if (args.type === "invoice.payment_succeeded" && subscription.userId) {
+          if (
+            args.type === "invoice.payment_succeeded" &&
+            subscription.userId
+          ) {
             await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
               userId: subscription.userId,
               periodStart: subscription.currentPeriodStart,
@@ -1158,9 +1160,7 @@ export const prepareCheckout = mutation({
     return {
       organizationId: args.organizationId,
       stripeCustomerId:
-        userCustomer?.stripeCustomerId ||
-        orgCustomer?.stripeCustomerId ||
-        null,
+        userCustomer?.stripeCustomerId || orgCustomer?.stripeCustomerId || null,
     };
   },
 });

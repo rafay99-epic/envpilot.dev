@@ -87,12 +87,9 @@ export async function POST(request: Request) {
     );
 
     if (!stripeCustomer) {
-      stripeCustomer = await convex.query(
-        api.subscriptions.getStripeCustomer,
-        {
-          organizationId: organizationId as Id<"organizations">,
-        }
-      );
+      stripeCustomer = await convex.query(api.subscriptions.getStripeCustomer, {
+        organizationId: organizationId as Id<"organizations">,
+      });
     }
 
     if (!stripeCustomer) {

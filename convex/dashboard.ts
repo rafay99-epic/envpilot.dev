@@ -312,9 +312,10 @@ export const getAnalytics = query({
       "analytics_retention_days"
     );
     const maxRetentionDays = retentionResolved.value as number | null;
-    const effectiveDays = maxRetentionDays !== null
-      ? Math.min(requestedDays, maxRetentionDays)
-      : requestedDays;
+    const effectiveDays =
+      maxRetentionDays !== null
+        ? Math.min(requestedDays, maxRetentionDays)
+        : requestedDays;
 
     const daysBack = effectiveDays;
     const startTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;

@@ -150,10 +150,18 @@ export async function checkCLIAccess(
   const tier = cliCheck.tierName ?? apiCheck.tierName ?? "free";
 
   if (!apiCheck.allowed) {
-    return { allowed: false, tier, reason: "API access is not available on your current tier." };
+    return {
+      allowed: false,
+      tier,
+      reason: "API access is not available on your current tier.",
+    };
   }
   if (!cliCheck.allowed) {
-    return { allowed: false, tier, reason: "CLI access is not available on your current tier." };
+    return {
+      allowed: false,
+      tier,
+      reason: "CLI access is not available on your current tier.",
+    };
   }
 
   return { allowed: true, tier };
@@ -186,10 +194,18 @@ export async function checkExtensionAccess(
   const tier = extCheck.tierName ?? apiCheck.tierName ?? "free";
 
   if (!apiCheck.allowed) {
-    return { allowed: false, tier, reason: "API access is not available on your current tier." };
+    return {
+      allowed: false,
+      tier,
+      reason: "API access is not available on your current tier.",
+    };
   }
   if (!extCheck.allowed) {
-    return { allowed: false, tier, reason: "VS Code extension access is not available on your current tier." };
+    return {
+      allowed: false,
+      tier,
+      reason: "VS Code extension access is not available on your current tier.",
+    };
   }
 
   return { allowed: true, tier };

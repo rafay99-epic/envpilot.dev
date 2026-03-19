@@ -41,7 +41,7 @@ export function TierBadge({
     ? { backgroundColor: tierDef.color, color: "#fff" }
     : undefined;
   const staticClass = !dynamicStyle
-    ? DEFAULT_TIER_STYLES[tier] ?? FALLBACK_STYLE
+    ? (DEFAULT_TIER_STYLES[tier] ?? FALLBACK_STYLE)
     : "";
 
   const isSpecial = tier !== "free";

@@ -580,7 +580,9 @@ export const grant = mutation({
       "granular_permissions"
     );
     if (!permCheck.allowed) {
-      throw new Error("Granular permissions are not available on your current tier.");
+      throw new Error(
+        "Granular permissions are not available on your current tier."
+      );
     }
 
     // Validate target user is part of the org
@@ -710,7 +712,9 @@ export const update = mutation({
       "granular_permissions"
     );
     if (!updatePermCheck.allowed) {
-      throw new Error("Granular permissions are not available on your current tier.");
+      throw new Error(
+        "Granular permissions are not available on your current tier."
+      );
     }
 
     // Team leads can only update permissions for members
@@ -920,7 +924,9 @@ export const bulkGrant = mutation({
       "granular_permissions"
     );
     if (!bulkPermCheck.allowed) {
-      throw new Error("Granular permissions are not available on your current tier.");
+      throw new Error(
+        "Granular permissions are not available on your current tier."
+      );
     }
 
     const grantedIds = [];
