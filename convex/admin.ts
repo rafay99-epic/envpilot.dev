@@ -811,7 +811,7 @@ export const listMigrations = query({
       {
         name: "seed-tier-definitions",
         description:
-          "Seeds default 'free' and 'pro' tier definitions if none exist. Safe to run multiple times.",
+          "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
       },
       {
         name: "seed-feature-registry",
@@ -822,6 +822,11 @@ export const listMigrations = query({
         name: "seed-tier-features",
         description:
           "Seeds default tier-feature overrides for free and pro tiers. Idempotent — skips existing overrides.",
+      },
+      {
+        name: "migrate-phase6",
+        description:
+          "Phase 6 migration: strips legacy limits/features from tierDefinitions, migrates organizationTiers to userTiers, backfills userId on subscriptions. Run ONCE after deploying Phase 6 schema.",
       },
     ] as Array<{ name: string; description: string }>;
   },
@@ -1030,6 +1035,93 @@ export const runMigration = mutation({
       }
 
       return { success: true, total: Object.values(tierConfigs).reduce((sum, f) => sum + Object.keys(f).length, 0), migrated: created, skipped };
+    }
+
+    if (args.name === "migrate-phase6") {
+      const results = {
+        tierDefsCleanedLimits: 0,
+        tierDefsCleanedFeatures: 0,
+        orgTiersMigrated: 0,
+        orgTiersDeleted: 0,
+        subscriptionsBackfilled: 0,
+        stripeCustomersBackfilled: 0,
+      };
+
+      const now = Date.now();
+
+      // 1. Strip limits/features from tierDefinitions
+      const tierDefs = await ctx.db.query("tierDefinitions").collect();
+      for (const td of tierDefs) {
+        const updates: Record<string, undefined> = {};
+        if ((td as Record<string, unknown>).limits !== undefined) {
+          updates.limits = undefined;
+          results.tierDefsCleanedLimits++;
+        }
+        if ((td as Record<string, unknown>).features !== undefined) {
+          updates.features = undefined;
+          results.tierDefsCleanedFeatures++;
+        }
+        if ((td as Record<string, unknown>).dynamicFeatures !== undefined) {
+          updates.dynamicFeatures = undefined;
+          results.tierDefsCleanedLimits++;
+        }
+        if (Object.keys(updates).length > 0) {
+          await ctx.db.patch(td._id, updates);
+        }
+      }
+
+      // 2. Migrate organizationTiers -> userTiers
+      const orgTiers = await ctx.db.query("organizationTiers").collect();
+      for (const ot of orgTiers) {
+        const org = await ctx.db.get(ot.organizationId);
+        if (org) {
+          const existing = await ctx.db
+            .query("userTiers")
+            .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
+            .first();
+          if (!existing) {
+            await ctx.db.insert("userTiers", {
+              userId: org.createdBy,
+              tier: ot.tier,
+              updatedAt: now,
+              reason: "migration.phase6",
+            });
+            results.orgTiersMigrated++;
+          }
+        }
+      }
+
+      // 3. Delete all organizationTiers records
+      for (const ot of orgTiers) {
+        await ctx.db.delete(ot._id);
+        results.orgTiersDeleted++;
+      }
+
+      // 4. Backfill userId on subscriptions
+      const subs = await ctx.db.query("subscriptions").collect();
+      for (const sub of subs) {
+        if (!sub.userId) {
+          const org = await ctx.db.get(sub.organizationId);
+          if (org) {
+            await ctx.db.patch(sub._id, { userId: org.createdBy });
+            results.subscriptionsBackfilled++;
+          }
+        }
+      }
+
+      // 5. Backfill userId on stripeCustomers
+      const customers = await ctx.db.query("stripeCustomers").collect();
+      for (const sc of customers) {
+        if (!sc.userId) {
+          const org = await ctx.db.get(sc.organizationId);
+          if (org) {
+            await ctx.db.patch(sc._id, { userId: org.createdBy });
+            results.stripeCustomersBackfilled++;
+          }
+        }
+      }
+
+      return { success: true, ...results };
     }
 
     throw new Error(`Unknown migration: ${args.name}`);

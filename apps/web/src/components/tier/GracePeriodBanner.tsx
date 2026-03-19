@@ -22,10 +22,7 @@ export function GracePeriodBanner({
 
   if (!graceActive || !gracePeriodEnd) return null;
 
-  const daysLeft = Math.max(
-    0,
-    Math.ceil((gracePeriodEnd - Date.now()) / (1000 * 60 * 60 * 24))
-  );
+  const daysLeft = computeDaysLeft(gracePeriodEnd);
 
   const handleRenew = () => {
     if (onRenewClick) {
@@ -54,5 +51,12 @@ export function GracePeriodBanner({
         <ArrowRight className="h-3.5 w-3.5" />
       </button>
     </div>
+  );
+}
+
+function computeDaysLeft(gracePeriodEnd: number): number {
+  return Math.max(
+    0,
+    Math.ceil((gracePeriodEnd - Date.now()) / (1000 * 60 * 60 * 24))
   );
 }

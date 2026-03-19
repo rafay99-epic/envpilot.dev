@@ -66,6 +66,8 @@ export default function UsagePage() {
   const { isLoading, tier, usage, isFree, enforcementEnabled } =
     useCachedTierData();
   const [orgCount, setOrgCount] = useState<number | null>(null);
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+  const { features: resolvedFeatures, isAllowed, getLimit } = useAllFeatures(orgId);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -101,9 +103,6 @@ export default function UsagePage() {
       </div>
     );
   }
-
-  const orgId = organization?.id as Id<"organizations"> | undefined;
-  const { features: resolvedFeatures, isAllowed, getLimit } = useAllFeatures(orgId);
 
   if (isLoading || !tier) {
     return (
