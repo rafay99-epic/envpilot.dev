@@ -5,6 +5,7 @@ import {
   countMembersAndPendingInvites,
 } from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
+import { isCronPaused } from "./tierLimits";
 import { batchGetUsers } from "./helpers";
 
 /**
@@ -435,6 +436,8 @@ export const resend = mutation({
 export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_invitations")) return;
+
     const now = Date.now();
 
     const expiredInvitations = await ctx.db

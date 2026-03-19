@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { rateLimiter } from "./rateLimits";
+import { isCronPaused } from "./tierLimits";
 import { batchGetUsers, userInfo } from "./helpers";
 
 /**
@@ -633,6 +634,8 @@ export const unlinkExtension = mutation({
 export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_project_access")) return;
+
     const now = Date.now();
 
     const expiredTokens = await ctx.db

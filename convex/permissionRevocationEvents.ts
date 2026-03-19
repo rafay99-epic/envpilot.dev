@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { isCronPaused } from "./tierLimits";
 
 /**
  * Permission Revocation Events
@@ -157,6 +158,9 @@ export const acknowledgeMultiple = mutation({
 export const cleanup = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_revocation_events"))
+      return;
+
     const now = Date.now();
 
     // Get all expired events

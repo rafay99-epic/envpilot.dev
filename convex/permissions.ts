@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers, userInfo } from "./helpers";
+import { isCronPaused } from "./tierLimits";
 import { checkBooleanFeature } from "./featureRegistry";
 
 /**
@@ -1162,6 +1163,8 @@ export const revokeAllForVariable = mutation({
 export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_permissions")) return;
+
     const now = Date.now();
 
     const allPermissions = await ctx.db

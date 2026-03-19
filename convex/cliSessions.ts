@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./rateLimits";
+import { isCronPaused } from "./tierLimits";
 
 // Constants
 const SESSION_CODE_LENGTH = 12;
@@ -433,6 +434,8 @@ export const storeExtensionToken = mutation({
  */
 export const cleanupExpiredSessions = internalMutation({
   handler: async (ctx) => {
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_cli_sessions")) return;
+
     const now = Date.now();
 
     // Find expired pending sessions
