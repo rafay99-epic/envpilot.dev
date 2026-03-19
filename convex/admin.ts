@@ -281,7 +281,10 @@ export const listOrganizations = query({
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const organizations = await ctx.db.query("organizations").order("desc").take(500);
+    const organizations = await ctx.db
+      .query("organizations")
+      .order("desc")
+      .take(500);
 
     const results = [];
     for (const org of organizations) {
