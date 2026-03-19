@@ -50,6 +50,21 @@ export async function isEnforcementEnabledFromDb(
 }
 
 /**
+ * Check if a cron job is paused via adminSettings.
+ * Crons are statically defined — this flag makes handlers skip work when paused.
+ */
+export async function isCronPaused(
+  db: DatabaseReader,
+  settingKey: string
+): Promise<boolean> {
+  const setting = await db
+    .query("adminSettings")
+    .withIndex("by_key", (q) => q.eq("key", settingKey))
+    .first();
+  return setting?.value === "true";
+}
+
+/**
  * Get the default tier name from the database.
  * Falls back to "free" if no default tier is defined.
  */

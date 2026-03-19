@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { MAX_BULK_IMPORT_SIZE } from "./tierLimits";
+import { MAX_BULK_IMPORT_SIZE, isCronPaused } from "./tierLimits";
 import {
   checkNumericLimit,
   checkBooleanFeature,
@@ -1545,6 +1545,10 @@ export const getRotationHistory = query({
  */
 export const processRotationExpiry = internalMutation({
   handler: async (ctx) => {
+    // Check if this cron is paused from admin panel
+    const paused = await isCronPaused(ctx.db, "cron_pause_rotation_expiry");
+    if (paused) return;
+
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const oneDay = 24 * 60 * 60 * 1000;

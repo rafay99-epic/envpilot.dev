@@ -18,6 +18,10 @@ import {
   Pencil,
   Trash2,
   Star,
+  Timer,
+  Pause,
+  Play,
+  RotateCcw,
   ChevronDown,
   ChevronRight,
   Search,
@@ -150,6 +154,11 @@ function TiersPage() {
   );
   const toggleFeatureActive = useAdminMutation(api.admin.toggleFeatureActive);
   const updateUserTier = useAdminMutation(api.admin.updateUserTier);
+
+  const cronJobs = useAdminQuery(api.admin.listCronJobs, {});
+  const rotationVars = useAdminQuery(api.admin.listRotationVariables, {});
+  const toggleCronPause = useAdminMutation(api.admin.toggleCronPause);
+  const updateVariableExpiry = useAdminMutation(api.admin.updateVariableExpiry);
 
   const tierEnforcement = settings?.tierEnforcement === "true";
 
@@ -976,6 +985,241 @@ function TiersPage() {
                           }`}
                         />
                       </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ==========================================
+          SECTION 5: CRON JOBS
+          ========================================== */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+          <Timer className="mr-2 inline h-4 w-4 text-zinc-400" />
+          Cron Jobs
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          Crons run on a fixed schedule. Pausing makes the handler skip all work
+          — the cron still fires but does nothing.
+        </p>
+        {!cronJobs ? (
+          <Spinner />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Name
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Function
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Interval
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-400">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-400">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {cronJobs.map((cron) => (
+                  <tr
+                    key={cron.settingKey}
+                    className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
+                  >
+                    <td className="px-4 py-2 text-xs text-zinc-300">
+                      {cron.name}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs text-zinc-400">
+                      {cron.function}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {cron.interval}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <Badge variant={cron.paused ? "danger" : "success"}>
+                        {cron.paused ? "Paused" : "Running"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const result = await toggleCronPause({
+                              settingKey: cron.settingKey,
+                            });
+                            toast(
+                              "success",
+                              `${cron.name} ${result.paused ? "paused" : "resumed"}`
+                            );
+                          } catch (err) {
+                            toast(
+                              "error",
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to toggle cron"
+                            );
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
+                          cron.paused
+                            ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                        }`}
+                      >
+                        {cron.paused ? (
+                          <>
+                            <Play className="h-3 w-3" /> Resume
+                          </>
+                        ) : (
+                          <>
+                            <Pause className="h-3 w-3" /> Pause
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ==========================================
+          SECTION 6: ROTATION VARIABLES (testing tools)
+          ========================================== */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-lg font-semibold text-zinc-100">
+          <RotateCcw className="mr-2 inline h-4 w-4 text-zinc-400" />
+          Rotation-Enabled Variables
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          Edit expiry timestamps for testing. Click a time to set it to minutes
+          from now.
+        </p>
+        {!rotationVars ? (
+          <Spinner />
+        ) : rotationVars.length === 0 ? (
+          <Card>
+            <p className="py-4 text-center text-sm text-zinc-500">
+              No rotation-enabled variables found.
+            </p>
+          </Card>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Variable
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Project
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Frequency
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-400">
+                    Expires At
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-400">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-400">
+                    Quick Set
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rotationVars.map((v) => (
+                  <tr
+                    key={v._id}
+                    className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
+                  >
+                    <td className="px-4 py-2 font-mono text-xs text-zinc-300">
+                      {v.key}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {v.projectName}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {v.rotationFrequencyDays}d
+                    </td>
+                    <td className="px-4 py-2 text-xs text-zinc-400">
+                      {new Date(v.expiresAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <Badge
+                        variant={
+                          v.rotationStatus === "expired"
+                            ? "danger"
+                            : v.rotationStatus === "expiring_soon"
+                              ? "warning"
+                              : "success"
+                        }
+                      >
+                        {v.rotationStatus}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {[
+                          { label: "2m", minutes: 2 },
+                          { label: "30m", minutes: 30 },
+                          { label: "5h", minutes: 300 },
+                          { label: "Past", minutes: -1 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            onClick={async () => {
+                              try {
+                                const newExpiry =
+                                  preset.minutes < 0
+                                    ? Date.now() - 1000
+                                    : Date.now() + preset.minutes * 60 * 1000;
+                                await updateVariableExpiry({
+                                  variableId: v._id,
+                                  expiresAt: newExpiry,
+                                  rotationStatus:
+                                    preset.minutes < 0
+                                      ? "active"
+                                      : preset.minutes <= 30
+                                        ? "active"
+                                        : "active",
+                                });
+                                toast(
+                                  "success",
+                                  `${v.key} expiry set to ${preset.label === "Past" ? "expired" : preset.label + " from now"}`
+                                );
+                              } catch (err) {
+                                toast(
+                                  "error",
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Failed to update"
+                                );
+                              }
+                            }}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                              preset.minutes < 0
+                                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
