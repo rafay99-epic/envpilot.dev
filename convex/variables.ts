@@ -7,6 +7,7 @@ import {
   checkNumericLimit,
   checkBooleanFeature,
   countActiveVariables,
+  countRotationEnabledVariables,
 } from "./featureRegistry";
 import {
   createAuditLog,
@@ -626,7 +627,7 @@ export const create = mutation({
       }
     }
 
-    // If rotation is requested, check feature gate
+    // If rotation is requested, check boolean gate + numeric limit
     if (args.rotationFrequencyDays && args.rotationFrequencyDays > 0) {
       const rotationCheck = await checkBooleanFeature(
         ctx.db,
@@ -636,6 +637,23 @@ export const create = mutation({
       if (!rotationCheck.allowed) {
         throw new Error(
           "Secret rotation requires a higher tier. Upgrade to enable rotation schedules."
+        );
+      }
+
+      // Check rotation-enabled variable limit
+      const currentRotationCount = await countRotationEnabledVariables(
+        ctx.db,
+        project.organizationId
+      );
+      const limitCheck = await checkNumericLimit(
+        ctx.db,
+        project.organizationId,
+        "secret_rotation_limit",
+        currentRotationCount
+      );
+      if (!limitCheck.allowed) {
+        throw new Error(
+          `Rotation-enabled variable limit reached (${limitCheck.current}/${limitCheck.limit}). Upgrade your tier for more.`
         );
       }
     }
@@ -663,8 +681,7 @@ export const create = mutation({
       args.rotationFrequencyDays && args.rotationFrequencyDays > 0
         ? {
             rotationFrequencyDays: args.rotationFrequencyDays,
-            expiresAt:
-              now + args.rotationFrequencyDays * 24 * 60 * 60 * 1000,
+            expiresAt: now + args.rotationFrequencyDays * 24 * 60 * 60 * 1000,
             lastRotatedAt: now,
             rotationStatus: "active" as const,
           }
@@ -729,7 +746,13 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const { variableId, updatedBy, changeReason, rotationFrequencyDays, ...updates } = args;
+    const {
+      variableId,
+      updatedBy,
+      changeReason,
+      rotationFrequencyDays,
+      ...updates
+    } = args;
 
     const variable = await ctx.db.get(variableId);
     if (!variable || variable.deletedAt) {
@@ -757,7 +780,7 @@ export const update = mutation({
       }
     }
 
-    // If rotation is being set/changed, check feature gate
+    // If rotation is being set/changed, check boolean gate + numeric limit
     if (rotationFrequencyDays !== undefined && rotationFrequencyDays > 0) {
       const rotationCheck = await checkBooleanFeature(
         ctx.db,
@@ -768,6 +791,28 @@ export const update = mutation({
         throw new Error(
           "Secret rotation requires a higher tier. Upgrade to enable rotation schedules."
         );
+      }
+
+      // Check rotation limit only when enabling rotation on a variable that didn't have it
+      const alreadyHasRotation =
+        variable.rotationFrequencyDays !== undefined &&
+        variable.rotationFrequencyDays > 0;
+      if (!alreadyHasRotation) {
+        const currentRotationCount = await countRotationEnabledVariables(
+          ctx.db,
+          project.organizationId
+        );
+        const limitCheck = await checkNumericLimit(
+          ctx.db,
+          project.organizationId,
+          "secret_rotation_limit",
+          currentRotationCount
+        );
+        if (!limitCheck.allowed) {
+          throw new Error(
+            `Rotation-enabled variable limit reached (${limitCheck.current}/${limitCheck.limit}). Upgrade your tier for more.`
+          );
+        }
       }
     }
 
@@ -852,9 +897,10 @@ export const update = mutation({
     });
 
     // Use "variable.rotated" if the value was changed on a rotation-enabled variable
-    const auditAction = isValueRotated && variable.rotationFrequencyDays
-      ? "variable.rotated" as const
-      : "variable.updated" as const;
+    const auditAction =
+      isValueRotated && variable.rotationFrequencyDays
+        ? ("variable.rotated" as const)
+        : ("variable.updated" as const);
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
@@ -870,7 +916,8 @@ export const update = mutation({
         fieldsUpdated: Object.keys(updates).filter(
           (k) => updates[k as keyof typeof updates] !== undefined
         ),
-        rotationFrequencyDays: rotationFrequencyDays ?? variable.rotationFrequencyDays,
+        rotationFrequencyDays:
+          rotationFrequencyDays ?? variable.rotationFrequencyDays,
       },
       involvesSensitiveData: variable.isSensitive,
       resourceType: "variable",
@@ -1429,7 +1476,11 @@ export const listExpiringVariables = query({
         .collect();
 
       for (const v of variables) {
-        if (v.expiresAt && v.expiresAt <= sevenDaysFromNow && v.rotationFrequencyDays) {
+        if (
+          v.expiresAt &&
+          v.expiresAt <= sevenDaysFromNow &&
+          v.rotationFrequencyDays
+        ) {
           results.push({
             _id: v._id,
             key: v.key,
@@ -1477,12 +1528,14 @@ export const getRotationHistory = query({
       .order("desc")
       .collect();
 
-    return logs.filter(
-      (log) =>
-        log.action === "variable.rotated" ||
-        log.action === "variable.expired" ||
-        log.action === "variable.rotation_reminder_sent"
-    ).slice(0, 50);
+    return logs
+      .filter(
+        (log) =>
+          log.action === "variable.rotated" ||
+          log.action === "variable.expired" ||
+          log.action === "variable.rotation_reminder_sent"
+      )
+      .slice(0, 50);
   },
 });
 
@@ -1541,15 +1594,22 @@ export const processRotationExpiry = internalMutation({
           });
 
           // Send expiry email if not already reminded recently
-          if (!variable.lastReminderSentAt || now - variable.lastReminderSentAt > oneDay) {
+          if (
+            !variable.lastReminderSentAt ||
+            now - variable.lastReminderSentAt > oneDay
+          ) {
             patchData.lastReminderSentAt = now;
-            await ctx.scheduler.runAfter(0, internal.emails.sendRotationReminderEmail, {
-              variableName: variable.key,
-              projectName: project.name,
-              organizationId: project.organizationId,
-              expiresAt,
-              reminderType: "expired" as const,
-            });
+            await ctx.scheduler.runAfter(
+              0,
+              internal.emails.sendRotationReminderEmail,
+              {
+                variableName: variable.key,
+                projectName: project.name,
+                organizationId: project.organizationId,
+                expiresAt,
+                reminderType: "expired" as const,
+              }
+            );
           }
         }
         await ctx.db.patch(variable._id, patchData);
@@ -1571,15 +1631,22 @@ export const processRotationExpiry = internalMutation({
         const project = await ctx.db.get(variable.projectId);
         if (project) {
           // Send 7-day reminder if not already sent
-          if (!variable.lastReminderSentAt || now - variable.lastReminderSentAt > oneDay) {
+          if (
+            !variable.lastReminderSentAt ||
+            now - variable.lastReminderSentAt > oneDay
+          ) {
             patchData.lastReminderSentAt = now;
-            await ctx.scheduler.runAfter(0, internal.emails.sendRotationReminderEmail, {
-              variableName: variable.key,
-              projectName: project.name,
-              organizationId: project.organizationId,
-              expiresAt,
-              reminderType: "7_days" as const,
-            });
+            await ctx.scheduler.runAfter(
+              0,
+              internal.emails.sendRotationReminderEmail,
+              {
+                variableName: variable.key,
+                projectName: project.name,
+                organizationId: project.organizationId,
+                expiresAt,
+                reminderType: "7_days" as const,
+              }
+            );
           }
         }
         await ctx.db.patch(variable._id, patchData);
@@ -1594,15 +1661,23 @@ export const processRotationExpiry = internalMutation({
         expiresAt > now
       ) {
         const project = await ctx.db.get(variable.projectId);
-        if (project && (!variable.lastReminderSentAt || now - variable.lastReminderSentAt > oneDay)) {
+        if (
+          project &&
+          (!variable.lastReminderSentAt ||
+            now - variable.lastReminderSentAt > oneDay)
+        ) {
           await ctx.db.patch(variable._id, { lastReminderSentAt: now });
-          await ctx.scheduler.runAfter(0, internal.emails.sendRotationReminderEmail, {
-            variableName: variable.key,
-            projectName: project.name,
-            organizationId: project.organizationId,
-            expiresAt,
-            reminderType: "1_day" as const,
-          });
+          await ctx.scheduler.runAfter(
+            0,
+            internal.emails.sendRotationReminderEmail,
+            {
+              variableName: variable.key,
+              projectName: project.name,
+              organizationId: project.organizationId,
+              expiresAt,
+              reminderType: "1_day" as const,
+            }
+          );
         }
       }
     }

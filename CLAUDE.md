@@ -24,6 +24,45 @@ The seed functions use an **upsert pattern** — running them multiple times is 
 
 All enforcement is automatically **bypassed when the Tier Enforcement admin toggle is OFF** (pre-alpha mode). The resolver returns `true` for booleans and `null` (unlimited) for numerics when enforcement is disabled.
 
+#### Dual-Gate Pattern: Boolean + Usage Limit
+
+When a feature incurs **compute or infrastructure cost** (crons, emails, external API calls), it must have **two** registry entries:
+
+1. **Boolean gate** (`feature_name`, type `boolean`) — controls whether the feature is available at all.
+2. **Numeric limit** (`feature_name_limit`, type `numeric`) — caps how many resources can use the feature. Use `"null"` for unlimited (pro), a number string for capped (free).
+
+**When to add a usage limit** — ask: does this feature run recurring background work per resource (crons, scheduled jobs, outbound emails)? If yes, it needs a limit. Examples:
+
+| Feature                       | Needs limit?                      | Why                                                             |
+| ----------------------------- | --------------------------------- | --------------------------------------------------------------- |
+| `secret_rotation`             | **Yes** → `secret_rotation_limit` | Hourly cron scans every rotation-enabled variable, sends emails |
+| `variable_version_history`    | No                                | Passive data — stored on write, no background cost              |
+| `bulk_import` / `bulk_delete` | No                                | One-time user-initiated action, no recurring cost               |
+| `sso_enabled`                 | No                                | Auth delegation — cost is per-login, not per-resource           |
+| `audit_log_retention_days`    | No                                | Already capped by the numeric value itself (days)               |
+| `custom_branding`             | No                                | Static config, no compute                                       |
+
+**Enforcement pattern** (backend):
+
+```typescript
+// 1. Check boolean gate first
+const gate = await checkBooleanFeature(db, orgId, "secret_rotation");
+if (!gate.allowed) throw new Error("...");
+
+// 2. Then check numeric limit
+const count = await countRotationEnabledVariables(db, orgId);
+const limit = await checkNumericLimit(
+  db,
+  orgId,
+  "secret_rotation_limit",
+  count
+);
+if (!limit.allowed)
+  throw new Error(`Limit reached (${limit.current}/${limit.limit})`);
+```
+
+Add a `count*` helper in `convex/featureRegistry.ts` for each limited feature (e.g., `countRotationEnabledVariables`).
+
 ### Versioning
 
 - When making changes to the **CLI** (`apps/cli/`), bump the version in `apps/cli/package.json`.
