@@ -598,9 +598,7 @@ export const sendRotationReminderEmail = internalAction({
           ? "1 day"
           : "";
 
-    const heading = isExpired
-      ? "Secret Expired"
-      : "Secret Expiring Soon";
+    const heading = isExpired ? "Secret Expired" : "Secret Expiring Soon";
 
     const description = isExpired
       ? `The secret <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong> has expired and should be rotated immediately.`

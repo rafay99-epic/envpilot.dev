@@ -54,7 +54,9 @@ export function VariableForm({
   const [error, setError] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(!initialData?.isSensitive);
   const [rotationEnabled, setRotationEnabled] = useState(
-    () => !!initialData?.rotationFrequencyDays && initialData.rotationFrequencyDays > 0
+    () =>
+      !!initialData?.rotationFrequencyDays &&
+      initialData.rotationFrequencyDays > 0
   );
 
   useEffect(() => {
@@ -64,7 +66,8 @@ export function VariableForm({
         ...initialData,
       }));
       setRotationEnabled(
-        !!initialData.rotationFrequencyDays && initialData.rotationFrequencyDays > 0
+        !!initialData.rotationFrequencyDays &&
+          initialData.rotationFrequencyDays > 0
       );
     }
   }, [initialData]);

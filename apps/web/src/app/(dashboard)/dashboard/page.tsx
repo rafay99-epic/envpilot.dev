@@ -40,8 +40,10 @@ export default function DashboardPage() {
     useTeamMembersQuickView(activeOrganizationId);
   const { status: onboardingStatus, isLoading: onboardingLoading } =
     useOnboardingStatus(activeOrganizationId);
-  const { variables: expiringVariables } =
-    useExpiringVariables(activeOrganizationId, convexUserId);
+  const { variables: expiringVariables } = useExpiringVariables(
+    activeOrganizationId,
+    convexUserId
+  );
   const { allowed: showRotation } = useFeatureGate(
     activeOrganizationId,
     "secret_rotation"
@@ -555,9 +557,7 @@ function ExpiringSecretRow({
           <p className="text-zinc-600">{variable.projectName}</p>
         </div>
       </div>
-      <TerminalBadge color={isExpired ? "red" : "amber"}>
-        {label}
-      </TerminalBadge>
+      <TerminalBadge color={isExpired ? "red" : "amber"}>{label}</TerminalBadge>
     </div>
   );
 }
