@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useState } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Badge } from "@/components/ui/Badge";
@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/Select";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/utils";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Ticket } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
@@ -69,6 +70,7 @@ function statusBadgeVariant(status: string) {
 }
 
 function TicketsPage() {
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -85,11 +87,37 @@ function TicketsPage() {
       })
     : undefined;
 
+  const filteredTickets = useMemo(() => {
+    if (!tickets) return undefined;
+    if (!search.trim()) return tickets;
+    const term = search.toLowerCase();
+    return tickets.filter(
+      (t) =>
+        (t.subject && t.subject.toLowerCase().includes(term)) ||
+        (t.email && t.email.toLowerCase().includes(term)) ||
+        (t.status && t.status.toLowerCase().includes(term))
+    );
+  }, [tickets, search]);
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
         Support Tickets
       </h1>
+
+      <div className="mb-4 flex items-center gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search tickets..."
+          className="w-72"
+        />
+        <span className="text-xs text-zinc-500">
+          {search.trim()
+            ? `${filteredTickets?.length ?? 0} of ${tickets?.length ?? 0} tickets`
+            : `${tickets?.length ?? 0} tickets`}
+        </span>
+      </div>
 
       <div className="mb-4 flex gap-4">
         <div className="w-48">
@@ -108,9 +136,9 @@ function TicketsPage() {
         </div>
       </div>
 
-      {!tickets ? (
+      {!filteredTickets ? (
         <Spinner />
-      ) : tickets.length === 0 ? (
+      ) : filteredTickets.length === 0 ? (
         <EmptyState
           icon={<Ticket className="h-8 w-8" />}
           title="No tickets found"
@@ -134,7 +162,7 @@ function TicketsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/50">
-              {tickets.map((ticket) => (
+              {filteredTickets.map((ticket) => (
                 <Fragment key={ticket._id}>
                   <tr
                     className="cursor-pointer transition-colors hover:bg-zinc-800/30"

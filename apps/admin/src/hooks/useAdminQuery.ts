@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useAction } from "convex/react";
+import {
+  useQuery,
+  usePaginatedQuery,
+  useMutation,
+  useAction,
+} from "convex/react";
 import { useAuthStore } from "@/stores/auth-store";
 import type {
   FunctionReference,
@@ -16,6 +21,18 @@ export function useAdminQuery<F extends FunctionReference<"query">>(
     | FunctionArgs<F>
     | "skip";
   return useQuery(query, queryArgs) as FunctionReturnType<F> | undefined;
+}
+
+export function useAdminPaginatedQuery<F extends FunctionReference<"query">>(
+  queryRef: F,
+  args: Omit<FunctionArgs<F>, "secret" | "paginationOpts"> | "skip",
+  options: { initialNumItems: number }
+) {
+  const secret = useAuthStore((s) => s.secret);
+  const shouldSkip = !secret || args === "skip";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queryArgs = (shouldSkip ? "skip" : { ...args, secret }) as any;
+  return usePaginatedQuery(queryRef, queryArgs, options);
 }
 
 export function useAdminMutation<F extends FunctionReference<"mutation">>(

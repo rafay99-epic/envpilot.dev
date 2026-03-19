@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { SEED_CHANGELOG } from "./changelog";
 import { SEED_FEATURE_REQUESTS } from "./featureRequests";
 
@@ -42,6 +43,7 @@ const BROWSABLE_TABLES = [
   "supportTickets",
   "contactMessages",
   "tierDefinitions",
+  "organizationTiers",
   "adminSettings",
 ] as const;
 
@@ -1664,6 +1666,27 @@ export const deleteTableRow = mutation({
     }
 
     await ctx.db.delete(args.id as any);
+  },
+});
+
+export const browseTablePaginated = query({
+  args: {
+    secret: v.string(),
+    tableName: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    if (
+      !BROWSABLE_TABLES.includes(
+        args.tableName as (typeof BROWSABLE_TABLES)[number]
+      )
+    ) {
+      throw new Error(`Table "${args.tableName}" is not browsable`);
+    }
+    return await (ctx.db.query(args.tableName as any) as any)
+      .order("desc")
+      .paginate(args.paginationOpts);
   },
 });
 
