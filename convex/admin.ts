@@ -64,9 +64,9 @@ export const getStats = query({
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const users = await ctx.db.query("users").collect();
-    const organizations = await ctx.db.query("organizations").collect();
-    const projects = await ctx.db.query("projects").collect();
+    const users = await ctx.db.query("users").take(10000);
+    const organizations = await ctx.db.query("organizations").take(10000);
+    const projects = await ctx.db.query("projects").take(10000);
 
     const unreadMessages = await ctx.db
       .query("contactMessages")
@@ -121,7 +121,7 @@ export const listContactMessages = query({
       .query("contactMessages")
       .withIndex("by_created_at")
       .order("desc")
-      .collect();
+      .take(500);
   },
 });
 
@@ -161,7 +161,7 @@ export const listSupportTickets = query({
       .query("supportTickets")
       .withIndex("by_created_at")
       .order("desc")
-      .collect();
+      .take(500);
   },
 });
 
@@ -194,20 +194,17 @@ export const listUsers = query({
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const users = await ctx.db.query("users").collect();
+    const users = await ctx.db.query("users").order("desc").take(500);
 
-    const results = [];
-    for (const user of users) {
-      const memberships = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .collect();
-
-      results.push({
-        ...user,
-        organizationCount: memberships.length,
-      });
-    }
+    const results = await Promise.all(
+      users.map(async (user) => {
+        const memberships = await ctx.db
+          .query("organizationMembers")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+        return { ...user, organizationCount: memberships.length };
+      })
+    );
 
     return results;
   },
@@ -284,7 +281,7 @@ export const listOrganizations = query({
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const organizations = await ctx.db.query("organizations").collect();
+    const organizations = await ctx.db.query("organizations").order("desc").take(500);
 
     const results = [];
     for (const org of organizations) {
@@ -1462,9 +1459,9 @@ export const getAnalytics = query({
     verifyAdmin(args.secret);
 
     // Get all users with creation times for growth chart
-    const users = await ctx.db.query("users").collect();
-    const organizations = await ctx.db.query("organizations").collect();
-    const projects = await ctx.db.query("projects").collect();
+    const users = await ctx.db.query("users").take(10000);
+    const organizations = await ctx.db.query("organizations").take(10000);
+    const projects = await ctx.db.query("projects").take(10000);
 
     // Messages and tickets
     const contactMessages = await ctx.db.query("contactMessages").collect();
@@ -1549,7 +1546,7 @@ export const getAnalytics = query({
     }
 
     // Tier distribution — user-level
-    const userTiers = await ctx.db.query("userTiers").collect();
+    const userTiers = await ctx.db.query("userTiers").take(5000);
     const tierDistribution: Record<string, number> = {};
     for (const ut of userTiers) {
       tierDistribution[ut.tier] = (tierDistribution[ut.tier] || 0) + 1;
@@ -1763,7 +1760,7 @@ export const listUserTiers = query({
   args: { secret: v.string() },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
-    const userTierRecords = await ctx.db.query("userTiers").collect();
+    const userTierRecords = await ctx.db.query("userTiers").take(200);
 
     return await Promise.all(
       userTierRecords.map(async (ut) => {
