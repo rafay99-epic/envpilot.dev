@@ -83,7 +83,7 @@ function TicketsPage() {
           return false;
         return true;
       })
-    : allTickets;
+    : undefined;
 
   return (
     <div>
