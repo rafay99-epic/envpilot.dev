@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Database, Pencil, Trash2 } from "lucide-react";
+import { useConfirmStore } from "@/stores/confirm-store";
 
 const BROWSABLE_TABLES = [
   { value: "", label: "Select a table..." },
@@ -70,6 +71,7 @@ function DataBrowserPage() {
 
   const updateRow = useAdminMutation(api.admin.updateTableRow);
   const deleteRow = useAdminMutation(api.admin.deleteTableRow);
+  const { confirm } = useConfirmStore();
 
   const [editModal, setEditModal] = useState<{
     id: string;
@@ -118,7 +120,13 @@ function DataBrowserPage() {
 
   const handleDelete = async (rowId: string) => {
     if (!table) return;
-    if (!confirm("Delete this row? This action cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Delete Row",
+      message: "This row will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
     await deleteRow({ tableName: table, id: rowId });
   };
 

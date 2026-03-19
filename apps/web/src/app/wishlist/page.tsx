@@ -528,7 +528,11 @@ interface RoadmapViewProps {
     | undefined;
 }
 
+const INITIAL_VISIBLE = 4;
+
 function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   if (!plannedFeatures) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -571,61 +575,99 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      {columns.map((col) => (
-        <div key={col.title}>
-          {/* Column header */}
-          <div className="mb-4 flex items-center gap-2 border-b border-zinc-800 pb-3">
-            <span className={`h-2 w-2 rounded-full ${col.dot}`} />
-            <h3
-              className={`text-xs font-bold uppercase tracking-wider ${col.color}`}
-            >
-              {col.title}
-            </h3>
-            <span className="ml-auto text-xs text-zinc-600">
-              {col.items.length}
-            </span>
-          </div>
+      {columns.map((col) => {
+        const isExpanded = expanded[col.title] ?? false;
+        const hasOverflow = col.items.length > INITIAL_VISIBLE;
+        const visibleItems = isExpanded
+          ? col.items
+          : col.items.slice(0, INITIAL_VISIBLE);
+        const hiddenCount = col.items.length - INITIAL_VISIBLE;
 
-          {/* Cards */}
-          <div className="space-y-3">
-            {col.items.length === 0 ? (
-              <p className="py-6 text-center text-xs text-zinc-700"># empty</p>
-            ) : (
-              col.items.map((feature) => (
-                <div
-                  key={feature._id}
-                  className={`rounded-lg border ${col.borderColor} bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700`}
-                >
-                  <h4 className="text-xs font-semibold text-zinc-200">
-                    {feature.title}
-                  </h4>
-                  <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">
-                    {feature.description}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between text-[10px] text-zinc-600">
-                    <span className="flex items-center gap-1">
-                      <ChevronUp className="h-3 w-3" />
-                      {feature.voteCount}
-                    </span>
-                    {col.showDate &&
-                      "updatedAt" in feature &&
-                      typeof feature.updatedAt === "number" && (
-                        <span>
-                          {new Date(
-                            feature.updatedAt as number
-                          ).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          })}
+        return (
+          <div key={col.title}>
+            {/* Column header */}
+            <div className="mb-4 flex items-center gap-2 border-b border-zinc-800 pb-3">
+              <span className={`h-2 w-2 rounded-full ${col.dot}`} />
+              <h3
+                className={`text-xs font-bold uppercase tracking-wider ${col.color}`}
+              >
+                {col.title}
+              </h3>
+              <span className="ml-auto text-xs text-zinc-600">
+                {col.items.length}
+              </span>
+            </div>
+
+            {/* Cards */}
+            <div className="space-y-3">
+              {col.items.length === 0 ? (
+                <p className="py-6 text-center text-xs text-zinc-700">
+                  # empty
+                </p>
+              ) : (
+                <>
+                  {visibleItems.map((feature) => (
+                    <div
+                      key={feature._id}
+                      className={`rounded-lg border ${col.borderColor} bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700`}
+                    >
+                      <h4 className="text-xs font-semibold text-zinc-200">
+                        {feature.title}
+                      </h4>
+                      <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">
+                        {feature.description}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between text-[10px] text-zinc-600">
+                        <span className="flex items-center gap-1">
+                          <ChevronUp className="h-3 w-3" />
+                          {feature.voteCount}
                         </span>
+                        {col.showDate &&
+                          "updatedAt" in feature &&
+                          typeof feature.updatedAt === "number" && (
+                            <span>
+                              {new Date(
+                                feature.updatedAt as number
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                          )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Show more / Show less toggle */}
+                  {hasOverflow && (
+                    <button
+                      onClick={() =>
+                        setExpanded((prev) => ({
+                          ...prev,
+                          [col.title]: !isExpanded,
+                        }))
+                      }
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 text-[11px] font-medium ${col.color} transition-colors hover:bg-zinc-900/50`}
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="h-3 w-3" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronUp className="h-3 w-3 rotate-180" />
+                          Show {hiddenCount} more
+                        </>
                       )}
-                  </div>
-                </div>
-              ))
-            )}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

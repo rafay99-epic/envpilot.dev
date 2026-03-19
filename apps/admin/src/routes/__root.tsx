@@ -1,5 +1,6 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 function RootErrorComponent({ error }: { error: Error }) {
   return (
@@ -42,7 +43,12 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRoute({
-  component: () => <Outlet />,
+  component: () => (
+    <>
+      <Outlet />
+      <ConfirmDialog />
+    </>
+  ),
   errorComponent: RootErrorComponent,
   notFoundComponent: NotFoundComponent,
 });

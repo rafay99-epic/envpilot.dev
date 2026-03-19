@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
+import { useConfirmStore } from "@/stores/confirm-store";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import {
   Crown,
@@ -74,6 +75,7 @@ function TiersPage() {
   const createTier = useAdminMutation(api.admin.createTierDefinition);
   const updateTier = useAdminMutation(api.admin.updateTierDefinition);
   const deleteTier = useAdminMutation(api.admin.deleteTierDefinition);
+  const { confirm } = useConfirmStore();
   const seedTiers = useAdminMutation(api.admin.seedDefaultTiers);
   const updateSetting = useAdminMutation(api.admin.updateAdminSetting);
   const setTierFeatureValue = useAdminMutation(api.admin.setTierFeatureValue);
@@ -157,7 +159,14 @@ function TiersPage() {
   };
 
   const handleDelete = async (id: Id<"tierDefinitions">) => {
-    if (!confirm("Are you sure you want to delete this tier?")) return;
+    const ok = await confirm({
+      title: "Delete Tier",
+      message:
+        "This tier definition will be permanently deleted. Users on this tier will fall back to defaults.",
+      confirmLabel: "Delete Tier",
+      variant: "danger",
+    });
+    if (!ok) return;
     setDeleting(id);
     try {
       await deleteTier({ id });

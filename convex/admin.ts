@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { SEED_CHANGELOG } from "./changelog";
+import { SEED_FEATURE_REQUESTS } from "./featureRequests";
 
 // ==========================================
 // HELPERS
@@ -776,6 +778,50 @@ export const updateFeatureRequestAdminNotes = mutation({
   },
 });
 
+export const createFeatureRequest = mutation({
+  args: {
+    secret: v.string(),
+    title: v.string(),
+    description: v.string(),
+    category: v.optional(v.string()),
+    adminNotes: v.optional(v.string()),
+    status: v.optional(
+      v.union(
+        v.literal("submitted"),
+        v.literal("under_review"),
+        v.literal("planned"),
+        v.literal("in_progress"),
+        v.literal("completed"),
+        v.literal("declined")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const title = args.title.trim();
+    const description = args.description.trim();
+    if (!title) throw new Error("Title is required");
+    if (!description) throw new Error("Description is required");
+    if (title.length > 200) throw new Error("Title too long (max 200)");
+    if (description.length > 5000)
+      throw new Error("Description too long (max 5000)");
+
+    const now = Date.now();
+    return await ctx.db.insert("featureRequests", {
+      title,
+      description,
+      submitterName: "Envpilot Team",
+      status: args.status ?? "planned",
+      category: args.category?.trim() || undefined,
+      adminNotes: args.adminNotes?.trim() || undefined,
+      voteCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
 export const deleteFeatureRequest = mutation({
   args: {
     secret: v.string(),
@@ -799,6 +845,28 @@ export const deleteFeatureRequest = mutation({
   },
 });
 
+export const clearAllFeatureRequests = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const allRequests = await ctx.db.query("featureRequests").collect();
+    const allVotes = await ctx.db.query("featureVotes").collect();
+
+    for (const vote of allVotes) {
+      await ctx.db.delete(vote._id);
+    }
+    for (const req of allRequests) {
+      await ctx.db.delete(req._id);
+    }
+
+    return {
+      deletedRequests: allRequests.length,
+      deletedVotes: allVotes.length,
+    };
+  },
+});
+
 // ==========================================
 // MIGRATIONS
 // ==========================================
@@ -808,27 +876,93 @@ export const listMigrations = query({
   handler: async (_ctx, args) => {
     verifyAdmin(args.secret);
     return [
-      {
-        name: "seed-tier-definitions",
-        description:
-          "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
-      },
+      // ── Feature & Tier System (run when adding features or updating tiers) ──
       {
         name: "seed-feature-registry",
         description:
           "Seeds all gatable features into the featureRegistry table. Idempotent — skips existing keys.",
+        category: "Feature & Tier System",
+        priority: 1,
+        destructive: false,
+        runOnce: false,
       },
       {
         name: "seed-tier-features",
         description:
           "Seeds default tier-feature overrides for free and pro tiers. Idempotent — skips existing overrides.",
+        category: "Feature & Tier System",
+        priority: 2,
+        destructive: false,
+        runOnce: false,
       },
+      {
+        name: "seed-tier-definitions",
+        description:
+          "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
+        category: "Feature & Tier System",
+        priority: 3,
+        destructive: false,
+        runOnce: false,
+      },
+
+      // ── Content Seeding ──
+      {
+        name: "seed-changelog",
+        description:
+          "Seeds all historical changelog entries (v0.1.0 through v1.7.1). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
+        category: "Content Seeding",
+        priority: 1,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "seed-feature-requests",
+        description:
+          "Seeds planned team features into the featureRequests table from FEATURES.md reference. Idempotent — skips entries that already exist by title. Safe to run multiple times.",
+        category: "Content Seeding",
+        priority: 2,
+        destructive: false,
+        runOnce: false,
+      },
+
+      // ── Destructive / Reset ──
+      {
+        name: "clear-changelog",
+        description:
+          "Deletes ALL changelog entries from the database. Use before re-seeding or to start fresh.",
+        category: "Destructive",
+        priority: 1,
+        destructive: true,
+        runOnce: false,
+      },
+      {
+        name: "clear-feature-requests",
+        description:
+          "Deletes ALL feature requests and their votes from the database.",
+        category: "Destructive",
+        priority: 2,
+        destructive: true,
+        runOnce: false,
+      },
+
+      // ── One-Time Migrations ──
       {
         name: "migrate-phase6",
         description:
           "Phase 6 migration: strips legacy limits/features from tierDefinitions, migrates organizationTiers to userTiers, backfills userId on subscriptions. Run ONCE after deploying Phase 6 schema.",
+        category: "One-Time Migrations",
+        priority: 1,
+        destructive: false,
+        runOnce: true,
       },
-    ] as Array<{ name: string; description: string }>;
+    ] as Array<{
+      name: string;
+      description: string;
+      category: string;
+      priority: number;
+      destructive: boolean;
+      runOnce: boolean;
+    }>;
   },
 });
 
@@ -1308,6 +1442,119 @@ export const runMigration = mutation({
       }
 
       return { success: true, ...results };
+    }
+
+    if (args.name === "seed-changelog") {
+      let created = 0;
+      let skipped = 0;
+      let deduped = 0;
+      const now = Date.now();
+
+      for (const entry of SEED_CHANGELOG) {
+        const existing = await ctx.db
+          .query("changelog")
+          .withIndex("by_version", (q: any) => q.eq("version", entry.version))
+          .collect();
+
+        const matches = existing.filter(
+          (e: { title: string }) => e.title === entry.title
+        );
+
+        if (matches.length > 0) {
+          // Keep first, delete any duplicates
+          for (let i = 1; i < matches.length; i++) {
+            await ctx.db.delete(matches[i]._id);
+            deduped++;
+          }
+          skipped++;
+          continue;
+        }
+
+        await ctx.db.insert("changelog", {
+          title: entry.title,
+          content: entry.content,
+          version: entry.version,
+          type: entry.type,
+          isPublished: true,
+          publishedAt: entry.publishedAt,
+          createdAt: entry.publishedAt,
+          updatedAt: now,
+        });
+        created++;
+      }
+
+      return {
+        success: true,
+        total: SEED_CHANGELOG.length,
+        migrated: created,
+        skipped,
+        duplicatesRemoved: deduped,
+      };
+    }
+
+    if (args.name === "clear-changelog") {
+      const all = await ctx.db.query("changelog").collect();
+      for (const entry of all) {
+        await ctx.db.delete(entry._id);
+      }
+      return { success: true, deleted: all.length };
+    }
+
+    if (args.name === "seed-feature-requests") {
+      let created = 0;
+      let skipped = 0;
+      const now = Date.now();
+
+      for (const entry of SEED_FEATURE_REQUESTS) {
+        // Check if a feature request with this exact title already exists
+        const existing = await ctx.db.query("featureRequests").collect();
+        const match = existing.find(
+          (e: { title: string }) => e.title === entry.title
+        );
+
+        if (match) {
+          skipped++;
+          continue;
+        }
+
+        await ctx.db.insert("featureRequests", {
+          title: entry.title,
+          description: entry.description,
+          submitterName: "Envpilot Team",
+          status: entry.status,
+          category: entry.category,
+          adminNotes: entry.adminNotes,
+          voteCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created++;
+      }
+
+      return {
+        success: true,
+        total: SEED_FEATURE_REQUESTS.length,
+        created,
+        skipped,
+      };
+    }
+
+    if (args.name === "clear-feature-requests") {
+      const allRequests = await ctx.db.query("featureRequests").collect();
+      const allVotes = await ctx.db.query("featureVotes").collect();
+
+      for (const vote of allVotes) {
+        await ctx.db.delete(vote._id);
+      }
+      for (const req of allRequests) {
+        await ctx.db.delete(req._id);
+      }
+
+      return {
+        success: true,
+        deletedRequests: allRequests.length,
+        deletedVotes: allVotes.length,
+      };
     }
 
     throw new Error(`Unknown migration: ${args.name}`);
