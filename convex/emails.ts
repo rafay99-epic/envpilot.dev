@@ -635,17 +635,12 @@ export const sendRotationReminderEmail = internalAction({
       // Only notify admins and team leads — they can act on rotation
       if (member.role !== "admin" && member.role !== "team_lead") continue;
 
-      // Check rotation reminder preference (defaults to true)
+      // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(
         internal.userPreferences.getByUserIdInternal,
         { userId: member.user._id }
       );
       if (prefs?.emailNotifications?.rotationReminders === false) continue;
-      // Also skip if securityAlerts are disabled and no explicit rotationReminders setting
-      if (
-        prefs?.emailNotifications?.rotationReminders === undefined &&
-        prefs?.emailNotifications?.securityAlerts === false
-      ) continue;
 
       await sendEmail(member.user.email, subject, html, text).catch((err) =>
         console.warn("[EMAIL] Rotation reminder failed:", err)
