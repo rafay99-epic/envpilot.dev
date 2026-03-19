@@ -65,9 +65,17 @@ Add a `count*` helper in `convex/featureRegistry.ts` for each limited feature (e
 
 ### Versioning
 
-- When making changes to the **CLI** (`apps/cli/`), bump the version in `apps/cli/package.json`.
-- When making changes to the **VS Code extension** (`apps/vscode-extension/`), bump the version in `apps/vscode-extension/package.json`.
-- Both currently at version `1.3.4`. Use semver: patch for fixes, minor for features, major for breaking changes.
+Semver policy across all packages:
+- **Minor bump** (1.X.0): Every new feature added to the package
+- **Patch bump** (1.0.X): Optimizations, bug fixes, patches
+- **Major bump** (X.0.0): Major rewrites or major UI overhauls (reserved, not used lightly)
+
+Package versions to bump when making changes:
+- **Web app** (`apps/web/`): bump `apps/web/package.json`
+- **Admin panel** (`apps/admin/`): bump `apps/admin/package.json`
+- **CLI** (`apps/cli/`): bump `apps/cli/package.json`
+- **VS Code extension** (`apps/vscode-extension/`): bump `apps/vscode-extension/package.json`
+- **Root monorepo** (`package.json`): bump when features span multiple packages
 
 ## Commands
 
