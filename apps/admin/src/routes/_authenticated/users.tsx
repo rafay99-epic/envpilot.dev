@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { timeAgo } from "@/lib/utils";
 import { ShieldBan, ShieldCheck } from "lucide-react";
+import { useConfirmStore } from "@/stores/confirm-store";
 
 export const Route = createFileRoute("/_authenticated/users")({
   component: UsersPage,
@@ -29,6 +30,7 @@ function UsersPage() {
   const users = useAdminQuery(api.admin.listUsers, {});
   const banUser = useAdminMutation(api.admin.banUser);
   const unbanUser = useAdminMutation(api.admin.unbanUser);
+  const { confirm } = useConfirmStore();
 
   const [banModal, setBanModal] = useState<{
     userId: Id<"users">;
@@ -50,7 +52,14 @@ function UsersPage() {
   };
 
   const handleUnban = async (userId: Id<"users">) => {
-    if (!confirm("Are you sure you want to unban this user?")) return;
+    const ok = await confirm({
+      title: "Unban User",
+      message:
+        "This user will regain full access to the platform. Are you sure?",
+      confirmLabel: "Unban",
+      variant: "default",
+    });
+    if (!ok) return;
     try {
       await unbanUser({ userId });
     } catch (err) {

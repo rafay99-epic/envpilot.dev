@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/utils";
+import { useConfirmStore } from "@/stores/confirm-store";
 import { Mail, Eye, EyeOff, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/messages")({
@@ -18,6 +19,7 @@ function MessagesPage() {
   const messages = useAdminQuery(api.admin.listContactMessages, {});
   const toggleRead = useAdminMutation(api.admin.markContactMessageRead);
   const deleteMessage = useAdminMutation(api.admin.deleteContactMessage);
+  const { confirm } = useConfirmStore();
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -93,11 +95,16 @@ function MessagesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          if (confirm("Delete this message?")) {
-                            deleteMessage({ id: msg._id });
-                          }
+                          const ok = await confirm({
+                            title: "Delete Message",
+                            message:
+                              "This message will be permanently deleted.",
+                            confirmLabel: "Delete",
+                            variant: "danger",
+                          });
+                          if (ok) deleteMessage({ id: msg._id });
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-red-400" />
