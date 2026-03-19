@@ -51,4 +51,11 @@ crons.interval(
   internal.subscriptions.expireGracePeriods
 );
 
+// Process secret rotation expiry — transition statuses and send reminder emails
+crons.interval(
+  "process secret rotation expiry",
+  { hours: 1 },
+  internal.variables.processRotationExpiry
+);
+
 export default crons;

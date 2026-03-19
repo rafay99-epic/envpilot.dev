@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import {
   checkBooleanFeature,
   checkNumericLimit,
@@ -67,6 +67,40 @@ export const getBySlug = query({
  * Get all members of an organization
  */
 export const getMembers = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const memberships = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+
+    const members = await Promise.all(
+      memberships.map(async (membership) => {
+        const user = await ctx.db.get(membership.userId);
+        return user
+          ? {
+              ...membership,
+              user: {
+                _id: user._id,
+                email: user.email,
+                name: user.name,
+                avatarUrl: user.avatarUrl,
+              },
+            }
+          : null;
+      })
+    );
+
+    return members.filter(Boolean);
+  },
+});
+
+/**
+ * Internal version of getMembers for use in server-side actions (e.g., email sending).
+ */
+export const getMembersInternal = internalQuery({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
     const memberships = await ctx.db

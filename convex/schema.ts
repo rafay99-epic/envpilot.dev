@@ -45,6 +45,7 @@ export default defineSchema({
         memberUpdates: v.boolean(),
         accessRequests: v.boolean(),
         securityAlerts: v.boolean(),
+        rotationReminders: v.optional(v.boolean()),
       })
     ),
     // Custom keyboard shortcut overrides (shortcut ID → binding string)
@@ -198,10 +199,23 @@ export default defineSchema({
     updatedAt: v.number(),
     // Soft delete support
     deletedAt: v.optional(v.number()),
+    // Secret rotation & expiry fields
+    rotationFrequencyDays: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    lastRotatedAt: v.optional(v.number()),
+    rotationStatus: v.optional(
+      v.union(
+        v.literal("active"),
+        v.literal("expiring_soon"),
+        v.literal("expired")
+      )
+    ),
+    lastReminderSentAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_and_key", ["projectId", "key"])
-    .index("by_project_and_environments", ["projectId", "environments"]),
+    .index("by_project_and_environments", ["projectId", "environments"])
+    .index("by_expires_at", ["expiresAt"]),
 
   // ==========================================
   // ENVIRONMENT VARIABLE REQUESTS
@@ -512,6 +526,10 @@ export default defineSchema({
       v.literal("variable.request_approved"),
       v.literal("variable.request_rejected"),
       v.literal("variable.request_canceled"),
+      // Variable rotation actions
+      v.literal("variable.rotated"),
+      v.literal("variable.expired"),
+      v.literal("variable.rotation_reminder_sent"),
       // Permission actions
       v.literal("permission.granted"),
       v.literal("permission.revoked"),

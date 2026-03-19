@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
+import { RotateCcw } from "lucide-react";
 
 export interface VariableFormData {
   key: string;
@@ -9,6 +10,7 @@ export interface VariableFormData {
   description: string;
   environments: Environment[];
   isSensitive: boolean;
+  rotationFrequencyDays?: number;
 }
 
 interface VariableFormProps {
@@ -17,7 +19,16 @@ interface VariableFormProps {
   onCancel: () => void;
   submitLabel?: string;
   isEditing?: boolean;
+  showRotation?: boolean;
 }
+
+const ROTATION_PRESETS = [
+  { label: "30 days", value: 30 },
+  { label: "60 days", value: 60 },
+  { label: "90 days", value: 90 },
+  { label: "180 days", value: 180 },
+  { label: "365 days", value: 365 },
+];
 
 const defaultFormData: VariableFormData = {
   key: "",
@@ -33,6 +44,7 @@ export function VariableForm({
   onCancel,
   submitLabel = "Save",
   isEditing = false,
+  showRotation = false,
 }: VariableFormProps) {
   const [formData, setFormData] = useState<VariableFormData>(() => ({
     ...defaultFormData,
@@ -41,6 +53,9 @@ export function VariableForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(!initialData?.isSensitive);
+  const [rotationEnabled, setRotationEnabled] = useState(
+    () => !!initialData?.rotationFrequencyDays && initialData.rotationFrequencyDays > 0
+  );
 
   useEffect(() => {
     if (initialData) {
@@ -48,6 +63,9 @@ export function VariableForm({
         ...prev,
         ...initialData,
       }));
+      setRotationEnabled(
+        !!initialData.rotationFrequencyDays && initialData.rotationFrequencyDays > 0
+      );
     }
   }, [initialData]);
 
@@ -66,6 +84,19 @@ export function VariableForm({
         : [...prev.environments, env];
       return { ...prev, environments };
     });
+  };
+
+  const handleRotationToggle = () => {
+    if (rotationEnabled) {
+      setRotationEnabled(false);
+      setFormData((prev) => ({ ...prev, rotationFrequencyDays: 0 }));
+    } else {
+      setRotationEnabled(true);
+      setFormData((prev) => ({
+        ...prev,
+        rotationFrequencyDays: prev.rotationFrequencyDays || 90,
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -263,6 +294,47 @@ export function VariableForm({
           </span>
         </label>
       </div>
+
+      {/* Rotation schedule (shown when feature is enabled for this org) */}
+      {showRotation && (
+        <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={rotationEnabled}
+              onChange={handleRotationToggle}
+              className="h-4 w-4"
+            />
+            <span className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <RotateCcw className="h-4 w-4 text-zinc-400" />
+              Enable rotation schedule
+            </span>
+          </label>
+          {rotationEnabled && (
+            <div className="mt-3 ml-7">
+              <select
+                value={formData.rotationFrequencyDays || 90}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    rotationFrequencyDays: Number(e.target.value),
+                  }))
+                }
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              >
+                {ROTATION_PRESETS.map((preset) => (
+                  <option key={preset.value} value={preset.value}>
+                    Every {preset.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-zinc-500">
+                You&apos;ll receive reminders before the secret expires.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4">

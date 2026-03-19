@@ -735,6 +735,15 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "secret_rotation",
+    displayName: "Secret Rotation & Expiry",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
 
   // Customization
   {
@@ -867,6 +876,7 @@ export const seedDefaultTierFeatures = internalMutation({
         granular_permissions: "true",
         audit_log_retention_days: "7",
         sso_enabled: "false",
+        secret_rotation: "false",
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
@@ -887,6 +897,7 @@ export const seedDefaultTierFeatures = internalMutation({
         granular_permissions: "true",
         audit_log_retention_days: "365",
         sso_enabled: "false",
+        secret_rotation: "true",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",

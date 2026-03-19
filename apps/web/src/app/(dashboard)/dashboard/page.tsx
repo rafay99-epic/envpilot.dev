@@ -7,6 +7,8 @@ import {
   useRecentProjects,
   useTeamMembersQuickView,
   useOnboardingStatus,
+  useExpiringVariables,
+  useFeatureGate,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { PERMISSIONS } from "@/lib/auth";
@@ -19,7 +21,7 @@ import {
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { Plus, ChevronRight, Check } from "lucide-react";
+import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
   const { user, organization } = useAuthContext();
@@ -36,6 +38,12 @@ export default function DashboardPage() {
     useTeamMembersQuickView(activeOrganizationId);
   const { status: onboardingStatus, isLoading: onboardingLoading } =
     useOnboardingStatus(activeOrganizationId);
+  const { variables: expiringVariables } =
+    useExpiringVariables(activeOrganizationId);
+  const { allowed: showRotation } = useFeatureGate(
+    activeOrganizationId,
+    "secret_rotation"
+  );
   const { hasPermission } = useAuthContext();
 
   const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
@@ -221,6 +229,36 @@ export default function DashboardPage() {
               </AnimatedList>
             )}
           </TerminalWindow>
+
+          {/* Expiring Secrets */}
+          {showRotation && (
+            <TerminalWindow title="expiring-secrets">
+              <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
+                <span className="font-mono text-xs text-zinc-500">
+                  <span className="text-green-400">$</span> envpilot secrets
+                  --expiring
+                </span>
+                <Link
+                  href="/dashboard/variables"
+                  className="text-xs text-zinc-500 hover:text-green-400"
+                >
+                  View all
+                </Link>
+              </div>
+              {expiringVariables.length === 0 ? (
+                <TerminalEmptyState
+                  command="envpilot secrets --expiring"
+                  message="No secrets expiring in the next 7 days."
+                />
+              ) : (
+                <AnimatedList className="divide-y divide-zinc-800/50">
+                  {expiringVariables.map((v) => (
+                    <ExpiringSecretRow key={String(v._id)} variable={v} />
+                  ))}
+                </AnimatedList>
+              )}
+            </TerminalWindow>
+          )}
         </div>
 
         {/* Right Column -- Team */}
@@ -417,6 +455,9 @@ const actionLabels: Record<string, string> = {
   "access.token_revoked": "revoked access token",
   "access.extension_linked": "linked extension",
   "access.extension_unlinked": "unlinked extension",
+  "variable.rotated": "rotated secret",
+  "variable.expired": "secret expired",
+  "variable.rotation_reminder_sent": "sent rotation reminder",
 };
 
 function ActivityRow({ activity }: { activity: ActivityItem }) {
@@ -481,6 +522,39 @@ function TeamMemberRow({
       </div>
       <TerminalBadge color={roleColor}>
         {member.role.replace("_", " ")}
+      </TerminalBadge>
+    </div>
+  );
+}
+
+function ExpiringSecretRow({
+  variable,
+}: {
+  variable: {
+    _id: unknown;
+    key: string;
+    projectName: string;
+    expiresAt: number;
+    rotationStatus: string;
+  };
+}) {
+  const isExpired = variable.rotationStatus === "expired";
+  const expiresDate = new Date(variable.expiresAt);
+  const label = isExpired
+    ? "expired"
+    : `expires ${expiresDate.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
+      <div className="flex items-center gap-3">
+        <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
+        <div>
+          <p className="text-sm text-zinc-300">{variable.key}</p>
+          <p className="text-zinc-600">{variable.projectName}</p>
+        </div>
+      </div>
+      <TerminalBadge color={isExpired ? "red" : "amber"}>
+        {label}
       </TerminalBadge>
     </div>
   );
