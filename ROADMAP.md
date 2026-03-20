@@ -6,7 +6,7 @@ Planned features and enhancements for future development.
 
 ## High Impact
 
-### Secret Rotation & Expiry
+### Secret Rotation & Expiry (DONE)
 
 - Auto-expire secrets after a configurable TTL
 - Rotation reminders and notifications via email
@@ -25,7 +25,7 @@ Planned features and enhancements for future development.
 - Configurable per-project webhook URLs
 - Event types: variable created/updated/deleted, permission changed, member added
 
-### Secret Sharing (Time-Limited Links)
+### Secret Sharing (Time-Limited Links) (DONE)
 
 - Generate a one-time or time-limited link to share a secret value
 - Auto-expires after view or TTL

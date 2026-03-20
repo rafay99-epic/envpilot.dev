@@ -90,17 +90,21 @@ export const listByType = query({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
 
+    // Fetch published entries and filter by type (supports both single and multi-type)
     const entries = await ctx.db
       .query("changelog")
-      .withIndex("by_type", (q) => q.eq("type", args.type))
+      .withIndex("by_published", (q) => q.eq("isPublished", true))
       .order("desc")
-      .take(limit * 2); // Fetch more to filter
+      .collect();
 
-    // Filter to only published entries
-    const published = entries.filter((e) => e.isPublished);
+    // Filter entries that include the requested type (backward compat with single type)
+    const matched = entries.filter((e) => {
+      const entryTypes = e.types ?? [e.type];
+      return entryTypes.includes(args.type);
+    });
 
     // Sort by publishedAt descending and limit
-    return published
+    return matched
       .sort((a, b) => {
         const aTime = a.publishedAt ?? a.createdAt;
         const bTime = b.publishedAt ?? b.createdAt;
@@ -157,19 +161,49 @@ export const create = mutation({
       v.literal("security"),
       v.literal("breaking")
     ),
+    types: v.optional(
+      v.array(
+        v.union(
+          v.literal("feature"),
+          v.literal("fix"),
+          v.literal("improvement"),
+          v.literal("security"),
+          v.literal("breaking")
+        )
+      )
+    ),
     isPublished: v.optional(v.boolean()),
+    scheduledFor: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const typesArray = args.types ?? [args.type];
     const isPublished = args.isPublished ?? false;
+
+    let publishStatus: string;
+    let publishedAt: number | undefined;
+
+    if (args.scheduledFor && args.scheduledFor > now) {
+      publishStatus = "scheduled";
+      publishedAt = args.scheduledFor;
+    } else if (isPublished) {
+      publishStatus = "published";
+      publishedAt = now;
+    } else {
+      publishStatus = "draft";
+      publishedAt = undefined;
+    }
 
     const entryId = await ctx.db.insert("changelog", {
       title: args.title,
       content: args.content,
       version: args.version,
-      type: args.type,
-      isPublished,
-      publishedAt: isPublished ? now : undefined,
+      type: typesArray[0],
+      types: typesArray,
+      isPublished: publishStatus === "published",
+      publishedAt,
+      scheduledFor: args.scheduledFor,
+      publishStatus,
       createdAt: now,
       updatedAt: now,
     });
@@ -196,9 +230,22 @@ export const update = mutation({
         v.literal("breaking")
       )
     ),
+    types: v.optional(
+      v.array(
+        v.union(
+          v.literal("feature"),
+          v.literal("fix"),
+          v.literal("improvement"),
+          v.literal("security"),
+          v.literal("breaking")
+        )
+      )
+    ),
+    scheduledFor: v.optional(v.number()),
+    isPublished: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { id, ...fields } = args;
     const now = Date.now();
 
     const existing = await ctx.db.get(id);
@@ -207,10 +254,37 @@ export const update = mutation({
     }
 
     const updateData: Record<string, unknown> = { updatedAt: now };
-    if (updates.title !== undefined) updateData.title = updates.title;
-    if (updates.content !== undefined) updateData.content = updates.content;
-    if (updates.version !== undefined) updateData.version = updates.version;
-    if (updates.type !== undefined) updateData.type = updates.type;
+    if (fields.title !== undefined) updateData.title = fields.title;
+    if (fields.content !== undefined) updateData.content = fields.content;
+    if (fields.version !== undefined) updateData.version = fields.version;
+
+    if (fields.types !== undefined) {
+      updateData.types = fields.types;
+      updateData.type = fields.types[0];
+    } else if (fields.type !== undefined) {
+      updateData.type = fields.type;
+    }
+
+    if (fields.scheduledFor !== undefined || fields.isPublished !== undefined) {
+      const scheduledFor = fields.scheduledFor ?? existing.scheduledFor;
+      const isPublished = fields.isPublished ?? existing.isPublished;
+
+      if (scheduledFor && scheduledFor > now) {
+        updateData.publishStatus = "scheduled";
+        updateData.isPublished = false;
+        updateData.publishedAt = scheduledFor;
+        updateData.scheduledFor = scheduledFor;
+      } else if (isPublished) {
+        updateData.publishStatus = "published";
+        updateData.isPublished = true;
+        updateData.publishedAt = existing.publishedAt ?? now;
+        updateData.scheduledFor = undefined;
+      } else {
+        updateData.publishStatus = "draft";
+        updateData.isPublished = false;
+        updateData.scheduledFor = undefined;
+      }
+    }
 
     await ctx.db.patch(id, updateData);
 
@@ -234,6 +308,8 @@ export const publish = mutation({
     await ctx.db.patch(args.id, {
       isPublished: true,
       publishedAt: now,
+      publishStatus: "published",
+      scheduledFor: undefined,
       updatedAt: now,
     });
 
@@ -256,6 +332,8 @@ export const unpublish = mutation({
 
     await ctx.db.patch(args.id, {
       isPublished: false,
+      publishStatus: "draft",
+      scheduledFor: undefined,
       updatedAt: now,
     });
 
@@ -1137,5 +1215,62 @@ export const clearAll = internalMutation({
       await ctx.db.delete(entry._id);
     }
     return { success: true, deleted: all.length };
+  },
+});
+
+/**
+ * Auto-publish scheduled changelog entries.
+ * Called by cron every 5 minutes. Finds entries with publishStatus === "scheduled"
+ * and scheduledFor <= now, then publishes them.
+ */
+export const publishScheduledEntries = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+
+    const scheduled = await ctx.db
+      .query("changelog")
+      .withIndex("by_publish_status", (q) => q.eq("publishStatus", "scheduled"))
+      .collect();
+
+    let published = 0;
+    for (const entry of scheduled) {
+      if (entry.scheduledFor && entry.scheduledFor <= now) {
+        await ctx.db.patch(entry._id, {
+          isPublished: true,
+          publishedAt: entry.scheduledFor,
+          publishStatus: "published",
+          updatedAt: now,
+        });
+        published++;
+      }
+    }
+
+    return { published };
+  },
+});
+
+/**
+ * Backward-compatibility migration: populate `types` and `publishStatus`
+ * for existing entries that only have `type` and `isPublished`.
+ * Run once from the Convex dashboard.
+ */
+export const migrateToMultiType = internalMutation({
+  handler: async (ctx) => {
+    const all = await ctx.db.query("changelog").collect();
+    let migrated = 0;
+
+    for (const entry of all) {
+      const needsMigration = !entry.types || !entry.publishStatus;
+      if (needsMigration) {
+        await ctx.db.patch(entry._id, {
+          types: entry.types ?? [entry.type],
+          publishStatus:
+            entry.publishStatus ?? (entry.isPublished ? "published" : "draft"),
+        });
+        migrated++;
+      }
+    }
+
+    return { success: true, total: all.length, migrated };
   },
 });

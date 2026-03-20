@@ -63,7 +63,10 @@ export default function ChangelogPage() {
   const [selectedType, setSelectedType] = useState<ChangelogType | null>(null);
 
   const filteredEntries = selectedType
-    ? entries?.filter((entry) => entry.type === selectedType)
+    ? entries?.filter((entry) => {
+        const entryTypes = entry.types ?? [entry.type];
+        return entryTypes.includes(selectedType);
+      })
     : entries;
 
   return (
@@ -190,6 +193,7 @@ export default function ChangelogPage() {
                       content={entry.content}
                       version={entry.version}
                       type={entry.type as ChangelogType}
+                      types={(entry.types ?? [entry.type]) as ChangelogType[]}
                       publishedAt={entry.publishedAt ?? entry.createdAt}
                     />
                   ))}
@@ -275,15 +279,18 @@ function ChangelogEntry({
   content,
   version,
   type,
+  types,
   publishedAt,
 }: {
   title: string;
   content: string;
   version: string;
   type: ChangelogType;
+  types?: ChangelogType[];
   publishedAt: number;
 }) {
-  const config = TYPE_CONFIG[type];
+  const entryTypes = types ?? [type];
+  const primaryConfig = TYPE_CONFIG[entryTypes[0]];
   const date = new Date(publishedAt);
   const formattedDate = date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -295,7 +302,7 @@ function ChangelogEntry({
     <article className="group relative pl-0 md:pl-8">
       {/* Timeline dot */}
       <div
-        className={`absolute left-0 top-[22px] hidden h-[15px] w-[15px] rounded-full border-2 border-zinc-950 md:block ${config.dot}`}
+        className={`absolute left-0 top-[22px] hidden h-[15px] w-[15px] rounded-full border-2 border-zinc-950 md:block ${primaryConfig.dot}`}
       />
 
       <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 transition-colors hover:border-zinc-700">
@@ -303,9 +310,14 @@ function ChangelogEntry({
         <div className="flex flex-wrap items-center gap-3">
           <time className="text-xs text-zinc-500">{formattedDate}</time>
           <span className="text-zinc-700">&middot;</span>
-          <span className={`text-xs font-medium ${config.color}`}>
-            [{config.prefix}] {config.label}
-          </span>
+          {entryTypes.map((t) => {
+            const cfg = TYPE_CONFIG[t];
+            return (
+              <span key={t} className={`text-xs font-medium ${cfg.color}`}>
+                [{cfg.prefix}] {cfg.label}
+              </span>
+            );
+          })}
           <span className="rounded border border-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">
             {version}
           </span>

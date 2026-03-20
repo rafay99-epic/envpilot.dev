@@ -58,4 +58,25 @@ crons.interval(
   internal.variables.processRotationExpiry
 );
 
+// Clean up expired shared secrets every hour
+crons.interval(
+  "cleanup expired shared secrets",
+  { hours: 1 },
+  internal.sharedSecrets.cleanupExpiredShares
+);
+
+// Clean up stale OTP codes every 30 minutes
+crons.interval(
+  "cleanup expired share OTPs",
+  { minutes: 30 },
+  internal.sharedSecrets.cleanupExpiredOtps
+);
+
+// Auto-publish scheduled changelog entries every 5 minutes
+crons.interval(
+  "publish scheduled changelog entries",
+  { minutes: 5 },
+  internal.changelog.publishScheduledEntries
+);
+
 export default crons;

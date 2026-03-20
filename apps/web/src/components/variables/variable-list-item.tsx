@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
-import { Eye, EyeOff, Copy, Check, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Copy, Check, Loader2, Share2 } from "lucide-react";
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -27,6 +27,8 @@ interface VariableListItemProps {
   canDelete?: boolean;
   canManagePermissions?: boolean;
   permissionLevel?: "read" | "write" | "admin" | null;
+  onShare?: () => void;
+  activeShareCount?: number;
   showCheckbox?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -45,6 +47,8 @@ export function VariableListItem({
   canDelete = false,
   canManagePermissions = false,
   permissionLevel,
+  onShare,
+  activeShareCount,
   showCheckbox = false,
   isSelected = false,
   onToggleSelect,
@@ -180,6 +184,18 @@ export function VariableListItem({
                 <Check className="h-4 w-4 text-green-500" />
               ) : (
                 <Copy className="h-4 w-4" />
+              )}
+            </button>
+          )}
+          {onShare && (
+            <button
+              onClick={onShare}
+              className="relative rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              title="Share via secure link"
+            >
+              <Share2 className="h-4 w-4" />
+              {activeShareCount !== undefined && activeShareCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-green-500" />
               )}
             </button>
           )}
