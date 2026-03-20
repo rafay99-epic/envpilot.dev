@@ -5,6 +5,13 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { readSecret } from "@/lib/vault";
+import {
+  serialize,
+  getFileExtension,
+  getContentType,
+  ALL_FORMATS,
+  type FormatType,
+} from "@/lib/format-converter";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -13,11 +20,12 @@ interface RouteParams {
 }
 
 /**
- * GET /api/projects/[id]/export - Export environment variables as .env or .json
+ * GET /api/projects/[id]/export - Export environment variables
  *
  * Query params:
  *   environment - "development" | "staging" | "production" (optional, default: all)
- *   format - "env" | "json" (optional, default: "env")
+ *   format - "env" | "json" | "yaml" | "docker-compose" | "aws" | "vercel" | "netlify" (optional, default: "env")
+ *   prefix - AWS Parameter Store prefix (optional, default: /project-name)
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -30,11 +38,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const url = new URL(request.url);
     const environment = url.searchParams.get("environment") || undefined;
-    const format = url.searchParams.get("format") || "env";
+    const format = (url.searchParams.get("format") || "env") as FormatType;
+    const prefix = url.searchParams.get("prefix") || undefined;
 
-    if (format !== "env" && format !== "json") {
+    if (!ALL_FORMATS.includes(format)) {
       return NextResponse.json(
-        { error: "Format must be 'env' or 'json'" },
+        { error: `Format must be one of: ${ALL_FORMATS.join(", ")}` },
         { status: 400 }
       );
     }
@@ -77,6 +86,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Check bulk_export feature gate
+    const featureCheck = await convex.query(api.featureRegistry.checkFeature, {
+      organizationId: project.organizationId,
+      featureKey: "bulk_export",
+    });
+
+    if (featureCheck && !featureCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Bulk export is not available on your current plan${featureCheck.tierName ? ` (${featureCheck.tierName})` : ""}. Upgrade to access this feature.`,
+        },
+        { status: 403 }
+      );
+    }
+
     // Get variables with access control
     const variables = await convex.query(api.variables.listWithAccess, {
       projectId: id as Id<"projects">,
@@ -89,50 +113,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       .filter((v) => !environment || v.environments.includes(environment));
 
     // Decrypt values
-    const decrypted: { key: string; value: string }[] = [];
+    const decrypted: Record<string, string> = {};
     for (const variable of accessible) {
       try {
         const value = await readSecret(variable.vaultRef);
-        decrypted.push({ key: variable.key, value: value || "" });
+        decrypted[variable.key] = value || "";
       } catch {
-        decrypted.push({ key: variable.key, value: "[DECRYPTION_FAILED]" });
+        decrypted[variable.key] = "[DECRYPTION_FAILED]";
       }
     }
 
-    const filename = `${environment || "all"}.${format}`;
+    const body = serialize(decrypted, format, {
+      projectName: project.name,
+      environment: environment || "all",
+      prefix,
+    });
 
-    if (format === "json") {
-      const jsonBody: Record<string, string> = {};
-      for (const { key, value } of decrypted) {
-        jsonBody[key] = value;
-      }
-
-      return new NextResponse(JSON.stringify(jsonBody, null, 2), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Content-Disposition": `attachment; filename="${filename}"`,
-        },
-      });
-    }
-
-    // .env format
-    const lines: string[] = [];
-    lines.push(`# Environment: ${environment || "all"}`);
-    lines.push(`# Project: ${project.name}`);
-    lines.push(`# Exported: ${new Date().toISOString()}`);
-    lines.push("");
-
-    for (const { key, value } of decrypted) {
-      lines.push(`${key}=${value}`);
-    }
-
-    const body = lines.join("\n") + "\n";
+    const ext = getFileExtension(format);
+    const contentType = getContentType(format);
+    const filename = `${environment || "all"}${ext}`;
 
     return new NextResponse(body, {
       status: 200,
       headers: {
-        "Content-Type": "text/plain",
+        "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });

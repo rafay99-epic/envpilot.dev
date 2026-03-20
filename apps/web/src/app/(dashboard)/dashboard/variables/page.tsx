@@ -25,6 +25,8 @@ import { Pagination } from "@/components/dashboard/pagination";
 import { staggeredRow } from "@/components/dashboard/animated-list";
 import {
   VariableEditModal,
+  ExportDialog,
+  ImportDialog,
   type VariableFormData,
 } from "@/components/variables";
 import { ConfirmDialog } from "@/components/ui";
@@ -41,6 +43,8 @@ import {
   Check,
   Loader2,
   RotateCcw,
+  Download,
+  Upload,
 } from "lucide-react";
 
 interface Variable {
@@ -84,6 +88,8 @@ export default function VariablesPage() {
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
   );
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -240,12 +246,26 @@ export default function VariablesPage() {
             Manage your encrypted secrets and configuration
           </p>
         </div>
-        {canCreateVariable && (
-          <TerminalButton>
-            <Plus className="h-4 w-4" />
-            Add Variable
-          </TerminalButton>
-        )}
+        <div className="flex items-center gap-2">
+          {selectedProject !== "all" && (
+            <TerminalButton onClick={() => setShowExportDialog(true)}>
+              <Download className="h-4 w-4" />
+              Export
+            </TerminalButton>
+          )}
+          {selectedProject !== "all" && canCreateVariable && (
+            <TerminalButton onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4" />
+              Import
+            </TerminalButton>
+          )}
+          {canCreateVariable && (
+            <TerminalButton>
+              <Plus className="h-4 w-4" />
+              Add Variable
+            </TerminalButton>
+          )}
+        </div>
       </div>
 
       {/* Notices */}
@@ -393,6 +413,29 @@ export default function VariablesPage() {
         confirmText="Delete"
         variant="danger"
       />
+
+      {/* Export Dialog */}
+      {selectedProject !== "all" && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          projectId={selectedProject as Id<"projects">}
+          projectName={
+            projects.find((p) => p._id === selectedProject)?.name || "project"
+          }
+          organizationId={activeOrganizationId}
+        />
+      )}
+
+      {/* Import Dialog */}
+      {selectedProject !== "all" && (
+        <ImportDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          projectId={selectedProject as Id<"projects">}
+          organizationId={activeOrganizationId}
+        />
+      )}
     </div>
   );
 }
