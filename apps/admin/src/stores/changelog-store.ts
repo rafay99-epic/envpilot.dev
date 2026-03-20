@@ -12,6 +12,7 @@ export type ChangelogType =
   | "security"
   | "breaking";
 
+export type PublishMode = "draft" | "immediate" | "scheduled";
 export type ViewMode = "list" | "editor";
 export type EditorTab = "write" | "preview";
 export type FilterType = ChangelogType | "all";
@@ -20,8 +21,9 @@ export interface ChangelogForm {
   title: string;
   content: string;
   version: string;
-  type: ChangelogType;
-  isPublished: boolean;
+  types: ChangelogType[];
+  publishMode: PublishMode;
+  scheduledFor: string | null; // ISO datetime-local string for the input
 }
 
 // ==========================================
@@ -32,8 +34,9 @@ export const EMPTY_FORM: ChangelogForm = {
   title: "",
   content: "",
   version: "",
-  type: "feature",
-  isPublished: false,
+  types: ["feature"],
+  publishMode: "draft",
+  scheduledFor: null,
 };
 
 export const TYPE_OPTIONS: {
@@ -145,6 +148,7 @@ interface ChangelogState {
     field: K,
     value: ChangelogForm[K]
   ) => void;
+  toggleType: (type: ChangelogType) => void;
   setForm: (form: ChangelogForm) => void;
   setSaving: (saving: boolean) => void;
   markSaved: () => void;
@@ -203,6 +207,21 @@ export const useChangelogStore = create<ChangelogState>((set) => ({
       form: { ...state.form, [field]: value },
       hasUnsavedChanges: true,
     })),
+
+  toggleType: (type) =>
+    set((state) => {
+      const current = state.form.types;
+      const has = current.includes(type);
+      // Don't allow deselecting the last type
+      if (has && current.length === 1) return state;
+      const next = has
+        ? current.filter((t) => t !== type)
+        : [...current, type];
+      return {
+        form: { ...state.form, types: next },
+        hasUnsavedChanges: true,
+      };
+    }),
 
   setForm: (form) => set({ form, hasUnsavedChanges: true }),
 

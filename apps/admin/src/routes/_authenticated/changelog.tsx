@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { useConfirmStore } from "@/stores/confirm-store";
 import {
   useChangelogStore,
@@ -39,6 +39,10 @@ import {
   Globe,
   GlobeLock,
   CircleDot,
+  Clock,
+  CheckSquare,
+  Square,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useCallback } from "react";
@@ -68,6 +72,11 @@ function typeBadgeVariant(type: string) {
   }
 }
 
+/** Get the types array from an entry, falling back to [entry.type] for backward compat */
+function getEntryTypes(entry: { type: string; types?: string[] }): string[] {
+  return entry.types ?? [entry.type];
+}
+
 // ==========================================
 // Main Page
 // ==========================================
@@ -94,11 +103,15 @@ function ListView() {
 
   const filteredEntries =
     entries && filterType !== "all"
-      ? entries.filter((e) => e.type === filterType)
+      ? entries.filter((e) => getEntryTypes(e).includes(filterType))
       : entries;
 
-  const publishedCount = entries?.filter((e) => e.isPublished).length ?? 0;
-  const draftCount = entries?.filter((e) => !e.isPublished).length ?? 0;
+  const publishedCount =
+    entries?.filter((e) => e.publishStatus === "published" || (!e.publishStatus && e.isPublished)).length ?? 0;
+  const scheduledCount =
+    entries?.filter((e) => e.publishStatus === "scheduled").length ?? 0;
+  const draftCount =
+    entries?.filter((e) => e.publishStatus === "draft" || (!e.publishStatus && !e.isPublished && e.publishStatus !== "scheduled")).length ?? 0;
 
   const handleTogglePublish = async (entryId: Id<"changelog">) => {
     await togglePublish({ id: entryId });
@@ -118,12 +131,21 @@ function ListView() {
   };
 
   const handleEdit = (entry: NonNullable<typeof entries>[number]) => {
+    const entryTypes = (entry.types ?? [entry.type]) as ChangelogType[];
     openEdit(entry._id, {
       title: entry.title ?? "",
       content: entry.content ?? "",
       version: entry.version ?? "",
-      type: (entry.type as ChangelogType) ?? "feature",
-      isPublished: entry.isPublished ?? false,
+      types: entryTypes.length > 0 ? entryTypes : ["feature"],
+      publishMode:
+        entry.publishStatus === "scheduled"
+          ? "scheduled"
+          : entry.isPublished
+            ? "immediate"
+            : "draft",
+      scheduledFor: entry.scheduledFor
+        ? new Date(entry.scheduledFor).toISOString().slice(0, 16)
+        : null,
     });
   };
 
@@ -135,7 +157,7 @@ function ListView() {
           <h1 className="text-2xl font-semibold text-zinc-100">Changelog</h1>
           <p className="mt-1 text-sm text-zinc-500">
             {entries
-              ? `${publishedCount} published, ${draftCount} drafts`
+              ? `${publishedCount} published${scheduledCount > 0 ? `, ${scheduledCount} scheduled` : ""}, ${draftCount} drafts`
               : "Loading..."}
           </p>
         </div>
@@ -170,7 +192,7 @@ function ListView() {
                 {type === "all" ? "All" : config?.label}
                 {type !== "all" && entries && (
                   <span className="ml-1.5 text-zinc-600">
-                    {entries.filter((e) => e.type === type).length}
+                    {entries.filter((e) => getEntryTypes(e).includes(type)).length}
                   </span>
                 )}
               </button>
@@ -195,7 +217,8 @@ function ListView() {
       ) : (
         <div className="space-y-3">
           {filteredEntries.map((entry) => {
-            const config = TYPE_CONFIG[entry.type as ChangelogType];
+            const entryTypes = getEntryTypes(entry);
+            const primaryConfig = TYPE_CONFIG[entryTypes[0] as ChangelogType];
             return (
               <Card
                 key={entry._id}
@@ -206,9 +229,9 @@ function ListView() {
                   <div
                     className={cn(
                       "h-3 w-3 rounded-full",
-                      config?.bgColor ?? "bg-zinc-700",
-                      config?.borderColor
-                        ? `border ${config.borderColor}`
+                      primaryConfig?.bgColor ?? "bg-zinc-700",
+                      primaryConfig?.borderColor
+                        ? `border ${primaryConfig.borderColor}`
                         : "border border-zinc-600"
                     )}
                   />
@@ -228,10 +251,22 @@ function ListView() {
                         {entry.version}
                       </span>
                     )}
-                    <Badge variant={typeBadgeVariant(entry.type)}>
-                      {config ? `${config.prefix} ${config.label}` : entry.type}
-                    </Badge>
-                    {entry.isPublished ? (
+                    {/* Type badges — render all types */}
+                    {entryTypes.map((t) => {
+                      const tc = TYPE_CONFIG[t as ChangelogType];
+                      return tc ? (
+                        <Badge key={t} variant={typeBadgeVariant(t)}>
+                          {tc.prefix} {tc.label}
+                        </Badge>
+                      ) : null;
+                    })}
+                    {/* Publish status */}
+                    {entry.publishStatus === "scheduled" ? (
+                      <Badge variant="info">
+                        <CalendarClock className="mr-1 h-2.5 w-2.5" />
+                        Scheduled{entry.scheduledFor ? ` ${formatDateTime(entry.scheduledFor)}` : ""}
+                      </Badge>
+                    ) : entry.isPublished ? (
                       <Badge variant="success">
                         <Globe className="mr-1 h-2.5 w-2.5" />
                         Published
@@ -310,6 +345,7 @@ function EditorView() {
     hasUnsavedChanges,
     closeEditor,
     updateField,
+    toggleType,
     setEditorTab,
     setSaving,
     markSaved,
@@ -319,6 +355,14 @@ function EditorView() {
 
   const handleSave = async () => {
     if (!form.title.trim() || !form.version.trim()) return;
+
+    // Validate scheduled time is in the future
+    if (form.publishMode === "scheduled") {
+      if (!form.scheduledFor) return;
+      const scheduledTs = new Date(form.scheduledFor).getTime();
+      if (scheduledTs <= Date.now()) return;
+    }
+
     setSaving(true);
     try {
       if (editingId) {
@@ -327,15 +371,26 @@ function EditorView() {
           title: form.title,
           content: form.content,
           version: form.version,
-          type: form.type,
+          type: form.types[0],
+          types: form.types,
+          isPublished: form.publishMode === "immediate",
+          scheduledFor:
+            form.publishMode === "scheduled" && form.scheduledFor
+              ? new Date(form.scheduledFor).getTime()
+              : undefined,
         });
       } else {
         await createEntry({
           title: form.title,
           content: form.content,
           version: form.version,
-          type: form.type,
-          isPublished: form.isPublished,
+          type: form.types[0],
+          types: form.types,
+          isPublished: form.publishMode === "immediate",
+          scheduledFor:
+            form.publishMode === "scheduled" && form.scheduledFor
+              ? new Date(form.scheduledFor).getTime()
+              : undefined,
         });
       }
       markSaved();
@@ -389,8 +444,6 @@ function EditorView() {
     [form.content, updateField]
   );
 
-  const config = TYPE_CONFIG[form.type];
-
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       {/* Top bar */}
@@ -418,29 +471,27 @@ function EditorView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!editingId && (
-            <label className="mr-2 flex items-center gap-2 text-sm text-zinc-400">
-              <input
-                type="checkbox"
-                checked={form.isPublished}
-                onChange={(e) => updateField("isPublished", e.target.checked)}
-                className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
-              />
-              Publish immediately
-            </label>
-          )}
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isSaving || !form.title.trim() || !form.version.trim()}
+            disabled={
+              isSaving ||
+              !form.title.trim() ||
+              !form.version.trim() ||
+              (form.publishMode === "scheduled" && !form.scheduledFor)
+            }
           >
             {isSaving
               ? "Saving..."
               : editingId
                 ? "Update Entry"
-                : "Create Entry"}
+                : form.publishMode === "immediate"
+                  ? "Publish Now"
+                  : form.publishMode === "scheduled"
+                    ? "Schedule Entry"
+                    : "Save Draft"}
           </Button>
         </div>
       </div>
@@ -598,19 +649,22 @@ function EditorView() {
             />
           </div>
 
-          {/* Type selector */}
+          {/* Change type selector — multi-select */}
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <label className="mb-3 block text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Change Type
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Change Types
             </label>
+            <p className="mb-3 text-[10px] text-zinc-600">
+              Select one or more types
+            </p>
             <div className="space-y-1.5">
               {TYPE_OPTIONS.map((opt) => {
                 const tc = TYPE_CONFIG[opt.value];
-                const isSelected = form.type === opt.value;
+                const isSelected = form.types.includes(opt.value);
                 return (
                   <button
                     key={opt.value}
-                    onClick={() => updateField("type", opt.value)}
+                    onClick={() => toggleType(opt.value)}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-all",
                       isSelected
@@ -618,12 +672,13 @@ function EditorView() {
                         : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300"
                     )}
                   >
-                    <CircleDot
-                      className={cn(
-                        "h-3.5 w-3.5",
-                        isSelected ? tc.color : "text-zinc-600"
-                      )}
-                    />
+                    {isSelected ? (
+                      <CheckSquare
+                        className={cn("h-3.5 w-3.5", tc.color)}
+                      />
+                    ) : (
+                      <Square className="h-3.5 w-3.5 text-zinc-600" />
+                    )}
                     <span className={cn("font-mono text-xs", tc.color)}>
                       {tc.prefix}
                     </span>
@@ -634,6 +689,81 @@ function EditorView() {
             </div>
           </div>
 
+          {/* Publish mode selector */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <label className="mb-3 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Publishing
+            </label>
+            <div className="space-y-1.5">
+              <button
+                onClick={() => updateField("publishMode", "draft")}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-all",
+                  form.publishMode === "draft"
+                    ? "border-zinc-600 bg-zinc-800 text-zinc-200"
+                    : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300"
+                )}
+              >
+                <GlobeLock className="h-3.5 w-3.5" />
+                Save as Draft
+              </button>
+              <button
+                onClick={() => updateField("publishMode", "immediate")}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-all",
+                  form.publishMode === "immediate"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                    : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300"
+                )}
+              >
+                <Globe className="h-3.5 w-3.5" />
+                Publish Now
+              </button>
+              <button
+                onClick={() => updateField("publishMode", "scheduled")}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-all",
+                  form.publishMode === "scheduled"
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                    : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300"
+                )}
+              >
+                <CalendarClock className="h-3.5 w-3.5" />
+                Schedule for Later
+              </button>
+            </div>
+
+            {/* Date/time picker when scheduling */}
+            {form.publishMode === "scheduled" && (
+              <div className="mt-3 space-y-2">
+                <input
+                  type="datetime-local"
+                  value={form.scheduledFor ?? ""}
+                  onChange={(e) =>
+                    updateField(
+                      "scheduledFor",
+                      e.target.value || null
+                    )
+                  }
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:invert"
+                />
+                {form.scheduledFor && (
+                  <p className="text-[10px] text-zinc-500">
+                    <Clock className="mr-1 inline h-3 w-3" />
+                    Publishes within 5 minutes of scheduled time
+                  </p>
+                )}
+                {form.scheduledFor &&
+                  new Date(form.scheduledFor).getTime() <= Date.now() && (
+                    <p className="text-[10px] text-red-400">
+                      Scheduled time must be in the future
+                    </p>
+                  )}
+              </div>
+            )}
+          </div>
+
           {/* Live preview card */}
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             <label className="mb-3 block text-xs font-medium uppercase tracking-wider text-zinc-500">
@@ -642,29 +772,39 @@ function EditorView() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] text-zinc-500">
-                  {new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {form.publishMode === "scheduled" && form.scheduledFor
+                    ? new Date(form.scheduledFor).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : new Date().toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                 </span>
                 {form.version && (
                   <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500">
                     {form.version}
                   </span>
                 )}
-                {config && (
-                  <span
-                    className={cn(
-                      "rounded border px-1.5 py-0.5 text-[10px]",
-                      config.bgColor,
-                      config.borderColor,
-                      config.color
-                    )}
-                  >
-                    {config.prefix} {config.label}
-                  </span>
-                )}
+                {form.types.map((t) => {
+                  const tc = TYPE_CONFIG[t];
+                  return tc ? (
+                    <span
+                      key={t}
+                      className={cn(
+                        "rounded border px-1.5 py-0.5 text-[10px]",
+                        tc.bgColor,
+                        tc.borderColor,
+                        tc.color
+                      )}
+                    >
+                      {tc.prefix} {tc.label}
+                    </span>
+                  ) : null;
+                })}
               </div>
               <p className="mt-2 flex items-center gap-1 text-sm font-medium text-zinc-100">
                 <ChevronRight className="h-3 w-3 text-emerald-500" />

@@ -461,7 +461,7 @@ export default defineSchema({
     content: v.string(),
     // Version tag (e.g., "v1.0.0", "v1.2.3")
     version: v.string(),
-    // Type of change
+    // Type of change (primary — kept for backward compat)
     type: v.union(
       v.literal("feature"), // New feature
       v.literal("fix"), // Bug fix
@@ -469,10 +469,26 @@ export default defineSchema({
       v.literal("security"), // Security update
       v.literal("breaking") // Breaking change
     ),
+    // Multiple change types (e.g., ["feature", "security"])
+    types: v.optional(
+      v.array(
+        v.union(
+          v.literal("feature"),
+          v.literal("fix"),
+          v.literal("improvement"),
+          v.literal("security"),
+          v.literal("breaking")
+        )
+      )
+    ),
     // Whether the entry is published and visible
     isPublished: v.boolean(),
     // Publication date (when made public)
     publishedAt: v.optional(v.number()),
+    // Scheduled publish timestamp (future date for auto-publish)
+    scheduledFor: v.optional(v.number()),
+    // Publish status: "draft" | "scheduled" | "published"
+    publishStatus: v.optional(v.string()),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -480,7 +496,8 @@ export default defineSchema({
     .index("by_published", ["isPublished"])
     .index("by_published_at", ["publishedAt"])
     .index("by_version", ["version"])
-    .index("by_type", ["type"]),
+    .index("by_type", ["type"])
+    .index("by_publish_status", ["publishStatus"]),
 
   // ==========================================
   // AUDIT LOGS

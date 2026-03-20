@@ -72,4 +72,11 @@ crons.interval(
   internal.sharedSecrets.cleanupExpiredOtps
 );
 
+// Auto-publish scheduled changelog entries every 5 minutes
+crons.interval(
+  "publish scheduled changelog entries",
+  { minutes: 5 },
+  internal.changelog.publishScheduledEntries
+);
+
 export default crons;
