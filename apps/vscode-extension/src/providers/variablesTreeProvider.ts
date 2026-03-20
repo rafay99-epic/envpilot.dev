@@ -248,7 +248,11 @@ export class VariableTreeItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon("symbol-variable");
         const valueStr = this.truncateValue(variable?.value || "");
         const versionTag = variable?.version ? ` v${variable.version}` : "";
-        this.description = valueStr + versionTag;
+        const tagSuffix =
+          variable?.tags && variable.tags.length > 0
+            ? ` [${variable.tags.map((t) => t.name).join(", ")}]`
+            : "";
+        this.description = valueStr + versionTag + tagSuffix;
         this.tooltip = this.createVariableTooltip(variable, false);
         break;
       }
@@ -340,6 +344,11 @@ export class VariableTreeItem extends vscode.TreeItem {
       `**Environments:** ${variable.environments.join(", ")}  \n`
     );
     md.appendMarkdown(`**Version:** ${variable.version}  \n`);
+    if (variable.tags && variable.tags.length > 0) {
+      md.appendMarkdown(
+        `**Tags:** ${variable.tags.map((t) => t.name).join(", ")}  \n`
+      );
+    }
     if (isSensitive) {
       md.appendMarkdown("**Sensitive:** $(lock) Yes");
     }

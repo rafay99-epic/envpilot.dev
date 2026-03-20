@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, useRef, use } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -14,6 +14,16 @@ import {
   TerminalButtonLink,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
+import { Pagination } from "@/components/dashboard/pagination";
+import { Pencil, Trash2, Plus, ListPlus, X, Loader2 } from "lucide-react";
+import {
+  useOrganizationTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+} from "@/hooks/queries";
+import type { Tag as TagType } from "@/hooks/queries";
+import { useFeatureGate, usePagination } from "@/hooks";
 
 interface Organization {
   _id: string;
@@ -27,7 +37,7 @@ interface Organization {
   };
 }
 
-type OrgSettingsTab = "general" | "access" | "danger";
+type OrgSettingsTab = "general" | "access" | "tags" | "danger";
 
 export default function OrganizationSettingsPage({
   params,
@@ -57,8 +67,16 @@ export default function OrganizationSettingsPage({
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [transferConfirmText, setTransferConfirmText] = useState("");
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<OrgSettingsTab>("general");
+  // Tab state — support ?tab=tags deep link
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as OrgSettingsTab) || "general";
+  const [activeTab, setActiveTab] = useState<OrgSettingsTab>(initialTab);
+
+  // Feature gate for tags
+  const { allowed: showTags } = useFeatureGate(
+    organization?._id as Id<"organizations"> | undefined,
+    "variable_tags"
+  );
 
   // Look up tier from organizationTiers table
   const tierData = useQuery(
@@ -72,6 +90,7 @@ export default function OrganizationSettingsPage({
   const tabs: { id: OrgSettingsTab; label: string }[] = [
     { id: "general", label: "General" },
     { id: "access", label: "Access Control" },
+    ...(showTags ? [{ id: "tags" as const, label: "Tags" }] : []),
     { id: "danger", label: "Danger Zone" },
   ];
 
@@ -299,6 +318,9 @@ export default function OrganizationSettingsPage({
             isSavingSettings={isSavingSettings}
             onToggle={handleToggleAccess}
           />
+        )}
+        {activeTab === "tags" && showTags && organization && (
+          <TagSettingsTab organizationId={organization._id as string} />
         )}
         {activeTab === "danger" && (
           <DangerZoneSettings
@@ -675,6 +697,652 @@ function DangerZoneSettings({
             Delete Organization
           </TerminalButton>
         )}
+      </TerminalCard>
+    </div>
+  );
+}
+
+// ============================================================
+// Tags Tab
+// ============================================================
+
+const TAG_COLORS = [
+  "#3b82f6",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+  "#6366f1",
+  "#84cc16",
+];
+
+function TagSettingsTab({ organizationId }: { organizationId: string }) {
+  const {
+    data: tagsData,
+    isLoading,
+    isError: isFetchError,
+    refetch,
+  } = useOrganizationTags(organizationId);
+  const tags = tagsData?.tags ?? [];
+  const createTagMut = useCreateTag();
+  const updateTagMut = useUpdateTag();
+  const deleteTagMut = useDeleteTag();
+
+  // UI state
+  const [showCreate, setShowCreate] = useState(false);
+  const [showBulkPaste, setShowBulkPaste] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState(TAG_COLORS[0]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Bulk paste state
+  const [bulkText, setBulkText] = useState("");
+  const [bulkEntries, setBulkEntries] = useState<
+    Array<{ name: string; color: string }>
+  >([]);
+  const [isBulkCreating, setIsBulkCreating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    total: number;
+    completed: number;
+    failures: Array<{ name: string; error: string }>;
+  } | null>(null);
+
+  // Notification state with auto-dismiss
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [tagSuccess, setTagSuccess] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showError = useCallback((msg: string) => {
+    setTagError(msg);
+    setTagSuccess(null);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setTagError(null), 5000);
+  }, []);
+
+  const showSuccess = useCallback((msg: string) => {
+    setTagSuccess(msg);
+    setTagError(null);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setTagSuccess(null), 3000);
+  }, []);
+
+  // Cleanup timers
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
+
+  // Pagination (20 per page — tags are lightweight)
+  const pagination = usePagination(tags, { pageSize: 20 });
+
+  const extractErrorMessage = (err: unknown, fallback: string): string => {
+    if (err instanceof Error) return err.message;
+    return fallback;
+  };
+
+  // Bulk paste parsing — accepts comma, semicolon, or newline separated names
+  const parseBulkText = useCallback(
+    (text: string) => {
+      const names = text
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && s.length <= 50);
+
+      // Deduplicate (case-insensitive) and remove names that already exist
+      const existingNames = new Set(tags.map((t) => t.name.toLowerCase()));
+      const seen = new Set<string>();
+      const entries: Array<{ name: string; color: string }> = [];
+
+      for (const name of names) {
+        const lower = name.toLowerCase();
+        if (seen.has(lower) || existingNames.has(lower)) continue;
+        seen.add(lower);
+        // Round-robin assign colors from the palette
+        entries.push({
+          name,
+          color: TAG_COLORS[entries.length % TAG_COLORS.length],
+        });
+      }
+
+      return entries;
+    },
+    [tags]
+  );
+
+  const handleBulkTextChange = useCallback(
+    (text: string) => {
+      setBulkText(text);
+      setBulkEntries(parseBulkText(text));
+    },
+    [parseBulkText]
+  );
+
+  const removeBulkEntry = (name: string) => {
+    setBulkEntries((prev) => prev.filter((e) => e.name !== name));
+  };
+
+  const handleBulkCreate = async () => {
+    if (bulkEntries.length === 0) return;
+
+    setIsBulkCreating(true);
+    const progress = {
+      total: bulkEntries.length,
+      completed: 0,
+      failures: [] as Array<{ name: string; error: string }>,
+    };
+    setBulkProgress(progress);
+
+    for (const entry of bulkEntries) {
+      try {
+        await createTagMut.mutateAsync({
+          organizationId,
+          name: entry.name,
+          color: entry.color,
+        });
+        progress.completed++;
+      } catch (err) {
+        progress.completed++;
+        progress.failures.push({
+          name: entry.name,
+          error: err instanceof Error ? err.message : "Failed",
+        });
+      }
+      setBulkProgress({ ...progress });
+    }
+
+    setIsBulkCreating(false);
+    setBulkProgress(null);
+
+    const successCount = progress.total - progress.failures.length;
+    if (progress.failures.length === 0) {
+      showSuccess(
+        `${successCount} tag${successCount !== 1 ? "s" : ""} created`
+      );
+      setBulkText("");
+      setBulkEntries([]);
+      setShowBulkPaste(false);
+    } else if (successCount > 0) {
+      showSuccess(
+        `${successCount} created, ${progress.failures.length} failed`
+      );
+      // Keep the form open with only the failed entries visible
+      setBulkEntries(
+        bulkEntries.filter((e) =>
+          progress.failures.some((f) => f.name === e.name)
+        )
+      );
+    } else {
+      showError("All tags failed to create. Check the errors below.");
+    }
+  };
+
+  const handleCreate = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 50) {
+      showError("Tag name must be 50 characters or less");
+      return;
+    }
+    try {
+      await createTagMut.mutateAsync({
+        organizationId,
+        name: trimmed,
+        color: newColor,
+      });
+      setNewName("");
+      setNewColor(TAG_COLORS[0]);
+      setShowCreate(false);
+      showSuccess(`Tag "${trimmed}" created`);
+    } catch (err) {
+      showError(extractErrorMessage(err, "Failed to create tag"));
+    }
+  };
+
+  const handleUpdate = async (tagId: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    if (trimmed.length > 50) {
+      showError("Tag name must be 50 characters or less");
+      return;
+    }
+    try {
+      await updateTagMut.mutateAsync({
+        tagId,
+        organizationId,
+        name: trimmed,
+        color: editColor,
+      });
+      setEditingId(null);
+      showSuccess(`Tag updated to "${trimmed}"`);
+    } catch (err) {
+      showError(extractErrorMessage(err, "Failed to update tag"));
+    }
+  };
+
+  const handleDelete = async (tagId: string) => {
+    const tagName = tags.find((t) => t._id === tagId)?.name ?? "Tag";
+    try {
+      await deleteTagMut.mutateAsync({ tagId, organizationId });
+      setDeletingId(null);
+      showSuccess(`Tag "${tagName}" deleted`);
+    } catch (err) {
+      showError(extractErrorMessage(err, "Failed to delete tag"));
+    }
+  };
+
+  const startEdit = (tag: TagType) => {
+    setEditingId(tag._id);
+    setEditName(tag.name);
+    setEditColor(tag.color);
+  };
+
+  if (isLoading) {
+    return <TerminalLoading />;
+  }
+
+  if (isFetchError) {
+    return (
+      <TerminalCard className="border-red-500/30">
+        <p className="text-sm text-red-400">
+          Failed to load tags. Please try again.
+        </p>
+        <TerminalButton
+          variant="secondary"
+          onClick={() => refetch()}
+          className="mt-3"
+        >
+          Retry
+        </TerminalButton>
+      </TerminalCard>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {tagError && (
+        <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{tagError}</p>
+          <button
+            onClick={() => setTagError(null)}
+            className="ml-4 shrink-0 text-xs text-red-400/60 hover:text-red-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {tagSuccess && (
+        <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+          <p className="text-sm text-green-400">{tagSuccess}</p>
+          <button
+            onClick={() => setTagSuccess(null)}
+            className="ml-4 shrink-0 text-xs text-green-400/60 hover:text-green-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <TerminalCard>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100">
+              Variable Tags
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Create and manage tags to organize your environment variables.
+              {tags.length > 0 && (
+                <span className="ml-1 text-zinc-600">
+                  ({tags.length} tag{tags.length !== 1 ? "s" : ""})
+                </span>
+              )}
+            </p>
+          </div>
+          {!showCreate && !showBulkPaste && (
+            <div className="flex gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => {
+                  setShowBulkPaste(true);
+                  setShowCreate(false);
+                }}
+              >
+                <ListPlus className="h-4 w-4" />
+                Bulk Add
+              </TerminalButton>
+              <TerminalButton
+                onClick={() => {
+                  setShowCreate(true);
+                  setShowBulkPaste(false);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                New Tag
+              </TerminalButton>
+            </div>
+          )}
+        </div>
+
+        {/* Bulk paste form */}
+        {showBulkPaste && (
+          <div className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Paste tag names
+              </label>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Separate with commas, semicolons, or newlines. Duplicates and
+                existing tags are skipped.
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={(e) => handleBulkTextChange(e.target.value)}
+                placeholder={`Database, AWS, API Keys\nFrontend, Backend, Auth\nCache; Storage; Monitoring`}
+                rows={4}
+                className="mt-2 block w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+                disabled={isBulkCreating}
+                autoFocus
+              />
+              {bulkText.trim() && (
+                <p className="mt-1 text-xs text-zinc-500">
+                  {bulkEntries.length} new tag
+                  {bulkEntries.length !== 1 ? "s" : ""} to create
+                  {bulkEntries.length === 0 &&
+                    bulkText.trim().length > 0 &&
+                    " (all names already exist or are duplicates)"}
+                </p>
+              )}
+            </div>
+
+            {/* Preview with color dots and remove buttons */}
+            {bulkEntries.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-400">
+                  Preview
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {bulkEntries.map((entry) => (
+                    <span
+                      key={entry.name}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 py-0.5 pl-2 pr-1 text-xs text-zinc-200"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      {entry.name}
+                      <button
+                        type="button"
+                        onClick={() => removeBulkEntry(entry.name)}
+                        disabled={isBulkCreating}
+                        className="rounded-full p-0.5 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 disabled:opacity-50"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progress */}
+            {bulkProgress && (
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+                <Loader2 className="h-4 w-4 animate-spin text-green-400" />
+                <span className="text-sm text-zinc-300">
+                  Creating {bulkProgress.completed}/{bulkProgress.total}...
+                </span>
+                {bulkProgress.failures.length > 0 && (
+                  <span className="text-sm text-red-400">
+                    ({bulkProgress.failures.length} failed)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Bulk failure details */}
+            {bulkProgress &&
+              bulkProgress.failures.length > 0 &&
+              !isBulkCreating && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                  <p className="text-xs font-medium text-red-400">
+                    Failed tags:
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {bulkProgress.failures.map((f, i) => (
+                      <li key={i} className="text-xs text-red-400/80">
+                        {f.name}: {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            <div className="flex justify-end gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => {
+                  setShowBulkPaste(false);
+                  setBulkText("");
+                  setBulkEntries([]);
+                  setBulkProgress(null);
+                }}
+                disabled={isBulkCreating}
+              >
+                Cancel
+              </TerminalButton>
+              <TerminalButton
+                onClick={handleBulkCreate}
+                disabled={bulkEntries.length === 0 || isBulkCreating}
+              >
+                {isBulkCreating
+                  ? `Creating ${bulkProgress?.completed ?? 0}/${bulkProgress?.total ?? 0}...`
+                  : `Create ${bulkEntries.length} Tag${bulkEntries.length !== 1 ? "s" : ""}`}
+              </TerminalButton>
+            </div>
+          </div>
+        )}
+
+        {/* Inline create form */}
+        {showCreate && (
+          <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+            <div className="flex items-center gap-3">
+              <TerminalInput
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Tag name"
+                maxLength={50}
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreate();
+                  }
+                  if (e.key === "Escape") setShowCreate(false);
+                }}
+                autoFocus
+              />
+              <div className="flex gap-1">
+                {TAG_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewColor(color)}
+                    className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                      newColor === color
+                        ? "scale-110 border-white"
+                        : "border-transparent hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => {
+                  setShowCreate(false);
+                  setNewName("");
+                }}
+              >
+                Cancel
+              </TerminalButton>
+              <TerminalButton
+                onClick={handleCreate}
+                disabled={!newName.trim() || createTagMut.isPending}
+              >
+                {createTagMut.isPending ? "Creating..." : "Create Tag"}
+              </TerminalButton>
+            </div>
+          </div>
+        )}
+
+        {/* Tags list */}
+        <div className="mt-6">
+          {tags.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              No tags yet. Create your first tag to start organizing variables.
+            </p>
+          ) : (
+            <>
+              <div className="divide-y divide-zinc-800">
+                {pagination.pageItems.map((tag) => (
+                  <div key={tag._id} className="flex items-center gap-3 py-3">
+                    {editingId === tag._id ? (
+                      <>
+                        <div className="flex flex-1 items-center gap-3">
+                          <TerminalInput
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            maxLength={50}
+                            className="flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleUpdate(tag._id);
+                              }
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            autoFocus
+                          />
+                          <div className="flex gap-1">
+                            {TAG_COLORS.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setEditColor(color)}
+                                className={`h-5 w-5 rounded-full border-2 transition-transform ${
+                                  editColor === color
+                                    ? "scale-110 border-white"
+                                    : "border-transparent hover:scale-105"
+                                }`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <TerminalButton
+                            variant="secondary"
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </TerminalButton>
+                          <TerminalButton
+                            onClick={() => handleUpdate(tag._id)}
+                            disabled={
+                              !editName.trim() || updateTagMut.isPending
+                            }
+                          >
+                            {updateTagMut.isPending ? "Saving..." : "Save"}
+                          </TerminalButton>
+                        </div>
+                      </>
+                    ) : deletingId === tag._id ? (
+                      <>
+                        <div className="flex-1">
+                          <p className="text-sm text-red-400">
+                            Delete &ldquo;{tag.name}&rdquo;? This will remove it
+                            from all variables.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <TerminalButton
+                            variant="secondary"
+                            onClick={() => setDeletingId(null)}
+                          >
+                            Cancel
+                          </TerminalButton>
+                          <TerminalButton
+                            variant="danger"
+                            onClick={() => handleDelete(tag._id)}
+                            disabled={deleteTagMut.isPending}
+                          >
+                            {deleteTagMut.isPending ? "Deleting..." : "Delete"}
+                          </TerminalButton>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          className="h-4 w-4 shrink-0 rounded-full"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-zinc-100">
+                            {tag.name}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => startEdit(tag)}
+                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                            title="Edit tag"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(tag._id)}
+                            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                            title="Delete tag"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pagination.totalPages > 1 && (
+                <Pagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  hasNextPage={pagination.hasNextPage}
+                  hasPrevPage={pagination.hasPrevPage}
+                  onNextPage={pagination.nextPage}
+                  onPrevPage={pagination.prevPage}
+                  onGoToPage={pagination.goToPage}
+                  startIndex={pagination.startIndex}
+                  endIndex={pagination.endIndex}
+                  totalItems={pagination.totalItems}
+                />
+              )}
+            </>
+          )}
+        </div>
       </TerminalCard>
     </div>
   );

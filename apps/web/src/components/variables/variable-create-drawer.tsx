@@ -10,6 +10,7 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
+import { useOrganizationTags, useCreateTag } from "@/hooks/queries";
 
 interface VariableCreateDrawerProps {
   isOpen: boolean;
@@ -42,6 +43,16 @@ export function VariableCreateDrawer({
   const varCheck = useTierLimitCheck(orgId, "create_variable", projId);
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
+  const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
+  const { data: tagsData } = useOrganizationTags(organizationId);
+  const createTag = useCreateTag();
+
+  const availableTags = showTags ? (tagsData?.tags ?? []) : [];
+
+  const handleCreateTag = async (name: string, color: string) => {
+    if (!organizationId) return;
+    await createTag.mutateAsync({ organizationId, name, color });
+  };
 
   const bulkBlocked = enforcing && !bulkCheck.isLoading && !bulkCheck.allowed;
   const varBlocked = enforcing && !varCheck.isLoading && !varCheck.allowed;
@@ -144,6 +155,8 @@ export function VariableCreateDrawer({
             onCancel={handleClose}
             submitLabel={submitLabel}
             showRotation={showRotation}
+            availableTags={availableTags}
+            onCreateTag={handleCreateTag}
           />
         )
       ) : bulkBlocked ? (
@@ -159,6 +172,8 @@ export function VariableCreateDrawer({
           onCancel={handleClose}
           submitLabel={bulkSubmitLabel}
           onSubmittingChange={setIsBulkSubmitting}
+          availableTags={availableTags}
+          onCreateTag={showTags ? handleCreateTag : undefined}
         />
       )}
     </DrawerPanel>

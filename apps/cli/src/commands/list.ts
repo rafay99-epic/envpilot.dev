@@ -30,6 +30,7 @@ export const listCommand = new Command("list")
   .option("-o, --organization <id>", "Organization ID (for projects/variables)")
   .option("-p, --project <id>", "Project ID (for variables)")
   .option("-e, --env <environment>", "Environment filter (for variables)")
+  .option("-t, --tag <name>", "Filter by tag name (for variables)")
   .option("--show-values", "Show actual variable values (masked by default)")
   .option("--json", "Output as JSON")
   .action(async (resource, options) => {
@@ -247,6 +248,7 @@ async function listVariables(
   options: {
     project?: string;
     env?: string;
+    tag?: string;
     showValues?: boolean;
     json?: boolean;
   }
@@ -281,13 +283,23 @@ async function listVariables(
     return response.data || [];
   });
 
-  if (variables.length === 0) {
-    info(`No variables found${environment ? ` for ${environment}` : ""}.`);
+  // Filter by tag name if specified
+  const tagFilter = options.tag?.toLowerCase();
+  const filtered = tagFilter
+    ? variables.filter((v) =>
+        v.tags?.some((t) => t.name.toLowerCase() === tagFilter)
+      )
+    : variables;
+
+  if (filtered.length === 0) {
+    info(
+      `No variables found${environment ? ` for ${environment}` : ""}${tagFilter ? ` with tag "${options.tag}"` : ""}.`
+    );
     return;
   }
 
   if (options.json) {
-    const output = variables.map((v) => ({
+    const output = filtered.map((v) => ({
       ...v,
       value: options.showValues ? v.value : maskValue(v.value),
     }));
@@ -295,26 +307,35 @@ async function listVariables(
     return;
   }
 
-  header(`Variables${environment ? ` (${environment})` : ""}`);
+  header(
+    `Variables${environment ? ` (${environment})` : ""}${tagFilter ? ` [tag: ${options.tag}]` : ""}`
+  );
   console.log();
 
+  // Check if any variable has tags to show the column
+  const hasTags = filtered.some((v) => v.tags && v.tags.length > 0);
+
   table(
-    variables.map((variable) => ({
+    filtered.map((variable) => ({
       key: variable.key,
       value: options.showValues ? variable.value : maskValue(variable.value),
       sensitive: variable.isSensitive ? chalk.yellow("●") : "",
+      tags: hasTags
+        ? variable.tags?.map((t) => t.name).join(", ") || chalk.dim("-")
+        : "",
       version: `v${variable.version}`,
     })),
     [
       { key: "key", header: "Key" },
       { key: "value", header: "Value", width: 40 },
       { key: "sensitive", header: "" },
+      ...(hasTags ? [{ key: "tags", header: "Tags", width: 25 }] : []),
       { key: "version", header: "Ver" },
     ]
   );
 
   console.log();
-  console.log(chalk.dim(`Total: ${variables.length} variables`));
+  console.log(chalk.dim(`Total: ${filtered.length} variables`));
 
   const role = getRole();
   if (role) {

@@ -44,6 +44,11 @@ export const queryKeys = {
     history: (id: string) => ["variables", id, "history"] as const,
   },
 
+  tags: {
+    all: ["tags"] as const,
+    list: (orgId: string) => ["tags", "list", orgId] as const,
+  },
+
   variableRequests: {
     all: ["variable-requests"] as const,
     list: (projectId: string) =>

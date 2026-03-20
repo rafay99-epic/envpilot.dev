@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import { Eye, EyeOff, Copy, Check, Loader2, Share2 } from "lucide-react";
+import { TagBadge } from "./tag-badge";
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -12,6 +13,7 @@ interface Variable {
   isSensitive: boolean;
   version: number;
   updatedAt: number;
+  tags?: Array<{ _id: string; name: string; color: string }>;
 }
 
 interface VariableListItemProps {
@@ -146,6 +148,9 @@ export function VariableListItem({
                   >
                     {env}
                   </span>
+                ))}
+                {variable.tags?.map((tag) => (
+                  <TagBadge key={tag._id} name={tag.name} color={tag.color} />
                 ))}
               </div>
               <span className="text-xs text-zinc-400 dark:text-zinc-500">

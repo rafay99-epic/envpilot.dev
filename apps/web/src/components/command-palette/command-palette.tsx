@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Lock, X } from "lucide-react";
+import { Search, Lock, X, Tag } from "lucide-react";
 import { useAuthContext } from "@/components/auth";
 import { useConvexUser, useGlobalSearch } from "@/hooks";
 import { ENVIRONMENTS } from "@/constants/project";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
+import { TagBadge } from "@/components/variables/tag-badge";
 
 export const OPEN_COMMAND_PALETTE_EVENT = "open-command-palette";
 
@@ -26,6 +27,7 @@ const ENV_COLORS: Record<string, string> = {
 export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [envFilter, setEnvFilter] = useState<EnvFilter>("all");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -36,13 +38,51 @@ export function CommandPalette() {
   const { searchTerm, setSearchTerm, results, isLoading } =
     useGlobalSearch(convexUserId);
 
-  // Filter results by environment
-  const filteredResults =
-    envFilter === "all"
-      ? results
-      : results.filter((r) =>
-          r.environments?.some((e) => e.toLowerCase().includes(envFilter))
-        );
+  // Collect unique tags from results for tag filter chips
+  const availableTags = useMemo(() => {
+    const tagMap = new Map<
+      string,
+      { _id: string; name: string; color: string }
+    >();
+    for (const r of results) {
+      if (r.tags) {
+        for (const tag of r.tags) {
+          if (!tagMap.has(tag._id)) tagMap.set(tag._id, tag);
+        }
+      }
+    }
+    return Array.from(tagMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [results]);
+
+  // Prune stale tag IDs from filter — computed inline to avoid setState-in-effect
+  const availableTagIds = useMemo(
+    () => new Set(availableTags.map((t) => t._id)),
+    [availableTags]
+  );
+  const activeTagFilter = useMemo(
+    () => tagFilter.filter((id) => availableTagIds.has(id)),
+    [tagFilter, availableTagIds]
+  );
+
+  // Filter results by environment AND tags
+  const filteredResults = results.filter((r) => {
+    // Environment filter
+    if (
+      envFilter !== "all" &&
+      !r.environments?.some((e) => e.toLowerCase().includes(envFilter))
+    ) {
+      return false;
+    }
+    // Tag filter (OR logic within selected tags)
+    if (activeTagFilter.length > 0) {
+      if (!r.tags || !r.tags.some((t) => activeTagFilter.includes(t._id))) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Clamp selectedIndex to valid range
   const clampedIndex =
@@ -63,6 +103,7 @@ export function CommandPalette() {
   function openPalette() {
     setSearchTerm("");
     setEnvFilter("all");
+    setTagFilter([]);
     setSelectedIndex(0);
     setIsOpen(true);
     setTimeout(() => inputRef.current?.focus(), 50);
@@ -197,7 +238,7 @@ export function CommandPalette() {
               </div>
 
               {/* Environment Filter Chips */}
-              <div className="flex gap-1.5 border-b border-zinc-700/50 px-4 py-2">
+              <div className="flex flex-wrap gap-1.5 border-b border-zinc-700/50 px-4 py-2">
                 {ENV_FILTERS.map((env) => (
                   <button
                     key={env}
@@ -211,6 +252,44 @@ export function CommandPalette() {
                     {env}
                   </button>
                 ))}
+                {/* Tag filter chips */}
+                {availableTags.length > 0 && (
+                  <>
+                    <span className="mx-1 self-center text-zinc-700">|</span>
+                    {availableTags.map((tag) => {
+                      const isSelected = tagFilter.includes(tag._id);
+                      return (
+                        <button
+                          key={tag._id}
+                          onClick={() => {
+                            setTagFilter((prev) =>
+                              isSelected
+                                ? prev.filter((id) => id !== tag._id)
+                                : [...prev, tag._id]
+                            );
+                            setSelectedIndex(0);
+                          }}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                            isSelected
+                              ? "text-white"
+                              : "text-zinc-500 hover:text-zinc-300 border-zinc-700/50 hover:border-zinc-600"
+                          }`}
+                          style={
+                            isSelected
+                              ? {
+                                  backgroundColor: tag.color,
+                                  borderColor: tag.color,
+                                }
+                              : undefined
+                          }
+                        >
+                          <Tag className="h-2.5 w-2.5" />
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
 
               {/* Results */}
@@ -269,23 +348,31 @@ export function CommandPalette() {
                           {result.organizationName}
                         </p>
 
-                        {/* Environment badges */}
-                        {result.environments &&
-                          result.environments.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {result.environments.map((env) => (
-                                <span
-                                  key={env}
-                                  className={`inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium ${
-                                    ENV_COLORS[env] ||
-                                    "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
-                                  }`}
-                                >
-                                  {env}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        {/* Environment + tag badges */}
+                        {((result.environments &&
+                          result.environments.length > 0) ||
+                          (result.tags && result.tags.length > 0)) && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {result.environments?.map((env) => (
+                              <span
+                                key={env}
+                                className={`inline-block rounded-full border px-1.5 py-0 text-[10px] font-medium ${
+                                  ENV_COLORS[env] ||
+                                  "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                                }`}
+                              >
+                                {env}
+                              </span>
+                            ))}
+                            {result.tags?.map((tag) => (
+                              <TagBadge
+                                key={tag._id}
+                                name={tag.name}
+                                color={tag.color}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))

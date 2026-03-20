@@ -44,6 +44,14 @@ export {
 } from "./useVariableRequestsQuery";
 
 export {
+  useOrganizationTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+  type Tag,
+} from "./useTagsQuery";
+
+export {
   useSubscription,
   useCreateCheckout,
   useCreatePortalSession,

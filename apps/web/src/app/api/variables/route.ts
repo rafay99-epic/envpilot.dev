@@ -32,6 +32,7 @@ const createVariableSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
   isSensitive: z.boolean().optional().default(false),
   rotationFrequencyDays: z.number().int().min(0).max(3650).optional(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 /**
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
       projectId,
       isSensitive,
       rotationFrequencyDays,
+      tagIds,
     } = validation.data;
 
     const convexUser = await getOrCreateConvexUser(convex, user);
@@ -206,6 +208,7 @@ export async function POST(request: Request) {
       isSensitive,
       createdBy: convexUser._id,
       rotationFrequencyDays,
+      tagIds: tagIds as Id<"variableTags">[] | undefined,
     });
 
     const variable = await convex.query(api.variables.getById, { variableId });
