@@ -145,14 +145,14 @@ export function TagSelector({
 
       {/* Inline create form */}
       {showCreate && onCreateTag && (
-        <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+        <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
           <input
             type="text"
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder="Tag name"
             maxLength={50}
-            className="flex-1 rounded border border-zinc-200 bg-white px-2 py-1 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
+            className="w-full rounded border border-zinc-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -162,13 +162,13 @@ export function TagSelector({
             }}
             autoFocus
           />
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {TAG_COLORS.map((color) => (
               <button
                 key={color}
                 type="button"
                 onClick={() => setNewTagColor(color)}
-                className={`h-5 w-5 rounded-full border-2 transition-transform ${
+                className={`h-6 w-6 rounded-full border-2 transition-transform ${
                   newTagColor === color
                     ? "scale-110 border-zinc-900 dark:border-white"
                     : "border-transparent hover:scale-105"
@@ -177,21 +177,23 @@ export function TagSelector({
               />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={!newTagName.trim() || isCreating}
-            className="rounded-lg bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {isCreating ? "..." : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCreate(false)}
-            className="rounded-lg px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-          >
-            Cancel
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreate(false)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={!newTagName.trim() || isCreating}
+              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              {isCreating ? "Creating..." : "Add Tag"}
+            </button>
+          </div>
         </div>
       )}
     </div>
