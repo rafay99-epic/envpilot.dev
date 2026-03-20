@@ -4,6 +4,7 @@ import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import type { Id } from "@convex/_generated/dataModel";
 import type { Environment } from "@/constants/project";
+import type { Tag } from "@/hooks/queries";
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -12,6 +13,7 @@ interface Variable {
   environments: string[];
   isSensitive: boolean;
   rotationFrequencyDays?: number;
+  tagIds?: string[];
 }
 
 interface VariableEditModalProps {
@@ -23,6 +25,8 @@ interface VariableEditModalProps {
     data: VariableFormData
   ) => Promise<void>;
   showRotation?: boolean;
+  availableTags?: Tag[];
+  onCreateTag?: (name: string, color: string) => Promise<void>;
 }
 
 export function VariableEditModal({
@@ -31,6 +35,8 @@ export function VariableEditModal({
   variable,
   onSave,
   showRotation = false,
+  availableTags,
+  onCreateTag,
 }: VariableEditModalProps) {
   const initialData: Partial<VariableFormData> | undefined = variable
     ? {
@@ -40,6 +46,7 @@ export function VariableEditModal({
         environments: variable.environments as Environment[],
         isSensitive: variable.isSensitive,
         rotationFrequencyDays: variable.rotationFrequencyDays,
+        tagIds: variable.tagIds,
       }
     : undefined;
 
@@ -59,6 +66,8 @@ export function VariableEditModal({
           submitLabel="Update Variable"
           isEditing
           showRotation={showRotation}
+          availableTags={availableTags}
+          onCreateTag={onCreateTag}
         />
       )}
     </DrawerPanel>

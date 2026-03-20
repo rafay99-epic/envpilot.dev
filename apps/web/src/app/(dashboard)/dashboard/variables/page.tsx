@@ -27,8 +27,11 @@ import {
   VariableEditModal,
   ExportDialog,
   ImportDialog,
+  TagBadge,
+  TagFilter,
   type VariableFormData,
 } from "@/components/variables";
+import { useOrganizationTags, useCreateTag } from "@/hooks/queries";
 import { ConfirmDialog } from "@/components/ui";
 import { motion } from "framer-motion";
 import {
@@ -61,6 +64,7 @@ interface Variable {
   rotationFrequencyDays?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
   expiresAt?: number;
+  tagIds?: string[];
 }
 
 export default function VariablesPage() {
@@ -78,10 +82,20 @@ export default function VariablesPage() {
     activeOrganizationId,
     "secret_rotation"
   );
+  const { allowed: showTags } = useFeatureGate(
+    activeOrganizationId,
+    "variable_tags"
+  );
+  const { data: tagsData } = useOrganizationTags(activeOrganizationId, {
+    enabled: showTags,
+  });
+  const orgTags = tagsData?.tags ?? [];
+  const createTagMutation = useCreateTag();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Modal states
   const [editingVariable, setEditingVariable] = useState<Variable | null>(null);
@@ -119,7 +133,11 @@ export default function VariablesPage() {
       selectedEnvironment === "all" ||
       variable.environments.includes(selectedEnvironment);
 
-    return matchesSearch && matchesProject && matchesEnvironment;
+    const matchesTags =
+      selectedTags.length === 0 ||
+      (variable.tagIds?.some((id) => selectedTags.includes(id)) ?? false);
+
+    return matchesSearch && matchesProject && matchesEnvironment && matchesTags;
   });
 
   const pagination = usePagination(filteredVariables, { pageSize: 15 });
@@ -168,6 +186,7 @@ export default function VariablesPage() {
           environments: data.environments,
           isSensitive: data.isSensitive,
           rotationFrequencyDays: data.rotationFrequencyDays,
+          tagIds: data.tagIds,
           changeReason: "Updated via dashboard",
         }),
       });
@@ -314,6 +333,20 @@ export default function VariablesPage() {
             </option>
           ))}
         </TerminalSelect>
+        {showTags && orgTags.length > 0 && (
+          <TagFilter
+            tags={orgTags}
+            selectedTagIds={selectedTags}
+            onToggleTag={(tagId) =>
+              setSelectedTags((prev) =>
+                prev.includes(tagId)
+                  ? prev.filter((id) => id !== tagId)
+                  : [...prev, tagId]
+              )
+            }
+            onClearAll={() => setSelectedTags([])}
+          />
+        )}
       </div>
 
       {/* Variables List */}
@@ -374,6 +407,18 @@ export default function VariablesPage() {
                         ? () => setDeletingVariable(variable)
                         : undefined
                     }
+                    tags={
+                      showTags && variable.tagIds
+                        ? variable.tagIds
+                            .map((id) => orgTags.find((t) => t._id === id))
+                            .filter(Boolean)
+                            .map((t) => ({
+                              _id: t!._id,
+                              name: t!.name,
+                              color: t!.color,
+                            }))
+                        : undefined
+                    }
                   />
                 ))}
               </tbody>
@@ -401,6 +446,18 @@ export default function VariablesPage() {
         variable={editingVariable}
         onSave={handleUpdateVariable}
         showRotation={showRotation}
+        availableTags={showTags ? orgTags : undefined}
+        onCreateTag={
+          showTags && activeOrganizationId
+            ? async (name: string, color: string) => {
+                await createTagMutation.mutateAsync({
+                  organizationId: activeOrganizationId,
+                  name,
+                  color,
+                });
+              }
+            : undefined
+        }
       />
 
       {/* Delete Confirmation */}
@@ -448,6 +505,7 @@ function VariableRow({
   onReveal,
   onEdit,
   onDelete,
+  tags,
 }: {
   variable: Variable;
   index?: number;
@@ -456,6 +514,7 @@ function VariableRow({
   onReveal: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  tags?: Array<{ _id: string; name: string; color: string }>;
 }) {
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -530,6 +589,9 @@ function VariableRow({
                   {variable.rotationFrequencyDays}d
                 </span>
               )}
+            {tags?.map((tag) => (
+              <TagBadge key={tag._id} name={tag.name} color={tag.color} />
+            ))}
           </div>
         </td>
         <td className="whitespace-nowrap px-5 py-3 text-sm text-zinc-500">

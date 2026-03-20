@@ -11,3 +11,6 @@ export {
   SharedVariablesSection,
   type ShareData,
 } from "./shared-variables-section";
+export { TagBadge } from "./tag-badge";
+export { TagSelector } from "./tag-selector";
+export { TagFilter } from "./tag-filter";

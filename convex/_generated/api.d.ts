@@ -37,6 +37,7 @@ import type * as seedFeatureRequests from "../seedFeatureRequests.js";
 import type * as sharedSecrets from "../sharedSecrets.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as supportTickets from "../supportTickets.js";
+import type * as tags from "../tags.js";
 import type * as templates from "../templates.js";
 import type * as tierLimits from "../tierLimits.js";
 import type * as userPreferences from "../userPreferences.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   sharedSecrets: typeof sharedSecrets;
   subscriptions: typeof subscriptions;
   supportTickets: typeof supportTickets;
+  tags: typeof tags;
   templates: typeof templates;
   tierLimits: typeof tierLimits;
   userPreferences: typeof userPreferences;

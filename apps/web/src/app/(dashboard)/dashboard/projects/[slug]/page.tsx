@@ -25,6 +25,7 @@ import {
   ExportDialog,
   ImportDialog,
   ShareSecretDrawer,
+  TagFilter,
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -40,6 +41,8 @@ import {
   useBulkDeleteVariables,
   useRollbackVariable,
   useCurrentUser,
+  useOrganizationTags,
+  useCreateTag,
 } from "@/hooks/queries";
 import {
   useVariableRequestsList,
@@ -64,6 +67,7 @@ interface Variable {
   rotationFrequencyDays?: number;
   expiresAt?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
+  tagIds?: string[];
 }
 
 interface VersionRecord {
@@ -88,6 +92,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
+  const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
+  const { data: tagsData } = useOrganizationTags(organization?.id);
+  const createTag = useCreateTag();
+  const orgTags = showTags ? (tagsData?.tags ?? []) : [];
 
   // Variable selection store for bulk operations
   const {
@@ -164,6 +172,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -239,6 +248,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         projectId,
         isSensitive: data.isSensitive,
         rotationFrequencyDays: data.rotationFrequencyDays,
+        tagIds: data.tagIds,
       });
 
       if (result.requested) {
@@ -276,6 +286,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         isSensitive: data.isSensitive,
         changeReason: "Updated via dashboard",
         rotationFrequencyDays: data.rotationFrequencyDays,
+        tagIds: data.tagIds,
       });
 
       setNotice("Variable updated successfully.");
@@ -388,10 +399,22 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
-  const filteredVariables =
-    selectedEnvironment === "all"
-      ? variables
-      : variables.filter((v) => v.environments.includes(selectedEnvironment));
+  const filteredVariables = variables.filter((v) => {
+    // Environment filter
+    if (
+      selectedEnvironment !== "all" &&
+      !v.environments.includes(selectedEnvironment)
+    ) {
+      return false;
+    }
+    // Tag filter (OR logic within selected tags)
+    if (selectedTags.length > 0) {
+      if (!v.tagIds || !v.tagIds.some((id) => selectedTags.includes(id))) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const variablePagination = usePagination(filteredVariables, { pageSize: 10 });
   const requestPagination = usePagination(requests, { pageSize: 5 });
@@ -519,7 +542,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Environment:
         </label>
@@ -548,6 +571,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </button>
           ))}
         </div>
+        {showTags && orgTags.length > 0 && (
+          <TagFilter
+            tags={orgTags}
+            selectedTagIds={selectedTags}
+            onToggleTag={(tagId) =>
+              setSelectedTags((prev) =>
+                prev.includes(tagId)
+                  ? prev.filter((id) => id !== tagId)
+                  : [...prev, tagId]
+              )
+            }
+            onClearAll={() => setSelectedTags([])}
+          />
+        )}
       </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -676,7 +713,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 {variablePagination.pageItems.map((variable) => (
                   <VariableListItem
                     key={variable._id}
-                    variable={variable}
+                    variable={{
+                      ...variable,
+                      tags: variable.tagIds
+                        ?.map((id) => orgTags.find((t) => t._id === id))
+                        .filter(Boolean) as
+                        | Array<{ _id: string; name: string; color: string }>
+                        | undefined,
+                    }}
                     onEdit={() => setEditingVariable(variable)}
                     onDelete={() => setDeletingVariable(variable)}
                     onViewHistory={() => handleViewHistory(variable)}
@@ -855,6 +899,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variable={editingVariable}
         onSave={handleUpdateVariable}
         showRotation={showRotation}
+        availableTags={orgTags}
+        onCreateTag={async (name, color) => {
+          if (!organization?.id) return;
+          await createTag.mutateAsync({
+            organizationId: organization.id,
+            name,
+            color,
+          });
+        }}
       />
 
       <ConfirmDialog

@@ -51,6 +51,14 @@ export const projectSchema = z.object({
 export type Project = z.infer<typeof projectSchema>;
 
 // Variable types
+export const variableTagSchema = z.object({
+  _id: z.string(),
+  name: z.string(),
+  color: z.string(),
+});
+
+export type VariableTag = z.infer<typeof variableTagSchema>;
+
 export const variableSchema = z.object({
   _id: z.string(),
   key: z.string(),
@@ -60,6 +68,7 @@ export const variableSchema = z.object({
   description: z.string().optional(),
   isSensitive: z.boolean().optional(),
   version: z.number().optional(),
+  tags: z.array(variableTagSchema).optional(),
 });
 
 export type Variable = z.infer<typeof variableSchema>;

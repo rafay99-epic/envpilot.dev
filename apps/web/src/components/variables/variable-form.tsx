@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 import { RotateCcw } from "lucide-react";
+import type { Tag } from "@/hooks/queries";
+import { TagSelector } from "./tag-selector";
 
 export interface VariableFormData {
   key: string;
@@ -11,6 +13,7 @@ export interface VariableFormData {
   environments: Environment[];
   isSensitive: boolean;
   rotationFrequencyDays?: number;
+  tagIds?: string[];
 }
 
 interface VariableFormProps {
@@ -20,6 +23,8 @@ interface VariableFormProps {
   submitLabel?: string;
   isEditing?: boolean;
   showRotation?: boolean;
+  availableTags?: Tag[];
+  onCreateTag?: (name: string, color: string) => Promise<void>;
 }
 
 const ROTATION_PRESETS = [
@@ -45,6 +50,8 @@ export function VariableForm({
   submitLabel = "Save",
   isEditing = false,
   showRotation = false,
+  availableTags,
+  onCreateTag,
 }: VariableFormProps) {
   const [formData, setFormData] = useState<VariableFormData>(() => ({
     ...defaultFormData,
@@ -276,6 +283,24 @@ export function VariableForm({
           ))}
         </div>
       </div>
+
+      {/* Tags */}
+      {availableTags && availableTags.length > 0 && (
+        <TagSelector
+          availableTags={availableTags}
+          selectedTagIds={formData.tagIds ?? []}
+          onChange={(tagIds) => setFormData((prev) => ({ ...prev, tagIds }))}
+          onCreateTag={onCreateTag}
+        />
+      )}
+      {availableTags && availableTags.length === 0 && onCreateTag && (
+        <TagSelector
+          availableTags={[]}
+          selectedTagIds={[]}
+          onChange={(tagIds) => setFormData((prev) => ({ ...prev, tagIds }))}
+          onCreateTag={onCreateTag}
+        />
+      )}
 
       {/* Sensitive toggle */}
       <div>

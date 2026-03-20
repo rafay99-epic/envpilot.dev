@@ -16,6 +16,7 @@ interface Variable {
   rotationFrequencyDays?: number;
   expiresAt?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
+  tagIds?: string[];
 }
 
 interface VersionRecord {
@@ -77,6 +78,7 @@ export function useCreateVariable() {
       projectId: string;
       isSensitive: boolean;
       rotationFrequencyDays?: number;
+      tagIds?: string[];
     }) =>
       api.post<{
         variable?: Variable;
@@ -112,6 +114,7 @@ export function useUpdateVariable() {
       isSensitive?: boolean;
       changeReason?: string;
       rotationFrequencyDays?: number;
+      tagIds?: string[];
     }) =>
       api.patch<{ variable: Variable }>(`/api/variables/${variableId}`, data),
     onSuccess: (_, variables) => {

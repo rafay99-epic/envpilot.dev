@@ -73,6 +73,12 @@ export interface Project {
   projectRole?: ProjectRole | null;
 }
 
+export interface VariableTag {
+  _id: string;
+  name: string;
+  color: string;
+}
+
 export interface EnvironmentVariable {
   _id: string;
   key: string;
@@ -82,6 +88,7 @@ export interface EnvironmentVariable {
   projectId: string;
   isSensitive: boolean;
   version: number;
+  tags?: VariableTag[];
 }
 
 export interface ProjectAccess {

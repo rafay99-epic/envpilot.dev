@@ -211,11 +211,34 @@ export default defineSchema({
       )
     ),
     lastReminderSentAt: v.optional(v.number()),
+    // Variable tags (organization-scoped tag references)
+    tagIds: v.optional(v.array(v.id("variableTags"))),
   })
     .index("by_project", ["projectId"])
     .index("by_project_and_key", ["projectId", "key"])
     .index("by_project_and_environments", ["projectId", "environments"])
     .index("by_expires_at", ["expiresAt"]),
+
+  // ==========================================
+  // VARIABLE TAGS (organization-scoped)
+  // ==========================================
+  variableTags: defineTable({
+    // Parent organization
+    organizationId: v.id("organizations"),
+    // Tag display name (e.g., "Database", "AWS")
+    name: v.string(),
+    // Tag color (hex, e.g., "#3b82f6")
+    color: v.string(),
+    // User who created the tag
+    createdBy: v.id("users"),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    // Soft delete support
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_organization_and_name", ["organizationId", "name"]),
 
   // ==========================================
   // ENVIRONMENT VARIABLE REQUESTS

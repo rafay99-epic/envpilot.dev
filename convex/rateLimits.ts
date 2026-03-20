@@ -66,6 +66,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 2,
   },
 
+  // Tag create/update/delete: 20 per minute per org
+  tagMutate: {
+    kind: "token bucket",
+    rate: 20,
+    period: 60_000,
+    capacity: 20,
+  },
+
   // ==========================================
   // SEARCH & INVITATIONS (per-org)
   // ==========================================

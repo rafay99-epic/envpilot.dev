@@ -16,4 +16,5 @@ export const ACTION_TO_FEATURE_KEY: Record<string, string> = {
   bulk_delete: "bulk_delete",
   bulk_export: "bulk_export",
   use_custom_branding: "custom_branding",
+  use_variable_tags: "variable_tags",
 };

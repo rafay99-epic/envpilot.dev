@@ -385,6 +385,8 @@ export const globalSearchWithAccess = query({
       description?: string;
       environments?: string[];
       isSensitive?: boolean;
+      tagIds?: string[];
+      tags?: Array<{ _id: string; name: string; color: string }>;
       projectId: string;
       projectName: string;
       projectSlug: string;
@@ -394,6 +396,12 @@ export const globalSearchWithAccess = query({
       organizationName: string;
       organizationSlug: string;
     }> = [];
+
+    // Pre-fetch tag cache for resolving tag names during search
+    const tagCache = new Map<
+      string,
+      { _id: string; name: string; color: string }
+    >();
 
     // Get all org memberships for this user
     const memberships = await ctx.db
@@ -512,12 +520,39 @@ export const globalSearchWithAccess = query({
           .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
 
-        const matches = variables.filter(
-          (v) =>
+        // Resolve tags for variables in this project batch
+        for (const variable of variables) {
+          if (variable.tagIds) {
+            for (const tagId of variable.tagIds) {
+              const tagIdStr = tagId as string;
+              if (!tagCache.has(tagIdStr)) {
+                const tag = await ctx.db.get(tagId);
+                if (tag && !tag.deletedAt) {
+                  tagCache.set(tagIdStr, {
+                    _id: tagIdStr,
+                    name: tag.name,
+                    color: tag.color,
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        const matches = variables.filter((v) => {
+          const tagNames =
+            v.tagIds
+              ?.map((id) => tagCache.get(id as string)?.name ?? "")
+              .filter(Boolean) ?? [];
+          return (
             v.key.toLowerCase().includes(searchLower) ||
             v.description?.toLowerCase().includes(searchLower) ||
-            v.environments?.some((e) => e.toLowerCase().includes(searchLower))
-        );
+            v.environments?.some((e) =>
+              e.toLowerCase().includes(searchLower)
+            ) ||
+            tagNames.some((name) => name.toLowerCase().includes(searchLower))
+          );
+        });
 
         for (const variable of matches) {
           // RBAC: admins and team leads always have access
@@ -542,12 +577,27 @@ export const globalSearchWithAccess = query({
           }
 
           if (hasAccess) {
+            // Resolve tags for this variable
+            const resolvedTags: Array<{
+              _id: string;
+              name: string;
+              color: string;
+            }> = [];
+            if (variable.tagIds) {
+              for (const tagId of variable.tagIds) {
+                const cached = tagCache.get(tagId as string);
+                if (cached) resolvedTags.push(cached);
+              }
+            }
+
             results.push({
               _id: variable._id as string,
               key: variable.key,
               description: variable.description,
               environments: variable.environments,
               isSensitive: variable.isSensitive,
+              tagIds: variable.tagIds as string[] | undefined,
+              tags: resolvedTags.length > 0 ? resolvedTags : undefined,
               projectId: project._id as string,
               projectName: project.name,
               projectSlug: project.slug,
@@ -584,6 +634,7 @@ export const create = mutation({
     isSensitive: v.optional(v.boolean()),
     createdBy: v.id("users"),
     rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -658,6 +709,19 @@ export const create = mutation({
       }
     }
 
+    // Validate tagIds belong to the same organization
+    if (args.tagIds && args.tagIds.length > 0) {
+      for (const tagId of args.tagIds) {
+        const tag = await ctx.db.get(tagId);
+        if (!tag || tag.deletedAt) {
+          throw new Error(`Tag not found: ${tagId}`);
+        }
+        if (tag.organizationId !== project.organizationId) {
+          throw new Error("Tag does not belong to this organization");
+        }
+      }
+    }
+
     const existingVariable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
@@ -700,6 +764,7 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
       ...rotationFields,
+      ...(args.tagIds && args.tagIds.length > 0 ? { tagIds: args.tagIds } : {}),
     });
 
     await ctx.db.insert("variableVersions", {
@@ -743,6 +808,7 @@ export const update = mutation({
     updatedBy: v.id("users"),
     changeReason: v.optional(v.string()),
     rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -751,6 +817,7 @@ export const update = mutation({
       updatedBy,
       changeReason,
       rotationFrequencyDays,
+      tagIds,
       ...updates
     } = args;
 
@@ -816,6 +883,19 @@ export const update = mutation({
       }
     }
 
+    // Validate tagIds if provided
+    if (tagIds !== undefined) {
+      for (const tId of tagIds) {
+        const tag = await ctx.db.get(tId);
+        if (!tag || tag.deletedAt) {
+          throw new Error(`Tag not found: ${tId}`);
+        }
+        if (tag.organizationId !== project.organizationId) {
+          throw new Error("Tag does not belong to this organization");
+        }
+      }
+    }
+
     const newVersion = variable.version + 1;
     const isValueRotated = updates.vaultRef !== undefined;
 
@@ -832,6 +912,8 @@ export const update = mutation({
       updateData.environments = updates.environments;
     if (updates.isSensitive !== undefined)
       updateData.isSensitive = updates.isSensitive;
+    if (tagIds !== undefined)
+      updateData.tagIds = tagIds.length > 0 ? tagIds : undefined;
 
     // Handle rotation frequency changes
     if (rotationFrequencyDays !== undefined) {
