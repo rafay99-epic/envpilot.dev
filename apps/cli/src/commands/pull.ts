@@ -24,6 +24,12 @@ import {
   diffEnvVars,
   applyFileProtection,
 } from "../lib/env-file.js";
+import {
+  serialize,
+  getDefaultFilename,
+  ALL_FORMATS,
+  type FormatType,
+} from "../lib/format-converter.js";
 import { getRole } from "../lib/config.js";
 import {
   notAuthenticated,
@@ -40,7 +46,15 @@ export const pullCommand = new Command("pull")
   )
   .option("-f, --file <path>", "Output file path (default: .env)")
   .option("--force", "Overwrite without confirmation")
-  .option("--format <format>", "Output format: env, json", "env")
+  .option(
+    "--format <format>",
+    "Output format: env, json, yaml, docker-compose, aws, vercel, netlify",
+    "env"
+  )
+  .option(
+    "--prefix <prefix>",
+    "AWS Parameter Store path prefix (default: /project-name)"
+  )
   .option("--dry-run", "Show what would be downloaded without writing")
   .option("--project <name-or-id>", "Pull a specific linked project")
   .option("--all", "Pull all linked projects")
@@ -89,7 +103,16 @@ export const pullCommand = new Command("pull")
 
       const environment =
         options.env || projectConfig.environment || "development";
-      const outputPath = options.file || getEnvPathForEnvironment(environment);
+      const fmt = (options.format || "env") as FormatType;
+      if (!ALL_FORMATS.includes(fmt)) {
+        error(`Unknown format: ${fmt}. Supported: ${ALL_FORMATS.join(", ")}`);
+        process.exit(1);
+      }
+      const outputPath =
+        options.file ||
+        (fmt === "env"
+          ? getEnvPathForEnvironment(environment)
+          : getDefaultFilename(fmt, environment));
 
       await pullProject(
         {
@@ -165,13 +188,19 @@ async function pullSingleProject(
     file?: string;
     force?: boolean;
     format?: string;
+    prefix?: string;
     dryRun?: boolean;
   }
 ): Promise<void> {
   checkTrackedFiles();
 
   const environment = options.env || project.environment;
-  const outputPath = options.file || getEnvPathForEnvironment(environment);
+  const fmt = (options.format || "env") as FormatType;
+  const outputPath =
+    options.file ||
+    (fmt === "env"
+      ? getEnvPathForEnvironment(environment)
+      : getDefaultFilename(fmt, environment));
 
   await pullProject(
     {
@@ -194,6 +223,7 @@ async function pullProject(
   options: {
     force?: boolean;
     format?: string;
+    prefix?: string;
     dryRun?: boolean;
   }
 ): Promise<void> {
@@ -285,10 +315,8 @@ async function pullProject(
     // Ignore — file may not exist yet
   }
 
-  if (options.format === "json") {
-    const fs = await import("node:fs");
-    fs.writeFileSync(outputPath, JSON.stringify(remoteVars, null, 2) + "\n");
-  } else {
+  const fmt = (options.format || "env") as FormatType;
+  if (fmt === "env") {
     const comments: Record<string, string> = {};
     for (const variable of variables) {
       if (variable.description) {
@@ -296,6 +324,14 @@ async function pullProject(
       }
     }
     writeEnvFile(outputPath, remoteVars, { sort: true, comments });
+  } else {
+    const fs = await import("node:fs");
+    const output = serialize(remoteVars, fmt, {
+      projectName: project.projectId,
+      environment: project.environment,
+      prefix: options.prefix,
+    });
+    fs.writeFileSync(outputPath, output, "utf-8");
   }
 
   // Apply role-based file protection (matches extension behavior)

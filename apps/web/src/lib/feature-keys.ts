@@ -14,5 +14,6 @@ export const ACTION_TO_FEATURE_KEY: Record<string, string> = {
   bulk_import: "bulk_import",
   use_cli: "cli_access",
   bulk_delete: "bulk_delete",
+  bulk_export: "bulk_export",
   use_custom_branding: "custom_branding",
 };

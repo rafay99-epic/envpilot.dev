@@ -706,6 +706,15 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "bulk_export",
+    displayName: "Bulk Export",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
 
   // Tools
   {
@@ -908,6 +917,7 @@ export const seedDefaultTierFeatures = internalMutation({
         variable_version_history: "false",
         bulk_import: "false",
         bulk_delete: "true",
+        bulk_export: "false",
         api_access: "true",
         extension_access: "false",
         cli_access: "false",
@@ -930,6 +940,7 @@ export const seedDefaultTierFeatures = internalMutation({
         variable_version_history: "true",
         bulk_import: "true",
         bulk_delete: "true",
+        bulk_export: "true",
         api_access: "true",
         extension_access: "true",
         cli_access: "true",

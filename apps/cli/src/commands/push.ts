@@ -22,6 +22,12 @@ import {
   getEnvPathForEnvironment,
   diffEnvVars,
 } from "../lib/env-file.js";
+import {
+  parse,
+  getDefaultFilename,
+  ALL_FORMATS,
+  type FormatType,
+} from "../lib/format-converter.js";
 import { validateEnvVars } from "../lib/validators.js";
 import {
   notAuthenticated,
@@ -40,6 +46,15 @@ export const pushCommand = new Command("push")
   .option("-f, --file <path>", "Input file path (default: .env)")
   .option("--merge", "Merge with existing variables (default)")
   .option("--replace", "Replace all existing variables")
+  .option(
+    "--format <format>",
+    "Input format: env, json, yaml, docker-compose, aws, vercel, netlify",
+    "env"
+  )
+  .option(
+    "--prefix <prefix>",
+    "AWS Parameter Store path prefix (default: /project-name)"
+  )
   .option("--dry-run", "Show what would be uploaded without making changes")
   .option("--force", "Skip confirmation")
   .option("--project <name-or-id>", "Push to a specific linked project")
@@ -146,11 +161,31 @@ export const pushCommand = new Command("push")
       }
 
       const environment = options.env || defaultEnvironment || "development";
-      const inputPath = options.file || getEnvPathForEnvironment(environment);
+      const fmt = (options.format || "env") as FormatType;
+      if (!ALL_FORMATS.includes(fmt)) {
+        error(`Unknown format: ${fmt}. Supported: ${ALL_FORMATS.join(", ")}`);
+        process.exit(1);
+      }
+      const inputPath =
+        options.file ||
+        (fmt === "env"
+          ? getEnvPathForEnvironment(environment)
+          : getDefaultFilename(fmt, environment));
       const mode = options.replace ? "replace" : "merge";
 
       // Read local file
-      const localVars = readEnvFile(inputPath);
+      let localVars: Record<string, string> | null;
+      if (fmt === "env") {
+        localVars = readEnvFile(inputPath);
+      } else {
+        const { readFileSync, existsSync } = await import("node:fs");
+        if (!existsSync(inputPath)) {
+          localVars = null;
+        } else {
+          const content = readFileSync(inputPath, "utf-8");
+          localVars = parse(content, fmt, { prefix: options.prefix });
+        }
+      }
       if (!localVars) {
         throw fileNotFound(inputPath);
       }
