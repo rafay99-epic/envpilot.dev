@@ -570,7 +570,15 @@ export default defineSchema({
       v.literal("audit.viewed"),
       // System-level admin actions
       v.literal("system.enforcement_toggled"),
-      v.literal("system.setting_changed")
+      v.literal("system.setting_changed"),
+      // Secret sharing actions
+      v.literal("share.created"),
+      v.literal("share.viewed"),
+      v.literal("share.burned"),
+      v.literal("share.expired"),
+      v.literal("share.revoked"),
+      v.literal("share.otp_sent"),
+      v.literal("share.otp_failed")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -1020,6 +1028,81 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_is_read", ["isRead"])
     .index("by_created_at", ["createdAt"]),
+
+  // ==========================================
+  // SHARED SECRETS (Time-Limited Secure Sharing)
+  // ==========================================
+  sharedSecrets: defineTable({
+    // Unique lookup token (shr_ prefix + 64 hex chars)
+    token: v.string(),
+    // WorkOS Vault reference holding the client-encrypted ciphertext
+    vaultRef: v.string(),
+    // Source variable (for audit trail only — NOT used to re-fetch the value)
+    variableId: v.id("environmentVariables"),
+    // Variable key name (for display in emails/audit — NOT the value)
+    variableKey: v.string(),
+    // Organization context (for audit logging and feature gating)
+    organizationId: v.id("organizations"),
+    // Project context (for audit logging)
+    projectId: v.id("projects"),
+    // User who created the share
+    createdBy: v.id("users"),
+    // Share mode
+    mode: v.union(v.literal("one_time"), v.literal("time_limited")),
+    // When the share expires (absolute timestamp)
+    expiresAt: v.number(),
+    // Whether passphrase protection is enabled (passphrase NOT stored server-side)
+    hasPassphrase: v.boolean(),
+    // Authorized recipient emails
+    recipientEmails: v.array(v.string()),
+    // Share lifecycle status
+    status: v.union(
+      v.literal("active"),
+      v.literal("burned"), // one-time: viewed
+      v.literal("expired"), // TTL elapsed
+      v.literal("revoked") // manually revoked by creator
+    ),
+    // Total views across all recipients
+    totalViewCount: v.number(),
+    // Lifecycle timestamps
+    createdAt: v.number(),
+    burnedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+  })
+    .index("by_token", ["token"])
+    .index("by_variable", ["variableId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_created_by", ["createdBy"])
+    .index("by_status_and_expires", ["status", "expiresAt"])
+    .index("by_project", ["projectId"]),
+
+  // ==========================================
+  // SHARE RECIPIENTS (Per-recipient tracking + OTP state)
+  // ==========================================
+  shareRecipients: defineTable({
+    // Reference to the parent shared secret
+    shareId: v.id("sharedSecrets"),
+    // Recipient email (lowercase, trimmed)
+    email: v.string(),
+    // OTP state
+    otpCode: v.optional(v.string()), // SHA-256 hashed 6-digit code
+    otpExpiresAt: v.optional(v.number()), // 5-minute TTL
+    otpAttempts: v.number(), // max 5 attempts before lockout
+    otpVerified: v.boolean(), // true once OTP confirmed
+    // View state
+    hasViewed: v.boolean(),
+    viewedAt: v.optional(v.number()),
+    viewerIpAddress: v.optional(v.string()),
+    viewerUserAgent: v.optional(v.string()),
+    // Email delivery
+    emailSentAt: v.optional(v.number()),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_share", ["shareId"])
+    .index("by_share_and_email", ["shareId", "email"])
+    .index("by_email", ["email"]),
 
   // ==========================================
   // ADMIN SETTINGS (Platform-wide configuration)

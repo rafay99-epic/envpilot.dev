@@ -24,6 +24,7 @@ import {
   VariableListItem,
   ExportDialog,
   ImportDialog,
+  ShareSecretDrawer,
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -86,6 +87,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
+  const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
 
   // Variable selection store for bulk operations
   const {
@@ -171,6 +173,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
   );
+
+  // Share drawer state
+  const [sharingVariable, setSharingVariable] = useState<Variable | null>(null);
 
   // History modal state
   const [historyVariableId, setHistoryVariableId] = useState<string | null>(
@@ -681,6 +686,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     canEdit={canUpdateVariable}
                     canDelete={canDeleteVariable}
                     permissionLevel={variable.permission ?? null}
+                    onShare={canShare ? () => setSharingVariable(variable) : undefined}
                     showCheckbox={canDeleteVariable}
                     isSelected={selectedIds.has(variable._id)}
                     onToggleSelect={() => toggleSelect(variable._id)}
@@ -956,6 +962,26 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             }
           />
         </FeatureGate>
+      )}
+
+      {/* Share Secret Drawer */}
+      {sharingVariable && projectId && orgId && (
+        <ShareSecretDrawer
+          isOpen={!!sharingVariable}
+          onClose={() => setSharingVariable(null)}
+          variable={sharingVariable}
+          organizationId={orgId}
+          projectId={projectId}
+          onRevealValue={async () => {
+            if (!sharingVariable.vaultRef || !organization?.id) return null;
+            const res = await fetch(
+              `/api/vault?vaultRef=${encodeURIComponent(sharingVariable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
+            );
+            const data = await res.json();
+            if (!res.ok) return null;
+            return data.data.value;
+          }}
+        />
       )}
     </div>
   );

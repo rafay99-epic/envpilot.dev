@@ -104,4 +104,31 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: 60_000,
     capacity: 10,
   },
+
+  // ==========================================
+  // SECRET SHARING
+  // ==========================================
+
+  // Share creation: 10 per hour per org
+  shareCreate: {
+    kind: "fixed window",
+    rate: 10,
+    period: 3_600_000,
+  },
+
+  // Email verification: 3 per minute per token (prevent email spam)
+  shareVerifyEmail: {
+    kind: "token bucket",
+    rate: 3,
+    period: 60_000,
+    capacity: 3,
+  },
+
+  // OTP verification: 5 per minute per token (brute-force prevention)
+  shareVerifyOtp: {
+    kind: "token bucket",
+    rate: 5,
+    period: 60_000,
+    capacity: 5,
+  },
 });

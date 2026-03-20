@@ -55,6 +55,14 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "variable.request_approved": "info",
   "variable.request_rejected": "warning",
   "variable.request_canceled": "info",
+  // Secret sharing actions
+  "share.created": "info",
+  "share.viewed": "warning",
+  "share.burned": "info",
+  "share.expired": "info",
+  "share.revoked": "info",
+  "share.otp_sent": "info",
+  "share.otp_failed": "warning",
 };
 
 // Resource type mapping for different action types
@@ -128,6 +136,14 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "security.token_validation_failed": "security",
   "security.rate_limit_exceeded": "security",
   "security.suspicious_activity": "security",
+  // Secret sharing
+  "share.created": "security",
+  "share.viewed": "security",
+  "share.burned": "security",
+  "share.expired": "security",
+  "share.revoked": "security",
+  "share.otp_sent": "security",
+  "share.otp_failed": "security",
 };
 
 export interface AuditLogInput {

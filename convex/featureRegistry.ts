@@ -791,6 +791,24 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 4,
   },
+  {
+    key: "secret_sharing",
+    displayName: "Secret Sharing Links",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 5,
+  },
+  {
+    key: "max_active_shares",
+    displayName: "Max Active Shares",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 6,
+  },
 
   // Customization
   {
@@ -926,6 +944,8 @@ export const seedDefaultTierFeatures = internalMutation({
         sso_enabled: "false",
         secret_rotation: "false",
         secret_rotation_limit: "7",
+        secret_sharing: "false",
+        max_active_shares: "0",
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
@@ -949,6 +969,8 @@ export const seedDefaultTierFeatures = internalMutation({
         sso_enabled: "false",
         secret_rotation: "true",
         secret_rotation_limit: "null",
+        secret_sharing: "true",
+        max_active_shares: "null",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",

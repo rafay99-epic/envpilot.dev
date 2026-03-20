@@ -22,6 +22,7 @@ import {
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
+import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -47,6 +48,10 @@ export default function DashboardPage() {
   const { allowed: showRotation } = useFeatureGate(
     activeOrganizationId,
     "secret_rotation"
+  );
+  const { allowed: showSharing } = useFeatureGate(
+    activeOrganizationId,
+    "secret_sharing"
   );
   const { hasPermission } = useAuthContext();
 
@@ -262,6 +267,11 @@ export default function DashboardPage() {
                 </AnimatedList>
               )}
             </TerminalWindow>
+          )}
+
+          {/* Shared Secrets — admin/team_lead only */}
+          {showSharing && activeOrganizationId && (
+            <SharedSecretsWidget organizationId={activeOrganizationId} />
           )}
         </div>
 
