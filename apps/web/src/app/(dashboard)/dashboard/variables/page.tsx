@@ -248,16 +248,16 @@ export default function VariablesPage() {
         </div>
         <div className="flex items-center gap-2">
           {selectedProject !== "all" && (
-              <TerminalButton onClick={() => setShowExportDialog(true)}>
-                <Download className="h-4 w-4" />
-                Export
-              </TerminalButton>
+            <TerminalButton onClick={() => setShowExportDialog(true)}>
+              <Download className="h-4 w-4" />
+              Export
+            </TerminalButton>
           )}
           {selectedProject !== "all" && canCreateVariable && (
-              <TerminalButton onClick={() => setShowImportDialog(true)}>
-                <Upload className="h-4 w-4" />
-                Import
-              </TerminalButton>
+            <TerminalButton onClick={() => setShowImportDialog(true)}>
+              <Upload className="h-4 w-4" />
+              Import
+            </TerminalButton>
           )}
           {canCreateVariable && (
             <TerminalButton>
@@ -421,8 +421,7 @@ export default function VariablesPage() {
           onClose={() => setShowExportDialog(false)}
           projectId={selectedProject as Id<"projects">}
           projectName={
-            projects.find((p) => p._id === selectedProject)?.name ||
-            "project"
+            projects.find((p) => p._id === selectedProject)?.name || "project"
           }
           organizationId={activeOrganizationId}
         />
