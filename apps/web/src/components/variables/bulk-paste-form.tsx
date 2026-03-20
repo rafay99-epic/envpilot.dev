@@ -53,6 +53,15 @@ export function BulkPasteForm({
     textareaRef.current?.focus();
   }, []);
 
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
   function handleTextChange(value: string) {
     setRawText(value);
     setSubmitError(null);

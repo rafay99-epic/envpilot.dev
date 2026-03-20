@@ -39,16 +39,20 @@ export function TagFilter({
         </button>
         {tags.map((tag) => {
           const isSelected = selectedTagIds.includes(tag._id);
+          const safeColor = /^#[0-9a-fA-F]{6}$/.test(tag.color)
+            ? tag.color
+            : "#6b7280";
           return (
             <button
               key={tag._id}
               onClick={() => onToggleTag(tag._id)}
+              aria-pressed={isSelected}
               className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 isSelected
                   ? "text-white"
                   : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               }`}
-              style={isSelected ? { backgroundColor: tag.color } : undefined}
+              style={isSelected ? { backgroundColor: safeColor } : undefined}
             >
               <Tag className="h-3 w-3" />
               {tag.name}

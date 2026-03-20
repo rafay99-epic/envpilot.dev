@@ -11,10 +11,11 @@ interface TagBadgeProps {
 
 export function TagBadge({
   name,
-  color,
+  color: rawColor,
   size = "sm",
   onRemove,
 }: TagBadgeProps) {
+  const color = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor : "#6b7280";
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border font-medium ${

@@ -13,8 +13,13 @@ import { rateLimiter } from "./rateLimits";
  */
 
 // ==========================================
-// DEFAULT SYSTEM TAGS
+// CONSTANTS & HELPERS
 // ==========================================
+
+const MAX_TAGS_PER_ORG = 100;
+const MAX_TAG_NAME_LENGTH = 50;
+const CASCADE_BATCH_SIZE = 100;
+const MAX_CASCADE_UPDATES = 500;
 
 const SYSTEM_TAGS: Array<{ name: string; color: string }> = [
   { name: "Database", color: "#3b82f6" },
@@ -32,12 +37,48 @@ const SYSTEM_TAGS: Array<{ name: string; color: string }> = [
 /** Available tag colors for the UI color picker */
 export const TAG_COLORS = SYSTEM_TAGS.map((t) => t.color);
 
+/** Validate a hex color string (e.g., "#3b82f6") */
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
+/** Verify that the caller is an org member and return their role */
+async function requireOrgMembership(
+  ctx: { db: any },
+  userId: Id<"users">,
+  organizationId: Id<"organizations">,
+  requiredRoles?: string[]
+): Promise<{ role: string }> {
+  const user = await ctx.db.get(userId);
+  if (!user) {
+    throw new Error("Not authorized");
+  }
+
+  const membership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q: any) =>
+      q.eq("organizationId", organizationId).eq("userId", userId)
+    )
+    .first();
+
+  if (!membership) {
+    throw new Error("Not authorized");
+  }
+
+  if (requiredRoles && !requiredRoles.includes(membership.role)) {
+    throw new Error("Insufficient permissions");
+  }
+
+  return { role: membership.role };
+}
+
 // ==========================================
 // QUERIES
 // ==========================================
 
 /**
  * List all non-deleted tags for an organization, sorted by name.
+ * Bounded by MAX_TAGS_PER_ORG (100) enforced on creation.
  */
 export const listByOrganization = query({
   args: {
@@ -88,6 +129,9 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // Auth: verify caller is a member of the org
+    await requireOrgMembership(ctx, args.createdBy, args.organizationId);
+
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
       key: args.organizationId,
@@ -106,16 +150,25 @@ export const create = mutation({
       );
     }
 
-    // Validate name is not empty
+    // Validate color is a valid hex color
+    if (!isValidHexColor(args.color)) {
+      throw new Error(
+        "Invalid color format. Must be a hex color (e.g., #3b82f6)."
+      );
+    }
+
+    // Validate and sanitize name
     const trimmedName = args.name.trim();
     if (!trimmedName) {
       throw new Error("Tag name cannot be empty");
     }
-    if (trimmedName.length > 50) {
-      throw new Error("Tag name must be 50 characters or less");
+    if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
+      throw new Error(
+        `Tag name must be ${MAX_TAG_NAME_LENGTH} characters or less`
+      );
     }
 
-    // Check uniqueness within org (case-insensitive)
+    // Check uniqueness within org (case-insensitive) + enforce max tags limit
     const existing = await ctx.db
       .query("variableTags")
       .withIndex("by_organization", (q) =>
@@ -123,6 +176,12 @@ export const create = mutation({
       )
       .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+
+    if (existing.length >= MAX_TAGS_PER_ORG) {
+      throw new Error(
+        `Maximum of ${MAX_TAGS_PER_ORG} tags per organization reached`
+      );
+    }
 
     const duplicate = existing.find(
       (t) => t.name.toLowerCase() === trimmedName.toLowerCase()
@@ -156,7 +215,7 @@ export const create = mutation({
 
 /**
  * Update an existing tag (rename or recolor).
- * Admin/team_lead only (enforced at API layer).
+ * Requires org membership (admin or team_lead).
  */
 export const update = mutation({
   args: {
@@ -170,6 +229,12 @@ export const update = mutation({
     if (!tag || tag.deletedAt) {
       throw new Error("Tag not found");
     }
+
+    // Auth: verify caller is admin or team_lead in the org
+    await requireOrgMembership(ctx, args.updatedBy, tag.organizationId, [
+      "admin",
+      "team_lead",
+    ]);
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -186,8 +251,10 @@ export const update = mutation({
       if (!trimmedName) {
         throw new Error("Tag name cannot be empty");
       }
-      if (trimmedName.length > 50) {
-        throw new Error("Tag name must be 50 characters or less");
+      if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
+        throw new Error(
+          `Tag name must be ${MAX_TAG_NAME_LENGTH} characters or less`
+        );
       }
 
       // Check uniqueness (exclude self)
@@ -214,6 +281,11 @@ export const update = mutation({
     }
 
     if (args.color !== undefined) {
+      if (!isValidHexColor(args.color)) {
+        throw new Error(
+          "Invalid color format. Must be a hex color (e.g., #3b82f6)."
+        );
+      }
       updateData.color = args.color;
     }
 
@@ -237,6 +309,7 @@ export const update = mutation({
 
 /**
  * Soft-delete a tag and strip it from all variables that reference it.
+ * Cascade updates are batched to avoid unbounded loops.
  */
 export const remove = mutation({
   args: {
@@ -248,6 +321,12 @@ export const remove = mutation({
     if (!tag || tag.deletedAt) {
       throw new Error("Tag not found");
     }
+
+    // Auth: verify caller is admin or team_lead in the org
+    await requireOrgMembership(ctx, args.deletedBy, tag.organizationId, [
+      "admin",
+      "team_lead",
+    ]);
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -262,6 +341,7 @@ export const remove = mutation({
     });
 
     // Cascade: strip this tag ID from all variables that reference it
+    // Process in batches to avoid unbounded loops
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -271,14 +351,21 @@ export const remove = mutation({
       .collect();
 
     let strippedCount = 0;
+    let totalProcessed = 0;
+
     for (const project of projects) {
+      if (totalProcessed >= MAX_CASCADE_UPDATES) break;
+
       const variables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
         .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+        .take(CASCADE_BATCH_SIZE);
 
       for (const variable of variables) {
+        if (totalProcessed >= MAX_CASCADE_UPDATES) break;
+        totalProcessed++;
+
         if (variable.tagIds && variable.tagIds.includes(args.tagId)) {
           const newTagIds = variable.tagIds.filter(
             (id: Id<"variableTags">) => id !== args.tagId
@@ -309,6 +396,7 @@ export const remove = mutation({
 /**
  * Seed system tags for an organization (called lazily or via migration).
  * Idempotent — skips tags that already exist by name.
+ * Restricted to org admins only.
  */
 export const seedSystemTags = mutation({
   args: {
@@ -317,6 +405,17 @@ export const seedSystemTags = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // Auth: only admins can seed system tags
+    await requireOrgMembership(ctx, args.createdBy, args.organizationId, [
+      "admin",
+    ]);
+
+    // Rate limit
+    await rateLimiter.limit(ctx, "tagMutate", {
+      key: args.organizationId,
+      throws: true,
+    });
 
     const existing = await ctx.db
       .query("variableTags")
@@ -329,7 +428,11 @@ export const seedSystemTags = mutation({
     const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
     let created = 0;
 
+    // Respect max tags per org limit when seeding
+    const availableSlots = MAX_TAGS_PER_ORG - existing.length;
+
     for (const tag of SYSTEM_TAGS) {
+      if (created >= availableSlots) break;
       if (existingNames.has(tag.name.toLowerCase())) continue;
 
       await ctx.db.insert("variableTags", {

@@ -709,9 +709,18 @@ export const create = mutation({
       }
     }
 
-    // Validate tagIds belong to the same organization
-    if (args.tagIds && args.tagIds.length > 0) {
-      for (const tagId of args.tagIds) {
+    // Validate and deduplicate tagIds
+    const validatedTagIds =
+      args.tagIds && args.tagIds.length > 0
+        ? [...new Set(args.tagIds)]
+        : undefined;
+
+    if (validatedTagIds && validatedTagIds.length > 0) {
+      if (validatedTagIds.length > 10) {
+        throw new Error("A variable can have at most 10 tags");
+      }
+
+      for (const tagId of validatedTagIds) {
         const tag = await ctx.db.get(tagId);
         if (!tag || tag.deletedAt) {
           throw new Error(`Tag not found: ${tagId}`);
@@ -764,7 +773,9 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
       ...rotationFields,
-      ...(args.tagIds && args.tagIds.length > 0 ? { tagIds: args.tagIds } : {}),
+      ...(validatedTagIds && validatedTagIds.length > 0
+        ? { tagIds: validatedTagIds }
+        : {}),
     });
 
     await ctx.db.insert("variableVersions", {
@@ -817,7 +828,7 @@ export const update = mutation({
       updatedBy,
       changeReason,
       rotationFrequencyDays,
-      tagIds,
+      tagIds: rawTagIds,
       ...updates
     } = args;
 
@@ -883,8 +894,15 @@ export const update = mutation({
       }
     }
 
-    // Validate tagIds if provided
+    // Validate and deduplicate tagIds if provided
+    const tagIds =
+      rawTagIds !== undefined ? [...new Set(rawTagIds)] : undefined;
+
     if (tagIds !== undefined) {
+      if (tagIds.length > 10) {
+        throw new Error("A variable can have at most 10 tags");
+      }
+
       for (const tId of tagIds) {
         const tag = await ctx.db.get(tId);
         if (!tag || tag.deletedAt) {

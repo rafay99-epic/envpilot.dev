@@ -93,7 +93,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
   const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
-  const { data: tagsData } = useOrganizationTags(organization?.id);
+  const { data: tagsData } = useOrganizationTags(organization?.id, {
+    enabled: showTags,
+  });
   const createTag = useCreateTag();
   const orgTags = showTags ? (tagsData?.tags ?? []) : [];
 
@@ -900,14 +902,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onSave={handleUpdateVariable}
         showRotation={showRotation}
         availableTags={orgTags}
-        onCreateTag={async (name, color) => {
-          if (!organization?.id) return;
-          await createTag.mutateAsync({
-            organizationId: organization.id,
-            name,
-            color,
-          });
-        }}
+        onCreateTag={
+          showTags
+            ? async (name, color) => {
+                if (!organization?.id) return;
+                await createTag.mutateAsync({
+                  organizationId: organization.id,
+                  name,
+                  color,
+                });
+              }
+            : undefined
+        }
       />
 
       <ConfirmDialog

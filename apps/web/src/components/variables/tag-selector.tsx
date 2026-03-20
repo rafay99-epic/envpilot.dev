@@ -94,6 +94,9 @@ export function TagSelector({
       <div className="flex flex-wrap gap-1.5">
         {availableTags.map((tag) => {
           const isSelected = selectedTagIds.includes(tag._id);
+          const safeColor = /^#[0-9a-fA-F]{6}$/.test(tag.color)
+            ? tag.color
+            : "#6b7280";
           return (
             <button
               key={tag._id}
@@ -108,9 +111,9 @@ export function TagSelector({
               style={
                 isSelected
                   ? {
-                      backgroundColor: `${tag.color}20`,
-                      color: tag.color,
-                      boxShadow: `0 0 0 1px ${tag.color}`,
+                      backgroundColor: `${safeColor}20`,
+                      color: safeColor,
+                      boxShadow: `0 0 0 1px ${safeColor}`,
                     }
                   : {
                       backgroundColor: "transparent",

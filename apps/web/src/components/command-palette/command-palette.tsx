@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -39,7 +39,7 @@ export function CommandPalette() {
     useGlobalSearch(convexUserId);
 
   // Collect unique tags from results for tag filter chips
-  const availableTags = (() => {
+  const availableTags = useMemo(() => {
     const tagMap = new Map<
       string,
       { _id: string; name: string; color: string }
@@ -54,7 +54,17 @@ export function CommandPalette() {
     return Array.from(tagMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  })();
+  }, [results]);
+
+  // Prune stale tag IDs from filter — computed inline to avoid setState-in-effect
+  const availableTagIds = useMemo(
+    () => new Set(availableTags.map((t) => t._id)),
+    [availableTags]
+  );
+  const activeTagFilter = useMemo(
+    () => tagFilter.filter((id) => availableTagIds.has(id)),
+    [tagFilter, availableTagIds]
+  );
 
   // Filter results by environment AND tags
   const filteredResults = results.filter((r) => {
@@ -66,8 +76,8 @@ export function CommandPalette() {
       return false;
     }
     // Tag filter (OR logic within selected tags)
-    if (tagFilter.length > 0) {
-      if (!r.tags || !r.tags.some((t) => tagFilter.includes(t._id))) {
+    if (activeTagFilter.length > 0) {
+      if (!r.tags || !r.tags.some((t) => activeTagFilter.includes(t._id))) {
         return false;
       }
     }
