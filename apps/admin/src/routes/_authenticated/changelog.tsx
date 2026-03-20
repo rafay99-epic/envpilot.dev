@@ -107,11 +107,18 @@ function ListView() {
       : entries;
 
   const publishedCount =
-    entries?.filter((e) => e.publishStatus === "published" || (!e.publishStatus && e.isPublished)).length ?? 0;
+    entries?.filter(
+      (e) =>
+        e.publishStatus === "published" || (!e.publishStatus && e.isPublished)
+    ).length ?? 0;
   const scheduledCount =
     entries?.filter((e) => e.publishStatus === "scheduled").length ?? 0;
   const draftCount =
-    entries?.filter((e) => e.publishStatus === "draft" || (!e.publishStatus && !e.isPublished && e.publishStatus !== "scheduled")).length ?? 0;
+    entries?.filter(
+      (e) =>
+        e.publishStatus === "draft" ||
+        (!e.publishStatus && !e.isPublished && e.publishStatus !== "scheduled")
+    ).length ?? 0;
 
   const handleTogglePublish = async (entryId: Id<"changelog">) => {
     await togglePublish({ id: entryId });
@@ -192,7 +199,10 @@ function ListView() {
                 {type === "all" ? "All" : config?.label}
                 {type !== "all" && entries && (
                   <span className="ml-1.5 text-zinc-600">
-                    {entries.filter((e) => getEntryTypes(e).includes(type)).length}
+                    {
+                      entries.filter((e) => getEntryTypes(e).includes(type))
+                        .length
+                    }
                   </span>
                 )}
               </button>
@@ -264,7 +274,10 @@ function ListView() {
                     {entry.publishStatus === "scheduled" ? (
                       <Badge variant="info">
                         <CalendarClock className="mr-1 h-2.5 w-2.5" />
-                        Scheduled{entry.scheduledFor ? ` ${formatDateTime(entry.scheduledFor)}` : ""}
+                        Scheduled
+                        {entry.scheduledFor
+                          ? ` ${formatDateTime(entry.scheduledFor)}`
+                          : ""}
                       </Badge>
                     ) : entry.isPublished ? (
                       <Badge variant="success">
@@ -673,9 +686,7 @@ function EditorView() {
                     )}
                   >
                     {isSelected ? (
-                      <CheckSquare
-                        className={cn("h-3.5 w-3.5", tc.color)}
-                      />
+                      <CheckSquare className={cn("h-3.5 w-3.5", tc.color)} />
                     ) : (
                       <Square className="h-3.5 w-3.5 text-zinc-600" />
                     )}
@@ -740,10 +751,7 @@ function EditorView() {
                   type="datetime-local"
                   value={form.scheduledFor ?? ""}
                   onChange={(e) =>
-                    updateField(
-                      "scheduledFor",
-                      e.target.value || null
-                    )
+                    updateField("scheduledFor", e.target.value || null)
                   }
                   min={new Date().toISOString().slice(0, 16)}
                   className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:invert"

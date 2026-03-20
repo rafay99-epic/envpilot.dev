@@ -1264,8 +1264,8 @@ export const migrateToMultiType = internalMutation({
       if (needsMigration) {
         await ctx.db.patch(entry._id, {
           types: entry.types ?? [entry.type],
-          publishStatus: entry.publishStatus ??
-            (entry.isPublished ? "published" : "draft"),
+          publishStatus:
+            entry.publishStatus ?? (entry.isPublished ? "published" : "draft"),
         });
         migrated++;
       }

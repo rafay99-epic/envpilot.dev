@@ -214,9 +214,7 @@ export const useChangelogStore = create<ChangelogState>((set) => ({
       const has = current.includes(type);
       // Don't allow deselecting the last type
       if (has && current.length === 1) return state;
-      const next = has
-        ? current.filter((t) => t !== type)
-        : [...current, type];
+      const next = has ? current.filter((t) => t !== type) : [...current, type];
       return {
         form: { ...state.form, types: next },
         hasUnsavedChanges: true,
