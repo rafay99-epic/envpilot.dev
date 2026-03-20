@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
 import { deleteSecret } from "@/lib/vault";
 import { handleApiError } from "@/lib/api-errors";
@@ -33,7 +34,7 @@ export async function DELETE(
 
     // Revoke share in Convex (admin check happens server-side)
     const result = await convex.mutation(api.sharedSecrets.revokeShare, {
-      shareId: shareId as any,
+      shareId: shareId as Id<"sharedSecrets">,
       userId: convexUser._id,
     });
 

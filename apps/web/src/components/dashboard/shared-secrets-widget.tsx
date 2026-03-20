@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -11,7 +12,7 @@ import {
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { Share2, Eye, Clock, Flame } from "lucide-react";
+import { Eye, Clock, Flame } from "lucide-react";
 
 interface SharedSecretsWidgetProps {
   organizationId: Id<"organizations">;
@@ -20,19 +21,11 @@ interface SharedSecretsWidgetProps {
 export function SharedSecretsWidget({
   organizationId,
 }: SharedSecretsWidgetProps) {
-  let shares;
-  let queryError: Error | null = null;
+  const shares = useQuery(api.sharedSecrets.listActiveByOrg, {
+    organizationId,
+  });
 
-  try {
-    shares = useQuery(api.sharedSecrets.listActiveByOrg, {
-      organizationId,
-    });
-  } catch (err) {
-    queryError =
-      err instanceof Error ? err : new Error("Failed to load shares");
-  }
-
-  const isLoading = !queryError && shares === undefined;
+  const isLoading = shares === undefined;
 
   return (
     <TerminalWindow title="shared-secrets">
@@ -47,25 +40,20 @@ export function SharedSecretsWidget({
           View all
         </Link>
       </div>
-      {queryError ? (
-        <TerminalEmptyState
-          command="envpilot shares --active"
-          message="Failed to load shared secrets."
-        />
-      ) : isLoading ? (
+      {isLoading ? (
         <TerminalLoading />
-      ) : shares && shares.length === 0 ? (
+      ) : shares.length === 0 ? (
         <TerminalEmptyState
           command="envpilot shares --active"
           message="No active shared secrets."
         />
-      ) : shares ? (
+      ) : (
         <AnimatedList className="divide-y divide-zinc-800/50">
           {shares.map((share) => (
             <SharedSecretRow key={String(share._id)} share={share} />
           ))}
         </AnimatedList>
-      ) : null}
+      )}
     </TerminalWindow>
   );
 }
@@ -82,8 +70,9 @@ interface ShareData {
 }
 
 function SharedSecretRow({ share }: { share: ShareData }) {
-  const timeRemaining = formatTimeRemaining(share.expiresAt);
-  const isExpiringSoon = share.expiresAt - Date.now() < 3_600_000; // < 1 hour
+  const [now] = useState(() => Date.now());
+  const timeRemaining = formatTimeRemaining(share.expiresAt, now);
+  const isExpiringSoon = share.expiresAt - now < 3_600_000; // < 1 hour
 
   return (
     <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
@@ -117,8 +106,8 @@ function SharedSecretRow({ share }: { share: ShareData }) {
   );
 }
 
-function formatTimeRemaining(expiresAt: number): string {
-  const diff = expiresAt - Date.now();
+function formatTimeRemaining(expiresAt: number, now: number): string {
+  const diff = expiresAt - now;
   if (diff <= 0) return "expired";
 
   const hours = Math.floor(diff / (1000 * 60 * 60));

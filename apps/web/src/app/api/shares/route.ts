@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
@@ -72,10 +73,10 @@ export async function POST(request: Request) {
     const result = await convex.mutation(api.sharedSecrets.createShare, {
       token,
       vaultRef: vaultResult.id,
-      variableId: data.variableId as any,
+      variableId: data.variableId as Id<"environmentVariables">,
       variableKey: data.variableKey,
-      organizationId: data.organizationId as any,
-      projectId: data.projectId as any,
+      organizationId: data.organizationId as Id<"organizations">,
+      projectId: data.projectId as Id<"projects">,
       userId: convexUser._id,
       mode: data.mode,
       expiresAt,
@@ -86,7 +87,9 @@ export async function POST(request: Request) {
     // Construct the full share URL with client key in fragment
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {
-      throw new Error("NEXT_PUBLIC_APP_URL is not configured. Cannot generate share URL.");
+      throw new Error(
+        "NEXT_PUBLIC_APP_URL is not configured. Cannot generate share URL."
+      );
     }
     const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
 
@@ -148,7 +151,7 @@ export async function GET(request: Request) {
     }
 
     const shares = await convex.query(api.sharedSecrets.listByVariable, {
-      variableId: variableId as any,
+      variableId: variableId as Id<"environmentVariables">,
     });
 
     return NextResponse.json(shares);
