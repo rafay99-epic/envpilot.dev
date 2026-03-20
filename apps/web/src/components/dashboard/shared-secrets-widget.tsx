@@ -20,11 +20,18 @@ interface SharedSecretsWidgetProps {
 export function SharedSecretsWidget({
   organizationId,
 }: SharedSecretsWidgetProps) {
-  const shares = useQuery(api.sharedSecrets.listActiveByOrg, {
-    organizationId,
-  });
+  let shares;
+  let queryError: Error | null = null;
 
-  const isLoading = shares === undefined;
+  try {
+    shares = useQuery(api.sharedSecrets.listActiveByOrg, {
+      organizationId,
+    });
+  } catch (err) {
+    queryError = err instanceof Error ? err : new Error("Failed to load shares");
+  }
+
+  const isLoading = !queryError && shares === undefined;
 
   return (
     <TerminalWindow title="shared-secrets">
@@ -39,20 +46,25 @@ export function SharedSecretsWidget({
           View all
         </Link>
       </div>
-      {isLoading ? (
+      {queryError ? (
+        <TerminalEmptyState
+          command="envpilot shares --active"
+          message="Failed to load shared secrets."
+        />
+      ) : isLoading ? (
         <TerminalLoading />
-      ) : shares.length === 0 ? (
+      ) : shares && shares.length === 0 ? (
         <TerminalEmptyState
           command="envpilot shares --active"
           message="No active shared secrets."
         />
-      ) : (
+      ) : shares ? (
         <AnimatedList className="divide-y divide-zinc-800/50">
           {shares.map((share) => (
             <SharedSecretRow key={String(share._id)} share={share} />
           ))}
         </AnimatedList>
-      )}
+      ) : null}
     </TerminalWindow>
   );
 }

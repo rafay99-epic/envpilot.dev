@@ -28,6 +28,7 @@ interface ActiveSharesListProps {
 
 export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
   const revokeShare = useRevokeShare();
 
   if (shares.length === 0) return null;
@@ -37,11 +38,14 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
       return;
     }
     setRevokingId(shareId);
+    setRevokeError(null);
     try {
       await revokeShare.mutateAsync(shareId);
       onRefresh?.();
-    } catch {
-      // Error handled by hook
+    } catch (err) {
+      setRevokeError(
+        err instanceof Error ? err.message : "Failed to revoke share"
+      );
     } finally {
       setRevokingId(null);
     }
@@ -96,6 +100,11 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
           Shared Links ({shares.length})
         </span>
       </div>
+      {revokeError && (
+        <div className="border-b border-zinc-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-zinc-800 dark:bg-red-900/20 dark:text-red-400">
+          {revokeError}
+        </div>
+      )}
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
         {shares.map((share) => (
           <div key={share._id} className="flex items-center justify-between px-3 py-2">

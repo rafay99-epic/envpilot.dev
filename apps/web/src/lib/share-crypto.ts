@@ -15,6 +15,13 @@ const IV_LENGTH = 12; // 96-bit IV for GCM
 const SALT_LENGTH = 16; // 128-bit salt for PBKDF2
 const PBKDF2_ITERATIONS = 100_000;
 
+/** Convert Uint8Array to ArrayBuffer for Web Crypto API compatibility. */
+function toBuffer(arr: Uint8Array): ArrayBuffer {
+  const buf = new ArrayBuffer(arr.byteLength);
+  new Uint8Array(buf).set(arr);
+  return buf;
+}
+
 /**
  * Generate a cryptographically random 256-bit client key.
  */
@@ -62,7 +69,7 @@ async function deriveKey(
     // Import clientKey directly as AES-GCM key
     const key = await crypto.subtle.importKey(
       "raw",
-      clientKey,
+      toBuffer(clientKey),
       { name: "AES-GCM" },
       false,
       ["encrypt", "decrypt"]
@@ -83,7 +90,7 @@ async function deriveKey(
   // Import combined material as PBKDF2 key
   const baseKey = await crypto.subtle.importKey(
     "raw",
-    combined,
+    toBuffer(combined),
     { name: "PBKDF2" },
     false,
     ["deriveKey"]
@@ -93,7 +100,7 @@ async function deriveKey(
   const derivedKey = await crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: useSalt,
+      salt: toBuffer(useSalt),
       iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
@@ -132,7 +139,7 @@ export async function encryptForShare(
   const encrypted = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
-    data
+    toBuffer(data)
   );
 
   // Build output: [salt?] + iv + ciphertext+authTag
@@ -193,7 +200,7 @@ export async function decryptFromShare(
   const decrypted = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
     key,
-    ciphertext
+    toBuffer(ciphertext)
   );
 
   const decoder = new TextDecoder();
@@ -207,7 +214,7 @@ export async function decryptFromShare(
 export async function sha256Hex(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", toBuffer(data));
   const hashArray = new Uint8Array(hashBuffer);
   return Array.from(hashArray)
     .map((b) => b.toString(16).padStart(2, "0"))

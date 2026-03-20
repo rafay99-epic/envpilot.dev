@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Email templates for Secret Sharing.
@@ -41,7 +42,7 @@ export async function sendShareNotificationEmail(params: {
       ? "This is a one-time link — it will be destroyed after viewing."
       : `This link expires ${expiresIn}.`;
 
-  await resend.emails.send({
+  const { error: sendError } = await resend.emails.send({
     from: `Envpilot <${from}>`,
     to: params.recipientEmail,
     subject: "A secret has been shared with you on Envpilot",
@@ -83,6 +84,14 @@ export async function sendShareNotificationEmail(params: {
 </body>
 </html>`,
   });
+
+  if (sendError) {
+    Sentry.captureException(new Error(sendError.message), {
+      tags: { source: "share-email", action: "notification" },
+      extra: { recipientEmail: params.recipientEmail },
+    });
+    throw new Error(`Failed to send notification email: ${sendError.message}`);
+  }
 }
 
 /**
@@ -95,7 +104,7 @@ export async function sendShareOtpEmail(params: {
   const resend = getResendClient();
   const from = getFromEmail();
 
-  await resend.emails.send({
+  const { error: sendError } = await resend.emails.send({
     from: `Envpilot <${from}>`,
     to: params.recipientEmail,
     subject: `Your Envpilot verification code: ${params.otp}`,
@@ -132,6 +141,14 @@ export async function sendShareOtpEmail(params: {
 </body>
 </html>`,
   });
+
+  if (sendError) {
+    Sentry.captureException(new Error(sendError.message), {
+      tags: { source: "share-email", action: "otp" },
+      extra: { recipientEmail: params.recipientEmail },
+    });
+    throw new Error(`Failed to send OTP email: ${sendError.message}`);
+  }
 }
 
 // Helpers

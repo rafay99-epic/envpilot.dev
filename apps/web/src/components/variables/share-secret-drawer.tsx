@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import { DrawerPanel } from "@/components/ui/drawer-panel";
 import { X, Copy, Check, Loader2, Mail, AlertTriangle } from "lucide-react";
+import * as Sentry from "@sentry/nextjs";
 import {
   generateClientKey,
   clientKeyToBase64Url,
@@ -128,7 +129,21 @@ export function ShareSecretDrawer({
       const url = `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`;
       setGeneratedUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create share");
+      const message = err instanceof Error ? err.message : "Failed to create share";
+      // Strip internal details (Convex request IDs, stack traces)
+      const cleanMessage = message
+        .replace(/\[Request ID: [^\]]+\]\s*/g, "")
+        .replace(/\s*at\s+\S+\s+\([^)]*\)/g, "")
+        .trim();
+      setError(cleanMessage || "Failed to create share. Please try again.");
+
+      // Report unexpected errors (not validation/tier) to Sentry
+      if (!message.includes("limit") && !message.includes("Upgrade")) {
+        Sentry.captureException(err, {
+          tags: { source: "share-drawer", action: "generate" },
+          extra: { variableKey: variable.key, mode, recipientCount: emails.length },
+        });
+      }
     } finally {
       setIsGenerating(false);
     }

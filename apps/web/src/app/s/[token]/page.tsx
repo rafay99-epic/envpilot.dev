@@ -12,7 +12,9 @@ import {
   KeyRound,
   Eye,
   Lock,
+  RefreshCw,
 } from "lucide-react";
+import * as Sentry from "@sentry/nextjs";
 import {
   base64UrlToClientKey,
   decryptFromShare,
@@ -137,12 +139,22 @@ export default function ShareViewerPage() {
         setStep("passphrase");
       } else {
         // Decrypt directly
-        const decrypted = await decryptFromShare(
-          result.encryptedPayload,
-          clientKey
-        );
-        setDecryptedSecret(decrypted);
-        setStep("revealed");
+        try {
+          const decrypted = await decryptFromShare(
+            result.encryptedPayload,
+            clientKey
+          );
+          setDecryptedSecret(decrypted);
+          setStep("revealed");
+        } catch (decryptErr) {
+          Sentry.captureException(decryptErr, {
+            tags: { source: "share-viewer", action: "decrypt" },
+          });
+          setStep("error");
+          setErrorMessage(
+            "Failed to decrypt the secret. The link may be corrupted."
+          );
+        }
       }
     } catch (err) {
       const message =
@@ -150,7 +162,8 @@ export default function ShareViewerPage() {
       if (
         message.includes("expired") ||
         message.includes("destroyed") ||
-        message.includes("revoked")
+        message.includes("revoked") ||
+        message.includes("invalid")
       ) {
         setStep("error");
         setErrorMessage(message);
@@ -178,8 +191,23 @@ export default function ShareViewerPage() {
       encryptedPayloadRef.current = null;
       setDecryptedSecret(decrypted);
       setStep("revealed");
-    } catch {
+    } catch (decryptErr) {
+      // Most likely wrong passphrase — don't spam Sentry with these
       setErrorMessage("Incorrect passphrase. Please try again.");
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!email.trim()) return;
+    setErrorMessage("");
+    try {
+      await verifyEmail.mutateAsync({ token, email: email.trim() });
+      setOtp("");
+      setOtpCountdown(300);
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Failed to resend code"
+      );
     }
   };
 
@@ -189,8 +217,12 @@ export default function ShareViewerPage() {
       await navigator.clipboard.writeText(decryptedSecret);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
+    } catch (clipErr) {
+      Sentry.addBreadcrumb({
+        category: "clipboard",
+        message: "Clipboard write failed — user may be on HTTP or restricted context",
+        level: "warning",
+      });
     }
   };
 
@@ -318,6 +350,20 @@ export default function ShareViewerPage() {
                     {formatCountdown(otpCountdown)}
                   </span>
                 </span>
+                {otpCountdown === 0 && (
+                  <button
+                    onClick={handleResendOtp}
+                    disabled={verifyEmail.isPending}
+                    className="flex items-center gap-1 text-green-400 hover:text-green-300 disabled:opacity-50"
+                  >
+                    {verifyEmail.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Request new code
+                  </button>
+                )}
               </div>
             </div>
           )}
