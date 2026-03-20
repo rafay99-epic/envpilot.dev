@@ -386,7 +386,8 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   );
 
   const filteredShares = useMemo(
-    () => (filter === "all" ? shares : shares.filter((s) => s.status === filter)),
+    () =>
+      filter === "all" ? shares : shares.filter((s) => s.status === filter),
     [shares, filter]
   );
 
