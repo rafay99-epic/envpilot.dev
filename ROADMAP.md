@@ -6,7 +6,7 @@ Planned features and enhancements for future development.
 
 ## High Impact
 
-### Secret Rotation & Expiry
+### Secret Rotation & Expiry (DONE)
 
 - Auto-expire secrets after a configurable TTL
 - Rotation reminders and notifications via email

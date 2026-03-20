@@ -34,6 +34,7 @@ import type * as projects from "../projects.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as seedChangelog from "../seedChangelog.js";
 import type * as seedFeatureRequests from "../seedFeatureRequests.js";
+import type * as sharedSecrets from "../sharedSecrets.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as supportTickets from "../supportTickets.js";
 import type * as templates from "../templates.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   rateLimits: typeof rateLimits;
   seedChangelog: typeof seedChangelog;
   seedFeatureRequests: typeof seedFeatureRequests;
+  sharedSecrets: typeof sharedSecrets;
   subscriptions: typeof subscriptions;
   supportTickets: typeof supportTickets;
   templates: typeof templates;
