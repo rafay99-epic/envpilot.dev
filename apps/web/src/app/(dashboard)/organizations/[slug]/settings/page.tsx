@@ -15,7 +15,7 @@ import {
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
-import { Pencil, Trash2, Plus, ClipboardPaste, X, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Plus, ListPlus, X, Loader2 } from "lucide-react";
 import {
   useOrganizationTags,
   useCreateTag,
@@ -1016,7 +1016,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
                   setShowCreate(false);
                 }}
               >
-                <ClipboardPaste className="h-4 w-4" />
+                <ListPlus className="h-4 w-4" />
                 Bulk Add
               </TerminalButton>
               <TerminalButton

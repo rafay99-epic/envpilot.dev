@@ -172,6 +172,8 @@ export function VariableCreateDrawer({
           onCancel={handleClose}
           submitLabel={bulkSubmitLabel}
           onSubmittingChange={setIsBulkSubmitting}
+          availableTags={availableTags}
+          onCreateTag={showTags ? handleCreateTag : undefined}
         />
       )}
     </DrawerPanel>

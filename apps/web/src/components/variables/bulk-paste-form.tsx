@@ -8,12 +8,16 @@ import {
   type EnvParseError,
 } from "@/lib/env-parser";
 import type { VariableFormData } from "./variable-form";
+import type { Tag } from "@/hooks/queries";
+import { TagSelector } from "./tag-selector";
 
 interface BulkPasteFormProps {
   onSubmit: (entries: VariableFormData[]) => Promise<void>;
   onCancel: () => void;
   submitLabel?: string;
   onSubmittingChange?: (isSubmitting: boolean) => void;
+  availableTags?: Tag[];
+  onCreateTag?: (name: string, color: string) => Promise<void>;
 }
 
 interface SubmitProgress {
@@ -28,6 +32,8 @@ export function BulkPasteForm({
   onCancel,
   submitLabel = "Create All",
   onSubmittingChange,
+  availableTags = [],
+  onCreateTag,
 }: BulkPasteFormProps) {
   const [rawText, setRawText] = useState("");
   const [entries, setEntries] = useState<ParsedEnvEntry[]>([]);
@@ -36,6 +42,7 @@ export function BulkPasteForm({
     "development",
   ]);
   const [isSensitive, setIsSensitive] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress] = useState<SubmitProgress | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -106,6 +113,7 @@ export function BulkPasteForm({
       description: "",
       environments,
       isSensitive,
+      tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     }));
 
     try {
@@ -229,6 +237,17 @@ export function BulkPasteForm({
           </span>
         </label>
       </div>
+
+      {/* Tags */}
+      {availableTags.length > 0 && (
+        <TagSelector
+          availableTags={availableTags}
+          selectedTagIds={selectedTagIds}
+          onChange={setSelectedTagIds}
+          onCreateTag={onCreateTag}
+          disabled={isSubmitting}
+        />
+      )}
 
       {/* Preview list */}
       {entries.length > 0 && (
