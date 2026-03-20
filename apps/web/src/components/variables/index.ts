@@ -7,4 +7,7 @@ export { ExportDialog } from "./export-dialog";
 export { ImportDialog } from "./import-dialog";
 export { ShareSecretDrawer } from "./share-secret-drawer";
 export { ActiveSharesList } from "./active-shares-list";
-export { SharedVariablesSection, type ShareData } from "./shared-variables-section";
+export {
+  SharedVariablesSection,
+  type ShareData,
+} from "./shared-variables-section";

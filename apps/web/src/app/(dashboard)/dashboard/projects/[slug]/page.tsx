@@ -25,15 +25,11 @@ import {
   ExportDialog,
   ImportDialog,
   ShareSecretDrawer,
-  SharedVariablesSection,
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { ApiError } from "@/lib/api-client";
-import { useRevokeShare } from "@/hooks/useShareSecret";
-import { useQuery as useConvexQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import {
   useProjectBySlug,
   useVariablesList,
@@ -163,19 +159,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const bulkDelete = useBulkDeleteVariables();
   const rollbackVariable = useRollbackVariable();
   const resolveRequest = useResolveVariableRequest();
-  const revokeShare = useRevokeShare();
-
-  // --- Convex Query: project shares (real-time) ---
-  const projectShares = useConvexQuery(
-    api.sharedSecrets.listByProject,
-    projectId ? { projectId } : "skip"
-  );
-  const isOrgAdmin =
-    organization?.role === "admin" || organization?.role === "team_lead";
-
-  const handleRevokeShare = async (shareId: string) => {
-    await revokeShare.mutateAsync(shareId);
-  };
 
   // --- Local UI state ---
   const [notice, setNotice] = useState<string | null>(null);
@@ -855,18 +838,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           )}
         </div>
       </div>
-
-      {/* Shared Variables Section — feature-gated, admin/team_lead only */}
-      {canShare && projectShares && projectShares.length > 0 && (
-        <SharedVariablesSection
-          shares={projectShares.map((s) => ({
-            ...s,
-            _id: String(s._id),
-          }))}
-          onRevoke={handleRevokeShare}
-          canRevoke={isOrgAdmin}
-        />
-      )}
 
       <VariableCreateDrawer
         isOpen={showCreateModal}

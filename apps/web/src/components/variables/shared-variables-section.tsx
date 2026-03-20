@@ -149,9 +149,7 @@ export function SharedVariablesSection({
             No shared variables yet.
           </div>
         ) : (
-          <AnimatedList
-            className="divide-y divide-zinc-200 dark:divide-zinc-800"
-          >
+          <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {shares.map((share) => (
               <div key={share._id} className="px-6 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -196,7 +194,8 @@ export function SharedVariablesSection({
                       Created {formatRelativeTime(share.createdAt)}
                       {share.status === "active" && (
                         <>
-                          {" · "}Expires in {formatTimeRemaining(share.expiresAt)}
+                          {" · "}Expires in{" "}
+                          {formatTimeRemaining(share.expiresAt)}
                         </>
                       )}
                       {" · "}

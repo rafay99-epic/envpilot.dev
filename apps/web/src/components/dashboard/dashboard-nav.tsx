@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Key,
+  Share2,
   Users,
   ClipboardList,
   BarChart3,
@@ -146,6 +147,11 @@ export function DashboardNav() {
           href: `/dashboard/projects/${projectSlug}`,
           label: "Variables",
           icon: <Key className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/shared`,
+          label: "Shared",
+          icon: <Share2 className="h-4 w-4" />,
         },
         {
           href: `/dashboard/projects/${projectSlug}/members`,

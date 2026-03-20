@@ -277,7 +277,11 @@ export default function ShareViewerPage() {
                     setEmail(e.target.value);
                     setErrorMessage("");
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && !verifyEmail.isPending && handleVerifyEmail()}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    !verifyEmail.isPending &&
+                    handleVerifyEmail()
+                  }
                   disabled={verifyEmail.isPending}
                   placeholder="your@email.com"
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -325,7 +329,10 @@ export default function ShareViewerPage() {
                     setErrorMessage("");
                   }}
                   onKeyDown={(e) =>
-                    e.key === "Enter" && otp.length === 6 && !verifyOtp.isPending && handleVerifyOtp()
+                    e.key === "Enter" &&
+                    otp.length === 6 &&
+                    !verifyOtp.isPending &&
+                    handleVerifyOtp()
                   }
                   disabled={verifyOtp.isPending}
                   placeholder="000000"

@@ -181,7 +181,8 @@ export const verifyRecipientEmail = mutation({
     }
 
     // Only reset attempts if previous OTP expired (natural timeout, not lockout bypass)
-    const shouldResetAttempts = !recipient.otpExpiresAt || recipient.otpExpiresAt < now;
+    const shouldResetAttempts =
+      !recipient.otpExpiresAt || recipient.otpExpiresAt < now;
 
     // Store the hashed OTP with 5-minute TTL
     await ctx.db.patch(recipient._id, {
@@ -415,7 +416,8 @@ export const revokeShare = mutation({
         )
         .first();
 
-      const isAdmin = membership?.role === "admin" || membership?.role === "team_lead";
+      const isAdmin =
+        membership?.role === "admin" || membership?.role === "team_lead";
       if (!isAdmin) {
         throw new Error("Not authorized to revoke this share.");
       }
