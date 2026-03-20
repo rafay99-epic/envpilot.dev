@@ -4,8 +4,9 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
+import * as Sentry from "@sentry/nextjs";
 import { createSecret } from "@/lib/vault";
-import { handleApiError } from "@/lib/api-errors";
+import { handleApiError, sanitizeConvexError } from "@/lib/api-errors";
 import { sendShareNotificationEmail } from "@/lib/share-emails";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -15,7 +16,7 @@ const createShareSchema = z.object({
   variableKey: z.string(),
   organizationId: z.string(),
   projectId: z.string(),
-  encryptedPayload: z.string().max(131072),
+  encryptedPayload: z.string().min(1).max(131072),
   mode: z.enum(["one_time", "time_limited"]),
   ttlMs: z.number().int().min(3_600_000).max(604_800_000),
   hasPassphrase: z.boolean(),
@@ -82,13 +83,13 @@ export async function POST(request: Request) {
       recipientEmails: data.recipientEmails,
     });
 
-    // Construct the share URL (without the client key -- that's added client-side)
+    // Construct the full share URL with client key in fragment
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "";
+    const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
 
     // Send notification emails to all recipients (best-effort, don't fail the request)
     const senderName = convexUser.name || convexUser.email;
-    const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
     for (const email of data.recipientEmails) {
       try {
         await sendShareNotificationEmail({
@@ -100,11 +101,10 @@ export async function POST(request: Request) {
           shareUrl,
         });
       } catch (emailErr) {
-        // Don't fail the share creation if email sending fails
-        console.error(
-          `Failed to send share notification to ${email}:`,
-          emailErr
-        );
+        Sentry.captureException(emailErr, {
+          tags: { source: "share-email", action: "notification" },
+          extra: { recipientEmail: email, token },
+        });
       }
     }
 
@@ -135,6 +135,14 @@ export async function GET(request: Request) {
         { error: "variableId is required" },
         { status: 400 }
       );
+    }
+
+    // Resolve Convex user to verify they have access
+    const convexUser = await convex.query(api.users.getByWorkosId, {
+      workosId: user.id,
+    });
+    if (!convexUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const shares = await convex.query(api.sharedSecrets.listByVariable, {

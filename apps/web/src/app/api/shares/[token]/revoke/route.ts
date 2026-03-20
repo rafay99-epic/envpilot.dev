@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import * as Sentry from "@sentry/nextjs";
 import { deleteSecret } from "@/lib/vault";
 import { handleApiError } from "@/lib/api-errors";
 
@@ -36,11 +37,14 @@ export async function DELETE(
       userId: convexUser._id,
     });
 
-    // Delete from Vault (best effort)
+    // Delete from Vault (best-effort, report failures to Sentry)
     try {
       await deleteSecret(result.vaultRef);
-    } catch {
-      // Vault cleanup is best-effort
+    } catch (vaultErr) {
+      Sentry.captureException(vaultErr, {
+        tags: { source: "share-vault", action: "revoke-delete" },
+        extra: { shareId, vaultRef: result.vaultRef },
+      });
     }
 
     return NextResponse.json({ success: true });

@@ -3,6 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
+import * as Sentry from "@sentry/nextjs";
 import { sendShareOtpEmail } from "@/lib/share-emails";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -58,7 +59,10 @@ export async function POST(
           otp, // Send the plaintext OTP in the email
         });
       } catch (emailErr) {
-        console.error("Failed to send OTP email:", emailErr);
+        Sentry.captureException(emailErr, {
+          tags: { source: "share-email", action: "otp" },
+          extra: { recipientEmail: email, token },
+        });
         // Don't reveal email send failures to prevent enumeration
       }
     }
@@ -75,7 +79,10 @@ export async function POST(
       );
     }
 
-    // For other errors, return generic success (anti-enumeration)
+    // Report unexpected errors to Sentry but return generic success (anti-enumeration)
+    Sentry.captureException(error, {
+      tags: { source: "share-verify-email" },
+    });
     return NextResponse.json({ success: true });
   }
 }

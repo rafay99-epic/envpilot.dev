@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   Loader2,
@@ -40,6 +40,9 @@ export default function ShareViewerPage() {
   const [copied, setCopied] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
   const [hasPassphrase, setHasPassphrase] = useState(false);
+
+  // Store encrypted payload in memory only (not sessionStorage) to prevent XSS exposure
+  const encryptedPayloadRef = useRef<string | null>(null);
 
   const verifyEmail = useVerifyShareEmail();
   const verifyOtp = useVerifyShareOtp();
@@ -129,9 +132,8 @@ export default function ShareViewerPage() {
       setHasPassphrase(result.hasPassphrase);
 
       if (result.hasPassphrase) {
-        // Need passphrase before decrypting
-        // Store the encrypted payload temporarily
-        sessionStorage.setItem("_sp", result.encryptedPayload);
+        // Need passphrase before decrypting — keep in memory only
+        encryptedPayloadRef.current = result.encryptedPayload;
         setStep("passphrase");
       } else {
         // Decrypt directly
@@ -163,7 +165,7 @@ export default function ShareViewerPage() {
     if (!passphrase || !clientKey) return;
 
     try {
-      const encryptedPayload = sessionStorage.getItem("_sp");
+      const encryptedPayload = encryptedPayloadRef.current;
       if (!encryptedPayload) {
         throw new Error("Encrypted data not found. Please start over.");
       }
@@ -173,7 +175,7 @@ export default function ShareViewerPage() {
         clientKey,
         passphrase
       );
-      sessionStorage.removeItem("_sp");
+      encryptedPayloadRef.current = null;
       setDecryptedSecret(decrypted);
       setStep("revealed");
     } catch {

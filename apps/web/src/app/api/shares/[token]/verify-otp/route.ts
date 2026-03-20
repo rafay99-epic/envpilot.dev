@@ -3,6 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
+import * as Sentry from "@sentry/nextjs";
 import { readSecret, deleteSecret } from "@/lib/vault";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -54,15 +55,30 @@ export async function POST(
       userAgent,
     });
 
-    // OTP verified -- read the client-encrypted ciphertext from Vault
-    const encryptedPayload = await readSecret(result.vaultRef);
+    // OTP verified — read the client-encrypted ciphertext from Vault
+    let encryptedPayload: string;
+    try {
+      encryptedPayload = await readSecret(result.vaultRef);
+    } catch (vaultErr) {
+      Sentry.captureException(vaultErr, {
+        tags: { source: "share-vault", action: "read" },
+        extra: { token, vaultRef: result.vaultRef },
+      });
+      return NextResponse.json(
+        { error: "Failed to retrieve the secret. Please try again." },
+        { status: 502 }
+      );
+    }
 
-    // For one-time shares, delete the vault entry
+    // For one-time shares, delete the vault entry (best-effort)
     if (result.mode === "one_time") {
       try {
         await deleteSecret(result.vaultRef);
-      } catch {
-        // Best effort -- cleanup cron will handle it
+      } catch (deleteErr) {
+        Sentry.captureException(deleteErr, {
+          tags: { source: "share-vault", action: "delete" },
+          extra: { token, vaultRef: result.vaultRef },
+        });
       }
     }
 
@@ -74,24 +90,46 @@ export async function POST(
     const message =
       error instanceof Error ? error.message : "Verification failed";
 
-    // Return specific error messages for known cases
-    if (message.includes("already viewed")) {
-      return NextResponse.json({ error: message }, { status: 410 });
+    // Classify Convex errors into proper HTTP status codes
+    if (
+      message.includes("already viewed") ||
+      message.includes("destroyed")
+    ) {
+      return NextResponse.json(
+        { error: "This secret was already viewed and destroyed." },
+        { status: 410 }
+      );
     }
     if (message.includes("expired")) {
-      return NextResponse.json({ error: message }, { status: 410 });
+      return NextResponse.json(
+        { error: "This secret has expired." },
+        { status: 410 }
+      );
     }
     if (message.includes("revoked")) {
-      return NextResponse.json({ error: message }, { status: 410 });
+      return NextResponse.json(
+        { error: "This share link was revoked by the owner." },
+        { status: 410 }
+      );
     }
     if (message.includes("not found") || message.includes("Not found")) {
-      return NextResponse.json({ error: "Share not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "This share link is invalid or has expired." },
+        { status: 404 }
+      );
     }
     if (message.includes("not authorized")) {
-      return NextResponse.json({ error: message }, { status: 403 });
+      // Use same generic message as not-found to prevent share existence enumeration
+      return NextResponse.json(
+        { error: "This share link is invalid or has expired." },
+        { status: 404 }
+      );
     }
     if (message.includes("locked out")) {
-      return NextResponse.json({ error: message }, { status: 403 });
+      return NextResponse.json(
+        { error: "Too many failed attempts. This email has been locked out." },
+        { status: 403 }
+      );
     }
     if (
       message.includes("attempts remaining") ||
@@ -105,6 +143,12 @@ export async function POST(
         { status: 429 }
       );
     }
+
+    // Unexpected errors → Sentry + generic message
+    Sentry.captureException(error, {
+      tags: { source: "share-verify-otp" },
+      extra: { token },
+    });
 
     return NextResponse.json(
       { error: "Verification failed. Please try again." },
