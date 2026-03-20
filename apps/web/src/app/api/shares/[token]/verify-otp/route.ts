@@ -22,8 +22,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  const { token } = await params;
   try {
-    const { token } = await params;
     const body = await request.json();
     const validation = verifyOtpSchema.safeParse(body);
 
