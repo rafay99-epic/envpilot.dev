@@ -15,7 +15,7 @@ import {
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, ClipboardPaste, X, Loader2 } from "lucide-react";
 import {
   useOrganizationTags,
   useCreateTag,
@@ -733,12 +733,25 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
 
   // UI state
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulkPaste, setShowBulkPaste] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TAG_COLORS[0]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Bulk paste state
+  const [bulkText, setBulkText] = useState("");
+  const [bulkEntries, setBulkEntries] = useState<
+    Array<{ name: string; color: string }>
+  >([]);
+  const [isBulkCreating, setIsBulkCreating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    total: number;
+    completed: number;
+    failures: Array<{ name: string; error: string }>;
+  } | null>(null);
 
   // Notification state with auto-dismiss
   const [tagError, setTagError] = useState<string | null>(null);
@@ -774,6 +787,102 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
   const extractErrorMessage = (err: unknown, fallback: string): string => {
     if (err instanceof Error) return err.message;
     return fallback;
+  };
+
+  // Bulk paste parsing — accepts comma, semicolon, or newline separated names
+  const parseBulkText = useCallback(
+    (text: string) => {
+      const names = text
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && s.length <= 50);
+
+      // Deduplicate (case-insensitive) and remove names that already exist
+      const existingNames = new Set(tags.map((t) => t.name.toLowerCase()));
+      const seen = new Set<string>();
+      const entries: Array<{ name: string; color: string }> = [];
+
+      for (const name of names) {
+        const lower = name.toLowerCase();
+        if (seen.has(lower) || existingNames.has(lower)) continue;
+        seen.add(lower);
+        // Round-robin assign colors from the palette
+        entries.push({
+          name,
+          color: TAG_COLORS[entries.length % TAG_COLORS.length],
+        });
+      }
+
+      return entries;
+    },
+    [tags]
+  );
+
+  const handleBulkTextChange = useCallback(
+    (text: string) => {
+      setBulkText(text);
+      setBulkEntries(parseBulkText(text));
+    },
+    [parseBulkText]
+  );
+
+  const removeBulkEntry = (name: string) => {
+    setBulkEntries((prev) => prev.filter((e) => e.name !== name));
+  };
+
+  const handleBulkCreate = async () => {
+    if (bulkEntries.length === 0) return;
+
+    setIsBulkCreating(true);
+    const progress = {
+      total: bulkEntries.length,
+      completed: 0,
+      failures: [] as Array<{ name: string; error: string }>,
+    };
+    setBulkProgress(progress);
+
+    for (const entry of bulkEntries) {
+      try {
+        await createTagMut.mutateAsync({
+          organizationId,
+          name: entry.name,
+          color: entry.color,
+        });
+        progress.completed++;
+      } catch (err) {
+        progress.completed++;
+        progress.failures.push({
+          name: entry.name,
+          error: err instanceof Error ? err.message : "Failed",
+        });
+      }
+      setBulkProgress({ ...progress });
+    }
+
+    setIsBulkCreating(false);
+    setBulkProgress(null);
+
+    const successCount = progress.total - progress.failures.length;
+    if (progress.failures.length === 0) {
+      showSuccess(
+        `${successCount} tag${successCount !== 1 ? "s" : ""} created`
+      );
+      setBulkText("");
+      setBulkEntries([]);
+      setShowBulkPaste(false);
+    } else if (successCount > 0) {
+      showSuccess(
+        `${successCount} created, ${progress.failures.length} failed`
+      );
+      // Keep the form open with only the failed entries visible
+      setBulkEntries(
+        bulkEntries.filter((e) =>
+          progress.failures.some((f) => f.name === e.name)
+        )
+      );
+    } else {
+      showError("All tags failed to create. Check the errors below.");
+    }
   };
 
   const handleCreate = async () => {
@@ -898,13 +1007,150 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
               )}
             </p>
           </div>
-          {!showCreate && (
-            <TerminalButton onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" />
-              New Tag
-            </TerminalButton>
+          {!showCreate && !showBulkPaste && (
+            <div className="flex gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => {
+                  setShowBulkPaste(true);
+                  setShowCreate(false);
+                }}
+              >
+                <ClipboardPaste className="h-4 w-4" />
+                Bulk Add
+              </TerminalButton>
+              <TerminalButton
+                onClick={() => {
+                  setShowCreate(true);
+                  setShowBulkPaste(false);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                New Tag
+              </TerminalButton>
+            </div>
           )}
         </div>
+
+        {/* Bulk paste form */}
+        {showBulkPaste && (
+          <div className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Paste tag names
+              </label>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Separate with commas, semicolons, or newlines. Duplicates and
+                existing tags are skipped.
+              </p>
+              <textarea
+                value={bulkText}
+                onChange={(e) => handleBulkTextChange(e.target.value)}
+                placeholder={`Database, AWS, API Keys\nFrontend, Backend, Auth\nCache; Storage; Monitoring`}
+                rows={4}
+                className="mt-2 block w-full resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
+                disabled={isBulkCreating}
+                autoFocus
+              />
+              {bulkText.trim() && (
+                <p className="mt-1 text-xs text-zinc-500">
+                  {bulkEntries.length} new tag
+                  {bulkEntries.length !== 1 ? "s" : ""} to create
+                  {bulkEntries.length === 0 &&
+                    bulkText.trim().length > 0 &&
+                    " (all names already exist or are duplicates)"}
+                </p>
+              )}
+            </div>
+
+            {/* Preview with color dots and remove buttons */}
+            {bulkEntries.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-400">
+                  Preview
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {bulkEntries.map((entry) => (
+                    <span
+                      key={entry.name}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 py-0.5 pl-2 pr-1 text-xs text-zinc-200"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: entry.color }}
+                      />
+                      {entry.name}
+                      <button
+                        type="button"
+                        onClick={() => removeBulkEntry(entry.name)}
+                        disabled={isBulkCreating}
+                        className="rounded-full p-0.5 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-300 disabled:opacity-50"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Progress */}
+            {bulkProgress && (
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+                <Loader2 className="h-4 w-4 animate-spin text-green-400" />
+                <span className="text-sm text-zinc-300">
+                  Creating {bulkProgress.completed}/{bulkProgress.total}...
+                </span>
+                {bulkProgress.failures.length > 0 && (
+                  <span className="text-sm text-red-400">
+                    ({bulkProgress.failures.length} failed)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Bulk failure details */}
+            {bulkProgress &&
+              bulkProgress.failures.length > 0 &&
+              !isBulkCreating && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                  <p className="text-xs font-medium text-red-400">
+                    Failed tags:
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {bulkProgress.failures.map((f, i) => (
+                      <li key={i} className="text-xs text-red-400/80">
+                        {f.name}: {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            <div className="flex justify-end gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => {
+                  setShowBulkPaste(false);
+                  setBulkText("");
+                  setBulkEntries([]);
+                  setBulkProgress(null);
+                }}
+                disabled={isBulkCreating}
+              >
+                Cancel
+              </TerminalButton>
+              <TerminalButton
+                onClick={handleBulkCreate}
+                disabled={bulkEntries.length === 0 || isBulkCreating}
+              >
+                {isBulkCreating
+                  ? `Creating ${bulkProgress?.completed ?? 0}/${bulkProgress?.total ?? 0}...`
+                  : `Create ${bulkEntries.length} Tag${bulkEntries.length !== 1 ? "s" : ""}`}
+              </TerminalButton>
+            </div>
+          </div>
+        )}
 
         {/* Inline create form */}
         {showCreate && (
