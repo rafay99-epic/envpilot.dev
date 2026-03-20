@@ -95,10 +95,7 @@ export function useCreateShare() {
         body: JSON.stringify(params),
       });
 
-      return handleShareResponse<CreateShareResponse>(
-        response,
-        "create share"
-      );
+      return handleShareResponse<CreateShareResponse>(response, "create share");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shares"] });
@@ -138,14 +135,11 @@ export function useVerifyShareEmail() {
     mutationFn: async (
       params: VerifyEmailParams
     ): Promise<{ success: boolean }> => {
-      const response = await fetch(
-        `/api/shares/${params.token}/verify-email`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: params.email }),
-        }
-      );
+      const response = await fetch(`/api/shares/${params.token}/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: params.email }),
+      });
 
       return handleShareResponse<{ success: boolean }>(
         response,
@@ -161,20 +155,15 @@ export function useVerifyShareEmail() {
 export function useVerifyShareOtp() {
   return useMutation({
     mutationKey: ["shares", "verify-otp"],
-    mutationFn: async (
-      params: VerifyOtpParams
-    ): Promise<VerifyOtpResponse> => {
-      const response = await fetch(
-        `/api/shares/${params.token}/verify-otp`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: params.email,
-            otp: params.otp,
-          }),
-        }
-      );
+    mutationFn: async (params: VerifyOtpParams): Promise<VerifyOtpResponse> => {
+      const response = await fetch(`/api/shares/${params.token}/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: params.email,
+          otp: params.otp,
+        }),
+      });
 
       return handleShareResponse<VerifyOtpResponse>(response, "verify code");
     },

@@ -71,7 +71,7 @@ export async function sendShareNotificationEmail(params: {
 
       <p style="color: #71717a; font-size: 13px; margin: 0 0 24px 0;">${modeLabel}</p>
 
-      <a href="${params.shareUrl}" style="display: block; text-align: center; background-color: #22c55e; color: #0a0a0a; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+      <a href="${escapeHtml(params.shareUrl)}" style="display: block; text-align: center; background-color: #22c55e; color: #0a0a0a; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
         View Secret
       </a>
     </div>
@@ -107,7 +107,7 @@ export async function sendShareOtpEmail(params: {
   const { error: sendError } = await resend.emails.send({
     from: `Envpilot <${from}>`,
     to: params.recipientEmail,
-    subject: `Your Envpilot verification code: ${params.otp}`,
+    subject: "Your Envpilot verification code",
     html: `
 <!DOCTYPE html>
 <html>

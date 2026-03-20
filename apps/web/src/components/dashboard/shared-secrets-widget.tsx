@@ -28,7 +28,8 @@ export function SharedSecretsWidget({
       organizationId,
     });
   } catch (err) {
-    queryError = err instanceof Error ? err : new Error("Failed to load shares");
+    queryError =
+      err instanceof Error ? err : new Error("Failed to load shares");
   }
 
   const isLoading = !queryError && shares === undefined;

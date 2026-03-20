@@ -10,7 +10,10 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const verifyOtpSchema = z.object({
   email: z.string().email(),
-  otp: z.string().length(6).regex(/^\d{6}$/),
+  otp: z
+    .string()
+    .length(6)
+    .regex(/^\d{6}$/),
 });
 
 /**
@@ -91,10 +94,7 @@ export async function POST(
       error instanceof Error ? error.message : "Verification failed";
 
     // Classify Convex errors into proper HTTP status codes
-    if (
-      message.includes("already viewed") ||
-      message.includes("destroyed")
-    ) {
+    if (message.includes("already viewed") || message.includes("destroyed")) {
       return NextResponse.json(
         { error: "This secret was already viewed and destroyed." },
         { status: 410 }

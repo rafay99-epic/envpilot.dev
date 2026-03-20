@@ -20,10 +20,7 @@ import {
   decryptFromShare,
   sha256Hex,
 } from "@/lib/share-crypto";
-import {
-  useVerifyShareEmail,
-  useVerifyShareOtp,
-} from "@/hooks/useShareSecret";
+import { useVerifyShareEmail, useVerifyShareOtp } from "@/hooks/useShareSecret";
 
 type ViewerStep = "email" | "otp" | "passphrase" | "revealed" | "error";
 
@@ -136,6 +133,8 @@ export default function ShareViewerPage() {
       if (result.hasPassphrase) {
         // Need passphrase before decrypting — keep in memory only
         encryptedPayloadRef.current = result.encryptedPayload;
+        setOtp("");
+        setEmail("");
         setStep("passphrase");
       } else {
         // Decrypt directly
@@ -145,6 +144,8 @@ export default function ShareViewerPage() {
             clientKey
           );
           setDecryptedSecret(decrypted);
+          setOtp("");
+          setEmail("");
           setStep("revealed");
         } catch (decryptErr) {
           Sentry.captureException(decryptErr, {
@@ -190,6 +191,7 @@ export default function ShareViewerPage() {
       );
       encryptedPayloadRef.current = null;
       setDecryptedSecret(decrypted);
+      setPassphrase("");
       setStep("revealed");
     } catch (decryptErr) {
       // Most likely wrong passphrase — don't spam Sentry with these
@@ -220,7 +222,8 @@ export default function ShareViewerPage() {
     } catch (clipErr) {
       Sentry.addBreadcrumb({
         category: "clipboard",
-        message: "Clipboard write failed — user may be on HTTP or restricted context",
+        message:
+          "Clipboard write failed — user may be on HTTP or restricted context",
         level: "warning",
       });
     }
@@ -274,7 +277,8 @@ export default function ShareViewerPage() {
                     setEmail(e.target.value);
                     setErrorMessage("");
                   }}
-                  onKeyDown={(e) => e.key === "Enter" && handleVerifyEmail()}
+                  onKeyDown={(e) => e.key === "Enter" && !verifyEmail.isPending && handleVerifyEmail()}
+                  disabled={verifyEmail.isPending}
                   placeholder="your@email.com"
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   autoFocus
@@ -321,8 +325,9 @@ export default function ShareViewerPage() {
                     setErrorMessage("");
                   }}
                   onKeyDown={(e) =>
-                    e.key === "Enter" && otp.length === 6 && handleVerifyOtp()
+                    e.key === "Enter" && otp.length === 6 && !verifyOtp.isPending && handleVerifyOtp()
                   }
+                  disabled={verifyOtp.isPending}
                   placeholder="000000"
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-center font-mono text-2xl tracking-[0.3em] text-zinc-100 placeholder:text-zinc-700 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   maxLength={6}
@@ -412,44 +417,65 @@ export default function ShareViewerPage() {
           )}
 
           {/* Step 3: Revealed */}
-          {step === "revealed" && decryptedSecret && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Eye className="h-5 w-5 text-green-500" />
-                <h2 className="font-mono text-sm font-semibold text-zinc-100">
-                  Secret revealed
-                </h2>
-              </div>
-              <div className="relative">
-                <div className="max-h-48 overflow-auto rounded-lg bg-zinc-800 p-3">
-                  <code className="break-all font-mono text-sm text-green-400">
-                    {decryptedSecret}
-                  </code>
+          {step === "revealed" &&
+            decryptedSecret &&
+            (() => {
+              // Parse KEY=VALUE format (first = is the delimiter)
+              const eqIndex = decryptedSecret.indexOf("=");
+              const secretKey =
+                eqIndex > 0 ? decryptedSecret.slice(0, eqIndex) : null;
+              const secretValue =
+                eqIndex > 0
+                  ? decryptedSecret.slice(eqIndex + 1)
+                  : decryptedSecret;
+
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-5 w-5 text-green-500" />
+                    <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                      Secret revealed
+                    </h2>
+                  </div>
+                  <div className="relative">
+                    <div className="max-h-48 overflow-auto rounded-lg bg-zinc-800 p-3">
+                      {secretKey ? (
+                        <code className="break-all font-mono text-sm">
+                          <span className="text-blue-400">{secretKey}</span>
+                          <span className="text-zinc-500">=</span>
+                          <span className="text-green-400">{secretValue}</span>
+                        </code>
+                      ) : (
+                        <code className="break-all font-mono text-sm text-green-400">
+                          {decryptedSecret}
+                        </code>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleCopy}
+                      className="absolute right-2 top-2 rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                    >
+                      {copied ? (
+                        <span className="flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Copied
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Copy className="h-3 w-3" /> Copy
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                    <p className="text-xs text-amber-400">
+                      This secret has been permanently destroyed. Close this tab
+                      when done.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={handleCopy}
-                  className="absolute right-2 top-2 rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
-                >
-                  {copied ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="h-3 w-3" /> Copied
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Copy className="h-3 w-3" /> Copy
-                    </span>
-                  )}
-                </button>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                <p className="text-xs text-amber-400">
-                  This secret has been permanently destroyed. Close this tab
-                  when done.
-                </p>
-              </div>
-            </div>
-          )}
+              );
+            })()}
 
           {/* Error state */}
           {step === "error" && (

@@ -48,7 +48,9 @@ export const createShare = mutation({
       "secret_sharing"
     );
     if (!boolGate.allowed) {
-      throw new Error(boolGate.reason ?? "Secret sharing is not enabled for your tier.");
+      throw new Error(
+        boolGate.reason ?? "Secret sharing is not enabled for your tier."
+      );
     }
 
     // 2. Feature gate: max_active_shares numeric
@@ -169,16 +171,23 @@ export const verifyRecipientEmail = mutation({
       return { success: true, emailMatched: false };
     }
 
-    // Check if already locked out
-    if (recipient.otpAttempts >= 5) {
+    // Check if already locked out (5+ attempts and OTP hasn't expired yet)
+    if (
+      recipient.otpAttempts >= 5 &&
+      recipient.otpExpiresAt &&
+      recipient.otpExpiresAt >= now
+    ) {
       return { success: true, emailMatched: false };
     }
+
+    // Only reset attempts if previous OTP expired (natural timeout, not lockout bypass)
+    const shouldResetAttempts = !recipient.otpExpiresAt || recipient.otpExpiresAt < now;
 
     // Store the hashed OTP with 5-minute TTL
     await ctx.db.patch(recipient._id, {
       otpCode: args.otpHash,
       otpExpiresAt: now + 5 * 60 * 1000, // 5 minutes
-      otpAttempts: 0, // Reset attempts on new OTP
+      otpAttempts: shouldResetAttempts ? 0 : recipient.otpAttempts,
     });
 
     // Audit log
@@ -261,7 +270,9 @@ export const verifyOtp = mutation({
 
     // Check lockout
     if (recipient.otpAttempts >= 5) {
-      throw new Error("Too many failed attempts. This email has been locked out.");
+      throw new Error(
+        "Too many failed attempts. This email has been locked out."
+      );
     }
 
     // Check OTP exists and hasn't expired
@@ -270,7 +281,9 @@ export const verifyOtp = mutation({
     }
 
     if (recipient.otpExpiresAt < now) {
-      throw new Error("Verification code has expired. Please request a new one.");
+      throw new Error(
+        "Verification code has expired. Please request a new one."
+      );
     }
 
     // Verify OTP hash
@@ -379,7 +392,7 @@ export const verifyOtp = mutation({
 });
 
 /**
- * Revoke a shared secret. Only the creator can revoke.
+ * Revoke a shared secret. The creator, org admins, and team leads can revoke.
  */
 export const revokeShare = mutation({
   args: {
@@ -392,8 +405,20 @@ export const revokeShare = mutation({
       throw new Error("Share not found.");
     }
 
-    if (share.createdBy !== args.userId) {
-      throw new Error("Only the share creator can revoke it.");
+    // Check if user is creator OR org admin/owner
+    const isCreator = share.createdBy === args.userId;
+    if (!isCreator) {
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("organizationId", share.organizationId).eq("userId", args.userId)
+        )
+        .first();
+
+      const isAdmin = membership?.role === "admin" || membership?.role === "team_lead";
+      if (!isAdmin) {
+        throw new Error("Not authorized to revoke this share.");
+      }
     }
 
     if (share.status !== "active") {
@@ -499,6 +524,55 @@ export const listActiveByOrg = query({
           viewedCount: recipients.filter((r) => r.hasViewed).length,
           createdAt: share.createdAt,
           createdBy: share.createdBy,
+        };
+      })
+    );
+
+    return result;
+  },
+});
+
+/**
+ * List all shares for a specific project (all statuses), sorted by most recent.
+ * Enriched with recipient data for admin/team-lead dashboards.
+ */
+export const listByProject = query({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const shares = await ctx.db
+      .query("sharedSecrets")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    // Sort by createdAt descending (most recent first)
+    shares.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Enrich with recipient data
+    const result = await Promise.all(
+      shares.map(async (share) => {
+        const recipients = await ctx.db
+          .query("shareRecipients")
+          .withIndex("by_share", (q) => q.eq("shareId", share._id))
+          .collect();
+
+        return {
+          _id: share._id,
+          variableKey: share.variableKey,
+          mode: share.mode,
+          status: share.status,
+          expiresAt: share.expiresAt,
+          hasPassphrase: share.hasPassphrase,
+          totalViewCount: share.totalViewCount,
+          createdAt: share.createdAt,
+          createdBy: share.createdBy,
+          recipients: recipients.map((r) => ({
+            email: r.email,
+            hasViewed: r.hasViewed,
+            viewedAt: r.viewedAt,
+            otpVerified: r.otpVerified,
+          })),
         };
       })
     );

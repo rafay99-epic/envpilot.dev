@@ -102,10 +102,11 @@ export function ShareSecretDrawer({
         throw new Error("Failed to retrieve variable value");
       }
 
-      // 2. Generate client key and encrypt
+      // 2. Generate client key and encrypt KEY=VALUE pair
       const clientKey = generateClientKey();
+      const sharePayload = `${variable.key}=${plaintext}`;
       const encryptedPayload = await encryptForShare(
-        plaintext,
+        sharePayload,
         clientKey,
         usePassphrase ? passphrase : undefined
       );
@@ -129,7 +130,8 @@ export function ShareSecretDrawer({
       const url = `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`;
       setGeneratedUrl(url);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create share";
+      const message =
+        err instanceof Error ? err.message : "Failed to create share";
       // Strip internal details (Convex request IDs, stack traces)
       const cleanMessage = message
         .replace(/\[Request ID: [^\]]+\]\s*/g, "")
@@ -141,7 +143,11 @@ export function ShareSecretDrawer({
       if (!message.includes("limit") && !message.includes("Upgrade")) {
         Sentry.captureException(err, {
           tags: { source: "share-drawer", action: "generate" },
-          extra: { variableKey: variable.key, mode, recipientCount: emails.length },
+          extra: {
+            variableKey: variable.key,
+            mode,
+            recipientCount: emails.length,
+          },
         });
       }
     } finally {
@@ -253,7 +259,9 @@ export function ShareSecretDrawer({
                   >
                     One-time view
                     {mode === "one_time" && (
-                      <span className="ml-1.5 text-xs opacity-70">Recommended</span>
+                      <span className="ml-1.5 text-xs opacity-70">
+                        Recommended
+                      </span>
                     )}
                   </button>
                   <button
@@ -321,7 +329,8 @@ export function ShareSecretDrawer({
               <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
                 <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                  Share link created and sent to {emails.length} recipient{emails.length === 1 ? "" : "s"}
+                  Share link created and sent to {emails.length} recipient
+                  {emails.length === 1 ? "" : "s"}
                 </span>
               </div>
 
@@ -349,8 +358,13 @@ export function ShareSecretDrawer({
               <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="text-xs text-amber-700 dark:text-amber-400">
-                  <p className="font-medium">This link contains the decryption key.</p>
-                  <p className="mt-0.5">It cannot be regenerated. Share it securely with your recipient{emails.length > 1 ? "s" : ""}.</p>
+                  <p className="font-medium">
+                    This link contains the decryption key.
+                  </p>
+                  <p className="mt-0.5">
+                    It cannot be regenerated. Share it securely with your
+                    recipient{emails.length > 1 ? "s" : ""}.
+                  </p>
                 </div>
               </div>
 
@@ -379,7 +393,11 @@ export function ShareSecretDrawer({
               </button>
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || emails.length === 0 || (usePassphrase && !passphrase)}
+                disabled={
+                  isGenerating ||
+                  emails.length === 0 ||
+                  (usePassphrase && !passphrase)
+                }
                 className="flex-1 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isGenerating ? (

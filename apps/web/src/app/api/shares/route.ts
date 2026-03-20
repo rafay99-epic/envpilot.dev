@@ -84,8 +84,10 @@ export async function POST(request: Request) {
     });
 
     // Construct the full share URL with client key in fragment
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!baseUrl) {
+      throw new Error("NEXT_PUBLIC_APP_URL is not configured. Cannot generate share URL.");
+    }
     const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
 
     // Send notification emails to all recipients (best-effort, don't fail the request)

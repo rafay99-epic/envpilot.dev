@@ -31,7 +31,7 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Revoke share in Convex
+    // Revoke share in Convex (admin check happens server-side)
     const result = await convex.mutation(api.sharedSecrets.revokeShare, {
       shareId: shareId as any,
       userId: convexUser._id,

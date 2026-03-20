@@ -34,7 +34,11 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
   if (shares.length === 0) return null;
 
   const handleRevoke = async (shareId: string) => {
-    if (!confirm("Are you sure you want to revoke this share link? Recipients will no longer be able to access the secret.")) {
+    if (
+      !confirm(
+        "Are you sure you want to revoke this share link? Recipients will no longer be able to access the secret."
+      )
+    ) {
       return;
     }
     setRevokingId(shareId);
@@ -107,7 +111,10 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
       )}
       <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
         {shares.map((share) => (
-          <div key={share._id} className="flex items-center justify-between px-3 py-2">
+          <div
+            key={share._id}
+            className="flex items-center justify-between px-3 py-2"
+          >
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 {share.mode === "one_time" ? (
@@ -126,7 +133,8 @@ export function ActiveSharesList({ shares, onRefresh }: ActiveSharesListProps) {
                 </span>
               )}
               <span className="text-xs text-zinc-400">
-                {share.totalViewCount} view{share.totalViewCount !== 1 ? "s" : ""}
+                {share.totalViewCount} view
+                {share.totalViewCount !== 1 ? "s" : ""}
               </span>
             </div>
             {share.status === "active" && (

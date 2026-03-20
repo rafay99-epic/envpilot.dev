@@ -58,7 +58,6 @@ crons.interval(
   internal.variables.processRotationExpiry
 );
 
-
 // Clean up expired shared secrets every hour
 crons.interval(
   "cleanup expired shared secrets",
