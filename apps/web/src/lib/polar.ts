@@ -48,7 +48,8 @@ export const getPolarClient = (): Polar | null => {
   if (!polarClient) {
     polarClient = new Polar({
       accessToken: process.env.POLAR_ACCESS_TOKEN,
-      server: (process.env.POLAR_SERVER as "sandbox" | "production") || "sandbox",
+      server:
+        (process.env.POLAR_SERVER as "sandbox" | "production") || "sandbox",
     });
   }
 

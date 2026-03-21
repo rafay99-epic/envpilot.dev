@@ -645,10 +645,7 @@ export const processWebhookEvent = action({
           eventData.customerEmail || eventData.customer?.email;
 
         if (!customerId || !customerEmail) {
-          console.error(
-            "Missing customer data in checkout:",
-            eventData.id
-          );
+          console.error("Missing customer data in checkout:", eventData.id);
           return;
         }
 
@@ -709,8 +706,10 @@ export const processWebhookEvent = action({
           polarSubscriptionId: eventData.id,
           polarProductId: productId,
           status: eventData.status,
-          currentPeriodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
-          currentPeriodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+          currentPeriodStart:
+            polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+          currentPeriodEnd:
+            polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
           cancelAtPeriodEnd: eventData.cancelAtPeriodEnd ?? false,
           cancelAt: polarTimestamp(eventData.endsAt),
           trialStart: polarTimestamp(eventData.startedAt),
@@ -734,7 +733,8 @@ export const processWebhookEvent = action({
           // Reset consumption counters on new subscription
           await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
             userId: resolvedUserId,
-            periodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            periodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
             periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
           });
 
@@ -780,8 +780,7 @@ export const processWebhookEvent = action({
             internal.subscriptions._getOrgById,
             { organizationId: polarCustomer.organizationId }
           );
-          const resolvedUserId =
-            polarCustomer.userId ?? fallbackOrg?.createdBy;
+          const resolvedUserId = polarCustomer.userId ?? fallbackOrg?.createdBy;
 
           if (!resolvedUserId) {
             console.error(
@@ -798,8 +797,10 @@ export const processWebhookEvent = action({
             polarSubscriptionId: eventData.id,
             polarProductId: productId,
             status: eventData.status,
-            currentPeriodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
-            currentPeriodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+            currentPeriodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            currentPeriodEnd:
+              polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
             cancelAtPeriodEnd: eventData.cancelAtPeriodEnd ?? false,
             cancelAt: polarTimestamp(eventData.endsAt),
             trialStart: polarTimestamp(eventData.startedAt),
@@ -822,8 +823,10 @@ export const processWebhookEvent = action({
             });
             await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
               userId: resolvedUserId,
-              periodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
-              periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+              periodStart:
+                polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+              periodEnd:
+                polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
             });
             await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
               userId: resolvedUserId,
@@ -890,7 +893,8 @@ export const processWebhookEvent = action({
           });
           await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
             userId: resolvedUserId,
-            periodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            periodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
             periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
           });
           await ctx.runMutation(internal.subscriptions._clearGracePeriod, {

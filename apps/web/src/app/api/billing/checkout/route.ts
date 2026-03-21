@@ -3,10 +3,7 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
-import {
-  getPolarClient,
-  isPaymentsEnabled,
-} from "@/lib/polar";
+import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 import { verifyNotBot } from "@/lib/botid";
 

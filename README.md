@@ -89,7 +89,7 @@ Copy `.env.example` to `.env.local` at the monorepo root. The web app reads it v
 
 | Variable                          | Description                            |
 | --------------------------------- | -------------------------------------- |
-| `POLAR_ACCESS_TOKEN`               | Polar.sh access token                  |
+| `POLAR_ACCESS_TOKEN`              | Polar.sh access token                  |
 | `POLAR_WEBHOOK_SECRET`            | Polar.sh webhook signing secret        |
 | `NEXT_PUBLIC_PAYMENTS_ENABLED`    | Set `true` to enable billing           |
 | `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` | Set `true` to enforce tier caps        |

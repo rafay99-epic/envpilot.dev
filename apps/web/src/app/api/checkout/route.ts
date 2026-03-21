@@ -97,8 +97,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(result.url);
   } catch (error) {
     console.error("Polar checkout error:", error);
-    const message =
-      error instanceof Error ? error.message : "Checkout failed";
+    const message = error instanceof Error ? error.message : "Checkout failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -5,10 +5,7 @@ import {
 } from "@polar-sh/sdk/webhooks";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
-import {
-  getPolarWebhookSecret,
-  isPaymentsEnabled,
-} from "@/lib/polar";
+import { getPolarWebhookSecret, isPaymentsEnabled } from "@/lib/polar";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
