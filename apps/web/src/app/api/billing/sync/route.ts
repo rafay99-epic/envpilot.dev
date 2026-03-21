@@ -23,10 +23,7 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function POST(req: Request) {
   if (!isPaymentsEnabled()) {
-    return NextResponse.json(
-      { error: "Payments disabled" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Payments disabled" }, { status: 503 });
   }
 
   const { user } = await withAuth();
@@ -38,17 +35,14 @@ export async function POST(req: Request) {
   const checkoutId = url.searchParams.get("checkout_id");
 
   if (!checkoutId) {
-    return NextResponse.json(
-      { error: "Missing checkout_id" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Missing checkout_id" }, { status: 400 });
   }
 
   const accessToken = process.env.POLAR_ACCESS_TOKEN;
   if (!accessToken) {
     return NextResponse.json(
       { error: "Payment system not configured" },
-      { status: 503 },
+      { status: 503 }
     );
   }
 

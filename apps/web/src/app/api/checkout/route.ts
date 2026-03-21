@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   if (products.length === 0) {
     return NextResponse.json(
       { error: "Missing products in query params" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   if (!accessToken) {
     return NextResponse.json(
       { error: "Payment system is not configured" },
-      { status: 503 },
+      { status: 503 }
     );
   }
 
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
   if (!convexUser) {
     return NextResponse.json(
       { error: "Failed to resolve user account" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 
