@@ -79,7 +79,7 @@ export async function GET(req: Request) {
   // Derive the app origin from the incoming request so the success redirect
   // always matches the domain the user is on (localhost, ngrok, production).
   const origin = url.origin;
-  const successUrl = `${origin}/dashboard?checkout_id={CHECKOUT_ID}`;
+  const successUrl = `${origin}/dashboard/checkout-success?checkout_id={CHECKOUT_ID}`;
 
   try {
     const result = await polar.checkouts.create({
