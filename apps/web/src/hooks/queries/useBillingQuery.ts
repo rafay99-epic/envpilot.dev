@@ -12,7 +12,7 @@ interface SubscriptionResponse {
     cancelAt: number | null;
     trialEnd: number | null;
   } | null;
-  hasStripeCustomer: boolean;
+  hasBillingCustomer: boolean;
   canManageBilling: boolean;
 }
 
@@ -32,8 +32,16 @@ export function useSubscription(
 
 export function useCreateCheckout() {
   return useMutation({
-    mutationFn: (data: { organizationId: string; priceId?: string }) =>
-      api.post<{ url: string }>("/api/billing/checkout", data),
+    mutationFn: (data: {
+      organizationId: string;
+      tierName: string;
+      successUrl: string;
+      cancelUrl: string;
+    }) =>
+      api.post<{ checkoutUrl: string; sessionId: string }>(
+        "/api/billing/checkout",
+        data
+      ),
   });
 }
 

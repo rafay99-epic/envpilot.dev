@@ -579,7 +579,7 @@ export const getTierByName = query({
 });
 
 /**
- * Get all tiers that have Stripe prices (for pricing page).
+ * Get all tiers that have Polar products (for pricing page).
  */
 export const getAvailableTiers = query({
   args: {},
@@ -594,7 +594,7 @@ export const getAvailableTiers = query({
         color: t.color,
         sortOrder: t.sortOrder,
         isDefault: t.isDefault,
-        stripePriceId: t.stripePriceId,
+        polarProductId: t.polarProductId,
         monthlyPrice: t.monthlyPrice,
         yearlyPrice: t.yearlyPrice,
         badge: t.badge,

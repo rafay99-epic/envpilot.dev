@@ -787,29 +787,28 @@ export default defineSchema({
     .index("by_active", ["isActive"]),
 
   // ==========================================
-  // SUBSCRIPTIONS (Stripe Integration)
+  // SUBSCRIPTIONS (Polar.sh Integration)
   // ==========================================
   subscriptions: defineTable({
     // Legacy reference, kept for backward compat queries
     organizationId: v.id("organizations"),
     // Reference to the user (billing is per-user, optional until migration backfills)
     userId: v.optional(v.id("users")),
-    // Stripe customer ID
-    stripeCustomerId: v.string(),
-    // Stripe subscription ID
-    stripeSubscriptionId: v.string(),
-    // Stripe price ID for the subscription
-    stripePriceId: v.string(),
-    // Subscription status from Stripe
+    // Polar customer ID
+    polarCustomerId: v.string(),
+    // Polar subscription ID
+    polarSubscriptionId: v.string(),
+    // Polar product ID for the subscription
+    polarProductId: v.string(),
+    // Subscription status from Polar
     status: v.union(
       v.literal("active"),
       v.literal("canceled"),
       v.literal("incomplete"),
-      v.literal("incomplete_expired"),
       v.literal("past_due"),
-      v.literal("paused"),
       v.literal("trialing"),
-      v.literal("unpaid")
+      v.literal("unpaid"),
+      v.literal("revoked")
     ),
     // Billing period
     currentPeriodStart: v.number(),
@@ -826,21 +825,21 @@ export default defineSchema({
   })
     .index("by_organization", ["organizationId"])
     .index("by_user", ["userId"])
-    .index("by_stripe_customer", ["stripeCustomerId"])
-    .index("by_stripe_subscription", ["stripeSubscriptionId"])
+    .index("by_polar_customer", ["polarCustomerId"])
+    .index("by_polar_subscription", ["polarSubscriptionId"])
     .index("by_status", ["status"]),
 
   // ==========================================
-  // STRIPE CUSTOMERS (Maps users to Stripe)
+  // POLAR CUSTOMERS (Maps users to Polar.sh)
   // ==========================================
-  stripeCustomers: defineTable({
+  polarCustomers: defineTable({
     // Legacy reference, kept for backward compat queries
     organizationId: v.id("organizations"),
     // Reference to the user (billing is per-user, optional until migration backfills)
     userId: v.optional(v.id("users")),
-    // Stripe customer ID
-    stripeCustomerId: v.string(),
-    // Email used for Stripe
+    // Polar customer ID
+    polarCustomerId: v.string(),
+    // Email used for Polar
     email: v.string(),
     // Timestamps
     createdAt: v.number(),
@@ -848,7 +847,7 @@ export default defineSchema({
   })
     .index("by_organization", ["organizationId"])
     .index("by_user", ["userId"])
-    .index("by_stripe_customer", ["stripeCustomerId"]),
+    .index("by_polar_customer", ["polarCustomerId"]),
 
   // ==========================================
   // CLI SESSIONS (Browser-to-CLI Authentication)
@@ -1181,8 +1180,8 @@ export default defineSchema({
     isDefault: v.boolean(),
     // Badge color (hex code)
     color: v.optional(v.string()),
-    // Stripe price ID for this tier (for multi-tier billing)
-    stripePriceId: v.optional(v.string()),
+    // Polar product ID for this tier (for multi-tier billing)
+    polarProductId: v.optional(v.string()),
     // Pricing & marketing fields for the public pricing page
     monthlyPrice: v.optional(v.number()),
     yearlyPrice: v.optional(v.number()),

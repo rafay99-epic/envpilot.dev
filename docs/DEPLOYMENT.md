@@ -35,8 +35,8 @@ Set these in Vercel's project settings:
 | `WORKOS_COOKIE_PASSWORD` | 32+ character secret                |
 | `NEXT_PUBLIC_APP_URL`    | `https://your-domain.com`           |
 | `WORKOS_REDIRECT_URI`    | `https://your-domain.com/callback`  |
-| `STRIPE_SECRET_KEY`      | `sk_live_...`                       |
-| `STRIPE_WEBHOOK_SECRET`  | `whsec_...`                         |
+| `POLAR_ACCESS_TOKEN`     | `polar_...`                         |
+| `POLAR_WEBHOOK_SECRET`   | `whsec_...`                         |
 | `RESEND_API_KEY`         | `re_...`                            |
 
 ### Deploy
@@ -170,5 +170,5 @@ The CI uses mock values for environment variables (no real credentials needed fo
 
 - **Vercel**: Dashboard at [vercel.com](https://vercel.com) for deploy logs, analytics
 - **Convex**: Dashboard at [dashboard.convex.dev](https://dashboard.convex.dev) for function logs, data browser
-- **Stripe**: Dashboard for payment monitoring, webhook logs
+- **Polar.sh**: Dashboard for payment monitoring, webhook logs
 - **WorkOS**: Dashboard for auth events, user management

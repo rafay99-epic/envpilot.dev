@@ -337,7 +337,7 @@ export default function TermsOfServicePage() {
                 <Subsection title="7.2 Payment">
                   <p>
                     Paid subscriptions are billed in advance (monthly or
-                    annually) through Stripe. By subscribing, you authorize us
+                    annually) through Polar.sh. By subscribing, you authorize us
                     to charge your payment method at the start of each billing
                     cycle. Fees are in U.S. dollars unless otherwise stated.
                   </p>

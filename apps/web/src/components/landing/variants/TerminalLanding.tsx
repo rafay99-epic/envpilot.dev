@@ -572,7 +572,7 @@ export default function TerminalLanding() {
                       </span>
                     </p>
                     <p>
-                      <span className="text-amber-400">STRIPE_SECRET</span>
+                      <span className="text-amber-400">API_SECRET</span>
                       <span className="text-zinc-600">=</span>
                       <span className="text-red-400">
                         sk_live_4eC39HqLyjWDarj
@@ -612,10 +612,10 @@ export default function TerminalLanding() {
                       </span>
                     </p>
                     <p>
-                      <span className="text-amber-400">STRIPE_SECRET</span>
+                      <span className="text-amber-400">API_SECRET</span>
                       <span className="text-zinc-600">=</span>
                       <span className="text-green-400">
-                        vault://ref/stripe_live_9182
+                        vault://ref/api_live_9182
                       </span>
                     </p>
                     <p>

@@ -63,7 +63,7 @@
 - Resource breakdown chart (by project/type)
 - Security insights
 
-## Billing & Payments (Stripe)
+## Billing & Payments (Polar.sh)
 
 - Checkout flow for subscription creation
 - Subscription management and status tracking
@@ -176,7 +176,7 @@
 - REST API routes for all entities (orgs, projects, variables, users, invitations, templates, billing, audit logs)
 - Dedicated CLI API endpoints (`/api/cli/*`)
 - Dedicated extension API endpoints (`/api/extension/*`)
-- Webhook endpoints (Stripe)
+- Webhook endpoints (Polar.sh)
 - Auth callback endpoints (OAuth, CLI device code, extension)
 - Config and version endpoints
 
@@ -197,7 +197,7 @@
 ## Integrations
 
 - **WorkOS** — AuthKit (OAuth), Vault (secret encryption)
-- **Stripe** — Subscriptions, checkout, customer portal, webhooks
+- **Polar.sh** — Subscriptions, checkout, customer portal, webhooks
 - **Resend** — Invitation emails, notification emails, support emails
 - **Sentry** — Error tracking (CLI, extension, web)
 - **Convex** — Real-time database, WebSocket sync, scheduled cron jobs

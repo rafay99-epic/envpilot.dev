@@ -23,8 +23,9 @@ env:
   WORKOS_API_KEY: ci-workos-api-key
   WORKOS_COOKIE_PASSWORD: 01234567890123456789012345678901
   WORKOS_REDIRECT_URI: http://localhost:3000/callback
-  STRIPE_SECRET_KEY: sk_test_placeholder
-  STRIPE_WEBHOOK_SECRET: whsec_placeholder
+  POLAR_ACCESS_TOKEN: pat_placeholder
+  POLAR_WEBHOOK_SECRET: whsec_placeholder
+  POLAR_SERVER: sandbox
   RESEND_API_KEY: re_placeholder
 
 jobs:
