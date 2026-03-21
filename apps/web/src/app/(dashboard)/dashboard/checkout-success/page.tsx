@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import {
@@ -18,55 +18,59 @@ import {
 
 type SyncStatus = "syncing" | "success" | "error";
 
+/**
+ * Sync subscription state by calling the billing sync endpoint.
+ * Returns true on success, false on failure (but we treat both as success
+ * since the webhook will handle the tier update regardless).
+ */
+async function syncBilling(checkoutId: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `/api/billing/sync?checkout_id=${encodeURIComponent(checkoutId)}`,
+      { method: "POST" }
+    );
+    if (!res.ok) {
+      console.warn("Sync endpoint returned non-OK status, continuing...");
+    }
+    return true;
+  } catch {
+    console.warn("Sync request failed, webhook will handle tier update");
+    return true; // Still treat as success — payment went through
+  }
+}
+
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const checkoutId = searchParams.get("checkout_id");
   const errorParam = searchParams.get("error");
   const confettiFired = useRef(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(
-    errorParam ? "error" : "syncing"
-  );
+  // Determine initial sync status: error if error param, success if no checkout
+  // to sync, syncing if we need to call the billing sync endpoint.
+  const initialStatus: SyncStatus = errorParam
+    ? "error"
+    : !checkoutId
+      ? "success"
+      : "syncing";
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(initialStatus);
   const [errorMessage, setErrorMessage] = useState(errorParam || "");
   const syncAttempted = useRef(false);
 
   // Sync subscription state on page load — this ensures the user's tier
   // is updated even if the webhook hasn't arrived yet (race condition fix).
-  const syncSubscription = useCallback(async () => {
-    if (!checkoutId) {
-      setSyncStatus("success");
-      return;
-    }
-
-    try {
-      const res = await fetch(
-        `/api/billing/sync?checkout_id=${encodeURIComponent(checkoutId)}`,
-        { method: "POST" }
-      );
-
-      if (res.ok) {
-        setSyncStatus("success");
-      } else {
-        // Sync endpoint might not exist yet or failed — that's OK,
-        // the webhook will handle it. Still show success UI.
-        console.warn("Sync endpoint returned non-OK status, continuing...");
-        setSyncStatus("success");
-      }
-    } catch {
-      // Network error on sync — still show success since payment went through
-      console.warn("Sync request failed, webhook will handle tier update");
-      setSyncStatus("success");
-    }
-  }, [checkoutId]);
-
   useEffect(() => {
-    if (errorParam) return; // Don't sync if we already have an error
+    if (initialStatus !== "syncing") return;
+    if (syncAttempted.current) return;
+    syncAttempted.current = true;
 
-    if (!syncAttempted.current) {
-      syncAttempted.current = true;
-      syncSubscription();
-    }
-  }, [errorParam, syncSubscription]);
+    let cancelled = false;
+    syncBilling(checkoutId!).then(() => {
+      if (!cancelled) setSyncStatus("success");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialStatus, checkoutId]);
 
   // Fire confetti when sync completes successfully
   useEffect(() => {
