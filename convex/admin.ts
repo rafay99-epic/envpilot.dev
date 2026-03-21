@@ -34,7 +34,7 @@ const BROWSABLE_TABLES = [
   "changelog",
   "auditLogs",
   "subscriptions",
-  "stripeCustomers",
+  "polarCustomers",
   "cliSessions",
   "cliTokens",
   "environmentTemplates",
@@ -593,7 +593,8 @@ export const createTierDefinition = mutation({
     sortOrder: v.number(),
     isDefault: v.boolean(),
     color: v.optional(v.string()),
-    stripePriceId: v.optional(v.string()),
+    polarProductId: v.optional(v.string()),
+    isComingSoon: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
@@ -627,7 +628,8 @@ export const createTierDefinition = mutation({
       sortOrder: args.sortOrder,
       isDefault: args.isDefault,
       color: args.color,
-      stripePriceId: args.stripePriceId,
+      polarProductId: args.polarProductId,
+      isComingSoon: args.isComingSoon ?? false,
       createdAt: now,
       updatedAt: now,
     });
@@ -643,7 +645,8 @@ export const updateTierDefinition = mutation({
     sortOrder: v.optional(v.number()),
     isDefault: v.optional(v.boolean()),
     color: v.optional(v.string()),
-    stripePriceId: v.optional(v.string()),
+    polarProductId: v.optional(v.string()),
+    isComingSoon: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
@@ -671,8 +674,10 @@ export const updateTierDefinition = mutation({
     if (args.sortOrder !== undefined) updates.sortOrder = args.sortOrder;
     if (args.isDefault !== undefined) updates.isDefault = args.isDefault;
     if (args.color !== undefined) updates.color = args.color;
-    if (args.stripePriceId !== undefined)
-      updates.stripePriceId = args.stripePriceId;
+    if (args.polarProductId !== undefined)
+      updates.polarProductId = args.polarProductId;
+    if (args.isComingSoon !== undefined)
+      updates.isComingSoon = args.isComingSoon;
 
     await ctx.db.patch(args.id, updates);
   },
@@ -740,6 +745,7 @@ export const seedDefaultTiers = mutation({
         sortOrder: 0,
         isDefault: true,
         color: "#71717a",
+        polarProductId: "35d0b155-c28a-4cca-a5cf-bbb14f6ab23c",
         monthlyPrice: 0,
         badge: "Alpha \u00b7 Free during early access",
         badgeColor: "amber",
@@ -764,12 +770,13 @@ export const seedDefaultTiers = mutation({
         sortOrder: 1,
         isDefault: false,
         color: "#a855f7",
+        polarProductId: "d1edde6d-3201-4cec-b1e4-e053d7edba23",
         monthlyPrice: 15,
-        badge: "Coming soon",
-        badgeColor: "zinc",
-        ctaText: "Coming Soon",
-        ctaLink: "/pricing",
-        isComingSoon: true,
+        badge: "Pro",
+        badgeColor: "green",
+        ctaText: "Upgrade to Pro",
+        ctaLink: "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23",
+        isComingSoon: false,
         highlightFeatures: [
           "Unlimited projects",
           "Unlimited variables",
@@ -1070,6 +1077,7 @@ export const runMigration = mutation({
           sortOrder: 0,
           isDefault: true,
           color: "#71717a",
+          polarProductId: "35d0b155-c28a-4cca-a5cf-bbb14f6ab23c",
           monthlyPrice: 0,
           badge: "Alpha · Free during early access",
           badgeColor: "amber",
@@ -1094,12 +1102,14 @@ export const runMigration = mutation({
           sortOrder: 1,
           isDefault: false,
           color: "#a855f7",
+          polarProductId: "d1edde6d-3201-4cec-b1e4-e053d7edba23",
           monthlyPrice: 15,
-          badge: "Coming soon",
-          badgeColor: "zinc",
-          ctaText: "Coming Soon",
-          ctaLink: "/pricing",
-          isComingSoon: true,
+          badge: "Pro",
+          badgeColor: "green",
+          ctaText: "Upgrade to Pro",
+          ctaLink:
+            "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23",
+          isComingSoon: false,
           highlightFeatures: [
             "Unlimited projects",
             "Unlimited variables",
@@ -1514,7 +1524,7 @@ export const runMigration = mutation({
         orgTiersMigrated: 0,
         orgTiersDeleted: 0,
         subscriptionsBackfilled: 0,
-        stripeCustomersBackfilled: 0,
+        polarCustomersBackfilled: 0,
       };
 
       const now = Date.now();
@@ -1579,14 +1589,14 @@ export const runMigration = mutation({
         }
       }
 
-      // 5. Backfill userId on stripeCustomers
-      const customers = await ctx.db.query("stripeCustomers").collect();
+      // 5. Backfill userId on polarCustomers
+      const customers = await ctx.db.query("polarCustomers").collect();
       for (const sc of customers) {
         if (!sc.userId) {
           const org = await ctx.db.get(sc.organizationId);
           if (org) {
             await ctx.db.patch(sc._id, { userId: org.createdBy });
-            results.stripeCustomersBackfilled++;
+            results.polarCustomersBackfilled++;
           }
         }
       }
@@ -2267,7 +2277,7 @@ export const updateUserTier = mutation({
  * 1. Strips `limits` and `features` from all tierDefinitions documents.
  * 2. Migrates organizationTiers → userTiers (if not already migrated).
  * 3. Deletes all organizationTiers records.
- * 4. Backfills userId on subscriptions/stripeCustomers from org owner.
+ * 4. Backfills userId on subscriptions/polarCustomers from org owner.
  *
  * Run this ONCE after deploying the Phase 6 schema.
  * After running, redeploy with organizationTiers table + limits/features
@@ -2284,7 +2294,7 @@ export const migratePhase6 = mutation({
       orgTiersMigrated: 0,
       orgTiersDeleted: 0,
       subscriptionsBackfilled: 0,
-      stripeCustomersBackfilled: 0,
+      polarCustomersBackfilled: 0,
     };
 
     // 1. Strip limits/features from tierDefinitions
@@ -2347,14 +2357,14 @@ export const migratePhase6 = mutation({
       }
     }
 
-    // 5. Backfill userId on stripeCustomers
-    const customers = await ctx.db.query("stripeCustomers").collect();
+    // 5. Backfill userId on polarCustomers
+    const customers = await ctx.db.query("polarCustomers").collect();
     for (const sc of customers) {
       if (!sc.userId) {
         const org = await ctx.db.get(sc.organizationId);
         if (org) {
           await ctx.db.patch(sc._id, { userId: org.createdBy });
-          results.stripeCustomersBackfilled++;
+          results.polarCustomersBackfilled++;
         }
       }
     }

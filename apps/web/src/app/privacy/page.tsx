@@ -246,7 +246,7 @@ export default function PrivacyPolicyPage() {
                 <Subsection title="3.5 Billing Data">
                   <p>
                     If you subscribe to a paid plan, our payment processor
-                    (Stripe) collects your payment method details. We store
+                    (Polar.sh) collects your payment method details. We store
                     subscription identifiers, plan tier, billing period dates,
                     and payment status. We do not store credit card numbers or
                     bank account information on our servers.
@@ -414,7 +414,7 @@ export default function PrivacyPolicyPage() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-green-400">Stripe</td>
+                        <td className="px-4 py-3 text-green-400">Polar.sh</td>
                         <td className="px-4 py-3">Payment processing</td>
                         <td className="px-4 py-3">
                           Email, billing address, payment method

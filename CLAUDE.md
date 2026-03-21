@@ -125,7 +125,7 @@ Envpilot is a secure environment variable management platform with three client 
 ```
 Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vault (encrypted secrets)
                               ↓
-                    WorkOS AuthKit (auth) + Stripe (billing) + Resend (email)
+                    WorkOS AuthKit (auth) + Polar.sh (billing) + Resend (email)
 ```
 
 - **Convex** is the real-time database. Functions in `convex/` are auto-deployed during `bun run dev`. React components consume data via `useQuery`/`useMutation` from `convex/react` with the auto-generated `api` object.
@@ -138,7 +138,7 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 - `apps/web/` — Next.js web app (`@envpilot/web`).
   - `apps/web/src/app/api/` — REST API routes. Use `withAuth()` middleware for auth. Use `ConvexHttpClient` for server-side Convex calls.
   - `apps/web/src/hooks/` — Custom React hooks wrapping Convex queries.
-  - `apps/web/src/lib/` — Shared utilities: auth, vault, stripe, email, tier-limits, feature-flags.
+  - `apps/web/src/lib/` — Shared utilities: auth, vault, polar, email, tier-limits, feature-flags.
 - `apps/cli/` — CLI npm package (`@envpilot/cli`). Uses Commander.js, builds with tsup, tests with vitest.
 - `apps/vscode-extension/` — VS Code extension package. OAuth-based auth, real-time sync, esbuild bundled.
 - `packages/` — Shared config packages (tsconfig, eslint-config, prettier-config).
@@ -168,4 +168,4 @@ Three-tier RBAC defined in `apps/web/src/lib/auth.ts`:
 All env vars live in `.env.local` at the **monorepo root**. The web app reads it via symlink (`apps/web/.env.local → ../../.env.local`). Run `bun run setup` to create both. See `.env.example` for the full template.
 
 Required: `NEXT_PUBLIC_CONVEX_URL`, `CONVEX_DEPLOYMENT`, `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_APP_URL`, `WORKOS_REDIRECT_URI`.
-Optional: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `RESEND_API_KEY`, `FROM_EMAIL`.
+Optional: `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `RESEND_API_KEY`, `FROM_EMAIL`.

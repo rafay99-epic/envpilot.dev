@@ -15,7 +15,7 @@ The web app has **two data-fetching layers**:
 
 ### Why Both?
 
-Convex provides real-time subscriptions via WebSocket — data updates automatically when the database changes. This is perfect for dashboards, live counters, and collaborative features. TanStack Query handles the REST API layer — calls to `/api/*` routes that go through Next.js, touch external services (WorkOS Vault, Stripe, Resend), or perform complex server-side operations. These don't need real-time subscriptions but benefit from caching, deduplication, retry logic, and structured loading/error states.
+Convex provides real-time subscriptions via WebSocket — data updates automatically when the database changes. This is perfect for dashboards, live counters, and collaborative features. TanStack Query handles the REST API layer — calls to `/api/*` routes that go through Next.js, touch external services (WorkOS Vault, Polar.sh, Resend), or perform complex server-side operations. These don't need real-time subscriptions but benefit from caching, deduplication, retry logic, and structured loading/error states.
 
 ## Key Files
 

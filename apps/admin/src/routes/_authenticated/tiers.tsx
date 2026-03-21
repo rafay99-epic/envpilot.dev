@@ -52,8 +52,9 @@ interface TierFormData {
   description: string;
   sortOrder: number;
   isDefault: boolean;
+  isComingSoon: boolean;
   color: string;
-  stripePriceId: string;
+  polarProductId: string;
 }
 
 interface TierFormErrors {
@@ -69,8 +70,9 @@ const EMPTY_FORM: TierFormData = {
   description: "",
   sortOrder: 0,
   isDefault: false,
+  isComingSoon: false,
   color: "#71717a",
-  stripePriceId: "",
+  polarProductId: "",
 };
 
 const PRESET_COLORS = [
@@ -206,8 +208,9 @@ function TiersPage() {
       description: tier.description ?? "",
       sortOrder: tier.sortOrder,
       isDefault: tier.isDefault,
+      isComingSoon: tier.isComingSoon ?? false,
       color: tier.color ?? "#71717a",
-      stripePriceId: tier.stripePriceId ?? "",
+      polarProductId: tier.polarProductId ?? "",
     };
     setForm(initial);
     initialFormRef.current = initial;
@@ -224,8 +227,9 @@ function TiersPage() {
       form.description !== initial.description ||
       form.sortOrder !== initial.sortOrder ||
       form.isDefault !== initial.isDefault ||
+      form.isComingSoon !== initial.isComingSoon ||
       form.color !== initial.color ||
-      form.stripePriceId !== initial.stripePriceId
+      form.polarProductId !== initial.polarProductId
     );
   }, [form]);
 
@@ -278,8 +282,9 @@ function TiersPage() {
           description: form.description || undefined,
           sortOrder: form.sortOrder,
           isDefault: form.isDefault,
+          isComingSoon: form.isComingSoon,
           color: form.color,
-          stripePriceId: form.stripePriceId || undefined,
+          polarProductId: form.polarProductId || undefined,
         });
         toast("success", `Tier "${form.displayName}" updated`);
       } else {
@@ -289,8 +294,9 @@ function TiersPage() {
           description: form.description || undefined,
           sortOrder: form.sortOrder,
           isDefault: form.isDefault,
+          isComingSoon: form.isComingSoon,
           color: form.color,
-          stripePriceId: form.stripePriceId || undefined,
+          polarProductId: form.polarProductId || undefined,
         });
         toast("success", `Tier "${form.displayName}" created`);
       }
@@ -622,13 +628,13 @@ function TiersPage() {
                       <Users className="h-3 w-3" />
                       {userCount} user{userCount !== 1 ? "s" : ""}
                     </span>
-                    {tier.stripePriceId && (
+                    {tier.polarProductId && (
                       <span
                         className="flex items-center gap-1 text-zinc-500"
-                        title={tier.stripePriceId}
+                        title={tier.polarProductId}
                       >
                         <CreditCard className="h-3 w-3" />
-                        Stripe linked
+                        Polar linked
                       </span>
                     )}
                   </div>
@@ -1448,15 +1454,15 @@ function TiersPage() {
                 <div>
                   <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-zinc-300">
                     <CreditCard className="h-3.5 w-3.5" />
-                    Stripe Price ID
+                    Polar Product ID
                   </label>
                   <input
                     type="text"
-                    value={form.stripePriceId}
+                    value={form.polarProductId}
                     onChange={(e) =>
-                      updateFormField("stripePriceId", e.target.value)
+                      updateFormField("polarProductId", e.target.value)
                     }
-                    placeholder="price_..."
+                    placeholder="prod_..."
                     className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
                   <p className="mt-1 text-[10px] text-zinc-500">Optional</p>
@@ -1476,6 +1482,23 @@ function TiersPage() {
                   <span className="font-medium">Default tier</span>
                   <p className="text-xs text-zinc-500">
                     Auto-assigned to new users
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:border-zinc-700">
+                <input
+                  type="checkbox"
+                  checked={form.isComingSoon}
+                  onChange={(e) =>
+                    updateFormField("isComingSoon", e.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500"
+                />
+                <div>
+                  <span className="font-medium">Coming Soon</span>
+                  <p className="text-xs text-zinc-500">
+                    Disables the upgrade button on the pricing page
                   </p>
                 </div>
               </label>

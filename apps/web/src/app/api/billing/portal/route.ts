@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
-import { getStripeClient, isPaymentsEnabled } from "@/lib/stripe";
+import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 import { verifyNotBot } from "@/lib/botid";
 
@@ -16,7 +16,7 @@ const portalSchema = z.object({
 
 /**
  * POST /api/billing/portal
- * Create a Stripe Billing Portal session for managing subscriptions
+ * Create a Polar Customer Portal session for managing subscriptions
  */
 export async function POST(request: Request) {
   try {
@@ -31,9 +31,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const stripe = getStripeClient();
+    const polar = getPolarClient();
 
-    if (!stripe) {
+    if (!polar) {
       return NextResponse.json(
         { error: "Payment system is not properly configured" },
         { status: 503 }
@@ -80,33 +80,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get Stripe customer — try user-level first, fallback to org-level
-    let stripeCustomer = await convex.query(
-      api.subscriptions.getStripeCustomerByUser,
+    // Get Polar customer — try user-level first, fallback to org-level
+    let polarCustomer = await convex.query(
+      api.subscriptions.getPolarCustomerByUser,
       { userId: convexUser._id }
     );
 
-    if (!stripeCustomer) {
-      stripeCustomer = await convex.query(api.subscriptions.getStripeCustomer, {
+    if (!polarCustomer) {
+      polarCustomer = await convex.query(api.subscriptions.getPolarCustomer, {
         organizationId: organizationId as Id<"organizations">,
       });
     }
 
-    if (!stripeCustomer) {
+    if (!polarCustomer) {
       return NextResponse.json(
         { error: "No billing account found. Please subscribe first." },
         { status: 404 }
       );
     }
 
-    // Create billing portal session
-    const session = await stripe.billingPortal.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
-      return_url: returnUrl,
+    // Create Polar customer portal session
+    const session = await polar.customerSessions.create({
+      customerId: polarCustomer.polarCustomerId,
     });
 
     return NextResponse.json({
-      portalUrl: session.url,
+      portalUrl: session.customerPortalUrl,
     });
   } catch (error) {
     console.error("Error creating billing portal session:", error);

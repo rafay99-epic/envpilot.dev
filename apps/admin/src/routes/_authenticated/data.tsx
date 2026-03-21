@@ -53,7 +53,7 @@ const BROWSABLE_TABLES = [
   { value: "changelog", label: "changelog" },
   { value: "auditLogs", label: "auditLogs" },
   { value: "subscriptions", label: "subscriptions" },
-  { value: "stripeCustomers", label: "stripeCustomers" },
+  { value: "polarCustomers", label: "polarCustomers" },
   { value: "cliSessions", label: "cliSessions" },
   { value: "cliTokens", label: "cliTokens" },
   { value: "environmentTemplates", label: "environmentTemplates" },

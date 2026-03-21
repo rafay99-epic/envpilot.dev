@@ -13,8 +13,8 @@
  */
 export const FEATURE_FLAGS = {
   /**
-   * Payment System (Stripe Integration)
-   * When enabled, users can upgrade via Stripe checkout.
+   * Payment System (Polar.sh Integration)
+   * When enabled, users can upgrade via Polar checkout.
    * Set NEXT_PUBLIC_PAYMENTS_ENABLED=true to enable.
    */
   PAYMENTS: "payments",

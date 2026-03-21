@@ -20,7 +20,7 @@
     },
     "apps/admin": {
       "name": "@envpilot/admin",
-      "version": "1.1.0",
+      "version": "1.3.1",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
@@ -55,7 +55,7 @@
     },
     "apps/cli": {
       "name": "@envpilot/cli",
-      "version": "1.3.4",
+      "version": "1.4.1",
       "bin": {
         "envpilot": "./dist/index.js",
       },
@@ -83,7 +83,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.3.4",
+      "version": "1.3.5",
       "dependencies": {
         "@sentry/node": "^10.43.0",
         "axios": "^1.6.2",
@@ -105,8 +105,10 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.7.0",
+      "version": "1.9.1",
       "dependencies": {
+        "@polar-sh/nextjs": "^0.9.5",
+        "@polar-sh/sdk": "^0.46.6",
         "@react-three/drei": "^10.7.7",
         "@react-three/fiber": "^9.5.0",
         "@sentry/nextjs": "^10",
@@ -117,6 +119,7 @@
         "@workos-inc/authkit-nextjs": "^2.14.0",
         "@workos-inc/node": "^8.5.0",
         "botid": "^1.5.11",
+        "canvas-confetti": "^1.9.4",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "convex": "^1.32.0",
@@ -129,7 +132,6 @@
         "react-markdown": "^10.1.0",
         "recharts": "^3.8.0",
         "remark-gfm": "^4.0.1",
-        "stripe": "^20.3.1",
         "tailwind-merge": "^3.5.0",
         "three": "^0.183.1",
         "zod": "^4.3.6",
@@ -141,6 +143,7 @@
         "@playwright/test": "^1.58.2",
         "@tailwindcss/postcss": "^4",
         "@tanstack/react-query-devtools": "^5.91.3",
+        "@types/canvas-confetti": "^1.9.0",
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",
@@ -556,6 +559,12 @@
 
     "@playwright/test": ["@playwright/test@1.58.2", "", { "dependencies": { "playwright": "1.58.2" }, "bin": { "playwright": "cli.js" } }, "sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA=="],
 
+    "@polar-sh/adapter-utils": ["@polar-sh/adapter-utils@0.4.5", "", { "dependencies": { "@polar-sh/sdk": "^0.46.4" } }, "sha512-ar9u2BMmF/6h0KQ2gRQBLPF/fKMcFyicZo1EpJU6awx84cmytVepw1LX5xQa7kMBxPgo8AIxUIXG5OPGeefnWQ=="],
+
+    "@polar-sh/nextjs": ["@polar-sh/nextjs@0.9.5", "", { "dependencies": { "@polar-sh/adapter-utils": "0.4.5", "@polar-sh/sdk": "^0.46.4" }, "peerDependencies": { "next": "^15.0.0 || ^16.0.0" } }, "sha512-T0mnFswqCWCpB1UAF1b3rD4HajX3gwR7rCjBMx86J/xUNvp0TKjdBHubAThQZaMlToNuAzYFr5KOTb5oWRVqPA=="],
+
+    "@polar-sh/sdk": ["@polar-sh/sdk@0.46.6", "", { "dependencies": { "standardwebhooks": "^1.0.0", "zod": "^3.25.65 || ^4.0.0" } }, "sha512-+ULxRCkGo74IbuVcVbnWEOY1Hu0EHRSJO9QNLKylllaQmhpGf/GeBnbb7l95lrKcjH1pJNdYVU/oA02+pGTluw=="],
+
     "@prisma/instrumentation": ["@prisma/instrumentation@7.2.0", "", { "dependencies": { "@opentelemetry/instrumentation": "^0.207.0" }, "peerDependencies": { "@opentelemetry/api": "^1.8" } }, "sha512-Rh9Z4x5kEj1OdARd7U18AtVrnL6rmLSI0qYShaB4W7Wx5BKbgzndWF+QnuzMb7GLfVdlT5aYCXoPQVYuYtVu0g=="],
 
     "@react-three/drei": ["@react-three/drei@10.7.7", "", { "dependencies": { "@babel/runtime": "^7.26.0", "@mediapipe/tasks-vision": "0.10.17", "@monogrid/gainmap-js": "^3.0.6", "@use-gesture/react": "^10.3.1", "camera-controls": "^3.1.0", "cross-env": "^7.0.3", "detect-gpu": "^5.0.56", "glsl-noise": "^0.0.0", "hls.js": "^1.5.17", "maath": "^0.10.8", "meshline": "^3.3.1", "stats-gl": "^2.2.8", "stats.js": "^0.17.0", "suspend-react": "^0.1.3", "three-mesh-bvh": "^0.8.3", "three-stdlib": "^2.35.6", "troika-three-text": "^0.52.4", "tunnel-rat": "^0.1.2", "use-sync-external-store": "^1.4.0", "utility-types": "^3.11.0", "zustand": "^5.0.1" }, "peerDependencies": { "@react-three/fiber": "^9.0.0", "react": "^19", "react-dom": "^19", "three": ">=0.159" }, "optionalPeers": ["react-dom"] }, "sha512-ff+J5iloR0k4tC++QtD/j9u3w5fzfgFAWDtAGQah9pF2B1YgOq/5JxqY0/aVoQG5r3xSZz0cv5tk2YuBob4xEQ=="],
@@ -789,6 +798,8 @@
     "@types/babel__template": ["@types/babel__template@7.4.4", "", { "dependencies": { "@babel/parser": "^7.1.0", "@babel/types": "^7.0.0" } }, "sha512-h/NUaSyG5EyxBIp8YRxo4RMe2/qQgvyowRwVMzhYhBCONbW8PUsg4lkFMrhgZhUe5z3L3MiLDuvyJ/CaPa2A8A=="],
 
     "@types/babel__traverse": ["@types/babel__traverse@7.28.0", "", { "dependencies": { "@babel/types": "^7.28.2" } }, "sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q=="],
+
+    "@types/canvas-confetti": ["@types/canvas-confetti@1.9.0", "", {}, "sha512-aBGj/dULrimR1XDZLtG9JwxX1b4HPRF6CX9Yfwh3NvstZEm1ZL7RBnel4keCPSqs1ANRu1u2Aoz9R+VmtjYuTg=="],
 
     "@types/chai": ["@types/chai@5.2.3", "", { "dependencies": { "@types/deep-eql": "*", "assertion-error": "^2.0.1" } }, "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA=="],
 
@@ -1149,6 +1160,8 @@
     "camera-controls": ["camera-controls@3.1.2", "", { "peerDependencies": { "three": ">=0.126.1" } }, "sha512-xkxfpG2ECZ6Ww5/9+kf4mfg1VEYAoe9aDSY+IwF0UEs7qEzwy0aVRfs2grImIECs/PoBtWFrh7RXsQkwG922JA=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001777", "", {}, "sha512-tmN+fJxroPndC74efCdp12j+0rk0RHwV5Jwa1zWaFVyw2ZxAuPeG8ZgWC3Wz7uSjT3qMRQ5XHZ4COgQmsCMJAQ=="],
+
+    "canvas-confetti": ["canvas-confetti@1.9.4", "", {}, "sha512-yxQbJkAVrFXWNbTUjPqjF7G+g6pDotOUHGbkZq2NELZUMDpiJ85rIEazVb8GTaAptNW2miJAXbs1BtioA251Pw=="],
 
     "ccount": ["ccount@2.0.1", "", {}, "sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg=="],
 
@@ -2333,8 +2346,6 @@
     "strip-json-comments": ["strip-json-comments@3.1.1", "", {}, "sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig=="],
 
     "strip-literal": ["strip-literal@2.1.1", "", { "dependencies": { "js-tokens": "^9.0.1" } }, "sha512-631UJ6O00eNGfMiWG78ck80dfBab8X6IVFB51jZK5Icd7XAs60Z5y7QdSd/wGIklnWvRbUNloVzhOKKmutxQ6Q=="],
-
-    "stripe": ["stripe@20.4.1", "", { "peerDependencies": { "@types/node": ">=16" }, "optionalPeers": ["@types/node"] }, "sha512-axCguHItc8Sxt0HC6aSkdVRPffjYPV7EQqZRb2GkIa8FzWDycE7nHJM19C6xAIynH1Qp1/BHiopSi96jGBxT0w=="],
 
     "structured-source": ["structured-source@4.0.0", "", { "dependencies": { "boundary": "^2.0.0" } }, "sha512-qGzRFNJDjFieQkl/sVOI2dUjHKRyL9dAJi2gCPGJLbJHBIkyOHxjuocpIEfbLioX+qSJpvbYdT49/YCdMznKxA=="],
 
