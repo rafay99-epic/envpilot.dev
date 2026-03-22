@@ -2115,8 +2115,7 @@ export const getPaymentReadiness = query({
     const paidTiers = tierDefinitions.filter((t) => !t.isDefault);
     const tiersWithProducts = paidTiers.map((tier) => {
       const product = paymentProducts.find(
-        (p) =>
-          p.tierName === tier.name && p.provider === "polar" && p.isActive
+        (p) => p.tierName === tier.name && p.provider === "polar" && p.isActive
       );
       return {
         tierName: tier.name,

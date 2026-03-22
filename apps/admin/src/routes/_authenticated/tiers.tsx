@@ -189,7 +189,8 @@ function TiersPage() {
     string | null
   >(null);
   const [showProductModal, setShowProductModal] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<Id<"paymentProducts"> | null>(null);
+  const [editingProductId, setEditingProductId] =
+    useState<Id<"paymentProducts"> | null>(null);
   const [productForm, setProductForm] = useState({
     tierName: "",
     provider: "polar",
@@ -1757,9 +1758,7 @@ function TiersPage() {
         isOpen={showProductModal}
         onClose={() => setShowProductModal(false)}
         title={
-          editingProductId
-            ? "Edit Product Mapping"
-            : "Add Product Mapping"
+          editingProductId ? "Edit Product Mapping" : "Add Product Mapping"
         }
         width="max-w-md"
       >
@@ -1891,10 +1890,7 @@ function TiersPage() {
                 "Create"
               )}
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowProductModal(false)}
-            >
+            <Button variant="ghost" onClick={() => setShowProductModal(false)}>
               Cancel
             </Button>
           </div>

@@ -1230,8 +1230,7 @@ export default defineSchema({
     eventType: v.string(),
     // When the event was processed
     processedAt: v.number(),
-  })
-    .index("by_webhook_id", ["webhookId"]),
+  }).index("by_webhook_id", ["webhookId"]),
 
   // ==========================================
   // PAYMENT PRODUCTS (Provider-agnostic product mapping)
