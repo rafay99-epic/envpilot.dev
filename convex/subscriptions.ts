@@ -663,21 +663,16 @@ export const processWebhookEvent = action({
 
       // -----------------------------------------------
       // SUBSCRIPTION CREATED / ACTIVE — activate tier
+      //
+      // User resolution strategy (handles race condition where
+      // subscription.created arrives before checkout.updated):
+      //   1. metadata.userId from checkout (most reliable)
+      //   2. customer.externalId (set to Convex userId at checkout)
+      //   3. polarCustomers table lookup (fallback)
       // -----------------------------------------------
       case "subscription.created":
       case "subscription.active": {
         const customerId = eventData.customerId as string;
-
-        const polarCustomer = await ctx.runQuery(
-          internal.subscriptions._getPolarCustomerById,
-          { polarCustomerId: customerId }
-        );
-
-        if (!polarCustomer) {
-          console.error("No customer found for Polar customer:", customerId);
-          return;
-        }
-
         const productId = eventData.productId as string;
 
         if (!productId) {
@@ -685,23 +680,80 @@ export const processWebhookEvent = action({
           return;
         }
 
-        // Resolve the user — prefer userId on polarCustomer, fallback to org owner
-        const org = await ctx.runQuery(internal.subscriptions._getOrgById, {
-          organizationId: polarCustomer.organizationId,
-        });
-        const resolvedUserId = polarCustomer.userId ?? org?.createdBy;
+        // --- Resolve user ID using multiple strategies ---
+        const metadata = eventData.metadata || {};
+        const customerExternalId =
+          eventData.customer?.externalId ?? eventData.externalCustomerId; // Embedded customer object // Top-level field
+
+        let resolvedUserId: string | undefined;
+        let resolvedOrgId: string | undefined;
+
+        // Strategy 1: metadata from checkout (most reliable)
+        if (metadata.userId) {
+          resolvedUserId = metadata.userId;
+          resolvedOrgId = metadata.organizationId;
+        }
+
+        // Strategy 2: customer.externalId (= Convex user ID, set at checkout)
+        if (!resolvedUserId && customerExternalId) {
+          resolvedUserId = customerExternalId;
+        }
+
+        // Strategy 3: polarCustomers table lookup (original approach)
+        if (!resolvedUserId) {
+          const polarCustomer = await ctx.runQuery(
+            internal.subscriptions._getPolarCustomerById,
+            { polarCustomerId: customerId }
+          );
+          if (polarCustomer) {
+            resolvedUserId = polarCustomer.userId ?? undefined;
+            resolvedOrgId = resolvedOrgId ?? polarCustomer.organizationId;
+          }
+        }
 
         if (!resolvedUserId) {
           console.error(
             "Could not resolve user for subscription:",
+            eventData.id,
+            "customerId:",
+            customerId
+          );
+          return;
+        }
+
+        // Resolve org ID — if we still don't have one, look up user's first org
+        if (!resolvedOrgId) {
+          const userOrgs = await ctx.runQuery(
+            internal.subscriptions._getUserOwnedOrgs,
+            { userId: resolvedUserId as any }
+          );
+          if (userOrgs.length > 0) {
+            resolvedOrgId = userOrgs[0]._id;
+          }
+        }
+
+        if (!resolvedOrgId) {
+          console.error(
+            "Could not resolve organization for subscription:",
             eventData.id
           );
           return;
         }
 
+        // Ensure polarCustomers record exists (handles race condition)
+        await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
+          organizationId: resolvedOrgId as any,
+          userId: resolvedUserId as any,
+          polarCustomerId: customerId,
+          email:
+            eventData.customer?.email ??
+            eventData.customerEmail ??
+            "unknown@polar.sh",
+        });
+
         await ctx.runMutation(internal.subscriptions.createSubscription, {
-          organizationId: polarCustomer.organizationId,
-          userId: resolvedUserId,
+          organizationId: resolvedOrgId as any,
+          userId: resolvedUserId as any,
           polarCustomerId: customerId,
           polarSubscriptionId: eventData.id,
           polarProductId: productId,
@@ -723,16 +775,16 @@ export const processWebhookEvent = action({
         );
 
         if (eventData.status === "active" || eventData.status === "trialing") {
-          // Primary: sync user tier
+          // Primary: sync user tier (user-level, not org-level)
           await ctx.runMutation(internal.subscriptions._syncUserTier, {
-            userId: resolvedUserId,
+            userId: resolvedUserId as any,
             tier: tierName,
             reason: "billing.subscription_created",
           });
 
           // Reset consumption counters on new subscription
           await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-            userId: resolvedUserId,
+            userId: resolvedUserId as any,
             periodStart:
               polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
             periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
@@ -740,11 +792,13 @@ export const processWebhookEvent = action({
 
           // Clear any active grace period
           await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-            userId: resolvedUserId,
+            userId: resolvedUserId as any,
           });
         }
 
-        console.log(`Polar: ${args.type}`);
+        console.log(
+          `Polar: ${args.type} — user ${resolvedUserId} → tier ${tierName}`
+        );
         break;
       }
 
@@ -759,16 +813,11 @@ export const processWebhookEvent = action({
 
         if (!existingSubscription) {
           // Subscription doesn't exist yet — handle as new creation
+          // Use same multi-strategy user resolution as subscription.created
           const customerId = eventData.customerId as string;
-          const polarCustomer = await ctx.runQuery(
-            internal.subscriptions._getPolarCustomerById,
-            { polarCustomerId: customerId }
-          );
-
-          if (!polarCustomer) {
-            console.error("No customer found for Polar customer:", customerId);
-            return;
-          }
+          const updMetadata = eventData.metadata || {};
+          const updExternalId =
+            eventData.customer?.externalId ?? eventData.externalCustomerId;
 
           const productId = eventData.productId as string;
           if (!productId) {
@@ -776,23 +825,71 @@ export const processWebhookEvent = action({
             return;
           }
 
-          const fallbackOrg = await ctx.runQuery(
-            internal.subscriptions._getOrgById,
-            { organizationId: polarCustomer.organizationId }
-          );
-          const resolvedUserId = polarCustomer.userId ?? fallbackOrg?.createdBy;
+          let resolvedUserId: string | undefined;
+          let resolvedOrgId: string | undefined;
+
+          // Strategy 1: metadata
+          if (updMetadata.userId) {
+            resolvedUserId = updMetadata.userId;
+            resolvedOrgId = updMetadata.organizationId;
+          }
+          // Strategy 2: customer.externalId
+          if (!resolvedUserId && updExternalId) {
+            resolvedUserId = updExternalId;
+          }
+          // Strategy 3: polarCustomers table
+          if (!resolvedUserId) {
+            const polarCustomer = await ctx.runQuery(
+              internal.subscriptions._getPolarCustomerById,
+              { polarCustomerId: customerId }
+            );
+            if (polarCustomer) {
+              resolvedUserId = polarCustomer.userId ?? undefined;
+              resolvedOrgId = resolvedOrgId ?? polarCustomer.organizationId;
+            }
+          }
 
           if (!resolvedUserId) {
             console.error(
-              "Could not resolve user for subscription:",
+              "Could not resolve user for subscription (update fallback):",
               eventData.id
             );
             return;
           }
 
+          // Resolve org
+          if (!resolvedOrgId) {
+            const userOrgs = await ctx.runQuery(
+              internal.subscriptions._getUserOwnedOrgs,
+              { userId: resolvedUserId as any }
+            );
+            if (userOrgs.length > 0) {
+              resolvedOrgId = userOrgs[0]._id;
+            }
+          }
+
+          if (!resolvedOrgId) {
+            console.error(
+              "Could not resolve org for subscription (update fallback):",
+              eventData.id
+            );
+            return;
+          }
+
+          // Ensure polarCustomers record exists
+          await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
+            organizationId: resolvedOrgId as any,
+            userId: resolvedUserId as any,
+            polarCustomerId: customerId,
+            email:
+              eventData.customer?.email ??
+              eventData.customerEmail ??
+              "unknown@polar.sh",
+          });
+
           await ctx.runMutation(internal.subscriptions.createSubscription, {
-            organizationId: polarCustomer.organizationId,
-            userId: resolvedUserId,
+            organizationId: resolvedOrgId as any,
+            userId: resolvedUserId as any,
             polarCustomerId: customerId,
             polarSubscriptionId: eventData.id,
             polarProductId: productId,
@@ -817,23 +914,25 @@ export const processWebhookEvent = action({
             eventData.status === "trialing"
           ) {
             await ctx.runMutation(internal.subscriptions._syncUserTier, {
-              userId: resolvedUserId,
+              userId: resolvedUserId as any,
               tier: tierName,
               reason: "billing.subscription_created",
             });
             await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-              userId: resolvedUserId,
+              userId: resolvedUserId as any,
               periodStart:
                 polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
               periodEnd:
                 polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
             });
             await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-              userId: resolvedUserId,
+              userId: resolvedUserId as any,
             });
           }
 
-          console.log("Polar: subscription created (from update fallback)");
+          console.log(
+            `Polar: subscription created (from update fallback) — user ${resolvedUserId}`
+          );
           return;
         }
 
@@ -1101,6 +1200,20 @@ export const _getOrgById = internalQuery({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.organizationId);
+  },
+});
+
+/**
+ * Get organizations owned by a user (for resolving org from user ID).
+ * Used when subscription events don't include org metadata.
+ */
+export const _getUserOwnedOrgs = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("organizations")
+      .filter((q) => q.eq(q.field("createdBy"), args.userId))
+      .collect();
   },
 });
 
