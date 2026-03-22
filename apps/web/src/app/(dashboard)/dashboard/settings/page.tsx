@@ -1575,9 +1575,32 @@ function BillingSettings({
       case "canceling":
         return "amber";
       case "past_due":
+      case "revoked":
+      case "unpaid":
         return "red";
       default:
         return "amber";
+    }
+  }
+
+  function getStatusLabel(status: string): string {
+    switch (status) {
+      case "active":
+        return "Active";
+      case "canceled":
+        return "Canceled";
+      case "revoked":
+        return "Expired";
+      case "past_due":
+        return "Past Due";
+      case "trialing":
+        return "Trial";
+      case "unpaid":
+        return "Unpaid";
+      case "incomplete":
+        return "Incomplete";
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   }
 
@@ -1649,6 +1672,7 @@ function BillingSettings({
   const sub = subscription?.subscription;
   const hasBillingCustomer = subscription?.hasBillingCustomer ?? false;
   const isActive = sub?.status === "active";
+  const isRevoked = sub?.status === "revoked" || sub?.status === "canceled";
   const isCancelingAtEnd = sub?.cancelAtPeriodEnd ?? false;
 
   return (
@@ -1678,19 +1702,21 @@ function BillingSettings({
             </div>
             {sub && (
               <TerminalBadge color={getStatusColor(sub.status)}>
-                {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                {getStatusLabel(sub.status)}
               </TerminalBadge>
             )}
-            {!sub && <TerminalBadge color="amber">Free</TerminalBadge>}
+            {!sub && <TerminalBadge color="green">Free</TerminalBadge>}
           </div>
 
           {sub ? (
             <>
-              {/* Current Period */}
+              {/* Last/Current Period */}
               <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-zinc-400" />
-                  <span className="text-sm text-zinc-300">Current period</span>
+                  <span className="text-sm text-zinc-300">
+                    {isRevoked ? "Last billing period" : "Current period"}
+                  </span>
                 </div>
                 <span className="text-sm text-zinc-400">
                   {formatDate(sub.currentPeriodStart)} &mdash;{" "}
@@ -1698,12 +1724,37 @@ function BillingSettings({
                 </span>
               </div>
 
-              {/* Next billing / Cancellation notice */}
-              {isCancelingAtEnd ? (
+              {/* Status-specific notices */}
+              {isRevoked ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                    <span className="text-sm text-red-300">
+                      Your subscription has ended. You are now on the Free plan.
+                    </span>
+                  </div>
+                  <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4 text-center">
+                    <p className="text-sm text-zinc-400 mb-3">
+                      Resubscribe to unlock Pro features again.
+                    </p>
+                    <button
+                      onClick={() => {
+                        window.location.href =
+                          "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+                    >
+                      Resubscribe to Pro
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : isCancelingAtEnd ? (
                 <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
                   <span className="text-sm text-amber-300">
-                    Cancels at end of period ({formatDate(sub.currentPeriodEnd)})
+                    Cancels at end of period ({formatDate(sub.currentPeriodEnd)}).
+                    You retain Pro access until then.
                   </span>
                 </div>
               ) : isActive ? (
@@ -1716,6 +1767,14 @@ function BillingSettings({
                   </div>
                   <span className="text-sm text-zinc-400">
                     {formatDate(sub.currentPeriodEnd)}
+                  </span>
+                </div>
+              ) : sub.status === "past_due" ? (
+                <div className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+                  <span className="text-sm text-red-300">
+                    Payment failed. Please update your payment method to avoid
+                    losing access.
                   </span>
                 </div>
               ) : null}
