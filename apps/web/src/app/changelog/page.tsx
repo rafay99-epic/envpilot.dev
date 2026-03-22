@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import remarkGfm from "remark-gfm";
 import { useChangelogEntries } from "@/hooks";
 import { ChevronRight } from "lucide-react";
@@ -97,18 +98,7 @@ export default function ChangelogPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-            >
-              sign-in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
-            >
-              get-started
-            </Link>
+            <PublicHeaderButtons />
           </div>
         </div>
       </header>
