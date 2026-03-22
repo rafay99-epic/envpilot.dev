@@ -683,8 +683,7 @@ export const processWebhookEvent = action({
         // --- Resolve user ID using multiple strategies ---
         const metadata = eventData.metadata || {};
         const customerExternalId =
-          eventData.customer?.externalId ?? // Embedded customer object
-          eventData.externalCustomerId; // Top-level field
+          eventData.customer?.externalId ?? eventData.externalCustomerId; // Embedded customer object // Top-level field
 
         let resolvedUserId: string | undefined;
         let resolvedOrgId: string | undefined;
