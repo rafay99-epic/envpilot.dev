@@ -363,19 +363,15 @@ export default function TermsOfServicePage() {
                       full access throughout.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-                      <span className="text-zinc-300">
-                        No further charges
-                      </span>{" "}
+                      <span className="text-zinc-300">No further charges</span>{" "}
                       will be made after cancellation. You will not be billed
                       for the next billing period.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
                       After your billing period ends, a{" "}
-                      <span className="text-zinc-300">
-                        7-day grace period
-                      </span>{" "}
-                      begins during which Pro features remain active. This
-                      gives you time to export data or resubscribe.
+                      <span className="text-zinc-300">7-day grace period</span>{" "}
+                      begins during which Pro features remain active. This gives
+                      you time to export data or resubscribe.
                     </li>
                     <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
                       After the grace period, your account reverts to the Free

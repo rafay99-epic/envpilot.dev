@@ -70,10 +70,9 @@ const FAQ_DATA: FAQSection[] = [
           <>
             Envpilot offers two plans:{" "}
             <span className="text-zinc-300">Free</span> (essential features,
-            limited resources) and{" "}
-            <span className="text-zinc-300">Pro</span> ($15/month, unlimited
-            resources and advanced features). See the Usage &amp; Plan page in
-            your dashboard for a full comparison.
+            limited resources) and <span className="text-zinc-300">Pro</span>{" "}
+            ($15/month, unlimited resources and advanced features). See the
+            Usage &amp; Plan page in your dashboard for a full comparison.
           </>
         ),
       },
@@ -132,27 +131,24 @@ const FAQ_DATA: FAQSection[] = [
               per-project, not total).
             </li>
             <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Pending Invitations</span>{" "}
-              &mdash; outstanding team invites.
+              <span className="text-zinc-300">Pending Invitations</span> &mdash;
+              outstanding team invites.
             </li>
             <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
               <span className="text-zinc-300">Active Share Links</span> &mdash;
               currently active secret sharing links.
             </li>
             <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">
-                Rotation-Enabled Variables
-              </span>{" "}
+              <span className="text-zinc-300">Rotation-Enabled Variables</span>{" "}
               &mdash; variables with automated rotation configured.
             </li>
             <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Audit Log Retention</span>{" "}
-              &mdash; how long audit logs are kept (7 days Free, 365 days Pro).
+              <span className="text-zinc-300">Audit Log Retention</span> &mdash;
+              how long audit logs are kept (7 days Free, 365 days Pro).
             </li>
             <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Analytics Retention</span>{" "}
-              &mdash; how long analytics data is stored (7 days Free, 30 days
-              Pro).
+              <span className="text-zinc-300">Analytics Retention</span> &mdash;
+              how long analytics data is stored (7 days Free, 30 days Pro).
             </li>
           </ul>
         ),
@@ -255,10 +251,7 @@ const FAQ_DATA: FAQSection[] = [
         answer: (
           <>
             Visit{" "}
-            <Link
-              href="/support"
-              className="text-green-400 hover:underline"
-            >
+            <Link href="/support" className="text-green-400 hover:underline">
               envpilot.dev/support
             </Link>{" "}
             to submit a support ticket, or email{" "}
@@ -291,10 +284,7 @@ const FAQ_DATA: FAQSection[] = [
             </a>{" "}
             to request account deletion. We will remove your personal data in
             accordance with our{" "}
-            <Link
-              href="/privacy"
-              className="text-green-400 hover:underline"
-            >
+            <Link href="/privacy" className="text-green-400 hover:underline">
               Privacy Policy
             </Link>{" "}
             and applicable data protection laws.
@@ -398,10 +388,7 @@ export default function FAQPage() {
             <p className="mt-3 text-sm text-zinc-500">
               Everything you need to know about Envpilot &middot; Can&apos;t
               find your answer?{" "}
-              <Link
-                href="/support"
-                className="text-green-400 hover:underline"
-              >
+              <Link href="/support" className="text-green-400 hover:underline">
                 Contact support
               </Link>
             </p>

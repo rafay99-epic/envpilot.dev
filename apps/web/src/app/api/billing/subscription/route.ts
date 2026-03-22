@@ -15,10 +15,22 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function GET(request: Request) {
   try {
-    // Check if payments are enabled
+    // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {
       return NextResponse.json(
         { error: "Payment system is currently disabled" },
+        { status: 503 }
+      );
+    }
+
+    // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+    const dbPaymentsEnabled = await convex.query(
+      api.tierLimits.isPaymentsEnabled,
+      {}
+    );
+    if (!dbPaymentsEnabled) {
+      return NextResponse.json(
+        { error: "Payment system is currently disabled by admin" },
         { status: 503 }
       );
     }

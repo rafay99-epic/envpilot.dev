@@ -103,8 +103,8 @@ export function LayoutC(props: UsageLayoutProps) {
         <div className="flex items-center gap-2.5">
           <HelpCircle className="h-4 w-4 text-zinc-500 shrink-0" />
           <p className="text-xs text-zinc-500">
-            Usage is computed in real time from your data.
-            Limits are enforced per resource &mdash; existing data is never deleted.
+            Usage is computed in real time from your data. Limits are enforced
+            per resource &mdash; existing data is never deleted.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-4">

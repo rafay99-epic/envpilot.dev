@@ -45,6 +45,8 @@ const BROWSABLE_TABLES = [
   "tierDefinitions",
   "organizationTiers",
   "adminSettings",
+  "paymentProducts",
+  "processedWebhookEvents",
 ] as const;
 
 // ==========================================
@@ -725,6 +727,159 @@ export const deleteTierDefinition = mutation({
   },
 });
 
+// ==========================================
+// PAYMENT PRODUCTS (Provider-agnostic product mapping)
+// ==========================================
+
+export const listPaymentProducts = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const products = await ctx.db.query("paymentProducts").collect();
+    return products.sort((a, b) => a.tierName.localeCompare(b.tierName));
+  },
+});
+
+export const createPaymentProduct = mutation({
+  args: {
+    secret: v.string(),
+    tierName: v.string(),
+    provider: v.string(),
+    productId: v.string(),
+    isActive: v.boolean(),
+    label: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    // Validate tier exists
+    const tier = await ctx.db
+      .query("tierDefinitions")
+      .withIndex("by_name", (q) => q.eq("name", args.tierName))
+      .first();
+    if (!tier) {
+      throw new Error(`Tier "${args.tierName}" does not exist`);
+    }
+
+    // Check for duplicate tier+provider mapping
+    const existing = await ctx.db
+      .query("paymentProducts")
+      .withIndex("by_tier_and_provider", (q) =>
+        q.eq("tierName", args.tierName).eq("provider", args.provider)
+      )
+      .first();
+    if (existing) {
+      throw new Error(
+        `A product mapping already exists for tier "${args.tierName}" with provider "${args.provider}"`
+      );
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("paymentProducts", {
+      tierName: args.tierName,
+      provider: args.provider,
+      productId: args.productId,
+      isActive: args.isActive,
+      label: args.label,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const updatePaymentProduct = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("paymentProducts"),
+    productId: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
+    label: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error("Payment product not found");
+    }
+
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.productId !== undefined) updates.productId = args.productId;
+    if (args.isActive !== undefined) updates.isActive = args.isActive;
+    if (args.label !== undefined) updates.label = args.label;
+
+    await ctx.db.patch(args.id, updates);
+  },
+});
+
+export const deletePaymentProduct = mutation({
+  args: {
+    secret: v.string(),
+    id: v.id("paymentProducts"),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error("Payment product not found");
+    }
+
+    await ctx.db.delete(args.id);
+  },
+});
+
+/**
+ * Seed payment products from existing tierDefinitions.polarProductId values.
+ * This migrates the tightly-coupled polarProductId into the decoupled
+ * paymentProducts table. Safe to run multiple times (idempotent).
+ */
+export const seedPaymentProducts = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const tiers = await ctx.db.query("tierDefinitions").collect();
+    const existingProducts = await ctx.db.query("paymentProducts").collect();
+
+    const now = Date.now();
+    let created = 0;
+    let skipped = 0;
+
+    for (const tier of tiers) {
+      if (!tier.polarProductId) continue;
+
+      // Check if mapping already exists for this tier+polar
+      const alreadyExists = existingProducts.some(
+        (p) => p.tierName === tier.name && p.provider === "polar"
+      );
+
+      if (alreadyExists) {
+        skipped++;
+        continue;
+      }
+
+      await ctx.db.insert("paymentProducts", {
+        tierName: tier.name,
+        provider: "polar",
+        productId: tier.polarProductId,
+        isActive: true,
+        label: `${tier.displayName} (Polar)`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      created++;
+    }
+
+    return {
+      seeded: true,
+      created,
+      skipped,
+      message: `Created ${created} payment product mappings, skipped ${skipped} existing`,
+    };
+  },
+});
+
 export const seedDefaultTiers = mutation({
   args: { secret: v.string() },
   handler: async (ctx, args) => {
@@ -810,9 +965,32 @@ export const seedDefaultTiers = mutation({
       }
     }
 
+    // Also seed payment products from the tier definitions
+    const existingProducts = await ctx.db.query("paymentProducts").collect();
+    let productsCreated = 0;
+
+    for (const tier of seedData) {
+      if (!tier.polarProductId) continue;
+      const alreadyExists = existingProducts.some(
+        (p) => p.tierName === tier.name && p.provider === "polar"
+      );
+      if (alreadyExists) continue;
+
+      await ctx.db.insert("paymentProducts", {
+        tierName: tier.name,
+        provider: "polar",
+        productId: tier.polarProductId,
+        isActive: true,
+        label: `${tier.displayName} (Polar)`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      productsCreated++;
+    }
+
     return {
       seeded: true,
-      message: "Created default free and pro tier definitions",
+      message: `Tiers: ${created} created, ${updated} updated. Payment products: ${productsCreated} created.`,
     };
   },
 });
@@ -991,6 +1169,15 @@ export const listMigrations = query({
           "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
         category: "Feature & Tier System",
         priority: 3,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "seed-payment-products",
+        description:
+          "Seeds payment product mappings from tierDefinitions.polarProductId into the paymentProducts table. Idempotent — skips existing mappings.",
+        category: "Feature & Tier System",
+        priority: 4,
         destructive: false,
         runOnce: false,
       },
@@ -1717,6 +1904,37 @@ export const runMigration = mutation({
       };
     }
 
+    if (args.name === "seed-payment-products") {
+      const tiers = await ctx.db.query("tierDefinitions").collect();
+      const existingProducts = await ctx.db.query("paymentProducts").collect();
+      const now = Date.now();
+      let created = 0;
+      let skipped = 0;
+
+      for (const tier of tiers) {
+        if (!tier.polarProductId) continue;
+        const alreadyExists = existingProducts.some(
+          (p) => p.tierName === tier.name && p.provider === "polar"
+        );
+        if (alreadyExists) {
+          skipped++;
+          continue;
+        }
+        await ctx.db.insert("paymentProducts", {
+          tierName: tier.name,
+          provider: "polar",
+          productId: tier.polarProductId,
+          isActive: true,
+          label: `${tier.displayName} (Polar)`,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created++;
+      }
+
+      return { success: true, created, skipped };
+    }
+
     throw new Error(`Unknown migration: ${args.name}`);
   },
 });
@@ -1871,12 +2089,63 @@ export const updateAdminSetting = mutation({
       });
     }
 
-    // Audit log for sensitive setting changes (e.g. tierEnforcement)
-    if (args.key === "tierEnforcement") {
+    // Audit log for sensitive setting changes
+    if (args.key === "tierEnforcement" || args.key === "paymentsEnabled") {
       console.warn(
-        `[SECURITY AUDIT] Tier enforcement toggled: key=${args.key}, value=${args.value}, previousValue=${previousValue}, timestamp=${new Date().toISOString()}`
+        `[SECURITY AUDIT] Admin setting toggled: key=${args.key}, value=${args.value}, previousValue=${previousValue}, timestamp=${new Date().toISOString()}`
       );
     }
+  },
+});
+
+// ==========================================
+// PAYMENT READINESS (Production deployment checklist)
+// ==========================================
+
+export const getPaymentReadiness = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const paymentProducts = await ctx.db.query("paymentProducts").collect();
+    const tierDefinitions = await ctx.db.query("tierDefinitions").collect();
+    const subscriptions = await ctx.db.query("subscriptions").collect();
+
+    // Check which paid tiers have active payment products
+    const paidTiers = tierDefinitions.filter((t) => !t.isDefault);
+    const tiersWithProducts = paidTiers.map((tier) => {
+      const product = paymentProducts.find(
+        (p) =>
+          p.tierName === tier.name && p.provider === "polar" && p.isActive
+      );
+      return {
+        tierName: tier.name,
+        displayName: tier.displayName,
+        hasActiveProduct: !!product,
+        productId: product?.productId ?? null,
+      };
+    });
+
+    const activeSubscriptions = subscriptions.filter(
+      (s) => s.status === "active"
+    );
+
+    // Read current paymentsEnabled setting
+    const setting = await ctx.db
+      .query("adminSettings")
+      .withIndex("by_key", (q) => q.eq("key", "paymentsEnabled"))
+      .first();
+
+    return {
+      paymentsEnabled: setting?.value === "true",
+      paymentProductsSeeded: paymentProducts.length > 0,
+      tiersWithProducts,
+      allPaidTiersConfigured: tiersWithProducts.every(
+        (t) => t.hasActiveProduct
+      ),
+      activeSubscriptionCount: activeSubscriptions.length,
+      canEnable: tiersWithProducts.some((t) => t.hasActiveProduct),
+    };
   },
 });
 

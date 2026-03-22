@@ -35,10 +35,22 @@ export async function POST(request: Request) {
     const botResponse = await verifyNotBot();
     if (botResponse) return botResponse;
 
-    // Check if payments are enabled
+    // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {
       return NextResponse.json(
         { error: "Payment system is currently disabled" },
+        { status: 503 }
+      );
+    }
+
+    // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+    const dbPaymentsEnabled = await convex.query(
+      api.tierLimits.isPaymentsEnabled,
+      {}
+    );
+    if (!dbPaymentsEnabled) {
+      return NextResponse.json(
+        { error: "Payment system is currently disabled by admin" },
         { status: 503 }
       );
     }
@@ -98,10 +110,9 @@ export async function POST(request: Request) {
     });
 
     if (!subscription) {
-      subscription = await convex.query(
-        api.subscriptions.getByOrganization,
-        { organizationId: organizationId as Id<"organizations"> }
-      );
+      subscription = await convex.query(api.subscriptions.getByOrganization, {
+        organizationId: organizationId as Id<"organizations">,
+      });
     }
 
     if (!subscription || !subscription.polarSubscriptionId) {
@@ -125,9 +136,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error canceling subscription:", error);
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to cancel subscription";
+      error instanceof Error ? error.message : "Failed to cancel subscription";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

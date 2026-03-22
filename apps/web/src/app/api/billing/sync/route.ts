@@ -22,8 +22,21 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  * race condition where the user arrives before the webhook.
  */
 export async function POST(req: Request) {
+  // Check if payments are enabled (env var = outer gate)
   if (!isPaymentsEnabled()) {
     return NextResponse.json({ error: "Payments disabled" }, { status: 503 });
+  }
+
+  // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+  const dbPaymentsEnabled = await convex.query(
+    api.tierLimits.isPaymentsEnabled,
+    {}
+  );
+  if (!dbPaymentsEnabled) {
+    return NextResponse.json(
+      { error: "Payment system is currently disabled by admin" },
+      { status: 503 }
+    );
   }
 
   const { user } = await withAuth();

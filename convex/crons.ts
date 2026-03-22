@@ -79,4 +79,11 @@ crons.interval(
   internal.changelog.publishScheduledEntries
 );
 
+// Clean up processed webhook events older than 7 days
+crons.interval(
+  "cleanup processed webhook events",
+  { hours: 6 },
+  internal.subscriptions.cleanupProcessedWebhooks
+);
+
 export default crons;

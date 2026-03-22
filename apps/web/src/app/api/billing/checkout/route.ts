@@ -28,10 +28,22 @@ export async function POST(request: Request) {
     const botResponse = await verifyNotBot();
     if (botResponse) return botResponse;
 
-    // Check if payments are enabled
+    // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {
       return NextResponse.json(
         { error: "Payment system is currently disabled" },
+        { status: 503 }
+      );
+    }
+
+    // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+    const dbPaymentsEnabled = await convex.query(
+      api.tierLimits.isPaymentsEnabled,
+      {}
+    );
+    if (!dbPaymentsEnabled) {
+      return NextResponse.json(
+        { error: "Payment system is currently disabled by admin" },
         { status: 503 }
       );
     }
@@ -88,11 +100,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Look up Polar product ID from tierDefinitions
+    // Look up Polar product ID — try paymentProducts first, fall back to tierDefinitions
+    const paymentProductId = await convex.query(
+      api.subscriptions.getProductIdForTier,
+      { tierName, provider: "polar" }
+    );
     const tierDef = await convex.query(api.featureRegistry.getTierByName, {
       name: tierName,
     });
-    if (!tierDef?.polarProductId) {
+    const polarProductId = paymentProductId ?? tierDef?.polarProductId;
+    if (!polarProductId) {
       return NextResponse.json(
         { error: `Tier "${tierName}" has no associated Polar product` },
         { status: 400 }
@@ -122,7 +139,7 @@ export async function POST(request: Request) {
 
     // Create Polar checkout session
     const checkout = await polar.checkouts.create({
-      products: [tierDef.polarProductId],
+      products: [polarProductId],
       successUrl,
       customerEmail: user.email,
       externalCustomerId: convexUser._id,

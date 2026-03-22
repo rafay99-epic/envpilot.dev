@@ -52,6 +52,39 @@ export async function isEnforcementEnabledFromDb(
 }
 
 /**
+ * Check if payments are enabled from the database.
+ * Defaults to false — payments are off until explicitly enabled from admin panel.
+ * The env var NEXT_PUBLIC_PAYMENTS_ENABLED is the outer gate (build-time);
+ * this DB toggle is the inner gate (runtime, admin-controllable).
+ */
+export async function isPaymentsEnabledFromDb(
+  db: DatabaseReader
+): Promise<boolean> {
+  const setting = await db
+    .query("adminSettings")
+    .withIndex("by_key", (q) => q.eq("key", "paymentsEnabled"))
+    .first();
+
+  if (setting) {
+    return setting.value === "true";
+  }
+
+  // Default to off until explicitly enabled from admin panel
+  return false;
+}
+
+/**
+ * Public query: check if payments are enabled (DB-level toggle).
+ * Called by billing API routes to enforce runtime payment control.
+ */
+export const isPaymentsEnabled = query({
+  args: {},
+  handler: async (ctx) => {
+    return await isPaymentsEnabledFromDb(ctx.db);
+  },
+});
+
+/**
  * Check if a cron job is paused via adminSettings.
  * Crons are statically defined — this flag makes handlers skip work when paused.
  */

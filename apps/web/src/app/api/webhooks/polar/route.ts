@@ -76,9 +76,14 @@ export async function POST(request: Request) {
   try {
     // Dispatch the verified event to Convex for processing.
     // All billing mutations are internal — only this action gateway is public.
+
+    // Extract webhook-id for deduplication
+    const webhookId = request.headers.get("webhook-id") ?? undefined;
+
     await convex.action(api.subscriptions.processWebhookEvent, {
       type: event.type,
       data: JSON.stringify(event.data),
+      webhookId,
     });
 
     return NextResponse.json({ received: true });

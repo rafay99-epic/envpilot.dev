@@ -66,6 +66,8 @@ const BROWSABLE_TABLES = [
   { value: "contactMessages", label: "contactMessages" },
   { value: "tierDefinitions", label: "tierDefinitions" },
   { value: "adminSettings", label: "adminSettings" },
+  { value: "paymentProducts", label: "paymentProducts" },
+  { value: "processedWebhookEvents", label: "processedWebhookEvents" },
 ];
 
 const PAGE_SIZE = 50;

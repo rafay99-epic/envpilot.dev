@@ -36,7 +36,10 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
-import { useSubscription, useCreatePortalSession } from "@/hooks/queries/useBillingQuery";
+import {
+  useSubscription,
+  useCreatePortalSession,
+} from "@/hooks/queries/useBillingQuery";
 import { TierBadge } from "@/components/tier/TierBadge";
 import Link from "next/link";
 
@@ -1645,7 +1648,8 @@ function BillingSettings({
     } catch (err) {
       setCancelMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to cancel subscription",
+        text:
+          err instanceof Error ? err.message : "Failed to cancel subscription",
       });
     } finally {
       setIsCanceling(false);
@@ -1753,8 +1757,8 @@ function BillingSettings({
                 <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
                   <span className="text-sm text-amber-300">
-                    Cancels at end of period ({formatDate(sub.currentPeriodEnd)}).
-                    You retain Pro access until then.
+                    Cancels at end of period ({formatDate(sub.currentPeriodEnd)}
+                    ). You retain Pro access until then.
                   </span>
                 </div>
               ) : isActive ? (

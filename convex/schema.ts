@@ -1219,4 +1219,40 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_name", ["name"]),
+
+  // ==========================================
+  // PROCESSED WEBHOOK EVENTS (Deduplication)
+  // ==========================================
+  processedWebhookEvents: defineTable({
+    // The webhook event ID (from webhook-id header)
+    webhookId: v.string(),
+    // Event type for debugging
+    eventType: v.string(),
+    // When the event was processed
+    processedAt: v.number(),
+  })
+    .index("by_webhook_id", ["webhookId"]),
+
+  // ==========================================
+  // PAYMENT PRODUCTS (Provider-agnostic product mapping)
+  // ==========================================
+  paymentProducts: defineTable({
+    // The tier this product maps to (e.g., "free", "pro")
+    tierName: v.string(),
+    // Payment provider (e.g., "polar", "stripe", "lemonsqueezy")
+    provider: v.string(),
+    // The product ID in the payment provider's system
+    productId: v.string(),
+    // Whether this mapping is currently active
+    isActive: v.boolean(),
+    // Human-readable label for admin UI
+    label: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tier", ["tierName"])
+    .index("by_provider", ["provider"])
+    .index("by_tier_and_provider", ["tierName", "provider"])
+    .index("by_product_id", ["productId"]),
 });

@@ -162,6 +162,12 @@ function TiersPage() {
   const toggleCronPause = useAdminMutation(api.admin.toggleCronPause);
   const updateVariableExpiry = useAdminMutation(api.admin.updateVariableExpiry);
 
+  const paymentProducts = useAdminQuery(api.admin.listPaymentProducts, {});
+  const createPaymentProduct = useAdminMutation(api.admin.createPaymentProduct);
+  const updatePaymentProduct = useAdminMutation(api.admin.updatePaymentProduct);
+  const deletePaymentProduct = useAdminMutation(api.admin.deletePaymentProduct);
+  const seedPaymentProducts = useAdminMutation(api.admin.seedPaymentProducts);
+
   const tierEnforcement = settings?.tierEnforcement === "true";
 
   const [showModal, setShowModal] = useState(false);
@@ -182,6 +188,17 @@ function TiersPage() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<
     string | null
   >(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<Id<"paymentProducts"> | null>(null);
+  const [productForm, setProductForm] = useState({
+    tierName: "",
+    provider: "polar",
+    productId: "",
+    isActive: true,
+    label: "",
+  });
+  const [productSaving, setProductSaving] = useState(false);
+  const [seedingProducts, setSeedingProducts] = useState(false);
 
   // ==========================================
   // TIER DEFINITION CRUD
@@ -1522,6 +1539,363 @@ function TiersPage() {
               disabled={saving || (formTouched && hasErrors(formErrors))}
             >
               {saving ? "Saving..." : editingId ? "Update Tier" : "Create Tier"}
+            </Button>
+          </div>
+        </div>
+      </Drawer>
+
+      {/* ==========================================
+          SECTION 7: PAYMENT PRODUCTS
+          ========================================== */}
+      <div className="mt-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">
+              Payment Products
+            </h2>
+            <p className="text-xs text-zinc-400">
+              Map payment provider product IDs to tiers. Supports multiple
+              providers for easy migration.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={async () => {
+                setSeedingProducts(true);
+                try {
+                  const result = await seedPaymentProducts({});
+                  toast("success", result.message);
+                } catch (err) {
+                  toast(
+                    "error",
+                    err instanceof Error ? err.message : "Failed to seed"
+                  );
+                } finally {
+                  setSeedingProducts(false);
+                }
+              }}
+              size="sm"
+              variant="ghost"
+              disabled={seedingProducts}
+            >
+              {seedingProducts ? (
+                <Spinner className="mr-1.5 h-3.5 w-3.5" />
+              ) : (
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Sync from Tiers
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingProductId(null);
+                setProductForm({
+                  tierName: tierDefs?.[0]?.name ?? "",
+                  provider: "polar",
+                  productId: "",
+                  isActive: true,
+                  label: "",
+                });
+                setShowProductModal(true);
+              }}
+              size="sm"
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Add Product Mapping
+            </Button>
+          </div>
+        </div>
+
+        {!paymentProducts ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : paymentProducts.length === 0 ? (
+          <Card className="py-8 text-center text-sm text-zinc-400">
+            No payment product mappings configured.
+            <br />
+            <span className="text-xs">
+              Add product IDs from your payment provider (Polar, Stripe, etc.)
+              to link them to tiers.
+            </span>
+          </Card>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-zinc-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                    Tier
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                    Provider
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                    Product ID
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-zinc-400">
+                    Label
+                  </th>
+                  <th className="px-4 py-2.5 text-center text-xs font-medium text-zinc-400">
+                    Status
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-zinc-400">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentProducts.map((product) => (
+                  <tr
+                    key={product._id}
+                    className="border-b border-zinc-800/50 last:border-0"
+                  >
+                    <td className="px-4 py-2.5">
+                      <span className="inline-flex items-center rounded-full border border-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
+                        {product.tierName}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-zinc-300">
+                      {product.provider}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">
+                        {product.productId}
+                      </code>
+                    </td>
+                    <td className="px-4 py-2.5 text-zinc-400">
+                      {product.label || "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await updatePaymentProduct({
+                              id: product._id,
+                              isActive: !product.isActive,
+                            });
+                            toast(
+                              "success",
+                              product.isActive
+                                ? "Product deactivated"
+                                : "Product activated"
+                            );
+                          } catch (err) {
+                            toast(
+                              "error",
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to toggle"
+                            );
+                          }
+                        }}
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                          product.isActive
+                            ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            : "bg-zinc-700/50 text-zinc-500 hover:bg-zinc-700"
+                        }`}
+                      >
+                        {product.isActive ? "Active" : "Inactive"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => {
+                            setEditingProductId(product._id);
+                            setProductForm({
+                              tierName: product.tierName,
+                              provider: product.provider,
+                              productId: product.productId,
+                              isActive: product.isActive,
+                              label: product.label ?? "",
+                            });
+                            setShowProductModal(true);
+                          }}
+                          className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: "Delete Product Mapping",
+                              message: `Remove the ${product.provider} product mapping for tier "${product.tierName}"?`,
+                              confirmLabel: "Delete",
+                              variant: "danger",
+                            });
+                            if (!ok) return;
+                            try {
+                              await deletePaymentProduct({
+                                id: product._id,
+                              });
+                              toast("success", "Product mapping deleted");
+                            } catch (err) {
+                              toast(
+                                "error",
+                                err instanceof Error
+                                  ? err.message
+                                  : "Failed to delete"
+                              );
+                            }
+                          }}
+                          className="rounded p-1 text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Payment Product Drawer */}
+      <Drawer
+        isOpen={showProductModal}
+        onClose={() => setShowProductModal(false)}
+        title={
+          editingProductId
+            ? "Edit Product Mapping"
+            : "Add Product Mapping"
+        }
+        width="max-w-md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Tier
+            </label>
+            <select
+              value={productForm.tierName}
+              onChange={(e) =>
+                setProductForm({ ...productForm, tierName: e.target.value })
+              }
+              disabled={!!editingProductId}
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+            >
+              {tierDefs?.map((t) => (
+                <option key={t.name} value={t.name}>
+                  {t.displayName} ({t.name})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Provider
+            </label>
+            <select
+              value={productForm.provider}
+              onChange={(e) =>
+                setProductForm({ ...productForm, provider: e.target.value })
+              }
+              disabled={!!editingProductId}
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+            >
+              <option value="polar">Polar</option>
+              {/* Add more providers here as needed */}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Product ID
+            </label>
+            <input
+              type="text"
+              value={productForm.productId}
+              onChange={(e) =>
+                setProductForm({ ...productForm, productId: e.target.value })
+              }
+              placeholder="prod_..."
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Label
+            </label>
+            <input
+              type="text"
+              value={productForm.label}
+              onChange={(e) =>
+                setProductForm({ ...productForm, label: e.target.value })
+              }
+              placeholder="e.g. Pro Monthly, Enterprise Annual"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2.5 text-sm text-zinc-300 transition-colors hover:border-zinc-700">
+            <input
+              type="checkbox"
+              checked={productForm.isActive}
+              onChange={(e) =>
+                setProductForm({ ...productForm, isActive: e.target.checked })
+              }
+              className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+            />
+            Active
+          </label>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={async () => {
+                if (!productForm.productId.trim()) {
+                  toast("error", "Product ID is required");
+                  return;
+                }
+                setProductSaving(true);
+                try {
+                  if (editingProductId) {
+                    await updatePaymentProduct({
+                      id: editingProductId,
+                      productId: productForm.productId,
+                      isActive: productForm.isActive,
+                      label: productForm.label || undefined,
+                    });
+                    toast("success", "Product mapping updated");
+                  } else {
+                    await createPaymentProduct({
+                      tierName: productForm.tierName,
+                      provider: productForm.provider,
+                      productId: productForm.productId,
+                      isActive: productForm.isActive,
+                      label: productForm.label || undefined,
+                    });
+                    toast("success", "Product mapping created");
+                  }
+                  setShowProductModal(false);
+                } catch (err) {
+                  toast(
+                    "error",
+                    err instanceof Error ? err.message : "Failed to save"
+                  );
+                } finally {
+                  setProductSaving(false);
+                }
+              }}
+              disabled={productSaving}
+              className="flex-1"
+            >
+              {productSaving ? (
+                <Spinner className="h-4 w-4" />
+              ) : editingProductId ? (
+                "Update"
+              ) : (
+                "Create"
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowProductModal(false)}
+            >
+              Cancel
             </Button>
           </div>
         </div>
