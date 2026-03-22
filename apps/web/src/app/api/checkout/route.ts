@@ -3,6 +3,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import { isPaymentsEnabled } from "@/lib/polar";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -22,6 +23,21 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
+
+  // Check if payments are enabled (env var = outer gate)
+  if (!isPaymentsEnabled()) {
+    return NextResponse.redirect(new URL("/pricing", url.origin));
+  }
+
+  // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+  const dbPaymentsEnabled = await convex.query(
+    api.tierLimits.isPaymentsEnabled,
+    {}
+  );
+  if (!dbPaymentsEnabled) {
+    return NextResponse.redirect(new URL("/pricing", url.origin));
+  }
+
   const products = url.searchParams.getAll("products");
 
   if (products.length === 0) {

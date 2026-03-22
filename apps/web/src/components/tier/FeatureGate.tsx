@@ -7,6 +7,7 @@ import {
   type TierAction,
 } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
+import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { ACTION_TO_FEATURE_KEY } from "@/lib/feature-keys";
 import { UpgradePrompt } from "./UpgradePrompt";
 import type { Id } from "@convex/_generated/dataModel";
@@ -207,6 +208,8 @@ export function LimitWarning({
   resourceName,
   warningThreshold = 80,
 }: LimitWarningProps) {
+  const paymentsEnabled = usePaymentsEnabled();
+
   if (limit === null) return null;
 
   const percentage = (current / limit) * 100;
@@ -232,15 +235,17 @@ export function LimitWarning({
         </svg>
         <span>
           You&apos;ve reached the {resourceName} limit ({current}/{limit}).
-          <button
-            onClick={() => {
-              window.location.href =
-                "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
-            }}
-            className="ml-1 text-purple-600 dark:text-purple-400 hover:underline font-medium"
-          >
-            Upgrade to Pro
-          </button>
+          {paymentsEnabled && (
+            <button
+              onClick={() => {
+                window.location.href =
+                  "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+              }}
+              className="ml-1 text-purple-600 dark:text-purple-400 hover:underline font-medium"
+            >
+              Upgrade to Pro
+            </button>
+          )}
         </span>
       </div>
     );

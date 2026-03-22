@@ -87,6 +87,7 @@ function generateFeatureLines(
 
 function DynamicPricingCards() {
   const pricingData = useQuery(api.featureRegistry.getPricingData);
+  const paymentsEnabled = useQuery(api.tierLimits.isPaymentsEnabled);
 
   if (!pricingData) {
     return (
@@ -110,7 +111,9 @@ function DynamicPricingCards() {
       variants={stagger}
     >
       {pricingData.tiers.map((tier) => {
-        const isComingSoon = tier.isComingSoon;
+        // When payments are disabled via admin toggle, force paid tiers to show as "Coming Soon"
+        const isComingSoon =
+          tier.isComingSoon || (!tier.isDefault && paymentsEnabled === false);
         const isDefault = tier.isDefault;
         const price = tier.monthlyPrice ?? 0;
         const badge = tier.badge;

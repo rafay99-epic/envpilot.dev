@@ -58,7 +58,7 @@ export interface UsageLayoutProps {
   };
   isAllowed: (key: string) => boolean;
   getLimit: (key: string) => number | null | undefined;
-  onUpgrade: () => void;
+  onUpgrade?: () => void;
 }
 
 // ---------------------------------------------------------------------------

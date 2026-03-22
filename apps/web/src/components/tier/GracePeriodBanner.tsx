@@ -1,6 +1,7 @@
 "use client";
 
 import { useUserTier } from "@/hooks/useFeatureGate";
+import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -19,6 +20,7 @@ export function GracePeriodBanner({
   onRenewClick,
 }: GracePeriodBannerProps) {
   const { graceActive, gracePeriodEnd, tier } = useUserTier(userId);
+  const paymentsEnabled = usePaymentsEnabled();
 
   if (!graceActive || !gracePeriodEnd) return null;
 
@@ -44,13 +46,15 @@ export function GracePeriodBanner({
         </span>{" "}
         to renew before being downgraded to the free plan.
       </span>
-      <button
-        onClick={handleRenew}
-        className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-green-400 transition-colors hover:text-green-300"
-      >
-        Renew
-        <ArrowRight className="h-3.5 w-3.5" />
-      </button>
+      {paymentsEnabled && (
+        <button
+          onClick={handleRenew}
+          className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-green-400 transition-colors hover:text-green-300"
+        >
+          Renew
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

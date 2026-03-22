@@ -41,6 +41,7 @@ import {
   useCreatePortalSession,
 } from "@/hooks/queries/useBillingQuery";
 import { TierBadge } from "@/components/tier/TierBadge";
+import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import Link from "next/link";
 
 type SettingsTab =
@@ -1552,6 +1553,7 @@ function BillingSettings({
 }) {
   const { data: subscription, isLoading } = useSubscription(organizationId);
   const portalMutation = useCreatePortalSession();
+  const paymentsEnabled = usePaymentsEnabled();
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -1739,18 +1741,22 @@ function BillingSettings({
                   </div>
                   <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4 text-center">
                     <p className="text-sm text-zinc-400 mb-3">
-                      Resubscribe to unlock Pro features again.
+                      {paymentsEnabled
+                        ? "Resubscribe to unlock Pro features again."
+                        : "Subscriptions are currently unavailable."}
                     </p>
-                    <button
-                      onClick={() => {
-                        window.location.href =
-                          "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
-                    >
-                      Resubscribe to Pro
-                      <ExternalLink className="h-3 w-3" />
-                    </button>
+                    {paymentsEnabled && (
+                      <button
+                        onClick={() => {
+                          window.location.href =
+                            "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+                      >
+                        Resubscribe to Pro
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : isCancelingAtEnd ? (
@@ -1786,18 +1792,22 @@ function BillingSettings({
           ) : (
             <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
               <p className="text-sm text-zinc-400">
-                You&apos;re on the Free plan. Upgrade to unlock more features.
+                {paymentsEnabled
+                  ? "You're on the Free plan. Upgrade to unlock more features."
+                  : "You're on the Free plan."}
               </p>
-              <button
-                onClick={() => {
-                  window.location.href =
-                    "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
-                }}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
-              >
-                Upgrade to Pro
-                <ExternalLink className="h-3 w-3" />
-              </button>
+              {paymentsEnabled && (
+                <button
+                  onClick={() => {
+                    window.location.href =
+                      "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+                >
+                  Upgrade to Pro
+                  <ExternalLink className="h-3 w-3" />
+                </button>
+              )}
             </div>
           )}
         </div>

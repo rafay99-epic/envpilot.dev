@@ -303,7 +303,7 @@ function UsageSection({
   enforcementEnabled: boolean;
   isFree: boolean;
   isAllowed: (key: string) => boolean;
-  onUpgrade: () => void;
+  onUpgrade?: () => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
 
@@ -471,12 +471,14 @@ function UsageSection({
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={onUpgrade}
-                        className="text-[11px] font-medium text-amber-400/80 hover:text-amber-300 transition-colors"
-                      >
-                        Unlock &rarr;
-                      </button>
+                      {onUpgrade && (
+                        <button
+                          onClick={onUpgrade}
+                          className="text-[11px] font-medium text-amber-400/80 hover:text-amber-300 transition-colors"
+                        >
+                          Unlock &rarr;
+                        </button>
+                      )}
                     </div>
                   );
                 }
@@ -546,7 +548,7 @@ function ResourceMeter({
   proLimit: string;
   isFree: boolean;
   enforcementEnabled: boolean;
-  onUpgrade: () => void;
+  onUpgrade?: () => void;
   compact?: boolean;
 }) {
   const isAt = limit !== null && limit > 0 && current >= limit;
@@ -576,7 +578,7 @@ function ResourceMeter({
         showValue
         size={compact ? "sm" : "md"}
       />
-      {isAt && enforcementEnabled && isFree && (
+      {isAt && enforcementEnabled && isFree && onUpgrade && (
         <button
           onClick={onUpgrade}
           className="mt-1.5 text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors"

@@ -256,12 +256,21 @@ function PricingSkeleton() {
 
 export default function PricingPage() {
   const pricingData = useQuery(api.featureRegistry.getPricingData);
+  const paymentsEnabled = useQuery(api.tierLimits.isPaymentsEnabled);
 
   if (!pricingData) {
     return <PricingSkeleton />;
   }
 
-  const { tiers, categories, allFeatures } = pricingData;
+  const { tiers: rawTiers, categories, allFeatures } = pricingData;
+
+  // When payments are disabled via admin toggle, force paid tiers to show as "Coming Soon"
+  const tiers = rawTiers.map((tier) => {
+    if (!tier.isDefault && paymentsEnabled === false) {
+      return { ...tier, isComingSoon: true };
+    }
+    return tier;
+  });
 
   return (
     <div className="min-h-screen bg-zinc-950 font-mono text-green-400">

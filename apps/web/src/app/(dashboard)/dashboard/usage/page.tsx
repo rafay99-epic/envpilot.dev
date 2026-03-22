@@ -11,12 +11,14 @@ import {
 import type { Id } from "@convex/_generated/dataModel";
 import type { UsageLayoutProps } from "./usage-data";
 import { LayoutC } from "./layout-c";
+import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 
 const CHECKOUT_URL =
   "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
 
 export default function UsagePage() {
   const { organization } = useAuthContext();
+  const paymentsEnabled = usePaymentsEnabled();
   const { isLoading, tier, usage, isFree, enforcementEnabled } =
     useCachedTierData();
   const [orgCount, setOrgCount] = useState<number | null>(null);
@@ -145,9 +147,11 @@ export default function UsagePage() {
     meterLimits,
     isAllowed,
     getLimit,
-    onUpgrade: () => {
-      window.location.href = CHECKOUT_URL;
-    },
+    onUpgrade: paymentsEnabled
+      ? () => {
+          window.location.href = CHECKOUT_URL;
+        }
+      : undefined,
   };
 
   return (
