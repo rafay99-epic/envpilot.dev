@@ -25,6 +25,10 @@ import {
   RotateCcw,
   Pencil,
   X,
+  CreditCard,
+  AlertTriangle,
+  Calendar,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -32,13 +36,17 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, getEffectiveShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { validateBinding } from "@/lib/shortcut-validation";
+import { useSubscription, useCreatePortalSession } from "@/hooks/queries/useBillingQuery";
+import { TierBadge } from "@/components/tier/TierBadge";
+import Link from "next/link";
 
 type SettingsTab =
   | "general"
   | "notifications"
   | "integrations"
   | "security"
-  | "customization";
+  | "customization"
+  | "billing";
 
 export default function SettingsPage() {
   const { user, organization } = useAuthContext();
@@ -50,6 +58,7 @@ export default function SettingsPage() {
     { id: "integrations", label: "Integrations" },
     { id: "security", label: "Security" },
     { id: "customization", label: "Customization" },
+    { id: "billing", label: "Billing" },
   ];
 
   return (
@@ -96,6 +105,12 @@ export default function SettingsPage() {
           >
             <CustomizationSettings />
           </FeatureGate>
+        )}
+        {activeTab === "billing" && (
+          <BillingSettings
+            organizationId={organization?.id}
+            organizationSlug={organization?.slug ?? undefined}
+          />
         )}
       </div>
     </div>
@@ -262,6 +277,54 @@ function GeneralSettings({
             </div>
           </div>
           <TerminalBadge color="green">Authenticated via WorkOS</TerminalBadge>
+        </div>
+      </TerminalCard>
+
+      {/* Quick Links */}
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">
+          Help &amp; Resources
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Common questions and documentation
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <a
+            href="/faq"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            FAQ &amp; How It Works
+          </a>
+          <a
+            href="/terms#billing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            Billing Terms
+          </a>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            Privacy Policy
+          </a>
+          <a
+            href="/support"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2.5 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2.5 text-sm text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-green-400" />
+            Contact Support
+          </a>
         </div>
       </TerminalCard>
     </div>
@@ -1460,4 +1523,453 @@ function formatRelativeTime(timestamp: number): string {
   if (hours < 24) return `${hours}h ago`;
   if (days < 30) return `${days}d ago`;
   return new Date(timestamp).toLocaleDateString();
+}
+
+// ============================================================
+// Billing Settings
+// ============================================================
+
+const CANCEL_REASONS = [
+  { value: "too_expensive", label: "Too expensive" },
+  { value: "missing_features", label: "Missing features I need" },
+  { value: "switched_service", label: "Switched to another service" },
+  { value: "unused", label: "Not using it enough" },
+  { value: "customer_service", label: "Customer service issues" },
+  { value: "low_quality", label: "Quality did not meet expectations" },
+  { value: "too_complex", label: "Too complex to use" },
+  { value: "other", label: "Other" },
+];
+
+function BillingSettings({
+  organizationId,
+  organizationSlug,
+}: {
+  organizationId: string | undefined;
+  organizationSlug: string | null | undefined;
+}) {
+  const { data: subscription, isLoading } = useSubscription(organizationId);
+  const portalMutation = useCreatePortalSession();
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelComment, setCancelComment] = useState("");
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  function formatDate(timestamp: number) {
+    return new Date(timestamp).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  function getStatusColor(status: string): "green" | "amber" | "red" {
+    switch (status) {
+      case "active":
+        return "green";
+      case "canceled":
+      case "canceling":
+        return "amber";
+      case "past_due":
+        return "red";
+      default:
+        return "amber";
+    }
+  }
+
+  async function handleManageBilling() {
+    if (!organizationId) return;
+    try {
+      const data = await portalMutation.mutateAsync({ organizationId });
+      window.open(data.url, "_blank");
+    } catch {
+      // Error is handled by mutation state
+    }
+  }
+
+  async function handleConfirmCancel() {
+    if (!organizationId) return;
+    setIsCanceling(true);
+    setCancelMessage(null);
+
+    try {
+      const res = await fetch("/api/billing/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          reason: cancelReason || undefined,
+          comment: cancelComment || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to cancel subscription");
+      }
+
+      setCancelMessage({
+        type: "success",
+        text: "Subscription cancellation scheduled. Your access continues until the end of the current billing period.",
+      });
+      setShowCancelConfirm(false);
+      setCancelReason("");
+      setCancelComment("");
+    } catch (err) {
+      setCancelMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to cancel subscription",
+      });
+    } finally {
+      setIsCanceling(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <TerminalCard>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-16 animate-pulse rounded-lg bg-zinc-800/50"
+              />
+            ))}
+          </div>
+        </TerminalCard>
+      </div>
+    );
+  }
+
+  const sub = subscription?.subscription;
+  const hasBillingCustomer = subscription?.hasBillingCustomer ?? false;
+  const isActive = sub?.status === "active";
+  const isCancelingAtEnd = sub?.cancelAtPeriodEnd ?? false;
+
+  return (
+    <div className="space-y-6">
+      {/* Subscription Details */}
+      <TerminalCard>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+            <CreditCard className="h-4 w-4 text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100">
+              Subscription
+            </h2>
+            <p className="text-sm text-zinc-500">
+              Your current plan and billing details
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          {/* Plan & Status */}
+          <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-zinc-100">Plan</span>
+              <TierBadge tier={subscription?.tier ?? "free"} />
+            </div>
+            {sub && (
+              <TerminalBadge color={getStatusColor(sub.status)}>
+                {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+              </TerminalBadge>
+            )}
+            {!sub && <TerminalBadge color="amber">Free</TerminalBadge>}
+          </div>
+
+          {sub ? (
+            <>
+              {/* Current Period */}
+              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm text-zinc-300">Current period</span>
+                </div>
+                <span className="text-sm text-zinc-400">
+                  {formatDate(sub.currentPeriodStart)} &mdash;{" "}
+                  {formatDate(sub.currentPeriodEnd)}
+                </span>
+              </div>
+
+              {/* Next billing / Cancellation notice */}
+              {isCancelingAtEnd ? (
+                <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span className="text-sm text-amber-300">
+                    Cancels at end of period ({formatDate(sub.currentPeriodEnd)})
+                  </span>
+                </div>
+              ) : isActive ? (
+                <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <Receipt className="h-4 w-4 text-zinc-400" />
+                    <span className="text-sm text-zinc-300">
+                      Next billing date
+                    </span>
+                  </div>
+                  <span className="text-sm text-zinc-400">
+                    {formatDate(sub.currentPeriodEnd)}
+                  </span>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
+              <p className="text-sm text-zinc-400">
+                You&apos;re on the Free plan. Upgrade to unlock more features.
+              </p>
+              <button
+                onClick={() => {
+                  window.location.href =
+                    "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                }}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
+              >
+                Upgrade to Pro
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </TerminalCard>
+
+      {/* Cancel Message */}
+      {cancelMessage && (
+        <div
+          className={`rounded-lg border p-4 text-sm ${
+            cancelMessage.type === "success"
+              ? "border-green-500/30 bg-green-500/5 text-green-400"
+              : "border-red-500/30 bg-red-500/5 text-red-400"
+          }`}
+        >
+          {cancelMessage.text}
+        </div>
+      )}
+
+      {/* Actions */}
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">
+          Billing Actions
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Manage your payment methods, invoices, and subscription
+        </p>
+
+        <div className="mt-6 space-y-3">
+          {hasBillingCustomer && (
+            <>
+              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                <div>
+                  <p className="text-sm font-medium text-zinc-100">
+                    Manage Billing
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Update payment methods and billing details
+                  </p>
+                </div>
+                <TerminalButton
+                  onClick={handleManageBilling}
+                  disabled={portalMutation.isPending}
+                >
+                  {portalMutation.isPending ? "Opening..." : "Open Portal"}
+                  {!portalMutation.isPending && (
+                    <ExternalLink className="ml-1.5 h-3 w-3" />
+                  )}
+                </TerminalButton>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+                <div>
+                  <p className="text-sm font-medium text-zinc-100">
+                    View Invoices & Receipts
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Access your billing history and download receipts
+                  </p>
+                </div>
+                <TerminalButton
+                  variant="secondary"
+                  onClick={handleManageBilling}
+                  disabled={portalMutation.isPending}
+                >
+                  {portalMutation.isPending ? "Opening..." : "View Invoices"}
+                  {!portalMutation.isPending && (
+                    <Receipt className="ml-1.5 h-3 w-3" />
+                  )}
+                </TerminalButton>
+              </div>
+            </>
+          )}
+
+          {isActive && !isCancelingAtEnd && (
+            <div className="flex items-center justify-between rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+              <div>
+                <p className="text-sm font-medium text-zinc-100">
+                  Cancel Subscription
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Cancel at the end of your current billing period
+                </p>
+              </div>
+              <TerminalButton
+                variant="danger"
+                onClick={() => setShowCancelConfirm(true)}
+              >
+                Cancel Plan
+              </TerminalButton>
+            </div>
+          )}
+
+          {!hasBillingCustomer && !isActive && (
+            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-6 text-center">
+              <p className="text-sm text-zinc-500">
+                No billing actions available on the Free plan.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {portalMutation.isError && (
+          <p className="mt-3 text-sm text-red-400">
+            {portalMutation.error instanceof Error
+              ? portalMutation.error.message
+              : "Failed to open billing portal"}
+          </p>
+        )}
+      </TerminalCard>
+
+      {/* Cancel Confirmation */}
+      {showCancelConfirm && sub && (
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+            </div>
+            <h2 className="text-base font-semibold text-zinc-100">
+              Confirm Cancellation
+            </h2>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <ul className="space-y-2 text-sm text-zinc-300">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-amber-400">&bull;</span>
+                Your Pro access continues until{" "}
+                {formatDate(sub.currentPeriodEnd)}
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-amber-400">&bull;</span>
+                After that, a 7-day grace period begins
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-amber-400">&bull;</span>
+                No refund for the current billing period
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 text-amber-400">&bull;</span>
+                Your data is never deleted
+              </li>
+            </ul>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            <div>
+              <label
+                htmlFor="cancelReason"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                Reason for canceling
+              </label>
+              <select
+                id="cancelReason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100"
+              >
+                <option value="">Select a reason (optional)</option>
+                {CANCEL_REASONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="cancelComment"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                Additional feedback (optional)
+              </label>
+              <textarea
+                id="cancelComment"
+                value={cancelComment}
+                onChange={(e) => setCancelComment(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                placeholder="Tell us how we can improve..."
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <TerminalButton
+              variant="secondary"
+              onClick={() => {
+                setShowCancelConfirm(false);
+                setCancelReason("");
+                setCancelComment("");
+              }}
+              disabled={isCanceling}
+            >
+              Go Back
+            </TerminalButton>
+            <TerminalButton
+              variant="danger"
+              onClick={handleConfirmCancel}
+              disabled={isCanceling}
+            >
+              {isCanceling ? "Canceling..." : "Confirm Cancellation"}
+            </TerminalButton>
+          </div>
+        </TerminalCard>
+      )}
+
+      {/* Quick Links */}
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">Quick Links</h2>
+        <div className="mt-4 space-y-2">
+          <Link
+            href="/faq#plans-billing"
+            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            Billing FAQ
+          </Link>
+          <Link
+            href="/terms#billing"
+            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            Terms of Service &mdash; Billing
+          </Link>
+          <Link
+            href="/privacy"
+            className="flex items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-4 py-3 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-zinc-500" />
+            Privacy Policy
+          </Link>
+        </div>
+      </TerminalCard>
+    </div>
+  );
 }

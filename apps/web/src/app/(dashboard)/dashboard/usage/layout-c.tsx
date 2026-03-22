@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { TierBadge } from "@/components/tier/TierBadge";
 import { TerminalWindow } from "@/components/dashboard/terminal-ui";
 import { UsageMeter } from "@/components/tier/UsageMeter";
@@ -30,6 +31,8 @@ import {
   KeySquare,
   ScrollText,
   BarChart3,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import type { UsageLayoutProps } from "./usage-data";
 import {
@@ -94,6 +97,33 @@ export function LayoutC(props: UsageLayoutProps) {
         isAllowed={isAllowed}
         onUpgrade={onUpgrade}
       />
+
+      {/* ── How Usage Works — info bar ─────────────────────────────────── */}
+      <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/20 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <HelpCircle className="h-4 w-4 text-zinc-500 shrink-0" />
+          <p className="text-xs text-zinc-500">
+            Usage is computed in real time from your data.
+            Limits are enforced per resource &mdash; existing data is never deleted.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0 ml-4">
+          <Link
+            href="/faq#usage-limits"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+          >
+            How it works
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+          <Link
+            href="/faq#plans-billing"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+          >
+            Billing FAQ
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
 
       {/* ── Feature Comparison Table ─────────────────────────────────── */}
       <TerminalWindow title="features — free vs pro">
