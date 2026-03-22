@@ -48,6 +48,6 @@ export function useCreateCheckout() {
 export function useCreatePortalSession() {
   return useMutation({
     mutationFn: (data: { organizationId: string }) =>
-      api.post<{ url: string }>("/api/billing/portal", data),
+      api.post<{ portalUrl: string }>("/api/billing/portal", data),
   });
 }

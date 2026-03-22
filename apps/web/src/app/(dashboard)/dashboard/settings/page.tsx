@@ -1585,7 +1585,7 @@ function BillingSettings({
     if (!organizationId) return;
     try {
       const data = await portalMutation.mutateAsync({ organizationId });
-      window.open(data.url, "_blank");
+      if (data.portalUrl) window.open(data.portalUrl, "_blank");
     } catch {
       // Error is handled by mutation state
     }

@@ -11,7 +11,7 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const portalSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
-  returnUrl: z.string().url("Return URL must be a valid URL"),
+  returnUrl: z.string().url("Return URL must be a valid URL").optional(),
 });
 
 /**
