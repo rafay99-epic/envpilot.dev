@@ -232,7 +232,13 @@ export function LimitWarning({
         </svg>
         <span>
           You&apos;ve reached the {resourceName} limit ({current}/{limit}).
-          <button className="ml-1 text-purple-600 dark:text-purple-400 hover:underline font-medium">
+          <button
+            onClick={() => {
+              window.location.href =
+                "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+            }}
+            className="ml-1 text-purple-600 dark:text-purple-400 hover:underline font-medium"
+          >
             Upgrade to Pro
           </button>
         </span>

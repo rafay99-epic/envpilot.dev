@@ -14,6 +14,10 @@ export interface TierUsage {
   maxVariablesInProject: number;
   maxVariablesProjectName: string;
   variablesPerProject: ProjectVariableCount[];
+  /** Number of currently active secret sharing links */
+  activeShares?: number;
+  /** Number of variables with rotation enabled */
+  rotationEnabledVars?: number;
 }
 
 /** Resolved feature value from the dynamic feature registry */

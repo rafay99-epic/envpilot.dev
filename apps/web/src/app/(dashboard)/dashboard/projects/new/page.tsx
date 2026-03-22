@@ -183,9 +183,8 @@ export default function NewProjectPage() {
           currentTier="free"
           variant="card"
           onUpgradeClick={() => {
-            if (organization?.slug) {
-              window.location.href = `/organizations/${organization.slug}/settings`;
-            }
+            window.location.href =
+              "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
           }}
         />
       </div>

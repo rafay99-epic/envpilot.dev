@@ -7,8 +7,10 @@ import {
   countActiveProjects,
   countActiveVariables,
   countMembersAndPendingInvites,
+  countRotationEnabledVariables,
   getUserTier,
 } from "./featureRegistry";
+import { countActiveShares } from "./sharedSecrets";
 
 /**
  * Tier Limits — Phase 6 cleanup
@@ -261,5 +263,99 @@ export const checkTierLimit = query({
           featureKey
         );
     }
+  },
+});
+
+/**
+ * Extended usage query — returns all metered resource counts for the usage page.
+ * Includes everything from getOrganizationUsage plus:
+ * - Active secret shares
+ * - Rotation-enabled variables
+ * - Pending invitations (separate from team member count)
+ */
+export const getExtendedUsage = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const org = await ctx.db.get(args.organizationId);
+    if (!org) return null;
+
+    const tier = await getUserTier(ctx.db, org.createdBy);
+
+    // Fetch all counts in parallel
+    const [
+      projects,
+      members,
+      pendingInvitations,
+      activeShares,
+      rotationEnabledVars,
+    ] = await Promise.all([
+      ctx.db
+        .query("projects")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .filter((q) => q.eq(q.field("deletedAt"), undefined))
+        .collect(),
+      ctx.db
+        .query("organizationMembers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect(),
+      ctx.db
+        .query("invitations")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("status"), "pending"),
+            q.gt(q.field("expiresAt"), Date.now())
+          )
+        )
+        .collect(),
+      countActiveShares(ctx.db, args.organizationId),
+      countRotationEnabledVariables(ctx.db, args.organizationId),
+    ]);
+
+    // Variable counts per project
+    const variableResults = await Promise.all(
+      projects.map(async (project) => {
+        const variables = await ctx.db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("deletedAt"), undefined))
+          .collect();
+        return {
+          projectId: project._id as string,
+          projectName: project.name,
+          count: variables.length,
+        };
+      })
+    );
+
+    let totalVariables = 0;
+    let maxVariableProject = { projectId: "", projectName: "", count: 0 };
+    for (const vc of variableResults) {
+      totalVariables += vc.count;
+      if (vc.count > maxVariableProject.count) {
+        maxVariableProject = vc;
+      }
+    }
+
+    return {
+      tier,
+      usage: {
+        projects: projects.length,
+        teamMembers: members.length,
+        pendingInvitations: pendingInvitations.length,
+        totalVariables,
+        maxVariablesInProject: maxVariableProject.count,
+        maxVariablesProjectName: maxVariableProject.projectName,
+        variablesPerProject: variableResults,
+        activeShares,
+        rotationEnabledVars,
+      },
+    };
   },
 });

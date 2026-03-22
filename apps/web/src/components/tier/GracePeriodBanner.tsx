@@ -28,7 +28,8 @@ export function GracePeriodBanner({
     if (onRenewClick) {
       onRenewClick();
     } else {
-      window.open("/pricing", "_blank");
+      window.location.href =
+        "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
     }
   };
 
