@@ -53,7 +53,7 @@ const BROWSABLE_TABLES = [
   { value: "changelog", label: "changelog" },
   { value: "auditLogs", label: "auditLogs" },
   { value: "subscriptions", label: "subscriptions" },
-  { value: "stripeCustomers", label: "stripeCustomers" },
+  { value: "polarCustomers", label: "polarCustomers" },
   { value: "cliSessions", label: "cliSessions" },
   { value: "cliTokens", label: "cliTokens" },
   { value: "environmentTemplates", label: "environmentTemplates" },
@@ -66,6 +66,8 @@ const BROWSABLE_TABLES = [
   { value: "contactMessages", label: "contactMessages" },
   { value: "tierDefinitions", label: "tierDefinitions" },
   { value: "adminSettings", label: "adminSettings" },
+  { value: "paymentProducts", label: "paymentProducts" },
+  { value: "processedWebhookEvents", label: "processedWebhookEvents" },
 ];
 
 const PAGE_SIZE = 50;

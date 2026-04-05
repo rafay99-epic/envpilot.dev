@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import type { DatabaseReader } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
 import { checkBooleanFeature, checkNumericLimit } from "./featureRegistry";
@@ -606,16 +607,14 @@ export const countActiveByOrg = query({
 // INTERNAL HELPERS
 // ==========================================
 
-async function countActiveShares(
-  db: any,
+export async function countActiveShares(
+  db: DatabaseReader,
   organizationId: Id<"organizations">
 ): Promise<number> {
   const shares = await db
     .query("sharedSecrets")
-    .withIndex("by_organization", (q: any) =>
-      q.eq("organizationId", organizationId)
-    )
-    .filter((q: any) => q.eq(q.field("status"), "active"))
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .filter((q) => q.eq(q.field("status"), "active"))
     .collect();
   return shares.length;
 }

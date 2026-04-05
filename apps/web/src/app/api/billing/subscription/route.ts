@@ -2,7 +2,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
-import { isPaymentsEnabled } from "@/lib/stripe";
+import { isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -15,10 +15,22 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function GET(request: Request) {
   try {
-    // Check if payments are enabled
+    // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {
       return NextResponse.json(
         { error: "Payment system is currently disabled" },
+        { status: 503 }
+      );
+    }
+
+    // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
+    const dbPaymentsEnabled = await convex.query(
+      api.tierLimits.isPaymentsEnabled,
+      {}
+    );
+    if (!dbPaymentsEnabled) {
+      return NextResponse.json(
+        { error: "Payment system is currently disabled by admin" },
         { status: 503 }
       );
     }
@@ -90,14 +102,14 @@ export async function GET(request: Request) {
       });
     }
 
-    // Get Stripe customer — try user-level first, fallback to org-level
-    let stripeCustomer = await convex.query(
-      api.subscriptions.getStripeCustomerByUser,
+    // Get Polar customer — try user-level first, fallback to org-level
+    let polarCustomer = await convex.query(
+      api.subscriptions.getPolarCustomerByUser,
       { userId: organization.createdBy }
     );
 
-    if (!stripeCustomer) {
-      stripeCustomer = await convex.query(api.subscriptions.getStripeCustomer, {
+    if (!polarCustomer) {
+      polarCustomer = await convex.query(api.subscriptions.getPolarCustomer, {
         organizationId: organizationId as Id<"organizations">,
       });
     }
@@ -116,7 +128,7 @@ export async function GET(request: Request) {
             trialEnd: subscription.trialEnd,
           }
         : null,
-      hasStripeCustomer: !!stripeCustomer,
+      hasBillingCustomer: !!polarCustomer,
       canManageBilling: membership.role === "admin",
     });
   } catch (error) {

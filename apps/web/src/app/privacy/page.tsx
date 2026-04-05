@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 
 const SECTIONS = [
   { id: "introduction", label: "Introduction" },
@@ -72,18 +73,7 @@ export default function PrivacyPolicyPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-            >
-              sign-in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
-            >
-              get-started
-            </Link>
+            <PublicHeaderButtons />
           </div>
         </div>
       </header>
@@ -246,7 +236,7 @@ export default function PrivacyPolicyPage() {
                 <Subsection title="3.5 Billing Data">
                   <p>
                     If you subscribe to a paid plan, our payment processor
-                    (Stripe) collects your payment method details. We store
+                    (Polar.sh) collects your payment method details. We store
                     subscription identifiers, plan tier, billing period dates,
                     and payment status. We do not store credit card numbers or
                     bank account information on our servers.
@@ -414,7 +404,7 @@ export default function PrivacyPolicyPage() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-green-400">Stripe</td>
+                        <td className="px-4 py-3 text-green-400">Polar.sh</td>
                         <td className="px-4 py-3">Payment processing</td>
                         <td className="px-4 py-3">
                           Email, billing address, payment method
@@ -734,6 +724,9 @@ export default function PrivacyPolicyPage() {
               </Link>
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
+              </Link>
+              <Link href="/faq" className="hover:text-zinc-400">
+                FAQ
               </Link>
               <Link href="/support" className="hover:text-zinc-400">
                 Support

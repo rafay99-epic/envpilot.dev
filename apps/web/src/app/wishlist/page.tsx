@@ -326,6 +326,9 @@ export default function WishlistPage() {
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
               </Link>
+              <Link href="/faq" className="hover:text-zinc-400">
+                FAQ
+              </Link>
               <Link href="/support" className="hover:text-zinc-400">
                 Support
               </Link>

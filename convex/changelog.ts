@@ -958,7 +958,7 @@ All checks are non-blocking and fail silently on network errors.`,
     content: `Moved all tier enforcement from client-side to server-side for security.
 
 - Created separate locked-down \`organizationTiers\` table
-- Stripe webhook mutations converted to \`internalMutation\` with a single public gateway
+- Polar.sh webhook mutations converted to \`internalMutation\` with a single public gateway
 - Replaced client-side \`NEXT_PUBLIC_ENFORCE_TIER_LIMITS\` with server-side \`ENFORCE_TIER_LIMITS\`
 - All API routes and React components now query tier data from the backend
 - Data migration to move tier field from organizations table to dedicated table`,

@@ -31,7 +31,7 @@ Planned features and enhancements for future development.
 - Auto-expires after view or TTL
 - Audit logged with viewer info
 
-### Variable Groups / Tags
+### Variable Groups / Tags (DONE)
 
 - Group related variables (e.g., "Database", "AWS", "API Keys")
 - Filter and search by tag in dashboard, CLI, and extension
@@ -100,7 +100,7 @@ Planned features and enhancements for future development.
 - Auto-refresh on change via WebSocket
 - Packages: `packages/sdk-node/`, `packages/sdk-python/`, `packages/sdk-go/`
 
-### Dashboard Analytics Charts
+### Dashboard Analytics Charts (DONE)
 
 - Charts for variable change frequency, most active projects, team activity
 - Security insights: unused variables, overly broad permissions, stale access tokens

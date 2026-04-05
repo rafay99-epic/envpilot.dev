@@ -24,7 +24,7 @@ Envpilot is a centralized platform for managing, sharing, and syncing environmen
 - **Organization & Project Hierarchy** — Manage multiple organizations, each with isolated projects and environments.
 - **Audit Logging** — Every read, write, and permission change is recorded for compliance.
 - **CLI & VS Code Extension** — Pull, push, and diff variables directly from your terminal or editor.
-- **Billing & Tier Limits** — Optional Stripe integration with enforceable Free / Pro tier caps.
+- **Billing & Tier Limits** — Optional Polar.sh integration with enforceable Free / Pro tier caps.
 
 ## Tech Stack
 
@@ -33,7 +33,7 @@ Envpilot is a centralized platform for managing, sharing, and syncing environmen
 | **Web App**        | Next.js 16, React 19, React Compiler, Tailwind CSS v4 |
 | **Backend**        | Convex (real-time database), WorkOS Vault (secrets)   |
 | **Authentication** | WorkOS AuthKit (email, OAuth, SAML)                   |
-| **Billing**        | Stripe (optional)                                     |
+| **Billing**        | Polar.sh (optional)                                   |
 | **Email**          | Resend (optional)                                     |
 | **CLI**            | Commander.js, Zod v4, tsup                            |
 | **VS Code Ext.**   | VS Code Extension API, esbuild                        |
@@ -89,9 +89,8 @@ Copy `.env.example` to `.env.local` at the monorepo root. The web app reads it v
 
 | Variable                          | Description                            |
 | --------------------------------- | -------------------------------------- |
-| `STRIPE_SECRET_KEY`               | Stripe secret key                      |
-| `STRIPE_WEBHOOK_SECRET`           | Stripe webhook signing secret          |
-| `STRIPE_PRO_PRICE_ID`             | Stripe price ID for Pro tier           |
+| `POLAR_ACCESS_TOKEN`              | Polar.sh access token                  |
+| `POLAR_WEBHOOK_SECRET`            | Polar.sh webhook signing secret        |
 | `NEXT_PUBLIC_PAYMENTS_ENABLED`    | Set `true` to enable billing           |
 | `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` | Set `true` to enforce tier caps        |
 | `RESEND_API_KEY`                  | Resend API key for transactional email |
@@ -159,7 +158,7 @@ envpilot/
 │   │   │   ├── app/               # App Router (pages + API routes)
 │   │   │   ├── components/        # React components
 │   │   │   ├── hooks/             # Custom hooks (Convex wrappers)
-│   │   │   ├── lib/               # Auth, vault, stripe, email, tier-limits
+│   │   │   ├── lib/               # Auth, vault, polar, email, tier-limits
 │   │   │   └── stores/            # Zustand state stores
 │   │   └── tests/e2e/             # Playwright test specs
 │   │
@@ -201,7 +200,7 @@ Browser / CLI / Extension
         ├──▶ Convex (real-time database)
         ├──▶ WorkOS Vault (encrypted secrets)
         ├──▶ WorkOS AuthKit (authentication)
-        ├──▶ Stripe (billing)
+        ├──▶ Polar.sh (billing)
         └──▶ Resend (email)
 ```
 

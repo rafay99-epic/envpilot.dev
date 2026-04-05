@@ -437,14 +437,14 @@ export const remove = mutation({
       await ctx.db.delete(sub._id);
     }
 
-    // Delete stripe customers
-    const stripeCustomers = await ctx.db
-      .query("stripeCustomers")
+    // Delete polar customers
+    const polarCustomers = await ctx.db
+      .query("polarCustomers")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
       .collect();
-    for (const sc of stripeCustomers) {
+    for (const sc of polarCustomers) {
       await ctx.db.delete(sc._id);
     }
 

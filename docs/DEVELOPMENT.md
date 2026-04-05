@@ -34,7 +34,7 @@ provo/
 │   │   ├── src/app/          # App Router pages + API routes
 │   │   ├── src/components/   # React components
 │   │   ├── src/hooks/        # Custom hooks (Convex query wrappers)
-│   │   └── src/lib/          # Utilities (auth, vault, stripe, email)
+│   │   └── src/lib/          # Utilities (auth, vault, polar, email)
 │   ├── cli/                  # CLI tool (@envpilot/cli)
 │   │   └── src/              # Commands, lib, types
 │   └── vscode-extension/     # VS Code extension (envpilot)
@@ -93,9 +93,8 @@ See `.env.example` for the full template with descriptions.
 | `WORKOS_COOKIE_PASSWORD`       | Yes      | 32+ char secret for session cookies     |
 | `WORKOS_REDIRECT_URI`          | Yes      | OAuth callback URL                      |
 | `NEXT_PUBLIC_APP_URL`          | Yes      | App URL (e.g., `http://localhost:3000`) |
-| `STRIPE_SECRET_KEY`            | No       | Stripe secret key                       |
-| `STRIPE_WEBHOOK_SECRET`        | No       | Stripe webhook signing secret           |
-| `STRIPE_PRO_PRICE_ID`          | No       | Stripe price ID for Pro tier            |
+| `POLAR_ACCESS_TOKEN`           | No       | Polar.sh access token                   |
+| `POLAR_WEBHOOK_SECRET`         | No       | Polar.sh webhook signing secret         |
 | `NEXT_PUBLIC_PAYMENTS_ENABLED` | No       | Set to `true` to enable billing         |
 | `RESEND_API_KEY`               | No       | Resend email API key                    |
 | `FROM_EMAIL`                   | No       | Sender email address                    |

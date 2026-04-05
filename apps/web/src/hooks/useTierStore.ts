@@ -21,7 +21,7 @@ export function useTierStoreSync() {
   const { convexUserId } = useConvexUser(user?.id);
 
   const usageData = useQuery(
-    api.tierLimits.getOrganizationUsage,
+    api.tierLimits.getExtendedUsage,
     orgId ? { organizationId: orgId } : "skip"
   );
 

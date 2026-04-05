@@ -12,44 +12,52 @@ import { getDefaultTierName, isCronPaused } from "./tierLimits";
 import { getUserTier } from "./featureRegistry";
 
 /**
- * Subscription Management for Stripe Integration
+ * Subscription Management for Polar.sh Integration
  *
- * USER-LEVEL BILLING: Subscriptions and Stripe customers are keyed by
+ * USER-LEVEL BILLING: Subscriptions and Polar customers are keyed by
  * userId. The org owner's subscription determines the tier for all
  * their owned organizations via the userTiers table.
  *
  * SECURITY: All webhook mutations are internalMutation — they cannot be
  * called from the client. Only the processWebhookEvent action (which is
- * called from the verified Stripe webhook handler) dispatches to them.
+ * called from the verified Polar webhook handler) dispatches to them.
  */
 
-// Subscription status type (matches Stripe's subscription statuses)
+// Subscription status type (matches Polar's subscription statuses)
 export const subscriptionStatus = v.union(
   v.literal("active"),
   v.literal("canceled"),
   v.literal("incomplete"),
-  v.literal("incomplete_expired"),
   v.literal("past_due"),
-  v.literal("paused"),
   v.literal("trialing"),
-  v.literal("unpaid")
+  v.literal("unpaid"),
+  v.literal("revoked")
 );
 
 // ==========================================
-// DYNAMIC PRICE-TO-TIER MAPPING
+// DYNAMIC PRODUCT-TO-TIER MAPPING
 // ==========================================
 
 /**
- * Maps a Stripe price ID to a tier name by looking up tierDefinitions.
+ * Maps a Polar product ID to a tier name by looking up tierDefinitions.
  * Falls back to default tier if no match found.
  */
-async function mapPriceIdToTier(
+async function mapProductIdToTier(
   db: DatabaseReader,
-  priceId: string
+  productId: string
 ): Promise<string> {
+  // Strategy 1: Look up in paymentProducts table (provider-agnostic)
+  const paymentProduct = await db
+    .query("paymentProducts")
+    .withIndex("by_product_id", (q) => q.eq("productId", productId))
+    .first();
+  if (paymentProduct && paymentProduct.isActive) return paymentProduct.tierName;
+
+  // Strategy 2: Legacy fallback — tierDefinitions.polarProductId
   const allTiers = await db.query("tierDefinitions").collect();
-  const match = allTiers.find((t) => t.stripePriceId === priceId);
+  const match = allTiers.find((t) => t.polarProductId === productId);
   if (match) return match.name;
+
   return await getDefaultTierName(db);
 }
 
@@ -86,28 +94,28 @@ export const getByUser = query({
 });
 
 /**
- * Get subscription by Stripe subscription ID
+ * Get subscription by Polar subscription ID
  */
-export const getByStripeSubscriptionId = query({
-  args: { stripeSubscriptionId: v.string() },
+export const getByPolarSubscriptionId = query({
+  args: { polarSubscriptionId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("subscriptions")
-      .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      .withIndex("by_polar_subscription", (q) =>
+        q.eq("polarSubscriptionId", args.polarSubscriptionId)
       )
       .first();
   },
 });
 
 /**
- * Get Stripe customer for an organization (LEGACY — backward compat)
+ * Get Polar customer for an organization (LEGACY — backward compat)
  */
-export const getStripeCustomer = query({
+export const getPolarCustomer = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("stripeCustomers")
+      .query("polarCustomers")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
@@ -116,28 +124,28 @@ export const getStripeCustomer = query({
 });
 
 /**
- * Get Stripe customer for a user (NEW)
+ * Get Polar customer for a user (NEW)
  */
-export const getStripeCustomerByUser = query({
+export const getPolarCustomerByUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("stripeCustomers")
+      .query("polarCustomers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
   },
 });
 
 /**
- * Get Stripe customer by Stripe customer ID
+ * Get Polar customer by Polar customer ID
  */
-export const getStripeCustomerById = query({
-  args: { stripeCustomerId: v.string() },
+export const getPolarCustomerById = query({
+  args: { polarCustomerId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("stripeCustomers")
-      .withIndex("by_stripe_customer", (q) =>
-        q.eq("stripeCustomerId", args.stripeCustomerId)
+      .query("polarCustomers")
+      .withIndex("by_polar_customer", (q) =>
+        q.eq("polarCustomerId", args.polarCustomerId)
       )
       .first();
   },
@@ -192,13 +200,13 @@ export const hasActiveUserSubscription = query({
 // ==========================================
 
 /**
- * Create or update a Stripe customer mapping
+ * Create or update a Polar customer mapping
  */
-export const upsertStripeCustomer = internalMutation({
+export const upsertPolarCustomer = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
-    stripeCustomerId: v.string(),
+    polarCustomerId: v.string(),
     email: v.string(),
   },
   handler: async (ctx, args) => {
@@ -206,13 +214,13 @@ export const upsertStripeCustomer = internalMutation({
 
     // Try to find by user first, then by org
     let existing = await ctx.db
-      .query("stripeCustomers")
+      .query("polarCustomers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
 
     if (!existing) {
       existing = await ctx.db
-        .query("stripeCustomers")
+        .query("polarCustomers")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
@@ -221,7 +229,7 @@ export const upsertStripeCustomer = internalMutation({
 
     if (existing) {
       await ctx.db.patch(existing._id, {
-        stripeCustomerId: args.stripeCustomerId,
+        polarCustomerId: args.polarCustomerId,
         email: args.email,
         userId: args.userId,
         updatedAt: now,
@@ -229,10 +237,10 @@ export const upsertStripeCustomer = internalMutation({
       return existing._id;
     }
 
-    return await ctx.db.insert("stripeCustomers", {
+    return await ctx.db.insert("polarCustomers", {
       organizationId: args.organizationId,
       userId: args.userId,
-      stripeCustomerId: args.stripeCustomerId,
+      polarCustomerId: args.polarCustomerId,
       email: args.email,
       createdAt: now,
       updatedAt: now,
@@ -247,9 +255,9 @@ export const createSubscription = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
-    stripeCustomerId: v.string(),
-    stripeSubscriptionId: v.string(),
-    stripePriceId: v.string(),
+    polarCustomerId: v.string(),
+    polarSubscriptionId: v.string(),
+    polarProductId: v.string(),
     status: subscriptionStatus,
     currentPeriodStart: v.number(),
     currentPeriodEnd: v.number(),
@@ -264,8 +272,8 @@ export const createSubscription = internalMutation({
     // Check if subscription already exists
     const existing = await ctx.db
       .query("subscriptions")
-      .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      .withIndex("by_polar_subscription", (q) =>
+        q.eq("polarSubscriptionId", args.polarSubscriptionId)
       )
       .first();
 
@@ -289,9 +297,9 @@ export const createSubscription = internalMutation({
     return await ctx.db.insert("subscriptions", {
       organizationId: args.organizationId,
       userId: args.userId,
-      stripeCustomerId: args.stripeCustomerId,
-      stripeSubscriptionId: args.stripeSubscriptionId,
-      stripePriceId: args.stripePriceId,
+      polarCustomerId: args.polarCustomerId,
+      polarSubscriptionId: args.polarSubscriptionId,
+      polarProductId: args.polarProductId,
       status: args.status,
       currentPeriodStart: args.currentPeriodStart,
       currentPeriodEnd: args.currentPeriodEnd,
@@ -306,11 +314,11 @@ export const createSubscription = internalMutation({
 });
 
 /**
- * Update a subscription from Stripe webhook
+ * Update a subscription from Polar webhook
  */
 export const updateSubscription = internalMutation({
   args: {
-    stripeSubscriptionId: v.string(),
+    polarSubscriptionId: v.string(),
     status: subscriptionStatus,
     currentPeriodStart: v.optional(v.number()),
     currentPeriodEnd: v.optional(v.number()),
@@ -323,13 +331,13 @@ export const updateSubscription = internalMutation({
 
     const subscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      .withIndex("by_polar_subscription", (q) =>
+        q.eq("polarSubscriptionId", args.polarSubscriptionId)
       )
       .first();
 
     if (!subscription) {
-      throw new Error(`Subscription not found: ${args.stripeSubscriptionId}`);
+      throw new Error(`Subscription not found: ${args.polarSubscriptionId}`);
     }
 
     const updateData: Record<string, unknown> = {
@@ -360,17 +368,17 @@ export const updateSubscription = internalMutation({
 });
 
 /**
- * Delete a subscription (when customer is deleted in Stripe)
+ * Delete a subscription (when customer is deleted in Polar)
  */
 export const deleteSubscription = internalMutation({
   args: {
-    stripeSubscriptionId: v.string(),
+    polarSubscriptionId: v.string(),
   },
   handler: async (ctx, args) => {
     const subscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      .withIndex("by_polar_subscription", (q) =>
+        q.eq("polarSubscriptionId", args.polarSubscriptionId)
       )
       .first();
 
@@ -585,17 +593,27 @@ export const logBillingEvent = internalMutation({
 });
 
 // ==========================================
-// WEBHOOK ACTION (public gateway for Stripe webhook handler)
+// WEBHOOK ACTION (public gateway for Polar webhook handler)
 // ==========================================
 
 /** Grace period duration in days. */
 const GRACE_PERIOD_DAYS = 7;
 
 /**
- * Process a Stripe webhook event.
+ * Helper: Parse Polar ISO 8601 timestamp to milliseconds.
+ * Polar sends dates as ISO strings, not Unix seconds like Stripe.
+ */
+function polarTimestamp(ts: string | null | undefined): number | undefined {
+  if (!ts) return undefined;
+  const ms = new Date(ts).getTime();
+  return isNaN(ms) ? undefined : ms;
+}
+
+/**
+ * Process a Polar webhook event.
  *
- * This is the single public entry point for all Stripe webhook events.
- * The Next.js webhook route verifies the Stripe signature, then calls
+ * This is the single public entry point for all Polar webhook events.
+ * The Next.js webhook route verifies the Polar signature, then calls
  * this action with the event type and serialized data.
  *
  * USER-LEVEL BILLING: All tier syncs write to userTiers (the single
@@ -607,197 +625,310 @@ const GRACE_PERIOD_DAYS = 7;
 export const processWebhookEvent = action({
   args: {
     type: v.string(),
-    data: v.string(), // JSON-serialized Stripe event data object
+    data: v.string(), // JSON-serialized Polar event data object
+    webhookId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const eventData = JSON.parse(args.data);
 
+    // --- Webhook deduplication ---
+    if (args.webhookId) {
+      const alreadyProcessed = await ctx.runQuery(
+        internal.subscriptions._checkWebhookProcessed,
+        { webhookId: args.webhookId }
+      );
+      if (alreadyProcessed) {
+        console.log(`Polar: skipping duplicate webhook ${args.webhookId}`);
+        return;
+      }
+    }
+
     switch (args.type) {
-      case "checkout.session.completed": {
-        const organizationId = eventData.metadata?.organizationId;
-        const userId = eventData.metadata?.userId;
+      // -----------------------------------------------
+      // CHECKOUT COMPLETED — link Polar customer to user
+      // -----------------------------------------------
+      case "checkout.updated": {
+        // Only process successful checkouts
+        if (eventData.status !== "succeeded") {
+          return;
+        }
+
+        const metadata = eventData.metadata || {};
+        const organizationId = metadata.organizationId;
+        const userId = metadata.userId;
 
         if (!organizationId || !userId) {
-          console.error("Missing metadata in checkout session:", eventData.id);
+          console.error("Missing metadata in checkout:", eventData.id);
           return;
         }
 
-        const customerId = eventData.customer as string;
+        const customerId = eventData.customerId as string;
         const customerEmail =
-          eventData.customer_email || eventData.customer_details?.email;
+          eventData.customerEmail || eventData.customer?.email;
 
         if (!customerId || !customerEmail) {
-          console.error(
-            "Missing customer data in checkout session:",
-            eventData.id
-          );
+          console.error("Missing customer data in checkout:", eventData.id);
           return;
         }
 
-        // Map Stripe customer to org and user
-        await ctx.runMutation(internal.subscriptions.upsertStripeCustomer, {
+        // Map Polar customer to org and user
+        await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
           organizationId,
           userId,
-          stripeCustomerId: customerId,
+          polarCustomerId: customerId,
           email: customerEmail,
         });
 
-        console.log("Stripe: checkout completed");
+        console.log("Polar: checkout completed");
         break;
       }
 
-      case "customer.subscription.created": {
-        const customerId = eventData.customer as string;
+      // -----------------------------------------------
+      // SUBSCRIPTION CREATED / ACTIVE — activate tier
+      //
+      // User resolution strategy (handles race condition where
+      // subscription.created arrives before checkout.updated):
+      //   1. metadata.userId from checkout (most reliable)
+      //   2. customer.externalId (set to Convex userId at checkout)
+      //   3. polarCustomers table lookup (fallback)
+      // -----------------------------------------------
+      case "subscription.created":
+      case "subscription.active": {
+        const customerId = eventData.customerId as string;
+        const productId = eventData.productId as string;
 
-        const stripeCustomer = await ctx.runQuery(
-          internal.subscriptions._getStripeCustomerById,
-          { stripeCustomerId: customerId }
-        );
-
-        if (!stripeCustomer) {
-          console.error("No customer found for Stripe customer:", customerId);
+        if (!productId) {
+          console.error("No product found in subscription:", eventData.id);
           return;
         }
 
-        const subscriptionItem = eventData.items?.data?.[0];
-        const priceId = subscriptionItem?.price?.id;
+        // --- Resolve user ID using multiple strategies ---
+        const metadata = eventData.metadata || {};
+        const customerExternalId =
+          eventData.customer?.externalId ?? eventData.externalCustomerId; // Embedded customer object // Top-level field
 
-        if (!priceId || !subscriptionItem) {
-          console.error("No price found in subscription:", eventData.id);
-          return;
+        let resolvedUserId: string | undefined;
+        let resolvedOrgId: string | undefined;
+
+        // Strategy 1: metadata from checkout (most reliable)
+        if (metadata.userId) {
+          resolvedUserId = metadata.userId;
+          resolvedOrgId = metadata.organizationId;
         }
 
-        // Resolve the user — prefer userId on stripeCustomer, fallback to org owner
-        const org = await ctx.runQuery(internal.subscriptions._getOrgById, {
-          organizationId: stripeCustomer.organizationId,
-        });
-        const resolvedUserId = stripeCustomer.userId ?? org?.createdBy;
+        // Strategy 2: customer.externalId (= Convex user ID, set at checkout)
+        if (!resolvedUserId && customerExternalId) {
+          resolvedUserId = customerExternalId;
+        }
+
+        // Strategy 3: polarCustomers table lookup (original approach)
+        if (!resolvedUserId) {
+          const polarCustomer = await ctx.runQuery(
+            internal.subscriptions._getPolarCustomerById,
+            { polarCustomerId: customerId }
+          );
+          if (polarCustomer) {
+            resolvedUserId = polarCustomer.userId ?? undefined;
+            resolvedOrgId = resolvedOrgId ?? polarCustomer.organizationId;
+          }
+        }
 
         if (!resolvedUserId) {
           console.error(
             "Could not resolve user for subscription:",
+            eventData.id,
+            "customerId:",
+            customerId
+          );
+          return;
+        }
+
+        // Resolve org ID — if we still don't have one, look up user's first org
+        if (!resolvedOrgId) {
+          const userOrgs = await ctx.runQuery(
+            internal.subscriptions._getUserOwnedOrgs,
+            { userId: resolvedUserId as any }
+          );
+          if (userOrgs.length > 0) {
+            resolvedOrgId = userOrgs[0]._id;
+          }
+        }
+
+        if (!resolvedOrgId) {
+          console.error(
+            "Could not resolve organization for subscription:",
             eventData.id
           );
           return;
         }
 
-        await ctx.runMutation(internal.subscriptions.createSubscription, {
-          organizationId: stripeCustomer.organizationId,
-          userId: resolvedUserId,
-          stripeCustomerId: customerId,
-          stripeSubscriptionId: eventData.id,
-          stripePriceId: priceId,
-          status: eventData.status,
-          currentPeriodStart: subscriptionItem.current_period_start * 1000,
-          currentPeriodEnd: subscriptionItem.current_period_end * 1000,
-          cancelAtPeriodEnd: eventData.cancel_at_period_end,
-          cancelAt: eventData.cancel_at
-            ? eventData.cancel_at * 1000
-            : undefined,
-          trialStart: eventData.trial_start
-            ? eventData.trial_start * 1000
-            : undefined,
-          trialEnd: eventData.trial_end
-            ? eventData.trial_end * 1000
-            : undefined,
+        // Ensure polarCustomers record exists (handles race condition)
+        await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
+          organizationId: resolvedOrgId as any,
+          userId: resolvedUserId as any,
+          polarCustomerId: customerId,
+          email:
+            eventData.customer?.email ??
+            eventData.customerEmail ??
+            "unknown@polar.sh",
         });
 
-        // Dynamic tier mapping from price ID
+        await ctx.runMutation(internal.subscriptions.createSubscription, {
+          organizationId: resolvedOrgId as any,
+          userId: resolvedUserId as any,
+          polarCustomerId: customerId,
+          polarSubscriptionId: eventData.id,
+          polarProductId: productId,
+          status: eventData.status,
+          currentPeriodStart:
+            polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+          currentPeriodEnd:
+            polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+          cancelAtPeriodEnd: eventData.cancelAtPeriodEnd ?? false,
+          cancelAt: polarTimestamp(eventData.endsAt),
+          trialStart: polarTimestamp(eventData.startedAt),
+          trialEnd: polarTimestamp(eventData.endsAt),
+        });
+
+        // Dynamic tier mapping from product ID
         const tierName = await ctx.runQuery(
-          internal.subscriptions._mapPriceToTier,
-          { priceId }
+          internal.subscriptions._mapProductToTier,
+          { productId }
         );
 
         if (eventData.status === "active" || eventData.status === "trialing") {
-          // Primary: sync user tier
+          // Primary: sync user tier (user-level, not org-level)
           await ctx.runMutation(internal.subscriptions._syncUserTier, {
-            userId: resolvedUserId,
+            userId: resolvedUserId as any,
             tier: tierName,
             reason: "billing.subscription_created",
           });
 
           // Reset consumption counters on new subscription
           await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-            userId: resolvedUserId,
-            periodStart: subscriptionItem.current_period_start * 1000,
-            periodEnd: subscriptionItem.current_period_end * 1000,
+            userId: resolvedUserId as any,
+            periodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
           });
 
           // Clear any active grace period
           await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-            userId: resolvedUserId,
+            userId: resolvedUserId as any,
           });
         }
 
-        console.log("Stripe: subscription created");
+        console.log(
+          `Polar: ${args.type} — user ${resolvedUserId} → tier ${tierName}`
+        );
         break;
       }
 
-      case "customer.subscription.updated": {
+      // -----------------------------------------------
+      // SUBSCRIPTION UPDATED — handle tier changes
+      // -----------------------------------------------
+      case "subscription.updated": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByStripeSubscriptionId,
-          { stripeSubscriptionId: eventData.id }
+          internal.subscriptions._getByPolarSubscriptionId,
+          { polarSubscriptionId: eventData.id }
         );
 
         if (!existingSubscription) {
           // Subscription doesn't exist yet — handle as new creation
-          const customerId = eventData.customer as string;
-          const stripeCustomer = await ctx.runQuery(
-            internal.subscriptions._getStripeCustomerById,
-            { stripeCustomerId: customerId }
-          );
+          // Use same multi-strategy user resolution as subscription.created
+          const customerId = eventData.customerId as string;
+          const updMetadata = eventData.metadata || {};
+          const updExternalId =
+            eventData.customer?.externalId ?? eventData.externalCustomerId;
 
-          if (!stripeCustomer) {
-            console.error("No customer found for Stripe customer:", customerId);
+          const productId = eventData.productId as string;
+          if (!productId) {
+            console.error("No product found in subscription:", eventData.id);
             return;
           }
 
-          const subItem = eventData.items?.data?.[0];
-          const priceId = subItem?.price?.id;
-          if (!priceId || !subItem) {
-            console.error("No price found in subscription:", eventData.id);
-            return;
-          }
+          let resolvedUserId: string | undefined;
+          let resolvedOrgId: string | undefined;
 
-          const fallbackOrg = await ctx.runQuery(
-            internal.subscriptions._getOrgById,
-            { organizationId: stripeCustomer.organizationId }
-          );
-          const resolvedUserId =
-            stripeCustomer.userId ?? fallbackOrg?.createdBy;
+          // Strategy 1: metadata
+          if (updMetadata.userId) {
+            resolvedUserId = updMetadata.userId;
+            resolvedOrgId = updMetadata.organizationId;
+          }
+          // Strategy 2: customer.externalId
+          if (!resolvedUserId && updExternalId) {
+            resolvedUserId = updExternalId;
+          }
+          // Strategy 3: polarCustomers table
+          if (!resolvedUserId) {
+            const polarCustomer = await ctx.runQuery(
+              internal.subscriptions._getPolarCustomerById,
+              { polarCustomerId: customerId }
+            );
+            if (polarCustomer) {
+              resolvedUserId = polarCustomer.userId ?? undefined;
+              resolvedOrgId = resolvedOrgId ?? polarCustomer.organizationId;
+            }
+          }
 
           if (!resolvedUserId) {
             console.error(
-              "Could not resolve user for subscription:",
+              "Could not resolve user for subscription (update fallback):",
               eventData.id
             );
             return;
           }
 
+          // Resolve org
+          if (!resolvedOrgId) {
+            const userOrgs = await ctx.runQuery(
+              internal.subscriptions._getUserOwnedOrgs,
+              { userId: resolvedUserId as any }
+            );
+            if (userOrgs.length > 0) {
+              resolvedOrgId = userOrgs[0]._id;
+            }
+          }
+
+          if (!resolvedOrgId) {
+            console.error(
+              "Could not resolve org for subscription (update fallback):",
+              eventData.id
+            );
+            return;
+          }
+
+          // Ensure polarCustomers record exists
+          await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
+            organizationId: resolvedOrgId as any,
+            userId: resolvedUserId as any,
+            polarCustomerId: customerId,
+            email:
+              eventData.customer?.email ??
+              eventData.customerEmail ??
+              "unknown@polar.sh",
+          });
+
           await ctx.runMutation(internal.subscriptions.createSubscription, {
-            organizationId: stripeCustomer.organizationId,
-            userId: resolvedUserId,
-            stripeCustomerId: customerId,
-            stripeSubscriptionId: eventData.id,
-            stripePriceId: priceId,
+            organizationId: resolvedOrgId as any,
+            userId: resolvedUserId as any,
+            polarCustomerId: customerId,
+            polarSubscriptionId: eventData.id,
+            polarProductId: productId,
             status: eventData.status,
-            currentPeriodStart: subItem.current_period_start * 1000,
-            currentPeriodEnd: subItem.current_period_end * 1000,
-            cancelAtPeriodEnd: eventData.cancel_at_period_end,
-            cancelAt: eventData.cancel_at
-              ? eventData.cancel_at * 1000
-              : undefined,
-            trialStart: eventData.trial_start
-              ? eventData.trial_start * 1000
-              : undefined,
-            trialEnd: eventData.trial_end
-              ? eventData.trial_end * 1000
-              : undefined,
+            currentPeriodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            currentPeriodEnd:
+              polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+            cancelAtPeriodEnd: eventData.cancelAtPeriodEnd ?? false,
+            cancelAt: polarTimestamp(eventData.endsAt),
+            trialStart: polarTimestamp(eventData.startedAt),
+            trialEnd: polarTimestamp(eventData.endsAt),
           });
 
           const tierName = await ctx.runQuery(
-            internal.subscriptions._mapPriceToTier,
-            { priceId }
+            internal.subscriptions._mapProductToTier,
+            { productId }
           );
 
           if (
@@ -805,56 +936,50 @@ export const processWebhookEvent = action({
             eventData.status === "trialing"
           ) {
             await ctx.runMutation(internal.subscriptions._syncUserTier, {
-              userId: resolvedUserId,
+              userId: resolvedUserId as any,
               tier: tierName,
               reason: "billing.subscription_created",
             });
             await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-              userId: resolvedUserId,
-              periodStart: subItem.current_period_start * 1000,
-              periodEnd: subItem.current_period_end * 1000,
+              userId: resolvedUserId as any,
+              periodStart:
+                polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+              periodEnd:
+                polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
             });
             await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-              userId: resolvedUserId,
+              userId: resolvedUserId as any,
             });
           }
 
-          console.log("Stripe: subscription created (from update fallback)");
+          console.log(
+            `Polar: subscription created (from update fallback) — user ${resolvedUserId}`
+          );
           return;
         }
 
         const previousStatus = existingSubscription.status;
         const newStatus = eventData.status;
-        const subscriptionItem = eventData.items?.data?.[0];
+        const productId = eventData.productId as string;
 
         await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          stripeSubscriptionId: eventData.id,
+          polarSubscriptionId: eventData.id,
           status: newStatus,
-          currentPeriodStart: subscriptionItem
-            ? subscriptionItem.current_period_start * 1000
-            : undefined,
-          currentPeriodEnd: subscriptionItem
-            ? subscriptionItem.current_period_end * 1000
-            : undefined,
-          cancelAtPeriodEnd: eventData.cancel_at_period_end,
-          cancelAt: eventData.cancel_at
-            ? eventData.cancel_at * 1000
-            : undefined,
-          trialEnd: eventData.trial_end
-            ? eventData.trial_end * 1000
-            : undefined,
+          currentPeriodStart: polarTimestamp(eventData.currentPeriodStart),
+          currentPeriodEnd: polarTimestamp(eventData.currentPeriodEnd),
+          cancelAtPeriodEnd: eventData.cancelAtPeriodEnd,
+          cancelAt: polarTimestamp(eventData.endsAt),
+          trialEnd: polarTimestamp(eventData.endsAt),
         });
 
-        // Determine tier from price
-        const priceId = subscriptionItem?.price?.id;
-        const previousTierName = priceId
-          ? await ctx.runQuery(internal.subscriptions._mapPriceToTier, {
-              priceId: existingSubscription.stripePriceId,
-            })
-          : "free";
-        const newTierName = priceId
-          ? await ctx.runQuery(internal.subscriptions._mapPriceToTier, {
-              priceId,
+        // Determine tier from product
+        const previousTierName = await ctx.runQuery(
+          internal.subscriptions._mapProductToTier,
+          { productId: existingSubscription.polarProductId }
+        );
+        const newTierName = productId
+          ? await ctx.runQuery(internal.subscriptions._mapProductToTier, {
+              productId,
             })
           : "free";
 
@@ -887,13 +1012,12 @@ export const processWebhookEvent = action({
             tier: newTierName,
             reason: "billing.subscription_updated",
           });
-          if (subscriptionItem) {
-            await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-              userId: resolvedUserId,
-              periodStart: subscriptionItem.current_period_start * 1000,
-              periodEnd: subscriptionItem.current_period_end * 1000,
-            });
-          }
+          await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
+            userId: resolvedUserId,
+            periodStart:
+              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+            periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+          });
           await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
             userId: resolvedUserId,
           });
@@ -905,27 +1029,81 @@ export const processWebhookEvent = action({
             reason: "billing.subscription_updated",
           });
         } else if (!isNowActive && wasActive) {
-          // Deactivated — will be handled by subscription.deleted or grace period
+          // Deactivated — will be handled by subscription.revoked or grace period
         }
 
-        console.log("Stripe: subscription updated");
+        console.log("Polar: subscription updated");
         break;
       }
 
-      case "customer.subscription.deleted": {
+      // -----------------------------------------------
+      // SUBSCRIPTION CANCELED — user requested cancellation
+      // Subscription still active until period end.
+      // -----------------------------------------------
+      case "subscription.canceled": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByStripeSubscriptionId,
-          { stripeSubscriptionId: eventData.id }
+          internal.subscriptions._getByPolarSubscriptionId,
+          { polarSubscriptionId: eventData.id }
         );
 
         if (!existingSubscription) {
-          console.log("Stripe: subscription not found for deletion");
+          console.log("Polar: subscription not found for cancellation");
           return;
         }
 
         await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          stripeSubscriptionId: eventData.id,
+          polarSubscriptionId: eventData.id,
           status: "canceled",
+          cancelAtPeriodEnd: true,
+          cancelAt: polarTimestamp(eventData.endsAt),
+        });
+
+        console.log("Polar: subscription canceled (will end at period end)");
+        break;
+      }
+
+      // -----------------------------------------------
+      // SUBSCRIPTION UNCANCELED — cancellation reversed
+      // -----------------------------------------------
+      case "subscription.uncanceled": {
+        const existingSubscription = await ctx.runQuery(
+          internal.subscriptions._getByPolarSubscriptionId,
+          { polarSubscriptionId: eventData.id }
+        );
+
+        if (!existingSubscription) {
+          console.log("Polar: subscription not found for uncancellation");
+          return;
+        }
+
+        await ctx.runMutation(internal.subscriptions.updateSubscription, {
+          polarSubscriptionId: eventData.id,
+          status: eventData.status ?? "active",
+          cancelAtPeriodEnd: false,
+        });
+
+        console.log("Polar: subscription uncanceled");
+        break;
+      }
+
+      // -----------------------------------------------
+      // SUBSCRIPTION REVOKED — final termination
+      // Start grace period (matches Stripe subscription.deleted)
+      // -----------------------------------------------
+      case "subscription.revoked": {
+        const existingSubscription = await ctx.runQuery(
+          internal.subscriptions._getByPolarSubscriptionId,
+          { polarSubscriptionId: eventData.id }
+        );
+
+        if (!existingSubscription) {
+          console.log("Polar: subscription not found for revocation");
+          return;
+        }
+
+        await ctx.runMutation(internal.subscriptions.updateSubscription, {
+          polarSubscriptionId: eventData.id,
+          status: "revoked",
           cancelAtPeriodEnd: false,
         });
 
@@ -953,28 +1131,25 @@ export const processWebhookEvent = action({
           });
         }
 
-        console.log("Stripe: subscription deleted (grace period started)");
+        console.log("Polar: subscription revoked (grace period started)");
         break;
       }
 
-      case "invoice.payment_succeeded":
-      case "invoice.payment_failed": {
-        // Extract subscription ID from invoice (Stripe SDK v20+ structure)
-        let subscriptionId: string | null = null;
-        if (eventData.parent?.subscription_details) {
-          const sub = eventData.parent.subscription_details.subscription;
-          subscriptionId = typeof sub === "string" ? sub : sub?.id || null;
-        }
+      // -----------------------------------------------
+      // ORDER PAID — payment succeeded
+      // -----------------------------------------------
+      case "order.paid": {
+        const subscriptionId = eventData.subscriptionId as string | undefined;
 
         if (!subscriptionId) return;
 
         const subscription = await ctx.runQuery(
-          internal.subscriptions._getByStripeSubscriptionId,
-          { stripeSubscriptionId: subscriptionId }
+          internal.subscriptions._getByPolarSubscriptionId,
+          { polarSubscriptionId: subscriptionId }
         );
 
         if (!subscription) {
-          console.log("Stripe: subscription not found for payment event");
+          console.log("Polar: subscription not found for payment event");
           return;
         }
 
@@ -983,37 +1158,20 @@ export const processWebhookEvent = action({
         });
 
         if (org) {
-          const billingAction =
-            args.type === "invoice.payment_succeeded"
-              ? ("billing.payment_succeeded" as const)
-              : ("billing.payment_failed" as const);
-
-          const details =
-            args.type === "invoice.payment_succeeded"
-              ? JSON.stringify({
-                  invoiceId: eventData.id,
-                  amount: eventData.amount_paid,
-                  currency: eventData.currency,
-                })
-              : JSON.stringify({
-                  invoiceId: eventData.id,
-                  amount: eventData.amount_due,
-                  currency: eventData.currency,
-                  attemptCount: eventData.attempt_count,
-                });
-
           await ctx.runMutation(internal.subscriptions.logBillingEvent, {
             organizationId: subscription.organizationId,
             userId: org.createdBy,
-            action: billingAction,
-            details,
+            action: "billing.payment_succeeded",
+            details: JSON.stringify({
+              orderId: eventData.id,
+              amount: eventData.totalAmount,
+              currency: eventData.currency,
+              billingReason: eventData.billingReason,
+            }),
           });
 
           // On successful payment, reset usage counters
-          if (
-            args.type === "invoice.payment_succeeded" &&
-            subscription.userId
-          ) {
+          if (subscription.userId) {
             await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
               userId: subscription.userId,
               periodStart: subscription.currentPeriodStart,
@@ -1022,12 +1180,20 @@ export const processWebhookEvent = action({
           }
         }
 
-        console.log(`Stripe: ${args.type}`);
+        console.log("Polar: order paid");
         break;
       }
 
       default:
-        console.log(`Unhandled Stripe event type: ${args.type}`);
+        console.log(`Unhandled Polar event type: ${args.type}`);
+    }
+
+    // --- Record processed webhook ---
+    if (args.webhookId) {
+      await ctx.runMutation(internal.subscriptions._recordWebhookProcessed, {
+        webhookId: args.webhookId,
+        eventType: args.type,
+      });
     }
   },
 });
@@ -1036,25 +1202,25 @@ export const processWebhookEvent = action({
 // INTERNAL QUERIES (used by processWebhookEvent action)
 // ==========================================
 
-export const _getStripeCustomerById = internalQuery({
-  args: { stripeCustomerId: v.string() },
+export const _getPolarCustomerById = internalQuery({
+  args: { polarCustomerId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("stripeCustomers")
-      .withIndex("by_stripe_customer", (q) =>
-        q.eq("stripeCustomerId", args.stripeCustomerId)
+      .query("polarCustomers")
+      .withIndex("by_polar_customer", (q) =>
+        q.eq("polarCustomerId", args.polarCustomerId)
       )
       .first();
   },
 });
 
-export const _getByStripeSubscriptionId = internalQuery({
-  args: { stripeSubscriptionId: v.string() },
+export const _getByPolarSubscriptionId = internalQuery({
+  args: { polarSubscriptionId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("subscriptions")
-      .withIndex("by_stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      .withIndex("by_polar_subscription", (q) =>
+        q.eq("polarSubscriptionId", args.polarSubscriptionId)
       )
       .first();
   },
@@ -1068,12 +1234,26 @@ export const _getOrgById = internalQuery({
 });
 
 /**
- * Dynamic price-to-tier mapping query (used in action context)
+ * Get organizations owned by a user (for resolving org from user ID).
+ * Used when subscription events don't include org metadata.
  */
-export const _mapPriceToTier = internalQuery({
-  args: { priceId: v.string() },
+export const _getUserOwnedOrgs = internalQuery({
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await mapPriceIdToTier(ctx.db, args.priceId);
+    return await ctx.db
+      .query("organizations")
+      .filter((q) => q.eq(q.field("createdBy"), args.userId))
+      .collect();
+  },
+});
+
+/**
+ * Dynamic product-to-tier mapping query (used in action context)
+ */
+export const _mapProductToTier = internalQuery({
+  args: { productId: v.string() },
+  handler: async (ctx, args) => {
+    return await mapProductIdToTier(ctx.db, args.productId);
   },
 });
 
@@ -1088,12 +1268,84 @@ export const _getUserTierName = internalQuery({
 });
 
 // ==========================================
+// WEBHOOK DEDUPLICATION
+// ==========================================
+
+export const _checkWebhookProcessed = internalQuery({
+  args: { webhookId: v.string() },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("processedWebhookEvents")
+      .withIndex("by_webhook_id", (q) => q.eq("webhookId", args.webhookId))
+      .first();
+    return !!existing;
+  },
+});
+
+export const _recordWebhookProcessed = internalMutation({
+  args: { webhookId: v.string(), eventType: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("processedWebhookEvents", {
+      webhookId: args.webhookId,
+      eventType: args.eventType,
+      processedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Clean up processed webhook events older than 7 days.
+ * Called by the cron job to prevent table bloat.
+ */
+export const cleanupProcessedWebhooks = internalMutation({
+  handler: async (ctx) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const oldEvents = await ctx.db
+      .query("processedWebhookEvents")
+      .filter((q) => q.lt(q.field("processedAt"), sevenDaysAgo))
+      .collect();
+
+    for (const event of oldEvents) {
+      await ctx.db.delete(event._id);
+    }
+
+    if (oldEvents.length > 0) {
+      console.log(`Cleaned up ${oldEvents.length} processed webhook events`);
+    }
+  },
+});
+
+// ==========================================
+// PAYMENT PRODUCTS (Provider-agnostic product mapping)
+// ==========================================
+
+/**
+ * Get the active product ID for a given tier and provider.
+ * Used by checkout route to find the correct Polar product.
+ */
+export const getProductIdForTier = query({
+  args: {
+    tierName: v.string(),
+    provider: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const product = await ctx.db
+      .query("paymentProducts")
+      .withIndex("by_tier_and_provider", (q) =>
+        q.eq("tierName", args.tierName).eq("provider", args.provider)
+      )
+      .first();
+    return product?.isActive ? product.productId : null;
+  },
+});
+
+// ==========================================
 // PUBLIC MUTATIONS (for user-initiated actions)
 // ==========================================
 
 /**
  * Store checkout session metadata
- * Called before redirecting to Stripe checkout.
+ * Called before redirecting to Polar checkout.
  * Now checks user-level subscription status alongside org-level.
  */
 export const prepareCheckout = mutation({
@@ -1144,16 +1396,16 @@ export const prepareCheckout = mutation({
       throw new Error("Organization already has an active subscription");
     }
 
-    // Get Stripe customer — prefer user-level, fallback to org-level
+    // Get Polar customer — prefer user-level, fallback to org-level
     const userCustomer = await ctx.db
-      .query("stripeCustomers")
+      .query("polarCustomers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
 
     const orgCustomer = userCustomer
       ? null
       : await ctx.db
-          .query("stripeCustomers")
+          .query("polarCustomers")
           .withIndex("by_organization", (q) =>
             q.eq("organizationId", args.organizationId)
           )
@@ -1161,8 +1413,8 @@ export const prepareCheckout = mutation({
 
     return {
       organizationId: args.organizationId,
-      stripeCustomerId:
-        userCustomer?.stripeCustomerId || orgCustomer?.stripeCustomerId || null,
+      polarCustomerId:
+        userCustomer?.polarCustomerId || orgCustomer?.polarCustomerId || null,
     };
   },
 });

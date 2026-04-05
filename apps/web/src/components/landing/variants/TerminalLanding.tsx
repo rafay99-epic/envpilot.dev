@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import {
   Shield,
   Users,
@@ -87,6 +88,7 @@ function generateFeatureLines(
 
 function DynamicPricingCards() {
   const pricingData = useQuery(api.featureRegistry.getPricingData);
+  const paymentsEnabled = useQuery(api.tierLimits.isPaymentsEnabled);
 
   if (!pricingData) {
     return (
@@ -110,7 +112,9 @@ function DynamicPricingCards() {
       variants={stagger}
     >
       {pricingData.tiers.map((tier) => {
-        const isComingSoon = tier.isComingSoon;
+        // When payments are disabled via admin toggle, force paid tiers to show as "Coming Soon"
+        const isComingSoon =
+          tier.isComingSoon || (!tier.isDefault && paymentsEnabled === false);
         const isDefault = tier.isDefault;
         const price = tier.monthlyPrice ?? 0;
         const badge = tier.badge;
@@ -335,18 +339,7 @@ export default function TerminalLanding() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-            >
-              sign-in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
-            >
-              get-started
-            </Link>
+            <PublicHeaderButtons />
           </div>
         </div>
       </header>
@@ -572,7 +565,7 @@ export default function TerminalLanding() {
                       </span>
                     </p>
                     <p>
-                      <span className="text-amber-400">STRIPE_SECRET</span>
+                      <span className="text-amber-400">API_SECRET</span>
                       <span className="text-zinc-600">=</span>
                       <span className="text-red-400">
                         sk_live_4eC39HqLyjWDarj
@@ -612,10 +605,10 @@ export default function TerminalLanding() {
                       </span>
                     </p>
                     <p>
-                      <span className="text-amber-400">STRIPE_SECRET</span>
+                      <span className="text-amber-400">API_SECRET</span>
                       <span className="text-zinc-600">=</span>
                       <span className="text-green-400">
-                        vault://ref/stripe_live_9182
+                        vault://ref/api_live_9182
                       </span>
                     </p>
                     <p>

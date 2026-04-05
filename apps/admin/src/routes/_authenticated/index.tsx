@@ -4,6 +4,7 @@ import { api } from "@convex/_generated/api";
 import { Card, StatCard } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
 import { BarChart, DonutChart, AreaChart } from "@/components/ui/charts";
+import { useConfirmStore } from "@/stores/confirm-store";
 import {
   Users,
   Building2,
@@ -14,21 +15,59 @@ import {
   Crown,
   Shield,
   TrendingUp,
+  CreditCard,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: DashboardPage,
 });
 
+// ==========================================
+// READINESS ITEM
+// ==========================================
+
+function ReadinessItem({
+  label,
+  ok,
+  detail,
+}: {
+  label: string;
+  ok: boolean;
+  detail?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? (
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+      ) : (
+        <XCircle className="h-4 w-4 shrink-0 text-red-400" />
+      )}
+      <span className="text-zinc-300">{label}</span>
+      {detail && (
+        <span className="ml-auto text-xs text-zinc-500">{detail}</span>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// DASHBOARD
+// ==========================================
+
 function DashboardPage() {
   const stats = useAdminQuery(api.admin.getStats, {});
   const analytics = useAdminQuery(api.admin.getAnalytics, {});
   const settings = useAdminQuery(api.admin.getAdminSettings, {});
   const updateSetting = useAdminMutation(api.admin.updateAdminSetting);
+  const paymentReadiness = useAdminQuery(api.admin.getPaymentReadiness, {});
+  const { confirm } = useConfirmStore();
 
   if (!stats) return <Spinner />;
 
   const tierEnforcement = settings?.tierEnforcement === "true";
+  const paymentsEnabled = settings?.paymentsEnabled === "true";
 
   const handleToggleEnforcement = async () => {
     await updateSetting({
@@ -37,34 +76,154 @@ function DashboardPage() {
     });
   };
 
+  const handleTogglePayments = async () => {
+    // When enabling: validate prerequisites
+    if (!paymentsEnabled) {
+      if (!paymentReadiness?.canEnable) {
+        return;
+      }
+    }
+
+    // When disabling: warn about active subscribers
+    if (
+      paymentsEnabled &&
+      paymentReadiness &&
+      paymentReadiness.activeSubscriptionCount > 0
+    ) {
+      const ok = await confirm({
+        title: "Disable Payment Gateway?",
+        message: `There are ${paymentReadiness.activeSubscriptionCount} active subscription(s). Disabling payments will prevent new checkouts and billing management. Existing subscriptions will continue via Polar until canceled. Continue?`,
+        confirmLabel: "Disable Payments",
+        cancelLabel: "Keep Enabled",
+        variant: "warning",
+      });
+      if (!ok) return;
+    }
+
+    await updateSetting({
+      key: "paymentsEnabled",
+      value: paymentsEnabled ? "false" : "true",
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-100">Dashboard</h1>
 
-        {/* Tier Enforcement Toggle */}
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
-          <Shield className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm text-zinc-300">Tier Enforcement</span>
-          <button
-            onClick={handleToggleEnforcement}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              tierEnforcement ? "bg-emerald-600" : "bg-zinc-700"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                tierEnforcement ? "translate-x-6" : "translate-x-1"
+        <div className="flex items-center gap-3">
+          {/* Payment Gateway Toggle */}
+          <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
+            <CreditCard className="h-4 w-4 text-zinc-400" />
+            <span className="text-sm text-zinc-300">Payments</span>
+            <button
+              onClick={handleTogglePayments}
+              disabled={!paymentReadiness?.canEnable && !paymentsEnabled}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                paymentsEnabled ? "bg-emerald-600" : "bg-zinc-700"
+              } ${
+                !paymentReadiness?.canEnable && !paymentsEnabled
+                  ? "cursor-not-allowed opacity-50"
+                  : ""
               }`}
-            />
-          </button>
-          <span
-            className={`text-xs font-medium ${tierEnforcement ? "text-emerald-400" : "text-zinc-500"}`}
-          >
-            {tierEnforcement ? "Active" : "Disabled"}
-          </span>
+              title={
+                !paymentReadiness?.canEnable && !paymentsEnabled
+                  ? "Configure payment products before enabling"
+                  : undefined
+              }
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                  paymentsEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span
+              className={`text-xs font-medium ${
+                paymentsEnabled ? "text-emerald-400" : "text-zinc-500"
+              }`}
+            >
+              {paymentsEnabled ? "Active" : "Disabled"}
+            </span>
+          </div>
+
+          {/* Tier Enforcement Toggle */}
+          <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5">
+            <Shield className="h-4 w-4 text-zinc-400" />
+            <span className="text-sm text-zinc-300">Tier Enforcement</span>
+            <button
+              onClick={handleToggleEnforcement}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                tierEnforcement ? "bg-emerald-600" : "bg-zinc-700"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                  tierEnforcement ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span
+              className={`text-xs font-medium ${tierEnforcement ? "text-emerald-400" : "text-zinc-500"}`}
+            >
+              {tierEnforcement ? "Active" : "Disabled"}
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Production Readiness Checklist */}
+      {paymentReadiness && (
+        <Card>
+          <div className="mb-4 flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-emerald-500" />
+            <h2 className="text-sm font-semibold text-zinc-100">
+              Payment System Readiness
+            </h2>
+          </div>
+          <div className="space-y-2.5">
+            <ReadinessItem
+              label="Payment products configured"
+              ok={paymentReadiness.paymentProductsSeeded}
+              detail={
+                paymentReadiness.tiersWithProducts
+                  .map(
+                    (t) =>
+                      `${t.displayName}: ${t.hasActiveProduct ? "✓" : "missing"}`
+                  )
+                  .join(", ") || "No paid tiers"
+              }
+            />
+            <ReadinessItem
+              label="All paid tiers have products"
+              ok={paymentReadiness.allPaidTiersConfigured}
+            />
+            <ReadinessItem
+              label="Payment gateway"
+              ok={paymentReadiness.paymentsEnabled}
+              detail={paymentReadiness.paymentsEnabled ? "Enabled" : "Disabled"}
+            />
+            <ReadinessItem
+              label="Tier enforcement"
+              ok={tierEnforcement}
+              detail={tierEnforcement ? "Active" : "Disabled"}
+            />
+            <ReadinessItem
+              label="Active subscribers"
+              ok={true}
+              detail={`${paymentReadiness.activeSubscriptionCount} subscription(s)`}
+            />
+          </div>
+          {!paymentReadiness.canEnable && !paymentReadiness.paymentsEnabled && (
+            <p className="mt-3 text-xs text-amber-400">
+              Configure payment products in Tiers &amp; Limits → Payment
+              Products before enabling payments. Run the "seed-payment-products"
+              migration from the Migrations page to auto-populate from tier
+              definitions.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

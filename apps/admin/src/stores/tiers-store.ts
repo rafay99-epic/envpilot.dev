@@ -12,7 +12,7 @@ export interface TierFormData {
   sortOrder: number;
   isDefault: boolean;
   color: string;
-  stripePriceId: string;
+  polarProductId: string;
 }
 
 export const EMPTY_TIER_FORM: TierFormData = {
@@ -22,7 +22,7 @@ export const EMPTY_TIER_FORM: TierFormData = {
   sortOrder: 0,
   isDefault: false,
   color: "#71717a",
-  stripePriceId: "",
+  polarProductId: "",
 };
 
 export interface PendingChange {
