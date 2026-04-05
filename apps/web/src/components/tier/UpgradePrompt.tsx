@@ -1,6 +1,7 @@
 "use client";
 
 import type { Tier } from "@/hooks/useTierLimits";
+import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { Sparkles, ArrowRight, Check } from "lucide-react";
 
 interface UpgradePromptProps {
@@ -48,13 +49,18 @@ export function UpgradePrompt({
   variant = "inline",
   className = "",
 }: UpgradePromptProps) {
+  const paymentsEnabled = usePaymentsEnabled();
   const upgradeName = targetTierName ?? "Pro";
+
+  // Don't show upgrade UI when payments are disabled
+  if (!paymentsEnabled) return null;
 
   const handleUpgradeClick = () => {
     if (onUpgradeClick) {
       onUpgradeClick();
     } else {
-      window.open("/pricing", "_blank");
+      window.location.href =
+        "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
     }
   };
 

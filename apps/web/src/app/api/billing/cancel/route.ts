@@ -9,14 +9,26 @@ import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-const portalSchema = z.object({
+const cancelSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
-  returnUrl: z.string().url("Return URL must be a valid URL").optional(),
+  reason: z
+    .enum([
+      "too_expensive",
+      "missing_features",
+      "switched_service",
+      "unused",
+      "customer_service",
+      "low_quality",
+      "too_complex",
+      "other",
+    ])
+    .optional(),
+  comment: z.string().max(1000).optional(),
 });
 
 /**
- * POST /api/billing/portal
- * Create a Polar Customer Portal session for managing subscriptions
+ * POST /api/billing/cancel
+ * Cancel a subscription at the end of the current billing period
  */
 export async function POST(request: Request) {
   try {
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const validation = portalSchema.safeParse(body);
+    const validation = cancelSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -68,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { organizationId, returnUrl } = validation.data;
+    const { organizationId, reason, comment } = validation.data;
 
     // Get Convex user
     const convexUser = await convex.query(api.users.getByWorkosId, {
@@ -87,44 +99,44 @@ export async function POST(request: Request) {
 
     if (!membership || membership.role !== "admin") {
       return NextResponse.json(
-        { error: "Only organization admins can access billing" },
+        { error: "Only organization admins can cancel subscriptions" },
         { status: 403 }
       );
     }
 
-    // Get Polar customer — try user-level first, fallback to org-level
-    let polarCustomer = await convex.query(
-      api.subscriptions.getPolarCustomerByUser,
-      { userId: convexUser._id }
-    );
+    // Get the subscription — try user-level first, fallback to org-level
+    let subscription = await convex.query(api.subscriptions.getByUser, {
+      userId: convexUser._id,
+    });
 
-    if (!polarCustomer) {
-      polarCustomer = await convex.query(api.subscriptions.getPolarCustomer, {
+    if (!subscription) {
+      subscription = await convex.query(api.subscriptions.getByOrganization, {
         organizationId: organizationId as Id<"organizations">,
       });
     }
 
-    if (!polarCustomer) {
+    if (!subscription || !subscription.polarSubscriptionId) {
       return NextResponse.json(
-        { error: "No billing account found. Please subscribe first." },
+        { error: "No active subscription found" },
         { status: 404 }
       );
     }
 
-    // Create Polar customer portal session
-    const session = await polar.customerSessions.create({
-      customerId: polarCustomer.polarCustomerId,
+    // Cancel via Polar API — sets cancelAtPeriodEnd
+    await polar.subscriptions.update({
+      id: subscription.polarSubscriptionId,
+      subscriptionUpdate: {
+        cancelAtPeriodEnd: true,
+        ...(reason && { customerCancellationReason: reason }),
+        ...(comment && { customerCancellationComment: comment }),
+      },
     });
 
-    return NextResponse.json({
-      portalUrl: session.customerPortalUrl,
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error creating billing portal session:", error);
+    console.error("Error canceling subscription:", error);
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to create billing portal session";
+      error instanceof Error ? error.message : "Failed to cancel subscription";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

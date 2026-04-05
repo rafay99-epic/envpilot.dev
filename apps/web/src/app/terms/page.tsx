@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 
 const SECTIONS = [
   { id: "acceptance", label: "Acceptance" },
@@ -76,18 +77,7 @@ export default function TermsOfServicePage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-            >
-              sign-in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
-            >
-              get-started
-            </Link>
+            <PublicHeaderButtons />
           </div>
         </div>
       </header>
@@ -103,7 +93,7 @@ export default function TermsOfServicePage() {
               Terms of Service
             </h1>
             <p className="mt-3 text-sm text-zinc-500">
-              Effective: March 10, 2026 &middot; Last updated: March 10, 2026
+              Effective: March 10, 2026 &middot; Last updated: March 23, 2026
             </p>
           </div>
         </section>
@@ -328,31 +318,92 @@ export default function TermsOfServicePage() {
                 <Subsection title="7.1 Plans">
                   <p>
                     The Service offers Free and Pro tiers. Features and limits
-                    for each tier are on our pricing page and may change. We
-                    will provide reasonable notice before materially reducing
-                    features for paying subscribers.
+                    for each tier are displayed on the Usage &amp; Plan page in
+                    your dashboard and may change. We will provide reasonable
+                    notice before materially reducing features for paying
+                    subscribers.
                   </p>
                 </Subsection>
 
                 <Subsection title="7.2 Payment">
                   <p>
-                    Paid subscriptions are billed in advance (monthly or
-                    annually) through Polar.sh. By subscribing, you authorize us
-                    to charge your payment method at the start of each billing
-                    cycle. Fees are in U.S. dollars unless otherwise stated.
+                    Pro subscriptions are billed monthly in advance through
+                    Polar.sh, our payment processor. By subscribing, you
+                    authorize us to charge your payment method at the start of
+                    each billing cycle. The first charge occurs immediately upon
+                    subscription. Subsequent charges occur on the same calendar
+                    date each month. Fees are in U.S. dollars unless otherwise
+                    stated.
                   </p>
                 </Subsection>
 
-                <Subsection title="7.3 Cancellation and Refunds">
+                <Subsection title="7.3 Cancellation">
                   <p>
-                    You may cancel at any time through organization settings.
-                    Your subscription remains active until the end of the
-                    current billing period, then reverts to Free tier. We do not
-                    provide prorated refunds unless required by applicable law.
+                    You may cancel your Pro subscription at any time through
+                    Account Settings &rarr; Billing in the dashboard. Upon
+                    cancellation:
+                  </p>
+                  <ul className="mt-2 space-y-1 pl-4">
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      Your Pro access{" "}
+                      <span className="text-zinc-300">
+                        continues until the end of your current billing period
+                      </span>
+                      . You have already paid for this period and will retain
+                      full access throughout.
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      <span className="text-zinc-300">No further charges</span>{" "}
+                      will be made after cancellation. You will not be billed
+                      for the next billing period.
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      After your billing period ends, a{" "}
+                      <span className="text-zinc-300">7-day grace period</span>{" "}
+                      begins during which Pro features remain active. This gives
+                      you time to export data or resubscribe.
+                    </li>
+                    <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
+                      After the grace period, your account reverts to the Free
+                      tier. A 30-day cooldown prevents repeated abuse of grace
+                      periods.
+                    </li>
+                  </ul>
+                </Subsection>
+
+                <Subsection title="7.4 Refund Policy">
+                  <p>
+                    We do not provide prorated refunds for the current billing
+                    period. When you cancel, you keep Pro access for the
+                    remainder of the period you have already paid for &mdash; no
+                    money is lost. Refunds may be issued where required by
+                    applicable consumer protection law (see Section 16).
                   </p>
                 </Subsection>
 
-                <Subsection title="7.4 Taxes">
+                <Subsection title="7.5 Data After Downgrade">
+                  <p>
+                    Your data is never deleted upon downgrade. If your resource
+                    usage exceeds Free tier limits, existing resources remain
+                    fully accessible but you will not be able to create new ones
+                    until you are within limits. For example, if you have 10
+                    projects and the Free limit is 3, all 10 remain accessible
+                    but you cannot create an 11th project.
+                  </p>
+                </Subsection>
+
+                <Subsection title="7.6 Usage-Based Features">
+                  <p>
+                    Certain features &mdash; including Secret Sharing (secure
+                    link generation with email delivery) and Secret Rotation
+                    (automated rotation with email alerts) &mdash; consume
+                    operational resources and are subject to numeric limits
+                    based on your plan tier. Current limits are displayed in
+                    real time on the Usage &amp; Plan page.
+                  </p>
+                </Subsection>
+
+                <Subsection title="7.7 Taxes">
                   <p>
                     Fees are exclusive of taxes. You are responsible for
                     applicable sales, use, VAT, GST, or similar taxes, except
@@ -688,6 +739,9 @@ export default function TermsOfServicePage() {
               </Link>
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
+              </Link>
+              <Link href="/faq" className="hover:text-zinc-400">
+                FAQ
               </Link>
               <Link href="/support" className="hover:text-zinc-400">
                 Support

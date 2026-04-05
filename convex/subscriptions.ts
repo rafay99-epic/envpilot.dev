@@ -46,9 +46,18 @@ async function mapProductIdToTier(
   db: DatabaseReader,
   productId: string
 ): Promise<string> {
+  // Strategy 1: Look up in paymentProducts table (provider-agnostic)
+  const paymentProduct = await db
+    .query("paymentProducts")
+    .withIndex("by_product_id", (q) => q.eq("productId", productId))
+    .first();
+  if (paymentProduct && paymentProduct.isActive) return paymentProduct.tierName;
+
+  // Strategy 2: Legacy fallback — tierDefinitions.polarProductId
   const allTiers = await db.query("tierDefinitions").collect();
   const match = allTiers.find((t) => t.polarProductId === productId);
   if (match) return match.name;
+
   return await getDefaultTierName(db);
 }
 
@@ -617,9 +626,22 @@ export const processWebhookEvent = action({
   args: {
     type: v.string(),
     data: v.string(), // JSON-serialized Polar event data object
+    webhookId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const eventData = JSON.parse(args.data);
+
+    // --- Webhook deduplication ---
+    if (args.webhookId) {
+      const alreadyProcessed = await ctx.runQuery(
+        internal.subscriptions._checkWebhookProcessed,
+        { webhookId: args.webhookId }
+      );
+      if (alreadyProcessed) {
+        console.log(`Polar: skipping duplicate webhook ${args.webhookId}`);
+        return;
+      }
+    }
 
     switch (args.type) {
       // -----------------------------------------------
@@ -1165,6 +1187,14 @@ export const processWebhookEvent = action({
       default:
         console.log(`Unhandled Polar event type: ${args.type}`);
     }
+
+    // --- Record processed webhook ---
+    if (args.webhookId) {
+      await ctx.runMutation(internal.subscriptions._recordWebhookProcessed, {
+        webhookId: args.webhookId,
+        eventType: args.type,
+      });
+    }
   },
 });
 
@@ -1234,6 +1264,78 @@ export const _getUserTierName = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await getUserTier(ctx.db, args.userId);
+  },
+});
+
+// ==========================================
+// WEBHOOK DEDUPLICATION
+// ==========================================
+
+export const _checkWebhookProcessed = internalQuery({
+  args: { webhookId: v.string() },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("processedWebhookEvents")
+      .withIndex("by_webhook_id", (q) => q.eq("webhookId", args.webhookId))
+      .first();
+    return !!existing;
+  },
+});
+
+export const _recordWebhookProcessed = internalMutation({
+  args: { webhookId: v.string(), eventType: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("processedWebhookEvents", {
+      webhookId: args.webhookId,
+      eventType: args.eventType,
+      processedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Clean up processed webhook events older than 7 days.
+ * Called by the cron job to prevent table bloat.
+ */
+export const cleanupProcessedWebhooks = internalMutation({
+  handler: async (ctx) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const oldEvents = await ctx.db
+      .query("processedWebhookEvents")
+      .filter((q) => q.lt(q.field("processedAt"), sevenDaysAgo))
+      .collect();
+
+    for (const event of oldEvents) {
+      await ctx.db.delete(event._id);
+    }
+
+    if (oldEvents.length > 0) {
+      console.log(`Cleaned up ${oldEvents.length} processed webhook events`);
+    }
+  },
+});
+
+// ==========================================
+// PAYMENT PRODUCTS (Provider-agnostic product mapping)
+// ==========================================
+
+/**
+ * Get the active product ID for a given tier and provider.
+ * Used by checkout route to find the correct Polar product.
+ */
+export const getProductIdForTier = query({
+  args: {
+    tierName: v.string(),
+    provider: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const product = await ctx.db
+      .query("paymentProducts")
+      .withIndex("by_tier_and_provider", (q) =>
+        q.eq("tierName", args.tierName).eq("provider", args.provider)
+      )
+      .first();
+    return product?.isActive ? product.productId : null;
   },
 });
 

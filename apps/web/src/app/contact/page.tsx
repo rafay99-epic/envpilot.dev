@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation } from "convex/react";
+import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import { api } from "@convex/_generated/api";
 import { Mail, MessageSquare, CheckCircle, AlertTriangle } from "lucide-react";
 
@@ -60,18 +61,7 @@ export default function ContactPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-            >
-              sign-in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
-            >
-              get-started
-            </Link>
+            <PublicHeaderButtons />
           </div>
         </div>
       </header>
@@ -315,6 +305,9 @@ export default function ContactPage() {
               </Link>
               <Link href="/terms" className="hover:text-zinc-400">
                 Terms
+              </Link>
+              <Link href="/faq" className="hover:text-zinc-400">
+                FAQ
               </Link>
               <Link href="/support" className="hover:text-zinc-400">
                 Support
