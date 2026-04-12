@@ -15,12 +15,20 @@ export const metadata: Metadata = {
 };
 
 export default async function PricingPage() {
-  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  let pricingData: PricingData | null = null;
+  let paymentsEnabled: boolean | null = null;
 
-  const [pricingData, paymentsEnabled] = await Promise.all([
-    convex.query(api.featureRegistry.getPricingData),
-    convex.query(api.tierLimits.isPaymentsEnabled),
-  ]);
+  try {
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    const [pricing, payments] = await Promise.all([
+      convex.query(api.featureRegistry.getPricingData),
+      convex.query(api.tierLimits.isPaymentsEnabled),
+    ]);
+    pricingData = pricing as PricingData;
+    paymentsEnabled = payments ?? false;
+  } catch {
+    // Graceful fallback — client component will fetch via useQuery
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 font-mono text-green-400">

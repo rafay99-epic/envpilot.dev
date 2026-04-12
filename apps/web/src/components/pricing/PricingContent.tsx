@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { Fragment } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { Check, X, Minus } from "lucide-react";
 
 // ============================================================
@@ -245,12 +247,36 @@ function ComparisonTable({
 // ============================================================
 
 export function PricingContent({
-  pricingData,
-  paymentsEnabled,
+  pricingData: serverPricingData,
+  paymentsEnabled: serverPaymentsEnabled,
 }: {
-  pricingData: PricingData;
-  paymentsEnabled: boolean;
+  pricingData: PricingData | null;
+  paymentsEnabled: boolean | null;
 }) {
+  // Client-side fallback: if server couldn't fetch (e.g. CI build), fetch on client
+  const clientPricingData = useQuery(
+    api.featureRegistry.getPricingData,
+    serverPricingData ? "skip" : undefined
+  );
+  const clientPaymentsEnabled = useQuery(
+    api.tierLimits.isPaymentsEnabled,
+    serverPaymentsEnabled !== null ? "skip" : undefined
+  );
+
+  const pricingData = serverPricingData ?? (clientPricingData as PricingData);
+  const paymentsEnabled =
+    serverPaymentsEnabled ?? clientPaymentsEnabled ?? false;
+
+  if (!pricingData) {
+    // Still loading client-side
+    return (
+      <div className="mt-12 grid gap-6 md:grid-cols-2">
+        <div className="h-96 animate-pulse rounded-lg border border-zinc-700/50 bg-zinc-900/90" />
+        <div className="h-96 animate-pulse rounded-lg border border-zinc-700/50 bg-zinc-900/90" />
+      </div>
+    );
+  }
+
   const { tiers: rawTiers, categories, allFeatures } = pricingData;
 
   // When payments are disabled via admin toggle, force paid tiers to show as "Coming Soon"

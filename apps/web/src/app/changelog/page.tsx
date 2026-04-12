@@ -17,16 +17,15 @@ export const metadata: Metadata = {
 export const revalidate = 60; // revalidate every 60 seconds for fresh changelog data
 
 export default async function ChangelogPage() {
-  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
   let entries: ChangelogEntry[] = [];
   try {
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
     entries =
       ((await convex.query(api.changelog.listPublished, {
         limit: 50,
       })) as ChangelogEntry[]) ?? [];
   } catch {
-    // Graceful fallback — show empty state
+    // Graceful fallback — client will render empty state; page still builds in CI
   }
 
   return (
