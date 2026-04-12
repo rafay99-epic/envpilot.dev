@@ -35,12 +35,21 @@ export const metadata: Metadata = {
     description:
       "Securely manage, share, and sync environment variables across your team with CLI, VS Code extension, and web dashboard.",
     url: baseUrl,
+    images: [
+      {
+        url: "/orgal_image.png",
+        width: 1200,
+        height: 630,
+        alt: "Envpilot — Secure Environment Variable Management",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Envpilot — Secure Environment Variable Management",
     description:
       "Securely manage, share, and sync environment variables across your team.",
+    images: ["/orgal_image.png"],
   },
   robots: {
     index: true,
