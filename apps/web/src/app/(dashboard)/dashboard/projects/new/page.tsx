@@ -135,33 +135,31 @@ export default function NewProjectPage() {
       const projectSlug = data.project.slug;
 
       if (selectedTemplate) {
-        const variablePromises = selectedTemplate.variables.map(
-          async (variable) => {
-            try {
-              const placeholderValue =
-                variable.defaultValue ||
-                variable.placeholder ||
-                `<${variable.key}>`;
+        // Create template variables sequentially to avoid overwhelming
+        // the WorkOS Vault API with concurrent requests.
+        for (const variable of selectedTemplate.variables) {
+          try {
+            const placeholderValue =
+              variable.defaultValue ||
+              variable.placeholder ||
+              `<${variable.key}>`;
 
-              await fetch("/api/variables", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  key: variable.key,
-                  value: placeholderValue,
-                  description: variable.description,
-                  environments: variable.environments,
-                  projectId,
-                  isSensitive: variable.isSensitive,
-                }),
-              });
-            } catch (err) {
-              console.error(`Failed to create variable ${variable.key}:`, err);
-            }
+            await fetch("/api/variables", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                key: variable.key,
+                value: placeholderValue,
+                description: variable.description,
+                environments: variable.environments,
+                projectId,
+                isSensitive: variable.isSensitive,
+              }),
+            });
+          } catch (err) {
+            console.error(`Failed to create variable ${variable.key}:`, err);
           }
-        );
-
-        await Promise.all(variablePromises);
+        }
       }
 
       router.push(`/dashboard/projects/${projectSlug}`);

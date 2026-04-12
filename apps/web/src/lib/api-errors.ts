@@ -48,7 +48,8 @@ export function isAuthorizationError(message: string): boolean {
     message.includes("Not a member of this organization") ||
     message.includes("No access to this project") ||
     message.includes("Insufficient project permissions") ||
-    message.includes("Cannot ") // hierarchy errors: "Cannot remove member: ..."
+    // Hierarchy errors from assertCanManageUser: "Cannot remove member: a team_lead cannot manage a admin"
+    /^Cannot \w+.*cannot manage/.test(message)
   );
 }
 

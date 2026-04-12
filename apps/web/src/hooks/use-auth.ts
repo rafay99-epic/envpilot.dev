@@ -71,9 +71,10 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
   }, []);
 
   useEffect(() => {
-    // Fetch if no initial data, or if initial data has no organization
-    // (e.g. server-side Convex query failed during layout render)
-    if (!initialData || !initialData.organization) {
+    // Fetch if no initial data, if initial data has no organization
+    // (e.g. server-side Convex query failed during layout render),
+    // or if initial data has no actions (server layout doesn't compute them).
+    if (!initialData || !initialData.organization || !initialData.actions) {
       fetchUser();
     }
   }, [initialData, fetchUser]);
