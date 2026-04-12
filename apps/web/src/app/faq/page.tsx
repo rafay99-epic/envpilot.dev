@@ -1,8 +1,14 @@
-"use client";
-
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import type { Metadata } from "next";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
+import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
+import { FAQAccordion } from "@/components/faq/FAQAccordion";
+
+export const metadata: Metadata = {
+  title: "FAQ | Envpilot",
+  description:
+    "Frequently asked questions about Envpilot. Learn about plans, billing, security, usage limits, and features.",
+};
 
 const SECTIONS = [
   { id: "getting-started", label: "Getting Started" },
@@ -13,19 +19,7 @@ const SECTIONS = [
   { id: "account-support", label: "Account & Support" },
 ];
 
-interface FAQItem {
-  question: string;
-  answer: React.ReactNode;
-}
-
-interface FAQSection {
-  id: string;
-  n: number;
-  title: string;
-  items: FAQItem[];
-}
-
-const FAQ_DATA: FAQSection[] = [
+const FAQ_DATA = [
   {
     id: "getting-started",
     n: 1,
@@ -38,20 +32,8 @@ const FAQ_DATA: FAQSection[] = [
       },
       {
         question: "How do I create an account?",
-        answer: (
-          <>
-            Visit{" "}
-            <a
-              href="https://envpilot.dev"
-              className="text-green-400 hover:underline"
-            >
-              envpilot.dev
-            </a>{" "}
-            and click &ldquo;Get Started.&rdquo; Authentication is handled
-            securely through WorkOS AuthKit &mdash; you can sign in with email
-            or supported SSO providers.
-          </>
-        ),
+        answer:
+          'Visit envpilot.dev and click "Get Started." Authentication is handled securely through WorkOS AuthKit \u2014 you can sign in with email or supported SSO providers.',
       },
       {
         question: "What is an Organization?",
@@ -67,15 +49,8 @@ const FAQ_DATA: FAQSection[] = [
     items: [
       {
         question: "What plans are available?",
-        answer: (
-          <>
-            Envpilot offers two plans:{" "}
-            <span className="text-zinc-300">Free</span> (essential features,
-            limited resources) and <span className="text-zinc-300">Pro</span>{" "}
-            ($15/month, unlimited resources and advanced features). See the
-            Usage &amp; Plan page in your dashboard for a full comparison.
-          </>
-        ),
+        answer:
+          "Envpilot offers two plans: Free (essential features, limited resources) and Pro ($15/month, unlimited resources and advanced features). See the Usage & Plan page in your dashboard for a full comparison.",
       },
       {
         question: "How does billing work?",
@@ -116,43 +91,8 @@ const FAQ_DATA: FAQSection[] = [
       },
       {
         question: "What resources are metered?",
-        answer: (
-          <ul className="space-y-2 pl-4">
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Projects</span> &mdash; total
-              active projects in your organization.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Team Members</span> &mdash;
-              members in your organization.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Variables per Project</span>{" "}
-              &mdash; environment variables in each project (counted
-              per-project, not total).
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Pending Invitations</span> &mdash;
-              outstanding team invites.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Active Share Links</span> &mdash;
-              currently active secret sharing links.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Rotation-Enabled Variables</span>{" "}
-              &mdash; variables with automated rotation configured.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Audit Log Retention</span> &mdash;
-              how long audit logs are kept (7 days Free, 365 days Pro).
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">Analytics Retention</span> &mdash;
-              how long analytics data is stored (7 days Free, 30 days Pro).
-            </li>
-          </ul>
-        ),
+        answer:
+          "Projects (total active), Team Members (per org), Variables per Project, Pending Invitations, Active Share Links, Rotation-Enabled Variables, Audit Log Retention (7 days Free, 365 days Pro), and Analytics Retention (7 days Free, 30 days Pro).",
       },
       {
         question: "What happens when I hit a limit?",
@@ -215,25 +155,8 @@ const FAQ_DATA: FAQSection[] = [
       },
       {
         question: "What developer tools are available?",
-        answer: (
-          <ul className="space-y-2 pl-4">
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">CLI</span> (
-              <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-green-400">
-                npx envpilot
-              </code>
-              ) &mdash; manage variables from your terminal.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">VS Code Extension</span> &mdash;
-              sync and edit variables directly in your editor.
-            </li>
-            <li className="text-zinc-500 before:mr-2 before:text-green-500 before:content-['-']">
-              <span className="text-zinc-300">API Access</span> &mdash;
-              programmatic access for CI/CD pipelines and automation.
-            </li>
-          </ul>
-        ),
+        answer:
+          "CLI (npx envpilot) for terminal management, VS Code Extension for real-time sync in your editor, and API Access for CI/CD pipelines and automation.",
       },
       {
         question: "What is Version History?",
@@ -249,23 +172,8 @@ const FAQ_DATA: FAQSection[] = [
     items: [
       {
         question: "How do I contact support?",
-        answer: (
-          <>
-            Visit{" "}
-            <Link href="/support" className="text-green-400 hover:underline">
-              envpilot.dev/support
-            </Link>{" "}
-            to submit a support ticket, or email{" "}
-            <a
-              href="mailto:support@envpilot.dev"
-              className="text-green-400 hover:underline"
-            >
-              support@envpilot.dev
-            </a>
-            . We typically respond within 24 hours on business days. Pro plan
-            users receive priority support with faster response times.
-          </>
-        ),
+        answer:
+          "Visit envpilot.dev/support to submit a support ticket, or email support@envpilot.dev. We typically respond within 24 hours on business days. Pro plan users receive priority support with faster response times.",
       },
       {
         question: "Can I transfer my organization?",
@@ -274,64 +182,14 @@ const FAQ_DATA: FAQSection[] = [
       },
       {
         question: "How do I delete my account?",
-        answer: (
-          <>
-            Contact{" "}
-            <a
-              href="mailto:support@envpilot.dev"
-              className="text-green-400 hover:underline"
-            >
-              support@envpilot.dev
-            </a>{" "}
-            to request account deletion. We will remove your personal data in
-            accordance with our{" "}
-            <Link href="/privacy" className="text-green-400 hover:underline">
-              Privacy Policy
-            </Link>{" "}
-            and applicable data protection laws.
-          </>
-        ),
+        answer:
+          "Contact support@envpilot.dev to request account deletion. We will remove your personal data in accordance with our Privacy Policy and applicable data protection laws.",
       },
     ],
   },
 ];
 
 export default function FAQPage() {
-  const [activeSection, setActiveSection] = useState("getting-started");
-  const [openItems, setOpenItems] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
-    );
-
-    for (const section of SECTIONS) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  function toggleItem(key: string) {
-    setOpenItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }
-
   return (
     <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
       {/* Header */}
@@ -388,88 +246,11 @@ export default function FAQPage() {
         {/* Content with sidebar */}
         <section className="py-12">
           <div className="mx-auto flex max-w-5xl gap-12 px-4">
-            {/* Sidebar TOC */}
-            <nav className="hidden w-48 shrink-0 lg:block">
-              <div className="sticky top-20">
-                <p className="mb-3 text-[10px] uppercase tracking-widest text-zinc-600">
-                  on this page
-                </p>
-                <ul className="space-y-1">
-                  {SECTIONS.map((s) => (
-                    <li key={s.id}>
-                      <a
-                        href={`#${s.id}`}
-                        className={`block py-1 text-xs transition-colors ${
-                          activeSection === s.id
-                            ? "text-green-400"
-                            : "text-zinc-600 hover:text-zinc-400"
-                        }`}
-                      >
-                        {activeSection === s.id && (
-                          <span className="mr-1">&gt;</span>
-                        )}
-                        {s.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </nav>
+            {/* Sidebar TOC — client island for scroll-spy */}
+            <ScrollSpySidebar sections={SECTIONS} />
 
-            {/* Main content */}
-            <div className="min-w-0 flex-1 text-sm leading-relaxed text-zinc-400">
-              {FAQ_DATA.map((section) => (
-                <Section
-                  key={section.id}
-                  id={section.id}
-                  n={section.n}
-                  title={section.title}
-                >
-                  <div className="space-y-2">
-                    {section.items.map((item, idx) => {
-                      const itemKey = `${section.id}-${idx}`;
-                      const isOpen = openItems.has(itemKey);
-                      return (
-                        <div
-                          key={itemKey}
-                          className="rounded-lg border border-zinc-800/50 bg-zinc-900/30"
-                        >
-                          <button
-                            onClick={() => toggleItem(itemKey)}
-                            className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-zinc-800/30"
-                          >
-                            <span className="text-sm text-zinc-200">
-                              {item.question}
-                            </span>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className={`shrink-0 text-green-500 transition-transform duration-200 ${
-                                isOpen ? "rotate-180" : ""
-                              }`}
-                            >
-                              <path d="m6 9 6 6 6-6" />
-                            </svg>
-                          </button>
-                          {isOpen && (
-                            <div className="border-t border-zinc-800/50 px-4 py-3 text-sm leading-relaxed text-zinc-400">
-                              {item.answer}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Section>
-              ))}
-            </div>
+            {/* FAQ content — client island for accordion toggle */}
+            <FAQAccordion sections={FAQ_DATA} />
           </div>
         </section>
       </main>
@@ -532,30 +313,5 @@ export default function FAQPage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function Section({
-  id,
-  n,
-  title,
-  children,
-}: {
-  id: string;
-  n: number;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className="scroll-mt-24 border-b border-zinc-800/50 py-8 first:pt-0 last:border-b-0"
-    >
-      <h2 className="text-base font-semibold text-zinc-100">
-        <span className="text-green-500">{String(n).padStart(2, "0")}.</span>{" "}
-        {title}
-      </h2>
-      <div className="mt-4">{children}</div>
-    </section>
   );
 }

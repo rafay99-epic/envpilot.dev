@@ -10,14 +10,49 @@ import {
   TerminalLoading,
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
-import {
-  ActivityChart,
-  ProjectActivityChart,
-  VariableChangesChart,
-  TeamActivityChart,
-  SecurityInsights,
-  ResourceBreakdownChart,
-} from "@/components/dashboard/analytics";
+import dynamic from "next/dynamic";
+
+// Lazy-load chart components — recharts is ~200 KB; only load on this page
+const ActivityChart = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then((mod) => mod.ActivityChart),
+  { ssr: false }
+);
+const ProjectActivityChart = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then(
+      (mod) => mod.ProjectActivityChart
+    ),
+  { ssr: false }
+);
+const VariableChangesChart = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then(
+      (mod) => mod.VariableChangesChart
+    ),
+  { ssr: false }
+);
+const TeamActivityChart = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then(
+      (mod) => mod.TeamActivityChart
+    ),
+  { ssr: false }
+);
+const SecurityInsights = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then(
+      (mod) => mod.SecurityInsights
+    ),
+  { ssr: false }
+);
+const ResourceBreakdownChart = dynamic(
+  () =>
+    import("@/components/dashboard/analytics").then(
+      (mod) => mod.ResourceBreakdownChart
+    ),
+  { ssr: false }
+);
 
 type TimeRange = 7 | 30 | 90;
 
