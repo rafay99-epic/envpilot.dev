@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
@@ -31,8 +30,8 @@ import {
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const { hasPermission, organization } = useAuthContext();
-  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const { canDo, organization } = useAuthContext();
+  const canCreateProject = canDo("org:create_project");
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();

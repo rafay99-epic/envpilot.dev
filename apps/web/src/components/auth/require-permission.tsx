@@ -2,41 +2,43 @@
 
 import type { ReactNode } from "react";
 import { useAuthContext } from "./auth-provider";
-import type { Permission } from "@/lib/auth";
 
-interface RequirePermissionProps {
-  permission: Permission;
+interface RequireActionProps {
+  /** Action string from convex/authz.ts (e.g. "org:create_project") */
+  action: string;
   children: ReactNode;
   fallback?: ReactNode;
 }
 
-interface RequireAnyPermissionProps {
-  permissions: Permission[];
+interface RequireAnyActionProps {
+  /** Action strings from convex/authz.ts */
+  actions: string[];
   children: ReactNode;
   fallback?: ReactNode;
 }
 
-interface RequireAllPermissionsProps {
-  permissions: Permission[];
+interface RequireAllActionsProps {
+  /** Action strings from convex/authz.ts */
+  actions: string[];
   children: ReactNode;
   fallback?: ReactNode;
 }
 
 /**
- * Conditionally render children based on a single permission
+ * Conditionally render children based on a single action
  */
 export function RequirePermission({
-  permission,
+  action,
   children,
   fallback = null,
-}: RequirePermissionProps) {
-  const { hasPermission, isLoading } = useAuthContext();
+}: RequireActionProps) {
+  const { canDo, isLoading } = useAuthContext();
 
   if (isLoading) {
     return null;
   }
 
-  if (!hasPermission(permission)) {
+  if (!canDo(action)) {
     return <>{fallback}</>;
   }
 
@@ -44,20 +46,20 @@ export function RequirePermission({
 }
 
 /**
- * Conditionally render children if user has ANY of the specified permissions
+ * Conditionally render children if user can perform ANY of the specified actions
  */
 export function RequireAnyPermission({
-  permissions,
+  actions,
   children,
   fallback = null,
-}: RequireAnyPermissionProps) {
-  const { hasAnyPermission, isLoading } = useAuthContext();
+}: RequireAnyActionProps) {
+  const { canDo, isLoading } = useAuthContext();
 
   if (isLoading) {
     return null;
   }
 
-  if (!hasAnyPermission(permissions)) {
+  if (!actions.some((a) => canDo(a))) {
     return <>{fallback}</>;
   }
 
@@ -65,20 +67,20 @@ export function RequireAnyPermission({
 }
 
 /**
- * Conditionally render children if user has ALL of the specified permissions
+ * Conditionally render children if user can perform ALL of the specified actions
  */
 export function RequireAllPermissions({
-  permissions,
+  actions,
   children,
   fallback = null,
-}: RequireAllPermissionsProps) {
-  const { hasAllPermissions, isLoading } = useAuthContext();
+}: RequireAllActionsProps) {
+  const { canDo, isLoading } = useAuthContext();
 
   if (isLoading) {
     return null;
   }
 
-  if (!hasAllPermissions(permissions)) {
+  if (!actions.every((a) => canDo(a))) {
     return <>{fallback}</>;
   }
 

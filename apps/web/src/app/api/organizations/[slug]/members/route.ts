@@ -126,30 +126,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Check if user can invite (admin or team_lead)
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (
-      !membership ||
-      (membership.role !== "admin" && membership.role !== "team_lead")
-    ) {
-      return NextResponse.json(
-        { error: "Only admins and team leads can invite members" },
-        { status: 403 }
-      );
-    }
-
-    // Team leads can only invite members, not admins
-    if (membership.role === "team_lead" && validation.data.role === "admin") {
-      return NextResponse.json(
-        { error: "Team leads cannot invite admins" },
-        { status: 403 }
-      );
-    }
-
+    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanManageUser)
     const { email, role, projectIds, projectRole } = validation.data;
 
     // Get organization details for the email
@@ -288,19 +265,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Only admins can change roles
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (!membership || membership.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can change member roles" },
-        { status: 403 }
-      );
-    }
-
+    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanManageUser)
     const { userId: targetUserId, role } = validation.data;
 
     // Get target user info before updating
@@ -386,22 +351,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Users can remove themselves, or admins can remove others
-    const isRemovingSelf = targetUserId === convexUser._id;
-
-    if (!isRemovingSelf) {
-      const membership = await convex.query(api.organizations.getMembership, {
-        organizationId,
-        userId: convexUser._id,
-      });
-
-      if (!membership || membership.role !== "admin") {
-        return NextResponse.json(
-          { error: "Only admins can remove other members" },
-          { status: 403 }
-        );
-      }
-    }
+    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanManageUser)
+    // Users can remove themselves; the mutation handles self-removal logic.
 
     // Get target user info before removing
     const targetUser = await convex.query(api.users.getById, {

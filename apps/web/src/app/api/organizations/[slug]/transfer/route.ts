@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { verifyNotBot } from "@/lib/botid";
+import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -55,18 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { targetUserEmail } = validation.data;
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Check admin
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (!membership || membership.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can transfer organization ownership" },
-        { status: 403 }
-      );
-    }
+    // Authorization is enforced in the Convex mutation (assertOrgAction)
 
     // Look up target user by email
     const targetUser = await convex.query(api.users.getByEmail, {
@@ -141,10 +131,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error transferring organization:", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to transfer organization";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to transfer organization");
   }
 }

@@ -9,7 +9,6 @@ import {
   useFeatureGate,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
@@ -68,16 +67,16 @@ interface Variable {
 }
 
 export default function VariablesPage() {
-  const { hasPermission, organization, user } = useAuthContext();
+  const { canDo, organization, user } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
   const { convexUserId } = useConvexUser(user?.id);
   const { variables, isLoading } = useVariables(activeOrganizationId);
   const { projects } = useProjects(activeOrganizationId, convexUserId);
-  const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE);
-  const canUpdateVariable = hasPermission(PERMISSIONS.VARIABLE_UPDATE);
-  const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
+  const canCreateVariable = canDo("org:create_project");
+  const canUpdateVariable = canDo("org:create_project");
+  const canDeleteVariable = canDo("org:create_project");
   const { allowed: showRotation } = useFeatureGate(
     activeOrganizationId,
     "secret_rotation"

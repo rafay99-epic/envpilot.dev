@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AuthUser, Organization, Permission } from "@/lib/auth";
-import { hasPermission, hasAllPermissions, hasAnyPermission } from "@/lib/auth";
+import type { AuthUser, Organization } from "@/lib/auth";
 
 interface UserData {
   user: AuthUser | null;
   organization: Organization | null;
+  actions?: string[];
   accessToken: string | null;
   impersonator?: {
     email: string;
@@ -21,9 +21,12 @@ interface UseAuthReturn {
   isAuthenticated: boolean;
   isImpersonating: boolean;
   impersonator: { email: string; reason: string | null } | undefined;
-  hasPermission: (permission: Permission) => boolean;
-  hasAllPermissions: (permissions: Permission[]) => boolean;
-  hasAnyPermission: (permissions: Permission[]) => boolean;
+  /** Check if the current user can perform an action (from backend authz).
+   *  Actions are strings like "org:invite_member", "org:delete_project", "project:update".
+   */
+  canDo: (action: string) => boolean;
+  /** All actions the current user can perform (from backend authz) */
+  actions: string[];
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -37,6 +40,7 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
   const [organization, setOrganization] = useState<Organization | null>(
     initialData?.organization ?? null
   );
+  const [actions, setActions] = useState<string[]>(initialData?.actions ?? []);
   const [isLoading, setIsLoading] = useState(!initialData);
   const [impersonator, setImpersonator] = useState(initialData?.impersonator);
 
@@ -48,15 +52,18 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
         const data: UserData = await response.json();
         setUser(data.user);
         setOrganization(data.organization);
+        setActions(data.actions ?? []);
         setImpersonator(data.impersonator);
       } else {
         setUser(null);
         setOrganization(null);
+        setActions([]);
         setImpersonator(undefined);
       }
     } catch {
       setUser(null);
       setOrganization(null);
+      setActions([]);
       setImpersonator(undefined);
     } finally {
       setIsLoading(false);
@@ -82,8 +89,6 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     window.location.href = "/sign-out";
   }, []);
 
-  const userPermissions = user?.permissions ?? [];
-
   return {
     user,
     organization,
@@ -91,12 +96,8 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     isAuthenticated: !!user,
     isImpersonating: !!impersonator,
     impersonator,
-    hasPermission: (permission: Permission) =>
-      hasPermission(userPermissions, permission),
-    hasAllPermissions: (permissions: Permission[]) =>
-      hasAllPermissions(userPermissions, permissions),
-    hasAnyPermission: (permissions: Permission[]) =>
-      hasAnyPermission(userPermissions, permissions),
+    canDo: (action: string) => actions.includes(action),
+    actions,
     signOut: signOutHandler,
     refreshUser: fetchUser,
   };

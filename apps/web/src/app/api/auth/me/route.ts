@@ -5,7 +5,6 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { AuthUser, Organization } from "@/lib/auth";
-import { getPermissionsForMembershipRole } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
   ACTIVE_ORG_COOKIE_NAME,
@@ -61,7 +60,7 @@ export async function GET(request: Request) {
       profilePictureUrl: user.profilePictureUrl ?? null,
       organizationId: activeOrganization?._id ?? null,
       role: activeOrganization?.role ?? null,
-      permissions: getPermissionsForMembershipRole(activeOrganization?.role),
+      // permissions are computed from backend authz → actions[]
       createdAt: new Date(user.createdAt),
       updatedAt: new Date(user.updatedAt),
     };
@@ -94,9 +93,20 @@ export async function GET(request: Request) {
       )
     );
 
+    // Compute actions from the backend authz module (single source of truth)
+    let actions: string[] = [];
+    if (activeOrganization) {
+      const perms = await convex.query(api.authz.getMyPermissions, {
+        userId: convexUser._id,
+        organizationId: activeOrganization._id as Id<"organizations">,
+      });
+      actions = perms.actions;
+    }
+
     return NextResponse.json({
       user: authUser,
       organization,
+      actions,
       organizations: organizations.map((org, index) => ({
         id: org._id,
         name: org.name,

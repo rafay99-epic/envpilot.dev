@@ -9,7 +9,6 @@ import { CommandPalette } from "@/components/command-palette";
 import { UpdateBanner } from "@/components/dashboard/update-banner";
 import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortcuts-provider";
 import type { AuthUser, Organization } from "@/lib/auth";
-import { getPermissionsForMembershipRole } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
   ACTIVE_ORG_COOKIE_NAME,
@@ -107,7 +106,7 @@ export default async function DashboardLayout({
     profilePictureUrl: user.profilePictureUrl ?? null,
     organizationId: activeOrganization?._id ?? null,
     role: activeOrganization?.role ?? null,
-    permissions: getPermissionsForMembershipRole(activeOrganization?.role),
+    // permissions are computed from backend authz via /api/auth/me → actions[]
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   };

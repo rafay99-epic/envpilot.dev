@@ -6,6 +6,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { verifyNotBot } from "@/lib/botid";
+import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -40,21 +41,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Check if user can cancel invitations (admin or team_lead)
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (
-      !membership ||
-      (membership.role !== "admin" && membership.role !== "team_lead")
-    ) {
-      return NextResponse.json(
-        { error: "Only admins and team leads can cancel invitations" },
-        { status: 403 }
-      );
-    }
+    // Authorization is enforced in the Convex mutation (assertOrgAction)
 
     // Verify invitation belongs to this organization before cancelling
     const invitations = await convex.query(
@@ -81,10 +68,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ cancelled: true });
   } catch (error) {
     console.error("Error cancelling invitation:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to cancel invitation";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to cancel invitation");
   }
 }
 
@@ -117,21 +101,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Check if user can resend invitations (admin or team_lead)
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (
-      !membership ||
-      (membership.role !== "admin" && membership.role !== "team_lead")
-    ) {
-      return NextResponse.json(
-        { error: "Only admins and team leads can resend invitations" },
-        { status: 403 }
-      );
-    }
+    // Authorization is enforced in the Convex mutation (assertOrgAction)
 
     // Get organization details for the email
     const organization = await convex.query(api.organizations.getById, {
@@ -190,9 +160,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Error resending invitation:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to resend invitation";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(error, "Failed to resend invitation");
   }
 }

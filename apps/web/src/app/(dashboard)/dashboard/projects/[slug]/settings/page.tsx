@@ -10,7 +10,6 @@ import {
   TerminalLoading,
   TerminalSelect,
 } from "@/components/dashboard/terminal-ui";
-import { PERMISSIONS } from "@/lib/auth";
 import {
   PROJECT_ICONS,
   PROJECT_COLORS,
@@ -21,7 +20,6 @@ import { ProjectIcon, FrameworkLogo } from "@/components/ui";
 import { PROJECT_TYPES } from "@/constants/templates";
 import {
   isFrameworkIcon,
-  parseFrameworkType,
   toFrameworkIcon,
   FRAMEWORK_ICON_TYPES,
 } from "@/constants/framework-logos";
@@ -47,9 +45,9 @@ export default function ProjectSettingsPage({
 }: ProjectSettingsPageProps) {
   const { slug } = use(params);
   const router = useRouter();
-  const { hasPermission, organization } = useAuthContext();
-  const canUpdateProject = hasPermission(PERMISSIONS.PROJECT_UPDATE);
-  const canDeleteProject = hasPermission(PERMISSIONS.PROJECT_DELETE);
+  const { canDo, organization } = useAuthContext();
+  const canUpdateProject = canDo("org:create_project");
+  const canDeleteProject = canDo("org:delete_project");
 
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);

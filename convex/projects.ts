@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
+import { assertOrgAction, assertProjectAction } from "./authz";
 
 /**
  * Project Queries and Mutations
@@ -205,6 +206,14 @@ export const create = mutation({
     createdBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: admins and team_leads can create projects
+    const { membership: creatorMembership } = await assertOrgAction(
+      ctx,
+      args.createdBy,
+      args.organizationId,
+      "org:create_project"
+    );
+
     const now = Date.now();
 
     // Check tier limits for project creation
@@ -213,15 +222,8 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    // Check if team leads are allowed to create projects
-    const creatorMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.createdBy)
-      )
-      .first();
-
-    if (creatorMembership?.role === "team_lead") {
+    // Check if team leads are allowed to create projects (org setting override)
+    if (creatorMembership.role === "team_lead") {
       const teamLeadsCanCreate =
         org.settings?.teamLeadsCanCreateProjects ?? true;
       if (!teamLeadsCanCreate) {
@@ -300,6 +302,14 @@ export const update = mutation({
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: org admins or project managers can update
+    await assertProjectAction(
+      ctx,
+      args.updatedBy,
+      args.projectId,
+      "project:update"
+    );
+
     const now = Date.now();
     const { projectId, updatedBy, ...updates } = args;
 
@@ -336,13 +346,21 @@ export const remove = mutation({
     deletedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
-
     const project = await ctx.db.get(args.projectId);
     if (!project) {
       throw new Error("Project not found");
     }
+
+    // Authorization: only org admins can delete projects
+    await assertOrgAction(
+      ctx,
+      args.deletedBy,
+      project.organizationId,
+      "org:delete_project"
+    );
+
+    const now = Date.now();
+    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
     // Soft-delete the project
     await ctx.db.patch(args.projectId, {
@@ -471,8 +489,6 @@ export const restore = mutation({
     restoredBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-
     const project = await ctx.db.get(args.projectId);
     if (!project) {
       throw new Error("Project not found");
@@ -481,6 +497,16 @@ export const restore = mutation({
     if (!project.deletedAt) {
       throw new Error("Project is not deleted");
     }
+
+    // Authorization: only org admins can restore deleted projects
+    await assertOrgAction(
+      ctx,
+      args.restoredBy,
+      project.organizationId,
+      "org:delete_project"
+    );
+
+    const now = Date.now();
 
     await ctx.db.patch(args.projectId, {
       deletedAt: undefined,
@@ -500,12 +526,20 @@ export const duplicate = mutation({
     includeVariables: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-
     const sourceProject = await ctx.db.get(args.projectId);
     if (!sourceProject || sourceProject.deletedAt) {
       throw new Error("Source project not found");
     }
+
+    // Authorization: admins and team_leads can duplicate (same as create)
+    await assertOrgAction(
+      ctx,
+      args.createdBy,
+      sourceProject.organizationId,
+      "org:create_project"
+    );
+
+    const now = Date.now();
 
     // Check tier limits for project creation (duplicate)
     const dupProjectCount = await countActiveProjects(

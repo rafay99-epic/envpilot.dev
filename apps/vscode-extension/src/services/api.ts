@@ -67,8 +67,11 @@ export class ApiService {
     });
     const projects = response.data.data?.projects || [];
 
-    // Cache project roles from the response
+    // Cache both org-level and project-level roles from the response
     for (const project of projects) {
+      if (project.userRole) {
+        this.roleCache.set(project._id, project.userRole);
+      }
       if (project.projectRole) {
         this.projectRoleCache.set(project._id, project.projectRole);
       }

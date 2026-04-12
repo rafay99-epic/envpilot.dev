@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import { useAnalytics } from "@/hooks";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -43,14 +42,14 @@ function getPermissionChangeCount(
 
 export default function AnalyticsPage() {
   const router = useRouter();
-  const { organization, hasPermission } = useAuthContext();
+  const { organization, canDo } = useAuthContext();
   const [daysBack, setDaysBack] = useState<TimeRange>(30);
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
 
   // Only admin and team lead can access analytics — redirect members to dashboard
-  const canViewAnalytics = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const canViewAnalytics = canDo("org:create_project");
 
   // Single unified query — no duplicate audit log fetches
   const { analytics, isLoading } = useAnalytics(
