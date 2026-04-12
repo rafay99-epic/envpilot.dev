@@ -213,7 +213,12 @@ export function useTemplate(templateId: string | null) {
       setError(null);
 
       try {
-        const variablePromises = template.variables.map(async (variable) => {
+        // Create variables sequentially to avoid overwhelming the WorkOS Vault API.
+        // Parallel calls (Promise.all) cause rate-limit / timeout 500 errors when
+        // templates have many variables.
+        let failedCount = 0;
+
+        for (const variable of template.variables) {
           const placeholderValue =
             variable.defaultValue ||
             variable.placeholder ||
@@ -240,11 +245,11 @@ export function useTemplate(templateId: string | null) {
               `Failed to create variable ${variable.key}:`,
               data.error
             );
+            failedCount++;
           }
-        });
+        }
 
-        await Promise.all(variablePromises);
-        return true;
+        return failedCount === 0;
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
         return false;

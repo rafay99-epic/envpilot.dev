@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { verifyNotBot } from "@/lib/botid";
+import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -115,19 +116,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Check if user is an admin
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (!membership || membership.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can update organization settings" },
-        { status: 403 }
-      );
-    }
-
+    // Authorization is enforced in the Convex mutation (assertOrgAction)
     const { name, description, logoUrl } = validation.data;
 
     await convex.mutation(api.organizations.update, {
@@ -145,10 +134,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ organization });
   } catch (error) {
     console.error("Error updating organization:", error);
-    return NextResponse.json(
-      { error: "Failed to update organization" },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to update organization");
   }
 }
 
@@ -179,18 +165,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     const { organizationId } = resolved;
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
-
-    if (!membership || membership.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can delete the organization" },
-        { status: 403 }
-      );
-    }
-
+    // Authorization is enforced in the Convex mutation (assertOrgAction)
     await convex.mutation(api.organizations.remove, {
       organizationId,
       deletedBy: convexUser._id,
@@ -199,9 +174,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ deleted: true });
   } catch (error) {
     console.error("Error deleting organization:", error);
-    return NextResponse.json(
-      { error: "Failed to delete organization" },
-      { status: 500 }
-    );
+    return handleApiError(error, "Failed to delete organization");
   }
 }

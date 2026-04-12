@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import type { AuthUser, Organization, Permission } from "@/lib/auth";
+import type { AuthUser, Organization } from "@/lib/auth";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -11,9 +11,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isImpersonating: boolean;
   impersonator?: { email: string; reason: string | null };
-  hasPermission: (permission: Permission) => boolean;
-  hasAllPermissions: (permissions: Permission[]) => boolean;
-  hasAnyPermission: (permissions: Permission[]) => boolean;
+  canDo: (action: string) => boolean;
+  actions: string[];
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }

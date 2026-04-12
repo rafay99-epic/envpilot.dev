@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import { useTierLimitCheck } from "@/hooks/useTierLimits";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
@@ -31,8 +30,8 @@ import {
 
 export default function NewProjectPage() {
   const router = useRouter();
-  const { hasPermission, organization } = useAuthContext();
-  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const { canDo, organization } = useAuthContext();
+  const canCreateProject = canDo("org:create_project");
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const tierCheck = useTierLimitCheck(orgId, "create_project");
   const enforcing = useEnforcementEnabled();
@@ -136,33 +135,31 @@ export default function NewProjectPage() {
       const projectSlug = data.project.slug;
 
       if (selectedTemplate) {
-        const variablePromises = selectedTemplate.variables.map(
-          async (variable) => {
-            try {
-              const placeholderValue =
-                variable.defaultValue ||
-                variable.placeholder ||
-                `<${variable.key}>`;
+        // Create template variables sequentially to avoid overwhelming
+        // the WorkOS Vault API with concurrent requests.
+        for (const variable of selectedTemplate.variables) {
+          try {
+            const placeholderValue =
+              variable.defaultValue ||
+              variable.placeholder ||
+              `<${variable.key}>`;
 
-              await fetch("/api/variables", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  key: variable.key,
-                  value: placeholderValue,
-                  description: variable.description,
-                  environments: variable.environments,
-                  projectId,
-                  isSensitive: variable.isSensitive,
-                }),
-              });
-            } catch (err) {
-              console.error(`Failed to create variable ${variable.key}:`, err);
-            }
+            await fetch("/api/variables", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                key: variable.key,
+                value: placeholderValue,
+                description: variable.description,
+                environments: variable.environments,
+                projectId,
+                isSensitive: variable.isSensitive,
+              }),
+            });
+          } catch (err) {
+            console.error(`Failed to create variable ${variable.key}:`, err);
           }
-        );
-
-        await Promise.all(variablePromises);
+        }
       }
 
       router.push(`/dashboard/projects/${projectSlug}`);

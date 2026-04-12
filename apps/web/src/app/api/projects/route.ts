@@ -116,41 +116,7 @@ export async function POST(request: Request) {
     const { name, slug, description, organizationId, icon, color } =
       validation.data;
 
-    // Verify user is a member of the organization
-    const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
-      organizationId as Id<"organizations">
-    );
-
-    if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Check if user has permission to create projects (admin or team_lead)
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
-      return NextResponse.json(
-        { error: "Insufficient permissions to create projects" },
-        { status: 403 }
-      );
-    }
-
-    // Check org settings for team lead project creation
-    if (membership.role === "team_lead") {
-      const org = await convex.query(api.organizations.getById, {
-        organizationId: organizationId as Id<"organizations">,
-      });
-      if (org?.settings?.teamLeadsCanCreateProjects === false) {
-        return NextResponse.json(
-          {
-            error:
-              "Project creation is restricted to admins in this organization",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
+    // Authorization is enforced in the Convex mutation (assertOrgAction + team_lead setting check)
     const projectId = await convex.mutation(api.projects.create, {
       name,
       slug,

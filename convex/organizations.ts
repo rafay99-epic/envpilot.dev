@@ -8,6 +8,7 @@ import {
 } from "./featureRegistry";
 import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
+import { assertOrgAction, assertCanManageUser } from "./authz";
 
 /**
  * Organization Queries and Mutations
@@ -260,6 +261,14 @@ export const update = mutation({
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins can update org details
+    await assertOrgAction(
+      ctx,
+      args.updatedBy,
+      args.organizationId,
+      "org:update"
+    );
+
     const now = Date.now();
     const { organizationId, updatedBy, ...updates } = args;
 
@@ -311,6 +320,14 @@ export const remove = mutation({
     deletedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins can delete an organization
+    await assertOrgAction(
+      ctx,
+      args.deletedBy,
+      args.organizationId,
+      "org:delete"
+    );
+
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
@@ -484,6 +501,17 @@ export const addMember = mutation({
     invitedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins and team_leads can add members
+    const { membership: callerMembership } = await assertOrgAction(
+      ctx,
+      args.invitedBy,
+      args.organizationId,
+      "org:invite_member"
+    );
+
+    // Hierarchy: team_leads can only add members, not equal/higher roles
+    assertCanManageUser(callerMembership.role, args.role, "invite member");
+
     const now = Date.now();
 
     // Check tier limits for adding team members
@@ -545,6 +573,22 @@ export const removeMember = mutation({
     removedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const isSelfRemoval = args.removedBy === args.userId;
+
+    // Capture the caller's membership from assertOrgAction to avoid a second DB query
+    let callerMembership: { role: string } | null = null;
+
+    if (!isSelfRemoval) {
+      // Authorization: only admins can remove OTHER members
+      const result = await assertOrgAction(
+        ctx,
+        args.removedBy,
+        args.organizationId,
+        "org:remove_member"
+      );
+      callerMembership = result.membership;
+    }
+
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
@@ -557,6 +601,15 @@ export const removeMember = mutation({
 
     if (!membership) {
       throw new Error("User is not a member of this organization");
+    }
+
+    // Hierarchy: when removing others, cannot remove a user at or above your level
+    if (!isSelfRemoval && callerMembership) {
+      assertCanManageUser(
+        callerMembership.role,
+        membership.role,
+        "remove member"
+      );
     }
 
     // Revoke all active extension/project access tokens for this user in this organization
@@ -683,6 +736,14 @@ export const updateMemberRole = mutation({
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins can change roles
+    const { membership: callerMembership } = await assertOrgAction(
+      ctx,
+      args.updatedBy,
+      args.organizationId,
+      "org:change_role"
+    );
+
     const now = Date.now();
 
     const membership = await ctx.db
@@ -695,6 +756,9 @@ export const updateMemberRole = mutation({
     if (!membership) {
       throw new Error("User is not a member of this organization");
     }
+
+    // Hierarchy: cannot change role of someone at or above your level
+    assertCanManageUser(callerMembership.role, membership.role, "change role");
 
     const oldRole = membership.role;
 
@@ -760,18 +824,15 @@ export const updateSettings = mutation({
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins can update org settings
+    await assertOrgAction(
+      ctx,
+      args.updatedBy,
+      args.organizationId,
+      "org:update_settings"
+    );
+
     const now = Date.now();
-
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.updatedBy)
-      )
-      .first();
-
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only admins can update organization settings");
-    }
 
     await ctx.db.patch(args.organizationId, {
       settings: args.settings,
@@ -901,23 +962,15 @@ export const revokeMemberCliToken = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins and team_leads can revoke sessions
+    await assertOrgAction(
+      ctx,
+      args.revokedBy,
+      args.organizationId,
+      "org:revoke_session"
+    );
+
     const now = Date.now();
-
-    // Verify caller is admin or team_lead
-    const callerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
-      )
-      .first();
-
-    if (
-      !callerMembership ||
-      (callerMembership.role !== "admin" &&
-        callerMembership.role !== "team_lead")
-    ) {
-      throw new Error("Only admins and team leads can revoke sessions");
-    }
 
     const token = await ctx.db.get(args.tokenId);
     if (!token || !token.isActive) {
@@ -953,24 +1006,16 @@ export const revokeMemberExtensionSession = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins and team_leads can revoke sessions
+    await assertOrgAction(
+      ctx,
+      args.revokedBy,
+      args.organizationId,
+      "org:revoke_session"
+    );
+
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
-
-    // Verify caller is admin or team_lead
-    const callerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
-      )
-      .first();
-
-    if (
-      !callerMembership ||
-      (callerMembership.role !== "admin" &&
-        callerMembership.role !== "team_lead")
-    ) {
-      throw new Error("Only admins and team leads can revoke sessions");
-    }
 
     const access = await ctx.db.get(args.projectAccessId);
     if (!access || !access.isActive) {
@@ -1026,24 +1071,16 @@ export const revokeAllMemberSessions = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins and team_leads can revoke sessions
+    await assertOrgAction(
+      ctx,
+      args.revokedBy,
+      args.organizationId,
+      "org:revoke_session"
+    );
+
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
-
-    // Verify caller is admin or team_lead
-    const callerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.revokedBy)
-      )
-      .first();
-
-    if (
-      !callerMembership ||
-      (callerMembership.role !== "admin" &&
-        callerMembership.role !== "team_lead")
-    ) {
-      throw new Error("Only admins and team leads can revoke sessions");
-    }
 
     // Verify target is a member
     const targetMembership = await ctx.db
@@ -1142,25 +1179,19 @@ export const transferOwnership = mutation({
     transferredBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins can transfer ownership
+    const { membership: callerMembership } = await assertOrgAction(
+      ctx,
+      args.transferredBy,
+      args.organizationId,
+      "org:transfer_ownership"
+    );
+
     const now = Date.now();
 
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
       throw new Error("Organization not found");
-    }
-
-    // Verify caller is admin
-    const callerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("userId", args.transferredBy)
-      )
-      .first();
-
-    if (!callerMembership || callerMembership.role !== "admin") {
-      throw new Error("Only admins can transfer organization ownership");
     }
 
     // Verify target user exists

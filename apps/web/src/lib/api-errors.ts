@@ -39,6 +39,21 @@ export function isTierLimitError(message: string): boolean {
 }
 
 /**
+ * Returns true if the error message indicates an authorization/permission failure
+ * thrown by the Convex authz module (convex/authz.ts).
+ */
+export function isAuthorizationError(message: string): boolean {
+  return (
+    message.includes("Insufficient permissions") ||
+    message.includes("Not a member of this organization") ||
+    message.includes("No access to this project") ||
+    message.includes("Insufficient project permissions") ||
+    // Hierarchy errors from assertCanManageUser: "Cannot remove member: a team_lead cannot manage a admin"
+    /^Cannot \w+.*cannot manage/.test(message)
+  );
+}
+
+/**
  * Standard error response handler for API routes.
  * Automatically sanitizes Convex errors and returns proper status codes
  * for tier-limit errors (403) vs generic errors (500).
@@ -56,7 +71,14 @@ export function handleApiError(
     );
   }
 
-  // Report 500-class errors to Sentry (tier limits are expected, not bugs)
+  if (isAuthorizationError(message)) {
+    return NextResponse.json(
+      { error: message, code: "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
+  // Report 500-class errors to Sentry (tier/auth errors are expected, not bugs)
   const isConvexError =
     error instanceof Error && /\[Request ID:/.test(error.message);
   Sentry.captureException(error, {

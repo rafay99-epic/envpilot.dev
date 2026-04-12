@@ -10,7 +10,6 @@ import {
   useToggleFavorite,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
@@ -23,7 +22,7 @@ import { AnimatedGrid } from "@/components/dashboard/animated-list";
 import { Plus, Clock, ChevronRight, Star } from "lucide-react";
 
 export default function ProjectsPage() {
-  const { hasPermission, organization, user } = useAuthContext();
+  const { canDo, organization, user } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -32,7 +31,7 @@ export default function ProjectsPage() {
     activeOrganizationId,
     convexUserId
   );
-  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const canCreateProject = canDo("org:create_project");
 
   // Favorites
   const { favoriteProjectIds } = useFavoriteProjects(convexUserId);

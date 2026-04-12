@@ -7,6 +7,7 @@ import {
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { batchGetUsers } from "./helpers";
+import { assertOrgAction, assertCanManageUser } from "./authz";
 
 /**
  * Invitation Queries and Mutations
@@ -127,6 +128,17 @@ export const create = mutation({
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Authorization: only admins and team_leads can invite
+    const { membership: callerMembership } = await assertOrgAction(
+      ctx,
+      args.invitedBy,
+      args.organizationId,
+      "org:invite_member"
+    );
+
+    // Hierarchy: team_leads can only invite roles below them (member only)
+    assertCanManageUser(callerMembership.role, args.role, "invite member");
+
     // Rate limit: prevent invitation spam
     await rateLimiter.limit(ctx, "invitationCreate", {
       key: args.organizationId,
@@ -391,6 +403,14 @@ export const cancel = mutation({
       throw new Error("Invitation not found");
     }
 
+    // Authorization: only admins and team_leads can cancel invitations
+    await assertOrgAction(
+      ctx,
+      args.cancelledBy,
+      invitation.organizationId,
+      "org:invite_member"
+    );
+
     if (invitation.status !== "pending") {
       throw new Error("Can only cancel pending invitations");
     }
@@ -408,14 +428,22 @@ export const resend = mutation({
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const expiresInDays = args.expiresInDays ?? 7;
-    const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
-
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) {
       throw new Error("Invitation not found");
     }
+
+    // Authorization: only admins and team_leads can resend invitations
+    await assertOrgAction(
+      ctx,
+      args.resentBy,
+      invitation.organizationId,
+      "org:invite_member"
+    );
+
+    const now = Date.now();
+    const expiresInDays = args.expiresInDays ?? 7;
+    const expiresAt = now + expiresInDays * 24 * 60 * 60 * 1000;
 
     if (invitation.status !== "pending") {
       throw new Error("Can only resend pending invitations");

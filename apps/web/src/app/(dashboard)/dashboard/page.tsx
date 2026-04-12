@@ -12,7 +12,6 @@ import {
   useConvexUser,
 } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
-import { PERMISSIONS } from "@/lib/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
@@ -53,10 +52,10 @@ export default function DashboardPage() {
     activeOrganizationId,
     "secret_sharing"
   );
-  const { hasPermission } = useAuthContext();
+  const { canDo } = useAuthContext();
 
-  const canCreateProject = hasPermission(PERMISSIONS.PROJECT_CREATE);
-  const canInviteTeam = hasPermission(PERMISSIONS.TEAM_INVITE);
+  const canCreateProject = canDo("org:create_project");
+  const canInviteTeam = canDo("org:invite_member");
 
   if (!organization) {
     return (

@@ -22,7 +22,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { PERMISSIONS } from "@/lib/auth";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/components/command-palette";
 
@@ -75,13 +74,13 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization, hasPermission } = useAuthContext();
+  const { organization, canDo } = useAuthContext();
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
 
   // Analytics is restricted to admin/team_lead
-  const canViewAnalytics = hasPermission(PERMISSIONS.PROJECT_CREATE);
+  const canViewAnalytics = canDo("org:create_project");
 
   // Detect project context from pathname
   const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);

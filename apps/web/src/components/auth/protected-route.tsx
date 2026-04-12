@@ -3,11 +3,11 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "./auth-provider";
-import type { Permission } from "@/lib/auth";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredPermissions?: Permission[];
+  /** Action strings from convex/authz.ts (e.g. "org:create_project") */
+  requiredActions?: string[];
   requireAll?: boolean;
   fallback?: ReactNode;
   redirectTo?: string;
@@ -19,14 +19,13 @@ interface ProtectedRouteProps {
  */
 export function ProtectedRoute({
   children,
-  requiredPermissions = [],
+  requiredActions = [],
   requireAll = true,
   fallback,
   redirectTo = "/sign-in",
 }: ProtectedRouteProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, hasAllPermissions, hasAnyPermission } =
-    useAuthContext();
+  const { isAuthenticated, isLoading, canDo } = useAuthContext();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -50,13 +49,13 @@ export function ProtectedRoute({
     return null;
   }
 
-  // Check permissions if required
-  if (requiredPermissions.length > 0) {
-    const hasRequiredPermissions = requireAll
-      ? hasAllPermissions(requiredPermissions)
-      : hasAnyPermission(requiredPermissions);
+  // Check actions if required
+  if (requiredActions.length > 0) {
+    const hasRequiredActions = requireAll
+      ? requiredActions.every((a) => canDo(a))
+      : requiredActions.some((a) => canDo(a));
 
-    if (!hasRequiredPermissions) {
+    if (!hasRequiredActions) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4">
           <div className="rounded-full bg-red-100 p-4 dark:bg-red-900/20">

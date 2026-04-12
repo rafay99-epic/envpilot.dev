@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { assertProjectAction } from "./authz";
 
 /**
  * Project Members - Project-level access control
@@ -175,45 +176,19 @@ export const addMember = mutation({
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: org admins or project managers can add members
+    await assertProjectAction(
+      ctx,
+      args.addedBy,
+      args.projectId,
+      "project:manage_members"
+    );
+
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
-    }
-
-    // Verify caller is authorized (org admin or project manager)
-    const callerOrgMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.addedBy)
-      )
-      .first();
-
-    if (!callerOrgMembership) {
-      throw new Error("Not authorized: caller is not an org member");
-    }
-
-    const isOrgAdmin = callerOrgMembership.role === "admin";
-
-    if (!isOrgAdmin) {
-      const callerProjectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", args.addedBy)
-        )
-        .first();
-
-      if (
-        !callerProjectMembership ||
-        callerProjectMembership.role !== "manager"
-      ) {
-        throw new Error(
-          "Not authorized: only org admins and project managers can add project members"
-        );
-      }
     }
 
     // Verify target user is an org member
@@ -283,46 +258,20 @@ export const removeMember = mutation({
     removedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: org admins or project managers can remove members
+    await assertProjectAction(
+      ctx,
+      args.removedBy,
+      args.projectId,
+      "project:manage_members"
+    );
+
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
-    }
-
-    // Verify caller authorization
-    const callerOrgMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.removedBy)
-      )
-      .first();
-
-    if (!callerOrgMembership) {
-      throw new Error("Not authorized");
-    }
-
-    const isOrgAdmin = callerOrgMembership.role === "admin";
-
-    if (!isOrgAdmin) {
-      const callerProjectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", args.removedBy)
-        )
-        .first();
-
-      if (
-        !callerProjectMembership ||
-        callerProjectMembership.role !== "manager"
-      ) {
-        throw new Error(
-          "Not authorized: only org admins and project managers can remove project members"
-        );
-      }
     }
 
     const membership = await ctx.db
@@ -420,45 +369,19 @@ export const updateMemberRole = mutation({
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: org admins or project managers can change project roles
+    await assertProjectAction(
+      ctx,
+      args.updatedBy,
+      args.projectId,
+      "project:manage_members"
+    );
+
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
-    }
-
-    // Verify caller authorization
-    const callerOrgMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.updatedBy)
-      )
-      .first();
-
-    if (!callerOrgMembership) {
-      throw new Error("Not authorized");
-    }
-
-    const isOrgAdmin = callerOrgMembership.role === "admin";
-
-    if (!isOrgAdmin) {
-      const callerProjectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", args.updatedBy)
-        )
-        .first();
-
-      if (
-        !callerProjectMembership ||
-        callerProjectMembership.role !== "manager"
-      ) {
-        throw new Error(
-          "Not authorized: only org admins and project managers can update project member roles"
-        );
-      }
     }
 
     const membership = await ctx.db
@@ -504,6 +427,14 @@ export const bulkAddMembers = mutation({
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: org admins or project managers can bulk-add members
+    await assertProjectAction(
+      ctx,
+      args.addedBy,
+      args.projectId,
+      "project:manage_members"
+    );
+
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);

@@ -13,7 +13,6 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
-import { PERMISSIONS } from "@/lib/auth";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
 import { ProjectIcon } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui";
@@ -82,11 +81,11 @@ interface VersionRecord {
 
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
-  const { hasPermission, organization } = useAuthContext();
-  const canCreateVariable = hasPermission(PERMISSIONS.VARIABLE_CREATE);
-  const canUpdateVariable = hasPermission(PERMISSIONS.VARIABLE_UPDATE);
-  const canDeleteVariable = hasPermission(PERMISSIONS.VARIABLE_DELETE);
-  const canReviewRequests = hasPermission(PERMISSIONS.VARIABLE_CREATE);
+  const { canDo, organization } = useAuthContext();
+  const canCreateVariable = canDo("org:create_project");
+  const canUpdateVariable = canDo("org:create_project");
+  const canDeleteVariable = canDo("org:create_project");
+  const canReviewRequests = canDo("org:create_project");
   const canRequestVariable = organization?.role === "member";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
@@ -1014,7 +1013,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             currentVersion={historyVariableVersion}
             history={(historyData?.history ?? []) as VersionRecord[]}
             onRollback={handleRollback}
-            canRollback={hasPermission(PERMISSIONS.VARIABLE_ROLLBACK)}
+            canRollback={canDo("org:delete_project")}
             isLoading={isLoadingHistory}
             error={
               historyQueryError
