@@ -10,7 +10,8 @@ import { UpgradePrompt } from "@/components/tier/UpgradePrompt";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
-import { useOrganizationTags, useCreateTag } from "@/hooks/queries";
+import { useOrganizationTags, useCreateTag, useConvexUser } from "@/hooks";
+import { useAuthContext } from "@/components/auth";
 
 interface VariableCreateDrawerProps {
   isOpen: boolean;
@@ -44,14 +45,21 @@ export function VariableCreateDrawer({
   const bulkCheck = useTierLimitCheck(orgId, "bulk_import");
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
-  const { data: tagsData } = useOrganizationTags(organizationId);
+  const { user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+  const { tags } = useOrganizationTags(showTags ? organizationId : undefined);
   const createTag = useCreateTag();
 
-  const availableTags = showTags ? (tagsData?.tags ?? []) : [];
+  const availableTags = showTags ? tags : [];
 
   const handleCreateTag = async (name: string, color: string) => {
-    if (!organizationId) return;
-    await createTag.mutateAsync({ organizationId, name, color });
+    if (!organizationId || !convexUserId) return;
+    await createTag.mutateAsync({
+      organizationId,
+      name,
+      color,
+      createdBy: convexUserId as string,
+    });
   };
 
   const bulkBlocked = enforcing && !bulkCheck.isLoading && !bulkCheck.allowed;

@@ -12,3 +12,4 @@ package-lock.json
 bun.lock
 *.vsix
 **/routeTree.gen.ts
+.agents

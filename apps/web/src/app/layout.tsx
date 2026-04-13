@@ -17,6 +17,8 @@ const geistMono = Geist_Mono({
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
 
+const ogImage = `${baseUrl}/orgal_image.png`;
+
 export const metadata: Metadata = {
   title: {
     default: "Envpilot — Secure Environment Variable Management",
@@ -28,6 +30,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  // Facebook, Instagram, WhatsApp, Telegram, LinkedIn, Discord, Slack, iMessage, Pinterest
   openGraph: {
     type: "website",
     siteName: "Envpilot",
@@ -35,12 +38,40 @@ export const metadata: Metadata = {
     description:
       "Securely manage, share, and sync environment variables across your team with CLI, VS Code extension, and web dashboard.",
     url: baseUrl,
+    locale: "en_US",
+    images: [
+      {
+        url: ogImage,
+        secureUrl: ogImage,
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "Envpilot — Secure Environment Variable Management",
+      },
+    ],
   },
+  // Twitter / X
   twitter: {
     card: "summary_large_image",
     title: "Envpilot — Secure Environment Variable Management",
     description:
       "Securely manage, share, and sync environment variables across your team.",
+    images: [
+      {
+        url: ogImage,
+        width: 1200,
+        height: 630,
+        alt: "Envpilot — Secure Environment Variable Management",
+      },
+    ],
+    site: "@envpilot",
+    creator: "@envpilot",
+  },
+  // Apple iMessage & Safari
+  appleWebApp: {
+    capable: true,
+    title: "Envpilot",
+    statusBarStyle: "black-translucent",
   },
   robots: {
     index: true,
@@ -52,6 +83,12 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  // Discord & Slack embed accent color, Pinterest rich pins
+  other: {
+    "theme-color": "#3B82F6",
+    "msapplication-TileColor": "#0a0a0a",
+    "pinterest-rich-pin": "true",
   },
 };
 

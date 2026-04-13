@@ -1,7 +1,7 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import type { Tag as TagType } from "@/hooks/queries";
+import type { Tag as TagType } from "@/hooks/useTags";
 
 interface TagFilterProps {
   tags: TagType[];

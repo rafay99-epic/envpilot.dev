@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
-import { usePagination } from "@/hooks";
+import { usePagination, useConvexUser } from "@/hooks";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
+import { useAuthContext } from "@/components/auth";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 
 interface Organization {
@@ -34,9 +37,17 @@ function OrgProBadge({ orgId }: { orgId: string }) {
 }
 
 export default function OrganizationsPage() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+
+  // Use Convex real-time query directly instead of fetch("/api/organizations")
+  const rawOrgs = useQuery(
+    api.organizations.listForUser,
+    convexUserId ? { userId: convexUserId } : "skip"
+  );
+  const isLoading = rawOrgs === undefined;
+  const organizations: Organization[] = (rawOrgs ?? []) as Organization[];
+
   const pagination = usePagination(organizations, { pageSize: 9 });
   const enforcing = useEnforcementEnabled();
 
@@ -52,37 +63,8 @@ export default function OrganizationsPage() {
     typeof orgLimitGate.limit === "number" ? orgLimitGate.limit : null;
   const orgLimitReached = enforcing && !orgLimitGate.allowed;
 
-  useEffect(() => {
-    async function fetchOrganizations() {
-      try {
-        const response = await fetch("/api/organizations");
-        if (!response.ok) {
-          throw new Error("Failed to fetch organizations");
-        }
-        const data = await response.json();
-        setOrganizations(data.organizations || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchOrganizations();
-  }, []);
-
   if (isLoading) {
     return <TerminalLoading fullPage />;
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-8">
-        <div className="rounded-xl border border-red-800/50 bg-red-900/20 p-6">
-          <p className="text-red-400">{error}</p>
-        </div>
-      </div>
-    );
   }
 
   return (

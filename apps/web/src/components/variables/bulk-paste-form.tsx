@@ -8,7 +8,7 @@ import {
   type EnvParseError,
 } from "@/lib/env-parser";
 import type { VariableFormData } from "./variable-form";
-import type { Tag } from "@/hooks/queries";
+import type { Tag } from "@/hooks/useTags";
 import { TagSelector } from "./tag-selector";
 
 interface BulkPasteFormProps {

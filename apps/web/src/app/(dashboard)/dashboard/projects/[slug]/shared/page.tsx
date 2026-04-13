@@ -23,7 +23,7 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
-import { useProjectBySlug } from "@/hooks/queries";
+import { useProjects } from "@/hooks";
 import { useRevokeShare } from "@/hooks/useShareSecret";
 import { ConfirmDialog } from "@/components/ui";
 
@@ -340,11 +340,9 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
 
-  const {
-    data: project,
-    isLoading: isLoadingProject,
-    error: projectError,
-  } = useProjectBySlug(orgId, slug);
+  const project = useProjects(orgId)?.projects.find((p) => p.slug === slug);
+  const isLoadingProject = project === undefined && !!slug;
+  const projectError = project === null ? new Error("Project not found") : null;
 
   const projectId = project?._id as Id<"projects"> | undefined;
 

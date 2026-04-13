@@ -4,7 +4,7 @@ import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import type { Id } from "@convex/_generated/dataModel";
 import type { Environment } from "@/constants/project";
-import type { Tag } from "@/hooks/queries";
+import type { Tag } from "@/hooks/useTags";
 
 interface Variable {
   _id: Id<"environmentVariables">;

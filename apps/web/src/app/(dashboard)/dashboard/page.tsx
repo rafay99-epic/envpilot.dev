@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   useDashboardStats,
@@ -238,40 +239,44 @@ export default function DashboardPage() {
             )}
           </TerminalWindow>
 
-          {/* Expiring Secrets */}
-          {showRotation && (
-            <TerminalWindow title="expiring-secrets">
-              <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
-                <span className="font-mono text-xs text-zinc-500">
-                  <span className="text-green-400">$</span> envpilot secrets
-                  --expiring
-                </span>
-                <Link
-                  href="/dashboard/variables"
-                  className="text-xs text-zinc-500 hover:text-green-400"
-                >
-                  View all
-                </Link>
-              </div>
-              {expiringVariables.length === 0 ? (
-                <TerminalEmptyState
-                  command="envpilot secrets --expiring"
-                  message="No secrets expiring in the next 7 days."
-                />
-              ) : (
-                <AnimatedList className="divide-y divide-zinc-800/50">
-                  {expiringVariables.map((v) => (
-                    <ExpiringSecretRow key={String(v._id)} variable={v} />
-                  ))}
-                </AnimatedList>
-              )}
-            </TerminalWindow>
-          )}
+          {/* Expiring Secrets — deferred section */}
+          <Suspense fallback={null}>
+            {showRotation && (
+              <TerminalWindow title="expiring-secrets">
+                <div className="flex items-center justify-between border-b border-zinc-700/50 px-5 py-2.5">
+                  <span className="font-mono text-xs text-zinc-500">
+                    <span className="text-green-400">$</span> envpilot secrets
+                    --expiring
+                  </span>
+                  <Link
+                    href="/dashboard/variables"
+                    className="text-xs text-zinc-500 hover:text-green-400"
+                  >
+                    View all
+                  </Link>
+                </div>
+                {expiringVariables.length === 0 ? (
+                  <TerminalEmptyState
+                    command="envpilot secrets --expiring"
+                    message="No secrets expiring in the next 7 days."
+                  />
+                ) : (
+                  <AnimatedList className="divide-y divide-zinc-800/50">
+                    {expiringVariables.map((v) => (
+                      <ExpiringSecretRow key={String(v._id)} variable={v} />
+                    ))}
+                  </AnimatedList>
+                )}
+              </TerminalWindow>
+            )}
+          </Suspense>
 
-          {/* Shared Secrets — admin/team_lead only */}
-          {showSharing && activeOrganizationId && (
-            <SharedSecretsWidget organizationId={activeOrganizationId} />
-          )}
+          {/* Shared Secrets — deferred section */}
+          <Suspense fallback={null}>
+            {showSharing && activeOrganizationId && (
+              <SharedSecretsWidget organizationId={activeOrganizationId} />
+            )}
+          </Suspense>
         </div>
 
         {/* Right Column -- Team */}

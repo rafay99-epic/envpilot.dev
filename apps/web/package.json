@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/web",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "description": "Envpilot web dashboard — manage secrets, teams, and projects",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "analyze": "ANALYZE=true next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test"
@@ -48,6 +49,7 @@
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
+    "@next/bundle-analyzer": "^16.2.3",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@tanstack/react-query-devtools": "^5.91.3",

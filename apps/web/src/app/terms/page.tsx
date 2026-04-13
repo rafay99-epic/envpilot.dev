@@ -1,8 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import type { Metadata } from "next";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
+import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
+
+export const metadata: Metadata = {
+  title: "Terms of Service | Envpilot",
+  description:
+    "Read the Envpilot Terms of Service governing your use of the platform, including billing, data ownership, and acceptable use policies.",
+};
 
 const SECTIONS = [
   { id: "acceptance", label: "Acceptance" },
@@ -27,28 +32,6 @@ const SECTIONS = [
 ];
 
 export default function TermsOfServicePage() {
-  const [activeSection, setActiveSection] = useState("acceptance");
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
-    );
-
-    for (const section of SECTIONS) {
-      const el = document.getElementById(section.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
       {/* Header */}
@@ -101,35 +84,10 @@ export default function TermsOfServicePage() {
         {/* Content with sidebar */}
         <section className="py-12">
           <div className="mx-auto flex max-w-5xl gap-12 px-4">
-            {/* Sidebar TOC */}
-            <nav className="hidden w-48 shrink-0 lg:block">
-              <div className="sticky top-20">
-                <p className="mb-3 text-[10px] uppercase tracking-widest text-zinc-600">
-                  on this page
-                </p>
-                <ul className="space-y-1">
-                  {SECTIONS.map((s) => (
-                    <li key={s.id}>
-                      <a
-                        href={`#${s.id}`}
-                        className={`block py-1 text-xs transition-colors ${
-                          activeSection === s.id
-                            ? "text-green-400"
-                            : "text-zinc-600 hover:text-zinc-400"
-                        }`}
-                      >
-                        {activeSection === s.id && (
-                          <span className="mr-1">&gt;</span>
-                        )}
-                        {s.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </nav>
+            {/* Sidebar TOC — client island for scroll-spy */}
+            <ScrollSpySidebar sections={SECTIONS} />
 
-            {/* Main content */}
+            {/* Main content — fully server-rendered */}
             <div className="min-w-0 flex-1 text-sm leading-relaxed text-zinc-400">
               <Section id="acceptance" n={1} title="Acceptance of Terms">
                 <p>
