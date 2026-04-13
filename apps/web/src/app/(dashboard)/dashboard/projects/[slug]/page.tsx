@@ -12,7 +12,19 @@ import { useAuthContext } from "@/components/auth";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { usePagination } from "@/hooks";
+import {
+  usePagination,
+  useProjectBySlug,
+  useConvexUser,
+  useOrganizationTags,
+  useCreateTag,
+  useVariableRequests,
+  useResolveVariableRequest,
+} from "@/hooks";
+import {
+  useProjectVariables,
+  useVariableHistory as useConvexVariableHistory,
+} from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
 import { ProjectIcon } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui";
@@ -30,22 +42,13 @@ import {
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { ApiError } from "@/lib/api-client";
+// Variable CRUD mutations MUST stay as API routes (WorkOS Vault integration)
 import {
-  useProjectBySlug,
-  useVariablesList,
-  useVariableHistory,
   useCreateVariable,
   useUpdateVariable,
   useDeleteVariable,
   useBulkDeleteVariables,
   useRollbackVariable,
-  useCurrentUser,
-  useOrganizationTags,
-  useCreateTag,
-} from "@/hooks/queries";
-import {
-  useVariableRequestsList,
-  useResolveVariableRequest,
 } from "@/hooks/queries";
 
 interface ProjectPageProps {
@@ -81,7 +84,7 @@ interface VersionRecord {
 
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
-  const { canDo, organization } = useAuthContext();
+  const { canDo, organization, user } = useAuthContext();
   const canCreateVariable = canDo("org:create_project");
   const canUpdateVariable = canDo("org:create_project");
   const canDeleteVariable = canDo("org:create_project");
@@ -92,11 +95,11 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
   const { allowed: showTags } = useFeatureGate(orgId, "variable_tags");
-  const { data: tagsData } = useOrganizationTags(organization?.id, {
-    enabled: showTags,
-  });
+  const { tags: tagsData } = useOrganizationTags(
+    showTags ? organization?.id : undefined
+  );
   const createTag = useCreateTag();
-  const orgTags = showTags ? (tagsData?.tags ?? []) : [];
+  const orgTags = showTags ? tagsData : [];
 
   // Variable selection store for bulk operations
   const {
@@ -142,24 +145,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     { enabled: addVarBinding.type === "sequence" }
   );
 
-  // --- TanStack Query: data fetching ---
-  const { data: currentUser } = useCurrentUser();
-  const convexUserId = (currentUser?.convexUserId as Id<"users">) ?? null;
+  // --- Convex: real-time data fetching (direct WebSocket, no API proxy) ---
+  const { convexUserId } = useConvexUser(user?.id);
 
-  const {
-    data: project,
-    isLoading,
-    error: projectError,
-  } = useProjectBySlug(orgId, slug);
+  const project = useProjectBySlug(orgId, slug);
+  const isLoading = project === undefined && !!slug;
+  const projectError = project === null ? new Error("Project not found") : null;
 
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const { data: variablesData, isLoading: isLoadingVariables } =
-    useVariablesList(projectId);
-  const variables = (variablesData?.variables ?? []) as Variable[];
+  const rawVariables = useProjectVariables(projectId);
+  const isLoadingVariables = rawVariables === undefined && !!projectId;
+  const variables = (rawVariables ?? []) as Variable[];
 
-  const { data: requestsData } = useVariableRequestsList(projectId);
-  const requests = requestsData?.requests ?? [];
+  const { requests } = useVariableRequests(projectId, convexUserId);
 
   // --- TanStack Query: mutations ---
   const createVariable = useCreateVariable();
@@ -194,13 +193,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [historyVariableKey, setHistoryVariableKey] = useState<string>("");
   const [historyVariableVersion, setHistoryVariableVersion] =
     useState<number>(0);
-  const {
-    data: historyData,
-    isLoading: isLoadingHistory,
-    error: historyQueryError,
-  } = useVariableHistory(historyVariableId ?? undefined, {
-    enabled: !!historyVariableId,
-  });
+  const rawHistory = useConvexVariableHistory(
+    historyVariableId
+      ? (historyVariableId as Id<"environmentVariables">)
+      : undefined
+  );
+  const historyData = rawHistory
+    ? { history: rawHistory as VersionRecord[] }
+    : undefined;
+  const isLoadingHistory = !!historyVariableId && rawHistory === undefined;
+  const historyQueryError = null;
 
   // Reveal value state
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
@@ -350,14 +352,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     requestId: Id<"environmentVariableRequests">,
     action: "approve" | "reject" | "cancel"
   ) => {
-    if (!projectId) return;
+    if (!projectId || !convexUserId) return;
     setNotice(null);
     setError(null);
     try {
       await resolveRequest.mutateAsync({
         requestId,
-        projectId,
         action,
+        reviewedBy: convexUserId as string,
       });
 
       setNotice(
@@ -904,11 +906,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onCreateTag={
           showTags
             ? async (name, color) => {
-                if (!organization?.id) return;
+                if (!organization?.id || !convexUserId) return;
                 await createTag.mutateAsync({
                   organizationId: organization.id,
                   name,
                   color,
+                  createdBy: convexUserId as string,
                 });
               }
             : undefined

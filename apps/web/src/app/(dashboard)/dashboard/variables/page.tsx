@@ -30,7 +30,7 @@ import {
   TagFilter,
   type VariableFormData,
 } from "@/components/variables";
-import { useOrganizationTags, useCreateTag } from "@/hooks/queries";
+import { useOrganizationTags, useCreateTag } from "@/hooks";
 import { ConfirmDialog } from "@/components/ui";
 import { motion } from "framer-motion";
 import {
@@ -85,10 +85,9 @@ export default function VariablesPage() {
     activeOrganizationId,
     "variable_tags"
   );
-  const { data: tagsData } = useOrganizationTags(activeOrganizationId, {
-    enabled: showTags,
-  });
-  const orgTags = tagsData?.tags ?? [];
+  const { tags: orgTags } = useOrganizationTags(
+    showTags ? activeOrganizationId : undefined
+  );
   const createTagMutation = useCreateTag();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -450,9 +449,10 @@ export default function VariablesPage() {
           showTags && activeOrganizationId
             ? async (name: string, color: string) => {
                 await createTagMutation.mutateAsync({
-                  organizationId: activeOrganizationId,
+                  organizationId: activeOrganizationId as string,
                   name,
                   color,
+                  createdBy: convexUserId as string,
                 });
               }
             : undefined

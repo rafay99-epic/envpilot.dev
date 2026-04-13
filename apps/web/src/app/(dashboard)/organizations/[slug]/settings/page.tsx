@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAuthContext } from "@/components/auth";
 import {
   TerminalCard,
   TerminalInput,
@@ -21,8 +22,9 @@ import {
   useCreateTag,
   useUpdateTag,
   useDeleteTag,
-} from "@/hooks/queries";
-import type { Tag as TagType } from "@/hooks/queries";
+  type Tag as TagType,
+  useConvexUser,
+} from "@/hooks";
 import { useFeatureGate, usePagination } from "@/hooks";
 
 interface Organization {
@@ -720,16 +722,15 @@ const TAG_COLORS = [
 ];
 
 function TagSettingsTab({ organizationId }: { organizationId: string }) {
-  const {
-    data: tagsData,
-    isLoading,
-    isError: isFetchError,
-    refetch,
-  } = useOrganizationTags(organizationId);
-  const tags = tagsData?.tags ?? [];
+  const { tags, isLoading } = useOrganizationTags(organizationId);
+  const isFetchError = false; // Convex handles errors via error boundaries
   const createTagMut = useCreateTag();
   const updateTagMut = useUpdateTag();
   const deleteTagMut = useDeleteTag();
+
+  // Get Convex user ID for mutation `createdBy`/`updatedBy`/`deletedBy` fields
+  const { user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
 
   // UI state
   const [showCreate, setShowCreate] = useState(false);
@@ -847,6 +848,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
           organizationId,
           name: entry.name,
           color: entry.color,
+          createdBy: convexUserId as string,
         });
         progress.completed++;
       } catch (err) {
@@ -897,6 +899,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
         organizationId,
         name: trimmed,
         color: newColor,
+        createdBy: convexUserId as string,
       });
       setNewName("");
       setNewColor(TAG_COLORS[0]);
@@ -917,9 +920,9 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
     try {
       await updateTagMut.mutateAsync({
         tagId,
-        organizationId,
         name: trimmed,
         color: editColor,
+        updatedBy: convexUserId as string,
       });
       setEditingId(null);
       showSuccess(`Tag updated to "${trimmed}"`);
@@ -931,7 +934,10 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
   const handleDelete = async (tagId: string) => {
     const tagName = tags.find((t) => t._id === tagId)?.name ?? "Tag";
     try {
-      await deleteTagMut.mutateAsync({ tagId, organizationId });
+      await deleteTagMut.mutateAsync({
+        tagId,
+        deletedBy: convexUserId as string,
+      });
       setDeletingId(null);
       showSuccess(`Tag "${tagName}" deleted`);
     } catch (err) {
@@ -957,7 +963,7 @@ function TagSettingsTab({ organizationId }: { organizationId: string }) {
         </p>
         <TerminalButton
           variant="secondary"
-          onClick={() => refetch()}
+          onClick={() => window.location.reload()}
           className="mt-3"
         >
           Retry

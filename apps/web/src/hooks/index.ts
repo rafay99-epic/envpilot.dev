@@ -11,6 +11,7 @@ export {
   useOrganizationProjectsWithStats,
   useProject,
   useUserProjects,
+  useProjectBySlug,
 } from "./useProjects";
 
 // Variable hooks
@@ -105,6 +106,21 @@ export { useFavoriteProjects, useToggleFavorite } from "./useFavorites";
 
 // Expiring variables hook
 export { useExpiringVariables } from "./useExpiringVariables";
+
+// Tag hooks (direct Convex — replaces TanStack Query proxy)
+export {
+  useOrganizationTags,
+  useCreateTag,
+  useUpdateTag,
+  useDeleteTag,
+  type Tag,
+} from "./useTags";
+
+// Variable request hooks (direct Convex — replaces TanStack Query proxy)
+export {
+  useVariableRequests,
+  useResolveVariableRequest,
+} from "./useVariableRequests";
 
 // Audit log hooks
 export {

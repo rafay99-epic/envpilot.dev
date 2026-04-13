@@ -41,3 +41,18 @@ export function useProject(projectId: Id<"projects"> | undefined) {
 export function useUserProjects(userId: Id<"users"> | undefined) {
   return useQuery(api.projects.listForUser, userId ? { userId } : "skip");
 }
+
+/**
+ * Hook for getting a project by slug (uses Convex index — single lookup, not fetch-all-and-filter)
+ */
+export function useProjectBySlug(
+  organizationId: Id<"organizations"> | string | undefined,
+  slug: string | undefined
+) {
+  return useQuery(
+    api.projects.getBySlug,
+    organizationId && slug
+      ? { organizationId: organizationId as Id<"organizations">, slug }
+      : "skip"
+  );
+}

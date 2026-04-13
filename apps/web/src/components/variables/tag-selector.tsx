@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Tag, Plus, Check } from "lucide-react";
-import type { Tag as TagType } from "@/hooks/queries";
+import type { Tag as TagType } from "@/hooks/useTags";
 import { TagBadge } from "./tag-badge";
 
 const TAG_COLORS = [
