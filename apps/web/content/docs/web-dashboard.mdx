@@ -1,0 +1,89 @@
+---
+title: Web Dashboard
+description: Create projects, manage variables, invite your team, and audit every action from the browser.
+icon: monitor
+---
+
+# Web Dashboard
+
+The web dashboard at [envpilot.dev](https://www.envpilot.dev) is the central interface for managing everything in Envpilot. Sign in with your SSO provider, then navigate using the sidebar.
+
+## Signing in
+
+Go to [envpilot.dev/sign-in](https://www.envpilot.dev/sign-in). Authentication is handled through WorkOS AuthKit, which supports Google, GitHub, and email-based SSO. After signing in, you land on the dashboard home page.
+
+## Dashboard navigation
+
+| Route                  | What it does                                 |
+| ---------------------- | -------------------------------------------- |
+| `/dashboard`           | Overview with recent activity                |
+| `/dashboard/projects`  | List, create, and manage projects            |
+| `/dashboard/variables` | Browse variables across all projects         |
+| `/dashboard/team`      | Invite members, assign organization roles    |
+| `/dashboard/audit`     | Full audit log with filters and export       |
+| `/dashboard/analytics` | Usage analytics and trends                   |
+| `/dashboard/usage`     | Current plan limits and feature availability |
+| `/dashboard/settings`  | Profile, integrations, active sessions       |
+
+## Projects
+
+Each project holds environment variables for three environments: **development**, **staging**, and **production**. Create a project from the dashboard, then add variables through the UI or push them from the CLI.
+
+Projects support role-based access at the project level:
+
+- **Manager** — full read/write, can manage project members
+- **Developer** — can view and edit variables, cannot manage members
+- **Viewer** — read-only access to variables they have explicit permission to see
+
+## Variables
+
+The variables page shows every variable across all projects you have access to. Each variable entry displays:
+
+- Key name and environment
+- Tags for organization
+- Masked or revealed value (toggle visibility)
+- Version history with rollback (Admin only)
+- Last modified timestamp and author
+
+Variables are encrypted at rest in WorkOS Vault. The dashboard retrieves and decrypts them on demand — values are never stored in plaintext on the server.
+
+## Team management
+
+Invite team members by email from the Team page. Each member gets an organization-level role:
+
+- **Admin** — full access to everything, including billing and deletion
+- **Team Lead** — manages projects, variables, and approves member requests
+- **Member** — read-only by default, must request access to variables
+
+See [Roles & Permissions](/docs/rbac) for the full breakdown.
+
+## Audit log
+
+Every action is recorded: variable reads, writes, permission changes, authentication events, team invitations, and more. The audit log captures:
+
+- Action type and category
+- User who performed it
+- IP address and user agent
+- Timestamp
+
+Filter by action type, user, date range, or category. Export logs as JSON for SOC 2 compliance. Admins can access the full audit trail; Team Leads see project-scoped logs.
+
+## Settings and integrations
+
+From the Settings page:
+
+- **Profile** — update your name and email
+- **Integrations** — install the VS Code extension, generate CLI tokens
+- **Active Sessions** — view and revoke CLI/extension sessions
+- **Organization** — manage organization details, billing, and plan upgrades
+- **Security** — review authentication settings and session policies
+
+## Version history
+
+Every variable edit creates a new version. The version history shows:
+
+- What changed (old value → new value, masked)
+- Who made the change
+- When it happened
+
+Admins can roll back any variable to a previous version per environment.
