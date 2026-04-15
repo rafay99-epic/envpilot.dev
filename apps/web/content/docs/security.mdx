@@ -1,0 +1,78 @@
+---
+title: Security
+description: AES-256 encryption, zero-knowledge architecture, per-variable access control, and a complete audit trail.
+icon: shield
+---
+
+# Security
+
+Envpilot is built on a zero-trust security model. Secrets are encrypted at rest with per-organization key isolation, access is enforced at the variable level, and every action is audited with full attribution.
+
+## Encryption at rest
+
+All secret values are encrypted using **AES-256** via [WorkOS Vault](https://workos.com/vault). Envpilot stores only vault reference IDs in its database — never plaintext values. Each secret gets its own encryption context derived from:
+
+- Organization ID
+- Project ID
+- Environment (optional)
+
+This means secrets are cryptographically isolated across organizations. Even if the database were compromised, the attacker would need access to WorkOS Vault's key management infrastructure to decrypt anything.
+
+## Zero-knowledge architecture
+
+Envpilot servers cannot read your secrets. The encryption and decryption flow works like this:
+
+1. When you create or update a variable, the value is sent to WorkOS Vault with your organization's key context
+2. Vault encrypts the value and returns a reference ID
+3. Envpilot stores only the reference ID
+4. When an authorized user requests the value, Envpilot sends the reference ID to Vault
+5. Vault decrypts and returns the value directly
+
+At no point does the Envpilot application layer hold an unencrypted secret in persistent storage.
+
+## Access control
+
+Access is enforced at three levels:
+
+1. **Organization role** — Admin, Team Lead, or Member (sets baseline)
+2. **Project role** — Manager, Developer, or Viewer (can restrict further)
+3. **Per-variable permissions** — read or write grants on individual variables, with optional expiration dates
+
+When a Member needs a variable they don't have access to, they submit a request through the CLI, extension, or dashboard. A Team Lead or Admin must approve it. All requests are tracked in the audit log.
+
+See [Roles & Permissions](/docs/rbac) for the complete access matrix.
+
+## Instant revocation
+
+When you revoke a team member's access from the dashboard:
+
+- **CLI** — the next API call returns 401, tokens are cleared
+- **VS Code Extension** — detects the revocation via WebSocket within seconds and automatically deletes synced `.env` files from disk (configurable via `envpilot.preventCopyOnRevoke`)
+- **Dashboard** — the user immediately loses visibility of the variable
+
+## Audit trail
+
+40+ action types are recorded, including:
+
+- Variable reads, writes, and deletions
+- Permission grants and revocations
+- Authentication events (login, logout, token refresh)
+- Team invitations and role changes
+- CLI and extension session activity
+
+Each audit entry includes the user, IP address, user agent, and timestamp. Admins can filter and export logs as JSON for compliance reporting.
+
+## Authentication
+
+- **Web dashboard** — SSO via WorkOS AuthKit (Google, GitHub, email)
+- **CLI** — Device-code flow: the CLI generates a one-time code, opens a browser for confirmation, and polls until authenticated. Tokens refresh automatically.
+- **VS Code Extension** — OAuth flow: the extension opens a browser, you authenticate, and the session is stored in VS Code's secure credential storage.
+
+All sessions use short-lived access tokens with automatic refresh. Active sessions can be individually revoked from the dashboard Settings page.
+
+## Local security
+
+- The CLI never stores plaintext secret values on disk (only in `.env` after an explicit `envpilot pull`)
+- The VS Code extension includes a dual-layer **commit guard**: a VS Code staging warning and a git pre-commit hook that blocks `.env` files from being committed
+- Pulled `.env` files are made read-only for non-admin roles to prevent accidental modification
+- All API communication uses HTTPS with TLS 1.2+

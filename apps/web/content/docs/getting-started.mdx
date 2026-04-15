@@ -1,0 +1,81 @@
+---
+title: Getting Started
+description: Install the CLI, authenticate, and pull your first set of environment variables in under a minute.
+icon: chevron-right
+---
+
+# Getting Started
+
+Envpilot is a secure environment variable manager for teams. Instead of passing `.env` files through Slack, email, or Git, your secrets live in an encrypted vault with per-variable access control. Pull them into any project with a single command.
+
+## Install the CLI
+
+```bash
+npm install -g @envpilot/cli
+```
+
+Or with bun:
+
+```bash
+bun install -g @envpilot/cli
+```
+
+Requires Node.js 18 or later.
+
+## Authenticate
+
+```bash
+envpilot login
+```
+
+This opens your browser to authenticate via SSO. The CLI generates a one-time device code, opens the authentication page, and polls until you confirm in the browser. Tokens are stored locally and refresh automatically.
+
+To skip the browser auto-open (useful in headless environments):
+
+```bash
+envpilot login --no-browser
+```
+
+## Set up a project
+
+```bash
+envpilot init
+```
+
+This walks you through selecting an organization, project, and default environment. It creates a `.envpilot` config file in the current directory and adds `.env` to your `.gitignore`.
+
+## Pull variables
+
+```bash
+envpilot pull
+```
+
+Downloads variables for the default environment and writes them to `.env`. To target a specific environment:
+
+```bash
+envpilot pull --env production
+```
+
+## Or do it all in one command
+
+```bash
+envpilot sync
+```
+
+`sync` chains login, init, and pull into a single flow. Best for first-time setup.
+
+## Open the interactive TUI
+
+```bash
+envpilot
+```
+
+Running `envpilot` with no arguments opens a keyboard-driven terminal dashboard. Browse all commands, read inline documentation, and launch any command directly. The TUI returns after each command finishes, so you can run multiple commands in one session. Press **Esc** to exit.
+
+## Three ways to access your secrets
+
+**CLI** — Pull, push, and manage variables from the terminal. Supports `.env`, JSON, YAML, Vercel, Netlify, AWS, and Docker Compose output formats.
+
+**VS Code Extension** — Real-time sync inside your editor. Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot) or search "Envpilot" in Extensions. Also works with [Cursor](https://cursor.com).
+
+**Web Dashboard** — Full management UI at [envpilot.dev](https://www.envpilot.dev). Create projects, manage variables across environments, invite team members, assign roles, and view audit logs.
