@@ -7,7 +7,6 @@ import {
   VaultError,
   isVaultConfigured,
 } from "@/lib/vault";
-import { verifyNotBot } from "@/lib/botid";
 
 /**
  * Client-side encryption API Routes
@@ -73,9 +72,6 @@ function errorResponse(
  */
 export async function POST(request: NextRequest) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     if (!isVaultConfigured()) {
       return errorResponse(
         "Vault service is not available",
@@ -132,9 +128,6 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     if (!isVaultConfigured()) {
       return errorResponse(
         "Vault service is not available",

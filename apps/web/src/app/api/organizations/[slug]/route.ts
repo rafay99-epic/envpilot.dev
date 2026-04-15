@@ -5,7 +5,6 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { verifyNotBot } from "@/lib/botid";
 import { handleApiError } from "@/lib/api-errors";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -83,9 +82,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { user } = await withAuth();
 
     if (!user) {
@@ -143,9 +139,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
  */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { user } = await withAuth();
 
     if (!user) {

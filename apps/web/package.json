@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/web",
-  "version": "1.11.2",
+  "version": "1.11.3",
   "private": true,
   "description": "Envpilot web dashboard — manage secrets, teams, and projects",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
@@ -27,7 +27,6 @@
     "@vercel/analytics": "^1.6.1",
     "@workos-inc/authkit-nextjs": "^2.14.0",
     "@workos-inc/node": "^8.5.0",
-    "botid": "^1.5.11",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

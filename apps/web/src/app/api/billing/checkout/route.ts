@@ -5,7 +5,6 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
-import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -25,9 +24,6 @@ const checkoutSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     // Check if payments are enabled (env var = outer gate)
     if (!isPaymentsEnabled()) {
       return NextResponse.json(

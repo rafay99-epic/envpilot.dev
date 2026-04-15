@@ -10,7 +10,6 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
-import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -103,9 +102,6 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { user } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

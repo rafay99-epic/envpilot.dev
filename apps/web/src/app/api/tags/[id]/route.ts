@@ -9,7 +9,6 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
-import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -84,9 +83,6 @@ async function resolveTagWithAuth(tagId: string) {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { id } = await context.params;
 
     let body: unknown;
@@ -152,9 +148,6 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { id } = await context.params;
 
     const resolved = await resolveTagWithAuth(id);

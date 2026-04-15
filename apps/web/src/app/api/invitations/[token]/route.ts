@@ -7,7 +7,6 @@ import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
-import { verifyNotBot } from "@/lib/botid";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -73,9 +72,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { user } = await withAuth();
 
     if (!user) {
@@ -173,9 +169,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
  */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const botResponse = await verifyNotBot();
-    if (botResponse) return botResponse;
-
     const { user } = await withAuth();
     const resolvedParams = await params;
     const { token } = resolvedParams;
