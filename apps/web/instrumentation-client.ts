@@ -1,4 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
+import { initBotId } from "botid/client/core";
+import { BOTID_PROTECTED_ROUTES } from "@/lib/botid-protected-routes";
+
+initBotId({
+  protect: BOTID_PROTECTED_ROUTES,
+});
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
