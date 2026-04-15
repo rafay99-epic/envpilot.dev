@@ -81,10 +81,13 @@ export async function handleError(error: unknown): Promise<never> {
     switch (error.code) {
       case ErrorCodes.NOT_AUTHENTICATED:
         process.exit(2);
+        break;
       case ErrorCodes.PERMISSION_DENIED:
         process.exit(3);
+        break;
       case ErrorCodes.TIER_LIMIT_EXCEEDED:
         process.exit(4);
+        break;
       default:
         process.exit(1);
     }

@@ -221,11 +221,12 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     description: "List organizations available to the current user.",
     argv: ["list", "organizations"],
     aliases: [["list", "orgs"]],
-    examples: [["list", "organizations"], ["list", "orgs", "--json"]],
-    websiteSurface: "Maps to `/api/cli/organizations`.",
-    notes: [
-      "Useful for discovering organization IDs and roles.",
+    examples: [
+      ["list", "organizations"],
+      ["list", "orgs", "--json"],
     ],
+    websiteSurface: "Maps to `/api/cli/organizations`.",
+    notes: ["Useful for discovering organization IDs and roles."],
     keywords: ["orgs", "organizations", "roles"],
   },
   {
@@ -235,7 +236,10 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     description: "Browse projects in the active organization.",
     argv: ["list", "projects"],
     args: "[--organization <id>] [--json]",
-    examples: [["list", "projects"], ["list", "projects", "--json"]],
+    examples: [
+      ["list", "projects"],
+      ["list", "projects", "--json"],
+    ],
     websiteSurface: "Maps to `/api/cli/projects`.",
     notes: [
       "Shows project roles when available.",
@@ -271,9 +275,7 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     argv: ["list", "linked"],
     examples: [["list", "linked"]],
     websiteSurface: "Local `.envpilot` configuration inspection.",
-    notes: [
-      "Shows the active linked project and environment mapping.",
-    ],
+    notes: ["Shows the active linked project and environment mapping."],
     keywords: ["linked", "local", "project-config"],
   },
   {
@@ -283,9 +285,11 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     description:
       "Switch the active organization, project, environment, or linked project.",
     argv: ["switch"],
-    args:
-      "[--organization <id>] [--project <id>] [--env <environment>] [--active <name-or-id>]",
-    examples: [["switch", "--env", "production"], ["switch", "--active", "api"]],
+    args: "[--organization <id>] [--project <id>] [--env <environment>] [--active <name-or-id>]",
+    examples: [
+      ["switch", "--env", "production"],
+      ["switch", "--active", "api"],
+    ],
     websiteSurface:
       "Works against the same organization/project inventory returned by website APIs.",
     notes: [
@@ -376,7 +380,8 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     argv: ["unlink"],
     args: "[project] [--force]",
     examples: [["unlink"], ["unlink", "api", "--force"]],
-    websiteSurface: "Local project-link management for website-backed projects.",
+    websiteSurface:
+      "Local project-link management for website-backed projects.",
     notes: [
       "Updates `.envpilot` and active-project state.",
       "Leaves existing `.env` files on disk.",
@@ -391,8 +396,14 @@ export function getCommandCatalog(): CLICommandDefinition[] {
   return COMMAND_CATALOG;
 }
 
+// Cached once — the catalog is static for the lifetime of the process.
+let _topLevelCache: CLICommandDefinition[] | null = null;
+
 export function getTopLevelCommandCatalog(): CLICommandDefinition[] {
-  return COMMAND_CATALOG.filter((command) => command.topLevel);
+  if (!_topLevelCache) {
+    _topLevelCache = COMMAND_CATALOG.filter((command) => command.topLevel);
+  }
+  return _topLevelCache;
 }
 
 export const CLI_COMMAND_COUNT = getTopLevelCommandCatalog().length;

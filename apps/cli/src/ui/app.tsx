@@ -11,39 +11,54 @@ import {
   getTopLevelCommandCatalog,
   type CLICommandDefinition,
 } from "../lib/command-catalog.js";
-import { executeCommand } from "./execute-command.js";
 import { isAuthenticated, getUser, getApiUrl } from "../lib/config.js";
+
+// Pre-compute a single searchable string per command so matchesQuery
+// avoids repeated array allocation, join, and toLowerCase on every keystroke.
+const searchIndex = new WeakMap<CLICommandDefinition, string>();
+
+function getSearchableText(command: CLICommandDefinition): string {
+  let text = searchIndex.get(command);
+  if (text === undefined) {
+    const parts: string[] = [
+      command.title,
+      command.description,
+      formatArgv(command.argv),
+      command.args ?? "",
+      command.category,
+    ];
+    if (command.aliases) {
+      for (const alias of command.aliases) parts.push(formatArgv(alias));
+    }
+    for (const example of command.examples) parts.push(formatArgv(example));
+    for (const note of command.notes) parts.push(note);
+    for (const kw of command.keywords) parts.push(kw);
+
+    text = parts.filter(Boolean).join(" ").toLowerCase();
+    searchIndex.set(command, text);
+  }
+  return text;
+}
 
 function matchesQuery(command: CLICommandDefinition, query: string): boolean {
   if (!query.trim()) {
     return true;
   }
-
-  const normalized = query.trim().toLowerCase();
-  return [
-    command.title,
-    command.description,
-    formatArgv(command.argv),
-    ...(command.aliases ?? []).map((alias) => formatArgv(alias)),
-    command.args,
-    command.category,
-    ...command.examples.map((example) => formatArgv(example)),
-    ...command.notes,
-    ...command.keywords,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .includes(normalized);
+  return getSearchableText(command).includes(query.trim().toLowerCase());
 }
+
+// Computed once at module load — the catalog never changes at runtime.
+const TOP_LEVEL_CATALOG = getTopLevelCommandCatalog();
 
 function useCommandSearch() {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const catalog = useMemo(() => getTopLevelCommandCatalog(), []);
   const commands = useMemo(
-    () => catalog.filter((command) => matchesQuery(command, deferredQuery)),
-    [catalog, deferredQuery]
+    () =>
+      TOP_LEVEL_CATALOG.filter((command) =>
+        matchesQuery(command, deferredQuery)
+      ),
+    [deferredQuery]
   );
 
   return {
@@ -72,13 +87,16 @@ function Section({
   );
 }
 
-export function CLIApp() {
+export interface CLIAppProps {
+  /** Called when the user selects a command to run. */
+  onSelectCommand?: (argv: string[]) => void;
+}
+
+export function CLIApp({ onSelectCommand }: CLIAppProps) {
   const { exit } = useApp();
   const { query, commands, updateQuery } = useCommandSearch();
-  const catalog = useMemo(() => getTopLevelCommandCatalog(), []);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedIndex >= commands.length) {
@@ -86,7 +104,7 @@ export function CLIApp() {
     }
   }, [commands.length, selectedIndex]);
 
-  const selectedCommand = commands[selectedIndex] ?? catalog[0];
+  const selectedCommand = commands[selectedIndex] ?? TOP_LEVEL_CATALOG[0];
   const user = getUser();
 
   useInput((input, key) => {
@@ -100,19 +118,13 @@ export function CLIApp() {
     }
 
     if (key.return && selectedCommand) {
+      // Guard against double-press before Ink unmounts.
       setIsRunning(true);
-      setStatusMessage(`Running ${formatArgv(selectedCommand.argv)} ...`);
-      executeCommand(selectedCommand.argv)
-        .then((code) => {
-          process.exitCode = code;
-          exit();
-        })
-        .catch((error: unknown) => {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          setStatusMessage(message);
-          setIsRunning(false);
-        });
+
+      // Signal the selected command to the parent loop, then unmount Ink
+      // so the child process gets a clean terminal.
+      onSelectCommand?.(selectedCommand.argv);
+      exit();
       return;
     }
 
@@ -190,9 +202,7 @@ export function CLIApp() {
           marginRight={1}
         >
           <Text color="greenBright">Commands</Text>
-          <Text color="gray">
-            ↑/↓ move, Enter run, Esc exit, Ctrl+U clear
-          </Text>
+          <Text color="gray">↑/↓ move, Enter run, Esc exit, Ctrl+U clear</Text>
           <Box flexDirection="column" marginTop={1}>
             {commands.length === 0 ? (
               <Text color="yellow">No commands match the current search.</Text>
@@ -255,12 +265,6 @@ export function CLIApp() {
           </Section>
         </Box>
       </Box>
-
-      {statusMessage ? (
-        <Box marginTop={1}>
-          <Text color={isRunning ? "cyan" : "red"}>{statusMessage}</Text>
-        </Box>
-      ) : null}
     </Box>
   );
 }
