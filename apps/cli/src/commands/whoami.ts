@@ -8,7 +8,10 @@ import {
   getUser,
   isAuthenticated,
 } from "../lib/config.js";
-import { readProjectConfigV2, getActiveProject } from "../lib/project-config.js";
+import {
+  readProjectConfigV2,
+  getActiveProject,
+} from "../lib/project-config.js";
 import { handleError, notAuthenticated } from "../lib/errors.js";
 import { header, keyValue, blank } from "../lib/ui.js";
 
@@ -24,7 +27,9 @@ export const whoamiCommand = new Command("whoami")
       const remoteUser = await api.getCurrentUser();
       const localUser = getUser();
       const linkedConfig = readProjectConfigV2();
-      const activeProject = linkedConfig ? getActiveProject(linkedConfig) : null;
+      const activeProject = linkedConfig
+        ? getActiveProject(linkedConfig)
+        : null;
 
       header("Current Session");
       blank();
@@ -34,7 +39,10 @@ export const whoamiCommand = new Command("whoami")
         ["API URL", getApiUrl()],
         ["Active Organization", getActiveOrganizationId()],
         ["Active Project", getActiveProjectId()],
-        ["Linked Project", activeProject?.projectName || activeProject?.projectId],
+        [
+          "Linked Project",
+          activeProject?.projectName || activeProject?.projectId,
+        ],
         ["Environment", activeProject?.environment],
       ]);
       blank();

@@ -7,7 +7,8 @@ import { openTUI } from "./ui/render-tui.js";
 initSentry();
 
 const args = process.argv.slice(2);
-const shouldOpenTUI = process.env.ENVPILOT_TUI_CHILD !== "1" && args.length === 0;
+const shouldOpenTUI =
+  process.env.ENVPILOT_TUI_CHILD !== "1" && args.length === 0;
 
 if (shouldOpenTUI) {
   await openTUI();

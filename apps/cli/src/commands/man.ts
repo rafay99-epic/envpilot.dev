@@ -71,8 +71,12 @@ function printManualIndex(commands: CLICommandDefinition[]): void {
   blank();
   line();
   console.log(chalk.green("Usage"));
-  console.log("  - `envpilot` or `envpilot ui` opens the interactive terminal UI.");
-  console.log("  - `envpilot man <command>` shows details for a single command.");
+  console.log(
+    "  - `envpilot` or `envpilot ui` opens the interactive terminal UI."
+  );
+  console.log(
+    "  - `envpilot man <command>` shows details for a single command."
+  );
 }
 
 export function createManCommand(commands: CLICommandDefinition[]): Command {
