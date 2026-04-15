@@ -25,6 +25,9 @@ npx @envpilot/cli login
 ## Quick Start
 
 ```bash
+# Open the interactive terminal UI
+envpilot
+
 # Authenticate with your Envpilot account
 envpilot login
 
@@ -43,6 +46,8 @@ envpilot push
 | Command                   | Description                                         |
 | ------------------------- | --------------------------------------------------- |
 | `envpilot login`          | Authenticate with your Envpilot account             |
+| `envpilot ui`             | Open the interactive Ink-powered terminal UI        |
+| `envpilot man [command]`  | Show the CLI manual page                            |
 | `envpilot logout`         | Log out and clear stored credentials                |
 | `envpilot init`           | Link the current directory to an Envpilot project   |
 | `envpilot pull`           | Pull environment variables into a local `.env` file |
@@ -53,6 +58,8 @@ envpilot push
 | `envpilot switch`         | Switch the active project                           |
 | `envpilot config`         | View or update CLI configuration                    |
 | `envpilot whoami`         | Show the currently authenticated user               |
+
+Run `envpilot man` for the full command reference and security notes.
 
 ## Role-Based Access
 
