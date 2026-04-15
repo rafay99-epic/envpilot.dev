@@ -34,6 +34,7 @@ export default authkitMiddleware({
       "/api/cli/variables",
       "/api/cli/variables/bulk",
       "/api/cli/tier",
+      "/api/cli/usage",
       // Extension API endpoints use bearer token auth, not browser session auth
       "/api/extension/(.*)",
       // Secret sharing public pages (email-verified, no browser session needed)

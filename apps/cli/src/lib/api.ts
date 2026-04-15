@@ -51,6 +51,26 @@ export class APIClient {
   }
 
   /**
+   * Detect auth middleware redirects that returned HTML instead of CLI JSON.
+   */
+  private isAuthRedirect(response: Response, bodyText?: string): boolean {
+    const location = response.headers.get("location") || "";
+    const finalUrl = response.url || "";
+    const contentType = response.headers.get("content-type") || "";
+    const preview = (bodyText || "").slice(0, 512).toLowerCase();
+
+    return (
+      response.redirected ||
+      location.includes("authkit") ||
+      finalUrl.includes("authkit") ||
+      (contentType.includes("text/html") &&
+        (preview.includes("authorization_session_id") ||
+          preview.includes("client_id=") ||
+          preview.includes("<!doctype html")))
+    );
+  }
+
+  /**
    * Make a GET request
    */
   async get<T>(path: string, params?: Record<string, string>): Promise<T> {
@@ -65,6 +85,7 @@ export class APIClient {
     const response = await fetch(url.toString(), {
       method: "GET",
       headers: this.getHeaders(),
+      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -80,6 +101,7 @@ export class APIClient {
       method: "POST",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
+      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -95,6 +117,7 @@ export class APIClient {
       method: "PUT",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
+      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -110,6 +133,7 @@ export class APIClient {
       method: "PATCH",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
+      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -124,6 +148,7 @@ export class APIClient {
     const response = await fetch(url.toString(), {
       method: "DELETE",
       headers: this.getHeaders(),
+      redirect: "follow",
     });
 
     if (!response.ok) {
@@ -143,6 +168,14 @@ export class APIClient {
 
     if (!contentType.includes("application/json")) {
       const body = await response.text();
+      if (this.isAuthRedirect(response, body)) {
+        clearAuth();
+        throw new APIError(
+          "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
+          401,
+          "AUTH_REDIRECT"
+        );
+      }
       const preview = body.replace(/\s+/g, " ").slice(0, 160);
       throw new APIError(
         `Expected JSON but got ${contentType || "unknown content type"} from ${response.url}. Response starts with: ${preview}`,
@@ -177,6 +210,19 @@ export class APIClient {
       code = data.code;
     } catch {
       // Ignore JSON parsing errors
+    }
+
+    if (
+      response.status >= 300 &&
+      response.status < 400 &&
+      this.isAuthRedirect(response)
+    ) {
+      clearAuth();
+      throw new APIError(
+        "Your CLI session expired or the server redirected this request to browser sign-in. Please run `envpilot login`.",
+        401,
+        "AUTH_REDIRECT"
+      );
     }
 
     // Handle authentication errors

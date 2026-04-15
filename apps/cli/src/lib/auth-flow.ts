@@ -7,6 +7,7 @@ import { setAccessToken, setRefreshToken, setUser } from "./config.js";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 150; // 5 minutes
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,11 +28,17 @@ export async function performLogin(options?: {
   const spinner = createSpinner("Generating authentication code...");
   spinner.start();
 
-  const initResponse = await api.post<{
-    code: string;
-    url: string;
-    expiresAt: number;
-  }>("/api/cli/auth?action=initiate", { deviceName });
+  let initResponse: { code: string; url: string; expiresAt: number };
+  try {
+    initResponse = await api.post<{
+      code: string;
+      url: string;
+      expiresAt: number;
+    }>("/api/cli/auth?action=initiate", { deviceName });
+  } catch (error) {
+    spinner.stop();
+    throw error;
+  }
 
   spinner.stop();
 
@@ -52,51 +59,70 @@ export async function performLogin(options?: {
   const pollSpinner = createSpinner("Waiting for authentication...");
   pollSpinner.start();
 
-  for (let attempts = 0; attempts < MAX_POLL_ATTEMPTS; attempts++) {
-    await sleep(POLL_INTERVAL_MS);
+  let consecutiveErrors = 0;
 
-    const pollResponse = await api.get<{
-      status: "pending" | "authenticated" | "expired" | "not_found";
-      accessToken?: string;
-      refreshToken?: string;
-      user?: {
-        id: string;
-        email: string;
-        name?: string;
+  try {
+    for (let attempts = 0; attempts < MAX_POLL_ATTEMPTS; attempts++) {
+      await sleep(POLL_INTERVAL_MS);
+
+      let pollResponse: {
+        status: "pending" | "authenticated" | "expired" | "not_found";
+        accessToken?: string;
+        refreshToken?: string;
+        user?: { id: string; email: string; name?: string };
       };
-    }>("/api/cli/auth", { action: "poll", code: initResponse.code });
 
-    if (pollResponse.status === "authenticated") {
-      pollSpinner.stop();
-
-      if (pollResponse.accessToken) {
-        setAccessToken(pollResponse.accessToken);
-      }
-      if (pollResponse.refreshToken) {
-        setRefreshToken(pollResponse.refreshToken);
-      }
-      if (pollResponse.user) {
-        setUser({
-          id: pollResponse.user.id,
-          email: pollResponse.user.email,
-          name: pollResponse.user.name,
+      try {
+        pollResponse = await api.get("/api/cli/auth", {
+          action: "poll",
+          code: initResponse.code,
         });
+        consecutiveErrors = 0;
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          throw new Error(
+            "Too many consecutive network errors while polling. Please check your connection and try again."
+          );
+        }
+        // Transient failure — retry on next iteration
+        continue;
       }
 
-      console.log();
-      success(`Logged in as ${chalk.bold(pollResponse.user?.email)}`);
-      return { email: pollResponse.user?.email || "" };
+      if (pollResponse.status === "authenticated") {
+        pollSpinner.stop();
+
+        if (pollResponse.accessToken) {
+          setAccessToken(pollResponse.accessToken);
+        }
+        if (pollResponse.refreshToken) {
+          setRefreshToken(pollResponse.refreshToken);
+        }
+        if (pollResponse.user) {
+          setUser({
+            id: pollResponse.user.id,
+            email: pollResponse.user.email,
+            name: pollResponse.user.name,
+          });
+        }
+
+        console.log();
+        success(`Logged in as ${chalk.bold(pollResponse.user?.email)}`);
+        return { email: pollResponse.user?.email || "" };
+      }
+
+      if (
+        pollResponse.status === "expired" ||
+        pollResponse.status === "not_found"
+      ) {
+        throw new Error("Authentication code expired. Please try again.");
+      }
     }
 
-    if (
-      pollResponse.status === "expired" ||
-      pollResponse.status === "not_found"
-    ) {
-      pollSpinner.stop();
-      throw new Error("Authentication code expired. Please try again.");
-    }
+    throw new Error("Authentication timed out. Please try again.");
+  } finally {
+    // Always stop the spinner so its setInterval timer is cleared,
+    // regardless of how the loop exits (success, error, timeout).
+    pollSpinner.stop();
   }
-
-  pollSpinner.stop();
-  throw new Error("Authentication timed out. Please try again.");
 }
