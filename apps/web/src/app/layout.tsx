@@ -17,7 +17,8 @@ const geistMono = Geist_Mono({
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
 
-const ogImage = `${baseUrl}/orgal_image.png`;
+const ogImagePng = `${baseUrl}/og-image.png`;
+const ogImageJpg = `${baseUrl}/og-image.jpg`;
 
 export const metadata: Metadata = {
   title: {
@@ -41,8 +42,8 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: [
       {
-        url: ogImage,
-        secureUrl: ogImage,
+        url: ogImagePng,
+        secureUrl: ogImagePng,
         width: 1200,
         height: 630,
         type: "image/png",
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
       },
     ],
   },
-  // Twitter / X
+  // Twitter / X — uses JPEG for faster crawler fetching (123KB vs 852KB PNG)
   twitter: {
     card: "summary_large_image",
     title: "Envpilot — Secure Environment Variable Management",
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
       "Securely manage, share, and sync environment variables across your team.",
     images: [
       {
-        url: ogImage,
+        url: ogImageJpg,
         width: 1200,
         height: 630,
         alt: "Envpilot — Secure Environment Variable Management",
