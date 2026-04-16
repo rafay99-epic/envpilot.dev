@@ -77,43 +77,58 @@ export async function GET(request: NextRequest) {
       userId: authResult.userId,
     });
 
-    // Decrypt values for accessible variables
-    const variablesWithValues = await Promise.all(
-      variables
-        .filter((v) => v.hasAccess)
-        .filter((v) => !environment || v.environments.includes(environment))
-        .map(async (variable) => {
-          try {
-            // Decrypt the value from vault
-            const value = await readSecret(variable.vaultRef);
+    // Decrypt values for accessible variables.
+    // Use allSettled so a single vault failure doesn't abort all other decryptions.
+    const accessible = variables
+      .filter((v) => v.hasAccess)
+      .filter((v) => !environment || v.environments.includes(environment));
 
-            return {
-              _id: variable._id,
-              key: variable.key,
-              value: value || "",
-              environment: variable.environments,
-              description: variable.description,
-              isSensitive: variable.isSensitive,
-              version: variable.version,
-              createdAt: variable.createdAt,
-              updatedAt: variable.updatedAt,
-            };
-          } catch (error) {
-            // If decryption fails, return without value
-            return {
-              _id: variable._id,
-              key: variable.key,
-              value: "[DECRYPTION_FAILED]",
-              environment: variable.environments,
-              description: variable.description,
-              isSensitive: variable.isSensitive,
-              version: variable.version,
-              createdAt: variable.createdAt,
-              updatedAt: variable.updatedAt,
-            };
-          }
-        })
+    const settled = await Promise.allSettled(
+      accessible.map(async (variable) => {
+        const value = await readSecret(variable.vaultRef);
+        return {
+          _id: variable._id,
+          key: variable.key,
+          value: value || "",
+          // Return the specific environment that was requested, not the full array.
+          // The CLI Variable type expects a single string, not string[].
+          environment: environment ?? variable.environments[0] ?? "development",
+          description: variable.description,
+          isSensitive: variable.isSensitive,
+          version: variable.version,
+          createdAt: variable.createdAt,
+          updatedAt: variable.updatedAt,
+        };
+      })
     );
+
+    const variablesWithValues: Array<{
+      _id: string;
+      key: string;
+      value: string;
+      environment: string;
+      description?: string;
+      isSensitive?: boolean;
+      version?: number;
+      createdAt?: number;
+      updatedAt?: number;
+    }> = [];
+    const decryptionFailures: string[] = [];
+
+    for (let i = 0; i < settled.length; i++) {
+      const result = settled[i];
+      if (result.status === "fulfilled") {
+        variablesWithValues.push(result.value);
+      } else {
+        // Log enough context to debug vault issues without leaking the value.
+        const variable = accessible[i];
+        console.error(
+          `[CLI Variables] Vault decryption failed for key "${variable.key}" (${variable._id}):`,
+          result.reason
+        );
+        decryptionFailures.push(variable.key);
+      }
+    }
 
     // Resolve project role for the user
     let projectRole: string | null = null;
@@ -138,6 +153,10 @@ export async function GET(request: NextRequest) {
         environment: environment || "all",
         role: membership.role,
         projectRole,
+        // Non-empty only when vault decryption failed for specific keys.
+        // These variables were skipped — they will NOT be injected.
+        decryptionFailures:
+          decryptionFailures.length > 0 ? decryptionFailures : undefined,
       },
     });
   } catch (error) {

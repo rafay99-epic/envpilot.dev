@@ -317,13 +317,18 @@ export class APIClient {
   }
 
   /**
-   * List variables in a project
+   * List variables in a project (with decrypted values).
+   *
+   * Returns both the variable list and any keys that failed vault decryption.
+   * Decryption failures are skipped server-side — they will NOT appear in
+   * `variables`. Callers should warn the user about `decryptionFailures`
+   * so they know those secrets weren't injected.
    */
   async listVariables(
     projectId: string,
     environment?: string,
     organizationId?: string
-  ): Promise<Variable[]> {
+  ): Promise<{ variables: Variable[]; decryptionFailures: string[] }> {
     const params: Record<string, string> = { projectId };
     if (environment) {
       params.environment = environment;
@@ -331,11 +336,15 @@ export class APIClient {
     if (organizationId) {
       params.organizationId = organizationId;
     }
-    const response = await this.get<ApiResponse<Variable[]>>(
-      "/api/cli/variables",
-      params
-    );
-    return response.data || [];
+    const response = await this.get<
+      ApiResponse<Variable[]> & {
+        meta?: { decryptionFailures?: string[] };
+      }
+    >("/api/cli/variables", params);
+    return {
+      variables: response.data || [],
+      decryptionFailures: response.meta?.decryptionFailures ?? [],
+    };
   }
 
   /**

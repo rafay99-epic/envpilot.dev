@@ -119,20 +119,19 @@ export const runCommand = new Command("run")
         parseInt(options.cacheTtl ?? String(DEFAULT_TTL), 10) || DEFAULT_TTL
       );
 
-      // ── Stale-while-revalidate cache ─────────────────────────────────────
+      // ── Fingerprint-gated stale-while-revalidate cache ───────────────────
       let variables: Variable[];
       let cacheHit = false;
       let cacheAge = "";
-      let backgroundRefresh = false;
 
       if (options.cache === false) {
-        // --no-cache: skip probe entirely, always hit the API
-        const fetchLabel = `Loading ${chalk.bold(environment)} secrets for ${chalk.bold(project.projectName || project.projectId)}...`;
-        variables = options.quiet
-          ? await fetchVariables(project.projectId, environment, organizationId)
-          : await withSpinner(fetchLabel, () =>
-              fetchVariables(project.projectId, environment, organizationId)
-            );
+        // --no-cache: bypass cache, always hit the API
+        variables = await doFetch(
+          project,
+          environment,
+          organizationId,
+          options.quiet
+        );
         writeCache(project.projectId, environment, organizationId, variables);
       } else {
         const probe = probeCache(
@@ -143,14 +142,14 @@ export const runCommand = new Command("run")
         );
 
         if (probe.hit && probe.fresh) {
-          // ── FRESH hit: zero API calls ────────────────────────────────────
+          // ── FRESH: zero API calls ──────────────────────────────────────
           variables = probe.entry.variables;
           cacheHit = true;
           cacheAge = formatAge(probe.entry.fetchedAt);
         } else if (probe.hit && !probe.fresh) {
-          // ── STALE hit: fingerprint check first (no vault decryption) ─────
-          // If nothing changed on the server, extend cache TTL for free.
-          // Only do the expensive full fetch when vars actually changed.
+          // ── STALE: fingerprint check (no vault decryption) ─────────────
+          // Ask the server if anything changed using only Convex metadata.
+          // Only do the expensive vault fetch when vars actually changed.
           try {
             const api = createAPIClient();
             const serverFingerprint = await api.checkFingerprint(
@@ -160,7 +159,7 @@ export const runCommand = new Command("run")
             );
 
             if (serverFingerprint === probe.entry.fingerprint) {
-              // Variables unchanged — extend freshness, serve from cache.
+              // Nothing changed — reset TTL, serve from cache for free.
               extendCacheFreshness(
                 project.projectId,
                 environment,
@@ -171,20 +170,13 @@ export const runCommand = new Command("run")
               cacheAge = formatAge(probe.entry.fetchedAt);
             } else {
               // Variables changed — full fetch required.
-              const fetchLabel = `Secrets updated, refreshing ${chalk.bold(environment)} for ${chalk.bold(project.projectName || project.projectId)}...`;
-              variables = options.quiet
-                ? await fetchVariables(
-                    project.projectId,
-                    environment,
-                    organizationId
-                  )
-                : await withSpinner(fetchLabel, () =>
-                    fetchVariables(
-                      project.projectId,
-                      environment,
-                      organizationId
-                    )
-                  );
+              variables = await doFetch(
+                project,
+                environment,
+                organizationId,
+                options.quiet,
+                "Secrets updated, refreshing"
+              );
               writeCache(
                 project.projectId,
                 environment,
@@ -193,25 +185,20 @@ export const runCommand = new Command("run")
               );
             }
           } catch {
-            // Fingerprint check failed (network issue?) — serve stale cache,
-            // attempt a background refresh so next run gets fresh data.
+            // Fingerprint check failed (e.g. offline) — serve stale cache.
+            // The next run will retry the fingerprint check.
             variables = probe.entry.variables;
             cacheHit = true;
             cacheAge = formatAge(probe.entry.fetchedAt);
-            backgroundRefresh = true;
           }
         } else {
-          // ── MISS: first run or cache cleared — full fetch ─────────────────
-          const fetchLabel = `Loading ${chalk.bold(environment)} secrets for ${chalk.bold(project.projectName || project.projectId)}...`;
-          variables = options.quiet
-            ? await fetchVariables(
-                project.projectId,
-                environment,
-                organizationId
-              )
-            : await withSpinner(fetchLabel, () =>
-                fetchVariables(project.projectId, environment, organizationId)
-              );
+          // ── MISS: first run or cache cleared ──────────────────────────
+          variables = await doFetch(
+            project,
+            environment,
+            organizationId,
+            options.quiet
+          );
           writeCache(project.projectId, environment, organizationId, variables);
         }
       }
@@ -269,18 +256,6 @@ export const runCommand = new Command("run")
         console.log();
       }
 
-      // Kick off background refresh for stale cache (fire-and-forget).
-      // We don't await this — the child process starts immediately.
-      if (backgroundRefresh) {
-        fetchVariables(project.projectId, environment, organizationId)
-          .then((fresh) => {
-            writeCache(project.projectId, environment, organizationId, fresh);
-          })
-          .catch(() => {
-            // Non-fatal — stale cache will be used next time too.
-          });
-      }
-
       // Spawn child process
       await runChild(commandArgs, finalEnv, options);
     } catch (err) {
@@ -288,13 +263,37 @@ export const runCommand = new Command("run")
     }
   });
 
-async function fetchVariables(
-  projectId: string,
+/**
+ * Fetch variables from the API with an optional spinner and decryption-failure warnings.
+ * Returns only the successfully decrypted variables; warns the user about any that failed.
+ */
+async function doFetch(
+  project: { projectId: string; projectName: string },
   environment: string,
-  organizationId: string
+  organizationId: string,
+  quiet: boolean | undefined,
+  labelPrefix = "Loading"
 ): Promise<Variable[]> {
+  const label = `${labelPrefix} ${chalk.bold(environment)} secrets for ${chalk.bold(project.projectName || project.projectId)}...`;
   const api = createAPIClient();
-  return api.listVariables(projectId, environment, organizationId);
+
+  const { variables, decryptionFailures } = quiet
+    ? await api.listVariables(project.projectId, environment, organizationId)
+    : await withSpinner(label, () =>
+        api.listVariables(project.projectId, environment, organizationId)
+      );
+
+  // Warn about any vault decryption failures so the user knows which
+  // variables were NOT injected — these are skipped, not silently broken.
+  if (decryptionFailures.length > 0) {
+    for (const key of decryptionFailures) {
+      warning(
+        `Could not decrypt ${chalk.bold(key)} — skipped (vault error, check server logs)`
+      );
+    }
+  }
+
+  return variables;
 }
 
 function printInjectionPreview(

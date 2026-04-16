@@ -45,6 +45,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // environment is required: the fingerprint must be scoped to the same
+  // environment as the cache entry, otherwise the hashes are always different
+  // and every stale check triggers an unnecessary full fetch.
+  if (!environment) {
+    return NextResponse.json(
+      { error: "Missing environment parameter" },
+      { status: 400 }
+    );
+  }
+
   try {
     // Verify project exists
     const project = await convex.query(api.projects.getById, {
@@ -74,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     const accessible = variables
       .filter((v) => v.hasAccess)
-      .filter((v) => !environment || v.environments.includes(environment));
+      .filter((v) => v.environments.includes(environment));
 
     // Fingerprint: sorted hash of id:version:updatedAt
     // Changes whenever a variable is added, removed, renamed, or its value
