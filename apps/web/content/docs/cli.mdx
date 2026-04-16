@@ -2,8 +2,8 @@
 title: CLI Tool
 description: Install, authenticate, and manage environment variables from your terminal with the Envpilot CLI.
 icon: terminal
-generatedAt: "2026-04-15T20:30:18.104Z"
-version: "1.5.0"
+generatedAt: "2026-04-17T00:00:00.000Z"
+version: "1.6.0"
 ---
 
 # CLI Tool
@@ -38,6 +38,9 @@ envpilot sync
 envpilot login
 envpilot init
 envpilot pull
+
+# Inject secrets at runtime without writing a .env file
+envpilot run -- bun dev
 ```
 
 ## Interactive TUI
@@ -188,6 +191,86 @@ envpilot push --replace
 > Managers/admins write directly; lower roles create requests for approval.
 
 > Compares local and remote variables before applying changes.
+
+---
+
+### Run
+
+#### `envpilot run [options] -- <command> [args...]`
+
+Inject project secrets as environment variables directly into a child process — **no `.env` file is written to disk.** Secrets are fetched from the vault, injected into the process environment, and disappear when the process exits.
+
+```bash
+envpilot run -- bun dev
+envpilot run -- npm test
+envpilot run -- node server.js
+envpilot run -- python manage.py runserver
+envpilot run --env production -- node dist/server.js
+envpilot run --env staging --print
+```
+
+> Secrets are injected via `process.env` — no file is created, nothing to gitignore, nothing to leak.
+
+> Use `--` to separate `envpilot` flags from the command you want to run.
+
+**Options**
+
+| Flag                         | Default        | Description                                                                     |
+| ---------------------------- | -------------- | ------------------------------------------------------------------------------- |
+| `-e, --env <environment>`    | linked env     | Environment to load (`development`, `staging`, `production`)                    |
+| `-p, --project <name-or-id>` | active project | Override the linked project                                                     |
+| `-o, --organization <id>`    | linked org     | Override the organization                                                       |
+| `--keep-existing`            | off            | Let your shell's env vars win over fetched secrets (useful for local overrides) |
+| `--print`                    | off            | Preview what would be injected and exit — no command runs                       |
+| `--shell`                    | off            | Run via the user's shell (enables pipes, `&&`, `$VAR` expansion)                |
+| `--no-cache`                 | off            | Skip the cache and always fetch fresh secrets                                   |
+| `--cache-ttl <seconds>`      | `3600`         | How long cached secrets stay fresh before a fingerprint check                   |
+| `-q, --quiet`                | off            | Suppress informational output                                                   |
+
+**How the cache works**
+
+`envpilot run` uses a fingerprint-gated local cache to avoid hitting the vault on every invocation:
+
+| Cache state               | What happens                               | Vault calls |
+| ------------------------- | ------------------------------------------ | ----------- |
+| Fresh (< 1 h)             | Serve from disk                            | **0**       |
+| Stale, vars unchanged     | Cheap metadata check → extend TTL          | **0**       |
+| Stale, vars changed       | Metadata check detects change → full fetch | 1×          |
+| First run / cache cleared | Full fetch, write cache                    | 1×          |
+
+Cache files are stored at `~/.config/envpilot/run-cache/` with `0600` permissions (owner read/write only). A different account, server URL, or token automatically invalidates the cache.
+
+**Overriding shell variables**
+
+By default fetched secrets override anything already in your shell. Use `--keep-existing` to reverse this — your local shell values win:
+
+```bash
+# Override everything with Envpilot secrets (default)
+envpilot run -- bun dev
+
+# Your shell's DATABASE_URL wins; only missing vars are filled in
+DATABASE_URL=postgres://localhost/dev envpilot run --keep-existing -- bun dev
+```
+
+**Dry-run preview**
+
+```bash
+envpilot run --print
+# Would inject 12 variables from backend/staging:
+#
+#   DATABASE_URL=post…rd (52 chars)
+#   API_SECRET=sk_t…2x (40 chars)
+#   ...
+# Dry run — no command executed.
+```
+
+**CI/CD usage**
+
+In CI pipelines, use `--quiet` and `--no-cache` to suppress output and guarantee fresh secrets:
+
+```bash
+envpilot run --env production --quiet --no-cache -- ./scripts/deploy.sh
+```
 
 ---
 
