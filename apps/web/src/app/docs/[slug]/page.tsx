@@ -107,7 +107,7 @@ export default async function DocPage({ params }: PageProps) {
       </header>
 
       {/* ── Body ─────────────────────────────────────────────────── */}
-      <div className="mx-auto flex max-w-6xl gap-0 px-6 pt-24 pb-16 lg:gap-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-0 px-6 pt-24 pb-16 lg:flex-row lg:gap-10">
         <DocsSidebar items={allDocs} activeSlug={slug} />
 
         <main className="min-w-0 flex-1">

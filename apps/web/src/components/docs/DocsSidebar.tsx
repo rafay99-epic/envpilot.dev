@@ -98,24 +98,30 @@ export function DocsSidebar({
         </nav>
       </aside>
 
-      {/* ── Mobile pills ─────────────────────────────────────────── */}
-      <div className="mb-6 flex gap-1.5 overflow-x-auto pb-1 lg:hidden">
-        {items.map((item) => {
-          const active = item.slug === activeSlug;
-          return (
-            <Link
-              key={item.slug}
-              href={`/docs/${item.slug}`}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                active
-                  ? "border border-green-500/30 bg-green-500/10 text-green-400"
-                  : "border border-zinc-800 bg-zinc-900 text-zinc-500"
-              }`}
-            >
-              {item.title}
-            </Link>
-          );
-        })}
+      {/* ── Mobile nav ───────────────────────────────────────────── */}
+      {/* Rendered as a full-width row ABOVE the main content.      */}
+      {/* The parent flex container is flex-col on mobile so this   */}
+      {/* stacks naturally instead of sitting beside <main>.        */}
+      <div className="w-full border-b border-zinc-800/60 pb-4 mb-6 lg:hidden">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {items.map((item) => {
+            const active = item.slug === activeSlug;
+            return (
+              <Link
+                key={item.slug}
+                href={`/docs/${item.slug}`}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                    : "border border-zinc-800 bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {ICON_MAP[item.icon] ?? ICON_MAP["file-text"]}
+                {item.title}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </>
   );

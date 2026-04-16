@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 
 const COMMANDS = [
+  "envpilot run -- bun dev",
+  "envpilot run --env production -- node server.js",
   "envpilot pull --env production",
   "envpilot push --env staging --dry-run",
+  "envpilot run --print",
   "envpilot list variables --show-values",
-  "envpilot init --environment development",
   "envpilot switch production",
 ];
 
@@ -266,10 +268,10 @@ export default function TerminalLanding() {
     },
     {
       icon: <Terminal className="h-4 w-4 text-green-400" />,
-      cmd: "cli",
-      flag: "--env production",
-      title: "CLI Tool",
-      desc: "Pull, push, list, switch, and init from your terminal. Dry-run previews for safe changes. Browser-based SSO.",
+      cmd: "run",
+      flag: "-- bun dev",
+      title: "Runtime Injection",
+      desc: "Inject secrets directly into any process with envpilot run. No .env file written, nothing to leak. Fingerprint-gated cache keeps startup near-instant.",
     },
     {
       icon: <Puzzle className="h-4 w-4 text-purple-400" />,
@@ -300,13 +302,13 @@ export default function TerminalLanding() {
     },
     {
       cmd: "envpilot init",
-      output: "✓ Linked to project: backend-api (development)",
+      output: "✓ Linked to project: backend-api (staging)",
       label: "Init",
     },
     {
-      cmd: "envpilot pull --env production",
-      output: "✓ Synced 47 variables to .env",
-      label: "Pull",
+      cmd: "envpilot run -- bun dev",
+      output: "✓ Injected 47 variables from backend-api/staging",
+      label: "Run",
     },
   ];
 
@@ -363,9 +365,9 @@ export default function TerminalLanding() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              <div className="mb-6 inline-flex items-center gap-2 rounded border border-amber-500/20 bg-amber-500/5 px-3 py-1 text-xs text-amber-400">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
-                Now with WebSocket real-time sync
+              <div className="mb-6 inline-flex items-center gap-2 rounded border border-green-500/20 bg-green-500/5 px-3 py-1 text-xs text-green-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+                New: inject secrets at runtime — no .env file needed
               </div>
 
               <h1 className="text-4xl font-bold tracking-tight text-zinc-100 md:text-6xl lg:text-7xl">
@@ -483,7 +485,7 @@ export default function TerminalLanding() {
                 {"// workflow"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-                Four commands to production
+                From zero to running in four commands
               </h2>
             </motion.div>
 
@@ -535,7 +537,7 @@ export default function TerminalLanding() {
                 {"// demo"}
               </p>
               <h2 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-                Your .env, but secure
+                No .env file. Ever.
               </h2>
             </motion.div>
 
@@ -588,39 +590,42 @@ export default function TerminalLanding() {
 
               <motion.div variants={fadeInUp} className="flex">
                 <TerminalWindow
-                  title="after — envpilot pull"
+                  title="after — envpilot run -- bun dev"
                   className="h-full"
                 >
                   <div className="space-y-1 text-xs">
                     <p>
                       <span className="text-zinc-500">
-                        # Auto-synced by Envpilot
+                        # No .env file. Secrets injected at runtime.
                       </span>
                     </p>
-                    <p>
+                    <p className="mt-1">
+                      <span className="text-green-500">$</span>{" "}
+                      <span className="text-zinc-300">
+                        envpilot run -- bun dev
+                      </span>
+                    </p>
+                    <p className="text-green-400/80">
+                      ✓ Injected 12 vars from backend/staging{" "}
+                      <span className="text-zinc-600">⚡ cache (4s ago)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-500">
                       <span className="text-amber-400">DATABASE_URL</span>
-                      <span className="text-zinc-600">=</span>
-                      <span className="text-green-400">
-                        vault://ref/db_prod_2847
+                      <span className="text-zinc-600"> → </span>
+                      <span className="text-green-400/70">
+                        decrypted inline
                       </span>
                     </p>
-                    <p>
+                    <p className="text-zinc-500">
                       <span className="text-amber-400">API_SECRET</span>
-                      <span className="text-zinc-600">=</span>
-                      <span className="text-green-400">
-                        vault://ref/api_live_9182
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-amber-400">AWS_SECRET_KEY</span>
-                      <span className="text-zinc-600">=</span>
-                      <span className="text-green-400">
-                        vault://ref/aws_key_5521
+                      <span className="text-zinc-600"> → </span>
+                      <span className="text-green-400/70">
+                        decrypted inline
                       </span>
                     </p>
                     <p className="mt-2 flex items-center gap-1.5 text-green-400">
                       <Check className="h-3 w-3" />
-                      Encrypted, versioned, access-logged
+                      Never written to disk. Gone when process exits.
                     </p>
                   </div>
                 </TerminalWindow>
@@ -673,6 +678,11 @@ export default function TerminalLanding() {
                       <span className="text-green-500">$</span> envpilot init
                     </p>
                     <p>
+                      <span className="text-green-500">$</span>{" "}
+                      <span className="text-green-300">envpilot run</span> --
+                      bun dev
+                    </p>
+                    <p>
                       <span className="text-green-500">$</span> envpilot pull
                       --env production
                     </p>
@@ -681,16 +691,12 @@ export default function TerminalLanding() {
                       --dry-run
                     </p>
                     <p>
-                      <span className="text-green-500">$</span> envpilot list
-                      variables --show-values
-                    </p>
-                    <p>
                       <span className="text-green-500">$</span> envpilot switch
                       staging
                     </p>
                   </div>
                   <div className="mt-3 border-t border-zinc-800 pt-3 text-xs text-zinc-600">
-                    8 commands. Browser-based SSO. Dry-run previews. CI/CD
+                    12 commands. Runtime injection. Browser-based SSO. CI/CD
                     ready.
                   </div>
                 </TerminalWindow>
