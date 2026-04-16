@@ -339,6 +339,29 @@ export class APIClient {
   }
 
   /**
+   * Check the variable fingerprint for a project/environment.
+   *
+   * Returns a short hash of variable metadata (id + version + updatedAt)
+   * WITHOUT decrypting vault secrets. The CLI uses this to decide whether
+   * a cached variable set is still current before doing a full (expensive)
+   * fetch. If the fingerprint matches, the cache can be extended for free.
+   */
+  async checkFingerprint(
+    projectId: string,
+    environment?: string,
+    organizationId?: string
+  ): Promise<string> {
+    const params: Record<string, string> = { projectId };
+    if (environment) params.environment = environment;
+    if (organizationId) params.organizationId = organizationId;
+    const response = await this.get<{ fingerprint: string }>(
+      "/api/cli/variables/fingerprint",
+      params
+    );
+    return response.fingerprint;
+  }
+
+  /**
    * Get a variable by ID (with decrypted value)
    */
   async getVariable(variableId: string): Promise<Variable> {

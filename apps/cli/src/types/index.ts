@@ -68,6 +68,8 @@ export const variableSchema = z.object({
   description: z.string().optional(),
   isSensitive: z.boolean().optional(),
   version: z.number().optional(),
+  updatedAt: z.number().optional(),
+  createdAt: z.number().optional(),
   tags: z.array(variableTagSchema).optional(),
 });
 

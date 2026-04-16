@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/web",
-  "version": "1.11.4",
+  "version": "1.12.0",
   "private": true,
   "description": "Envpilot web dashboard — manage secrets, teams, and projects",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
