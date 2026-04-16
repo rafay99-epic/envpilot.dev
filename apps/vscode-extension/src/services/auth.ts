@@ -9,6 +9,11 @@ import type { AuthSession, User, ApiResponse } from "../types";
 
 const AUTH_CHECK_PATH = "/api/extension/auth/check";
 
+/** Only log the first 8 chars of the session token — enough to correlate. */
+function sessionPrefix(token: string): string {
+  return token.slice(0, 8);
+}
+
 /**
  * Authentication service for the extension
  * Uses OAuth flow through the browser for secure authentication
@@ -33,6 +38,9 @@ export class AuthService {
 
     // Create a unique session token for this auth attempt
     const sessionToken = generateSessionToken();
+    const session = sessionPrefix(sessionToken);
+
+    output.logEvent("signIn.start", { session, serverUrl });
 
     // Store pending session
     await this.context.globalState.update("pendingAuthSession", sessionToken);
@@ -44,8 +52,9 @@ export class AuthService {
     const browserOpened = await openUrlReliably(authUrl);
 
     if (browserOpened) {
-      output.log("Browser opened for sign-in");
+      output.logEvent("signIn.browser_opened", { session });
     } else {
+      output.warnEvent("signIn.browser_open_failed", { session });
       // Browser failed — tell user about clipboard and output channel
       const action = await vscode.window.showWarningMessage(
         "Could not open browser. The sign-in URL has been copied to your clipboard.",
@@ -68,6 +77,7 @@ export class AuthService {
     const serverUrl = getServerUrl();
     const POLL_INTERVAL_MS = 2000;
     const MAX_POLL_DURATION_MS = 120000; // 2 minutes timeout
+    const session = sessionPrefix(sessionToken);
 
     return vscode.window.withProgress(
       {
@@ -84,6 +94,11 @@ export class AuthService {
         while (!cancellationToken.isCancellationRequested) {
           // Check timeout
           if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
+            output.warnEvent("poll.timeout", {
+              session,
+              attempts,
+              elapsed_ms: Date.now() - startTime,
+            });
             await this.context.globalState.update(
               "pendingAuthSession",
               undefined
@@ -114,6 +129,7 @@ export class AuthService {
             message: `Waiting for browser sign-in... (${Math.floor((Date.now() - startTime) / 1000)}s)`,
           });
 
+          const reqStart = Date.now();
           try {
             const response = await axios.get<ApiResponse<AuthSession>>(
               `${serverUrl}${AUTH_CHECK_PATH}`,
@@ -124,6 +140,14 @@ export class AuthService {
             );
 
             if (response.data.data) {
+              output.logEvent("poll.success", {
+                session,
+                attempts,
+                status: response.status,
+                duration_ms: Date.now() - reqStart,
+                elapsed_ms: Date.now() - startTime,
+              });
+
               await this.storage.setAuthSession(response.data.data);
               this._onAuthStateChanged.fire(response.data.data);
               await this.context.globalState.update(
@@ -136,12 +160,48 @@ export class AuthService {
               );
               return true;
             }
-          } catch {
-            // Ignore poll errors and keep trying
+
+            // 200 with no data shouldn't happen, but log it so we see it.
+            output.warnEvent("poll.empty_response", {
+              session,
+              attempts,
+              status: response.status,
+            });
+          } catch (err: unknown) {
+            const axErr = err as {
+              response?: { status?: number };
+              code?: string;
+              message?: string;
+            };
+            const status = axErr?.response?.status;
+            // 404 is the expected "not yet" response while the user is
+            // still on the browser auth page — log it at debug granularity
+            // so it doesn't drown the channel, but include it when status
+            // is unexpected (429, 5xx, network errors).
+            if (status === 404) {
+              output.logEvent("poll.waiting", {
+                session,
+                attempts,
+                duration_ms: Date.now() - reqStart,
+              });
+            } else {
+              output.warnEvent("poll.error", {
+                session,
+                attempts,
+                status: status ?? "network",
+                code: axErr?.code ?? "-",
+                message: axErr?.message ?? "unknown",
+                duration_ms: Date.now() - reqStart,
+              });
+            }
           }
         }
 
-        // Cancelled by user
+        output.warnEvent("poll.cancelled", {
+          session,
+          attempts,
+          elapsed_ms: Date.now() - startTime,
+        });
         await this.context.globalState.update("pendingAuthSession", undefined);
         return false;
       }

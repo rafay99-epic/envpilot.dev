@@ -26,6 +26,7 @@ import type * as featureRequests from "../featureRequests.js";
 import type * as helpers from "../helpers.js";
 import type * as invitations from "../invitations.js";
 import type * as organizations from "../organizations.js";
+import type * as pendingExtensionAuthSessions from "../pendingExtensionAuthSessions.js";
 import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
 import type * as permissions from "../permissions.js";
 import type * as pools from "../pools.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   helpers: typeof helpers;
   invitations: typeof invitations;
   organizations: typeof organizations;
+  pendingExtensionAuthSessions: typeof pendingExtensionAuthSessions;
   permissionRevocationEvents: typeof permissionRevocationEvents;
   permissions: typeof permissions;
   pools: typeof pools;
