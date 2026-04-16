@@ -317,13 +317,18 @@ export class APIClient {
   }
 
   /**
-   * List variables in a project
+   * List variables in a project (with decrypted values).
+   *
+   * Returns both the variable list and any keys that failed vault decryption.
+   * Decryption failures are skipped server-side — they will NOT appear in
+   * `variables`. Callers should warn the user about `decryptionFailures`
+   * so they know those secrets weren't injected.
    */
   async listVariables(
     projectId: string,
     environment?: string,
     organizationId?: string
-  ): Promise<Variable[]> {
+  ): Promise<{ variables: Variable[]; decryptionFailures: string[] }> {
     const params: Record<string, string> = { projectId };
     if (environment) {
       params.environment = environment;
@@ -331,11 +336,38 @@ export class APIClient {
     if (organizationId) {
       params.organizationId = organizationId;
     }
-    const response = await this.get<ApiResponse<Variable[]>>(
-      "/api/cli/variables",
+    const response = await this.get<
+      ApiResponse<Variable[]> & {
+        meta?: { decryptionFailures?: string[] };
+      }
+    >("/api/cli/variables", params);
+    return {
+      variables: response.data || [],
+      decryptionFailures: response.meta?.decryptionFailures ?? [],
+    };
+  }
+
+  /**
+   * Check the variable fingerprint for a project/environment.
+   *
+   * Returns a short hash of variable metadata (id + version + updatedAt)
+   * WITHOUT decrypting vault secrets. The CLI uses this to decide whether
+   * a cached variable set is still current before doing a full (expensive)
+   * fetch. If the fingerprint matches, the cache can be extended for free.
+   */
+  async checkFingerprint(
+    projectId: string,
+    environment?: string,
+    organizationId?: string
+  ): Promise<string> {
+    const params: Record<string, string> = { projectId };
+    if (environment) params.environment = environment;
+    if (organizationId) params.organizationId = organizationId;
+    const response = await this.get<{ fingerprint: string }>(
+      "/api/cli/variables/fingerprint",
       params
     );
-    return response.data || [];
+    return response.fingerprint;
   }
 
   /**

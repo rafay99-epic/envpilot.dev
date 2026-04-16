@@ -9,7 +9,10 @@ export function createProgram(): Command {
   program
     .name("envpilot")
     .description("Envpilot CLI - Sync, secure, and share environment variables")
-    .version(CLI_VERSION);
+    .version(CLI_VERSION)
+    // Required so subcommands (like `run`) can use passThroughOptions()
+    // to forward args/flags to a spawned child process after `--`.
+    .enablePositionalOptions();
 
   for (const command of getTopLevelCommandCatalog()) {
     if (command.createCommand) {

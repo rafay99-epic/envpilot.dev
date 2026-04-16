@@ -11,6 +11,7 @@ import { unlinkCommand } from "../commands/unlink.js";
 import { syncCommand } from "../commands/sync.js";
 import { usageCommand } from "../commands/usage.js";
 import { whoamiCommand } from "../commands/whoami.js";
+import { runCommand } from "../commands/run.js";
 import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
 
@@ -194,6 +195,43 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["upload", "bulk", "merge", "replace"],
     topLevel: true,
     createCommand: () => pushCommand,
+  },
+  {
+    id: "run",
+    title: "Run command with secrets",
+    category: "Sync",
+    description:
+      "Inject project secrets into a child process without writing a .env file (envpilot run -- bun dev).",
+    argv: ["run"],
+    args: "[--env <environment>] [--project <name-or-id>] [--keep-existing] [--print] -- <command> [args...]",
+    examples: [
+      ["run", "--", "bun", "dev"],
+      ["run", "--env", "production", "--", "node", "server.js"],
+      ["run", "--project", "api", "--", "pnpm", "test"],
+      ["run", "--print"],
+      ["run", "--keep-existing", "--", "bun", "dev"],
+    ],
+    websiteSurface: "Maps to `/api/cli/variables` for read access.",
+    notes: [
+      "Use `--` to separate envpilot flags from the command to execute.",
+      "Secrets override existing shell vars by default; pass --keep-existing to flip.",
+      "On Windows, the command is run through the shell so .cmd / .bat files resolve.",
+      "Signals (SIGINT, SIGTERM, SIGHUP, SIGQUIT) are forwarded to the child process.",
+      "Use --print to inspect what would be injected without executing anything.",
+    ],
+    keywords: [
+      "run",
+      "exec",
+      "spawn",
+      "inject",
+      "secrets",
+      "env",
+      "ephemeral",
+      "no-file",
+      "doppler",
+    ],
+    topLevel: true,
+    createCommand: () => runCommand,
   },
   {
     id: "list",
