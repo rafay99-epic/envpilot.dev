@@ -16,6 +16,13 @@ crons.interval(
   internal.cliSessions.cleanupExpiredSessions
 );
 
+// Clean up expired pending extension auth handshake records every 15 minutes
+crons.interval(
+  "cleanup expired pending extension auth sessions",
+  { minutes: 15 },
+  internal.pendingExtensionAuthSessions.cleanupExpired
+);
+
 // Clean up expired project access tokens every hour
 crons.interval(
   "cleanup expired project access",
