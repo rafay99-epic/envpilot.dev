@@ -2,14 +2,14 @@
 
 ## Overview
 
-Envpilot deploys to three platforms:
+Envpilot deploys to multiple platforms. The CI/CD pipeline (`.github/workflows/ci-deploy.yml`) handles all deployments automatically on push to `main`.
 
-| Component         | Platform            | Command                      |
-| ----------------- | ------------------- | ---------------------------- |
-| Web App           | Vercel              | Automatic on push to `main`  |
-| Convex Backend    | Convex Cloud        | `bun run convex:deploy`      |
-| VS Code Extension | VS Code Marketplace | `npx @vscode/vsce publish`   |
-| CLI               | npm Registry        | `cd apps/cli && npm publish` |
+| Component         | Platform                         | Trigger                          |
+| ----------------- | -------------------------------- | -------------------------------- |
+| Web App           | Vercel                           | Automatic on push to `main`      |
+| Convex Backend    | Convex Cloud                     | CI detects `convex/` changes     |
+| VS Code Extension | VS Code Marketplace + Open VSX   | CI detects version bump          |
+| CLI               | npm Registry                     | CI detects version bump          |
 
 ## Web App (Vercel)
 
@@ -44,7 +44,7 @@ Set these in Vercel's project settings:
 Vercel auto-deploys on push to `main`. For manual deploy:
 
 ```bash
-cd apps/web && npx vercel --prod
+cd apps/web && bunx vercel --prod
 ```
 
 ## Convex Backend
@@ -60,7 +60,7 @@ cd apps/web && npx vercel --prod
 From the **monorepo root**:
 
 ```bash
-bun run convex:deploy
+bunx convex deploy
 ```
 
 This pushes all functions from `convex/` to Convex Cloud. Schema changes are applied automatically.
@@ -84,21 +84,27 @@ bun run build:extension
 
 ```bash
 cd apps/vscode-extension
-npx @vscode/vsce package
+bunx @vscode/vsce package --no-dependencies
 ```
 
-This creates a `.vsix` file (e.g., `envpilot-0.1.0.vsix`).
+This creates a `.vsix` file (e.g., `envpilot-1.3.7.vsix`).
 
 ### Publish
 
 ```bash
 cd apps/vscode-extension
-npx @vscode/vsce publish
+
+# VS Code Marketplace (also available in Cursor)
+bunx @vscode/vsce publish --no-dependencies
+
+# Open VSX Registry (VS Codium, Gitpod, Theia)
+bunx ovsx publish envpilot-*.vsix -p $OPEN_VSX_TOKEN
 ```
 
 Requirements:
 
-- A Personal Access Token from [Azure DevOps](https://dev.azure.com)
+- A Personal Access Token from [Azure DevOps](https://dev.azure.com) for VS Code Marketplace
+- An access token from [open-vsx.org](https://open-vsx.org) for Open VSX
 - Publisher `envpilot` registered in the [VS Code Marketplace](https://marketplace.visualstudio.com/manage)
 
 ### Version Bump
@@ -121,13 +127,13 @@ bun run build:cli
 
 ```bash
 cd apps/cli
-npm publish
+bun publish --access public
 ```
 
 Requirements:
 
 - npm account with publish access to `@envpilot` scope
-- Run `npm login` first
+- Auth configured in `~/.npmrc`
 
 ### Version Bump
 
@@ -135,36 +141,26 @@ Update `version` in `apps/cli/package.json` before publishing.
 
 ### Binary
 
-After installation (`npm install -g @envpilot/cli`), the CLI is available as `envpilot`.
+After installation (`bun install -g @envpilot/cli`), the CLI is available as `envpilot`.
 
 ## CI/CD
 
-### GitHub Actions
+The unified CI/CD pipeline (`.github/workflows/ci-deploy.yml`) handles everything:
 
-The CI workflow (`.github/workflows/ci.yml`) runs on:
+```
+quality → build → detect → deploy (convex, extension, CLI) → release
+```
 
-- Push to `main`
-- Pull requests
-- Manual dispatch
+See [CI docs](ci.md) for full details.
 
-### Jobs
+### Required GitHub Secrets
 
-| Job              | What it checks                   |
-| ---------------- | -------------------------------- |
-| **App**          | Web typecheck, lint, build       |
-| **CLI**          | CLI lint, build                  |
-| **Extension**    | Extension typecheck, lint, build |
-| **Format**       | Prettier check across monorepo   |
-| **React Doctor** | React best practices validation  |
-
-All jobs use:
-
-- `bun install --frozen-lockfile` (single install from root)
-- `bunx turbo <task> --filter=<package>` for workspace commands
-
-### Required Secrets
-
-The CI uses mock values for environment variables (no real credentials needed for builds).
+| Secret                     | Purpose                          |
+| -------------------------- | -------------------------------- |
+| `CONVEX_DEPLOY_KEY`        | Convex production deploy         |
+| `NPM_TOKEN`                | npm publish for CLI              |
+| `OPEN_VSX_TOKEN`           | Open VSX Registry publish        |
+| `VSCODE_MARKETPLACE_TOKEN` | VS Code Marketplace publish      |
 
 ## Monitoring
 

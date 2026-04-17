@@ -31,10 +31,7 @@
     "check:all": "turbo lint typecheck build && prettier --check .",
     "test:e2e": "turbo test:e2e --filter=@envpilot/web",
     "test:cli": "turbo test --filter=@envpilot/cli",
-    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && echo 'Environment ready — edit .env.local with your values'",
-    "docs:generate": "bun run scripts/generate-docs.ts",
-    "publish:cli": "turbo build --filter=@envpilot/cli && cd apps/cli && npm publish --access public",
-    "publish:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce publish --no-dependencies"
+    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && echo 'Environment ready — edit .env.local with your values'"
   },
   "devDependencies": {
     "@envpilot/prettier-config": "workspace:*",

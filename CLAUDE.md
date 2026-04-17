@@ -86,12 +86,11 @@ Package versions to bump when making changes:
 ## Commands
 
 ```bash
-# Development (runs Next.js + Convex in parallel)
+# Development (runs Next.js + Convex + Admin in parallel)
 bun run dev
 
 # Run individual apps
-bun run dev:web                                    # Next.js only
-bun run dev:convex                                 # Convex only
+bun run dev:admin                                  # Admin dashboard only
 bun run dev:cli                                    # CLI watch mode
 bun run dev:extension                              # Extension watch mode
 
@@ -99,12 +98,13 @@ bun run dev:extension                              # Extension watch mode
 bun run build                                      # build all apps
 bun run build:web                                  # web app only
 bun run build:cli                                  # CLI only
-bun run build:extension                            # extension only
+bun run build:admin                                # admin dashboard only
+bun run build:extension                            # extension + package VSIX
 
 # Lint & typecheck
 bun run lint                                       # lint all
 bun run typecheck                                  # typecheck all
-bun run format:check                               # prettier check
+bunx prettier --check .                            # prettier check (no standalone script)
 bun run format:fix                                 # prettier fix
 bun run check:all                                  # full CI check
 
@@ -116,8 +116,7 @@ cd apps/web && bunx playwright test tests/e2e/specific.spec.ts
 bun run test:cli
 
 # Convex
-bun run convex:deploy                              # deploy functions to production
-bun run dev:convex                                 # sync functions during development
+bunx convex deploy                                 # deploy functions to production
 ```
 
 ## Architecture

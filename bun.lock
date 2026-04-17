@@ -55,7 +55,7 @@
     },
     "apps/cli": {
       "name": "@envpilot/cli",
-      "version": "1.5.0",
+      "version": "1.6.1",
       "bin": {
         "envpilot": "./dist/index.js",
       },
@@ -86,7 +86,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.3.6",
+      "version": "1.3.7",
       "dependencies": {
         "@sentry/node": "^10.43.0",
         "axios": "^1.6.2",
@@ -108,7 +108,7 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.11.3",
+      "version": "1.11.5",
       "dependencies": {
         "@polar-sh/nextjs": "^0.9.5",
         "@polar-sh/sdk": "^0.46.6",
