@@ -4,32 +4,32 @@ All commands are run from the monorepo root with `bun run`.
 
 ## Development
 
-| Command                 | Description                                              |
-| ----------------------- | -------------------------------------------------------- |
-| `bun run dev`           | Start web app + Convex + admin dashboard in parallel     |
-| `bun run dev:admin`     | Admin dashboard dev server only                          |
-| `bun run dev:cli`       | CLI watch mode                                           |
-| `bun run dev:extension` | VS Code extension watch mode                             |
+| Command                 | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `bun run dev`           | Start web app + Convex + admin dashboard in parallel |
+| `bun run dev:admin`     | Admin dashboard dev server only                      |
+| `bun run dev:cli`       | CLI watch mode                                       |
+| `bun run dev:extension` | VS Code extension watch mode                         |
 
 ## Build
 
-| Command                   | Description                     |
-| ------------------------- | ------------------------------- |
-| `bun run build`           | Build all apps                  |
-| `bun run build:web`       | Build web app only              |
-| `bun run build:cli`       | Build CLI only                  |
-| `bun run build:admin`     | Build admin dashboard only      |
-| `bun run build:extension` | Build & package extension VSIX  |
+| Command                   | Description                    |
+| ------------------------- | ------------------------------ |
+| `bun run build`           | Build all apps                 |
+| `bun run build:web`       | Build web app only             |
+| `bun run build:cli`       | Build CLI only                 |
+| `bun run build:admin`     | Build admin dashboard only     |
+| `bun run build:extension` | Build & package extension VSIX |
 
 ## Quality
 
-| Command                       | Description                                          |
-| ----------------------------- | ---------------------------------------------------- |
-| `bun run lint`                | ESLint across all workspaces                         |
-| `bun run typecheck`           | TypeScript type-check all workspaces                 |
-| `bunx prettier --check .`     | Prettier check (no standalone script)                |
-| `bun run format:fix`          | Prettier auto-fix                                    |
-| `bun run check:all`           | Full CI pipeline (lint + typecheck + build + format) |
+| Command                   | Description                                          |
+| ------------------------- | ---------------------------------------------------- |
+| `bun run lint`            | ESLint across all workspaces                         |
+| `bun run typecheck`       | TypeScript type-check all workspaces                 |
+| `bunx prettier --check .` | Prettier check (no standalone script)                |
+| `bun run format:fix`      | Prettier auto-fix                                    |
+| `bun run check:all`       | Full CI pipeline (lint + typecheck + build + format) |
 
 ## Testing
 

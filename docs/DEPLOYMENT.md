@@ -4,12 +4,12 @@
 
 Envpilot deploys to multiple platforms. The CI/CD pipeline (`.github/workflows/ci-deploy.yml`) handles all deployments automatically on push to `main`.
 
-| Component         | Platform                         | Trigger                          |
-| ----------------- | -------------------------------- | -------------------------------- |
-| Web App           | Vercel                           | Automatic on push to `main`      |
-| Convex Backend    | Convex Cloud                     | CI detects `convex/` changes     |
-| VS Code Extension | VS Code Marketplace + Open VSX   | CI detects version bump          |
-| CLI               | npm Registry                     | CI detects version bump          |
+| Component         | Platform                       | Trigger                      |
+| ----------------- | ------------------------------ | ---------------------------- |
+| Web App           | Vercel                         | Automatic on push to `main`  |
+| Convex Backend    | Convex Cloud                   | CI detects `convex/` changes |
+| VS Code Extension | VS Code Marketplace + Open VSX | CI detects version bump      |
+| CLI               | npm Registry                   | CI detects version bump      |
 
 ## Web App (Vercel)
 
@@ -155,12 +155,12 @@ See [CI docs](ci.md) for full details.
 
 ### Required GitHub Secrets
 
-| Secret                     | Purpose                          |
-| -------------------------- | -------------------------------- |
-| `CONVEX_DEPLOY_KEY`        | Convex production deploy         |
-| `NPM_TOKEN`                | npm publish for CLI              |
-| `OPEN_VSX_TOKEN`           | Open VSX Registry publish        |
-| `VSCODE_MARKETPLACE_TOKEN` | VS Code Marketplace publish      |
+| Secret                     | Purpose                     |
+| -------------------------- | --------------------------- |
+| `CONVEX_DEPLOY_KEY`        | Convex production deploy    |
+| `NPM_TOKEN`                | npm publish for CLI         |
+| `OPEN_VSX_TOKEN`           | Open VSX Registry publish   |
+| `VSCODE_MARKETPLACE_TOKEN` | VS Code Marketplace publish |
 
 ## Monitoring
 

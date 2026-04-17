@@ -48,25 +48,25 @@ envpilot/
 
 ## Development Commands
 
-| Command                   | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| `bun run dev`             | Start web app + Convex + admin in parallel           |
-| `bun run dev:admin`       | Admin dashboard dev server only                      |
-| `bun run dev:cli`         | CLI watch mode (tsup)                                |
-| `bun run dev:extension`   | Extension watch mode (esbuild + tsc)                 |
-| `bun run build`           | Build all apps                                       |
-| `bun run build:web`       | Build web app only                                   |
-| `bun run build:cli`       | Build CLI only                                       |
-| `bun run build:admin`     | Build admin dashboard only                           |
-| `bun run build:extension` | Build & package extension VSIX                       |
-| `bun run lint`            | Lint all apps                                        |
-| `bun run typecheck`       | Typecheck all apps                                   |
-| `bunx prettier --check .` | Check formatting (no standalone script)              |
-| `bun run format:fix`      | Auto-format all files                                |
-| `bun run check:all`       | Full CI check (lint + typecheck + build + format)    |
-| `bun run test:e2e`        | Playwright E2E tests (web)                           |
-| `bun run test:cli`        | CLI unit tests (vitest)                              |
-| `bunx convex deploy`      | Deploy Convex to production                          |
+| Command                   | Description                                       |
+| ------------------------- | ------------------------------------------------- |
+| `bun run dev`             | Start web app + Convex + admin in parallel        |
+| `bun run dev:admin`       | Admin dashboard dev server only                   |
+| `bun run dev:cli`         | CLI watch mode (tsup)                             |
+| `bun run dev:extension`   | Extension watch mode (esbuild + tsc)              |
+| `bun run build`           | Build all apps                                    |
+| `bun run build:web`       | Build web app only                                |
+| `bun run build:cli`       | Build CLI only                                    |
+| `bun run build:admin`     | Build admin dashboard only                        |
+| `bun run build:extension` | Build & package extension VSIX                    |
+| `bun run lint`            | Lint all apps                                     |
+| `bun run typecheck`       | Typecheck all apps                                |
+| `bunx prettier --check .` | Check formatting (no standalone script)           |
+| `bun run format:fix`      | Auto-format all files                             |
+| `bun run check:all`       | Full CI check (lint + typecheck + build + format) |
+| `bun run test:e2e`        | Playwright E2E tests (web)                        |
+| `bun run test:cli`        | CLI unit tests (vitest)                           |
+| `bunx convex deploy`      | Deploy Convex to production                       |
 
 ### Targeting Specific Apps
 
