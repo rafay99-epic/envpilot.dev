@@ -4,6 +4,46 @@ import type { CLIConfig, User } from "../types/index.js";
 // Default API URL - production by default, can be overridden via config
 const DEFAULT_API_URL = "https://www.envpilot.dev";
 
+// Hosts that should always be canonicalized to their www equivalent.
+// The apex domain (envpilot.dev) 307-redirects to www.envpilot.dev, and
+// Node's fetch strips the Authorization header across that hostname change,
+// which leads to false 401s on authenticated requests. We bake the canonical
+// form into the config so users can never accidentally set the apex host.
+const HOST_CANONICALIZATION: Record<string, string> = {
+  "envpilot.dev": "www.envpilot.dev",
+};
+
+/**
+ * Normalize a user-provided API URL so it points at a host that won't
+ * cross-origin-redirect and strip auth headers. Also strips trailing slashes
+ * so URL construction is predictable.
+ *
+ * Exported so that other modules (e.g. the `config set` command) can
+ * validate and display the canonical URL before storing.
+ */
+export function normalizeApiUrl(raw: string): string {
+  let value = raw.trim();
+  // Assume https if no scheme was given
+  if (!/^https?:\/\//i.test(value)) {
+    value = `https://${value}`;
+  }
+  try {
+    const parsed = new URL(value);
+    const canonicalHost = HOST_CANONICALIZATION[parsed.hostname.toLowerCase()];
+    if (canonicalHost) {
+      parsed.hostname = canonicalHost;
+    }
+    // Drop trailing slashes in the path so `new URL(path, base)` behaves.
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    // Serialize without a dangling slash
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    // Fall back to raw input if URL parsing fails — callers will surface
+    // the error when the request actually goes out.
+    return value;
+  }
+}
+
 // Config store using conf package
 const config = new Conf<CLIConfig>({
   projectName: "envpilot",
@@ -17,7 +57,7 @@ const config = new Conf<CLIConfig>({
  */
 export function getConfig(): CLIConfig {
   return {
-    apiUrl: config.get("apiUrl") ?? DEFAULT_API_URL,
+    apiUrl: normalizeApiUrl(config.get("apiUrl") ?? DEFAULT_API_URL),
     accessToken: config.get("accessToken"),
     refreshToken: config.get("refreshToken"),
     activeProjectId: config.get("activeProjectId"),
@@ -44,14 +84,18 @@ export function setConfig(updates: Partial<CLIConfig>): void {
  * Get the API URL
  */
 export function getApiUrl(): string {
-  return config.get("apiUrl") ?? DEFAULT_API_URL;
+  const stored = config.get("apiUrl");
+  const raw = stored ?? DEFAULT_API_URL;
+  // Normalize on read too, so configs written by older CLI versions that
+  // stored the apex host (envpilot.dev) are transparently fixed.
+  return normalizeApiUrl(raw);
 }
 
 /**
  * Set the API URL
  */
 export function setApiUrl(url: string): void {
-  config.set("apiUrl", url);
+  config.set("apiUrl", normalizeApiUrl(url));
 }
 
 /**

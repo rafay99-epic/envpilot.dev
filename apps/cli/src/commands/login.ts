@@ -6,7 +6,7 @@ import { performLogin } from "../lib/auth-flow.js";
 
 export const loginCommand = new Command("login")
   .description("Authenticate with Envpilot")
-  .option("--api-url <url>", "API URL (default: http://localhost:3000)")
+  .option("--api-url <url>", "API URL (default: https://www.envpilot.dev)")
   .option("--no-browser", "Do not automatically open the browser")
   .action(async (options) => {
     try {
