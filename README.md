@@ -7,18 +7,26 @@
 <p align="center">Secure environment variable management for teams. Bun + Turborepo monorepo powering the web dashboard, CLI, and VS Code extension.</p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot"><img src="https://img.shields.io/visual-studio-marketplace/v/EnvPilot.envpilot?style=for-the-badge&logo=visualstudiocode&logoColor=white&label=VS%20Code%20Marketplace" alt="VS Code Marketplace" /></a>
-  <a href="https://open-vsx.org/extension/envpilot/envpilot"><img src="https://img.shields.io/open-vsx/v/envpilot/envpilot?style=for-the-badge&logo=vscodium&logoColor=white&label=Open%20VSX" alt="Open VSX" /></a>
-  <a href="https://www.npmjs.com/package/@envpilot/cli"><img src="https://img.shields.io/npm/v/@envpilot/cli?style=for-the-badge&logo=npm&logoColor=white&label=CLI" alt="npm" /></a>
-  <a href="https://envpilot.dev"><img src="https://img.shields.io/badge/Website-envpilot.dev-0ea5e9?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-proprietary-a855f7?style=flat-square" alt="License" /></a>
+  <a href="https://envpilot.dev"><img src="https://img.shields.io/badge/website-envpilot.dev-0ea5e9?style=flat-square&logo=safari&logoColor=white" alt="Website" /></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Bun-111111?style=for-the-badge&logo=bun&logoColor=white" alt="Bun" />
-  <img src="https://img.shields.io/badge/Turborepo-0f172a?style=for-the-badge&logo=turborepo&logoColor=white" alt="Turborepo" />
-  <img src="https://img.shields.io/badge/Next.js-111111?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Convex-2563eb?style=for-the-badge&logo=databricks&logoColor=white" alt="Convex" />
-  <img src="https://img.shields.io/badge/TypeScript-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <a href="https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot"><img src="https://img.shields.io/visual-studio-marketplace/v/EnvPilot.envpilot?style=flat-square&logo=visualstudiocode&logoColor=white&label=VS%20Code" alt="VS Code Marketplace" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot"><img src="https://img.shields.io/visual-studio-marketplace/i/EnvPilot.envpilot?style=flat-square&logo=visualstudiocode&logoColor=white&label=installs" alt="VS Code Installs" /></a>
+  <a href="https://open-vsx.org/extension/envpilot/envpilot"><img src="https://img.shields.io/open-vsx/v/envpilot/envpilot?style=flat-square&logo=vscodium&logoColor=white&label=Open%20VSX" alt="Open VSX" /></a>
+  <a href="https://open-vsx.org/extension/envpilot/envpilot"><img src="https://img.shields.io/open-vsx/dt/envpilot/envpilot?style=flat-square&logo=vscodium&logoColor=white&label=downloads" alt="Open VSX Downloads" /></a>
+  <a href="https://www.npmjs.com/package/@envpilot/cli"><img src="https://img.shields.io/npm/v/@envpilot/cli?style=flat-square&logo=npm&logoColor=white&label=CLI" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/@envpilot/cli"><img src="https://img.shields.io/npm/dm/@envpilot/cli?style=flat-square&logo=npm&logoColor=white&label=downloads" alt="npm Downloads" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Bun-111111?style=flat-square&logo=bun&logoColor=white" alt="Bun" />
+  <img src="https://img.shields.io/badge/Turborepo-0f172a?style=flat-square&logo=turborepo&logoColor=white" alt="Turborepo" />
+  <img src="https://img.shields.io/badge/Next.js-111111?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Convex-2563eb?style=flat-square&logo=databricks&logoColor=white" alt="Convex" />
+  <img src="https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-06b6d4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
 </p>
 
 ## Docs
