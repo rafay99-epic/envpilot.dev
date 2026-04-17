@@ -1,0 +1,41 @@
+name: "Envpilot — Inject Environment Variables"
+description: "Fetch encrypted environment variables from Envpilot and inject them into your GitHub Actions workflow."
+author: "Envpilot <hello@envpilot.dev>"
+
+branding:
+  icon: "lock"
+  color: "green"
+
+inputs:
+  token:
+    description: "Envpilot CI/CD access token. Generate in dashboard Settings → Access Tokens and store as a GitHub Secret (ENVPILOT_TOKEN)."
+    required: true
+  project-id:
+    description: "The Envpilot project ID to fetch variables from. Find it in your dashboard URL."
+    required: true
+  environment:
+    description: "The environment to fetch variables for (e.g. production, staging, development)."
+    required: false
+    default: "production"
+  api-url:
+    description: "Base URL of your Envpilot instance. Override only if self-hosting."
+    required: false
+    default: "https://www.envpilot.dev"
+  export-env:
+    description: "Export variables as environment variables available to all subsequent steps in the job."
+    required: false
+    default: "true"
+  mask-values:
+    description: "Mask variable values in GitHub Actions logs so they are never printed in plaintext."
+    required: false
+    default: "true"
+
+outputs:
+  injected-count:
+    description: "Number of variables successfully injected into the environment."
+  failed-count:
+    description: "Number of variables that could not be decrypted (vault errors). Check server logs for details."
+
+runs:
+  using: "node20"
+  main: "dist/index.js"

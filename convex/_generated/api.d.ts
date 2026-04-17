@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accessTokens from "../accessTokens.js";
 import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
 import type * as auditHelpers from "../auditHelpers.js";
@@ -55,6 +56,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accessTokens: typeof accessTokens;
   admin: typeof admin;
   analytics: typeof analytics;
   auditHelpers: typeof auditHelpers;

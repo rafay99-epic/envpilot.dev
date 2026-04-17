@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
 import { useAuthContext } from "@/components/auth";
+import { api } from "@convex/_generated/api";
 import {
   TerminalWindow,
   TerminalCard,
@@ -29,6 +31,8 @@ import {
   AlertTriangle,
   Calendar,
   Receipt,
+  Trash2,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -49,6 +53,7 @@ type SettingsTab =
   | "notifications"
   | "integrations"
   | "security"
+  | "access-tokens"
   | "customization"
   | "billing";
 
@@ -61,6 +66,7 @@ export default function SettingsPage() {
     { id: "notifications", label: "Notifications" },
     { id: "integrations", label: "Integrations" },
     { id: "security", label: "Security" },
+    { id: "access-tokens", label: "Access Tokens" },
     { id: "customization", label: "Customization" },
     { id: "billing", label: "Billing" },
   ];
@@ -100,6 +106,7 @@ export default function SettingsPage() {
         {activeTab === "notifications" && <NotificationSettings />}
         {activeTab === "integrations" && <IntegrationsSettings />}
         {activeTab === "security" && <SecuritySettings />}
+        {activeTab === "access-tokens" && <AccessTokensSettings />}
         {activeTab === "customization" && (
           <FeatureGate
             organizationId={organization?.id as Id<"organizations"> | undefined}
@@ -1162,6 +1169,667 @@ function SecuritySettings() {
             )}
           </div>
         )}
+      </TerminalCard>
+    </div>
+  );
+}
+
+// ============================================================
+// Access Tokens Settings
+// ============================================================
+
+interface AccessToken {
+  _id: string;
+  name: string;
+  tokenPreview: string;
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  projectIds: string[];
+  environments: string[];
+  expiresAt: number;
+  lastUsedAt?: number;
+  createdAt: number;
+  isExpired: boolean;
+}
+
+type AccessTokensPhase =
+  | { type: "list" }
+  | { type: "creating" }
+  | { type: "created"; token: string; name: string };
+
+function AccessTokensSettings() {
+  const { organization } = useAuthContext();
+  const [tokens, setTokens] = useState<AccessToken[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [phase, setPhase] = useState<AccessTokensPhase>({ type: "list" });
+  const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Create form state
+  const [formName, setFormName] = useState("");
+  const [formOrgId, setFormOrgId] = useState("");
+  const [formProjectIds, setFormProjectIds] = useState<string[]>([]);
+  // Default to development only — safest starting scope
+  const [formEnvironments, setFormEnvironments] = useState<string[]>([
+    "development",
+  ]);
+  // Expiry as preset days (7 | 30 | 90 | null = unselected)
+  const [formExpiryDays, setFormExpiryDays] = useState<7 | 30 | 90 | null>(
+    null
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Load projects for the selected org directly via Convex.
+  // useQuery with "skip" when no org is selected avoids unnecessary queries.
+  const projectsList = useQuery(
+    api.projects.listByOrganization,
+    formOrgId ? { organizationId: formOrgId as Id<"organizations"> } : "skip"
+  );
+
+  useEffect(() => {
+    fetchTokens();
+  }, []);
+
+  async function fetchTokens() {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/users/me/access-tokens");
+      if (res.ok) {
+        const data = await res.json();
+        setTokens(data.tokens ?? []);
+      }
+    } catch {
+      // Leave empty
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Mirrors the rules in convex/accessTokens.ts and the Zod schema —
+  // three independent enforcement layers with identical rules.
+  const VALID_EXPIRY_PRESET_DAYS: ReadonlyArray<7 | 30 | 90> = [7, 30, 90];
+  const VALID_ENV_VALUES = ["development", "staging", "production"] as const;
+
+  async function handleCreate() {
+    if (!formName.trim() || !formOrgId || !formExpiryDays) return;
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // ── Validate before sending (defence-in-depth) ─────────────────────
+      if (formName.trim().length > 100) {
+        setError("Token name must be 100 characters or fewer.");
+        return;
+      }
+      if (
+        !(VALID_EXPIRY_PRESET_DAYS as ReadonlyArray<number>).includes(
+          formExpiryDays
+        )
+      ) {
+        setError("Token lifetime must be 7, 30, or 90 days.");
+        return;
+      }
+      if (formEnvironments.length > 3) {
+        setError("A token can restrict up to 3 environments.");
+        return;
+      }
+      for (const env of formEnvironments) {
+        if (!(VALID_ENV_VALUES as ReadonlyArray<string>).includes(env)) {
+          setError(`Invalid environment "${env}".`);
+          return;
+        }
+      }
+      if (formProjectIds.length > 50) {
+        setError("A token can restrict up to 50 projects.");
+        return;
+      }
+      // ── End validation ─────────────────────────────────────────────────
+
+      const expiresAt = Date.now() + formExpiryDays * 24 * 60 * 60 * 1000;
+
+      const res = await fetch("/api/users/me/access-tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formName.trim(),
+          organizationId: formOrgId,
+          projectIds: formProjectIds,
+          environments: formEnvironments,
+          expiresAt,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Failed to create access token");
+        return;
+      }
+
+      setPhase({ type: "created", token: data.token, name: formName.trim() });
+      setFormName("");
+      setFormOrgId("");
+      setFormProjectIds([]);
+      setFormEnvironments(["development"]);
+      setFormExpiryDays(null);
+      await fetchTokens();
+    } catch {
+      setError("Failed to create access token");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleRevoke(tokenId: string) {
+    try {
+      const res = await fetch(`/api/users/me/access-tokens/${tokenId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setTokens((prev) => prev.filter((t) => t._id !== tokenId));
+        setRevokeConfirm(null);
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function formatDate(ts: number) {
+    return new Date(ts).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  const ENVIRONMENTS = ["development", "staging", "production"];
+  const EXPIRY_PRESETS = [
+    { days: 7 as const, label: "7 days" },
+    { days: 30 as const, label: "30 days" },
+    { days: 90 as const, label: "90 days" },
+  ];
+
+  // "Token Created" modal
+  if (phase.type === "created") {
+    return (
+      <div className="space-y-6">
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+              <KeyRound className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Token Created
+              </h2>
+              <p className="text-sm text-zinc-500">{phase.name}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <p className="text-sm font-medium text-amber-400">
+              Copy your token now — it will not be shown again.
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Store it as a GitHub Secret named{" "}
+              <code className="font-mono text-zinc-300">ENVPILOT_TOKEN</code>.
+            </p>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+            <code className="flex-1 font-mono text-sm text-green-400 break-all">
+              {phase.token}
+            </code>
+            <button
+              onClick={() => handleCopy(phase.token)}
+              className="shrink-0 rounded p-1.5 text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300"
+              title="Copy token"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              Usage in GitHub Actions
+            </p>
+            <pre className="mt-2 font-mono text-xs text-zinc-300 whitespace-pre-wrap">{`- uses: rafay99-epic/envpilot.dev/packages/github-action@v1
+  with:
+    token: \${{ secrets.ENVPILOT_TOKEN }}
+    project-id: "your-project-id"
+    environment: production`}</pre>
+          </div>
+
+          <div className="mt-6">
+            <TerminalButton onClick={() => setPhase({ type: "list" })}>
+              Done
+            </TerminalButton>
+          </div>
+        </TerminalCard>
+      </div>
+    );
+  }
+
+  // "Create Token" form
+  if (phase.type === "creating") {
+    return (
+      <div className="space-y-6">
+        <TerminalCard>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Create Access Token
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Scoped CI/CD tokens for GitHub Actions and pipelines
+              </p>
+            </div>
+          </div>
+
+          {/* ── Security Warning ─────────────────────────────────────────── */}
+          <div className="mt-5 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold text-red-400">
+                  Handle this token with care
+                </p>
+                <ul className="space-y-1 text-xs text-zinc-400">
+                  <li>
+                    • Anyone who holds this token can read your environment
+                    variables — treat it like a password.
+                  </li>
+                  <li>
+                    •{" "}
+                    <span className="text-zinc-200">
+                      Scope to specific projects
+                    </span>{" "}
+                    below — never grant access to all projects unless absolutely
+                    necessary.
+                  </li>
+                  <li>
+                    •{" "}
+                    <span className="text-zinc-200">
+                      Scope to specific environments
+                    </span>{" "}
+                    — start with Development only; add Production only when
+                    required.
+                  </li>
+                  <li>
+                    • Store it exclusively in{" "}
+                    <span className="font-mono text-zinc-200">
+                      GitHub Secrets
+                    </span>{" "}
+                    or your CI secret manager — never in code or logs.
+                  </li>
+                  <li>
+                    • The token is shown{" "}
+                    <span className="text-zinc-200">exactly once</span> after
+                    creation and cannot be recovered.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-5">
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Token Name
+              </label>
+              <TerminalInput
+                type="text"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder='e.g. "GitHub Actions Production"'
+                className="mt-1"
+              />
+            </div>
+
+            {/* Organization */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Organization
+              </label>
+              <select
+                value={formOrgId}
+                onChange={(e) => {
+                  setFormOrgId(e.target.value);
+                  setFormProjectIds([]);
+                }}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100"
+              >
+                <option value="">Select an organization…</option>
+                {organization?.id && (
+                  <option value={organization.id}>{organization.name}</option>
+                )}
+              </select>
+              <p className="mt-1 text-xs text-zinc-600">
+                Only organizations where you are admin or team lead are shown.
+              </p>
+            </div>
+
+            {/* Projects */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Projects{" "}
+                <span className="font-normal text-zinc-500">
+                  — scope to specific projects{" "}
+                  <span className="text-zinc-600">(leave empty for all)</span>
+                </span>
+              </label>
+              {!formOrgId ? (
+                <p className="mt-2 text-xs text-zinc-600">
+                  Select an organization first.
+                </p>
+              ) : (projectsList ?? []).length === 0 ? (
+                <p className="mt-2 text-xs text-zinc-600">
+                  {projectsList === undefined
+                    ? "Loading projects…"
+                    : "No projects found in this organization."}
+                </p>
+              ) : (
+                <div className="mt-2 space-y-1">
+                  {(projectsList ?? []).map((p) => (
+                    <label
+                      key={p._id}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-800/30 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800/60"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formProjectIds.includes(p._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormProjectIds((prev) => [...prev, p._id]);
+                          } else {
+                            setFormProjectIds((prev) =>
+                              prev.filter((id) => id !== p._id)
+                            );
+                          }
+                        }}
+                        className="accent-green-500"
+                      />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Environments */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Environments{" "}
+                <span className="font-normal text-zinc-500">
+                  — restrict to specific environments{" "}
+                  <span className="text-zinc-600">(leave empty for all)</span>
+                </span>
+              </label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {ENVIRONMENTS.map((env) => (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => {
+                      if (formEnvironments.includes(env)) {
+                        setFormEnvironments((prev) =>
+                          prev.filter((e) => e !== env)
+                        );
+                      } else {
+                        setFormEnvironments((prev) => [...prev, env]);
+                      }
+                    }}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                      formEnvironments.includes(env)
+                        ? "border-green-500/30 bg-green-500/10 text-green-400"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    {env}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Development is selected by default. Add Production only when
+                required.
+              </p>
+            </div>
+
+            {/* Expiry — preset buttons only */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Token Lifetime
+              </label>
+              <div className="mt-2 flex gap-2">
+                {EXPIRY_PRESETS.map(({ days, label }) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setFormExpiryDays(days)}
+                    className={`flex-1 rounded-lg border py-2.5 text-sm font-medium transition-colors ${
+                      formExpiryDays === days
+                        ? "border-green-500/40 bg-green-500/10 text-green-400"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {formExpiryDays && (
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  Expires on{" "}
+                  <span className="text-zinc-300">
+                    {new Date(
+                      Date.now() + formExpiryDays * 24 * 60 * 60 * 1000
+                    ).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  . Maximum lifetime is 90 days.
+                </p>
+              )}
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex items-center gap-3">
+            <TerminalButton
+              onClick={handleCreate}
+              disabled={
+                !formName.trim() ||
+                !formOrgId ||
+                !formExpiryDays ||
+                isSubmitting
+              }
+            >
+              {isSubmitting ? "Creating…" : "Create Token"}
+            </TerminalButton>
+            <TerminalButton
+              variant="secondary"
+              onClick={() => {
+                setPhase({ type: "list" });
+                setError(null);
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </TerminalButton>
+          </div>
+        </TerminalCard>
+      </div>
+    );
+  }
+
+  // Token list view
+  return (
+    <div className="space-y-6">
+      <TerminalCard>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700/50">
+              <KeyRound className="h-4 w-4 text-zinc-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">
+                Access Tokens
+              </h2>
+              <p className="text-sm text-zinc-500">
+                Scoped tokens for CI/CD pipelines and GitHub Actions
+              </p>
+            </div>
+          </div>
+          <FeatureGate
+            organizationId={
+              organization?.id as
+                | import("@convex/_generated/dataModel").Id<"organizations">
+                | undefined
+            }
+            featureKey="access_tokens"
+            featureName="CI/CD Access Tokens"
+            fallbackVariant="inline"
+          >
+            <TerminalButton onClick={() => setPhase({ type: "creating" })}>
+              <Plus className="h-3.5 w-3.5" />
+              Create Token
+            </TerminalButton>
+          </FeatureGate>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {isLoading ? (
+            <>
+              {[1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-16 animate-pulse rounded-lg bg-zinc-800/50"
+                />
+              ))}
+            </>
+          ) : tokens.length === 0 ? (
+            <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-8 text-center">
+              <KeyRound className="mx-auto h-8 w-8 text-zinc-700" />
+              <p className="mt-3 text-sm font-medium text-zinc-400">
+                No access tokens
+              </p>
+              <p className="mt-1 text-xs text-zinc-600">
+                Create a token to use in GitHub Actions and CI/CD pipelines.
+              </p>
+            </div>
+          ) : (
+            tokens.map((token) => (
+              <div
+                key={token._id}
+                className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-zinc-100">
+                        {token.name}
+                      </p>
+                      {token.isExpired && (
+                        <span className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
+                          Expired
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 font-mono text-xs text-zinc-600">
+                      {token.tokenPreview}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                      <span>{token.organizationName}</span>
+                      <span>
+                        {token.projectIds.length === 0
+                          ? "All projects"
+                          : `${token.projectIds.length} project${token.projectIds.length !== 1 ? "s" : ""}`}
+                      </span>
+                      <span>
+                        {token.environments.length === 0
+                          ? "All environments"
+                          : token.environments.join(", ")}
+                      </span>
+                      <span>Expires {formatDate(token.expiresAt)}</span>
+                      {token.lastUsedAt && (
+                        <span>Last used {formatDate(token.lastUsedAt)}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    {revokeConfirm === token._id ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRevoke(token._id)}
+                          className="text-xs font-medium text-red-400 transition-colors hover:text-red-300"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setRevokeConfirm(null)}
+                          className="text-xs text-zinc-500 transition-colors hover:text-zinc-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setRevokeConfirm(token._id)}
+                        className="rounded p-1.5 text-zinc-600 transition-colors hover:bg-zinc-700 hover:text-red-400"
+                        title="Revoke token"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </TerminalCard>
+
+      <TerminalCard>
+        <h2 className="text-base font-semibold text-zinc-100">Usage</h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          How to use access tokens in your CI/CD pipeline
+        </p>
+        <div className="mt-4 space-y-3 text-xs text-zinc-500">
+          <p>
+            1. Create a token scoped to the organization and projects you need.
+          </p>
+          <p>
+            2. Add it as a GitHub repository secret named{" "}
+            <code className="font-mono text-zinc-300">ENVPILOT_TOKEN</code>.
+          </p>
+          <p>3. Use the GitHub Action in your workflow:</p>
+          <pre className="rounded-lg border border-zinc-700/50 bg-zinc-900 p-3 font-mono text-zinc-400">{`- uses: rafay99-epic/envpilot.dev/packages/github-action@v1
+  with:
+    token: \${{ secrets.ENVPILOT_TOKEN }}
+    project-id: "your-project-id"
+    environment: production`}</pre>
+        </div>
       </TerminalCard>
     </div>
   );

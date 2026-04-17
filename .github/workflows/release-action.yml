@@ -1,0 +1,204 @@
+name: Release GitHub Action
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/github-action/**"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip tagging and release)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-action
+  cancel-in-progress: false
+
+jobs:
+  # ──────────────────────────────────────────────────────────
+  # 1. Detect whether the version has changed
+  # ──────────────────────────────────────────────────────────
+  detect:
+    name: Detect version change
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.compare.outputs.should_release }}
+      local_version: ${{ steps.compare.outputs.local_version }}
+      major_version: ${{ steps.compare.outputs.major_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Compare local vs latest tag
+        id: compare
+        run: |
+          LOCAL_VERSION=$(jq -r '.version' packages/github-action/package.json)
+          echo "local_version=${LOCAL_VERSION}" >> "$GITHUB_OUTPUT"
+
+          MAJOR=$(echo "$LOCAL_VERSION" | cut -d. -f1)
+          echo "major_version=${MAJOR}" >> "$GITHUB_OUTPUT"
+
+          LATEST_TAG=$(git tag --list "action/v*" --sort=-version:refname | head -1 || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing action tag found — treating as new release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            TAGGED_VERSION="${LATEST_TAG#action/v}"
+            if [ "$LOCAL_VERSION" = "$TAGGED_VERSION" ]; then
+              echo "Version ${LOCAL_VERSION} already tagged — skipping."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "New version detected: ${TAGGED_VERSION} → ${LOCAL_VERSION}"
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # ──────────────────────────────────────────────────────────
+  # 2. CI — typecheck, lint, rebuild dist
+  # ──────────────────────────────────────────────────────────
+  ci:
+    name: CI checks
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.should_release == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bunx turbo typecheck --filter=@envpilot/github-action
+
+      - name: Lint
+        run: bunx turbo lint --filter=@envpilot/github-action
+
+      - name: Build
+        run: bunx turbo build --filter=@envpilot/github-action --force
+
+  # ──────────────────────────────────────────────────────────
+  # 3. Rebuild dist, tag, and create GitHub Release
+  # ──────────────────────────────────────────────────────────
+  release:
+    name: Tag and Release
+    runs-on: ubuntu-latest
+    needs: [detect, ci]
+    if: needs.detect.outputs.should_release == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Rebuild dist bundle
+        run: bunx turbo build --filter=@envpilot/github-action --force
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit rebuilt dist
+        if: ${{ !(github.event.inputs.dry_run == 'true') }}
+        run: |
+          git add packages/github-action/dist/index.js
+          # Only commit if there are changes to the dist
+          git diff --staged --quiet || git commit -m "chore(action): rebuild dist for v${{ needs.detect.outputs.local_version }} [skip ci]"
+          git push
+
+      - name: Tag versioned release
+        if: ${{ !(github.event.inputs.dry_run == 'true') }}
+        run: |
+          VERSION="${{ needs.detect.outputs.local_version }}"
+          MAJOR="${{ needs.detect.outputs.major_version }}"
+
+          # Exact version tag
+          git tag -a "action/v${VERSION}" -m "GitHub Action v${VERSION}"
+
+          # Floating major tag (e.g. action/v1) — overwrite so @v1 always points to latest
+          git tag -fa "action/v${MAJOR}" -m "GitHub Action v${MAJOR} (latest)"
+
+          git push origin "action/v${VERSION}"
+          git push origin "action/v${MAJOR}" --force
+
+      - name: Create GitHub Release
+        if: ${{ !(github.event.inputs.dry_run == 'true') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: action/v${{ needs.detect.outputs.local_version }}
+          name: "Envpilot GitHub Action v${{ needs.detect.outputs.local_version }}"
+          body: |
+            ## Envpilot GitHub Action v${{ needs.detect.outputs.local_version }}
+
+            Inject encrypted environment variables from Envpilot into your GitHub Actions workflows.
+
+            ### Usage
+
+            ```yaml
+            - uses: rafay99-epic/envpilot.dev/packages/github-action@v${{ needs.detect.outputs.major_version }}
+              with:
+                token: ${{ secrets.ENVPILOT_TOKEN }}
+                project-id: "your-project-id"
+                environment: production
+            ```
+
+            ### Inputs
+
+            | Input | Required | Default | Description |
+            |-------|----------|---------|-------------|
+            | `token` | ✓ | — | CI/CD access token from Settings → Access Tokens |
+            | `project-id` | ✓ | — | Envpilot project ID |
+            | `environment` | | `production` | Environment to fetch |
+            | `api-url` | | `https://www.envpilot.dev` | Envpilot instance URL |
+            | `export-env` | | `true` | Export vars to `$GITHUB_ENV` |
+            | `mask-values` | | `true` | Mask values in logs |
+
+            ### Outputs
+
+            | Output | Description |
+            |--------|-------------|
+            | `injected-count` | Number of variables successfully injected |
+            | `failed-count` | Number of variables that failed to decrypt |
+
+            ### Prerequisites
+
+            1. Create a CI/CD access token in your Envpilot dashboard under **Settings → Access Tokens** (Pro plan required).
+            2. Add it as a GitHub repository secret named `ENVPILOT_TOKEN`.
+          generate_release_notes: false
+
+      - name: Dry run summary
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "Dry run — would have released action/v${{ needs.detect.outputs.local_version }}"

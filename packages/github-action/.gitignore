@@ -1,0 +1,4 @@
+node_modules/
+# dist/ is intentionally NOT ignored — GitHub Actions requires the built
+# dist/index.js to be committed so the runner can execute it without
+# a separate install/build step.

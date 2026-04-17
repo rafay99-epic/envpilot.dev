@@ -753,6 +753,15 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "access_tokens",
+    displayName: "CI/CD Access Tokens",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
 
   // Security
   {
@@ -949,6 +958,7 @@ export const seedDefaultTierFeatures = internalMutation({
         api_access: "true",
         extension_access: "false",
         cli_access: "false",
+        access_tokens: "false",
         granular_permissions: "true",
         audit_log_retention_days: "7",
         sso_enabled: "false",
@@ -975,6 +985,7 @@ export const seedDefaultTierFeatures = internalMutation({
         api_access: "true",
         extension_access: "true",
         cli_access: "true",
+        access_tokens: "true",
         granular_permissions: "true",
         audit_log_retention_days: "365",
         sso_enabled: "false",

@@ -943,6 +943,38 @@ export default defineSchema({
     .index("by_user_active", ["userId", "isActive"]),
 
   // ==========================================
+  // ACCESS TOKENS (CI/CD Scoped Tokens)
+  // ==========================================
+  accessTokens: defineTable({
+    // WorkOS user ID of creator/owner
+    userId: v.string(),
+    // Display name, e.g. "GitHub Actions Production"
+    name: v.string(),
+    // "ep_at_" prefix + 48-char random alphanumeric
+    token: v.string(),
+    // Which organization this token has access to
+    organizationId: v.id("organizations"),
+    // Which projects (empty array = all org projects)
+    projectIds: v.array(v.id("projects")),
+    // Which environments (empty array = all environments)
+    environments: v.array(v.string()),
+    // Expiration timestamp in ms
+    expiresAt: v.number(),
+    // Last time the token was used
+    lastUsedAt: v.optional(v.number()),
+    // Whether the token is still active
+    isActive: v.boolean(),
+    // Creation timestamp
+    createdAt: v.number(),
+    // When revoked (if applicable)
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_org", ["organizationId"])
+    .index("by_user_active", ["userId", "isActive"]),
+
+  // ==========================================
   // ENVIRONMENT TEMPLATES
   // ==========================================
   environmentTemplates: defineTable({
