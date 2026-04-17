@@ -17,8 +17,8 @@ import {
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
- * POST /api/cli/auth/initiate
- * Initiate CLI authentication flow
+ * POST /api/cli/auth?action=initiate|refresh|revoke
+ * Dispatches to the appropriate handler based on the `action` query param.
  */
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);

@@ -10,6 +10,20 @@ import type {
 } from "../types/index.js";
 
 /**
+ * Return the registrable domain (eTLD+1 approximation) for a hostname.
+ * For hostnames like `envpilot.dev` or `www.envpilot.dev` this returns
+ * `envpilot.dev`. This is a heuristic — we only use it to decide whether
+ * a redirect is "same site" and thus safe to re-issue with Authorization.
+ */
+function registrableDomain(hostname: string): string {
+  const parts = hostname.toLowerCase().split(".").filter(Boolean);
+  if (parts.length <= 2) return parts.join(".");
+  return parts.slice(-2).join(".");
+}
+
+const MAX_MANUAL_REDIRECTS = 5;
+
+/**
  * Custom error class for API errors
  */
 export class APIError extends Error {
@@ -60,13 +74,85 @@ export class APIClient {
     const preview = (bodyText || "").slice(0, 512).toLowerCase();
 
     return (
-      response.redirected ||
       location.includes("authkit") ||
       finalUrl.includes("authkit") ||
       (contentType.includes("text/html") &&
         (preview.includes("authorization_session_id") ||
           preview.includes("client_id=") ||
           preview.includes("<!doctype html")))
+    );
+  }
+
+  /**
+   * Perform a fetch that follows 3xx redirects manually, re-attaching the
+   * Authorization header when the redirect stays inside the same registrable
+   * domain (eTLD+1). This defends against the apex→www redirect case where
+   * Node's default redirect follower drops the Authorization header on any
+   * hostname change and the resulting request comes back as a bogus 401 —
+   * which used to wipe the user's credentials.
+   *
+   * Cross-site redirects (different registrable domain) are followed without
+   * the Authorization header, matching browser/fetch security semantics.
+   */
+  private async fetchWithSafeRedirects(
+    initialUrl: string,
+    init: RequestInit
+  ): Promise<Response> {
+    let currentUrl = initialUrl;
+    let currentInit: RequestInit = { ...init, redirect: "manual" };
+
+    for (let hop = 0; hop < MAX_MANUAL_REDIRECTS; hop++) {
+      const response = await fetch(currentUrl, currentInit);
+
+      // Not a redirect — return as-is
+      if (response.status < 300 || response.status >= 400) {
+        return response;
+      }
+
+      const location = response.headers.get("location");
+      if (!location) return response;
+
+      const nextUrl = new URL(location, currentUrl);
+      const prevHost = new URL(currentUrl).hostname;
+      const sameSite =
+        registrableDomain(nextUrl.hostname) === registrableDomain(prevHost);
+
+      const headers = new Headers(currentInit.headers);
+      if (!sameSite) {
+        // Cross-site redirect — strip credentials (matches fetch spec)
+        headers.delete("Authorization");
+      }
+
+      // 303 and (per spec) most 302/301 redirects coerce POST/PUT/PATCH to
+      // GET and drop the body. 307 and 308 preserve method and body.
+      let nextMethod = (currentInit.method || "GET").toUpperCase();
+      let nextBody = currentInit.body;
+      if (
+        response.status === 301 ||
+        response.status === 302 ||
+        response.status === 303
+      ) {
+        if (nextMethod !== "GET" && nextMethod !== "HEAD") {
+          nextMethod = "GET";
+          nextBody = undefined;
+          headers.delete("Content-Type");
+        }
+      }
+
+      currentUrl = nextUrl.toString();
+      currentInit = {
+        ...currentInit,
+        method: nextMethod,
+        headers,
+        body: nextBody,
+        redirect: "manual",
+      };
+    }
+
+    throw new APIError(
+      `Too many redirects while calling ${initialUrl}`,
+      0,
+      "TOO_MANY_REDIRECTS"
     );
   }
 
@@ -82,10 +168,9 @@ export class APIClient {
       }
     }
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
       method: "GET",
       headers: this.getHeaders(),
-      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -97,11 +182,10 @@ export class APIClient {
   async post<T>(path: string, body?: unknown): Promise<T> {
     const url = new URL(path, this.baseUrl);
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
       method: "POST",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
-      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -113,11 +197,10 @@ export class APIClient {
   async put<T>(path: string, body?: unknown): Promise<T> {
     const url = new URL(path, this.baseUrl);
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
       method: "PUT",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
-      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -129,11 +212,10 @@ export class APIClient {
   async patch<T>(path: string, body?: unknown): Promise<T> {
     const url = new URL(path, this.baseUrl);
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
       method: "PATCH",
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
-      redirect: "follow",
     });
 
     return this.handleResponse<T>(response);
@@ -145,10 +227,9 @@ export class APIClient {
   async delete(path: string): Promise<void> {
     const url = new URL(path, this.baseUrl);
 
-    const response = await fetch(url.toString(), {
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
       method: "DELETE",
       headers: this.getHeaders(),
-      redirect: "follow",
     });
 
     if (!response.ok) {
@@ -169,7 +250,13 @@ export class APIClient {
     if (!contentType.includes("application/json")) {
       const body = await response.text();
       if (this.isAuthRedirect(response, body)) {
-        clearAuth();
+        // We intentionally do NOT call clearAuth() here. The server decided
+        // to send us to the browser sign-in flow, but that doesn't mean the
+        // stored token is garbage — it may be a CDN/edge quirk, a same-site
+        // redirect, or a transient auth-middleware misroute. Wiping creds on
+        // the first surprise response locks the user out of their own
+        // session. Surface the error; let them re-run `envpilot login` if
+        // the token really is bad.
         throw new APIError(
           "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
           401,
@@ -212,26 +299,16 @@ export class APIClient {
       // Ignore JSON parsing errors
     }
 
-    if (
-      response.status >= 300 &&
-      response.status < 400 &&
-      this.isAuthRedirect(response)
-    ) {
-      clearAuth();
-      throw new APIError(
-        "Your CLI session expired or the server redirected this request to browser sign-in. Please run `envpilot login`.",
-        401,
-        "AUTH_REDIRECT"
-      );
-    }
-
-    // Handle authentication errors
+    // Handle authentication errors.
+    // A 401 from the server means the token is definitively rejected —
+    // always wipe local credentials so `isAuthenticated()` reflects
+    // reality and the user isn't stuck in a failing loop.
     if (response.status === 401) {
       clearAuth();
       throw new APIError(
-        "Authentication required. Please run `envpilot login`.",
+        "Authentication failed. Please run `envpilot login`.",
         401,
-        "UNAUTHORIZED"
+        code || "UNAUTHORIZED"
       );
     }
 
@@ -271,7 +348,7 @@ export class APIClient {
    * Get current user info
    */
   async getCurrentUser(): Promise<User> {
-    return this.get<User>("/api/cli/auth/me");
+    return this.get<User>("/api/cli/auth", { action: "me" });
   }
 
   /**
@@ -441,7 +518,7 @@ export class APIClient {
   async initiateAuth(
     deviceName: string
   ): Promise<{ code: string; url: string; expiresAt: number }> {
-    return this.post("/api/cli/auth/initiate", { deviceName });
+    return this.post("/api/cli/auth?action=initiate", { deviceName });
   }
 
   /**
@@ -453,7 +530,7 @@ export class APIClient {
     refreshToken?: string;
     user?: User;
   }> {
-    return this.get("/api/cli/auth/poll", { code });
+    return this.get("/api/cli/auth", { action: "poll", code });
   }
 
   /**
@@ -463,14 +540,14 @@ export class APIClient {
     accessToken: string;
     refreshToken: string;
   }> {
-    return this.post("/api/cli/auth/refresh", { refreshToken });
+    return this.post("/api/cli/auth?action=refresh", { refreshToken });
   }
 
   /**
    * Revoke access token (logout)
    */
   async revokeToken(): Promise<void> {
-    return this.post("/api/cli/auth/revoke", {});
+    return this.post("/api/cli/auth?action=revoke", {});
   }
 }
 

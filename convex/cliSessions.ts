@@ -11,26 +11,34 @@ const ACCESS_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days for access t
 const REFRESH_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90 days for refresh token
 
 /**
- * Generate a random alphanumeric code
+ * Generate a random alphanumeric code using a CSPRNG.
+ * Uses crypto.getRandomValues() instead of Math.random() so that
+ * session codes cannot be predicted by an attacker.
  */
 function generateCode(length: number): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed ambiguous chars (0, O, I, 1)
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
   let code = "";
   for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(bytes[i] % chars.length);
   }
   return code;
 }
 
 /**
- * Generate a secure token
+ * Generate a secure token using a CSPRNG.
+ * Access and refresh tokens are long-lived (30–90 days) so they MUST
+ * be generated with crypto.getRandomValues(), not Math.random().
  */
 function generateToken(prefix: string): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
   let token = prefix;
   for (let i = 0; i < 48; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+    token += chars.charAt(bytes[i] % chars.length);
   }
   return token;
 }
@@ -61,7 +69,12 @@ export const initiate = mutation({
         .query("cliSessions")
         .withIndex("by_code", (q) => q.eq("code", code))
         .first();
-    } while (existingSession && existingSession.status === "pending");
+      // Reject codes that collide with ANY existing session — not just
+      // pending ones. The old check allowed reuse when the previous session
+      // was "authenticated" or "expired", but poll() uses .first() on the
+      // same index, which could then return the OLD session (with stale or
+      // missing tokens) instead of the new one.
+    } while (existingSession);
 
     // Create session
     const sessionId = await ctx.db.insert("cliSessions", {
@@ -190,6 +203,13 @@ export const poll = query({
     }
 
     if (session.status === "authenticated") {
+      // Guard: tokens must exist on an authenticated session. If they're
+      // somehow missing (schema allows optional), surface it clearly so the
+      // CLI can show a meaningful error instead of silently dropping creds.
+      if (!session.accessToken || !session.refreshToken) {
+        return { status: "not_found" as const };
+      }
+
       // Get user info
       const user = session.userId ? await ctx.db.get(session.userId) : null;
 

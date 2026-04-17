@@ -6,6 +6,7 @@ import {
   clearConfig,
   getConfigPath,
   setApiUrl,
+  normalizeApiUrl,
   isAuthenticated,
 } from "../lib/config.js";
 import {
@@ -110,17 +111,20 @@ async function handleSet(key: string | undefined, value: string | undefined) {
   }
 
   switch (key) {
-    case "apiUrl":
-      // Validate URL
+    case "apiUrl": {
+      // Normalize first (adds https:// if missing, canonicalizes host),
+      // then validate the result so bare domains like "envpilot.dev" work.
+      const normalized = normalizeApiUrl(value);
       try {
-        new URL(value);
+        new URL(normalized);
       } catch {
         error("Invalid URL format");
         process.exit(1);
       }
       setApiUrl(value);
-      success(`Set apiUrl to ${value}`);
+      success(`Set apiUrl to ${normalized}`);
       break;
+    }
 
     default:
       error(`Cannot set key: ${key}`);

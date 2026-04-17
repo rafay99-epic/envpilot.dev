@@ -30,11 +30,7 @@ export async function performLogin(options?: {
 
   let initResponse: { code: string; url: string; expiresAt: number };
   try {
-    initResponse = await api.post<{
-      code: string;
-      url: string;
-      expiresAt: number;
-    }>("/api/cli/auth?action=initiate", { deviceName });
+    initResponse = await api.initiateAuth(deviceName);
   } catch (error) {
     spinner.stop();
     throw error;
@@ -73,10 +69,7 @@ export async function performLogin(options?: {
       };
 
       try {
-        pollResponse = await api.get("/api/cli/auth", {
-          action: "poll",
-          code: initResponse.code,
-        });
+        pollResponse = await api.pollAuth(initResponse.code);
         consecutiveErrors = 0;
       } catch {
         consecutiveErrors++;
@@ -92,12 +85,20 @@ export async function performLogin(options?: {
       if (pollResponse.status === "authenticated") {
         pollSpinner.stop();
 
-        if (pollResponse.accessToken) {
-          setAccessToken(pollResponse.accessToken);
+        // The server must return tokens when status is "authenticated".
+        // Fail explicitly instead of silently proceeding without credentials —
+        // a silent miss here leaves the user "logged in" with no stored token,
+        // making every subsequent command fail with "Authentication required".
+        if (!pollResponse.accessToken || !pollResponse.refreshToken) {
+          throw new Error(
+            "Authentication succeeded but the server did not return session tokens. " +
+              "This is likely a server-side issue. Please try again or contact support."
+          );
         }
-        if (pollResponse.refreshToken) {
-          setRefreshToken(pollResponse.refreshToken);
-        }
+
+        setAccessToken(pollResponse.accessToken);
+        setRefreshToken(pollResponse.refreshToken);
+
         if (pollResponse.user) {
           setUser({
             id: pollResponse.user.id,
