@@ -30,6 +30,9 @@
 - [CI / CD](docs/ci.md) (GitHub Actions pipeline)
 - [Development Guide](docs/DEVELOPMENT.md) (conventions, Convex, TypeScript)
 - [Deployment Guide](docs/DEPLOYMENT.md) (Vercel, Convex, npm, VS Code Marketplace)
+- [Features](docs/FEATURES.md) (full feature inventory)
+- [Roadmap](docs/ROADMAP.md) (planned features)
+- [Security TODO](docs/SECURITY-TODO.md) (pre-launch security checklist)
 
 ## Quick Start
 
