@@ -1,48 +1,18 @@
 "use client";
 
-import { useState, useEffect, use, useCallback, useRef } from "react";
+import { useState, use, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { ConfirmDialog, ProjectIcon } from "@/components/ui";
-import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { usePagination } from "@/hooks";
+import { usePagination, useConvexUser } from "@/hooks";
+import { useAuthContext } from "@/components/auth";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
-
-interface Member {
-  _id: string;
-  userId: string;
-  role: "admin" | "team_lead" | "member";
-  joinedAt: number;
-  user: {
-    _id: string;
-    email: string;
-    name?: string;
-    avatarUrl?: string;
-  };
-}
-
-interface Invitation {
-  _id: string;
-  email: string;
-  role: "admin" | "team_lead" | "member";
-  expiresAt: number;
-  createdAt: number;
-  invitedByUser?: {
-    name?: string;
-    email: string;
-  };
-}
-
-interface Organization {
-  _id: string;
-  name: string;
-  role: "admin" | "team_lead" | "member";
-  tier?: string;
-}
 
 interface SearchUser {
   _id: string;
@@ -53,24 +23,67 @@ interface SearchUser {
   hasPendingInvitation?: boolean;
 }
 
-interface Project {
-  _id: string;
-  name: string;
-  slug: string;
-  icon?: string;
-  color?: string;
-}
-
 export default function OrganizationMembersPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
-  const [organization, setOrganization] = useState<Organization | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+
+  // ---------------------------------------------------------------------------
+  // Convex queries — real-time via WebSocket, no fetch() round-trip
+  // ---------------------------------------------------------------------------
+  const org = useQuery(api.organizations.getBySlug, { slug });
+  const orgId = org?._id;
+
+  const membersData = useQuery(
+    api.organizations.getMembers,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+  const invitationsData = useQuery(
+    api.invitations.listPendingByOrganization,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+  const projectsData = useQuery(
+    api.projects.listByOrganization,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+
+  // Derive loading state from Convex query readiness
+  const isLoading = org === undefined || membersData === undefined;
+
+  // Safe accessors — never null after loading
+  const members = (membersData ?? []) as Array<{
+    _id: string;
+    userId: string;
+    role: "admin" | "team_lead" | "member";
+    joinedAt: number;
+    user: { _id: string; email: string; name?: string; avatarUrl?: string };
+  }>;
+  const invitations = (invitationsData ?? []) as Array<{
+    _id: string;
+    email: string;
+    role: "admin" | "team_lead" | "member";
+    expiresAt: number;
+    createdAt: number;
+    invitedByUser?: { name?: string; email: string };
+  }>;
+  const projects = (projectsData ?? []) as Array<{
+    _id: string;
+    name: string;
+    slug: string;
+    icon?: string;
+    color?: string;
+  }>;
+
+  // Derive current user's role from the members list
+  const currentUserMember = convexUserId
+    ? members.find((m) => m.userId === (convexUserId as string))
+    : undefined;
+  const userRole = currentUserMember?.role;
+
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -82,7 +95,6 @@ export default function OrganizationMembersPage({
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [inviteProjectRole, setInviteProjectRole] = useState<
     "viewer" | "developer" | "manager"
@@ -130,7 +142,7 @@ export default function OrganizationMembersPage({
   const enforcing = useEnforcementEnabled();
   const totalMemberSlots = members.length + invitations.length;
   const memberLimitGate = useFeatureGate(
-    organization?._id ? (organization._id as Id<"organizations">) : undefined,
+    orgId ? (orgId as Id<"organizations">) : undefined,
     "max_team_members",
     { currentCount: totalMemberSlots }
   );
@@ -138,51 +150,10 @@ export default function OrganizationMembersPage({
   const memberLimit =
     typeof memberLimitGate.limit === "number" ? memberLimitGate.limit : null;
 
-  useEffect(() => {
-    fetchData();
-  }, [slug]);
-
-  async function fetchData() {
-    try {
-      const [orgRes, membersRes] = await Promise.all([
-        fetch(`/api/organizations/${slug}`),
-        fetch(`/api/organizations/${slug}/members`),
-      ]);
-
-      if (!orgRes.ok) {
-        throw new Error("Failed to fetch organization");
-      }
-
-      const orgData = await orgRes.json();
-      setOrganization(orgData.organization);
-
-      // Fetch projects using the org's Convex ID (not the slug)
-      const projectsRes = await fetch(
-        `/api/projects?organizationId=${orgData.organization._id}`
-      );
-
-      if (membersRes.ok) {
-        const membersData = await membersRes.json();
-        setMembers(membersData.members || []);
-        setInvitations(membersData.invitations || []);
-      }
-
-      if (projectsRes.ok) {
-        const projectsData = await projectsRes.json();
-        setProjects(projectsData.projects || []);
-      } else {
-        console.error(
-          "[MEMBERS] Failed to fetch projects:",
-          projectsRes.status,
-          await projectsRes.text().catch(() => "")
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Mutation handlers — keep API fetch for server-side auth; Convex reactivity
+  // auto-updates queries after backend data changes (no manual refetch needed)
+  // ---------------------------------------------------------------------------
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -228,8 +199,7 @@ export default function OrganizationMembersPage({
         );
       }
       setTimeout(() => setNotice(null), 8000);
-
-      fetchData();
+      // No manual refetch — Convex reactivity updates invitations query automatically
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -252,12 +222,7 @@ export default function OrganizationMembersPage({
         const data = await response.json();
         throw new Error(data.error || "Failed to update role");
       }
-
-      setMembers(
-        members.map((m) =>
-          m.user._id === userId ? { ...m, role: newRole } : m
-        )
-      );
+      // No manual state update — Convex reactivity updates members query
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     }
@@ -282,8 +247,7 @@ export default function OrganizationMembersPage({
             const data = await response.json();
             throw new Error(data.error || "Failed to remove member");
           }
-
-          setMembers(members.filter((m) => m.user._id !== userId));
+          // No manual state update — Convex reactivity updates members query
         } catch (err) {
           setError(err instanceof Error ? err.message : "An error occurred");
         }
@@ -302,7 +266,7 @@ export default function OrganizationMembersPage({
       setIsSearching(true);
       try {
         const response = await fetch(
-          `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${organization?._id}&limit=5`
+          `/api/users/search?q=${encodeURIComponent(query)}&organizationId=${orgId}&limit=5`
         );
         if (response.ok) {
           const data = await response.json();
@@ -315,7 +279,7 @@ export default function OrganizationMembersPage({
         setIsSearching(false);
       }
     },
-    [slug, organization]
+    [slug, orgId]
   );
 
   function handleEmailChange(value: string) {
@@ -428,8 +392,7 @@ export default function OrganizationMembersPage({
             const data = await response.json();
             throw new Error(data.error || "Failed to cancel invitation");
           }
-
-          setInvitations(invitations.filter((inv) => inv._id !== invitationId));
+          // No manual state update — Convex reactivity updates invitations query
         } catch (err) {
           setError(err instanceof Error ? err.message : "An error occurred");
         }
@@ -450,8 +413,7 @@ export default function OrganizationMembersPage({
         const data = await response.json();
         throw new Error(data.error || "Failed to resend invitation");
       }
-
-      fetchData();
+      // No manual refetch — Convex reactivity handles updates
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     }
@@ -460,15 +422,52 @@ export default function OrganizationMembersPage({
   const membersPagination = usePagination(members, { pageSize: 10 });
   const invitationsPagination = usePagination(invitations, { pageSize: 10 });
 
-  const canInvite =
-    organization?.role === "admin" || organization?.role === "team_lead";
-  const isAdmin = organization?.role === "admin";
+  const canInvite = userRole === "admin" || userRole === "team_lead";
+  const isAdmin = userRole === "admin";
 
   if (isLoading) {
-    return <TerminalLoading />;
+    return (
+      <div className="mx-auto max-w-4xl space-y-8">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-4 w-32 animate-pulse rounded bg-zinc-800/60" />
+            <div className="mt-4 h-8 w-44 animate-pulse rounded bg-zinc-800" />
+            <div className="mt-2 h-4 w-56 animate-pulse rounded bg-zinc-800/40" />
+          </div>
+          <div className="h-10 w-32 animate-pulse rounded-lg bg-zinc-800" />
+        </div>
+        {/* Members list skeleton */}
+        <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+            <div className="h-5 w-24 animate-pulse rounded bg-zinc-800" />
+          </div>
+          <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-6 py-4"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-800" />
+                  <div className="space-y-1.5">
+                    <div className="h-4 w-28 animate-pulse rounded bg-zinc-800" />
+                    <div className="h-3 w-40 animate-pulse rounded bg-zinc-800/40" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-24 animate-pulse rounded-lg bg-zinc-800/60" />
+                  <div className="h-8 w-8 animate-pulse rounded bg-zinc-800/40" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (error && !organization) {
+  if (error && !org) {
     return (
       <div className="mx-auto max-w-4xl">
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-900/20">
@@ -499,13 +498,13 @@ export default function OrganizationMembersPage({
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to {organization?.name}
+            Back to {org?.name}
           </Link>
           <h1 className="mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-100">
             Team Members
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage who has access to {organization?.name}.
+            Manage who has access to {org?.name}.
           </p>
         </div>
         {canInvite && (

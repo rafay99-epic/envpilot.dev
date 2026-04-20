@@ -40,6 +40,12 @@ export async function GET(request: NextRequest) {
     return unauthorizedResponse(authResult.error);
   }
 
+  const ipAddress =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    undefined;
+  const userAgent = request.headers.get("user-agent") || undefined;
+
   const url = new URL(request.url);
   const projectId = url.searchParams.get("projectId");
   const environment = url.searchParams.get("environment");
@@ -129,6 +135,22 @@ export async function GET(request: NextRequest) {
         decryptionFailures.push(variable.key);
       }
     }
+
+    // Fire-and-forget: log access for anomaly detection (non-blocking)
+    Promise.allSettled(
+      variablesWithValues.map((v) =>
+        convex.mutation(api.variables.logAccess, {
+          variableId: v._id as Id<"environmentVariables">,
+          accessedBy: authResult.userId!,
+          accessType: "export" as const,
+          ipAddress,
+          userAgent,
+          environment: environment || undefined,
+        })
+      )
+    ).catch(() => {
+      // Swallow errors — audit logging must never break variable fetch
+    });
 
     // Resolve project role for the user
     let projectRole: string | null = null;

@@ -5,53 +5,99 @@ import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
 import { useAnalytics } from "@/hooks";
 import type { Id } from "@convex/_generated/dataModel";
-import {
-  TerminalWindow,
-  TerminalLoading,
-  TerminalEmptyState,
-} from "@/components/dashboard/terminal-ui";
+import { TerminalEmptyState } from "@/components/dashboard/terminal-ui";
 import dynamic from "next/dynamic";
+
+// Deterministic bar heights — avoids impure Math.random() in render
+const SKELETON_BAR_HEIGHTS = [35, 58, 42, 71, 28, 63, 49, 76, 33, 55, 44, 68];
+
+// Skeleton placeholder for lazy-loaded chart panels
+function ChartSkeleton({ height = "h-48" }: { height?: string }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90">
+      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
+        <div className="h-3 w-3 rounded-full bg-zinc-700" />
+        <div className="h-3 w-3 rounded-full bg-zinc-700" />
+        <div className="h-3 w-3 rounded-full bg-zinc-700" />
+        <div className="ml-2 h-3 w-28 animate-pulse rounded bg-zinc-700" />
+      </div>
+      <div className={`${height} animate-pulse bg-zinc-900/50 p-6`}>
+        <div className="flex h-full items-end gap-1">
+          {SKELETON_BAR_HEIGHTS.map((h, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-t bg-zinc-800/60"
+              style={{ height: `${h}%` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Skeleton for the 4-card security insight row
+function InsightsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-zinc-700/50 bg-zinc-900/90 p-6"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 animate-pulse rounded-full bg-zinc-800" />
+            <div className="space-y-1.5">
+              <div className="h-3 w-16 animate-pulse rounded bg-zinc-800/60" />
+              <div className="h-5 w-10 animate-pulse rounded bg-zinc-800" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Lazy-load chart components — recharts is ~200 KB; only load on this page
 const ActivityChart = dynamic(
   () =>
     import("@/components/dashboard/analytics").then((mod) => mod.ActivityChart),
-  { ssr: false }
+  { ssr: false, loading: () => <ChartSkeleton height="h-64" /> }
 );
 const ProjectActivityChart = dynamic(
   () =>
     import("@/components/dashboard/analytics").then(
       (mod) => mod.ProjectActivityChart
     ),
-  { ssr: false }
+  { ssr: false, loading: () => <ChartSkeleton /> }
 );
 const VariableChangesChart = dynamic(
   () =>
     import("@/components/dashboard/analytics").then(
       (mod) => mod.VariableChangesChart
     ),
-  { ssr: false }
+  { ssr: false, loading: () => <ChartSkeleton /> }
 );
 const TeamActivityChart = dynamic(
   () =>
     import("@/components/dashboard/analytics").then(
       (mod) => mod.TeamActivityChart
     ),
-  { ssr: false }
+  { ssr: false, loading: () => <ChartSkeleton /> }
 );
 const SecurityInsights = dynamic(
   () =>
     import("@/components/dashboard/analytics").then(
       (mod) => mod.SecurityInsights
     ),
-  { ssr: false }
+  { ssr: false, loading: () => <InsightsSkeleton /> }
 );
 const ResourceBreakdownChart = dynamic(
   () =>
     import("@/components/dashboard/analytics").then(
       (mod) => mod.ResourceBreakdownChart
     ),
-  { ssr: false }
+  { ssr: false, loading: () => <ChartSkeleton /> }
 );
 
 type TimeRange = 7 | 30 | 90;
@@ -108,9 +154,17 @@ export default function AnalyticsPage() {
           setDaysBack={setDaysBack}
           maxRetentionDays={maxRetentionDays}
         />
-        <TerminalWindow title="loading-analytics">
-          <TerminalLoading />
-        </TerminalWindow>
+        {/* Show layout-matching skeletons to prevent layout shift */}
+        <ChartSkeleton height="h-64" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <InsightsSkeleton />
       </div>
     );
   }

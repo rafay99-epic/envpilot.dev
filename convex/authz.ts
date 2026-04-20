@@ -51,6 +51,9 @@ export const ORG_ACTIONS = {
   // Tag management
   "org:create_tag": ["admin", "team_lead", "member"] as OrgRole[],
   "org:manage_tag": ["admin", "team_lead"] as OrgRole[],
+
+  // Anomaly detection (security feature — admin + team_lead only)
+  "org:view_anomalies": ["admin", "team_lead"] as OrgRole[],
 } as const;
 
 export const PROJECT_ACTIONS = {

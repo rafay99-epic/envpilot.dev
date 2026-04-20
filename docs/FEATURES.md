@@ -217,3 +217,232 @@
 - Keyboard shortcuts with command palette
 - Pagination, search, and filtering across all list views
 - Bulk operations (import, export, delete)
+
+## 🔧 Finish What’s Already Half-Built (Quick Wins)
+
+These are the lowest-effort, highest-impact items because the schema already exists:
+
+- **Template marketplace**
+  - Tables: `environmentTemplates` + `templateVariables` already exist.
+  - Ship a “Next.js + Stripe + Supabase” template picker during project creation.
+  - Add community-submitted templates + voting.
+
+- **SSO implementation**
+  - `workosOrgId` exists in schema.
+  - Wire WorkOS AuthKit org SSO into a Pro flow.
+
+- **Feature request voting UI**
+  - `featureVotes` table exists.
+  - `/wishlist` page exists, but voting isn’t exposed.
+
+- **Custom branding**
+  - Registry flag exists, but no UI.
+  - Let Pro users set **logo + primary color** on:
+    - shared secret links
+    - invitation emails
+
+- **Keyboard shortcut customizer**
+  - Flag is already enabled.
+  - Build the UI.
+
+---
+
+## 🚀 Enhance Existing Features
+
+### Variables & Secrets
+
+- **Drift detection**
+  - Compare `.env` file on disk vs. remote state in CLI/extension.
+  - Show a **“drift” badge** in the tree view.
+
+- **Variable references / interpolation**
+  - Example: `DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@...`
+  - Huge DX win.
+
+- **Secret references to other secrets**
+  - Example: `{{ prod.STRIPE_KEY }}`
+  - Let staging inherit from prod with override.
+
+- **“Why did this change?” annotations**
+  - Optional **reason field** on every variable edit.
+  - Surface it in version history.
+
+- **Variable deprecation warnings**
+  - Mark a var as deprecated with a sunset date.
+  - CLI/extension warns before removal.
+
+- **Environment comparison view**
+  - Side-by-side diff of dev vs. staging vs. prod.
+  - Include “copy to other env” button.
+
+### Audit & Security
+
+- **Anomaly detection**
+  - Flag unusual access patterns:
+    - user pulling all prod secrets for first time
+    - off-hours access
+    - new IP
+  - Send email alerts.
+
+- **Breach response workflow**
+  - One-click: “rotate all secrets in this project”
+  - Automated coordinator for connected services.
+
+- **Secret health score per project**
+  - Rotated recently?
+  - Shared externally?
+  - Expired permissions?
+  - Overall score.
+
+- **Just-in-time access requests**
+  - Member requests temporary prod access → admin approves for N hours → auto-revoked.
+
+### CLI / Extension
+
+- **`envpilot run`**
+  - Example: `envpilot run -- bun dev`
+  - Inject secrets into child process without writing a `.env` file.
+  - Standard Doppler pattern.
+
+- **`envpilot exec`**
+  - Example: `envpilot exec --env prod npm test`
+  - Namespaced by environment for CI scripts.
+
+- **Shell completions**
+  - `bash` / `zsh` / `fish` completions for:
+    - `envpilot switch`
+    - project names
+    - env names
+
+- **Extension: variable value preview on hover**
+  - When permission allows: hover over `process.env.API_KEY` to see masked value.
+
+- **Extension: “Open in Envpilot” CodeLens**
+  - Add CodeLens on `process.env.X` references.
+
+---
+
+## ⭐ Bold Differentiators (Stand Out)
+
+### AI / Intelligent Features
+
+- **AI-powered secret classifier**
+  - On paste, detect “this looks like AWS key / Stripe key / JWT”
+  - Auto-tag + enable rotation reminders.
+
+- **AI `.env` onboarding**
+  - User uploads messy `.env.example`
+  - AI structures it into projects/environments with suggested value sources.
+
+- **Natural language search**
+  - Example: “Show me all Stripe keys that haven’t been rotated in 90 days.”
+
+### Integrations (this is where Doppler / Infisical win)
+
+- **Sync destinations**
+  - Push variables to:
+    - Vercel, Netlify, Cloudflare, Railway, Render, Fly.io
+    - AWS Secrets Manager / Parameter Store
+    - GCP Secret Manager
+    - Azure Key Vault
+    - Kubernetes secrets (operator)
+    - GitHub Actions secrets (your deferred `packages/github-action/` plan)
+    - CircleCI, GitLab CI
+  - One-way sync with webhook retry.
+
+- **GitHub App**
+  - Auto-comment on PRs:
+    - “This PR adds `STRIPE_KEY` to code — no matching variable in Envpilot for staging.”
+
+- **PR preview environment**
+  - Auto-provision a scoped env for every preview deployment.
+  - Auto-teardown on merge.
+
+- **Terraform / Pulumi provider**
+  - Manage Envpilot projects as IaC.
+
+- **SDKs**
+  - Official SDKs:
+    - `@envpilot/node`
+    - `@envpilot/python`
+    - `@envpilot/go`
+    - `@envpilot/rust`
+  - Fetch + cache + auto-refresh without a `.env` file.
+
+### Compliance & Enterprise
+
+- **SOC 2 / HIPAA / GDPR mode**
+  - Toggleable compliance profile enforcing:
+    - audit retention
+    - MFA
+    - IP allowlists
+    - data residency
+
+- **IP allowlisting**
+  - Per org / per token.
+
+- **Service accounts with scoped tokens**
+  - Separate from user auth.
+  - Per-service, per-env, revocable.
+
+- **Break-glass access**
+  - Emergency access with:
+    - automatic Slack alert
+    - mandatory post-mortem form
+
+- **Data residency**
+  - Let orgs choose EU / US Convex region.
+
+### Collaboration
+
+- **Slack / Discord / Teams notifications**
+  - Per-project channels for:
+    - rotations
+    - access requests
+    - approvals
+
+- **Approval workflows**
+  - Writes to prod require N approvals before applying (dual-control).
+
+- **Comments on variables**
+  - Context threads:
+    - “why does `STRIPE_KEY` have `sk_test_` prefix in prod?”
+    - “oh that’s the sandbox checkout.”
+
+- **Shared drafts**
+  - Propose a batch of variable changes, review like a PR, merge when approved.
+
+### Developer UX
+
+- **`.env` linting**
+  - Detect:
+    - hardcoded secrets in code
+    - missing vars
+    - unused vars
+  - As a CLI command + GitHub check.
+
+- **Local-only overrides**
+  - Personal values shadow team defaults for one dev, never synced.
+
+- **Offline mode for CLI**
+  - Cached encrypted bundle; works on planes.
+
+- **Multiple active organizations**
+  - In CLI/extension context, not just one.
+
+### Billing / Monetization
+
+- **Usage-based add-ons**
+  - Extra seats
+  - extra secret shares
+  - extra rotation-enabled vars
+  - without jumping straight to Pro
+
+- **Team plan tier**
+  - Between Free and Pro:
+    - small teams need >3 members but not all Pro features
+
+- **Annual billing discount**
+  - 2 months free
+
+---

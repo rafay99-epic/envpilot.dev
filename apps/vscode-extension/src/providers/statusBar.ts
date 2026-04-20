@@ -22,7 +22,9 @@ export class StatusBarProvider {
     );
     this.statusBarItem.command = "envpilot.showStatus";
 
-    this.authService.onAuthStateChanged(() => this.update());
+    this.authService.onAuthStateChanged(() => {
+      this.update();
+    });
     this.syncService.onSyncComplete((result) =>
       this.handleSyncComplete(result)
     );

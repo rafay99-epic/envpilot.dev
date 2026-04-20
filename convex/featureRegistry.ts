@@ -850,6 +850,26 @@ const SEED_FEATURES = [
     sortOrder: 0,
   },
 
+  // Security — Anomaly Detection (Dual-Gate: boolean + numeric limit)
+  {
+    key: "anomaly_detection",
+    displayName: "Anomaly Detection",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 5,
+  },
+  {
+    key: "anomaly_detection_limit",
+    displayName: "Anomaly Detection Rules",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 6,
+  },
+
   // Support
   {
     key: "priority_support",
@@ -959,6 +979,8 @@ export const seedDefaultTierFeatures = internalMutation({
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
+        anomaly_detection: "false",
+        anomaly_detection_limit: "0",
         priority_support: "false",
       },
       pro: {
@@ -985,6 +1007,8 @@ export const seedDefaultTierFeatures = internalMutation({
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",
+        anomaly_detection: "true",
+        anomaly_detection_limit: "null",
         priority_support: "true",
       },
     };

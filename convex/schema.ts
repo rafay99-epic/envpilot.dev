@@ -669,7 +669,8 @@ export default defineSchema({
     .index("by_org_and_severity", ["organizationId", "severity"])
     .index("by_severity", ["severity"])
     .index("by_resource_type", ["resourceType"])
-    .index("by_session", ["sessionId"]),
+    .index("by_session", ["sessionId"])
+    .index("by_user_and_created", ["userId", "createdAt"]),
 
   // ==========================================
   // USER TIERS (Replaces organizationTiers)
@@ -1283,4 +1284,137 @@ export default defineSchema({
     .index("by_provider", ["provider"])
     .index("by_tier_and_provider", ["tierName", "provider"])
     .index("by_product_id", ["productId"]),
+
+  // ==========================================
+  // ACCESS BASELINES (Per-user behavioral profile for anomaly detection)
+  // ==========================================
+  accessBaselines: defineTable({
+    // The user this baseline belongs to
+    userId: v.id("users"),
+    // Organization context
+    organizationId: v.id("organizations"),
+    // Known IP addresses from last 30 days (capped at 50)
+    knownIps: v.array(v.string()),
+    // Known user agents from last 30 days (capped at 20)
+    knownUserAgents: v.array(v.string()),
+    // Typical working hours (UTC)
+    typicalHoursStart: v.number(),
+    typicalHoursEnd: v.number(),
+    // Typical working days (0=Sun, 1=Mon, ..., 6=Sat)
+    typicalDays: v.array(v.number()),
+    // Environments the user has accessed
+    accessedEnvironments: v.array(v.string()),
+    // Whether the user has ever exported production secrets
+    hasPulledProd: v.boolean(),
+    // Rolling average of daily accesses
+    avgDailyAccesses: v.number(),
+    // Total accesses analyzed for this baseline
+    totalAccessCount: v.number(),
+    // Number of distinct days with activity
+    daysOfHistory: v.number(),
+    // Timestamps
+    lastUpdated: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user_and_org", ["userId", "organizationId"])
+    .index("by_organization", ["organizationId"]),
+
+  // ==========================================
+  // ANOMALY RULES (Configurable detection rule parameters)
+  // ==========================================
+  anomalyRules: defineTable({
+    // Machine ID: "new_ip", "off_hours", "first_prod_bulk_pull", etc.
+    ruleId: v.string(),
+    // Human-readable name
+    displayName: v.string(),
+    // Description of what this rule detects
+    description: v.string(),
+    // Whether this rule is currently active
+    isEnabled: v.boolean(),
+    // Alert severity when triggered
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("critical")
+    ),
+    // JSON string of rule-specific thresholds (e.g. {"bufferHours":2})
+    thresholds: v.string(),
+    // Minimum days of baseline history before rule activates
+    minHistoryDays: v.number(),
+    // Whether to send email alerts when triggered
+    emailAlertEnabled: v.boolean(),
+    // Minimum minutes between duplicate alerts for same rule+user
+    alertCooldownMinutes: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_rule_id", ["ruleId"])
+    .index("by_enabled", ["isEnabled"]),
+
+  // ==========================================
+  // ANOMALY EVENTS (Detected anomaly records)
+  // ==========================================
+  anomalyEvents: defineTable({
+    // Organization where anomaly was detected
+    organizationId: v.id("organizations"),
+    // User whose activity triggered the anomaly
+    userId: v.id("users"),
+    // Which rule matched
+    ruleId: v.string(),
+    // Human-readable rule name
+    ruleName: v.string(),
+    // Severity level
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("critical")
+    ),
+    // Current status
+    status: v.union(
+      v.literal("open"),
+      v.literal("acknowledged"),
+      v.literal("dismissed"),
+      v.literal("resolved")
+    ),
+    // JSON string with contextual details (IP, action, environment, etc.)
+    details: v.string(),
+    // Link to the triggering audit log entry
+    auditLogId: v.optional(v.id("auditLogs")),
+    // Optional project context
+    projectId: v.optional(v.id("projects")),
+    // Resolution info
+    resolvedBy: v.optional(v.id("users")),
+    resolvedAt: v.optional(v.number()),
+    resolutionNote: v.optional(v.string()),
+    // When the anomaly was detected
+    detectedAt: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_org_and_status", ["organizationId", "status"])
+    .index("by_org_and_detected", ["organizationId", "detectedAt"])
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_rule_and_user", ["ruleId", "userId"]),
+
+  // ==========================================
+  // ANOMALY DISMISSALS ("This Was Me" acknowledgments)
+  // ==========================================
+  anomalyDismissals: defineTable({
+    // The anomaly event that was dismissed
+    anomalyEventId: v.id("anomalyEvents"),
+    // User who dismissed the anomaly
+    dismissedBy: v.id("users"),
+    // Optional reason for dismissal
+    reason: v.optional(v.string()),
+    // Optional JSON pattern to suppress future similar alerts
+    // e.g. {"type":"ip","value":"1.2.3.4"}
+    suppressFuturePattern: v.optional(v.string()),
+    // When the dismissal occurred
+    dismissedAt: v.number(),
+  })
+    .index("by_event", ["anomalyEventId"])
+    .index("by_user", ["dismissedBy"]),
 });

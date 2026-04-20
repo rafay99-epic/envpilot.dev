@@ -20,6 +20,12 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  */
 export async function GET(request: Request) {
   try {
+    const ipAddress =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      undefined;
+    const userAgent = request.headers.get("user-agent") || undefined;
+
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
     const environment = searchParams.get("environment") || "development";
@@ -156,6 +162,24 @@ export async function GET(request: Request) {
         }
       })
     );
+
+    // Fire-and-forget: log access for anomaly detection (non-blocking)
+    Promise.allSettled(
+      variablesWithValues
+        .filter((v) => v.value !== "[DECRYPTION_FAILED]")
+        .map((v) =>
+          convex.mutation(api.variables.logAccess, {
+            variableId: v._id as Id<"environmentVariables">,
+            accessedBy: authorizedUserId,
+            accessType: "export" as const,
+            ipAddress,
+            userAgent,
+            environment,
+          })
+        )
+    ).catch(() => {
+      // Swallow errors — audit logging must never break variable fetch
+    });
 
     return NextResponse.json({
       data: {

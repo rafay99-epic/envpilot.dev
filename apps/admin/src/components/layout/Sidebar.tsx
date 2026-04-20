@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
   LogOut,
   Globe,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
@@ -28,6 +29,7 @@ const navItems = [
   { to: "/feature-requests", label: "Feature Requests", icon: Lightbulb },
   { to: "/migrations", label: "Migrations", icon: ArrowUpDown },
   { to: "/data", label: "Data Browser", icon: Database },
+  { to: "/anomaly-detection", label: "Anomaly Detection", icon: ShieldAlert },
 ] as const;
 
 export function Sidebar() {
