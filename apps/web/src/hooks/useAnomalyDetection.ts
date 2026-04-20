@@ -4,7 +4,10 @@ import type { Id } from "@convex/_generated/dataModel";
 
 export function useAnomalyEvents(
   organizationId: Id<"organizations"> | undefined,
-  options?: { status?: "open" | "acknowledged" | "dismissed" | "resolved"; limit?: number }
+  options?: {
+    status?: "open" | "acknowledged" | "dismissed" | "resolved";
+    limit?: number;
+  }
 ) {
   return useQuery(
     api.anomalyDetection.getAnomalyEvents,

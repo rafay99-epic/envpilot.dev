@@ -2094,8 +2094,7 @@ export const runMigration = mutation({
     }
 
     if (args.name === "test-anomaly-detection") {
-      const orgId =
-        "kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">;
+      const orgId = "kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">;
       const userId = "m972vw39nq0pkk9qa181gmehqs82yt4v" as Id<"users">;
       return await runAnomalyDetectionTest(ctx, {
         organizationId: orgId,
@@ -3198,12 +3197,77 @@ export const runAnomalyTest = mutation({
       args.organizationId ??
       ("kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">);
     const userId =
-      args.userId ??
-      ("m972vw39nq0pkk9qa181gmehqs82yt4v" as Id<"users">);
+      args.userId ?? ("m972vw39nq0pkk9qa181gmehqs82yt4v" as Id<"users">);
 
     return await runAnomalyDetectionTest(ctx, {
       organizationId: orgId,
       userId,
     });
+  },
+});
+
+/**
+ * Clean up test anomaly events and test audit logs for the target org.
+ *
+ * Removes all __test-marked anomaly events and audit logs, but KEEPS the
+ * seeded baseline intact. This clears cooldown windows so the real CLI/extension
+ * pipeline can trigger rules against the test baseline.
+ */
+export const cleanupAnomalyTestData = mutation({
+  args: {
+    secret: v.string(),
+    organizationId: v.optional(v.id("organizations")),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const orgId =
+      args.organizationId ??
+      ("kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">);
+
+    // Delete __test anomaly events
+    const events = await ctx.db
+      .query("anomalyEvents")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
+
+    let eventsDeleted = 0;
+    for (const event of events) {
+      try {
+        const details = JSON.parse(event.details);
+        if (details.__test) {
+          await ctx.db.delete(event._id);
+          eventsDeleted++;
+        }
+      } catch {
+        // Not a test event
+      }
+    }
+
+    // Delete __test audit logs
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_org_and_created", (q) => q.eq("organizationId", orgId))
+      .collect();
+
+    let logsDeleted = 0;
+    for (const log of logs) {
+      try {
+        const details = JSON.parse(log.details || "{}");
+        if (details.__test) {
+          await ctx.db.delete(log._id);
+          logsDeleted++;
+        }
+      } catch {
+        // Not a test log
+      }
+    }
+
+    return {
+      success: true,
+      eventsDeleted,
+      logsDeleted,
+      baselineKept: true,
+    };
   },
 });

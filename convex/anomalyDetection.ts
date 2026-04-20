@@ -1351,8 +1351,7 @@ export async function runAnomalyDetectionTest(
     {
       id: "velocity_spike_positive",
       ruleId: "velocity_spike",
-      description:
-        "11th access in 60min window (threshold ~3.1) → should FIRE",
+      description: "11th access in 60min window (threshold ~3.1) → should FIRE",
       expectFire: true,
       auditArgs: {
         action: "variable.exported",

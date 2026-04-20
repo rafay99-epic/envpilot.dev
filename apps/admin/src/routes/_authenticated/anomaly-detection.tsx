@@ -647,9 +647,29 @@ interface TestReport {
 
 function TestSuiteTab() {
   const runTest = useAdminMutation(api.admin.runAnomalyTest);
+  const cleanupTest = useAdminMutation(api.admin.cleanupAnomalyTestData);
   const [running, setRunning] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
   const [report, setReport] = useState<TestReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCleanup = async () => {
+    setCleaningUp(true);
+    try {
+      const result = (await cleanupTest({})) as {
+        eventsDeleted: number;
+        logsDeleted: number;
+      };
+      toast(
+        "success",
+        `Cleaned up ${result.eventsDeleted} test events, ${result.logsDeleted} test logs. Baseline kept.`
+      );
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Cleanup failed");
+    } finally {
+      setCleaningUp(false);
+    }
+  };
 
   const handleRunTest = async () => {
     setRunning(true);
@@ -687,24 +707,43 @@ function TestSuiteTab() {
           </h2>
           <p className="text-xs text-zinc-500">
             Run automated tests against the detection engine. Seeds controlled
-            baselines and audit logs for the Syntax Lab Technology org, evaluates
-            all rules with positive and negative scenarios, and reports
-            pass/fail.
+            baselines and audit logs for the Syntax Lab Technology org,
+            evaluates all rules with positive and negative scenarios, and
+            reports pass/fail.
           </p>
         </div>
-        <Button onClick={handleRunTest} disabled={running}>
-          {running ? (
-            <>
-              <Spinner className="h-4 w-4" />
-              Running...
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Run Tests
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            onClick={handleCleanup}
+            disabled={cleaningUp || running}
+          >
+            {cleaningUp ? (
+              <>
+                <Spinner className="h-4 w-4" />
+                Cleaning...
+              </>
+            ) : (
+              <>
+                <X className="h-4 w-4" />
+                Cleanup Test Data
+              </>
+            )}
+          </Button>
+          <Button onClick={handleRunTest} disabled={running || cleaningUp}>
+            {running ? (
+              <>
+                <Spinner className="h-4 w-4" />
+                Running...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Run Tests
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Error */}
