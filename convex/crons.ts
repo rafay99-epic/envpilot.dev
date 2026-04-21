@@ -93,4 +93,11 @@ crons.interval(
   internal.subscriptions.cleanupProcessedWebhooks
 );
 
+// Build anomaly detection baselines every hour
+crons.interval(
+  "build anomaly detection baselines",
+  { hours: 1 },
+  internal.anomalyDetection.buildBaselines
+);
+
 export default crons;

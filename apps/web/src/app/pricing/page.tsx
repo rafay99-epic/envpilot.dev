@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import {
@@ -19,7 +19,6 @@ export default async function PricingPage() {
   let paymentsEnabled: boolean | null = null;
 
   try {
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
     const [pricing, payments] = await Promise.all([
       convex.query(api.featureRegistry.getPricingData),
       convex.query(api.tierLimits.isPaymentsEnabled),

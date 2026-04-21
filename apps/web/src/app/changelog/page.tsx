@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import {
@@ -19,7 +19,6 @@ export const revalidate = 60; // revalidate every 60 seconds for fresh changelog
 export default async function ChangelogPage() {
   let entries: ChangelogEntry[] = [];
   try {
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
     entries =
       ((await convex.query(api.changelog.listPublished, {
         limit: 50,

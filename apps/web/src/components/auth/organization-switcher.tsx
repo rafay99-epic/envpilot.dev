@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -176,9 +177,11 @@ export function OrganizationSwitcher({
           className={`flex items-center overflow-hidden ${collapsed ? "justify-center" : "gap-3"}`}
         >
           {currentOrg?.logoUrl ? (
-            <img
+            <Image
               src={currentOrg.logoUrl}
               alt={currentOrg.name}
+              width={32}
+              height={32}
               className="h-8 w-8 shrink-0 rounded-lg object-cover"
             />
           ) : (
@@ -237,9 +240,11 @@ export function OrganizationSwitcher({
                 }`}
               >
                 {org.logoUrl ? (
-                  <img
+                  <Image
                     src={org.logoUrl}
                     alt={org.name}
+                    width={32}
+                    height={32}
                     className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
                   />
                 ) : (

@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.workos.com" },
+      { protocol: "https", hostname: "workoscdn.com" },
+      { protocol: "https", hostname: "**.workoscdn.com" },
       { protocol: "https", hostname: "**.googleusercontent.com" },
       { protocol: "https", hostname: "**.githubusercontent.com" },
       { protocol: "https", hostname: "svgl.app" },

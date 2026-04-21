@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
@@ -11,8 +11,6 @@ import {
   tokenPrefix,
 } from "@/lib/logger";
 import * as crypto from "crypto";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 function generateToken(length: number = 64): string {
   return crypto.randomBytes(length).toString("hex");

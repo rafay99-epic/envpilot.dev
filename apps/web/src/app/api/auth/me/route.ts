@@ -1,18 +1,17 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { cacheHeaders } from "@/lib/cache-headers";
 import {
   ACTIVE_ORG_COOKIE_NAME,
   selectActiveOrganization,
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // GET /api/auth/me - Get current authenticated user
 export async function GET(request: Request) {
@@ -65,12 +64,30 @@ export async function GET(request: Request) {
       updatedAt: new Date(user.updatedAt),
     };
 
-    // Get tier for active organization from organizationTiers table
-    const activeTierData = activeOrganization
-      ? await convex.query(api.featureRegistry.getResolvedFeatures, {
-          organizationId: activeOrganization._id as Id<"organizations">,
-        })
-      : null;
+    // Parallel: batch-fetch all org tiers (1 query instead of N), and fetch
+    // permissions for the active org. Previously this was sequential:
+    // active org tier → all tiers → permissions (waterfall of 3 round-trips).
+    const [orgTiers, perms] = await Promise.all([
+      organizations.length > 0
+        ? convex.query(api.featureRegistry.getResolvedFeaturesBatch, {
+            organizationIds: organizations.map(
+              (o) => o._id as Id<"organizations">
+            ),
+          })
+        : Promise.resolve([]),
+      activeOrganization
+        ? convex.query(api.authz.getMyPermissions, {
+            userId: convexUser._id,
+            organizationId: activeOrganization._id as Id<"organizations">,
+          })
+        : Promise.resolve({ actions: [] }),
+    ]);
+
+    const activeTierIndex = activeOrganization
+      ? organizations.findIndex((o) => o._id === activeOrganization._id)
+      : -1;
+    const activeTierData =
+      activeTierIndex >= 0 ? orgTiers[activeTierIndex] : null;
 
     const organization: Organization | null = activeOrganization
       ? {
@@ -84,41 +101,25 @@ export async function GET(request: Request) {
         }
       : null;
 
-    // Get tiers for all organizations
-    const orgTiers = await Promise.all(
-      organizations.map((org) =>
-        convex.query(api.featureRegistry.getResolvedFeatures, {
-          organizationId: org._id as Id<"organizations">,
-        })
-      )
+    return NextResponse.json(
+      {
+        user: authUser,
+        organization,
+        actions: perms.actions,
+        organizations: organizations.map((org, index) => ({
+          id: org._id,
+          name: org.name,
+          slug: org.slug,
+          tier: orgTiers[index]?.tierName ?? "free",
+          role: org.role,
+        })),
+        accessToken,
+        impersonator: impersonator
+          ? { email: impersonator.email, reason: impersonator.reason ?? null }
+          : undefined,
+      },
+      { headers: cacheHeaders.privateShort }
     );
-
-    // Compute actions from the backend authz module (single source of truth)
-    let actions: string[] = [];
-    if (activeOrganization) {
-      const perms = await convex.query(api.authz.getMyPermissions, {
-        userId: convexUser._id,
-        organizationId: activeOrganization._id as Id<"organizations">,
-      });
-      actions = perms.actions;
-    }
-
-    return NextResponse.json({
-      user: authUser,
-      organization,
-      actions,
-      organizations: organizations.map((org, index) => ({
-        id: org._id,
-        name: org.name,
-        slug: org.slug,
-        tier: orgTiers[index]?.tierName ?? "free",
-        role: org.role,
-      })),
-      accessToken,
-      impersonator: impersonator
-        ? { email: impersonator.email, reason: impersonator.reason ?? null }
-        : undefined,
-    });
   } catch (error) {
     console.error("Error fetching user:", error);
     return NextResponse.json(

@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import { Id } from "./_generated/dataModel";
 import { SEED_CHANGELOG } from "./changelog";
 import { SEED_FEATURE_REQUESTS } from "./featureRequests";
+import { runAnomalyDetectionTest } from "./anomalyDetection";
 
 // ==========================================
 // HELPERS
@@ -47,6 +49,10 @@ const BROWSABLE_TABLES = [
   "adminSettings",
   "paymentProducts",
   "processedWebhookEvents",
+  "accessBaselines",
+  "anomalyRules",
+  "anomalyEvents",
+  "anomalyDismissals",
 ] as const;
 
 // ==========================================
@@ -1182,6 +1188,27 @@ export const listMigrations = query({
         runOnce: false,
       },
 
+      {
+        name: "seed-anomaly-rules",
+        description:
+          "Seeds default anomaly detection rules (new_ip, off_hours, first_prod_bulk_pull, velocity_spike, new_device_sensitive, cross_org_burst). Idempotent — skips existing rules.",
+        category: "Feature & Tier System",
+        priority: 5,
+        destructive: false,
+        runOnce: false,
+      },
+
+      // ── Testing ──
+      {
+        name: "test-anomaly-detection",
+        description:
+          "Run automated anomaly detection test suite. Seeds a controlled baseline and audit logs for the Syntax Lab Technology org, then evaluates all 6 rules with positive and negative scenarios. Creates real anomaly events visible in the Events tab.",
+        category: "Testing",
+        priority: 1,
+        destructive: true,
+        runOnce: false,
+      },
+
       // ── Content Seeding ──
       {
         name: "seed-changelog",
@@ -1546,6 +1573,25 @@ export const runMigration = mutation({
           resettable: false,
           sortOrder: 0,
         },
+        // Security — Anomaly Detection (Dual-Gate: boolean + numeric limit)
+        {
+          key: "anomaly_detection",
+          displayName: "Anomaly Detection",
+          valueType: "boolean" as const,
+          category: "Security",
+          defaultValue: "false",
+          resettable: false,
+          sortOrder: 5,
+        },
+        {
+          key: "anomaly_detection_limit",
+          displayName: "Anomaly Detection Rules",
+          valueType: "numeric" as const,
+          category: "Security",
+          defaultValue: "0",
+          resettable: false,
+          sortOrder: 6,
+        },
         {
           key: "priority_support",
           displayName: "Priority Support",
@@ -1638,6 +1684,8 @@ export const runMigration = mutation({
           keyboard_shortcuts_custom: "true",
           custom_branding: "false",
           analytics_retention_days: "7",
+          anomaly_detection: "false",
+          anomaly_detection_limit: "0",
           priority_support: "false",
         },
         pro: {
@@ -1664,6 +1712,8 @@ export const runMigration = mutation({
           keyboard_shortcuts_custom: "true",
           custom_branding: "true",
           analytics_retention_days: "30",
+          anomaly_detection: "true",
+          anomaly_detection_limit: "null",
           priority_support: "true",
         },
       };
@@ -1699,6 +1749,114 @@ export const runMigration = mutation({
           (sum, f) => sum + Object.keys(f).length,
           0
         ),
+        migrated: created,
+        skipped,
+      };
+    }
+
+    if (args.name === "seed-anomaly-rules") {
+      const DEFAULT_ANOMALY_RULES = [
+        {
+          ruleId: "new_ip",
+          displayName: "New IP Address",
+          description:
+            "Detects access from an IP address not seen in the user's last 30 days of activity.",
+          isEnabled: true,
+          severity: "warning" as const,
+          thresholds: JSON.stringify({}),
+          minHistoryDays: 7,
+          emailAlertEnabled: true,
+          alertCooldownMinutes: 240,
+        },
+        {
+          ruleId: "off_hours",
+          displayName: "Off-Hours Access",
+          description:
+            "Detects access outside the user's typical working hours (with configurable buffer).",
+          isEnabled: true,
+          severity: "warning" as const,
+          thresholds: JSON.stringify({ bufferHours: 2 }),
+          minHistoryDays: 14,
+          emailAlertEnabled: false,
+          alertCooldownMinutes: 480,
+        },
+        {
+          ruleId: "first_prod_bulk_pull",
+          displayName: "First Production Bulk Export",
+          description:
+            "Detects when a user who has never exported production secrets performs a production export.",
+          isEnabled: true,
+          severity: "critical" as const,
+          thresholds: JSON.stringify({}),
+          minHistoryDays: 0,
+          emailAlertEnabled: true,
+          alertCooldownMinutes: 60,
+        },
+        {
+          ruleId: "velocity_spike",
+          displayName: "Access Velocity Spike",
+          description:
+            "Detects when a user's access rate in a 1-hour window exceeds 5x their average hourly rate.",
+          isEnabled: true,
+          severity: "warning" as const,
+          thresholds: JSON.stringify({
+            velocityMultiplier: 5,
+            windowMinutes: 60,
+          }),
+          minHistoryDays: 7,
+          emailAlertEnabled: true,
+          alertCooldownMinutes: 120,
+        },
+        {
+          ruleId: "new_device_sensitive",
+          displayName: "New Device + Sensitive Data",
+          description:
+            "Detects when sensitive data is accessed from an unrecognized device/user agent.",
+          isEnabled: true,
+          severity: "info" as const,
+          thresholds: JSON.stringify({}),
+          minHistoryDays: 7,
+          emailAlertEnabled: false,
+          alertCooldownMinutes: 1440,
+        },
+        {
+          ruleId: "cross_org_burst",
+          displayName: "Cross-Organization Burst",
+          description:
+            "Detects when a user accesses 3+ organizations within a 5-minute window.",
+          isEnabled: true,
+          severity: "critical" as const,
+          thresholds: JSON.stringify({ windowMinutes: 5, minOrgs: 3 }),
+          minHistoryDays: 0,
+          emailAlertEnabled: true,
+          alertCooldownMinutes: 60,
+        },
+      ];
+
+      const now = Date.now();
+      let created = 0;
+      let skipped = 0;
+
+      for (const rule of DEFAULT_ANOMALY_RULES) {
+        const existing = await ctx.db
+          .query("anomalyRules")
+          .withIndex("by_rule_id", (q: any) => q.eq("ruleId", rule.ruleId))
+          .first();
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await ctx.db.insert("anomalyRules", {
+          ...rule,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created++;
+      }
+
+      return {
+        success: true,
+        total: DEFAULT_ANOMALY_RULES.length,
         migrated: created,
         skipped,
       };
@@ -1933,6 +2091,15 @@ export const runMigration = mutation({
       }
 
       return { success: true, created, skipped };
+    }
+
+    if (args.name === "test-anomaly-detection") {
+      const orgId = "kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">;
+      const userId = "m972vw39nq0pkk9qa181gmehqs82yt4v" as Id<"users">;
+      return await runAnomalyDetectionTest(ctx, {
+        organizationId: orgId,
+        userId,
+      });
     }
 
     throw new Error(`Unknown migration: ${args.name}`);
@@ -2699,6 +2866,12 @@ export const listCronJobs = query({
         interval: "Every 1 hour",
         settingKey: "cron_pause_rotation_expiry",
       },
+      {
+        name: "build anomaly detection baselines",
+        function: "anomalyDetection.buildBaselines",
+        interval: "Every 1 hour",
+        settingKey: "cron_pause_anomaly_baselines",
+      },
     ];
 
     const settings = await ctx.db.query("adminSettings").collect();
@@ -2828,5 +3001,273 @@ export const listRotationVariables = query({
     }
 
     return results.sort((a, b) => a.expiresAt - b.expiresAt);
+  },
+});
+
+// ==========================================
+// ANOMALY DETECTION ADMIN
+// ==========================================
+
+/**
+ * List all anomaly events across all organizations (admin view).
+ */
+export const listAllAnomalyEvents = query({
+  args: {
+    secret: v.string(),
+    status: v.optional(
+      v.union(
+        v.literal("open"),
+        v.literal("acknowledged"),
+        v.literal("dismissed"),
+        v.literal("resolved")
+      )
+    ),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    const limit = args.limit ?? 100;
+
+    let events;
+    if (args.status) {
+      events = await ctx.db
+        .query("anomalyEvents")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .order("desc")
+        .take(limit);
+    } else {
+      events = await ctx.db.query("anomalyEvents").order("desc").take(limit);
+    }
+
+    const enriched = await Promise.all(
+      events.map(async (event) => {
+        const user = await ctx.db.get(event.userId);
+        const org = await ctx.db.get(event.organizationId);
+        return {
+          ...event,
+          userName: user?.name ?? user?.email ?? "Unknown",
+          userEmail: user?.email ?? "Unknown",
+          orgName: org?.name ?? "Unknown",
+          parsedDetails: (() => {
+            try {
+              return JSON.parse(event.details);
+            } catch {
+              return {};
+            }
+          })(),
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
+
+/**
+ * Get anomaly detection statistics (admin dashboard).
+ */
+export const getAnomalyStats = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const openEvents = await ctx.db
+      .query("anomalyEvents")
+      .withIndex("by_status", (q) => q.eq("status", "open"))
+      .collect();
+
+    const critical = openEvents.filter((e) => e.severity === "critical").length;
+    const warning = openEvents.filter((e) => e.severity === "warning").length;
+    const info = openEvents.filter((e) => e.severity === "info").length;
+
+    const totalBaselines = await ctx.db.query("accessBaselines").collect();
+
+    const rules = await ctx.db.query("anomalyRules").collect();
+    const enabledRules = rules.filter((r) => r.isEnabled).length;
+
+    return {
+      openTotal: openEvents.length,
+      openCritical: critical,
+      openWarning: warning,
+      openInfo: info,
+      totalBaselines: totalBaselines.length,
+      totalRules: rules.length,
+      enabledRules,
+    };
+  },
+});
+
+/**
+ * List all anomaly rules (admin view).
+ */
+export const listAnomalyRules = query({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+    return await ctx.db.query("anomalyRules").collect();
+  },
+});
+
+/**
+ * Update an anomaly rule (admin action).
+ */
+export const updateAnomalyRule = mutation({
+  args: {
+    secret: v.string(),
+    ruleId: v.string(),
+    isEnabled: v.optional(v.boolean()),
+    severity: v.optional(
+      v.union(v.literal("info"), v.literal("warning"), v.literal("critical"))
+    ),
+    thresholds: v.optional(v.string()),
+    emailAlertEnabled: v.optional(v.boolean()),
+    alertCooldownMinutes: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const rule = await ctx.db
+      .query("anomalyRules")
+      .withIndex("by_rule_id", (q) => q.eq("ruleId", args.ruleId))
+      .first();
+    if (!rule) throw new Error(`Rule not found: ${args.ruleId}`);
+
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.isEnabled !== undefined) updates.isEnabled = args.isEnabled;
+    if (args.severity !== undefined) updates.severity = args.severity;
+    if (args.thresholds !== undefined) updates.thresholds = args.thresholds;
+    if (args.emailAlertEnabled !== undefined)
+      updates.emailAlertEnabled = args.emailAlertEnabled;
+    if (args.alertCooldownMinutes !== undefined)
+      updates.alertCooldownMinutes = args.alertCooldownMinutes;
+
+    await ctx.db.patch(rule._id, updates);
+    return { success: true };
+  },
+});
+
+/**
+ * Resolve or dismiss an anomaly event (admin action).
+ */
+export const resolveAnomalyEvent = mutation({
+  args: {
+    secret: v.string(),
+    anomalyEventId: v.id("anomalyEvents"),
+    status: v.union(
+      v.literal("acknowledged"),
+      v.literal("dismissed"),
+      v.literal("resolved")
+    ),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const event = await ctx.db.get(args.anomalyEventId);
+    if (!event) throw new Error("Anomaly event not found");
+
+    await ctx.db.patch(args.anomalyEventId, {
+      status: args.status,
+      resolutionNote: args.note,
+      resolvedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Run the automated anomaly detection test suite.
+ *
+ * Seeds a controlled baseline + audit logs for the target org,
+ * evaluates all 6 rules with positive/negative scenarios,
+ * and returns a detailed pass/fail report.
+ */
+export const runAnomalyTest = mutation({
+  args: {
+    secret: v.string(),
+    organizationId: v.optional(v.id("organizations")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    // Default to Syntax Lab Technology org / creator
+    const orgId =
+      args.organizationId ??
+      ("kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">);
+    const userId =
+      args.userId ?? ("m972vw39nq0pkk9qa181gmehqs82yt4v" as Id<"users">);
+
+    return await runAnomalyDetectionTest(ctx, {
+      organizationId: orgId,
+      userId,
+    });
+  },
+});
+
+/**
+ * Clean up test anomaly events and test audit logs for the target org.
+ *
+ * Removes all __test-marked anomaly events and audit logs, but KEEPS the
+ * seeded baseline intact. This clears cooldown windows so the real CLI/extension
+ * pipeline can trigger rules against the test baseline.
+ */
+export const cleanupAnomalyTestData = mutation({
+  args: {
+    secret: v.string(),
+    organizationId: v.optional(v.id("organizations")),
+  },
+  handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
+
+    const orgId =
+      args.organizationId ??
+      ("kd7f8n3c5eb36s7kndcdm3ehjd835e7f" as Id<"organizations">);
+
+    // Delete __test anomaly events
+    const events = await ctx.db
+      .query("anomalyEvents")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
+
+    let eventsDeleted = 0;
+    for (const event of events) {
+      try {
+        const details = JSON.parse(event.details);
+        if (details.__test) {
+          await ctx.db.delete(event._id);
+          eventsDeleted++;
+        }
+      } catch {
+        // Not a test event
+      }
+    }
+
+    // Delete __test audit logs
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_org_and_created", (q) => q.eq("organizationId", orgId))
+      .collect();
+
+    let logsDeleted = 0;
+    for (const log of logs) {
+      try {
+        const details = JSON.parse(log.details || "{}");
+        if (details.__test) {
+          await ctx.db.delete(log._id);
+          logsDeleted++;
+        }
+      } catch {
+        // Not a test log
+      }
+    }
+
+    return {
+      success: true,
+      eventsDeleted,
+      logsDeleted,
+      baselineKept: true,
+    };
   },
 });

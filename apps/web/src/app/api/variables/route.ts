@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
@@ -11,8 +11,6 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const createVariableSchema = z.object({
   key: z

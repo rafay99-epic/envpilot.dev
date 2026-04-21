@@ -12,6 +12,7 @@ import {
   Share2,
   Users,
   ClipboardList,
+  ShieldAlert,
   BarChart3,
   Gauge,
   Settings,
@@ -82,6 +83,9 @@ export function DashboardNav() {
   // Analytics is restricted to admin/team_lead
   const canViewAnalytics = canDo("org:create_project");
 
+  // Anomaly detection is restricted to admin/team_lead
+  const canViewAnomalies = canDo("org:view_anomalies");
+
   // Detect project context from pathname
   const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
   const projectSlug =
@@ -94,6 +98,11 @@ export function DashboardNav() {
   const orgSettingsHref = organization?.slug
     ? `/organizations/${organization.slug}/settings`
     : "/dashboard/settings";
+
+  // Team members href — link directly to avoid redirect via /dashboard/team
+  const orgTeamHref = organization?.slug
+    ? `/organizations/${organization.slug}/members`
+    : "/dashboard/team";
 
   // Org-level nav items
   const orgNavItems: NavItem[] = [
@@ -108,7 +117,7 @@ export function DashboardNav() {
       icon: <FolderOpen className="h-4 w-4" />,
     },
     {
-      href: "/dashboard/team",
+      href: orgTeamHref,
       label: "Team",
       icon: <Users className="h-4 w-4" />,
     },
@@ -117,6 +126,16 @@ export function DashboardNav() {
       label: "Audit Logs",
       icon: <ClipboardList className="h-4 w-4" />,
     },
+    // Anomalies visible only to admin/team_lead (security feature)
+    ...(canViewAnomalies
+      ? [
+          {
+            href: "/dashboard/anomalies",
+            label: "Anomalies",
+            icon: <ShieldAlert className="h-4 w-4" />,
+          },
+        ]
+      : []),
     // Analytics visible only to admin/team_lead
     ...(canViewAnalytics
       ? [

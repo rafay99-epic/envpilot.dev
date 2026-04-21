@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import {
@@ -9,8 +9,7 @@ import {
   checkCLIAccess,
   tierLimitResponse,
 } from "@/lib/cli-auth";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+import { cacheHeaders } from "@/lib/cache-headers";
 
 /**
  * GET /api/cli/tier
@@ -80,32 +79,37 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    return NextResponse.json({
-      tier: resolvedFeatures?.tierName ?? "free",
-      enforcementEnabled,
-      // Legacy format for older CLI versions
-      apiAccessEnabled: resolvedFeatures?.features?.api_access?.value ?? true,
-      limits: {
-        projects: resolvedFeatures?.features?.max_projects?.value ?? null,
-        variablesPerProject:
-          resolvedFeatures?.features?.max_variables_per_project?.value ?? null,
-        teamMembers:
-          resolvedFeatures?.features?.max_team_members?.value ?? null,
+    return NextResponse.json(
+      {
+        tier: resolvedFeatures?.tierName ?? "free",
+        enforcementEnabled,
+        // Legacy format for older CLI versions
+        apiAccessEnabled: resolvedFeatures?.features?.api_access?.value ?? true,
+        limits: {
+          projects: resolvedFeatures?.features?.max_projects?.value ?? null,
+          variablesPerProject:
+            resolvedFeatures?.features?.max_variables_per_project?.value ??
+            null,
+          teamMembers:
+            resolvedFeatures?.features?.max_team_members?.value ?? null,
+        },
+        features: {
+          versionHistory:
+            resolvedFeatures?.features?.variable_version_history?.value ??
+            false,
+          bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
+          extensionAccess:
+            resolvedFeatures?.features?.extension_access?.value ?? true,
+          granularPermissions:
+            resolvedFeatures?.features?.granular_permissions?.value ?? false,
+          auditLogRetentionDays:
+            resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
+        },
+        // New dynamic format
+        resolvedFeatures: resolvedFeatures?.features ?? {},
       },
-      features: {
-        versionHistory:
-          resolvedFeatures?.features?.variable_version_history?.value ?? false,
-        bulkImport: resolvedFeatures?.features?.bulk_import?.value ?? false,
-        extensionAccess:
-          resolvedFeatures?.features?.extension_access?.value ?? true,
-        granularPermissions:
-          resolvedFeatures?.features?.granular_permissions?.value ?? false,
-        auditLogRetentionDays:
-          resolvedFeatures?.features?.audit_log_retention_days?.value ?? 7,
-      },
-      // New dynamic format
-      resolvedFeatures: resolvedFeatures?.features ?? {},
-    });
+      { headers: cacheHeaders.privateMedium }
+    );
   } catch (error) {
     console.error("CLI tier error:", error);
     return NextResponse.json(

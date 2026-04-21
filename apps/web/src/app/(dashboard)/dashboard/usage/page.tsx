@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useAuthContext } from "@/components/auth";
 import { useCachedTierData } from "@/hooks/useTierStore";
-import { useAllFeatures } from "@/hooks";
+import { useAllFeatures, useConvexUser } from "@/hooks";
+import { useUserOrganizations } from "@/hooks/useOrganizations";
 import {
   TerminalWindow,
   TerminalLoading,
@@ -17,11 +17,10 @@ const CHECKOUT_URL =
   "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
 
 export default function UsagePage() {
-  const { organization } = useAuthContext();
+  const { organization, user } = useAuthContext();
   const paymentsEnabled = usePaymentsEnabled();
   const { isLoading, tier, usage, isFree, enforcementEnabled } =
     useCachedTierData();
-  const [orgCount, setOrgCount] = useState<number | null>(null);
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const {
     features: resolvedFeatures,
@@ -29,28 +28,13 @@ export default function UsagePage() {
     getLimit,
   } = useAllFeatures(orgId);
 
-  // Fetch owned org count
-  useEffect(() => {
-    const controller = new AbortController();
-    async function fetchOrgCount() {
-      try {
-        const response = await fetch("/api/organizations", {
-          signal: controller.signal,
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const owned = (data.organizations || []).filter(
-            (o: { role: string }) => o.role === "admin"
-          );
-          setOrgCount(owned.length);
-        }
-      } catch {
-        // Silently fail (includes AbortError)
-      }
-    }
-    fetchOrgCount();
-    return () => controller.abort();
-  }, []);
+  // Owned org count via Convex WebSocket — instant, no HTTP round-trip
+  const { convexUserId } = useConvexUser(user?.id);
+  const allOrgs = useUserOrganizations(convexUserId);
+  const orgCount =
+    allOrgs !== undefined
+      ? allOrgs.filter((o) => o !== null && o.role === "admin").length
+      : null;
 
   // -----------------------------------------------------------------------
   // Early returns

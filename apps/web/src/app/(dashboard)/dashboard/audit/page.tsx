@@ -15,7 +15,6 @@ import {
   TerminalInput,
   TerminalSelect,
   TerminalButton,
-  TerminalLoading,
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
@@ -250,63 +249,77 @@ export default function AuditPage() {
         </TerminalButton>
       </div>
 
-      {/* Summary Cards */}
-      {summary && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <TerminalCard>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10">
-                <Activity className="h-4 w-4 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Total Events</p>
+      {/* Summary Cards — always render structure, pulse values while loading */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10">
+              <Activity className="h-4 w-4 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Total Events</p>
+              {summary ? (
                 <p className="text-lg font-bold text-zinc-100">
                   {summary.totalEvents.toLocaleString()}
                 </p>
-              </div>
+              ) : (
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+              )}
             </div>
-          </TerminalCard>
-          <TerminalCard>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Security Events</p>
+          </div>
+        </TerminalCard>
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Security Events</p>
+              {summary ? (
                 <p className="text-lg font-bold text-zinc-100">
                   {summary.securityEventCount}
                 </p>
-              </div>
+              ) : (
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+              )}
             </div>
-          </TerminalCard>
-          <TerminalCard>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
-                <Lock className="h-4 w-4 text-red-400" />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Sensitive Access</p>
+          </div>
+        </TerminalCard>
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10">
+              <Lock className="h-4 w-4 text-red-400" />
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Sensitive Access</p>
+              {summary ? (
                 <p className="text-lg font-bold text-zinc-100">
                   {summary.sensitiveAccessCount}
                 </p>
-              </div>
+              ) : (
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+              )}
             </div>
-          </TerminalCard>
-          <TerminalCard>
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-                <Shield className="h-4 w-4 text-green-400" />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500">Period</p>
+          </div>
+        </TerminalCard>
+        <TerminalCard>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+              <Shield className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500">Period</p>
+              {summary ? (
                 <p className="text-lg font-bold text-zinc-100">
                   {summary.periodDays}d
                 </p>
-              </div>
+              ) : (
+                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-zinc-800" />
+              )}
             </div>
-          </TerminalCard>
-        </div>
-      )}
+          </div>
+        </TerminalCard>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -343,7 +356,22 @@ export default function AuditPage() {
 
       {/* Audit Logs */}
       {isLoading ? (
-        <TerminalLoading />
+        <TerminalWindow title="audit-log">
+          <div className="divide-y divide-zinc-800/50">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3 px-5 py-3">
+                <div className="h-3 w-32 animate-pulse rounded bg-zinc-800" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3 w-56 animate-pulse rounded bg-zinc-800" />
+                  <div className="flex gap-3">
+                    <div className="h-3 w-28 animate-pulse rounded bg-zinc-800/40" />
+                    <div className="h-3 w-20 animate-pulse rounded bg-zinc-800/40" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </TerminalWindow>
       ) : filteredLogs.length === 0 ? (
         <TerminalWindow title="audit-log">
           <TerminalEmptyState
