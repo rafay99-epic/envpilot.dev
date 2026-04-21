@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -9,8 +9,6 @@ import * as Sentry from "@sentry/nextjs";
 import { createSecret } from "@/lib/vault";
 import { handleApiError, sanitizeConvexError } from "@/lib/api-errors";
 import { sendShareNotificationEmail } from "@/lib/share-emails";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const createShareSchema = z.object({
   variableId: z.string(),

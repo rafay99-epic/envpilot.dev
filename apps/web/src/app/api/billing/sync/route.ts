@@ -1,11 +1,9 @@
 import { Polar } from "@polar-sh/sdk";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * POST /api/billing/sync?checkout_id=<id>

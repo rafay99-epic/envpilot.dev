@@ -1,10 +1,8 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { BUILT_IN_TEMPLATES } from "@/constants/templates";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * POST /api/templates/seed - Seed built-in templates

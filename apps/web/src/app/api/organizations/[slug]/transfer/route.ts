@@ -1,14 +1,12 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { handleApiError } from "@/lib/api-errors";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const transferSchema = z.object({
   targetUserEmail: z.string().email("A valid email address is required"),

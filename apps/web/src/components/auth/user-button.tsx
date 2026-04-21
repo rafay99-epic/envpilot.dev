@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthContext } from "./auth-provider";
 import { LogOut, LayoutDashboard, Settings } from "lucide-react";
 
@@ -55,9 +56,11 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
         title={collapsed ? `${user.firstName} ${user.lastName}` : undefined}
       >
         {user.profilePictureUrl ? (
-          <img
+          <Image
             src={user.profilePictureUrl}
             alt={`${user.firstName ?? "User"}'s avatar`}
+            width={32}
+            height={32}
             className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-zinc-700"
           />
         ) : (

@@ -3,11 +3,9 @@ import {
   validateEvent,
   WebhookVerificationError,
 } from "@polar-sh/sdk/webhooks";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getPolarWebhookSecret, isPaymentsEnabled } from "@/lib/polar";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
  * Polar.sh Webhook Handler

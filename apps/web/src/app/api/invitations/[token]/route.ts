@@ -1,14 +1,12 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 type RouteParams = { params: Promise<{ token: string }> };
 

@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
@@ -8,8 +8,6 @@ import { z } from "zod";
 
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Convex ID pattern - alphanumeric characters only
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;

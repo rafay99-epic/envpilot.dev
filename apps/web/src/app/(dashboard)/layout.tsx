@@ -1,7 +1,7 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
@@ -15,8 +15,6 @@ import {
   selectActiveOrganization,
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export default async function DashboardLayout({
   children,
@@ -33,6 +31,7 @@ export default async function DashboardLayout({
   let convexUser;
   let organizations: OrganizationWithMembershipRole[] = [];
   let activeOrganization: OrganizationWithMembershipRole | null = null;
+  let orgTier = "free";
 
   try {
     convexUser = await getOrCreateConvexUser(convex, {
@@ -82,16 +81,43 @@ export default async function DashboardLayout({
       );
     }
 
-    organizations = (await convex.query(api.organizations.listForUser, {
-      userId: convexUser._id,
-    })) as OrganizationWithMembershipRole[];
-
     const cookieStore = await cookies();
     const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
+
+    // Parallel fetch: org list + tier for the cookie-hinted active org.
+    // Previously these ran sequentially, adding a round-trip on every dashboard
+    // navigation. If the cookie matches the actual active org (the common case),
+    // we avoid a waterfall.
+    const [orgList, tierByGuess] = await Promise.all([
+      convex.query(api.organizations.listForUser, {
+        userId: convexUser._id,
+      }) as Promise<OrganizationWithMembershipRole[]>,
+      preferredOrgId
+        ? convex
+            .query(api.featureRegistry.getResolvedFeatures, {
+              organizationId:
+                preferredOrgId as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    organizations = orgList;
     activeOrganization = selectActiveOrganization(
       organizations,
       preferredOrgId
     );
+
+    // Use the parallel-fetched tier only if the cookie matched the resolved
+    // active org. Otherwise fall back to "free" and let the client fetch via
+    // /api/auth/me — avoids another server round-trip on the layout.
+    if (
+      activeOrganization &&
+      tierByGuess &&
+      activeOrganization._id === preferredOrgId
+    ) {
+      orgTier = tierByGuess.tierName ?? "free";
+    }
   } catch (err) {
     // Log but don't crash — client-side auth hook will fetch the data
     console.error("Failed to load organization context in layout:", err);
@@ -110,23 +136,6 @@ export default async function DashboardLayout({
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
   };
-
-  // Look up the tier from the organizationTiers table
-  let orgTier: string = "free";
-  if (activeOrganization) {
-    try {
-      const tierData = await convex.query(
-        api.featureRegistry.getResolvedFeatures,
-        {
-          organizationId:
-            activeOrganization._id as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
-        }
-      );
-      orgTier = (tierData?.tierName as string) ?? "free";
-    } catch {
-      // Fall back to free tier if query fails
-    }
-  }
 
   const organization: Organization | null = activeOrganization
     ? {

@@ -524,6 +524,124 @@ export const getResolvedFeatures = query({
 });
 
 /**
+ * Batch version of getResolvedFeatures — resolves tiers for multiple
+ * organizations in a single query. Use this when a caller would otherwise
+ * loop with Promise.all over getResolvedFeatures (e.g. /api/auth/me which
+ * fetches tiers for every org the user belongs to).
+ *
+ * Returns results in the same order as the input organizationIds.
+ * Missing orgs return null in their slot.
+ */
+export const getResolvedFeaturesBatch = query({
+  args: { organizationIds: v.array(v.id("organizations")) },
+  handler: async (ctx, args) => {
+    if (args.organizationIds.length === 0) return [];
+
+    // Fetch shared data ONCE (instead of per-org)
+    const enforced = await isEnforcementEnabledFromDb(ctx.db);
+    const allFeatures = await ctx.db
+      .query("featureRegistry")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .collect();
+
+    // When enforcement is off, every org gets the same "unlimited" shape
+    if (!enforced) {
+      const features: Record<
+        string,
+        {
+          value: boolean | number | null;
+          valueType: string;
+          displayName: string;
+          category: string;
+        }
+      > = {};
+      for (const f of allFeatures) {
+        features[f.key] = {
+          value: f.valueType === "boolean" ? true : null,
+          valueType: f.valueType,
+          displayName: f.displayName,
+          category: f.category,
+        };
+      }
+      return args.organizationIds.map(() => ({
+        tierName: "unlimited",
+        features,
+      }));
+    }
+
+    // Resolve each org's effective tier (owner tier + grace period)
+    const results = await Promise.all(
+      args.organizationIds.map(async (organizationId) => {
+        const org = await ctx.db.get(organizationId);
+        if (!org) return null;
+
+        const { tierName, ownerId } = await getOrgOwnerTier(
+          ctx.db,
+          organizationId
+        );
+
+        const grace = await ctx.db
+          .query("subscriptionGracePeriods")
+          .withIndex("by_user", (q) => q.eq("userId", ownerId))
+          .first();
+
+        let effectiveTier = tierName;
+        if (grace?.isActive && grace.gracePeriodEnd > Date.now()) {
+          effectiveTier = grace.previousTier;
+        }
+
+        return { organizationId, effectiveTier };
+      })
+    );
+
+    // Group unique tiers so we only fetch each tier's overrides once
+    const uniqueTiers = [
+      ...new Set(
+        results.filter((r) => r !== null).map((r) => r!.effectiveTier)
+      ),
+    ];
+    const tierOverridesByTier = new Map<string, Map<string, string>>();
+    await Promise.all(
+      uniqueTiers.map(async (tier) => {
+        const overrides = await ctx.db
+          .query("tierFeatures")
+          .withIndex("by_tier", (q) => q.eq("tierName", tier))
+          .collect();
+        tierOverridesByTier.set(
+          tier,
+          new Map(overrides.map((o) => [o.featureKey, o.value]))
+        );
+      })
+    );
+
+    return results.map((result) => {
+      if (!result) return null;
+      const overrideMap =
+        tierOverridesByTier.get(result.effectiveTier) ?? new Map();
+      const features: Record<
+        string,
+        {
+          value: boolean | number | null;
+          valueType: string;
+          displayName: string;
+          category: string;
+        }
+      > = {};
+      for (const f of allFeatures) {
+        const rawValue = overrideMap.get(f.key) ?? f.defaultValue;
+        features[f.key] = {
+          value: parseFeatureValue(rawValue, f.valueType),
+          valueType: f.valueType,
+          displayName: f.displayName,
+          category: f.category,
+        };
+      }
+      return { tierName: result.effectiveTier, features };
+    });
+  },
+});
+
+/**
  * Get a user's tier info including grace period status.
  */
 export const getUserTierInfo = query({

@@ -1,14 +1,12 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
+import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { handleApiError } from "@/lib/api-errors";
 import { createSecret, readSecret } from "@/lib/vault";
 import { parse, ALL_FORMATS, type FormatType } from "@/lib/format-converter";
-
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 interface RouteParams {
   params: Promise<{ id: string }>;
