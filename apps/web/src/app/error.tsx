@@ -1,10 +1,11 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect, useReducer, useRef } from "react";
+import { createLogger } from "@/lib/logger";
 
 const MAX_AUTO_RETRIES = 2;
+const log = createLogger("app/error");
 
 export default function Error({
   error,
@@ -17,18 +18,30 @@ export default function Error({
   const [retriesExhausted, markExhausted] = useReducer(() => true, false);
 
   useEffect(() => {
-    console.error("Application error:", error);
-
     // Auto-retry transient errors (502, network failures) up to MAX_AUTO_RETRIES times
     if (retryCount.current < MAX_AUTO_RETRIES) {
       retryCount.current += 1;
       const delay = retryCount.current * 1000;
+      log.warn("application_error_retrying", {
+        attempt: retryCount.current,
+        delay_ms: delay,
+        digest: error.digest,
+        message: error.message,
+      });
       const timer = setTimeout(() => reset(), delay);
       return () => clearTimeout(timer);
     }
 
     // All retries exhausted — report to Sentry and show error UI
-    Sentry.captureException(error);
+    log.error(
+      "application_error_exhausted",
+      {
+        digest: error.digest,
+        attempts: retryCount.current,
+        message: error.message,
+      },
+      error
+    );
     const timer = setTimeout(() => markExhausted(), 0);
     return () => clearTimeout(timer);
   }, [error, reset]);

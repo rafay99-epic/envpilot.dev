@@ -4,10 +4,7 @@ import { cookies } from "next/headers";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
-import { DashboardNav } from "@/components/dashboard/dashboard-nav";
-import { CommandPalette } from "@/components/command-palette";
-import { UpdateBanner } from "@/components/dashboard/update-banner";
-import { KeyboardShortcutsProvider } from "@/components/keyboard/keyboard-shortcuts-provider";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
@@ -15,6 +12,9 @@ import {
   selectActiveOrganization,
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("app/dashboard/layout");
 
 export default async function DashboardLayout({
   children,
@@ -120,7 +120,11 @@ export default async function DashboardLayout({
     }
   } catch (err) {
     // Log but don't crash — client-side auth hook will fetch the data
-    console.error("Failed to load organization context in layout:", err);
+    log.error(
+      "organization_context_load_failed",
+      { userId: user.id, email: user.email },
+      err
+    );
   }
 
   // Transform to our AuthUser type
@@ -151,36 +155,7 @@ export default async function DashboardLayout({
 
   return (
     <AuthProvider initialUser={authUser} initialOrganization={organization}>
-      <div className="dark flex min-h-screen bg-[#0f172a] text-zinc-100">
-        {/* Subtle grid background */}
-        <div
-          className="pointer-events-none fixed inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-
-        {/* Sidebar Navigation */}
-        <DashboardNav />
-
-        {/* Main Content */}
-        <main className="relative z-10 flex-1 overflow-auto">
-          <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
-
-        {/* Global Keyboard Shortcuts */}
-        <KeyboardShortcutsProvider>
-          {/* Global Search Command Palette */}
-          <CommandPalette />
-        </KeyboardShortcutsProvider>
-
-        {/* Update Available Notification */}
-        <UpdateBanner />
-      </div>
+      <DashboardShell>{children}</DashboardShell>
     </AuthProvider>
   );
 }

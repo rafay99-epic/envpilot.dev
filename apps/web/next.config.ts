@@ -3,6 +3,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import { APP_VERSIONS } from "./src/lib/versions";
 
+const sentryTunnelRoute = "/api/telemetry-envelope";
+
 // Run `ANALYZE=true bun run build` (or `bun run analyze`) to inspect bundles
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -79,7 +81,7 @@ export default withAnalyzer(
     // This can increase your server load as well as your hosting bill.
     // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
     // side errors will fail.
-    tunnelRoute: "/monitoring",
+    tunnelRoute: sentryTunnelRoute,
 
     webpack: {
       // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)

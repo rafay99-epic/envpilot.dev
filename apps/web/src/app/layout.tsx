@@ -104,6 +104,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <Script id="config-shim" strategy="beforeInteractive">
+          {`globalThis.CONFIG = globalThis.CONFIG || {};`}
+        </Script>
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />
         {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (

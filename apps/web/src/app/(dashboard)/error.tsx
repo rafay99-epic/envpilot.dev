@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useReducer, useRef } from "react";
+import { createLogger } from "@/lib/logger";
 
 const MAX_AUTO_RETRIES = 2;
+const log = createLogger("app/dashboard/error");
 
 export default function DashboardError({
   error,
@@ -15,18 +17,31 @@ export default function DashboardError({
   const [retriesExhausted, markExhausted] = useReducer(() => true, false);
 
   useEffect(() => {
-    console.error("Dashboard error:", error);
-
     // Auto-retry transient errors (e.g. 502 during org switch) before showing UI
     if (retryCount.current < MAX_AUTO_RETRIES) {
       retryCount.current += 1;
       const delay = retryCount.current * 1000;
+      log.warn("dashboard_error_retrying", {
+        attempt: retryCount.current,
+        delay_ms: delay,
+        digest: error.digest,
+        message: error.message,
+      });
       const timer = setTimeout(() => reset(), delay);
       return () => clearTimeout(timer);
     }
 
     // All retries exhausted — schedule showing the error UI via a microtask
     // to avoid synchronous setState within an effect body.
+    log.error(
+      "dashboard_error_exhausted",
+      {
+        digest: error.digest,
+        attempts: retryCount.current,
+        message: error.message,
+      },
+      error
+    );
     const timer = setTimeout(() => markExhausted(), 0);
     return () => clearTimeout(timer);
   }, [error, reset]);

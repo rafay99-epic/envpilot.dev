@@ -7,6 +7,9 @@ import {
   type EnvironmentTemplate,
   type ProjectType,
 } from "@/constants/templates";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hooks/useTemplates");
 
 interface UseTemplatesOptions {
   projectType?: ProjectType;
@@ -99,6 +102,7 @@ export function useTemplates(
         throw new Error(data.error || "Failed to seed templates");
       }
     } catch (err) {
+      log.error("seed_templates_failed", {}, err);
       setError(err instanceof Error ? err.message : "An error occurred");
       throw err;
     } finally {
@@ -166,6 +170,7 @@ export function useTemplates(
         const data = await response.json();
         return data.template._id;
       } catch (err) {
+        log.error("duplicate_template_failed", { templateId, newName }, err);
         setError(err instanceof Error ? err.message : "An error occurred");
         return null;
       } finally {
@@ -251,6 +256,15 @@ export function useTemplate(templateId: string | null) {
 
         return failedCount === 0;
       } catch (err) {
+        log.error(
+          "apply_template_failed",
+          {
+            templateId: template.id,
+            projectId,
+            variableCount: template.variables.length,
+          },
+          err
+        );
         setError(err instanceof Error ? err.message : "An error occurred");
         return false;
       } finally {

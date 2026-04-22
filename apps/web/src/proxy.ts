@@ -25,7 +25,7 @@ export default authkitMiddleware({
       "/robots.txt",
       "/api/health",
       "/api/config",
-      "/monitoring",
+      "/api/telemetry-envelope",
       "/api/webhooks/polar",
       // CLI API endpoints use bearer token auth, not browser session auth
       "/api/cli/auth",
