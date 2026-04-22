@@ -13,6 +13,9 @@ import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("app/dashboard/organization-members");
 
 interface SearchUser {
   _id: string;
@@ -201,6 +204,17 @@ export default function OrganizationMembersPage({
       setTimeout(() => setNotice(null), 8000);
       // No manual refetch — Convex reactivity updates invitations query automatically
     } catch (err) {
+      log.error(
+        "organization_invite_failed",
+        {
+          slug,
+          email: inviteEmail,
+          inviteRole,
+          projectIds: selectedProjectIds,
+          projectRole: inviteProjectRole,
+        },
+        err
+      );
       setInviteError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsInviting(false);
@@ -224,6 +238,11 @@ export default function OrganizationMembersPage({
       }
       // No manual state update — Convex reactivity updates members query
     } catch (err) {
+      log.error(
+        "member_role_update_failed",
+        { slug, userId, newRole, organizationId: orgId },
+        err
+      );
       setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
@@ -249,6 +268,11 @@ export default function OrganizationMembersPage({
           }
           // No manual state update — Convex reactivity updates members query
         } catch (err) {
+          log.error(
+            "member_remove_failed",
+            { slug, userId, organizationId: orgId },
+            err
+          );
           setError(err instanceof Error ? err.message : "An error occurred");
         }
       },
@@ -274,7 +298,11 @@ export default function OrganizationMembersPage({
           setShowSearchResults(true);
         }
       } catch (err) {
-        console.error("Search error:", err);
+        log.error(
+          "member_search_failed",
+          { slug, organizationId: orgId, query },
+          err
+        );
       } finally {
         setIsSearching(false);
       }
@@ -323,6 +351,11 @@ export default function OrganizationMembersPage({
         setError(data.error || "Failed to fetch sessions");
       }
     } catch (err) {
+      log.error(
+        "member_sessions_fetch_failed",
+        { slug, userId, organizationId: orgId },
+        err
+      );
       setError(err instanceof Error ? err.message : "Failed to fetch sessions");
     } finally {
       setIsLoadingSessions(false);
@@ -367,6 +400,11 @@ export default function OrganizationMembersPage({
       }
       setIsLoadingSessions(false);
     } catch (err) {
+      log.error(
+        "member_session_revoke_failed",
+        { slug, userId, type, sessionId, organizationId: orgId },
+        err
+      );
       setError(err instanceof Error ? err.message : "Failed to revoke session");
     } finally {
       setIsRevokingSession(false);
@@ -394,6 +432,11 @@ export default function OrganizationMembersPage({
           }
           // No manual state update — Convex reactivity updates invitations query
         } catch (err) {
+          log.error(
+            "invitation_cancel_failed",
+            { slug, invitationId, organizationId: orgId },
+            err
+          );
           setError(err instanceof Error ? err.message : "An error occurred");
         }
       },
@@ -415,6 +458,11 @@ export default function OrganizationMembersPage({
       }
       // No manual refetch — Convex reactivity handles updates
     } catch (err) {
+      log.error(
+        "invitation_resend_failed",
+        { slug, invitationId, organizationId: orgId },
+        err
+      );
       setError(err instanceof Error ? err.message : "An error occurred");
     }
   }

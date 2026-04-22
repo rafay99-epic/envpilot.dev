@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AuthUser, Organization } from "@/lib/auth";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hooks/use-auth");
 
 interface UserData {
   user: AuthUser | null;
@@ -60,7 +63,8 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
         setActions([]);
         setImpersonator(undefined);
       }
-    } catch {
+    } catch (error) {
+      log.error("fetch_user_failed", {}, error);
       setUser(null);
       setOrganization(null);
       setActions([]);

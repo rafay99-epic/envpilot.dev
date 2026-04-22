@@ -1,7 +1,32 @@
 import * as Sentry from "@sentry/nextjs";
 
+const sentryEnabled = process.env.NODE_ENV !== "development";
+
+function isTwitterInAppBrowserConfigNoise(event: Sentry.ErrorEvent) {
+  const exceptionValues = event.exception?.values ?? [];
+  const messageMatches = exceptionValues.some((exception) =>
+    exception.value?.includes("Can't find variable: CONFIG")
+  );
+
+  if (!messageMatches) return false;
+
+  const stackMatches = exceptionValues.some((exception) =>
+    exception.stacktrace?.frames?.some((frame) => {
+      const fn = frame.function ?? "";
+      return fn === "updateGapFiller" || fn === "updateFooterPositions";
+    })
+  );
+
+  const browserName =
+    event.contexts?.browser?.name ?? event.tags?.["browser.name"];
+  const isTwitterBrowser = browserName === "Twitter";
+
+  return stackMatches || isTwitterBrowser;
+}
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: sentryEnabled,
 
   enableLogs: true,
 
@@ -10,6 +35,10 @@ Sentry.init({
   replaysOnErrorSampleRate: 0,
 
   beforeSend(event) {
+    if (isTwitterInAppBrowserConfigNoise(event)) {
+      return null;
+    }
+
     if (event.breadcrumbs) {
       event.breadcrumbs = event.breadcrumbs.map((bc) => {
         if (bc.data) {
@@ -33,4 +62,6 @@ Sentry.init({
   ],
 });
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export const onRouterTransitionStart = sentryEnabled
+  ? Sentry.captureRouterTransitionStart
+  : () => {};

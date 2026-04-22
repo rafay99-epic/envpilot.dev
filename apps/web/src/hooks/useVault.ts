@@ -1,4 +1,7 @@
 import { useState, useCallback } from "react";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hooks/useVault");
 
 /**
  * Vault API Response Types
@@ -156,6 +159,7 @@ export function useVault(): UseVaultReturn {
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "An unexpected error occurred";
+        log.error("vault_request_failed", { url, method: options.method }, err);
         setError(message);
         return null;
       } finally {

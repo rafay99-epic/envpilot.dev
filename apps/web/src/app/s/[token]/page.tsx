@@ -14,15 +14,16 @@ import {
   Lock,
   RefreshCw,
 } from "lucide-react";
-import * as Sentry from "@sentry/nextjs";
 import {
   base64UrlToClientKey,
   decryptFromShare,
   sha256Hex,
 } from "@/lib/share-crypto";
 import { useVerifyShareEmail, useVerifyShareOtp } from "@/hooks/useShareSecret";
+import { createLogger } from "@/lib/logger";
 
 type ViewerStep = "email" | "otp" | "passphrase" | "revealed" | "error";
+const log = createLogger("app/share-viewer");
 
 export default function ShareViewerPage() {
   const params = useParams<{ token: string }>();
@@ -63,7 +64,11 @@ export default function ShareViewerPage() {
         throw new Error("Invalid key length");
       }
       setClientKey(key);
-    } catch {
+    } catch (error) {
+      log.warn("share_key_invalid", {
+        token,
+        reason: error instanceof Error ? error.message : "unknown_error",
+      });
       setStep("error");
       setErrorMessage("Invalid decryption key in URL.");
     }
@@ -106,6 +111,11 @@ export default function ShareViewerPage() {
       setOtpCountdown(300);
       setStep("otp");
     } catch (err) {
+      log.error(
+        "share_email_verification_failed",
+        { token, email: email.trim() },
+        err
+      );
       setStep("error");
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to verify email"
@@ -148,9 +158,7 @@ export default function ShareViewerPage() {
           setEmail("");
           setStep("revealed");
         } catch (decryptErr) {
-          Sentry.captureException(decryptErr, {
-            tags: { source: "share-viewer", action: "decrypt" },
-          });
+          log.error("share_secret_decrypt_failed", { token }, decryptErr);
           setStep("error");
           setErrorMessage(
             "Failed to decrypt the secret. The link may be corrupted."
@@ -170,6 +178,11 @@ export default function ShareViewerPage() {
         setErrorMessage(message);
       } else {
         // Stay on OTP step for retry-able errors
+        log.warn("share_otp_verification_failed", {
+          token,
+          email: email.trim(),
+          reason: message,
+        });
         setErrorMessage(message);
       }
     }
@@ -195,6 +208,11 @@ export default function ShareViewerPage() {
       setStep("revealed");
     } catch (decryptErr) {
       // Most likely wrong passphrase — don't spam Sentry with these
+      log.warn("share_passphrase_decrypt_failed", {
+        token,
+        reason:
+          decryptErr instanceof Error ? decryptErr.message : "unknown_error",
+      });
       setErrorMessage("Incorrect passphrase. Please try again.");
     }
   };
@@ -207,6 +225,7 @@ export default function ShareViewerPage() {
       setOtp("");
       setOtpCountdown(300);
     } catch (err) {
+      log.error("share_otp_resend_failed", { token, email: email.trim() }, err);
       setErrorMessage(
         err instanceof Error ? err.message : "Failed to resend code"
       );
@@ -220,11 +239,10 @@ export default function ShareViewerPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (clipErr) {
-      Sentry.addBreadcrumb({
-        category: "clipboard",
-        message:
-          "Clipboard write failed — user may be on HTTP or restricted context",
-        level: "warning",
+      log.warn("share_clipboard_write_failed", {
+        token,
+        reason:
+          clipErr instanceof Error ? clipErr.message : "restricted_context",
       });
     }
   };

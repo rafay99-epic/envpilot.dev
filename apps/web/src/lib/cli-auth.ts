@@ -2,6 +2,9 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 import type { Id, Doc } from "@convex/_generated/dataModel";
 import { NextRequest } from "next/server";
+import { createLogger, tokenPrefix } from "@/lib/logger";
+
+const log = createLogger("lib/cli-auth");
 
 /**
  * Result of CLI token validation
@@ -58,8 +61,11 @@ export async function validateCLIToken(
       .mutation(api.cliSessions.updateLastUsed, {
         accessToken: token,
       })
-      .catch(() => {
-        // Ignore errors in background update
+      .catch((error) => {
+        log.warn("token_last_used_update_failed", {
+          token: tokenPrefix(token),
+          reason: error instanceof Error ? error.message : "unknown",
+        });
       });
 
     return {
@@ -68,6 +74,7 @@ export async function validateCLIToken(
       user: result.user,
     };
   } catch (error) {
+    log.error("token_validation_failed", { token: tokenPrefix(token) }, error);
     return {
       valid: false,
       error: "Failed to validate token",

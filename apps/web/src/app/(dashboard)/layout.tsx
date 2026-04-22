@@ -12,6 +12,9 @@ import {
   selectActiveOrganization,
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("app/dashboard/layout");
 
 export default async function DashboardLayout({
   children,
@@ -117,7 +120,11 @@ export default async function DashboardLayout({
     }
   } catch (err) {
     // Log but don't crash — client-side auth hook will fetch the data
-    console.error("Failed to load organization context in layout:", err);
+    log.error(
+      "organization_context_load_failed",
+      { userId: user.id, email: user.email },
+      err
+    );
   }
 
   // Transform to our AuthUser type

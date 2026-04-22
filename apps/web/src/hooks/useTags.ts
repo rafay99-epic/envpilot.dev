@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hooks/useTags");
 
 // ── Shared Tag type ──────────────────────────────────────────
 // Used by tag-selector, tag-filter, variable-form, etc.
@@ -64,6 +67,13 @@ export function useCreateTag() {
           createdBy: data.createdBy as Id<"users">,
         });
         return { tag: { _id: tagId } };
+      } catch (error) {
+        log.error(
+          "create_tag_failed",
+          { organizationId: data.organizationId, name: data.name },
+          error
+        );
+        throw error;
       } finally {
         setIsPending(false);
       }
@@ -95,6 +105,13 @@ export function useUpdateTag() {
           updatedBy: data.updatedBy as Id<"users">,
         });
         return { tag: { _id: tagId } };
+      } catch (error) {
+        log.error(
+          "update_tag_failed",
+          { tagId: data.tagId, name: data.name, color: data.color },
+          error
+        );
+        throw error;
       } finally {
         setIsPending(false);
       }
@@ -119,6 +136,9 @@ export function useDeleteTag() {
           deletedBy: data.deletedBy as Id<"users">,
         });
         return result;
+      } catch (error) {
+        log.error("delete_tag_failed", { tagId: data.tagId }, error);
+        throw error;
       } finally {
         setIsPending(false);
       }

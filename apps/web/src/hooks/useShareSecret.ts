@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as Sentry from "@sentry/nextjs";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hooks/useShareSecret");
 
 /**
  * React Query hooks for Secret Sharing.
@@ -62,17 +64,23 @@ async function handleShareResponse<T>(
   try {
     const data = await response.json();
     if (data.error) errorMessage = data.error;
-  } catch {
+  } catch (error) {
+    log.error(
+      "parse_share_error_response_failed",
+      { action, status: response.status },
+      error
+    );
     // Response wasn't JSON — use status text
     errorMessage = response.statusText || errorMessage;
   }
 
   // Report server errors (5xx) to Sentry — 4xx are expected user errors
   if (response.status >= 500) {
-    Sentry.captureException(new Error(errorMessage), {
-      tags: { source: "share-hook", action },
-      extra: { status: response.status },
-    });
+    log.error(
+      "share_api_failed",
+      { action, status: response.status },
+      new Error(errorMessage)
+    );
   }
 
   throw new Error(errorMessage);

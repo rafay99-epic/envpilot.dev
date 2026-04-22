@@ -4,8 +4,11 @@
 
 import * as Sentry from "@sentry/nextjs";
 
+const sentryEnabled = process.env.NODE_ENV !== "development";
+
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
+  enabled: sentryEnabled,
 
   enableLogs: true,
   sendDefaultPii: true,

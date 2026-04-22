@@ -1,6 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve, basename } from "node:path";
 import matter from "gray-matter";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("lib/docs/content");
 
 export interface DocPage {
   slug: string;
@@ -44,7 +47,8 @@ export function getDocBySlug(slug: string): DocPage | null {
       version: (data.version as string) ?? undefined,
       content: interpolate(content, data),
     };
-  } catch {
+  } catch (error) {
+    log.error("doc_load_failed", { slug }, error);
     return null;
   }
 }

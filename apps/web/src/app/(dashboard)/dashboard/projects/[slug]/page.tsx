@@ -42,6 +42,7 @@ import {
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { ApiError } from "@/lib/api-client";
+import { createLogger } from "@/lib/logger";
 // Variable CRUD mutations MUST stay as API routes (WorkOS Vault integration)
 import {
   useCreateVariable,
@@ -50,6 +51,8 @@ import {
   useBulkDeleteVariables,
   useRollbackVariable,
 } from "@/hooks/queries";
+
+const log = createLogger("app/dashboard/project-detail");
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -228,6 +231,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       );
       exitSelectionMode();
     } catch (err) {
+      log.error(
+        "project_bulk_delete_failed",
+        {
+          projectId,
+          selectedCount: selectedIds.size,
+          organizationId: organization?.id,
+        },
+        err
+      );
       setError(
         err instanceof Error ? err.message : "Failed to delete variables"
       );
@@ -266,6 +278,17 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           : err instanceof Error
             ? err.message
             : "Failed to create variable";
+      log.error(
+        "project_variable_create_failed",
+        {
+          projectId,
+          organizationId: organization?.id,
+          key: data.key,
+          environments: data.environments,
+          code: err instanceof ApiError ? err.code : undefined,
+        },
+        err
+      );
       setError(message);
       throw err;
     }
@@ -296,6 +319,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
+      log.error(
+        "project_variable_update_failed",
+        {
+          projectId,
+          variableId,
+          organizationId: organization?.id,
+          environments: data.environments,
+        },
+        err
+      );
       setError(message);
       throw err;
     }
@@ -317,6 +350,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
+      log.error(
+        "project_variable_delete_failed",
+        {
+          projectId,
+          variableId: deletingVariable._id,
+          organizationId: organization?.id,
+        },
+        err
+      );
       setError(message);
       throw err;
     }
@@ -342,6 +384,16 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         `Rolled back ${historyVariableKey} to version ${targetVersion}.`
       );
     } catch (err) {
+      log.error(
+        "project_variable_rollback_failed",
+        {
+          projectId,
+          variableId: historyVariableId,
+          targetVersion,
+          organizationId: organization?.id,
+        },
+        err
+      );
       setError(
         err instanceof Error ? err.message : "Failed to rollback variable"
       );
@@ -370,6 +422,17 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             : "Request canceled."
       );
     } catch (err) {
+      log.error(
+        "project_request_resolution_failed",
+        {
+          projectId,
+          requestId,
+          action,
+          reviewedBy: convexUserId,
+          organizationId: organization?.id,
+        },
+        err
+      );
       setError(
         err instanceof Error ? err.message : `Failed to ${action} request`
       );
@@ -391,7 +454,17 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         ...prev,
         [variable._id]: data.data.value,
       }));
-    } catch {
+    } catch (err) {
+      log.error(
+        "project_variable_reveal_failed",
+        {
+          projectId,
+          variableId: variable._id,
+          organizationId: organization.id,
+          vaultRef: variable.vaultRef,
+        },
+        err
+      );
       setError("Failed to reveal variable value.");
     } finally {
       setRevealingIds((prev) => {

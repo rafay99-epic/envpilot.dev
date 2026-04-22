@@ -3,6 +3,9 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Doc } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "./convex-helpers";
+import { createLogger, tokenPrefix } from "./logger";
+
+const log = createLogger("lib/extension-auth");
 
 interface ExtensionAuthResult {
   convexUser: Doc<"users">;
@@ -32,7 +35,10 @@ export async function authenticateExtensionRequest(
   // is not active on this route (e.g. extension API routes)
   try {
     return await authenticateBySession();
-  } catch {
+  } catch (error) {
+    log.warn("session_auth_unavailable", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
     return null;
   }
 }
@@ -58,7 +64,8 @@ async function authenticateByToken(
     }
 
     return { convexUser: user };
-  } catch {
+  } catch (error) {
+    log.error("token_auth_failed", { token: tokenPrefix(token) }, error);
     return null;
   }
 }

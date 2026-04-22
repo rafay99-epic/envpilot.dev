@@ -48,6 +48,9 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("app/dashboard/variables");
 
 interface Variable {
   _id: Id<"environmentVariables">;
@@ -155,7 +158,17 @@ export default function VariablesPage() {
         ...prev,
         [variable._id]: data.data.value,
       }));
-    } catch {
+    } catch (err) {
+      log.error(
+        "variable_reveal_failed",
+        {
+          variableId: variable._id,
+          projectId: variable.projectId,
+          organizationId: organization.id,
+          vaultRef: variable.vaultRef,
+        },
+        err
+      );
       setError("Failed to reveal variable value.");
       setTimeout(() => setError(null), 3000);
     } finally {
@@ -205,6 +218,16 @@ export default function VariablesPage() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to update variable";
+      log.error(
+        "variable_update_failed",
+        {
+          variableId,
+          projectId: editingVariable?.projectId,
+          organizationId: organization?.id,
+          environments: data.environments,
+        },
+        err
+      );
       setError(message);
       throw err;
     }
@@ -231,6 +254,15 @@ export default function VariablesPage() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to delete variable";
+      log.error(
+        "variable_delete_failed",
+        {
+          variableId: deletingVariable._id,
+          projectId: deletingVariable.projectId,
+          organizationId: organization?.id,
+        },
+        err
+      );
       setError(message);
     }
   };
@@ -533,8 +565,11 @@ function VariableRow({
       await navigator.clipboard.writeText(`${variable.key}=${revealedValue}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
+    } catch (error) {
+      log.warn("variable_copy_failed", {
+        variableId: variable._id,
+        reason: error instanceof Error ? error.message : "clipboard_failed",
+      });
     }
   };
 
