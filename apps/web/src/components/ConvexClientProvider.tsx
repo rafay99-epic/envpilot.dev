@@ -76,8 +76,12 @@ const queryClient = new QueryClient({
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ConvexProvider client={convex}>{children}</ConvexProvider>
+      <ConvexBoundaryProvider>{children}</ConvexBoundaryProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
+}
+
+export function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
+  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
 }
