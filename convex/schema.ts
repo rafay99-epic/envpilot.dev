@@ -1417,4 +1417,24 @@ export default defineSchema({
   })
     .index("by_event", ["anomalyEventId"])
     .index("by_user", ["dismissedBy"]),
+
+  // ==========================================
+  // MOBILE TOKENS (Mobile app authentication)
+  // ==========================================
+  mobileTokens: defineTable({
+    userId: v.id("users"),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    deviceName: v.string(),
+    deviceId: v.string(),
+    platform: v.union(v.literal("ios"), v.literal("android")),
+    lastUsedAt: v.number(),
+    expiresAt: v.number(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_access_token", ["accessToken"])
+    .index("by_refresh_token", ["refreshToken"])
+    .index("by_user", ["userId"]),
 });

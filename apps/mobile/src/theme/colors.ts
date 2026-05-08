@@ -1,0 +1,31 @@
+export const colors = {
+  bgPrimary: "#0f172a",
+  bgCard: "rgba(24,24,27,0.9)",
+  bgInput: "#18181b",
+  bgElevated: "#27272a",
+
+  green: "#22c55e",
+  greenMuted: "rgba(34,197,94,0.1)",
+  greenBorder: "rgba(34,197,94,0.3)",
+  amber: "#fbbf24",
+  amberMuted: "rgba(251,191,36,0.1)",
+  amberBorder: "rgba(251,191,36,0.3)",
+  red: "#ef5350",
+  redMuted: "rgba(239,83,80,0.1)",
+  redBorder: "rgba(239,83,80,0.3)",
+  blue: "#3b82f6",
+  blueMuted: "rgba(59,130,246,0.1)",
+  blueBorder: "rgba(59,130,246,0.3)",
+  purple: "#a855f7",
+  purpleMuted: "rgba(168,85,247,0.1)",
+  purpleBorder: "rgba(168,85,247,0.3)",
+
+  textPrimary: "#ededed",
+  textSecondary: "#a1a1aa",
+  textMuted: "#71717a",
+  textDisabled: "#52525b",
+
+  border: "rgba(113,113,122,0.5)",
+  borderSubtle: "rgba(63,63,70,0.5)",
+  borderFocus: "rgba(34,197,94,0.5)",
+} as const;

@@ -20,18 +20,21 @@
     "dev:cli": "turbo dev --filter=@envpilot/cli",
     "dev:admin": "turbo dev --filter=@envpilot/admin",
     "dev:extension": "turbo dev --filter=envpilot",
+    "dev:mobile": "cd apps/mobile && npx expo start",
     "build": "turbo build",
     "build:web": "turbo build --filter=@envpilot/web",
     "build:cli": "turbo build --filter=@envpilot/cli",
     "build:admin": "turbo build --filter=@envpilot/admin",
     "build:extension": "turbo build --filter=envpilot && cd apps/vscode-extension && npx @vscode/vsce package --no-dependencies",
+    "build:mobile:android": "cd apps/mobile/android && ./gradlew assembleRelease",
+    "build:mobile:ios": "cd apps/mobile && xcodebuild -workspace ios/mobile.xcworkspace -scheme mobile -configuration Release",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format:fix": "prettier --write .",
     "check:all": "turbo lint typecheck build && prettier --check .",
     "test:e2e": "turbo test:e2e --filter=@envpilot/web",
     "test:cli": "turbo test --filter=@envpilot/cli",
-    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && echo 'Environment ready — edit .env.local with your values'"
+    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local; ln -sf ../../.env.local apps/mobile/.env.local && echo 'Environment ready — edit .env.local with your values'"
   },
   "devDependencies": {
     "@envpilot/prettier-config": "workspace:*",
