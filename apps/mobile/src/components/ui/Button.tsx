@@ -1,33 +1,26 @@
 import { Pressable, Text, ActivityIndicator } from "react-native";
+import type { ViewStyle, TextStyle } from "react-native";
+import { colors } from "@/theme/colors";
+import { fonts } from "@/theme/typography";
 
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 interface ButtonProps {
   title: string;
-  onPress: () => void;
+  onPress?: () => void;
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
-  className?: string;
+  icon?: React.ReactNode;
+  style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
-const variantStyles: Record<ButtonVariant, { container: string; text: string }> = {
-  primary: {
-    container: "border-green-500/30 bg-green-500/10",
-    text: "text-green-400",
-  },
-  secondary: {
-    container: "border-zinc-700 bg-zinc-800",
-    text: "text-zinc-300",
-  },
-  danger: {
-    container: "border-red-500/30 bg-red-500/10",
-    text: "text-red-400",
-  },
-  ghost: {
-    container: "border-transparent bg-transparent",
-    text: "text-zinc-400",
-  },
+const variantStyles: Record<ButtonVariant, { bg: string; border: string; text: string }> = {
+  primary: { bg: colors.green, border: colors.green, text: "#02110a" },
+  secondary: { bg: colors.surface2, border: colors.border, text: colors.textPrimary },
+  danger: { bg: "rgba(232,90,90,0.04)", border: colors.redBorder, text: colors.red },
+  ghost: { bg: "transparent", border: "transparent", text: colors.muted },
 };
 
 export function Button({
@@ -36,25 +29,48 @@ export function Button({
   variant = "primary",
   loading = false,
   disabled = false,
-  className,
+  icon,
+  style,
+  textStyle,
 }: ButtonProps) {
-  const styles = variantStyles[variant];
+  const v = variantStyles[variant];
 
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => ({
+        backgroundColor: v.bg,
+        borderWidth: variant === "ghost" ? 0 : 1,
+        borderColor: v.border,
+        borderRadius: variant === "primary" ? 14 : 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+        gap: 8,
+        opacity: disabled ? 0.5 : 1,
         transform: [{ scale: pressed ? 0.97 : 1 }],
+        ...style,
       })}
-      className={`flex-row items-center justify-center rounded-lg border px-4 py-3 ${styles.container} ${disabled ? "opacity-50" : ""} ${className ?? ""}`}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#22c55e" />
+        <ActivityIndicator size="small" color={v.text} />
       ) : (
-        <Text className={`font-sans-semibold text-base ${styles.text}`}>
-          {title}
-        </Text>
+        <>
+          {icon}
+          <Text
+            style={{
+              fontFamily: fonts.sansBold,
+              fontSize: variant === "primary" ? 15 : 14,
+              color: v.text,
+              ...textStyle,
+            }}
+          >
+            {title}
+          </Text>
+        </>
       )}
     </Pressable>
   );

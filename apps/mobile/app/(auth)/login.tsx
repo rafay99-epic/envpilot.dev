@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
-import { TerminalCard } from "@/components/ui/TerminalCard";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { getOAuthURL } from "@/api/auth";
+import { colors } from "@/theme/colors";
+import { fonts } from "@/theme/typography";
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
@@ -25,48 +27,131 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0f172a]">
-      <View className="flex-1 items-center justify-center px-6">
-        <View className="mb-8 items-center">
-          <Text className="font-mono-semibold text-2xl text-green-400">
-            $ envpilot
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {/* Top section */}
+        <View style={styles.topSection}>
+          <Text style={styles.terminalPrompt}>$ envpilot login</Text>
+
+          <Text style={styles.heroText}>
+            Secrets in{"\n"}your{" "}
+            <Text style={styles.heroGreen}>pocket.</Text>
           </Text>
-          <Text className="mt-2 font-sans text-sm text-zinc-500">
-            Secure environment variable management
+
+          <Text style={styles.description}>
+            Sign in to manage environment variables, approve shares, and respond
+            to anomalies.
           </Text>
         </View>
 
-        <TerminalCard title="authentication" className="w-full">
-          <View className="gap-4">
-            <View>
-              <Text className="font-mono text-xs text-zinc-500">
-                {">"} Connecting to Envpilot...
-              </Text>
-              <Text className="mt-1 font-mono text-xs text-zinc-400">
-                Sign in to access your organizations, projects, and environment
-                variables.
-              </Text>
+        {/* Bottom section */}
+        <View style={styles.bottomSection}>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
+          ) : null}
 
-            {error ? (
-              <View className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
-                <Text className="font-mono text-xs text-red-400">{error}</Text>
-              </View>
-            ) : null}
+          <Button
+            title="Continue with Face ID"
+            onPress={handleLogin}
+            loading={loading}
+            variant="primary"
+            icon={<Icon name="face-id" size={20} color="#02110a" />}
+          />
 
-            <Button
-              title="Sign in"
-              onPress={handleLogin}
-              loading={loading}
-              variant="primary"
-            />
-          </View>
-        </TerminalCard>
+          <Button
+            title="Continue with GitHub"
+            onPress={handleLogin}
+            loading={loading}
+            variant="secondary"
+            icon={<Icon name="github" size={20} color={colors.textPrimary} />}
+          />
 
-        <Text className="mt-6 font-sans text-xs text-zinc-600">
-          By signing in, you agree to our Terms of Service
-        </Text>
+          <Button
+            title="Sign in with email →"
+            onPress={handleLogin}
+            loading={loading}
+            variant="ghost"
+            icon={<Icon name="arrow-r" size={16} color={colors.muted} />}
+            textStyle={styles.ghostButtonText}
+          />
+
+          <Text style={styles.ssoText}>
+            # SSO via WorkOS · End-to-end encrypted
+          </Text>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  content: {
+    flex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  topSection: {
+    gap: 16,
+  },
+  terminalPrompt: {
+    fontFamily: fonts.mono,
+    fontSize: 13,
+    color: colors.green,
+    marginBottom: 8,
+  },
+  heroText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 38,
+    fontWeight: "800",
+    color: colors.textPrimary,
+    letterSpacing: 38 * -0.03,
+    lineHeight: 38 * 1.05,
+  },
+  heroGreen: {
+    color: colors.green,
+  },
+  description: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 21,
+    color: colors.muted,
+    marginTop: 14,
+  },
+  bottomSection: {
+    gap: 10,
+  },
+  errorContainer: {
+    backgroundColor: colors.redSoft,
+    borderWidth: 1,
+    borderColor: colors.redBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errorText: {
+    fontFamily: fonts.mono,
+    fontSize: 12,
+    color: colors.red,
+  },
+  ghostButtonText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.muted,
+  },
+  ssoText: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    color: colors.muted,
+    textAlign: "center",
+    marginTop: 8,
+    opacity: 0.6,
+  },
+});

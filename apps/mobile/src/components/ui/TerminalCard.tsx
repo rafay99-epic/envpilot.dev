@@ -1,33 +1,52 @@
 import { View, Text } from "react-native";
+import type { ReactNode } from "react";
+import type { ViewStyle } from "react-native";
+import { colors } from "@/theme/colors";
+import { fonts } from "@/theme/typography";
 
 interface TerminalCardProps {
   title?: string;
-  children: React.ReactNode;
-  className?: string;
+  accent?: ReactNode;
+  children: ReactNode;
+  style?: ViewStyle;
+  borderColor?: string;
 }
 
-function WindowDots() {
-  return (
-    <View className="flex-row items-center gap-1.5">
-      <View className="h-2.5 w-2.5 rounded-full bg-[#ef5350]/80" />
-      <View className="h-2.5 w-2.5 rounded-full bg-[#fbbf24]/80" />
-      <View className="h-2.5 w-2.5 rounded-full bg-[#22c55e]/80" />
-    </View>
-  );
-}
-
-export function TerminalCard({ title, children, className }: TerminalCardProps) {
+export function TerminalCard({ title, accent, children, style, borderColor }: TerminalCardProps) {
   return (
     <View
-      className={`overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 ${className ?? ""}`}
+      style={{
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: borderColor || colors.border,
+        borderRadius: 14,
+        overflow: "hidden",
+        ...style,
+      }}
     >
-      <View className="flex-row items-center border-b border-zinc-700/50 px-3 py-2">
-        <WindowDots />
-        {title ? (
-          <Text className="ml-3 font-mono text-xs text-zinc-500">{title}</Text>
-        ) : null}
-      </View>
-      <View className="p-4">{children}</View>
+      {title ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            backgroundColor: "rgba(255,255,255,0.015)",
+          }}
+        >
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#ff5f57" }} />
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#febc2e" }} />
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#28c840" }} />
+          </View>
+          <Text style={{ fontFamily: fonts.mono, fontSize: 11, color: colors.muted }}>{title}</Text>
+          {accent ? <View style={{ marginLeft: "auto" }}>{accent}</View> : null}
+        </View>
+      ) : null}
+      {children}
     </View>
   );
 }
