@@ -26,6 +26,7 @@ import type * as featureRegistry from "../featureRegistry.js";
 import type * as featureRequests from "../featureRequests.js";
 import type * as helpers from "../helpers.js";
 import type * as invitations from "../invitations.js";
+import type * as mobileTokens from "../mobileTokens.js";
 import type * as organizations from "../organizations.js";
 import type * as pendingExtensionAuthSessions from "../pendingExtensionAuthSessions.js";
 import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   featureRequests: typeof featureRequests;
   helpers: typeof helpers;
   invitations: typeof invitations;
+  mobileTokens: typeof mobileTokens;
   organizations: typeof organizations;
   pendingExtensionAuthSessions: typeof pendingExtensionAuthSessions;
   permissionRevocationEvents: typeof permissionRevocationEvents;

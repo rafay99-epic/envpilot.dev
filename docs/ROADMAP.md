@@ -46,13 +46,13 @@ Planned features and enhancements for future development.
 - Extend existing env diff to compare across projects
 - Useful for microservices that should share certain configs
 
-### Import/Export Formats
+### Import/Export Formats (Done)
 
 - Import from YAML, JSON, docker-compose.yml, AWS Parameter Store, Vercel, Netlify
 - Export to those same formats
 - CLI: `envpilot pull --format docker-compose`
 
-### Variable Validation Rules
+### Variable Validation Rules 
 
 - Define regex patterns or value constraints per variable (e.g., URL format, port range)
 - Warn on push if values don't match rules
@@ -64,7 +64,7 @@ Planned features and enhancements for future development.
 - Never synced to other team members
 - Useful for `DEBUG=true` or local ports
 
-### CLI `run` Command
+### CLI `run` Command. (Done)
 
 - `envpilot run -- node server.js` — inject env vars into a subprocess without writing `.env`
 - Prevents secrets from ever touching disk
@@ -81,7 +81,7 @@ Planned features and enhancements for future development.
 - Reduces duplication across environments
 - Circular reference detection required
 
-### Branch-Based Environments
+### Branch-Based Environments 
 
 - Auto-create environment configs tied to git branches
 - Preview environment support for CI/CD
