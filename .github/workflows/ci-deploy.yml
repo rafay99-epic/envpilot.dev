@@ -439,12 +439,15 @@ jobs:
       - name: Build CLI
         run: bunx turbo build --filter=@envpilot/cli --force
 
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-
       - name: Publish to npm
         working-directory: apps/cli
+        # NPM_CONFIG_TOKEN is the reliable auth path for `bun publish` in CI.
+        # The previous ~/.npmrc approach failed because bun does not
+        # consistently read it, surfacing as
+        # "missing authentication (run 'bunx npm login')".
         run: bun publish --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag CLI release
         run: |
