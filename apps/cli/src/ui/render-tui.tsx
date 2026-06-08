@@ -1,10 +1,10 @@
-import chalk from "chalk";
 import { executeCommand } from "./execute-command.js";
 
 export async function openTUI(): Promise<void> {
-  const [{ render }, { CLIApp }] = await Promise.all([
+  const [{ render }, { CLIApp }, { PressAnyKey }] = await Promise.all([
     import("ink"),
     import("./app.js"),
+    import("./press-any-key.js"),
   ]);
 
   // The TUI runs in a loop: render → pick command → execute → repeat.
@@ -34,28 +34,19 @@ export async function openTUI(): Promise<void> {
       process.exitCode = code;
     }
 
-    // Let the user read the command output before the TUI re-renders.
-    console.log();
-    console.log(
-      chalk.dim("  Press any key to return to the TUI…  (q to quit)")
+    // Let the user read the command output, then wait for a keypress.
+    // Rendered through Ink (not raw process.stdin) so the stdin lifecycle
+    // stays consistent after the child process inherited the terminal.
+    let quit = false;
+    const prompt = render(
+      <PressAnyKey
+        onResolve={(q) => {
+          quit = q;
+        }}
+      />
     );
 
-    // Wait for a single keypress.
-    const quit = await new Promise<boolean>((resolve) => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(true);
-      }
-      process.stdin.resume();
-
-      process.stdin.once("data", (data: Buffer) => {
-        const ch = data.toString();
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.pause();
-        resolve(ch === "q" || ch === "Q");
-      });
-    });
+    await prompt.waitUntilExit();
 
     if (quit) {
       break;
