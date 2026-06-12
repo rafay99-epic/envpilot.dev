@@ -43,11 +43,6 @@ export class FileProtectionService {
 
     this.protectionModes.set(filePath, mode);
 
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(vscode.Uri.file(filePath).fsPath, "**")
-    );
-
-    // Use a broad pattern and filter by path
     const fileWatcher = vscode.workspace.createFileSystemWatcher(filePath);
 
     fileWatcher.onDidChange(async () => {
@@ -89,9 +84,6 @@ export class FileProtectionService {
         }, 500)
       );
     });
-
-    // Clean up the unused broad watcher
-    watcher.dispose();
 
     this.watchers.set(filePath, fileWatcher);
   }

@@ -819,39 +819,35 @@ export class SyncService {
     directory: LinkedDirectory
   ): Promise<SyncResult> {
     try {
-      // Validate token first
-      const validation = await this.api.validateAccessToken(
-        project.accessToken
+      // Fetch all environments in parallel. The server validates the access
+      // token on every variables request, so a separate upfront validation
+      // round trip is redundant — a revoked token surfaces as an error here.
+      const varsByEnv = await Promise.all(
+        directory.environments.map((env) =>
+          this.api.getVariables(
+            project.projectId,
+            env,
+            project.accessToken,
+            undefined,
+            { fresh: true }
+          )
+        )
       );
-      if (!validation.valid) {
-        return {
-          success: false,
-          variablesCount: 0,
-          targetFile: directory.targetFile,
-          error: validation.reason,
-        };
-      }
 
-      // Fetch variables for specified environments
       const allVariables: EnvironmentVariable[] = [];
-      for (const env of directory.environments) {
-        const vars = await this.api.getVariables(
-          project.projectId,
-          env,
-          project.accessToken
-        );
+      directory.environments.forEach((env, i) => {
         // Add with environment prefix if multiple environments
         if (directory.environments.length > 1) {
-          for (const v of vars) {
+          for (const v of varsByEnv[i]) {
             allVariables.push({
               ...v,
               key: `${env.toUpperCase()}_${v.key}`,
             });
           }
         } else {
-          allVariables.push(...vars);
+          allVariables.push(...varsByEnv[i]);
         }
-      }
+      });
 
       // Deduplicate by key (last wins)
       const uniqueVars = new Map<string, EnvironmentVariable>();
@@ -875,8 +871,8 @@ export class SyncService {
         directory.directoryPath
       );
 
-      // Update last used on server
-      await this.api.updateLastUsed(project.accessToken);
+      // Update last used on server — bookkeeping, don't block the sync on it
+      void this.api.updateLastUsed(project.accessToken).catch(() => {});
 
       return {
         success: true,
@@ -894,14 +890,17 @@ export class SyncService {
   }
 
   /**
-   * Sync all directories for a project
+   * Sync all directories for a project (in parallel — each directory
+   * writes to its own file; metadata writes are serialized in storage)
    */
   async syncAllDirectories(project: LinkedProjectV2): Promise<SyncResult[]> {
-    const results: SyncResult[] = [];
+    const results = await Promise.all(
+      project.directories.map((directory) =>
+        this.syncDirectory(project, directory)
+      )
+    );
 
-    for (const directory of project.directories) {
-      const result = await this.syncDirectory(project, directory);
-      results.push(result);
+    for (const result of results) {
       this._onSyncComplete.fire(result);
     }
 

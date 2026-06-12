@@ -23,6 +23,14 @@ export class ApiService {
   private storage: StorageService;
   private roleCache: Map<string, MembershipRole> = new Map();
   private projectRoleCache: Map<string, ProjectRole> = new Map();
+  /**
+   * Short-TTL response cache. One sync triggers refreshes of the variables
+   * tree, dashboard panel, and status bar — without this, each refresh
+   * re-fetches identical data (including vault-decrypted variables).
+   */
+  private responseCache: Map<string, { at: number; value: unknown }> =
+    new Map();
+  private static readonly CACHE_TTL_MS = 30_000;
 
   constructor(storage: StorageService) {
     this.storage = storage;
@@ -50,16 +58,44 @@ export class ApiService {
     );
   }
 
+  private getCached<T>(key: string): T | undefined {
+    const entry = this.responseCache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.at > ApiService.CACHE_TTL_MS) {
+      this.responseCache.delete(key);
+      return undefined;
+    }
+    return entry.value as T;
+  }
+
+  private setCached(key: string, value: unknown): void {
+    this.responseCache.set(key, { at: Date.now(), value });
+  }
+
+  /** Drop all cached responses (manual refresh, sign-out). */
+  clearCache(): void {
+    this.responseCache.clear();
+  }
+
   // Organizations
   async getOrganizations(): Promise<Organization[]> {
+    const cached = this.getCached<Organization[]>("orgs");
+    if (cached) return cached;
+
     const response = await this.client.get<
       ApiResponse<{ organizations: Organization[] }>
     >("/api/extension/organizations");
-    return response.data.data?.organizations || [];
+    const organizations = response.data.data?.organizations || [];
+    this.setCached("orgs", organizations);
+    return organizations;
   }
 
   // Projects
   async getProjects(organizationId?: string): Promise<Project[]> {
+    const cacheKey = `projects:${organizationId ?? "all"}`;
+    const cached = this.getCached<Project[]>(cacheKey);
+    if (cached) return cached;
+
     const response = await this.client.get<
       ApiResponse<{ projects: Project[] }>
     >("/api/extension/projects", {
@@ -77,6 +113,7 @@ export class ApiService {
       }
     }
 
+    this.setCached(cacheKey, projects);
     return projects;
   }
 
@@ -96,8 +133,15 @@ export class ApiService {
     projectId: string,
     environment: string,
     accessToken?: string,
-    organizationId?: string
+    organizationId?: string,
+    options?: { fresh?: boolean }
   ): Promise<EnvironmentVariable[]> {
+    const cacheKey = `vars:${projectId}:${environment}:${organizationId ?? ""}`;
+    if (!options?.fresh) {
+      const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
+      if (cached) return cached;
+    }
+
     const headers: Record<string, string> = {};
     if (accessToken) {
       headers["X-Access-Token"] = accessToken;
@@ -120,7 +164,55 @@ export class ApiService {
       this.roleCache.set(projectId, response.data.data.role);
     }
 
-    return response.data.data?.variables || [];
+    const variables = response.data.data?.variables || [];
+    this.setCached(cacheKey, variables);
+    return variables;
+  }
+
+  /**
+   * Variable metadata only — `value` is always empty. Used by UI surfaces
+   * (tree view, dashboard) that never display values: skips per-variable
+   * vault decryption on the server, which is the slow part of getVariables,
+   * and avoids logging spurious "export" audit events for mere rendering.
+   */
+  async getVariablesMetadata(
+    projectId: string,
+    environment: string,
+    accessToken?: string,
+    organizationId?: string
+  ): Promise<EnvironmentVariable[]> {
+    const cacheKey = `varsmeta:${projectId}:${environment}:${organizationId ?? ""}`;
+    const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
+    if (cached) return cached;
+
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["X-Access-Token"] = accessToken;
+    }
+
+    const params: Record<string, string> = {
+      projectId,
+      environment,
+      metadataOnly: "true",
+    };
+    if (organizationId) {
+      params.organizationId = organizationId;
+    }
+
+    const response = await this.client.get<
+      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
+    >("/api/extension/variables", {
+      params,
+      headers,
+    });
+
+    if (response.data.data?.role) {
+      this.roleCache.set(projectId, response.data.data.role);
+    }
+
+    const variables = response.data.data?.variables || [];
+    this.setCached(cacheKey, variables);
+    return variables;
   }
 
   /**
@@ -212,12 +304,20 @@ export class ApiService {
 
   // Usage info
   async getUsage(organizationId: string): Promise<UsageInfo | null> {
+    const cacheKey = `usage:${organizationId}`;
+    const cached = this.getCached<UsageInfo>(cacheKey);
+    if (cached) return cached;
+
     try {
       const response = await this.client.get<ApiResponse<UsageInfo>>(
         "/api/extension/usage",
         { params: { organizationId } }
       );
-      return response.data.data || null;
+      const usage = response.data.data || null;
+      if (usage) {
+        this.setCached(cacheKey, usage);
+      }
+      return usage;
     } catch {
       return null;
     }

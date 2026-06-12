@@ -68,7 +68,9 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
     const env = linkedProject.defaultEnvironment || "development";
 
     try {
-      const variables = await this.api.getVariables(
+      // Metadata only — the tree never displays values, so don't make the
+      // server decrypt every variable from the vault just to render names.
+      const variables = await this.api.getVariablesMetadata(
         linkedProject.projectId,
         env,
         linkedProject.accessToken
@@ -246,13 +248,12 @@ export class VariableTreeItem extends vscode.TreeItem {
 
       case "variable": {
         this.iconPath = new vscode.ThemeIcon("symbol-variable");
-        const valueStr = this.truncateValue(variable?.value || "");
-        const versionTag = variable?.version ? ` v${variable.version}` : "";
-        const tagSuffix =
-          variable?.tags && variable.tags.length > 0
-            ? ` [${variable.tags.map((t) => t.name).join(", ")}]`
-            : "";
-        this.description = valueStr + versionTag + tagSuffix;
+        const parts: string[] = [];
+        if (variable?.version) parts.push(`v${variable.version}`);
+        if (variable?.tags && variable.tags.length > 0) {
+          parts.push(`[${variable.tags.map((t) => t.name).join(", ")}]`);
+        }
+        this.description = parts.join(" ");
         this.tooltip = this.createVariableTooltip(variable, false);
         break;
       }
@@ -262,12 +263,8 @@ export class VariableTreeItem extends vscode.TreeItem {
           "lock",
           new vscode.ThemeColor("charts.yellow")
         );
-        const charCount = variable?.value?.length ?? 0;
         const vTag = variable?.version ? ` v${variable.version}` : "";
-        this.description =
-          charCount > 0
-            ? `\u2022\u2022\u2022\u2022\u2022\u2022 (${charCount} chars)${vTag}`
-            : `\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022${vTag}`;
+        this.description = `\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022${vTag}`;
         this.tooltip = this.createVariableTooltip(variable, true);
         break;
       }
@@ -331,8 +328,9 @@ export class VariableTreeItem extends vscode.TreeItem {
     if (isSensitive) {
       md.appendMarkdown("$(lock) *Sensitive \u2014 value hidden*\n\n");
     } else {
-      md.appendCodeblock(variable.value, "properties");
-      md.appendMarkdown("\n");
+      md.appendMarkdown(
+        "$(cloud-download) *Value synced to your local .env file*\n\n"
+      );
     }
 
     if (variable.description) {
@@ -354,11 +352,5 @@ export class VariableTreeItem extends vscode.TreeItem {
     }
 
     return md;
-  }
-
-  private truncateValue(value: string, maxLength = 40): string {
-    if (!value) return "";
-    if (value.length <= maxLength) return value;
-    return value.substring(0, maxLength) + "\u2026";
   }
 }

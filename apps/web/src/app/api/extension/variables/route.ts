@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
     const environment = searchParams.get("environment") || "development";
+    const metadataOnly = searchParams.get("metadataOnly") === "true";
     const accessToken = request.headers.get("X-Access-Token");
 
     if (!projectId) {
@@ -131,6 +132,27 @@ export async function GET(request: Request) {
     const variables = variablesWithAccess
       .filter((variable) => variable.hasAccess)
       .filter((variable) => variable.environments.includes(environment));
+
+    // Metadata-only mode: no vault decryption and no "export" audit events.
+    // Used by extension UI surfaces (tree view, dashboard) that display
+    // names and metadata but never values.
+    if (metadataOnly) {
+      return NextResponse.json({
+        data: {
+          variables: variables.map((variable) => ({
+            _id: variable._id,
+            key: variable.key,
+            value: "",
+            description: variable.description || null,
+            environments: variable.environments,
+            projectId: variable.projectId,
+            isSensitive: variable.isSensitive,
+            version: variable.version,
+          })),
+          role: userRole,
+        },
+      });
+    }
 
     const variablesWithValues = await Promise.all(
       variables.map(async (variable) => {

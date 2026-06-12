@@ -265,9 +265,15 @@ export class AuthService {
       }
 
       return false;
-    } catch {
-      // If refresh fails, sign out
-      await this.signOut();
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
+      // Only sign out when the server definitively rejects the refresh
+      // token (4xx). Transient network errors or server outages must not
+      // destroy an otherwise valid session.
+      if (status !== undefined && status >= 400 && status < 500) {
+        await this.signOut();
+      }
       return false;
     }
   }
