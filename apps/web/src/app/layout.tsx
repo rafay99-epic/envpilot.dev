@@ -28,9 +28,9 @@ export const metadata: Metadata = {
   description:
     "Securely manage, share, and sync environment variables across your team. CLI, VS Code extension, and web dashboard with role-based access control.",
   metadataBase: new URL(baseUrl),
-  alternates: {
-    canonical: "/",
-  },
+  // NOTE: no root-level `alternates.canonical` — it would be inherited by
+  // every page that doesn't override it, telling crawlers all subpages are
+  // duplicates of the homepage. Each page sets its own canonical instead.
   // Facebook, Instagram, WhatsApp, Telegram, LinkedIn, Discord, Slack, iMessage, Pinterest
   openGraph: {
     type: "website",
@@ -87,10 +87,33 @@ export const metadata: Metadata = {
   },
   // Discord & Slack embed accent color, Pinterest rich pins
   other: {
-    "theme-color": "#3B82F6",
+    "theme-color": "#22c55e",
     "msapplication-TileColor": "#0a0a0a",
     "pinterest-rich-pin": "true",
   },
+};
+
+// Sitewide structured data — helps Google show a site name, logo, and
+// sitelinks search box for brand queries.
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${baseUrl}/#organization`,
+      name: "Envpilot",
+      url: baseUrl,
+      logo: `${baseUrl}/icon.png`,
+      email: "hello@envpilot.dev",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${baseUrl}/#website`,
+      name: "Envpilot",
+      url: baseUrl,
+      publisher: { "@id": `${baseUrl}/#organization` },
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -104,6 +127,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         <Script id="config-shim" strategy="beforeInteractive">
           {`globalThis.CONFIG = globalThis.CONFIG || {};`}
         </Script>

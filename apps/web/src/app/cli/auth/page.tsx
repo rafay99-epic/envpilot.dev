@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -17,9 +17,28 @@ import {
 
 export default function CLIAuthPage() {
   return (
-    <AuthProvider>
-      <CLIAuthPageContent />
-    </AuthProvider>
+    // useSearchParams() in the content requires a Suspense boundary for
+    // static prerendering (the root loading.tsx that used to provide one
+    // was removed).
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
+          <span className="font-mono text-sm text-green-400">
+            <span className="text-zinc-500">$</span> authenticating
+            <span
+              className="inline-block w-2 bg-green-400"
+              style={{ animation: "blink 1s step-end infinite" }}
+            >
+              &nbsp;
+            </span>
+          </span>
+        </div>
+      }
+    >
+      <AuthProvider>
+        <CLIAuthPageContent />
+      </AuthProvider>
+    </Suspense>
   );
 }
 

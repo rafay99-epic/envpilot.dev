@@ -15,6 +15,10 @@ export default authkitMiddleware({
       "/sign-up",
       "/callback",
       "/changelog",
+      "/docs",
+      "/docs/(.*)",
+      "/faq",
+      "/vs/(.*)",
       "/wishlist",
       "/privacy",
       "/terms",
@@ -23,8 +27,15 @@ export default authkitMiddleware({
       "/pricing",
       "/sitemap.xml",
       "/robots.txt",
+      "/feed.xml",
+      "/llms.txt",
+      "/llms-full.txt",
       "/api/health",
       "/api/config",
+      "/api/status",
+      // Returns 401 JSON for signed-out users; must not redirect to WorkOS
+      // (a cross-origin redirect makes client fetches throw on public pages)
+      "/api/auth/me",
       "/api/telemetry-envelope",
       "/api/webhooks/polar",
       // CLI API endpoints use bearer token auth, not browser session auth

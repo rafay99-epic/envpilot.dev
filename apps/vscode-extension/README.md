@@ -162,3 +162,10 @@ If the browser fails to open, the sign-in URL is automatically copied to your cl
 ## Support
 
 For issues and feature requests, visit the [Envpilot GitHub repository](https://github.com/rafay99-epic/envpilot.dev/issues).
+
+## Links
+
+- [Website](https://www.envpilot.dev)
+- [Documentation](https://www.envpilot.dev/docs)
+- [Privacy Policy](https://www.envpilot.dev/privacy)
+- [Terms of Service](https://www.envpilot.dev/terms)

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import {
   useFeatureRequests,
   usePlannedFeatures,
@@ -10,6 +9,15 @@ import {
 } from "@/hooks";
 import { Id } from "@convex/_generated/dataModel";
 import { ChevronUp, Plus, X, AlertTriangle } from "lucide-react";
+import {
+  MarketingShell,
+  PageHero,
+  GlowCard,
+  GlowDivider,
+  TerminalFrame,
+  Stagger,
+  StaggerItem,
+} from "@/components/marketing";
 
 type TabType = "requests" | "roadmap";
 type StatusFilter =
@@ -20,6 +28,7 @@ type StatusFilter =
   | "in_progress"
   | "completed";
 
+/** Brand palette is locked to green / amber / red / zinc. */
 const statusConfig: Record<
   string,
   { label: string; color: string; dot: string }
@@ -30,11 +39,11 @@ const statusConfig: Record<
     color: "text-amber-400",
     dot: "bg-amber-400",
   },
-  planned: { label: "planned", color: "text-blue-400", dot: "bg-blue-400" },
+  planned: { label: "planned", color: "text-zinc-300", dot: "bg-zinc-400" },
   in_progress: {
     label: "in-progress",
-    color: "text-purple-400",
-    dot: "bg-purple-400",
+    color: "text-amber-400",
+    dot: "bg-amber-400",
   },
   completed: {
     label: "completed",
@@ -75,225 +84,171 @@ export default function WishlistPage() {
   const categories = useFeatureCategories();
   const { submit, vote, unvote } = useFeatureRequestMutations();
 
-  const handleVote = useCallback(
-    async (featureId: Id<"featureRequests">) => {
-      if (!voterEmail) {
-        setPendingVoteId(featureId);
-        setShowEmailPrompt(true);
-        return;
+  const handleVote = async (featureId: Id<"featureRequests">) => {
+    if (!voterEmail) {
+      setPendingVoteId(featureId);
+      setShowEmailPrompt(true);
+      return;
+    }
+
+    try {
+      if (votedFeatures.has(featureId)) {
+        await unvote({ featureRequestId: featureId, voterEmail });
+        setVotedFeatures((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(featureId);
+          return newSet;
+        });
+      } else {
+        await vote({ featureRequestId: featureId, voterEmail });
+        setVotedFeatures((prev) => new Set([...prev, featureId]));
       }
+    } catch {
+      setToastMessage(
+        "Failed to update vote. You may have already voted for this feature."
+      );
+    }
+  };
 
-      try {
-        if (votedFeatures.has(featureId)) {
-          await unvote({ featureRequestId: featureId, voterEmail });
-          setVotedFeatures((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(featureId);
-            return newSet;
-          });
-        } else {
-          await vote({ featureRequestId: featureId, voterEmail });
-          setVotedFeatures((prev) => new Set([...prev, featureId]));
-        }
-      } catch {
-        setToastMessage(
-          "Failed to update vote. You may have already voted for this feature."
-        );
-      }
-    },
-    [voterEmail, votedFeatures, vote, unvote]
-  );
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = emailInput.trim();
+    if (!email || !pendingVoteId) return;
 
-  const handleEmailSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      const email = emailInput.trim();
-      if (!email || !pendingVoteId) return;
+    setVoterEmail(email);
+    setShowEmailPrompt(false);
+    setEmailInput("");
 
-      setVoterEmail(email);
-      setShowEmailPrompt(false);
-      setEmailInput("");
-
-      try {
-        await vote({ featureRequestId: pendingVoteId, voterEmail: email });
-        setVotedFeatures((prev) => new Set([...prev, pendingVoteId]));
-      } catch {
-        setToastMessage(
-          "Failed to vote. You may have already voted for this feature."
-        );
-      }
-      setPendingVoteId(null);
-    },
-    [emailInput, pendingVoteId, vote]
-  );
+    try {
+      await vote({ featureRequestId: pendingVoteId, voterEmail: email });
+      setVotedFeatures((prev) => new Set([...prev, pendingVoteId]));
+    } catch {
+      setToastMessage(
+        "Failed to vote. You may have already voted for this feature."
+      );
+    }
+    setPendingVoteId(null);
+  };
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-green-400">$</span>
-            <span className="font-bold text-zinc-100">envpilot</span>
-            <span className="text-xs text-zinc-600">v1.0</span>
-          </Link>
-
-          <nav className="hidden items-center gap-6 md:flex">
-            {[
-              { label: "Changelog", href: "/changelog" },
-              { label: "Wishlist", href: "/wishlist" },
-              { label: "Docs", href: "/docs" },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowSubmitForm(true)}
-              className="flex items-center gap-1.5 rounded border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs text-green-400 transition-all hover:bg-green-500/20"
+    <MarketingShell>
+      <PageHero
+        eyebrow="wishlist"
+        title={
+          <>
+            Help shape <span className="text-green-400">the roadmap</span>
+          </>
+        }
+        description="Vote on what we build next, or submit your own ideas. Every vote shapes the product."
+        align="left"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowSubmitForm(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            submit-feature
+          </button>
+          <div className="flex gap-2">
+            <TabButton
+              active={activeTab === "requests"}
+              onClick={() => setActiveTab("requests")}
             >
-              <Plus className="h-3 w-3" />
-              submit-feature
-            </button>
-            <Link
-              href="/sign-in"
-              className="text-xs text-zinc-500 transition-colors hover:text-green-400"
+              ❯ ls requests/
+            </TabButton>
+            <TabButton
+              active={activeTab === "roadmap"}
+              onClick={() => setActiveTab("roadmap")}
             >
-              sign-in
-            </Link>
+              ❯ cat roadmap
+            </TabButton>
           </div>
         </div>
-      </header>
+      </PageHero>
 
-      <main className="pt-14">
-        {/* Hero */}
-        <section className="border-b border-zinc-800/50 py-16">
-          <div className="mx-auto max-w-5xl px-4">
-            <p className="text-xs uppercase tracking-widest text-green-500">
-              {"// wishlist"}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-              Feature requests &amp; roadmap
-            </h1>
-            <p className="mt-3 max-w-xl text-sm text-zinc-500">
-              Vote on what we build next, or submit your own ideas. Every vote
-              shapes the product.
-            </p>
+      <GlowDivider />
 
-            {/* Tabs */}
-            <div className="mt-8 flex gap-2">
-              <button
-                onClick={() => setActiveTab("requests")}
-                className={`rounded border px-4 py-2 text-xs transition-all ${
-                  activeTab === "requests"
-                    ? "border-green-500/30 bg-green-500/10 text-green-400"
-                    : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-                }`}
-              >
-                $ ls requests/
-              </button>
-              <button
-                onClick={() => setActiveTab("roadmap")}
-                className={`rounded border px-4 py-2 text-xs transition-all ${
-                  activeTab === "roadmap"
-                    ? "border-green-500/30 bg-green-500/10 text-green-400"
-                    : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-                }`}
-              >
-                $ cat roadmap
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Content */}
-        <section className="py-12">
-          <div className="mx-auto max-w-5xl px-4">
-            {activeTab === "requests" ? (
-              <>
-                {/* Filters */}
-                <div className="mb-8 flex flex-wrap items-center gap-3">
-                  <span className="text-xs text-zinc-600">--status</span>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        "all",
-                        "submitted",
-                        "under_review",
-                        "planned",
-                        "in_progress",
-                        "completed",
-                      ] as StatusFilter[]
-                    ).map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setStatusFilter(status)}
-                        className={`rounded border px-2.5 py-1 text-xs transition-all ${
-                          statusFilter === status
-                            ? "border-green-500/30 bg-green-500/10 text-green-400"
-                            : "border-zinc-800 text-zinc-500 hover:border-zinc-700"
-                        }`}
-                      >
-                        {status === "all" ? "*" : status.replace("_", "-")}
-                      </button>
-                    ))}
-                  </div>
-
-                  {categories && categories.length > 0 && (
-                    <>
-                      <span className="text-xs text-zinc-600">--category</span>
-                      <select
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-400 focus:border-zinc-700 focus:outline-none"
-                      >
-                        <option value="all">all</option>
-                        {categories.map((cat: string) => (
-                          <option key={cat} value={cat}>
-                            {cat.toLowerCase()}
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  )}
+      {/* Content */}
+      <section className="relative py-14">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          {activeTab === "requests" ? (
+            <>
+              {/* Filters */}
+              <div className="mb-10 flex flex-wrap items-center gap-3">
+                <span className="font-mono text-xs text-zinc-600">
+                  --status
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "all",
+                      "submitted",
+                      "under_review",
+                      "planned",
+                      "in_progress",
+                      "completed",
+                    ] as StatusFilter[]
+                  ).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={`rounded-lg border px-2.5 py-1 font-mono text-xs transition-all ${
+                        statusFilter === status
+                          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+                          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+                      }`}
+                    >
+                      {status === "all" ? "*" : status.replace("_", "-")}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Feature List */}
-                {!featureRequests ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="text-xs text-zinc-600">
-                      <span className="animate-pulse text-green-500">&gt;</span>{" "}
-                      loading requests...
-                    </div>
-                  </div>
-                ) : featureRequests.length === 0 ? (
-                  <EmptyState onSubmit={() => setShowSubmitForm(true)} />
-                ) : (
-                  <div className="space-y-3">
-                    {featureRequests.map((feature: FeatureRequestType) => (
+                {categories && categories.length > 0 && (
+                  <>
+                    <span className="font-mono text-xs text-zinc-600">
+                      --category
+                    </span>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 font-mono text-xs text-zinc-200 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                    >
+                      <option value="all">all</option>
+                      {categories.map((cat: string) => (
+                        <option key={cat} value={cat}>
+                          {cat.toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+
+              {/* Feature List */}
+              {!featureRequests ? (
+                <LoadingSkeleton rows={4} />
+              ) : featureRequests.length === 0 ? (
+                <EmptyState onSubmit={() => setShowSubmitForm(true)} />
+              ) : (
+                <Stagger className="space-y-3">
+                  {featureRequests.map((feature: FeatureRequestType) => (
+                    <StaggerItem key={feature._id}>
                       <FeatureCard
-                        key={feature._id}
                         feature={feature}
                         hasVoted={votedFeatures.has(feature._id)}
                         onVote={() => handleVote(feature._id)}
                       />
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <RoadmapView plannedFeatures={plannedFeatures} />
-            )}
-          </div>
-        </section>
-      </main>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              )}
+            </>
+          ) : (
+            <RoadmapView plannedFeatures={plannedFeatures} />
+          )}
+        </div>
+      </section>
 
       {/* Submit Form Modal */}
       {showSubmitForm && (
@@ -305,106 +260,50 @@ export default function WishlistPage() {
         />
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-zinc-800/50 py-8">
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2 text-xs text-zinc-600">
-              <span className="text-green-500">$</span> envpilot --version{" "}
-              <span className="text-zinc-500">1.0.0</span>
-            </div>
-            <div className="flex gap-4 text-xs text-zinc-600">
-              <Link href="/docs" className="hover:text-zinc-400">
-                Docs
-              </Link>
-              <Link href="/changelog" className="hover:text-zinc-400">
-                Changelog
-              </Link>
-              <Link href="/privacy" className="hover:text-zinc-400">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-zinc-400">
-                Terms
-              </Link>
-              <Link href="/faq" className="hover:text-zinc-400">
-                FAQ
-              </Link>
-              <Link href="/support" className="hover:text-zinc-400">
-                Support
-              </Link>
-              <Link href="/contact" className="hover:text-zinc-400">
-                Contact
-              </Link>
-            </div>
-            <div className="text-right text-xs text-zinc-700">
-              <p>&copy; {new Date().getFullYear()} Envpilot</p>
-              <p className="text-[10px] text-zinc-800">
-                Built at{" "}
-                <a
-                  href="https://syntaxlabtechnology.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Syntax Lab Technology
-                </a>{" "}
-                &middot;{" "}
-                <a
-                  href="https://rafay99.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Abdul Rafay
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
-
       {/* Email Prompt Dialog */}
       {showEmailPrompt && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-950 font-mono shadow-2xl">
-            <div className="border-b border-zinc-800 px-5 py-4">
-              <h3 className="text-sm font-semibold text-zinc-100">
-                Enter your email to vote
-              </h3>
-            </div>
-            <form onSubmit={handleEmailSubmit} className="px-5 py-4">
-              <p className="mb-3 text-xs text-zinc-400">
-                Your email is used to track your votes and prevent duplicates.
-              </p>
-              <input
-                type="email"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoFocus
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
-              />
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEmailPrompt(false);
-                    setPendingVoteId(null);
-                    setEmailInput("");
-                  }}
-                  className="rounded border border-zinc-700 px-4 py-1.5 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded border border-green-500/30 bg-green-500/10 px-4 py-1.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"
-                >
-                  Vote
-                </button>
+          <div className="mx-4 w-full max-w-sm rounded-xl bg-gradient-to-b from-green-500/50 via-zinc-700/40 to-zinc-800/40 p-px shadow-[0_0_60px_-12px_rgba(34,197,94,0.35)]">
+            <div className="overflow-hidden rounded-[11px] bg-zinc-950 font-mono">
+              <div className="border-b border-zinc-800 px-5 py-4">
+                <h3 className="font-sans text-sm font-bold tracking-tight text-zinc-100">
+                  Enter your email to vote
+                </h3>
               </div>
-            </form>
+              <form onSubmit={handleEmailSubmit} className="px-5 py-4">
+                <p className="mb-3 text-xs text-zinc-400">
+                  Your email is used to track your votes and prevent duplicates.
+                </p>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  autoFocus
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEmailPrompt(false);
+                      setPendingVoteId(null);
+                      setEmailInput("");
+                    }}
+                    className="rounded-lg border border-zinc-800 px-4 py-1.5 text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-300"
+                  >
+                    cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-green-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-colors hover:bg-green-400"
+                  >
+                    vote
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -412,7 +311,7 @@ export default function WishlistPage() {
       {/* Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[100]">
-          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 font-mono text-xs text-red-400 shadow-lg">
+          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-zinc-950 px-4 py-3 font-mono text-xs text-red-400 shadow-[0_0_30px_-8px_rgba(248,113,113,0.4)]">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>{toastMessage}</span>
             <button
@@ -424,6 +323,49 @@ export default function WishlistPage() {
           </div>
         </div>
       )}
+    </MarketingShell>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border px-4 py-2 font-mono text-xs transition-all ${
+        active
+          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function LoadingSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="flex gap-4 rounded-xl border border-zinc-800/80 p-5"
+        >
+          <div className="h-14 w-14 shrink-0 animate-pulse rounded-lg bg-zinc-900/40" />
+          <div className="flex-1 space-y-3 py-1">
+            <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-900/40" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-zinc-900/40" />
+            <div className="h-3 w-1/4 animate-pulse rounded bg-zinc-900/40" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -438,67 +380,70 @@ function FeatureCard({ feature, hasVoted, onVote }: FeatureCardProps) {
   const status = statusConfig[feature.status] ?? statusConfig.submitted;
 
   return (
-    <div className="group flex gap-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700">
-      {/* Vote */}
-      <button
-        onClick={onVote}
-        className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded border transition-all ${
-          hasVoted
-            ? "border-green-500/30 bg-green-500/10 text-green-400"
-            : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
-        }`}
-      >
-        <ChevronUp className="h-4 w-4" />
-        <span className="text-xs font-bold">{feature.voteCount}</span>
-      </button>
+    <GlowCard className="p-5">
+      <div className="flex gap-4">
+        {/* Upvote */}
+        <button
+          onClick={onVote}
+          aria-pressed={hasVoted}
+          className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border font-mono transition-all ${
+            hasVoted
+              ? "border-green-500/60 bg-green-500/15 text-green-400 shadow-[0_0_20px_-4px_rgba(34,197,94,0.5)]"
+              : "border-zinc-800 bg-zinc-950/40 text-zinc-500 hover:border-green-500/40 hover:text-green-400"
+          }`}
+        >
+          <ChevronUp className="h-4 w-4" />
+          <span className="text-xs font-bold">{feature.voteCount}</span>
+        </button>
 
-      {/* Content */}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-zinc-100">
-            {feature.title}
-          </h3>
-          <span
-            className={`flex items-center gap-1.5 text-[10px] ${status.color}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-            {status.label}
-          </span>
-          {feature.category && (
-            <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500">
-              {feature.category}
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-sans text-sm font-bold tracking-tight text-zinc-100">
+              {feature.title}
+            </h3>
+            <span
+              className={`flex items-center gap-1.5 font-mono text-[10px] ${status.color}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+              {status.label}
             </span>
-          )}
+            {feature.category && (
+              <span className="rounded-full border border-zinc-800 bg-zinc-950/60 px-2 py-0.5 font-mono text-[10px] text-zinc-500">
+                {feature.category}
+              </span>
+            )}
+          </div>
+          <p className="mt-1.5 line-clamp-2 font-mono text-xs leading-relaxed text-zinc-500">
+            {feature.description}
+          </p>
+          <p className="mt-2 font-mono text-[10px] text-zinc-600">
+            {new Date(feature.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
         </div>
-        <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-zinc-500">
-          {feature.description}
-        </p>
-        <p className="mt-2 text-[10px] text-zinc-600">
-          {new Date(feature.createdAt).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        </p>
       </div>
-    </div>
+    </GlowCard>
   );
 }
 
 function EmptyState({ onSubmit }: { onSubmit: () => void }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-800 p-12 text-center">
-      <p className="text-sm text-zinc-500">
-        <span className="text-green-500">$</span> envpilot wishlist --list
+    <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/40 p-12 text-center">
+      <p className="font-mono text-sm text-zinc-500">
+        <span className="text-green-500">❯</span> envpilot wishlist --list
       </p>
-      <p className="mt-2 text-xs text-zinc-600">
+      <p className="mt-2 font-mono text-xs text-zinc-600">
         No feature requests yet. Be the first.
       </p>
       <button
         onClick={onSubmit}
-        className="mt-6 inline-flex items-center gap-2 rounded border border-green-500/30 bg-green-500/10 px-4 py-2 text-xs text-green-400 transition-all hover:bg-green-500/20"
+        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_24px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400"
       >
-        <Plus className="h-3 w-3" />
+        <Plus className="h-3.5 w-3.5" />
         submit-feature
       </button>
     </div>
@@ -538,11 +483,14 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
 
   if (!plannedFeatures) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="text-xs text-zinc-600">
-          <span className="animate-pulse text-green-500">&gt;</span> loading
-          roadmap...
-        </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-3">
+            <div className="h-8 animate-pulse rounded-lg bg-zinc-900/40" />
+            <div className="h-24 animate-pulse rounded-xl bg-zinc-900/40" />
+            <div className="h-24 animate-pulse rounded-xl bg-zinc-900/40" />
+          </div>
+        ))}
       </div>
     );
   }
@@ -552,17 +500,17 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
   const columns = [
     {
       title: "planned",
-      dot: "bg-blue-400",
-      color: "text-blue-400",
-      borderColor: "border-blue-500/20",
+      dot: "bg-zinc-400",
+      color: "text-zinc-300",
+      borderColor: "border-zinc-800",
       items: planned,
       showDate: false,
     },
     {
       title: "in-progress",
-      dot: "bg-purple-400",
-      color: "text-purple-400",
-      borderColor: "border-purple-500/20",
+      dot: "bg-amber-400",
+      color: "text-amber-400",
+      borderColor: "border-amber-500/20",
       items: inProgress,
       showDate: false,
     },
@@ -577,7 +525,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
   ];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <Stagger className="grid gap-6 lg:grid-cols-3">
       {columns.map((col) => {
         const isExpanded = expanded[col.title] ?? false;
         const hasOverflow = col.items.length > INITIAL_VISIBLE;
@@ -587,16 +535,23 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
         const hiddenCount = col.items.length - INITIAL_VISIBLE;
 
         return (
-          <div key={col.title}>
+          <StaggerItem
+            key={col.title}
+            className={`rounded-xl border ${col.borderColor} bg-zinc-900/20 p-4`}
+          >
             {/* Column header */}
             <div className="mb-4 flex items-center gap-2 border-b border-zinc-800 pb-3">
-              <span className={`h-2 w-2 rounded-full ${col.dot}`} />
+              <span
+                className={`h-2 w-2 rounded-full ${col.dot} ${
+                  col.title === "in-progress" ? "animate-pulse" : ""
+                }`}
+              />
               <h3
-                className={`text-xs font-bold uppercase tracking-wider ${col.color}`}
+                className={`font-mono text-xs font-bold uppercase tracking-wider ${col.color}`}
               >
                 {col.title}
               </h3>
-              <span className="ml-auto text-xs text-zinc-600">
+              <span className="ml-auto rounded-full border border-zinc-800 bg-zinc-950/60 px-2 py-0.5 font-mono text-[10px] text-zinc-500">
                 {col.items.length}
               </span>
             </div>
@@ -604,7 +559,7 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
             {/* Cards */}
             <div className="space-y-3">
               {col.items.length === 0 ? (
-                <p className="py-6 text-center text-xs text-zinc-700">
+                <p className="py-6 text-center font-mono text-xs text-zinc-700">
                   # empty
                 </p>
               ) : (
@@ -612,15 +567,15 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                   {visibleItems.map((feature) => (
                     <div
                       key={feature._id}
-                      className={`rounded-lg border ${col.borderColor} bg-zinc-900/50 p-4 transition-colors hover:border-zinc-700`}
+                      className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition-colors hover:border-green-500/30"
                     >
-                      <h4 className="text-xs font-semibold text-zinc-200">
+                      <h4 className="font-sans text-xs font-bold tracking-tight text-zinc-200">
                         {feature.title}
                       </h4>
-                      <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">
+                      <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-zinc-500">
                         {feature.description}
                       </p>
-                      <div className="mt-3 flex items-center justify-between text-[10px] text-zinc-600">
+                      <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-zinc-600">
                         <span className="flex items-center gap-1">
                           <ChevronUp className="h-3 w-3" />
                           {feature.voteCount}
@@ -650,17 +605,17 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                           [col.title]: !isExpanded,
                         }))
                       }
-                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 text-[11px] font-medium ${col.color} transition-colors hover:bg-zinc-900/50`}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed ${col.borderColor} py-2.5 font-mono text-[11px] font-medium ${col.color} transition-colors hover:bg-zinc-900/50`}
                     >
                       {isExpanded ? (
                         <>
                           <ChevronUp className="h-3 w-3" />
-                          Show less
+                          show less
                         </>
                       ) : (
                         <>
                           <ChevronUp className="h-3 w-3 rotate-180" />
-                          Show {hiddenCount} more
+                          show {hiddenCount} more
                         </>
                       )}
                     </button>
@@ -668,10 +623,10 @@ function RoadmapView({ plannedFeatures }: RoadmapViewProps) {
                 </>
               )}
             </div>
-          </div>
+          </StaggerItem>
         );
       })}
-    </div>
+    </Stagger>
   );
 }
 
@@ -687,6 +642,9 @@ interface SubmitFeatureModalProps {
   voterEmail: string;
   setVoterEmail: (email: string) => void;
 }
+
+const INPUT_CLASSES =
+  "mt-1.5 block w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20";
 
 function SubmitFeatureModal({
   onClose,
@@ -747,114 +705,121 @@ function SubmitFeatureModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative w-full max-w-lg overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-2xl">
-        {/* Terminal title bar */}
-        <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-800/80 px-4 py-2.5">
-          <div className="h-3 w-3 rounded-full bg-red-500/80" />
-          <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-          <div className="h-3 w-3 rounded-full bg-green-500/80" />
-          <span className="ml-2 text-xs text-zinc-500">
-            submit-feature-request
-          </span>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <TerminalFrame
+        title="submit-feature-request"
+        glow
+        className="relative w-full max-w-lg"
+        bodyClassName="max-h-[80vh] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between">
+          <p className="font-mono text-xs text-zinc-500">
+            <span className="text-green-500">❯</span> envpilot feature --new
+          </p>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-300"
+            aria-label="Close"
+            className="rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-300"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="p-6">
-          <p className="text-xs text-zinc-500">
-            <span className="text-green-500">$</span> envpilot feature --new
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            {error && (
-              <div className="rounded border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-red-400">
-                error: {error}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs text-zinc-400">title *</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1.5 block w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-                placeholder="Brief title for your feature"
-              />
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {error && (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 font-mono text-xs text-red-400">
+              error: {error}
             </div>
+          )}
 
+          <div>
+            <label className="block font-mono text-xs text-zinc-400">
+              title *
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={INPUT_CLASSES}
+              placeholder="Brief title for your feature"
+            />
+          </div>
+
+          <div>
+            <label className="block font-mono text-xs text-zinc-400">
+              description *
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className={INPUT_CLASSES}
+              placeholder="Describe the feature and why it would be valuable..."
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs text-zinc-400">
-                description *
+              <label className="block font-mono text-xs text-zinc-400">
+                email *
               </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="mt-1.5 block w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-                placeholder="Describe the feature and why it would be valuable..."
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder="you@example.com"
               />
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs text-zinc-400">email *</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 block w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400">name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1.5 block w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-                  placeholder="Optional"
-                />
-              </div>
-            </div>
-
             <div>
-              <label className="block text-xs text-zinc-400">category</label>
+              <label className="block font-mono text-xs text-zinc-400">
+                name
+              </label>
               <input
                 type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="mt-1.5 block w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-700 focus:outline-none"
-                placeholder="e.g., security, integrations, ui"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder="Optional"
               />
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded border border-zinc-800 px-4 py-2 text-xs text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-400"
-              >
-                cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded border border-green-500/30 bg-green-500/10 px-4 py-2 text-xs text-green-400 transition-all hover:bg-green-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "submitting..." : "submit"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+          <div>
+            <label className="block font-mono text-xs text-zinc-400">
+              category
+            </label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={INPUT_CLASSES}
+              placeholder="e.g., security, integrations, ui"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-zinc-800 px-4 py-2 font-mono text-xs text-zinc-500 transition-colors hover:border-green-500/30 hover:text-zinc-300"
+            >
+              cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-lg bg-green-500 px-4 py-2 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_20px_-6px_rgba(34,197,94,0.6)] transition-all hover:bg-green-400 disabled:opacity-50"
+            >
+              {isSubmitting ? "submitting..." : "submit"}
+            </button>
+          </div>
+        </form>
+      </TerminalFrame>
     </div>
   );
 }

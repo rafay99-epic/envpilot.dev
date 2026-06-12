@@ -4,13 +4,14 @@ import { useState, useRef, type ReactNode } from "react";
 import { Copy, Check } from "lucide-react";
 
 /**
- * Terminal-style code block wrapper that matches the landing page.
+ * Terminal-style code block frame matching the marketing TerminalFrame:
  *
- * Features:
- *   - macOS traffic light dots (red, yellow, green)
- *   - Language label in the title bar
+ *   - rounded-xl bordered window with macOS traffic lights
+ *   - Language label in the title bar (bash/sh → "terminal")
  *   - Copy-to-clipboard button with success feedback
- *   - #0f172a background (--terminal-bg)
+ *
+ * The rehype-pretty-code <pre> renders inside; its line/token styling
+ * comes from globals.css (#0f172a terminal background).
  */
 export function CodeBlock({
   children,
@@ -37,10 +38,10 @@ export function CodeBlock({
   return (
     <div
       ref={preRef}
-      className="group mb-6 overflow-hidden rounded-lg border border-zinc-700/50 shadow-lg"
+      className="group mb-6 overflow-hidden rounded-xl border border-zinc-800 shadow-lg transition-colors hover:border-green-500/30"
     >
       {/* Title bar */}
-      <div className="flex items-center justify-between border-b border-zinc-700/30 bg-zinc-800/80 px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-2.5">
         <div className="flex items-center gap-3">
           {/* Traffic lights */}
           <div className="flex items-center gap-1.5">
@@ -50,25 +51,28 @@ export function CodeBlock({
           </div>
 
           {title && (
-            <span className="font-mono text-xs text-zinc-500">{title}</span>
+            <span className="font-mono text-xs text-zinc-500">
+              <span className="mr-1.5 text-green-500/70">❯</span>
+              {title}
+            </span>
           )}
         </div>
 
         {/* Copy button */}
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-700/50 hover:text-zinc-300"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-xs text-zinc-500 transition-colors hover:bg-zinc-800/80 hover:text-zinc-300"
           aria-label="Copy code"
         >
           {copied ? (
             <>
               <Check className="h-3.5 w-3.5 text-green-400" />
-              <span className="text-green-400">Copied</span>
+              <span className="text-green-400">copied</span>
             </>
           ) : (
             <>
               <Copy className="h-3.5 w-3.5" />
-              <span>Copy</span>
+              <span>copy</span>
             </>
           )}
         </button>

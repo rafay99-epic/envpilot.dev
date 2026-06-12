@@ -2,7 +2,16 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
-import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
+import {
+  MarketingShell,
+  PageHero,
+  SectionHeading,
+  TerminalFrame,
+  GlowDivider,
+  Reveal,
+  Stagger,
+  StaggerItem,
+} from "@/components/marketing";
 import {
   PricingContent,
   type PricingData,
@@ -12,6 +21,42 @@ export const metadata: Metadata = {
   title: "Pricing | Envpilot",
   description:
     "Simple, transparent pricing for Envpilot. Start free with AES-256 encryption, RBAC, and real-time sync. Upgrade to Pro for unlimited resources.",
+  alternates: { canonical: "/pricing" },
+};
+
+const FAQ_ITEMS = [
+  {
+    q: "Is the free plan really free?",
+    a: "Yes. During our alpha period, the free plan includes CLI and VS Code Extension access at no cost. No credit card required.",
+  },
+  {
+    q: "What happens when Pro launches?",
+    a: "Your free plan stays free forever. Pro adds unlimited resources, version history, bulk import, granular permissions, and extended audit log retention.",
+  },
+  {
+    q: "Can I change plans later?",
+    a: "Absolutely. Upgrade or downgrade at any time. When downgrading, you get a 7-day grace period to adjust your usage.",
+  },
+  {
+    q: "Is my data encrypted?",
+    a: "Yes. All secret values are encrypted with AES-256 and stored in an isolated vault. Envpilot never stores plaintext secrets in the database.",
+  },
+  {
+    q: "Do you offer team/enterprise pricing?",
+    a: "Enterprise plans with SSO, custom branding, and dedicated support are on the roadmap. Contact us for early access.",
+  },
+];
+
+// FAQ rich results for the pricing page, generated from the same data the
+// page renders.
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: { "@type": "Answer", text: item.a },
+  })),
 };
 
 export default async function PricingPage() {
@@ -30,132 +75,117 @@ export default async function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
-      {/* Header — server-rendered */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-green-400">$</span>
-            <span className="font-bold text-zinc-100">envpilot</span>
-            <span className="text-xs text-zinc-600">v1.0</span>
-          </Link>
+    <MarketingShell>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      {/* Hero */}
+      <PageHero
+        eyebrow="pricing"
+        title={
+          <>
+            Simple, <span className="text-green-400">transparent</span> pricing
+          </>
+        }
+        description="Start free. Upgrade when you need more power. Every plan includes AES-256 encryption, role-based access control, and real-time sync across CLI, VS Code, and web dashboard."
+      />
 
-          <nav className="hidden items-center gap-6 md:flex">
-            {[
-              { label: "Features", href: "/#features" },
-              { label: "Workflow", href: "/#workflow" },
-              { label: "Pricing", href: "/pricing" },
-              { label: "Docs", href: "/docs" },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`text-xs transition-colors hover:text-green-400 ${
-                  item.label === "Pricing" ? "text-green-400" : "text-zinc-500"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <PublicHeaderButtons />
-          </div>
+      {/* Pricing cards + feature comparison (client island) */}
+      <section className="relative pb-28">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <PricingContent
+            pricingData={pricingData as PricingData}
+            paymentsEnabled={paymentsEnabled ?? false}
+          />
         </div>
-      </header>
+      </section>
 
-      <main className="pt-14">
-        {/* Pricing Section */}
-        <section className="border-t border-zinc-800/50 py-24">
-          <div className="mx-auto max-w-5xl px-4">
-            <p className="text-xs uppercase tracking-widest text-green-500">
-              {"// pricing"}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-              Simple, transparent pricing
-            </h1>
-            <p className="mt-4 max-w-xl text-xs leading-relaxed text-zinc-500">
-              Start free. Upgrade when you need more power. Every plan includes
-              AES-256 encryption, role-based access control, and real-time sync
-              across CLI, VS Code, and web dashboard.
-            </p>
+      <GlowDivider />
 
-            {/* Client island for pricing cards + comparison table */}
-            <PricingContent
-              pricingData={pricingData as PricingData}
-              paymentsEnabled={paymentsEnabled ?? false}
-            />
-          </div>
-        </section>
-
-        {/* FAQ — fully server-rendered, no interactivity */}
-        <section className="border-t border-zinc-800/50 py-24">
-          <div className="mx-auto max-w-3xl px-4">
-            <p className="text-xs uppercase tracking-widest text-green-500">
-              {"// faq"}
-            </p>
-            <h2 className="mt-2 text-2xl font-bold text-zinc-100">
-              Frequently asked questions
-            </h2>
-            <div className="mt-8 space-y-6">
-              {[
-                {
-                  q: "Is the free plan really free?",
-                  a: "Yes. During our alpha period, the free plan includes CLI and VS Code Extension access at no cost. No credit card required.",
-                },
-                {
-                  q: "What happens when Pro launches?",
-                  a: "Your free plan stays free forever. Pro adds unlimited resources, version history, bulk import, granular permissions, and extended audit log retention.",
-                },
-                {
-                  q: "Can I change plans later?",
-                  a: "Absolutely. Upgrade or downgrade at any time. When downgrading, you get a 7-day grace period to adjust your usage.",
-                },
-                {
-                  q: "Is my data encrypted?",
-                  a: "Yes. All secret values are encrypted with AES-256 and stored in an isolated vault. Envpilot never stores plaintext secrets in the database.",
-                },
-                {
-                  q: "Do you offer team/enterprise pricing?",
-                  a: "Enterprise plans with SSO, custom branding, and dedicated support are on the roadmap. Contact us for early access.",
-                },
-              ].map(({ q, a }) => (
-                <div key={q} className="border-b border-zinc-800/50 pb-5">
-                  <h3 className="text-xs font-medium text-zinc-200">{q}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+      {/* FAQ */}
+      <section className="relative py-28">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <SectionHeading
+            eyebrow="faq"
+            title={
+              <>
+                Frequently asked{" "}
+                <span className="text-green-400">questions</span>
+              </>
+            }
+            description="Everything you need to know before getting started."
+          />
+          <Stagger className="mt-10 space-y-4">
+            {FAQ_ITEMS.map(({ q, a }) => (
+              <StaggerItem key={q}>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 transition-colors duration-300 hover:border-green-500/30">
+                  <h3 className="flex items-start gap-2.5 font-sans text-sm font-bold tracking-tight text-zinc-100">
+                    <span aria-hidden className="font-mono text-green-400">
+                      ❯
+                    </span>
+                    {q}
+                  </h3>
+                  <p className="mt-2.5 pl-6 font-mono text-xs leading-relaxed text-zinc-500">
                     {a}
                   </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </div>
+      </section>
 
-        {/* CTA — server-rendered */}
-        <section className="border-t border-zinc-800/50 bg-zinc-900/30 py-24">
-          <div className="mx-auto max-w-5xl px-4 text-center">
-            <div className="mx-auto inline-block overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
-              <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-                <span className="h-3 w-3 rounded-full bg-red-500/80" />
-                <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                <span className="h-3 w-3 rounded-full bg-green-500/80" />
-                <span className="ml-2 text-xs text-zinc-500">
-                  bash — get started
-                </span>
+      <GlowDivider />
+
+      {/* Final CTA */}
+      <section className="relative py-28">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <SectionHeading
+            eyebrow="get started"
+            title={
+              <>
+                Ship secrets <span className="text-green-400">safely</span>{" "}
+                today
+              </>
+            }
+            description="Get started in under 2 minutes. No credit card required."
+            align="center"
+            className="items-center"
+          />
+          <Reveal className="mx-auto mt-10 max-w-xl" delay={0.1}>
+            <TerminalFrame title="bash — get started" glow>
+              <div className="text-left">
+                <p className="text-xs text-zinc-300">
+                  <span aria-hidden className="text-green-400">
+                    ❯{" "}
+                  </span>
+                  <span className="text-green-400">npx</span> @envpilot/cli init
+                </p>
+                <p className="mt-2 text-[11px] text-zinc-600">
+                  # encrypted vault, RBAC, and real-time sync in one command
+                </p>
               </div>
-              <div className="p-5 font-mono text-sm leading-relaxed">
-                <code className="text-xs text-green-400">
-                  npx @envpilot/cli init
-                </code>
-              </div>
+            </TerminalFrame>
+          </Reveal>
+          <Reveal className="mt-8" delay={0.2}>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Link
+                href="/sign-up"
+                className="rounded-lg bg-green-500 px-6 py-3 font-mono text-xs font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
+              >
+                Get Started Free
+              </Link>
+              <Link
+                href="/docs"
+                className="rounded-lg border border-zinc-800 px-6 py-3 font-mono text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-green-400"
+              >
+                Read the docs
+              </Link>
             </div>
-            <p className="mt-6 text-xs text-zinc-500">
-              Get started in under 2 minutes. No credit card required.
-            </p>
-          </div>
-        </section>
-      </main>
-    </div>
+          </Reveal>
+        </div>
+      </section>
+    </MarketingShell>
   );
 }
