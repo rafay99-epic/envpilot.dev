@@ -18,6 +18,7 @@ export default authkitMiddleware({
       "/docs",
       "/docs/(.*)",
       "/faq",
+      "/vs/(.*)",
       "/wishlist",
       "/privacy",
       "/terms",

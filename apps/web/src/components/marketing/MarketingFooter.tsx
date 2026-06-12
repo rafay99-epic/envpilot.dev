@@ -22,6 +22,14 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
+    title: "compare",
+    links: [
+      { label: "vs Doppler", href: "/vs/doppler" },
+      { label: "vs Infisical", href: "/vs/infisical" },
+      { label: "vs .env files", href: "/vs/dotenv" },
+    ],
+  },
+  {
     title: "support",
     links: [
       { label: "FAQ", href: "/faq" },
@@ -49,8 +57,8 @@ export function MarketingFooter() {
   return (
     <footer className="relative overflow-hidden border-t border-zinc-800/60 bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 pt-16 pb-8 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
-          <div>
+        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-[1.4fr_repeat(5,1fr)]">
+          <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-md border border-green-500/30 bg-green-500/10 font-mono text-sm font-bold text-green-400">
                 ❯

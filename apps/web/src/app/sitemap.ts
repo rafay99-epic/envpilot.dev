@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllDocs } from "@/lib/docs/content";
+import { COMPARISONS } from "@/lib/comparisons";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.envpilot.dev";
@@ -79,5 +80,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...docsPages];
+  // ── Competitor comparison pages ───────────────────────────────────────
+
+  const comparisonPages: MetadataRoute.Sitemap = COMPARISONS.map((c) => ({
+    url: `${baseUrl}/vs/${c.slug}`,
+    lastModified: now,
+    changeFrequency: "monthly" as const,
+    priority: 0.8,
+  }));
+
+  return [...staticPages, ...docsPages, ...comparisonPages];
 }

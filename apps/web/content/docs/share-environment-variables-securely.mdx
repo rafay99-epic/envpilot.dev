@@ -1,0 +1,72 @@
+---
+title: How to Share Environment Variables Securely
+description: Why sharing .env files over Slack or email is dangerous, and how to share environment variables and secrets with your team the right way.
+icon: shield
+---
+
+# How to Share Environment Variables Securely with Your Team
+
+Every development team hits this moment: a new engineer joins, clones the repo, runs the app — and it crashes because they don't have the `.env` file. So someone DMs it to them on Slack. It works, everyone moves on, and your production database credentials now live in a chat log forever.
+
+This guide covers why that's a real problem, the common workarounds and their trade-offs, and how to set up secret sharing that's actually secure.
+
+## Why sharing .env files over Slack is dangerous
+
+It feels harmless because it's so common. But pasting secrets into chat creates problems that compound over time:
+
+- **Secrets outlive their welcome.** Chat history is searchable and effectively permanent. A credential shared two years ago is still sitting there — long after the person who shared it left the company.
+- **No revocation.** When someone leaves the team, you can remove their Slack account, but every secret they ever received is still on their laptop, in their email, in their notes.
+- **No audit trail.** If a key leaks, you have no way to know who had access to it, when they got it, or which copy leaked.
+- **Drift.** The `.env` file in chat is a snapshot. Three weeks later someone rotates a key, and half the team is debugging errors caused by stale values.
+- **Compliance failure.** SOC 2, ISO 27001, and most security questionnaires explicitly ask how you distribute secrets. "We paste them in Slack" is a failing answer.
+
+The same applies to email, shared Google Docs, Notion pages, and committing `.env` to a private repo. Private is not the same as secure — repo access is rarely scoped to who should see production credentials, and git history never forgets.
+
+## What good secret sharing looks like
+
+Whatever tool you use, secure team secret sharing has five properties:
+
+1. **Encryption at rest** — secrets are stored encrypted (e.g. AES-256), not as plaintext in a database or document.
+2. **Access control** — people see only the secrets they need. A frontend contractor doesn't need production database credentials.
+3. **Revocation** — removing a person removes their access, immediately, without rotating every key they ever saw.
+4. **Audit logging** — every read, write, and share is recorded with who/what/when.
+5. **A single source of truth** — everyone pulls the current values from one place, so rotation propagates instead of causing drift.
+
+## Common approaches, compared
+
+**Encrypted files in the repo (SOPS, git-crypt, dotenv-vault).** Better than plaintext, and it keeps secrets versioned next to code. But key distribution just moves the problem (now you share the _decryption_ key), revocation still means re-encrypting everything, and there's no per-secret access control or audit trail.
+
+**Cloud provider secret managers (AWS Secrets Manager, GCP Secret Manager).** Excellent for production workloads that already run in that cloud. But they're awkward for local development — every developer needs cloud IAM credentials, and the DX of pulling twenty variables into a local dev server is poor.
+
+**Password managers (1Password, Bitwarden).** Fine for a handful of shared credentials, and far better than chat. But they're built for humans logging into websites, not for injecting forty variables into a process at runtime — so developers end up copy-pasting values back into local `.env` files, recreating the drift problem.
+
+**A dedicated environment variable manager.** Purpose-built tools (Envpilot, Doppler, Infisical) store secrets encrypted, scope access by project/environment/role, keep an audit log, and inject variables directly into your process — so the `.env` file disappears entirely.
+
+## The workflow with Envpilot
+
+[Envpilot](/) stores secrets AES-256-encrypted in an isolated vault, with [role-based access control](/docs/rbac) down to the individual variable. The day-to-day workflow looks like this:
+
+```bash
+# One-time setup
+npm install -g @envpilot/cli
+envpilot login
+envpilot init                      # link the repo to a project
+
+# Run your app — variables are injected at runtime, no .env file written
+envpilot run -- npm run dev
+```
+
+When a teammate joins, you add them to the project in the dashboard and they run the same three commands. When someone leaves, you remove them — every secret stays where it is, and their access is gone. When a key rotates, everyone gets the new value on their next run automatically.
+
+For the full setup walkthrough, see [Getting Started](/docs/getting-started).
+
+## Checklist: migrating off shared .env files
+
+1. Pick a single source of truth and import your current `.env` files into it.
+2. Add `.env*` to `.gitignore` (and scrub any committed history with `git filter-repo` if needed).
+3. **Rotate every secret that was ever shared over chat or email** — assume they're compromised, because you can't prove they aren't.
+4. Scope access: production credentials to the people who deploy, staging to the team, local-dev to everyone.
+5. Switch local development to runtime injection (`envpilot run -- <command>`) so plaintext files stop being created at all.
+6. Turn on audit logging and review it when offboarding.
+
+The rotation step is the one teams skip — and it's the most important. A secrets manager protects you going forward; it can't un-leak what's already in your chat history.

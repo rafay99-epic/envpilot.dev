@@ -65,6 +65,9 @@ export function getAllDocs(): Omit<DocPage, "content">[] {
     "web-dashboard",
     "security",
     "rbac",
+    // Guides — SEO entry points targeting problem-first searches
+    "share-environment-variables-securely",
+    "nextjs-environment-variables",
   ];
 
   const files = readdirSync(CONTENT_DIR)
