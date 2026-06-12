@@ -5,6 +5,12 @@ import { Fragment } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Check, X, Minus } from "lucide-react";
+import {
+  SectionHeading,
+  Stagger,
+  StaggerItem,
+  Reveal,
+} from "@/components/marketing";
 
 // ============================================================
 // Types matching the Convex getPricingData return shape
@@ -83,9 +89,9 @@ function formatFeatureValue(
 ): React.ReactNode {
   if (valueType === "boolean") {
     return value ? (
-      <Check className="mx-auto h-3 w-3 text-green-400" />
+      <Check className="mx-auto h-3.5 w-3.5 text-green-400" />
     ) : (
-      <X className="mx-auto h-3 w-3 text-zinc-600" />
+      <X className="mx-auto h-3.5 w-3.5 text-zinc-600" />
     );
   }
   if (value === null) {
@@ -95,30 +101,132 @@ function formatFeatureValue(
 }
 
 // ============================================================
-// Terminal Window
+// Pricing Card
 // ============================================================
 
-function TerminalWindow({
-  title,
-  children,
-  className = "",
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function PricingCard({ tier }: { tier: Tier }) {
+  const isComingSoon = tier.isComingSoon;
+  const isDefault = tier.isDefault;
+  const price = tier.monthlyPrice ?? 0;
+  const highlights =
+    tier.highlightFeatures.length > 0
+      ? tier.highlightFeatures
+      : generateFeatureLines(tier.features);
+  const cta =
+    tier.ctaText ||
+    (isComingSoon ? "Coming Soon" : isDefault ? "Get Started Free" : "Upgrade");
+  const ctaHref = tier.ctaLink || "/sign-up";
+  const emphasized = isDefault && !isComingSoon;
+
+  const badgeColorClass =
+    tier.badgeColor === "amber"
+      ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
+      : tier.badgeColor === "green"
+        ? "border-green-500/20 bg-green-500/5 text-green-400"
+        : "border-zinc-700 bg-zinc-800/50 text-zinc-500";
+  const dotColorClass =
+    tier.badgeColor === "amber"
+      ? "bg-amber-400"
+      : tier.badgeColor === "green"
+        ? "bg-green-400"
+        : "bg-zinc-500";
+
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl ${className}`}
+      className={`relative w-full rounded-2xl p-px transition-shadow duration-300 ${
+        emphasized
+          ? "bg-gradient-to-b from-green-500/50 via-zinc-700/40 to-zinc-800/40 shadow-[0_0_60px_-16px_rgba(34,197,94,0.35)]"
+          : "bg-zinc-800/60"
+      }`}
     >
-      <div className="flex items-center gap-2 border-b border-zinc-700/50 bg-zinc-800/80 px-4 py-2.5">
-        <span className="h-3 w-3 rounded-full bg-red-500/80" />
-        <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
-        <span className="h-3 w-3 rounded-full bg-green-500/80" />
-        <span className="ml-2 text-xs text-zinc-500">{title}</span>
-      </div>
-      <div className="flex-1 p-5 font-mono text-sm leading-relaxed">
-        {children}
+      <div className="flex h-full flex-col rounded-[15px] bg-zinc-950/95 p-7">
+        {/* Tier name + badge */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">
+            {tier.name}
+          </span>
+          <div className="flex items-center gap-2">
+            {isComingSoon && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/50 px-2.5 py-0.5 font-mono text-[10px] text-zinc-500">
+                <span className="h-1 w-1 rounded-full bg-zinc-500" />
+                coming soon
+              </span>
+            )}
+            {tier.badge && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] ${badgeColorClass}`}
+              >
+                <span className={`h-1 w-1 rounded-full ${dotColorClass}`} />
+                {tier.badge}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Display name */}
+        <h3
+          className={`mt-4 font-sans text-lg font-bold tracking-tight ${
+            isComingSoon ? "text-zinc-400" : "text-zinc-100"
+          }`}
+        >
+          {tier.displayName}
+        </h3>
+
+        {/* Price */}
+        <div className="mt-2 flex items-baseline gap-2">
+          <span
+            className={`font-sans text-5xl font-bold tracking-tight ${
+              isComingSoon ? "text-zinc-400" : "text-zinc-100"
+            }`}
+          >
+            ${price}
+          </span>
+          <span className="font-mono text-xs text-zinc-600">
+            / month / organization
+          </span>
+        </div>
+
+        {/* What's included */}
+        <p className="mt-7 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+          {"// what's included"}
+        </p>
+        <div className="mt-3 space-y-2.5">
+          {highlights.map((item) => (
+            <p
+              key={item}
+              className={`flex items-start gap-2.5 font-mono text-xs ${
+                isComingSoon ? "text-zinc-600" : "text-zinc-400"
+              }`}
+            >
+              <Check
+                className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                  isComingSoon ? "text-zinc-700" : "text-green-400"
+                }`}
+              />
+              {item}
+            </p>
+          ))}
+        </div>
+
+        <div className="mt-8 flex-1" />
+
+        {/* CTA */}
+        {isComingSoon ? (
+          <span className="block cursor-not-allowed rounded-lg border border-zinc-800 px-5 py-3 text-center font-mono text-xs text-zinc-600">
+            {cta}
+          </span>
+        ) : (
+          <Link
+            href={ctaHref}
+            className={`block rounded-lg px-5 py-3 text-center font-mono text-xs font-semibold transition-all ${
+              emphasized
+                ? "bg-green-500 text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] hover:shadow-[0_0_55px_-8px_rgba(34,197,94,0.8)]"
+                : "border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20"
+            }`}
+          >
+            {cta}
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -166,78 +274,83 @@ function ComparisonTable({
   const hiddenKeys = new Set(["sso_enabled"]);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead>
-          <tr className="border-b border-zinc-700/50">
-            <th className="w-1/3 py-3 pr-4 font-medium text-zinc-500">
-              Feature
-            </th>
-            {tiers.map((tier) => (
-              <th
-                key={tier.name}
-                className="px-4 py-3 text-center font-medium text-zinc-400"
-              >
-                {tier.displayName}
+    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left font-mono text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800 bg-zinc-900/60">
+              <th className="w-1/3 px-5 py-4 font-medium uppercase tracking-widest text-zinc-500">
+                Feature
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((category) => {
-            const features = featuresByCategory.get(category) ?? [];
-            const visibleFeatures = features.filter(
-              (f) => !hiddenKeys.has(f.key)
-            );
-            if (visibleFeatures.length === 0) return null;
+              {tiers.map((tier) => (
+                <th
+                  key={tier.name}
+                  className="px-4 py-4 text-center font-sans text-sm font-bold tracking-tight text-zinc-100"
+                >
+                  {tier.displayName}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((category) => {
+              const features = featuresByCategory.get(category) ?? [];
+              const visibleFeatures = features.filter(
+                (f) => !hiddenKeys.has(f.key)
+              );
+              if (visibleFeatures.length === 0) return null;
 
-            return (
-              <Fragment key={category}>
-                <tr>
-                  <td
-                    colSpan={tiers.length + 1}
-                    className="pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-green-500"
-                  >
-                    {category}
-                  </td>
-                </tr>
-                {visibleFeatures.map((feature) => (
-                  <tr key={feature.key} className="border-b border-zinc-800/50">
-                    <td className="py-2.5 pr-4 text-zinc-400">
-                      {feature.displayName}
-                      {feature.description && (
-                        <span className="mt-0.5 block text-[10px] text-zinc-600">
-                          {feature.description}
-                        </span>
-                      )}
+              return (
+                <Fragment key={category}>
+                  <tr className="border-b border-zinc-800/50 bg-green-500/[0.03]">
+                    <td
+                      colSpan={tiers.length + 1}
+                      className="px-5 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-green-400"
+                    >
+                      {`// ${category}`}
                     </td>
-                    {tiers.map((tier) => {
-                      const entry = tierFeatureMap
-                        .get(tier.name)
-                        ?.get(feature.key);
-                      if (!entry) {
+                  </tr>
+                  {visibleFeatures.map((feature) => (
+                    <tr
+                      key={feature.key}
+                      className="border-b border-zinc-800/50 transition-colors last:border-b-0 hover:bg-green-500/[0.04]"
+                    >
+                      <td className="px-5 py-3 text-zinc-400">
+                        {feature.displayName}
+                        {feature.description && (
+                          <span className="mt-0.5 block text-[10px] text-zinc-600">
+                            {feature.description}
+                          </span>
+                        )}
+                      </td>
+                      {tiers.map((tier) => {
+                        const entry = tierFeatureMap
+                          .get(tier.name)
+                          ?.get(feature.key);
+                        if (!entry) {
+                          return (
+                            <td
+                              key={tier.name}
+                              className="px-4 py-3 text-center"
+                            >
+                              <Minus className="mx-auto h-3.5 w-3.5 text-zinc-700" />
+                            </td>
+                          );
+                        }
                         return (
-                          <td
-                            key={tier.name}
-                            className="px-4 py-2.5 text-center"
-                          >
-                            <Minus className="mx-auto h-3 w-3 text-zinc-700" />
+                          <td key={tier.name} className="px-4 py-3 text-center">
+                            {formatFeatureValue(entry.value, entry.valueType)}
                           </td>
                         );
-                      }
-                      return (
-                        <td key={tier.name} className="px-4 py-2.5 text-center">
-                          {formatFeatureValue(entry.value, entry.valueType)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                      })}
+                    </tr>
+                  ))}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -270,9 +383,13 @@ export function PricingContent({
   if (!pricingData) {
     // Still loading client-side
     return (
-      <div className="mt-12 grid gap-6 md:grid-cols-2">
-        <div className="h-96 animate-pulse rounded-lg border border-zinc-700/50 bg-zinc-900/90" />
-        <div className="h-96 animate-pulse rounded-lg border border-zinc-700/50 bg-zinc-900/90" />
+      <div className="grid gap-6 md:grid-cols-2">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="h-96 animate-pulse rounded-2xl border border-zinc-800 bg-zinc-900/40"
+          />
+        ))}
       </div>
     );
   }
@@ -290,120 +407,32 @@ export function PricingContent({
   return (
     <>
       {/* Pricing Cards */}
-      <div className="mt-12 grid gap-6 md:grid-cols-2">
-        {tiers.map((tier) => {
-          const isComingSoon = tier.isComingSoon;
-          const price = tier.monthlyPrice ?? 0;
-          const badge = tier.badge;
-          const badgeColor = tier.badgeColor;
-          const highlights =
-            tier.highlightFeatures.length > 0
-              ? tier.highlightFeatures
-              : generateFeatureLines(tier.features);
-          const cta =
-            tier.ctaText ||
-            (isComingSoon
-              ? "Coming Soon"
-              : tier.isDefault
-                ? "Get Started Free"
-                : "Upgrade");
-          const ctaHref = tier.ctaLink || "/sign-up";
-
-          const badgeColorClass =
-            badgeColor === "amber"
-              ? "border-amber-500/20 bg-amber-500/5 text-amber-400"
-              : badgeColor === "green"
-                ? "border-green-500/20 bg-green-500/5 text-green-400"
-                : "border-zinc-700 bg-zinc-800/50 text-zinc-500";
-          const dotColorClass =
-            badgeColor === "amber"
-              ? "bg-amber-400"
-              : badgeColor === "green"
-                ? "bg-green-400"
-                : "bg-zinc-500";
-
-          return (
-            <TerminalWindow
-              key={tier.name}
-              title={`plan \u2014 ${tier.name}${isComingSoon ? " (coming soon)" : ""}`}
-              className="h-full"
-            >
-              <div className="flex items-baseline gap-2">
-                <span
-                  className={`text-3xl font-bold ${
-                    isComingSoon ? "text-zinc-400" : "text-green-400"
-                  }`}
-                >
-                  ${price}
-                </span>
-                <span className="text-xs text-zinc-600">
-                  / month / organization
-                </span>
-              </div>
-              {badge && (
-                <div
-                  className={`mt-1 inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] ${badgeColorClass}`}
-                >
-                  <span className={`h-1 w-1 rounded-full ${dotColorClass}`} />
-                  {badge}
-                </div>
-              )}
-              <div className="mt-5 space-y-2 text-xs">
-                {highlights.map((item) => (
-                  <p
-                    key={item}
-                    className={`flex items-center gap-2 ${
-                      isComingSoon ? "text-zinc-500" : "text-zinc-400"
-                    }`}
-                  >
-                    <Check
-                      className={`h-3 w-3 shrink-0 ${
-                        isComingSoon ? "text-zinc-600" : "text-green-400"
-                      }`}
-                    />
-                    {item}
-                  </p>
-                ))}
-              </div>
-              <div className="mt-6">
-                {isComingSoon ? (
-                  <span className="block cursor-not-allowed rounded border border-zinc-700 px-4 py-2.5 text-center text-xs text-zinc-600">
-                    {cta}
-                  </span>
-                ) : (
-                  <Link
-                    href={ctaHref}
-                    className="block rounded border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-center text-xs text-green-400 transition-all hover:bg-green-500/20"
-                  >
-                    {cta}
-                  </Link>
-                )}
-              </div>
-            </TerminalWindow>
-          );
-        })}
-      </div>
+      <Stagger className="grid gap-6 md:grid-cols-2">
+        {tiers.map((tier) => (
+          <StaggerItem key={tier.name} className="flex">
+            <PricingCard tier={tier} />
+          </StaggerItem>
+        ))}
+      </Stagger>
 
       {/* Feature Comparison */}
-      <section className="mt-24 border-t border-zinc-800/50 pt-24">
-        <p className="text-xs uppercase tracking-widest text-green-500">
-          {"// details"}
-        </p>
-        <h2 className="mt-2 text-2xl font-bold text-zinc-100">
-          Feature comparison
-        </h2>
-        <p className="mt-2 text-xs text-zinc-500">
-          A detailed breakdown of what&apos;s included in each plan.
-        </p>
-        <div className="mt-8">
-          <TerminalWindow title="feature-matrix">
-            <ComparisonTable
-              tiers={tiers}
-              allFeatures={allFeatures}
-              categories={categories}
-            />
-          </TerminalWindow>
-        </div>
+      <section className="mt-28">
+        <SectionHeading
+          eyebrow="details"
+          title={
+            <>
+              Feature <span className="text-green-400">comparison</span>
+            </>
+          }
+          description="A detailed breakdown of what's included in each plan."
+        />
+        <Reveal className="mt-10" delay={0.1}>
+          <ComparisonTable
+            tiers={tiers}
+            allFeatures={allFeatures}
+            categories={categories}
+          />
+        </Reveal>
       </section>
     </>
   );

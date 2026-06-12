@@ -3,9 +3,55 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 import { api } from "@convex/_generated/api";
-import { Mail, MessageSquare, CheckCircle, AlertTriangle } from "lucide-react";
+import {
+  MarketingShell,
+  PageHero,
+  GlowCard,
+  GlowDivider,
+  Reveal,
+  Stagger,
+  StaggerItem,
+} from "@/components/marketing";
+import {
+  Mail,
+  CheckCircle,
+  AlertTriangle,
+  LifeBuoy,
+  HelpCircle,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
+
+const INPUT_CLASSES =
+  "w-full rounded-lg border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 font-mono text-sm text-zinc-200 placeholder-zinc-600 transition-colors focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20";
+
+const EMAILS = [
+  { label: "General inquiries", address: "hello@envpilot.dev" },
+  { label: "Support", address: "support@envpilot.dev" },
+  { label: "Privacy", address: "privacy@envpilot.dev" },
+];
+
+const CHANNELS = [
+  {
+    href: "/support",
+    title: "Submit a support ticket",
+    description: "Hit a bug or need a hand? Open a ticket.",
+    icon: <LifeBuoy className="h-4 w-4 text-green-400" />,
+  },
+  {
+    href: "/faq",
+    title: "Browse the FAQ",
+    description: "Plans, billing, limits, and security — answered.",
+    icon: <HelpCircle className="h-4 w-4 text-green-400" />,
+  },
+  {
+    href: "/wishlist",
+    title: "Request a feature",
+    description: "Tell us what to build next on the wishlist.",
+    icon: <Sparkles className="h-4 w-4 text-green-400" />,
+  },
+];
 
 export default function ContactPage() {
   const submitMessage = useMutation(api.contactMessages.submit);
@@ -34,314 +80,234 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-green-400">$</span>
-            <span className="font-bold text-zinc-100">envpilot</span>
-            <span className="text-xs text-zinc-600">v1.0</span>
-          </Link>
+    <MarketingShell>
+      <PageHero
+        eyebrow="contact"
+        title="Say hello."
+        description="Have a question, partnership inquiry, or just want to say hello? We'd love to hear from you."
+      />
 
-          <nav className="hidden items-center gap-6 md:flex">
-            {[
-              { label: "Changelog", href: "/changelog" },
-              { label: "Wishlist", href: "/wishlist" },
-              { label: "Docs", href: "/docs" },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+      <GlowDivider />
 
-          <div className="flex items-center gap-3">
-            <PublicHeaderButtons />
-          </div>
-        </div>
-      </header>
+      <section className="relative py-20">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="grid gap-12 lg:grid-cols-5">
+            {/* Left — pitch + alternative channels */}
+            <div className="lg:col-span-2">
+              <Stagger className="space-y-5">
+                <StaggerItem>
+                  <h2 className="font-sans text-2xl font-bold tracking-tight text-zinc-100">
+                    Real humans, fast replies.
+                  </h2>
+                  <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                    Whether it&apos;s feedback, a partnership idea, or a
+                    question about Envpilot — drop us a line and we&apos;ll
+                    route it to the right person.
+                  </p>
+                </StaggerItem>
 
-      <main className="pt-14">
-        {/* Hero */}
-        <section className="border-b border-zinc-800/50 py-16">
-          <div className="mx-auto max-w-5xl px-4">
-            <p className="text-xs uppercase tracking-widest text-green-500">
-              {"// contact"}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-              Get in touch
-            </h1>
-            <p className="mt-3 max-w-xl text-sm text-zinc-500">
-              Have a question, partnership inquiry, or just want to say hello?
-              We&apos;d love to hear from you.
-            </p>
-          </div>
-        </section>
+                {CHANNELS.map((channel) => (
+                  <StaggerItem key={channel.href}>
+                    <Link href={channel.href} className="block">
+                      <GlowCard className="p-5">
+                        <div className="flex items-start gap-3">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-green-500/20 bg-green-500/5">
+                            {channel.icon}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 font-sans text-sm font-semibold text-zinc-100">
+                              {channel.title}
+                              <ArrowRight className="h-3.5 w-3.5 text-green-500 transition-transform group-hover:translate-x-0.5" />
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                              {channel.description}
+                            </p>
+                          </div>
+                        </div>
+                      </GlowCard>
+                    </Link>
+                  </StaggerItem>
+                ))}
 
-        {/* Content */}
-        <section className="py-12">
-          <div className="mx-auto max-w-5xl px-4">
-            <div className="grid gap-12 lg:grid-cols-3">
-              {/* Sidebar */}
-              <div className="lg:col-span-1">
-                <div className="sticky top-20 space-y-6">
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
+                <StaggerItem>
+                  <GlowCard className="p-5">
+                    <div className="flex items-center gap-2 font-sans text-sm font-semibold text-zinc-100">
                       <Mail className="h-4 w-4 text-green-400" />
                       Email us
                     </div>
                     <div className="mt-4 space-y-3">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-zinc-600">
-                          General inquiries
-                        </p>
-                        <a
-                          href="mailto:hello@envpilot.dev"
-                          className="mt-1 block text-sm text-green-400 hover:underline"
-                        >
-                          hello@envpilot.dev
-                        </a>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-zinc-600">
-                          Support
-                        </p>
-                        <a
-                          href="mailto:support@envpilot.dev"
-                          className="mt-1 block text-sm text-green-400 hover:underline"
-                        >
-                          support@envpilot.dev
-                        </a>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-zinc-600">
-                          Privacy
-                        </p>
-                        <a
-                          href="mailto:privacy@envpilot.dev"
-                          className="mt-1 block text-sm text-green-400 hover:underline"
-                        >
-                          privacy@envpilot.dev
-                        </a>
-                      </div>
+                      {EMAILS.map((item) => (
+                        <div key={item.address}>
+                          <p className="text-[10px] uppercase tracking-widest text-zinc-600">
+                            {item.label}
+                          </p>
+                          <a
+                            href={`mailto:${item.address}`}
+                            className="mt-1 block text-sm text-green-400 underline-offset-4 hover:underline"
+                          >
+                            {item.address}
+                          </a>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  </GlowCard>
+                </StaggerItem>
+              </Stagger>
+            </div>
 
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-100">
-                      <MessageSquare className="h-4 w-4 text-green-400" />
-                      Other ways to reach us
-                    </div>
-                    <ul className="mt-4 space-y-3">
-                      <li>
-                        <Link
-                          href="/support"
-                          className="flex items-center gap-2 text-xs text-zinc-500 transition-colors hover:text-green-400"
+            {/* Right — the form */}
+            <div className="lg:col-span-3">
+              <Reveal>
+                <div className="relative rounded-xl bg-gradient-to-b from-green-500/25 via-zinc-700/30 to-zinc-800/30 p-px shadow-[0_0_80px_-16px_rgba(34,197,94,0.25)]">
+                  <div className="rounded-[11px] bg-zinc-950/95 p-6 backdrop-blur-md sm:p-8">
+                    {isSubmitted ? (
+                      <div className="py-10 text-center">
+                        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)]">
+                          <CheckCircle className="h-7 w-7 text-green-400" />
+                        </span>
+                        <h2 className="mt-5 font-sans text-xl font-bold tracking-tight text-zinc-100">
+                          Message sent
+                        </h2>
+                        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
+                          <span className="text-green-400">$</span> echo
+                          &quot;Thanks for reaching out! We&apos;ll get back to
+                          you at <span className="text-green-400">{email}</span>{" "}
+                          soon.&quot;
+                        </p>
+                        <button
+                          onClick={() => {
+                            setIsSubmitted(false);
+                            setName("");
+                            setEmail("");
+                            setSubject("");
+                            setMessage("");
+                          }}
+                          className="mt-7 rounded-lg border border-zinc-800 px-5 py-2.5 text-xs text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-200"
                         >
-                          <span className="text-green-500">&gt;</span>
-                          Submit a support ticket
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          href="/wishlist"
-                          className="flex items-center gap-2 text-xs text-zinc-500 transition-colors hover:text-green-400"
+                          Send another message
+                        </button>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleSubmit} className="space-y-6">
+                        {error && (
+                          <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-xs text-red-400">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            {error}
+                          </div>
+                        )}
+
+                        {/* Name and Email */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label
+                              htmlFor="contact-name"
+                              className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            >
+                              <span className="text-green-500">❯</span> Name
+                            </label>
+                            <input
+                              id="contact-name"
+                              name="name"
+                              type="text"
+                              autoComplete="name"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              required
+                              maxLength={100}
+                              placeholder="Your name"
+                              className={INPUT_CLASSES}
+                            />
+                          </div>
+                          <div>
+                            <label
+                              htmlFor="contact-email"
+                              className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                            >
+                              <span className="text-green-500">❯</span> Email
+                            </label>
+                            <input
+                              id="contact-email"
+                              name="email"
+                              type="email"
+                              autoComplete="email"
+                              spellCheck={false}
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              required
+                              placeholder="you@example.com"
+                              className={INPUT_CLASSES}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Subject */}
+                        <div>
+                          <label
+                            htmlFor="contact-subject"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                          >
+                            <span className="text-green-500">❯</span> Subject
+                          </label>
+                          <input
+                            id="contact-subject"
+                            name="subject"
+                            type="text"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            required
+                            maxLength={200}
+                            placeholder="What's this about?"
+                            className={INPUT_CLASSES}
+                          />
+                        </div>
+
+                        {/* Message */}
+                        <div>
+                          <label
+                            htmlFor="contact-message"
+                            className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-500"
+                          >
+                            <span className="text-green-500">❯</span> Message
+                          </label>
+                          <textarea
+                            id="contact-message"
+                            name="message"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            required
+                            maxLength={5000}
+                            rows={8}
+                            placeholder="Tell us what's on your mind…"
+                            className={`${INPUT_CLASSES} resize-y`}
+                          />
+                          <p className="mt-1 text-right text-[10px] text-zinc-700">
+                            {message.length}/5000
+                          </p>
+                        </div>
+
+                        {/* Submit */}
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgba(34,197,94,0.6)] transition-shadow hover:shadow-[0_0_60px_-8px_rgba(34,197,94,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="text-green-500">&gt;</span>
-                          Request a feature
-                        </Link>
-                      </li>
-                    </ul>
+                          {isSubmitting ? (
+                            <span className="flex items-center gap-2">
+                              <span className="animate-pulse">_</span> Sending…
+                            </span>
+                          ) : (
+                            "Send message"
+                          )}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              {/* Main form */}
-              <div className="lg:col-span-2">
-                {isSubmitted ? (
-                  <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-8 text-center">
-                    <CheckCircle className="mx-auto h-10 w-10 text-green-400" />
-                    <h2 className="mt-4 text-lg font-semibold text-zinc-100">
-                      Message sent
-                    </h2>
-                    <p className="mt-2 text-sm text-zinc-400">
-                      <span className="text-green-400">$</span> echo
-                      &quot;Thanks for reaching out! We&apos;ll get back to you
-                      at <span className="text-green-400">{email}</span>{" "}
-                      soon.&quot;
-                    </p>
-                    <button
-                      onClick={() => {
-                        setIsSubmitted(false);
-                        setName("");
-                        setEmail("");
-                        setSubject("");
-                        setMessage("");
-                      }}
-                      className="mt-6 rounded border border-zinc-700 px-4 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
-                    >
-                      Send another message
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {error && (
-                      <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-xs text-red-400">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        {error}
-                      </div>
-                    )}
-
-                    {/* Name and Email */}
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-xs text-zinc-500">
-                          Name
-                        </label>
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          required
-                          maxLength={100}
-                          placeholder="Your name"
-                          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs text-zinc-500">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                          placeholder="you@example.com"
-                          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Subject */}
-                    <div>
-                      <label className="mb-1.5 block text-xs text-zinc-500">
-                        Subject
-                      </label>
-                      <input
-                        type="text"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        required
-                        maxLength={200}
-                        placeholder="What's this about?"
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
-                      />
-                    </div>
-
-                    {/* Message */}
-                    <div>
-                      <label className="mb-1.5 block text-xs text-zinc-500">
-                        Message
-                      </label>
-                      <textarea
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        required
-                        maxLength={5000}
-                        rows={8}
-                        placeholder="Tell us what's on your mind..."
-                        className="w-full resize-y rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-green-500/50 focus:outline-none focus:ring-1 focus:ring-green-500/30"
-                      />
-                      <p className="mt-1 text-right text-[10px] text-zinc-700">
-                        {message.length}/5000
-                      </p>
-                    </div>
-
-                    {/* Submit */}
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="rounded border border-green-500/30 bg-green-500/10 px-6 py-2.5 text-sm text-green-400 transition-all hover:bg-green-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <span className="flex items-center gap-2">
-                          <span className="animate-pulse">_</span> Sending...
-                        </span>
-                      ) : (
-                        "Send message"
-                      )}
-                    </button>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-zinc-800/50 py-8">
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2 text-xs text-zinc-600">
-              <span className="text-green-500">$</span> envpilot --version{" "}
-              <span className="text-zinc-500">1.0.0</span>
-            </div>
-            <div className="flex gap-4 text-xs text-zinc-600">
-              <Link href="/docs" className="hover:text-zinc-400">
-                Docs
-              </Link>
-              <Link href="/changelog" className="hover:text-zinc-400">
-                Changelog
-              </Link>
-              <Link href="/privacy" className="hover:text-zinc-400">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-zinc-400">
-                Terms
-              </Link>
-              <Link href="/faq" className="hover:text-zinc-400">
-                FAQ
-              </Link>
-              <Link href="/support" className="hover:text-zinc-400">
-                Support
-              </Link>
-              <Link href="/contact" className="hover:text-zinc-400">
-                Contact
-              </Link>
-            </div>
-            <div className="text-right text-xs text-zinc-700">
-              <p>&copy; {new Date().getFullYear()} Envpilot</p>
-              <p className="text-[10px] text-zinc-800">
-                Built at{" "}
-                <a
-                  href="https://syntaxlabtechnology.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Syntax Lab Technology
-                </a>{" "}
-                &middot;{" "}
-                <a
-                  href="https://rafay99.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Abdul Rafay
-                </a>
-              </p>
+              </Reveal>
             </div>
           </div>
         </div>
-      </footer>
-    </div>
+      </section>
+    </MarketingShell>
   );
 }

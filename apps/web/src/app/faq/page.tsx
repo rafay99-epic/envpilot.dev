@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
+import { MarketingShell, PageHero, GlowDivider } from "@/components/marketing";
 import { ScrollSpySidebar } from "@/components/ui/ScrollSpySidebar";
 import { FAQAccordion } from "@/components/faq/FAQAccordion";
 
@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "FAQ | Envpilot",
   description:
     "Frequently asked questions about Envpilot. Learn about plans, billing, security, usage limits, and features.",
+  alternates: { canonical: "/faq" },
 };
 
 const SECTIONS = [
@@ -33,7 +34,7 @@ const FAQ_DATA = [
       {
         question: "How do I create an account?",
         answer:
-          'Visit envpilot.dev and click "Get Started." Authentication is handled securely through WorkOS AuthKit \u2014 you can sign in with email or supported SSO providers.',
+          'Visit envpilot.dev and click "Get Started." Authentication is handled securely through WorkOS AuthKit — you can sign in with email or supported SSO providers.',
       },
       {
         question: "What is an Organization?",
@@ -60,7 +61,7 @@ const FAQ_DATA = [
       {
         question: "Can I cancel my subscription?",
         answer:
-          "Yes, you can cancel at any time from Account Settings \u2192 Billing. When you cancel, your Pro access continues until the end of your current billing period. After that, a 7-day grace period begins where you retain Pro features while you decide. After the grace period, your account reverts to the Free tier.",
+          "Yes, you can cancel at any time from Account Settings → Billing. When you cancel, your Pro access continues until the end of your current billing period. After that, a 7-day grace period begins where you retain Pro features while you decide. After the grace period, your account reverts to the Free tier.",
       },
       {
         question: "Do you offer refunds?",
@@ -97,12 +98,12 @@ const FAQ_DATA = [
       {
         question: "What happens when I hit a limit?",
         answer:
-          "When you reach a resource limit, you cannot create more of that resource until you either remove existing ones or upgrade to Pro. Existing resources are never deleted or restricted \u2014 only new creation is blocked.",
+          "When you reach a resource limit, you cannot create more of that resource until you either remove existing ones or upgrade to Pro. Existing resources are never deleted or restricted — only new creation is blocked.",
       },
       {
         question: "Are usage counts real-time?",
         answer:
-          "Yes. All usage counts are computed in real time from your actual data \u2014 there are no cached or delayed counters. When you delete a project or remove a team member, the count updates immediately.",
+          "Yes. All usage counts are computed in real time from your actual data — there are no cached or delayed counters. When you delete a project or remove a team member, the count updates immediately.",
       },
     ],
   },
@@ -124,7 +125,7 @@ const FAQ_DATA = [
       {
         question: "What is audit logging?",
         answer:
-          "Every action in Envpilot is recorded in an audit log \u2014 variable reads, writes, deletions, team changes, permission updates, and more. Audit logs include the action type, user identity, timestamp, IP address, and user agent. Free tier retains logs for 7 days; Pro tier for 365 days.",
+          "Every action in Envpilot is recorded in an audit log — variable reads, writes, deletions, team changes, permission updates, and more. Audit logs include the action type, user identity, timestamp, IP address, and user agent. Free tier retains logs for 7 days; Pro tier for 365 days.",
       },
       {
         question: "Who can access my variables?",
@@ -141,7 +142,7 @@ const FAQ_DATA = [
       {
         question: "What is Secret Sharing?",
         answer:
-          "Secret Sharing lets you generate secure, time-limited links to share individual variables with anyone \u2014 even people outside your organization. Links can be set to expire after a single view or a specific time period. This feature uses email notifications and is available on the Pro plan.",
+          "Secret Sharing lets you generate secure, time-limited links to share individual variables with anyone — even people outside your organization. Links can be set to expire after a single view or a specific time period. This feature uses email notifications and is available on the Pro plan.",
       },
       {
         question: "What is Secret Rotation?",
@@ -178,7 +179,7 @@ const FAQ_DATA = [
       {
         question: "Can I transfer my organization?",
         answer:
-          "Yes. Organization admins can transfer ownership to another admin member through Organization Settings \u2192 Danger Zone.",
+          "Yes. Organization admins can transfer ownership to another admin member through Organization Settings → Danger Zone.",
       },
       {
         question: "How do I delete my account?",
@@ -189,129 +190,56 @@ const FAQ_DATA = [
   },
 ];
 
+// FAQ rich results in Google search, generated from the same data the page
+// renders so the two can't drift apart.
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_DATA.flatMap((section) =>
+    section.items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    }))
+  ),
+};
+
 export default function FAQPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 font-mono text-green-400">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-green-400">$</span>
-            <span className="font-bold text-zinc-100">envpilot</span>
-            <span className="text-xs text-zinc-600">v1.0</span>
-          </Link>
+    <MarketingShell>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <PageHero
+        eyebrow="faq"
+        title="Questions, answered."
+        description={
+          <>
+            Everything you need to know about Envpilot. Can&apos;t find your
+            answer?{" "}
+            <Link
+              href="/support"
+              className="text-green-400 underline-offset-4 hover:underline"
+            >
+              Contact support
+            </Link>
+            .
+          </>
+        }
+      />
 
-          <nav className="hidden items-center gap-6 md:flex">
-            {[
-              { label: "Changelog", href: "/changelog" },
-              { label: "Wishlist", href: "/wishlist" },
-              { label: "Docs", href: "/docs" },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="text-xs text-zinc-500 transition-colors hover:text-green-400"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+      <GlowDivider />
 
-          <div className="flex items-center gap-3">
-            <PublicHeaderButtons />
-          </div>
+      <section className="relative py-20">
+        <div className="mx-auto flex max-w-5xl gap-12 px-4 sm:px-6">
+          {/* Sidebar TOC — client island for scroll-spy */}
+          <ScrollSpySidebar sections={SECTIONS} />
+
+          {/* FAQ content — client island for accordion toggle */}
+          <FAQAccordion sections={FAQ_DATA} />
         </div>
-      </header>
-
-      <main className="pt-14">
-        {/* Hero */}
-        <section className="border-b border-zinc-800/50 py-16">
-          <div className="mx-auto max-w-5xl px-4">
-            <p className="text-xs uppercase tracking-widest text-green-500">
-              {"// help"}
-            </p>
-            <h1 className="mt-2 text-3xl font-bold text-zinc-100 md:text-4xl">
-              Frequently Asked Questions
-            </h1>
-            <p className="mt-3 text-sm text-zinc-500">
-              Everything you need to know about Envpilot &middot; Can&apos;t
-              find your answer?{" "}
-              <Link href="/support" className="text-green-400 hover:underline">
-                Contact support
-              </Link>
-            </p>
-          </div>
-        </section>
-
-        {/* Content with sidebar */}
-        <section className="py-12">
-          <div className="mx-auto flex max-w-5xl gap-12 px-4">
-            {/* Sidebar TOC — client island for scroll-spy */}
-            <ScrollSpySidebar sections={SECTIONS} />
-
-            {/* FAQ content — client island for accordion toggle */}
-            <FAQAccordion sections={FAQ_DATA} />
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-zinc-800/50 py-8">
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-2 text-xs text-zinc-600">
-              <span className="text-green-500">$</span> envpilot --version{" "}
-              <span className="text-zinc-500">1.0.0</span>
-            </div>
-            <div className="flex gap-4 text-xs text-zinc-600">
-              <Link href="/docs" className="hover:text-zinc-400">
-                Docs
-              </Link>
-              <Link href="/changelog" className="hover:text-zinc-400">
-                Changelog
-              </Link>
-              <Link href="/privacy" className="hover:text-zinc-400">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-zinc-400">
-                Terms
-              </Link>
-              <Link href="/faq" className="hover:text-zinc-400">
-                FAQ
-              </Link>
-              <Link href="/support" className="hover:text-zinc-400">
-                Support
-              </Link>
-              <Link href="/contact" className="hover:text-zinc-400">
-                Contact
-              </Link>
-            </div>
-            <div className="text-right text-xs text-zinc-700">
-              <p>&copy; {new Date().getFullYear()} Envpilot</p>
-              <p className="text-[10px] text-zinc-800">
-                Built at{" "}
-                <a
-                  href="https://syntaxlabtechnology.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Syntax Lab Technology
-                </a>{" "}
-                &middot;{" "}
-                <a
-                  href="https://rafay99.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-500"
-                >
-                  Abdul Rafay
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+      </section>
+    </MarketingShell>
   );
 }
