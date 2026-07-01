@@ -180,11 +180,10 @@ export class StatusBarProvider {
     this.lastSyncResult = result;
     this.update();
 
-    if (result.success) {
-      vscode.window.showInformationMessage(
-        `Synced ${result.variablesCount} variables to ${result.targetFile}`
-      );
-    } else {
+    // Successful syncs update the status bar silently — this fires once per
+    // directory on every background sync, so toasts here are pure noise
+    // (manual pulls already show an aggregate notification).
+    if (!result.success) {
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.errorBackground"
       );

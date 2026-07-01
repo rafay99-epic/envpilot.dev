@@ -1,77 +1,54 @@
-import * as Sentry from "@sentry/node";
+/**
+ * Lazy facade over the Sentry chunk. @sentry/node accounts for most of the
+ * extension bundle, so it's built into a separate file (dist/sentry.js, see
+ * scripts/build.mjs) and only required after activation has finished — or
+ * on demand when the first error is captured.
+ */
+type SentryRuntime = typeof import("./sentryRuntime");
 
-declare const __EXTENSION_SENTRY_DSN__: string;
-declare const __EXTENSION_VERSION__: string;
+let runtime: SentryRuntime | null = null;
+let loadFailed = false;
 
-let initialized = false;
+function getRuntime(): SentryRuntime | null {
+  if (runtime || loadFailed) return runtime;
+  try {
+    // "./sentry.js" is marked external in the esbuild config and resolved
+    // at runtime relative to dist/extension.js.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    runtime = require("./sentry.js") as SentryRuntime;
+  } catch {
+    loadFailed = true;
+  }
+  return runtime;
+}
 
 export function initSentry(): void {
-  const dsn =
-    typeof __EXTENSION_SENTRY_DSN__ !== "undefined"
-      ? __EXTENSION_SENTRY_DSN__
-      : "";
-  if (initialized || !dsn) return;
-
-  Sentry.init({
-    dsn,
-    environment: "vscode-extension",
-    release:
-      typeof __EXTENSION_VERSION__ !== "undefined"
-        ? __EXTENSION_VERSION__
-        : "0.0.0",
-
-    // Free tier: disable performance monitoring
-    tracesSampleRate: 0,
-
-    beforeSend(event) {
-      // Strip home directory paths from stack frames for privacy
-      if (event.exception?.values) {
-        for (const exc of event.exception.values) {
-          if (exc.stacktrace?.frames) {
-            for (const frame of exc.stacktrace.frames) {
-              if (frame.filename) {
-                frame.filename = frame.filename.replace(
-                  /\/Users\/[^/]+/g,
-                  "/~"
-                );
-                frame.filename = frame.filename.replace(
-                  /C:\\Users\\[^\\]+/g,
-                  "C:\\~"
-                );
-              }
-            }
-          }
-        }
-      }
-      // Never send request bodies (may contain env variable values)
-      if (event.request?.data) {
-        event.request.data = "[REDACTED]";
-      }
-      return event;
-    },
-  });
-  initialized = true;
+  // Defer the chunk load so it never competes with activation.
+  setTimeout(() => {
+    getRuntime()?.initSentry();
+  }, 0);
 }
 
 export function captureError(
   error: unknown,
   context?: Record<string, unknown>
 ): void {
-  if (!initialized) return;
-  Sentry.captureException(error, { extra: context });
+  const rt = getRuntime();
+  if (!rt) return;
+  rt.initSentry();
+  rt.captureError(error, context);
 }
 
 export function setSentryUser(userId: string, email?: string): void {
-  if (!initialized) return;
-  Sentry.setUser({ id: userId, email });
+  getRuntime()?.setSentryUser(userId, email);
 }
 
 export function clearSentryUser(): void {
-  if (!initialized) return;
-  Sentry.setUser(null);
+  getRuntime()?.clearSentryUser();
 }
 
 export async function closeSentry(): Promise<void> {
-  if (!initialized) return;
-  await Sentry.close(2000);
+  // Only flush if the chunk was ever loaded — don't load it just to close it.
+  if (!runtime) return;
+  await runtime.closeSentry();
 }

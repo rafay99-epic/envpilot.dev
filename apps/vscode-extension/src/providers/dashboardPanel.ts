@@ -114,12 +114,13 @@ export class DashboardPanelProvider implements vscode.Disposable {
       activeProject =
         (await this.syncService.getLinkedProjectV2ForWorkspace()) || null;
 
-      // Try to get variable count for active project
+      // Try to get variable count for active project — metadata only,
+      // the dashboard just needs the count, never the values
       if (activeProject) {
         try {
           const dir = activeProject.directories[0];
           if (dir) {
-            const vars = await this.apiService.getVariables(
+            const vars = await this.apiService.getVariablesMetadata(
               activeProject.projectId,
               dir.environments[0] || "development",
               activeProject.accessToken

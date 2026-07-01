@@ -51,6 +51,14 @@ interface LinkedProjectMetadataV2 {
 export class StorageService {
   private context: vscode.ExtensionContext;
   private migrationComplete = false;
+  /**
+   * In-memory copy of the auth session. Secret storage is an async IPC call
+   * and the API client reads the session on every request — cache it and
+   * invalidate on set/clear. `undefined` means "not loaded yet".
+   */
+  private cachedSession: AuthSession | null | undefined = undefined;
+  /** Serializes metadata read-modify-write cycles from concurrent syncs. */
+  private metadataWriteQueue: Promise<void> = Promise.resolve();
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -142,31 +150,38 @@ export class StorageService {
 
   // Auth Session Management
   async getAuthSession(): Promise<AuthSession | null> {
-    const session = await this.context.secrets.get(AUTH_SESSION_KEY);
-    if (!session) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(session) as AuthSession;
-
-      // Check if session is expired
-      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-        await this.clearAuthSession();
-        return null;
+    if (this.cachedSession === undefined) {
+      const session = await this.context.secrets.get(AUTH_SESSION_KEY);
+      if (!session) {
+        this.cachedSession = null;
+      } else {
+        try {
+          this.cachedSession = JSON.parse(session) as AuthSession;
+        } catch {
+          this.cachedSession = null;
+        }
       }
+    }
 
-      return parsed;
-    } catch {
+    // Check if session is expired
+    if (
+      this.cachedSession?.expiresAt &&
+      Date.now() > this.cachedSession.expiresAt
+    ) {
+      await this.clearAuthSession();
       return null;
     }
+
+    return this.cachedSession;
   }
 
   async setAuthSession(session: AuthSession): Promise<void> {
+    this.cachedSession = session;
     await this.context.secrets.store(AUTH_SESSION_KEY, JSON.stringify(session));
   }
 
   async clearAuthSession(): Promise<void> {
+    this.cachedSession = null;
     await this.context.secrets.delete(AUTH_SESSION_KEY);
   }
 
@@ -602,9 +617,22 @@ export class StorageService {
   }
 
   /**
-   * Update a directory's sync timestamp - V2 format
+   * Update a directory's sync timestamp - V2 format.
+   * Queued so concurrent directory syncs don't clobber each other's
+   * read-modify-write of the shared metadata array.
    */
   async updateDirectorySyncTime(
+    projectId: string,
+    directoryPath: string
+  ): Promise<void> {
+    const task = this.metadataWriteQueue.then(() =>
+      this.doUpdateDirectorySyncTime(projectId, directoryPath)
+    );
+    this.metadataWriteQueue = task.catch(() => {});
+    return task;
+  }
+
+  private async doUpdateDirectorySyncTime(
     projectId: string,
     directoryPath: string
   ): Promise<void> {

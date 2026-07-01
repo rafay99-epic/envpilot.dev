@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -38,7 +38,6 @@
     "team"
   ],
   "activationEvents": [
-    "workspaceContains:.env*",
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
@@ -250,6 +249,7 @@
         "envpilot.serverUrl": {
           "type": "string",
           "default": "",
+          "scope": "machine",
           "description": "The URL of the Envpilot server (auto-configured at build time)"
         },
         "envpilot.autoSync": {
@@ -316,6 +316,7 @@
         "envpilot.convexUrl": {
           "type": "string",
           "default": "",
+          "scope": "machine",
           "description": "Convex deployment URL for real-time sync (auto-detected from server if empty)"
         },
         "envpilot.enableCodeLens": {

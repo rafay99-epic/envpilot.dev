@@ -151,23 +151,34 @@ export async function activate(context: vscode.ExtensionContext) {
   syncService.setClipboardGuard(clipboardGuardService);
   realTimeSyncService = new RealTimeSyncService(syncService, storageService);
 
-  // Initialize Convex WebSocket connection
-  await initializeConvexService();
+  // Initialize Convex WebSocket connection in the background — the
+  // auto-detect path makes an HTTP call (up to 5s) that must not block
+  // activation. Subscriptions are wired up once it resolves.
+  const convexReady = initializeConvexService();
 
-  // Initialize commit guard if enabled
+  // Initialize commit guard in the background if enabled — it activates the
+  // Git extension and spawns git processes, which is too slow for activation.
   if (isCommitGuardEnabled()) {
-    await gitCommitGuardService.initialize();
-
-    // Show one-time notification about commit guard
-    const guardNotified = context.globalState.get<boolean>(
-      "envpilot.commitGuardNotified"
-    );
-    if (!guardNotified) {
-      vscode.window.showInformationMessage(
-        "Envpilot: .env commit guard is active. A pre-commit hook has been installed to protect your secrets."
-      );
-      context.globalState.update("envpilot.commitGuardNotified", true);
-    }
+    void gitCommitGuardService
+      .initialize()
+      .then(() => {
+        // Show one-time notification about commit guard
+        const guardNotified = context.globalState.get<boolean>(
+          "envpilot.commitGuardNotified"
+        );
+        if (!guardNotified) {
+          vscode.window.showInformationMessage(
+            "Envpilot: .env commit guard is active. A pre-commit hook has been installed to protect your secrets."
+          );
+          context.globalState.update("envpilot.commitGuardNotified", true);
+        }
+      })
+      .catch((err) => {
+        captureError(err);
+        output.error(
+          `Commit guard initialization failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      });
   }
 
   // Initialize UI providers
@@ -296,15 +307,19 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Start reactive sync if authenticated and auto-sync enabled
   if (isAuthenticated && shouldAutoSync()) {
-    syncService.startPeriodicSync();
-    realTimeSyncService.startRealTimeSync();
-
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
-      syncService.syncAllDirectories(linkedProject);
+      void syncService.syncAllDirectories(linkedProject);
     }
 
     await updateContextFlags();
+
+    // WebSocket subscriptions need the Convex connection — start them as
+    // soon as it's ready instead of holding up activation.
+    void convexReady.then(() => {
+      syncService.startPeriodicSync();
+      realTimeSyncService.startRealTimeSync();
+    });
   }
 
   // Check for extension updates (non-blocking)
@@ -382,6 +397,7 @@ async function handleSignIn(): Promise<void> {
 
 async function handleSignOut(): Promise<void> {
   await authService.signOut();
+  apiService.clearCache();
   syncService.stopPeriodicSync();
   realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
@@ -896,18 +912,20 @@ async function handlePullVariables(): Promise<void> {
       statusBarProvider.setSyncing(true);
       dashboardPanelProvider.notifySyncStarted();
 
-      // Sync all linked projects (V2)
+      // Sync all linked projects (V2) in parallel
       const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
       if (allLinkedProjects.length > 0) {
+        const resultsPerProject = await Promise.all(
+          allLinkedProjects.map((project) =>
+            syncService.syncAllDirectories(project)
+          )
+        );
+
         let totalSuccessful = 0;
         let totalDirs = 0;
-
-        for (const project of allLinkedProjects) {
-          const results = await syncService.syncAllDirectories(project);
-          if (results) {
-            totalSuccessful += results.filter((r) => r.success).length;
-            totalDirs += results.length;
-          }
+        for (const results of resultsPerProject) {
+          totalSuccessful += results.filter((r) => r.success).length;
+          totalDirs += results.length;
         }
 
         statusBarProvider.setSyncing(false);
@@ -943,6 +961,8 @@ async function handlePullVariables(): Promise<void> {
 }
 
 function handleRefresh(): void {
+  // Manual refresh should always hit the server, not the response cache
+  apiService.clearCache();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
   statusBarProvider.update();
