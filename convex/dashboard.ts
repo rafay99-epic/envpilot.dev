@@ -27,22 +27,32 @@ export const getStats = query({
       .collect();
     const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
-    // Get variables only for projects in this organization
-    const variablesNested = await Promise.all(
-      projects.map(async (project) => {
-        const projectVars = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect();
-        return projectVars.filter(
-          (variable) => variable.deletedAt === undefined
-        );
-      })
-    );
-    const variables = variablesNested.flat();
-
-    // Count encrypted (sensitive) variables
-    const encryptedCount = variables.filter((v) => v.isSensitive).length;
+    // Count variables + sensitive variables with a bounded global scan.
+    // Collecting every variable of every project re-ran on every variable
+    // write and could blow the read budget for a variable-heavy org. We cap the
+    // total documents scanned across all projects; if the cap is hit the totals
+    // are approximate (marked via `approximate`).
+    const VARIABLE_SCAN_CAP = 2000;
+    let variablesTotal = 0;
+    let encryptedCount = 0;
+    let variablesCapped = false;
+    let variableBudget = VARIABLE_SCAN_CAP;
+    for (const project of projects) {
+      if (variableBudget <= 0) {
+        variablesCapped = true;
+        break;
+      }
+      const projectVars = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .take(variableBudget);
+      variableBudget -= projectVars.length;
+      for (const variable of projectVars) {
+        if (variable.deletedAt !== undefined) continue;
+        variablesTotal++;
+        if (variable.isSensitive) encryptedCount++;
+      }
+    }
 
     // Get organization members count
     const members = await ctx.db
@@ -60,7 +70,11 @@ export const getStats = query({
       )
       .collect();
 
-    // Get audit logs from last 7 days
+    // Get audit logs from last 7 days. Every mutation in the app writes an
+    // auditLogs row, so an unbounded collect here re-reads the entire week's
+    // audit trail on every write. Cap the scan; the count saturates at the cap
+    // ("500+" semantics via the `capped` flag below).
+    const AUDIT_EVENT_CAP = 500;
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const recentAuditLogs = await ctx.db
       .query("auditLogs")
@@ -69,7 +83,7 @@ export const getStats = query({
           .eq("organizationId", args.organizationId)
           .gte("createdAt", sevenDaysAgo)
       )
-      .collect();
+      .take(AUDIT_EVENT_CAP);
 
     // Get projects created this month
     const startOfMonth = new Date();
@@ -85,14 +99,19 @@ export const getStats = query({
         thisMonth: projectsThisMonth,
       },
       variables: {
-        total: variables.length,
+        total: variablesTotal,
         encrypted: encryptedCount,
+        // True when the variable scan hit VARIABLE_SCAN_CAP; totals are a
+        // lower-bound approximation in that case.
+        approximate: variablesCapped,
       },
       team: {
         total: members.length,
       },
       auditEvents: {
         last7Days: recentAuditLogs.length,
+        // True when the count saturated at AUDIT_EVENT_CAP ("500+").
+        capped: recentAuditLogs.length >= AUDIT_EVENT_CAP,
       },
       pendingRequests: {
         total: pendingRequests.length,
@@ -140,14 +159,16 @@ export const getRecentActivity = query({
       );
     }
 
-    // Over-fetch so that after scope filtering we can still return ~10 rows.
+    // Over-fetch (developers only) so that after project-scope filtering we can
+    // still return ~10 rows. 40 is a tighter bound than the old 100 that still
+    // yields ~10 visible rows in practice while cutting audit reads 60%.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
       .order("desc")
-      .take(assignedProjectIds ? 100 : 10);
+      .take(assignedProjectIds ? 40 : 10);
 
     // Developer scope: keep org-level entries (no projectId) and entries for
     // assigned projects only.
@@ -209,15 +230,21 @@ export const getRecentProjects = query({
       .filter((p) => p.deletedAt === undefined)
       .slice(0, 5);
 
+    // Cap the per-project variable read. Collecting every variable of each of
+    // the 5 shown projects re-ran on every variable write; for a "recent
+    // projects" widget an approximate count is fine. When a project has more
+    // than the cap, variableCount saturates and variableCountCapped is true
+    // (render as e.g. "100+").
+    const VARIABLE_COUNT_CAP = 100;
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
         const projectVars = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect();
-        const variables = projectVars.filter(
+          .take(VARIABLE_COUNT_CAP);
+        const variableCount = projectVars.filter(
           (variable) => variable.deletedAt === undefined
-        );
+        ).length;
 
         return {
           _id: project._id,
@@ -227,7 +254,8 @@ export const getRecentProjects = query({
           icon: project.icon,
           color: project.color,
           createdAt: project.createdAt,
-          variableCount: variables.length,
+          variableCount,
+          variableCountCapped: projectVars.length >= VARIABLE_COUNT_CAP,
         };
       })
     );
@@ -368,13 +396,19 @@ export const getAnalytics = query({
     const daysBack = effectiveDays;
     const startTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
 
-    // Single audit log fetch for both summary + project breakdown
+    // Single audit log fetch for both summary + project breakdown. Capped so
+    // audit-heavy orgs can't blow the read budget on this window scan. We take
+    // the most recent AUDIT_LOG_CAP events (order desc); when the cap is hit the
+    // aggregations reflect only the newest events in the window (see
+    // `logsCapped` in the return).
+    const AUDIT_LOG_CAP = 2000;
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
         q.eq("organizationId", args.organizationId).gte("createdAt", startTime)
       )
-      .collect();
+      .order("desc")
+      .take(AUDIT_LOG_CAP);
 
     // Fetch all non-deleted projects
     const allProjects = await ctx.db
@@ -523,6 +557,9 @@ export const getAnalytics = query({
     return {
       // Summary data
       totalEvents: logs.length,
+      // True when the audit scan saturated at AUDIT_LOG_CAP; aggregations then
+      // cover only the most recent events in the window.
+      logsCapped: logs.length >= AUDIT_LOG_CAP,
       actionCounts,
       severityCounts,
       resourceTypeCounts,

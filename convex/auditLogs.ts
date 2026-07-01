@@ -31,6 +31,16 @@ async function getRetentionCutoff(
   if (days === null) return null; // unlimited
   return Date.now() - days * 24 * 60 * 60 * 1000;
 }
+
+// Read caps. auditLogs is the fastest-growing table (one row per mutation), and
+// Convex has no O(1) count, so every org-wide read must be bounded by an index
+// range plus a take() cap. Aggregations report `capped: true` when the cap is
+// hit so callers can surface an "approximate / showing first N" hint.
+const COUNT_CAP = 1000; // countByOrganization
+const SUMMARY_CAP = 5000; // getSummary
+const REPORT_CAP = 5000; // getComplianceReport
+const ALERT_COUNT_CAP = 5000; // getAlertCount
+
 // ==========================================
 // BASIC QUERIES
 // ==========================================
@@ -44,22 +54,20 @@ export const listByOrganization = query({
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
 
+    // Push the retention cutoff into the index range so the DB never scans rows
+    // older than the retention window.
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
       .order("desc")
       .take(limit + (args.offset ?? 0));
 
     const offsetLogs = args.offset ? logs.slice(args.offset) : logs;
-    const resultLogs = offsetLogs.slice(0, limit);
-
-    // Apply audit log retention cutoff
-    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
-    const retainedLogs = cutoff
-      ? resultLogs.filter((log) => log.createdAt >= cutoff)
-      : resultLogs;
+    const retainedLogs = offsetLogs.slice(0, limit);
 
     const userMap = await batchGetUsers(
       ctx,
@@ -81,17 +89,20 @@ export const countByOrganization = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
+    // Push the retention cutoff into the index range so only in-range rows are
+    // read, and cap with take() so the read can't grow with org history. For
+    // histories larger than COUNT_CAP this returns COUNT_CAP (approximate).
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-    return retainedLogs.length;
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
+      .take(COUNT_CAP);
+
+    return logs.length;
   },
 });
 
@@ -107,7 +118,8 @@ export const listByProject = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    // Apply retention cutoff via project -> org
+    // Apply retention cutoff via project -> org. The by_project index is not
+    // org-scoped, so the cutoff is applied in memory on the bounded result set.
     const project = await ctx.db.get(args.projectId);
     const cutoff = project
       ? await getRetentionCutoff(ctx.db, project.organizationId)
@@ -143,7 +155,9 @@ export const listByVariable = query({
       .order("desc")
       .take(args.limit ?? 50);
 
-    // Apply retention cutoff via variable -> project -> org
+    // Apply retention cutoff via variable -> project -> org. The by_variable
+    // index is not org-scoped, so the cutoff is applied in memory on the
+    // bounded result set.
     const variable = await ctx.db.get(args.variableId);
     const project = variable ? await ctx.db.get(variable.projectId) : null;
     const cutoff = project
@@ -175,27 +189,29 @@ export const listByUser = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    let logsQuery = ctx.db
+    const limit = args.limit ?? 50;
+    const orgId = args.organizationId;
+
+    // There is no composite user+org index, so when scoping to an org we fetch
+    // a bounded window by user (via the by_user_and_created index) and filter
+    // it in memory — never a db `.filter` scan of the whole table.
+    const fetchCount = orgId ? Math.max(limit, 500) : limit;
+    let logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId));
+      .withIndex("by_user_and_created", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(fetchCount);
 
-    if (args.organizationId) {
-      logsQuery = logsQuery.filter((q) =>
-        q.eq(q.field("organizationId"), args.organizationId)
-      );
+    if (orgId) {
+      logs = logs.filter((l) => l.organizationId === orgId);
+      const cutoff = await getRetentionCutoff(ctx.db, orgId);
+      if (cutoff) logs = logs.filter((l) => l.createdAt >= cutoff);
     }
 
-    const logs = await logsQuery.order("desc").take(args.limit ?? 50);
-
-    // Apply retention cutoff if org context available
-    let retainedLogs = logs;
-    if (args.organizationId) {
-      const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
-      if (cutoff) retainedLogs = logs.filter((l) => l.createdAt >= cutoff);
-    }
+    const limitedLogs = logs.slice(0, limit);
 
     const logsWithDetails = await Promise.all(
-      retainedLogs.map(async (log) => {
+      limitedLogs.map(async (log) => {
         const org = await ctx.db.get(log.organizationId);
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
         return {
@@ -218,12 +234,16 @@ export const listByAction = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Use the by_org_and_action index so only rows for this org+action are
+    // read (bounded by take), instead of scanning all org rows with a db
+    // `.filter`. The index appends _creationTime (not our createdAt field),
+    // so the retention cutoff is applied in memory on the bounded result set.
+    const action = args.action as Doc<"auditLogs">["action"];
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_org_and_action", (q) =>
+        q.eq("organizationId", args.organizationId).eq("action", action)
       )
-      .filter((q) => q.eq(q.field("action"), args.action))
       .order("desc")
       .take(args.limit ?? 50);
 
@@ -282,18 +302,18 @@ export const listSecurityEvents = query({
 
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
+    // Push the retention cutoff into the index range, then take a bounded
+    // window and narrow to security actions in memory.
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
       .order("desc")
       .take(1000);
 
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-    let securityLogs = retainedLogs.filter((log) =>
+    let securityLogs = logs.filter((log) =>
       securityActions.includes(log.action)
     );
 
@@ -341,24 +361,28 @@ export const listSensitiveDataAccess = query({
 
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
-    const logsQuery = ctx.db
+    // The retention cutoff and an explicit startTime both bound the low end of
+    // the createdAt range; use the larger of the two in the index range so the
+    // DB reads as few rows as possible.
+    const lowerBound =
+      args.startTime != null && cutoff != null
+        ? Math.max(args.startTime, cutoff)
+        : (args.startTime ?? cutoff);
+
+    const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .order("desc");
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return lowerBound != null ? base.gte("createdAt", lowerBound) : base;
+      })
+      .order("desc")
+      .take(2000);
 
-    const logs = await logsQuery.take(2000);
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-
-    const sensitiveAccessLogs = retainedLogs.filter((log) => {
+    const sensitiveAccessLogs = logs.filter((log) => {
       // Check if it's an access action
       if (!accessActions.includes(log.action)) return false;
 
-      // Filter by time range if specified
-      if (args.startTime && log.createdAt < args.startTime) return false;
+      // Filter by upper time bound if specified (lower bound handled by index)
       if (args.endTime && log.createdAt > args.endTime) return false;
 
       // Filter for sensitive data only
@@ -447,20 +471,22 @@ export const listPermissionChanges = query({
 
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
+    const lowerBound =
+      args.startTime != null && cutoff != null
+        ? Math.max(args.startTime, cutoff)
+        : (args.startTime ?? cutoff);
+
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return lowerBound != null ? base.gte("createdAt", lowerBound) : base;
+      })
       .order("desc")
       .take(2000);
 
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-    const permissionLogs = retainedLogs.filter((log) => {
+    const permissionLogs = logs.filter((log) => {
       if (!permissionActions.includes(log.action)) return false;
-      if (args.startTime && log.createdAt < args.startTime) return false;
       if (args.endTime && log.createdAt > args.endTime) return false;
       return true;
     });
@@ -533,16 +559,15 @@ export const listByTimeRange = query({
       ? Math.max(args.startTime, cutoff)
       : args.startTime;
 
+    // Both bounds of the time range are served by the by_org_and_created index
+    // range instead of a post-scan db `.filter`.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("createdAt"), effectiveStartTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
+        q
+          .eq("organizationId", args.organizationId)
+          .gte("createdAt", effectiveStartTime)
+          .lte("createdAt", args.endTime)
       )
       .order("desc")
       .take(args.limit ?? 500);
@@ -600,13 +625,18 @@ export const getSummary = query({
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const startTime = cutoff ? Math.max(rawStartTime, cutoff) : rawStartTime;
 
+    // Serve the time window from the index range and cap the read so it can't
+    // grow unbounded with org history. `capped` signals the aggregation ran on
+    // a truncated (most-recent) window.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId).gte("createdAt", startTime)
       )
-      .filter((q) => q.gte(q.field("createdAt"), startTime))
-      .collect();
+      .order("desc")
+      .take(SUMMARY_CAP);
+
+    const capped = logs.length >= SUMMARY_CAP;
 
     const actionCounts: Record<string, number> = {};
     const userActivityCounts: Record<string, number> = {};
@@ -679,6 +709,7 @@ export const getSummary = query({
       sensitiveAccessCount,
       securityEventCount,
       periodDays: daysBack,
+      capped,
     };
   },
 });
@@ -699,18 +730,19 @@ export const getComplianceReport = query({
       ? Math.max(args.startTime, cutoff)
       : args.startTime;
 
+    // Serve the reporting window from the index range and cap the read.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q
+          .eq("organizationId", args.organizationId)
+          .gte("createdAt", effectiveStartTime)
+          .lte("createdAt", args.endTime)
       )
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("createdAt"), effectiveStartTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
-      )
-      .collect();
+      .order("desc")
+      .take(REPORT_CAP);
+
+    const capped = logs.length >= REPORT_CAP;
 
     // Calculate metrics
     const variableAccessLogs = logs.filter(
@@ -777,6 +809,7 @@ export const getComplianceReport = query({
         permissionChangesLogged: true,
         securityEventsMonitored: true,
       },
+      capped,
     };
   },
 });
@@ -802,16 +835,15 @@ export const getForExport = query({
       ? Math.max(args.startTime, cutoff)
       : args.startTime;
 
+    // Serve both time bounds from the index range instead of a post-scan
+    // db `.filter`.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("createdAt"), effectiveStartTime),
-          q.lte(q.field("createdAt"), args.endTime)
-        )
+        q
+          .eq("organizationId", args.organizationId)
+          .gte("createdAt", effectiveStartTime)
+          .lte("createdAt", args.endTime)
       )
       .order("desc")
       .take(10000); // Limit for performance
@@ -898,18 +930,18 @@ export const getRecentAlerts = query({
     const limit = args.limit ?? 10;
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
+    // Push the retention cutoff into the index range, then narrow to
+    // alert-severity events in memory on the bounded window.
     const logs = await ctx.db
       .query("auditLogs")
-      .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
       .order("desc")
       .take(500);
 
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-    const alertLogs = retainedLogs.filter(
+    const alertLogs = logs.filter(
       (log) => log.severity === "critical" || log.severity === "warning"
     );
 
@@ -943,13 +975,17 @@ export const getAlertCount = query({
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const effectiveSince = cutoff ? Math.max(sinceTime, cutoff) : sinceTime;
 
+    // Serve the "since" lower bound from the index range and cap the read so
+    // it can't grow unbounded.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_org_and_created", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q
+          .eq("organizationId", args.organizationId)
+          .gte("createdAt", effectiveSince)
       )
-      .filter((q) => q.gte(q.field("createdAt"), effectiveSince))
-      .collect();
+      .order("desc")
+      .take(ALERT_COUNT_CAP);
 
     const criticalCount = logs.filter(
       (log) => log.severity === "critical"
@@ -966,6 +1002,7 @@ export const getAlertCount = query({
       critical: criticalCount,
       warning: warningCount,
       securityEvents: securityCount,
+      capped: logs.length >= ALERT_COUNT_CAP,
     };
   },
 });

@@ -18,7 +18,6 @@ import { rateLimiter } from "./rateLimits";
 import { authorizeVariableAccess, requireVariableAccess } from "./authHelpers";
 import {
   assertOrgAction,
-  getActiveVariableGrant,
   getVariableAccess,
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
@@ -44,6 +43,31 @@ function assertWithinEnvironmentScope(
   }
 }
 
+/**
+ * Build a variableId → active grant lookup from a caller's grant rows.
+ *
+ * Collapses the same (variable, user) revocation history that
+ * getActiveVariableGrant scans per call into a single Map so list queries
+ * can resolve grants without an indexed read per variable. Mirrors
+ * getActiveVariableGrant's selection exactly: only rows that are active and
+ * unexpired qualify, and the first such row per variable wins (matching its
+ * `.find(...)`). Callers should pass rows already filtered to isActive=true
+ * (e.g. via the by_user_active index).
+ */
+function buildActiveGrantMap(
+  grants: Doc<"variablePermissions">[]
+): Map<string, Doc<"variablePermissions">> {
+  const now = Date.now();
+  const byVariable = new Map<string, Doc<"variablePermissions">>();
+  for (const grant of grants) {
+    if (!grant.isActive) continue;
+    if (grant.expiresAt && grant.expiresAt <= now) continue;
+    const key = grant.variableId as string;
+    if (!byVariable.has(key)) byVariable.set(key, grant);
+  }
+  return byVariable;
+}
+
 // ==========================================
 // QUERIES
 // ==========================================
@@ -52,12 +76,13 @@ export const listByProject = query({
   args: {
     projectId: v.id("projects"),
     environment: v.optional(v.string()),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
+      .take(args.limit ?? 500);
     const variables = allVariables.filter(
       (variable) => variable.deletedAt === undefined
     );
@@ -75,8 +100,10 @@ export const listByProject = query({
 export const listByOrganization = query({
   args: {
     organizationId: v.id("organizations"),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const perProjectLimit = args.limit ?? 500;
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -92,7 +119,7 @@ export const listByOrganization = query({
         const allVariables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect();
+          .take(perProjectLimit);
         const variables = allVariables.filter(
           (variable) => variable.deletedAt === undefined
         );
@@ -127,6 +154,7 @@ export const listOrgVariablesWithAccess = query({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Resolve the caller's org role — non-members get nothing.
@@ -173,6 +201,19 @@ export const listOrgVariablesWithAccess = query({
     const roleWrite =
       isOwner || orgRole === "project_manager" || orgRole === "team_lead";
 
+    // Prefetch the caller's active grants ONCE (only developers consult them,
+    // but a single indexed query is far cheaper than one per variable).
+    const grantByVariable = buildActiveGrantMap(
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_user_active", (q) =>
+          q.eq("userId", args.userId).eq("isActive", true)
+        )
+        .collect()
+    );
+
+    const perProjectLimit = args.limit ?? 500;
+
     const results: Array<
       Omit<Doc<"environmentVariables">, "vaultRef"> & {
         vaultRef?: string;
@@ -192,7 +233,7 @@ export const listOrgVariablesWithAccess = query({
       const allVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
+        .take(perProjectLimit);
 
       // Scoped developers never receive out-of-scope variables at all.
       const variables = allVariables.filter(
@@ -206,12 +247,8 @@ export const listOrgVariablesWithAccess = query({
         if (roleWrite) {
           access = "write";
         } else {
-          // Developer — resolve per-variable grant
-          const grant = await getActiveVariableGrant(
-            ctx,
-            args.userId,
-            variable._id
-          );
+          // Developer — resolve per-variable grant from the prefetched map
+          const grant = grantByVariable.get(variable._id as string) ?? null;
           if (grant) {
             access = grant.permission === "read" ? "read" : "write";
           }
@@ -357,6 +394,7 @@ export const listWithAccess = query({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -407,7 +445,7 @@ export const listWithAccess = query({
     const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
+      .take(args.limit ?? 500);
     // Scoped developers never receive out-of-scope variables at all —
     // not even their metadata/keys
     const variables = allVariables.filter(
@@ -416,13 +454,23 @@ export const listWithAccess = query({
         isEnvironmentScopeAllowed(environmentScope, variable.environments)
     );
 
+    // Prefetch the caller's active grants ONCE instead of one indexed query
+    // per variable (getActiveVariableGrant N+1). by_user_active already
+    // filters to isActive=true; drop expired grants and dedupe to the first
+    // active/unexpired grant per variable — the exact row
+    // getActiveVariableGrant would have returned.
+    const grantByVariable = buildActiveGrantMap(
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_user_active", (q) =>
+          q.eq("userId", args.userId).eq("isActive", true)
+        )
+        .collect()
+    );
+
     const variablesWithAccess = await Promise.all(
       variables.map(async (variable) => {
-        const grant = await getActiveVariableGrant(
-          ctx,
-          args.userId,
-          variable._id
-        );
+        const grant = grantByVariable.get(variable._id as string) ?? null;
 
         // Mirrors getVariableAccess: owner → write; assigned PM/TL → write;
         // developers per grant; unassigned grant holders capped at read.
@@ -472,12 +520,13 @@ export const listMetadataByProject = query({
   args: {
     projectId: v.id("projects"),
     environment: v.optional(v.string()),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
+      .take(args.limit ?? 500);
     const variables = allVariables.filter(
       (variable) => variable.deletedAt === undefined
     );
@@ -502,8 +551,10 @@ export const search = query({
   args: {
     organizationId: v.id("organizations"),
     searchTerm: v.string(),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const resultLimit = args.limit ?? 100;
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -518,10 +569,12 @@ export const search = query({
     const results = [];
 
     for (const project of projects) {
+      // Cap the per-project read and stop scanning projects once the result
+      // budget is filled, so a large org never reads its entire variable set.
       const allVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
+        .take(resultLimit);
       const variables = allVariables.filter(
         (variable) => variable.deletedAt === undefined
       );
@@ -539,9 +592,11 @@ export const search = query({
           projectSlug: project.slug,
         }))
       );
+
+      if (results.length >= resultLimit) break;
     }
 
-    return results;
+    return results.slice(0, resultLimit);
   },
 });
 
@@ -580,19 +635,30 @@ export const globalSearchWithAccess = query({
       { _id: string; name: string; color: string }
     >();
 
-    const cacheTagsFor = async (variable: Doc<"environmentVariables">) => {
-      if (!variable.tagIds) return;
-      for (const tagId of variable.tagIds) {
-        const tagIdStr = tagId as string;
-        if (!tagCache.has(tagIdStr)) {
-          const tag = await ctx.db.get(tagId);
-          if (tag && !tag.deletedAt) {
-            tagCache.set(tagIdStr, {
-              _id: tagIdStr,
-              name: tag.name,
-              color: tag.color,
-            });
-          }
+    // Batch tag resolution: collect the union of not-yet-cached tag ids across
+    // a set of variables and fetch each unique tag exactly once (in parallel)
+    // instead of a sequential get per (variable, tag). tagCache dedupes across
+    // the whole search so a shared tag is never fetched twice.
+    const preloadTags = async (vars: Doc<"environmentVariables">[]) => {
+      const missing = new Set<string>();
+      for (const variable of vars) {
+        if (!variable.tagIds) continue;
+        for (const tagId of variable.tagIds) {
+          const tagIdStr = tagId as string;
+          if (!tagCache.has(tagIdStr)) missing.add(tagIdStr);
+        }
+      }
+      if (missing.size === 0) return;
+      const fetched = await Promise.all(
+        [...missing].map((id) => ctx.db.get(id as Id<"variableTags">))
+      );
+      for (const tag of fetched) {
+        if (tag && !tag.deletedAt) {
+          tagCache.set(tag._id as string, {
+            _id: tag._id as string,
+            name: tag.name,
+            color: tag.color,
+          });
         }
       }
     };
@@ -746,10 +812,8 @@ export const globalSearchWithAccess = query({
           (variable) => variable.deletedAt === undefined
         );
 
-        // Resolve tags for variables in this project batch
-        for (const variable of variables) {
-          await cacheTagsFor(variable);
-        }
+        // Resolve tags for variables in this project batch (one batched fetch)
+        await preloadTags(variables);
 
         // Scoped developers never receive out-of-scope variables at all —
         // not even their metadata/keys
@@ -827,7 +891,7 @@ export const globalSearchWithAccess = query({
         const org = await ctx.db.get(project.organizationId);
         if (!org) continue;
 
-        await cacheTagsFor(variable);
+        await preloadTags([variable]);
         if (!matchesSearch(variable)) continue;
 
         const resolvedTags = resolveTagsFor(variable);
@@ -1817,6 +1881,7 @@ export const listExpiringVariables = query({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Verify caller is a member of the organization
@@ -1859,13 +1924,30 @@ export const listExpiringVariables = query({
         q.eq("organizationId", args.organizationId)
       )
       .collect();
-    const projects = allProjects.filter(
-      (project) =>
-        project.deletedAt === undefined &&
-        (isOwner || assignedProjectIds.has(project._id as string))
-    );
+    // Map accessible (live + owner/assigned) projects for O(1) lookup by id.
+    const accessibleProjects = new Map<string, Doc<"projects">>();
+    for (const project of allProjects) {
+      if (project.deletedAt !== undefined) continue;
+      if (isOwner || assignedProjectIds.has(project._id as string)) {
+        accessibleProjects.set(project._id as string, project);
+      }
+    }
 
     const sevenDaysFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
+    const resultLimit = args.limit ?? 100;
+
+    // Read ONLY variables whose expiry falls in the next 7 days via the
+    // by_expires_at index, instead of collecting every variable in every
+    // accessible project. `.gt(0)` skips rows with no expiry (undefined sorts
+    // before 0). The range is a narrow time window so it stays small; we then
+    // filter to this caller's accessible projects and env scope.
+    const expiringDocs = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_expires_at", (q) =>
+        q.gt("expiresAt", 0).lte("expiresAt", sevenDaysFromNow)
+      )
+      .collect();
+
     const results: Array<{
       _id: Id<"environmentVariables">;
       key: string;
@@ -1876,43 +1958,37 @@ export const listExpiringVariables = query({
       rotationFrequencyDays: number;
     }> = [];
 
-    for (const project of projects) {
+    for (const variable of expiringDocs) {
+      if (variable.deletedAt !== undefined) continue;
+      if (!variable.rotationFrequencyDays) continue;
+      if (variable.expiresAt === undefined) continue;
+
+      const project = accessibleProjects.get(variable.projectId as string);
+      if (!project) continue;
+
+      // Scoped developers never receive out-of-scope variables.
       const environmentScope =
         orgRole === "developer"
-          ? scopeByProject.get(project._id as string)
+          ? scopeByProject.get(variable.projectId as string)
           : undefined;
-
-      const allVariables = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
-      // Scoped developers never receive out-of-scope variables.
-      const variables = allVariables.filter(
-        (variable) =>
-          variable.deletedAt === undefined &&
-          isEnvironmentScopeAllowed(environmentScope, variable.environments)
-      );
-
-      for (const v of variables) {
-        if (
-          v.expiresAt &&
-          v.expiresAt <= sevenDaysFromNow &&
-          v.rotationFrequencyDays
-        ) {
-          results.push({
-            _id: v._id,
-            key: v.key,
-            projectName: project.name,
-            projectId: project._id,
-            expiresAt: v.expiresAt,
-            rotationStatus: v.rotationStatus ?? "active",
-            rotationFrequencyDays: v.rotationFrequencyDays,
-          });
-        }
+      if (!isEnvironmentScopeAllowed(environmentScope, variable.environments)) {
+        continue;
       }
+
+      results.push({
+        _id: variable._id,
+        key: variable.key,
+        projectName: project.name,
+        projectId: project._id,
+        expiresAt: variable.expiresAt,
+        rotationStatus: variable.rotationStatus ?? "active",
+        rotationFrequencyDays: variable.rotationFrequencyDays,
+      });
     }
 
-    return results.sort((a, b) => a.expiresAt - b.expiresAt);
+    return results
+      .sort((a, b) => a.expiresAt - b.expiresAt)
+      .slice(0, resultLimit);
   },
 });
 
@@ -1940,11 +2016,15 @@ export const getRotationHistory = query({
       .first();
     if (!membership) return [];
 
+    // The response is capped at 50 rotation events, so we only need the most
+    // recent audit logs — bound the read instead of collecting a variable's
+    // entire audit history. 200 leaves generous headroom for interleaved
+    // non-rotation actions while keeping the read cost fixed.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
       .order("desc")
-      .collect();
+      .take(200);
 
     return logs
       .filter(
@@ -1971,13 +2051,25 @@ export const processRotationExpiry = internalMutation({
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const oneDay = 24 * 60 * 60 * 1000;
 
-    // Fetch all variables and filter in JS — deletedAt is an optional field,
-    // so the non-deleted check happens after collection
-    const allDocs = await ctx.db.query("environmentVariables").collect();
-    const allVars = allDocs.filter((doc) => doc.deletedAt === undefined);
+    // Only variables with an expiry set AND already within the 7-day horizon
+    // can trigger any status transition or reminder below (expired ≤ now,
+    // expiring_soon ≤ now+7d, 1-day reminder ⊂ expiring_soon). Bound the read
+    // tightly via the by_expires_at index instead of scanning the whole table
+    // hourly. `.gt(0)` excludes rows where expiresAt is undefined (they sort
+    // before 0), so non-rotating variables are never read.
+    const expiryHorizon = now + sevenDays;
+    const expiringDocs = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_expires_at", (q) =>
+        q.gt("expiresAt", 0).lte("expiresAt", expiryHorizon)
+      )
+      .collect();
 
-    const rotatingVariables = allVars.filter(
+    // deletedAt is an optional field, so the non-deleted check happens in JS.
+    // rotationFrequencyDays must be a live rotation schedule.
+    const rotatingVariables = expiringDocs.filter(
       (v) =>
+        v.deletedAt === undefined &&
         v.expiresAt !== undefined &&
         v.rotationFrequencyDays !== undefined &&
         v.rotationFrequencyDays > 0

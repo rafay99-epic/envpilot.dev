@@ -590,48 +590,59 @@ export const getUsersWithProjectAccess = query({
         .collect()
     ).filter((variable) => !variable.deletedAt);
 
+    // variablePermissions has no project-scoped index, so one indexed read per
+    // variable is the minimum. Run them concurrently (instead of awaiting in a
+    // sequential loop) and fold into the user map in a single pass. Promise.all
+    // preserves order, so the resulting user ordering matches the old loop.
+    const permsPerVariable = await Promise.all(
+      variables.map(async (variable) => ({
+        variable,
+        permissions: (
+          await ctx.db
+            .query("variablePermissions")
+            .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+            .collect()
+        ).filter((p) => p.isActive),
+      }))
+    );
+
     const userPermissions = new Map<
       string,
       { userId: Id<"users">; variables: { key: string; permission: string }[] }
     >();
 
-    for (const variable of variables) {
-      const permissions = (
-        await ctx.db
-          .query("variablePermissions")
-          .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-          .collect()
-      ).filter((p) => p.isActive);
-
+    for (const { variable, permissions } of permsPerVariable) {
       for (const perm of permissions) {
         const userIdStr = perm.userId.toString();
-        if (!userPermissions.has(userIdStr)) {
-          userPermissions.set(userIdStr, {
-            userId: perm.userId,
-            variables: [],
-          });
+        let entry = userPermissions.get(userIdStr);
+        if (!entry) {
+          entry = { userId: perm.userId, variables: [] };
+          userPermissions.set(userIdStr, entry);
         }
-        userPermissions.get(userIdStr)!.variables.push({
+        entry.variables.push({
           key: variable.key,
           permission: perm.permission,
         });
       }
     }
 
-    const result = await Promise.all(
-      Array.from(userPermissions.values()).map(async (entry) => {
-        const user = await ctx.db.get(entry.userId);
+    // Resolve distinct users once (deduped) instead of a get() per entry.
+    const entries = Array.from(userPermissions.values());
+    const userMap = await batchGetUsers(
+      ctx,
+      entries.map((e) => e.userId)
+    );
+
+    return entries
+      .map((entry) => {
+        const user = userMap.get(entry.userId.toString());
         return {
-          user: user
-            ? { _id: user._id, name: user.name, email: user.email }
-            : null,
+          user: userInfo(user),
           variables: entry.variables,
           totalVariables: entry.variables.length,
         };
       })
-    );
-
-    return result.filter((r) => r.user !== null);
+      .filter((r) => r.user !== null);
   },
 });
 
@@ -1167,20 +1178,32 @@ export const cleanupExpired = internalMutation({
 
     const now = Date.now();
 
+    // Runs at most once per day (crons.daily "cleanup expired permissions").
+    // A full scan is unavoidable here: the app now creates many PERMANENT
+    // grants (no expiresAt), and an expiresAt index would still scan them
+    // (undefined sorts before numbers), so an index buys nothing. Instead we
+    // stream the collected rows and bail out early on anything that isn't an
+    // active, actually-expired grant — permanent grants (the common case) cost
+    // one cheap `continue` and zero further work.
     const allPermissions = await ctx.db.query("variablePermissions").collect();
-
-    const expiredPermissions = allPermissions.filter(
-      (p) => p.isActive && p.expiresAt && p.expiresAt < now
-    );
 
     // Cache project lookups so repeated variables don't re-fetch
     const projectCache = new Map<string, Doc<"projects"> | null>();
 
-    for (const perm of expiredPermissions) {
+    let cleanedUp = 0;
+
+    for (const perm of allPermissions) {
+      // Skip permanent grants (no expiry) first — minimal work for the bulk of
+      // rows — then inactive and not-yet-expired grants.
+      if (!perm.expiresAt) continue;
+      if (!perm.isActive) continue;
+      if (perm.expiresAt >= now) continue;
+
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,
       });
+      cleanedUp++;
 
       // Audit: permission expired (user-visible loss of access)
       const variable = await ctx.db.get(perm.variableId);
@@ -1209,6 +1232,6 @@ export const cleanupExpired = internalMutation({
       });
     }
 
-    return { cleanedUp: expiredPermissions.length };
+    return { cleanedUp };
   },
 });

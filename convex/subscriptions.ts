@@ -1386,8 +1386,8 @@ export const cleanupProcessedWebhooks = internalMutation({
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const oldEvents = await ctx.db
       .query("processedWebhookEvents")
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.processedAt < sevenDaysAgo));
+      .withIndex("by_processed_at", (q) => q.lt("processedAt", sevenDaysAgo))
+      .collect();
 
     for (const event of oldEvents) {
       await ctx.db.delete(event._id);

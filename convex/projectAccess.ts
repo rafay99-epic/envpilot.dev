@@ -771,10 +771,10 @@ export const cleanupExpired = internalMutation({
 
     const expiredTokens = await ctx.db
       .query("projectAccess")
-      .collect()
-      .then((rows) =>
-        rows.filter((doc) => doc.isActive === true && doc.expiresAt < now)
-      );
+      .withIndex("by_active_and_expires", (q) =>
+        q.eq("isActive", true).lt("expiresAt", now)
+      )
+      .collect();
 
     for (const token of expiredTokens) {
       await ctx.db.patch(token._id, {

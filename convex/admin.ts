@@ -1237,7 +1237,7 @@ export const listMigrations = query({
       {
         name: "migrate-unified-roles",
         description:
-          "Migrates legacy roles to the unified 4-role system: admin→owner, team_lead→project_manager, member→developer (or team_lead if they managed a project); pending invitations migrate the same way; variable permission admin→write. Idempotent.",
+          "Migrates legacy roles to the unified 4-role system: admin→owner, team_lead→project_manager, member→developer (or team_lead if they managed a project); pending invitations migrate the same way; variable permission admin→write. Then backfills a read grant for every developer on every variable in their assigned projects so no existing user loses visibility. Idempotent — safe to re-run.",
         category: "One-Time Migrations",
         priority: 2,
         destructive: false,
@@ -1957,6 +1957,8 @@ export const runMigration = mutation({
         invitationsSkipped: 0,
         variablePermissionsMigrated: 0,
         variablePermissionsSkipped: 0,
+        developerReadGrantsBackfilled: 0,
+        developerReadGrantsSkipped: 0,
       };
 
       const orgMembers = await ctx.db.query("organizationMembers").collect();
@@ -2052,6 +2054,70 @@ export const runMigration = mutation({
           results.variablePermissionsMigrated++;
         } else {
           results.variablePermissionsSkipped++;
+        }
+      }
+
+      // d. Backfill developer read grants — flow preservation.
+      //    Under the old model a project-level "developer" could read ALL
+      //    variables in their assigned projects; the unified model makes
+      //    developer access grant-based, so without this pass existing
+      //    developers would lose visibility the moment roles migrate. Give
+      //    every developer a read grant on every (non-deleted) variable in
+      //    their assigned projects. Runs AFTER the role passes so it reads
+      //    final roles. Idempotent: skips variables that already have an
+      //    active grant for the user.
+      //    NOTE: this is the only write-heavy part of the migration
+      //    (developers × their variables). Bounded and fine at current scale;
+      //    if the dataset ever grows very large, split it into its own
+      //    chunked migration to stay under the per-mutation write limit.
+      const now = Date.now();
+      const migratedMembers = await ctx.db
+        .query("organizationMembers")
+        .collect();
+      for (const member of migratedMembers) {
+        if (normalizeOrgRole(member.role) !== "developer") continue;
+        const assignments = await ctx.db
+          .query("projectMembers")
+          .withIndex("by_user", (q) => q.eq("userId", member.userId))
+          .collect();
+        for (const pm of assignments) {
+          const project = await ctx.db.get(pm.projectId);
+          if (
+            !project ||
+            project.deletedAt ||
+            project.organizationId !== member.organizationId
+          ) {
+            continue;
+          }
+          const projectVariables = await ctx.db
+            .query("environmentVariables")
+            .withIndex("by_project", (q) => q.eq("projectId", pm.projectId))
+            .collect();
+          for (const variable of projectVariables) {
+            if (variable.deletedAt) continue;
+            const existingGrants = await ctx.db
+              .query("variablePermissions")
+              .withIndex("by_variable_and_user", (q) =>
+                q.eq("variableId", variable._id).eq("userId", member.userId)
+              )
+              .collect();
+            const hasActiveGrant = existingGrants.some(
+              (g) => g.isActive && (!g.expiresAt || g.expiresAt > now)
+            );
+            if (hasActiveGrant) {
+              results.developerReadGrantsSkipped++;
+              continue;
+            }
+            await ctx.db.insert("variablePermissions", {
+              variableId: variable._id,
+              userId: member.userId,
+              permission: "read",
+              grantedBy: member.userId,
+              grantedAt: now,
+              isActive: true,
+            });
+            results.developerReadGrantsBackfilled++;
+          }
         }
       }
 

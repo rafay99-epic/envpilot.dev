@@ -1,11 +1,169 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import type { DatabaseReader } from "./_generated/server";
+import type { DatabaseReader, QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
 import { checkBooleanFeature, checkNumericLimit } from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
-import { assertOrgMembership, getVariableAccess } from "./authz";
+import {
+  assertOrgMembership,
+  getVariableAccess,
+  isEnvironmentScopeAllowed,
+  normalizeOrgRole,
+} from "./authz";
+
+// Upper bound on shares scanned by the list queries. Beyond this the oldest/
+// least-relevant rows are dropped rather than blowing the per-query read
+// budget; share lists are dashboards, not exhaustive exports.
+const MAX_SHARE_SCAN = 500;
+
+/**
+ * Compute the caller's effective access ("read" | "write") to a batch of
+ * variables in the fewest reads possible, mirroring authz.getVariableAccess
+ * exactly. Callers pass the variableIds referenced by a set of shares; the
+ * returned map only contains entries the caller can access (deleted variables,
+ * missing projects, and no-access cases are omitted).
+ *
+ * Reads: variables (deduped) + projects (deduped) + one org-membership lookup
+ * per distinct org + one project-membership lookup per distinct project + ONE
+ * variablePermissions scan (by_user_active) for the caller's grants — instead
+ * of getVariableAccess's full read fan-out per share.
+ */
+async function buildVariableAccessMap(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  variableIds: Id<"environmentVariables">[]
+): Promise<Map<string, "read" | "write">> {
+  const now = Date.now();
+
+  // Variables (deduped), dropping deleted ones.
+  const uniqueVarIds = [...new Set(variableIds.map((id) => id.toString()))];
+  const variableDocs = await Promise.all(
+    uniqueVarIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
+  );
+  const varMap = new Map<string, Doc<"environmentVariables">>();
+  for (const variable of variableDocs) {
+    if (variable && !variable.deletedAt) {
+      varMap.set(variable._id.toString(), variable);
+    }
+  }
+
+  // Projects (deduped), dropping deleted ones.
+  const projectIds = [
+    ...new Set([...varMap.values()].map((va) => va.projectId.toString())),
+  ];
+  const projectDocs = await Promise.all(
+    projectIds.map((id) => ctx.db.get(id as Id<"projects">))
+  );
+  const projMap = new Map<string, Doc<"projects">>();
+  for (const project of projectDocs) {
+    if (project && !project.deletedAt) {
+      projMap.set(project._id.toString(), project);
+    }
+  }
+
+  // Caller's org membership, one lookup per distinct org.
+  const orgIds = [
+    ...new Set([...projMap.values()].map((p) => p.organizationId.toString())),
+  ];
+  const membershipMap = new Map<string, Doc<"organizationMembers"> | null>();
+  await Promise.all(
+    orgIds.map(async (orgId) => {
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", orgId as Id<"organizations">)
+            .eq("userId", userId)
+        )
+        .first();
+      membershipMap.set(orgId, membership);
+    })
+  );
+
+  // Caller's project membership, one lookup per distinct project.
+  const projMemberMap = new Map<string, Doc<"projectMembers"> | null>();
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const pm = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", projectId as Id<"projects">).eq("userId", userId)
+        )
+        .first();
+      projMemberMap.set(projectId, pm);
+    })
+  );
+
+  // Caller's active, unexpired grants — a single indexed scan, keyed by
+  // variableId (mirrors authz.getActiveVariableGrant's active+unexpired rule).
+  const grants = await ctx.db
+    .query("variablePermissions")
+    .withIndex("by_user_active", (q) =>
+      q.eq("userId", userId).eq("isActive", true)
+    )
+    .collect();
+  const grantMap = new Map<string, Doc<"variablePermissions">>();
+  for (const grant of grants) {
+    if (grant.expiresAt && grant.expiresAt <= now) continue;
+    const key = grant.variableId.toString();
+    if (!grantMap.has(key)) grantMap.set(key, grant);
+  }
+
+  const accessMap = new Map<string, "read" | "write">();
+  for (const variable of varMap.values()) {
+    const project = projMap.get(variable.projectId.toString());
+    if (!project) continue; // missing/deleted project → no access
+
+    const membership = membershipMap.get(project.organizationId.toString());
+    if (!membership) continue; // not an org member → no access
+
+    const role = normalizeOrgRole(membership.role);
+    if (role === "owner") {
+      accessMap.set(variable._id.toString(), "write");
+      continue;
+    }
+
+    const projectMembership = projMemberMap.get(variable.projectId.toString());
+
+    if (
+      projectMembership &&
+      (role === "project_manager" || role === "team_lead")
+    ) {
+      accessMap.set(variable._id.toString(), "write");
+      continue;
+    }
+
+    // Developers scoped to specific environments never see out-of-scope vars.
+    if (
+      projectMembership &&
+      role === "developer" &&
+      !isEnvironmentScopeAllowed(
+        projectMembership.environments,
+        variable.environments
+      )
+    ) {
+      continue;
+    }
+
+    const grant = grantMap.get(variable._id.toString());
+    if (!grant) continue; // no grant → no access
+
+    // Unassigned members are capped at read (per-variable viewer sharing).
+    if (!projectMembership) {
+      accessMap.set(variable._id.toString(), "read");
+      continue;
+    }
+
+    accessMap.set(
+      variable._id.toString(),
+      grant.permission === "read" ? "read" : "write"
+    );
+  }
+
+  return accessMap;
+}
 
 /**
  * Shared Secrets — Convex Mutations & Queries
@@ -497,7 +655,8 @@ export const listByVariable = query({
     const shares = await ctx.db
       .query("sharedSecrets")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-      .collect();
+      .order("desc")
+      .take(MAX_SHARE_SCAN);
 
     // Enrich with recipient data
     const result = await Promise.all(
@@ -551,16 +710,22 @@ export const listActiveByOrg = query({
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .collect()
+        .order("desc")
+        .take(MAX_SHARE_SCAN)
     ).filter((share) => share.status === "active");
+
+    // Resolve the caller's access to every referenced variable in one batched
+    // pass instead of a full getVariableAccess fan-out per share.
+    const accessMap = await buildVariableAccessMap(
+      ctx,
+      args.userId,
+      shares.map((share) => share.variableId)
+    );
 
     const enriched = await Promise.all(
       shares.map(async (share) => {
         // Drop shares whose underlying variable the caller can't access.
-        const variable = await ctx.db.get(share.variableId);
-        if (!variable || variable.deletedAt) return null;
-        const access = await getVariableAccess(ctx, args.userId, variable);
-        if (access === null) return null;
+        if (!accessMap.has(share.variableId.toString())) return null;
 
         const recipients = await ctx.db
           .query("shareRecipients")
@@ -612,19 +777,25 @@ export const listByProject = query({
     const shares = await ctx.db
       .query("sharedSecrets")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
+      .order("desc")
+      .take(MAX_SHARE_SCAN);
 
     // Sort by createdAt descending (most recent first)
     shares.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Resolve the caller's access to every referenced variable in one batched
+    // pass instead of a full getVariableAccess fan-out per share.
+    const accessMap = await buildVariableAccessMap(
+      ctx,
+      args.userId,
+      shares.map((share) => share.variableId)
+    );
 
     // Enrich with recipient data — drop shares whose underlying variable the
     // caller can't access (each row exposes variableKey + recipients).
     const enriched = await Promise.all(
       shares.map(async (share) => {
-        const variable = await ctx.db.get(share.variableId);
-        if (!variable || variable.deletedAt) return null;
-        const access = await getVariableAccess(ctx, args.userId, variable);
-        if (access === null) return null;
+        if (!accessMap.has(share.variableId.toString())) return null;
 
         const recipients = await ctx.db
           .query("shareRecipients")
@@ -753,23 +924,24 @@ export const cleanupExpiredOtps = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
 
-    // Get all share recipients that have an OTP set
-    // We need to scan since we don't have an index on otpExpiresAt
-    const allRecipients = await ctx.db.query("shareRecipients").collect();
+    // Only scan recipients whose OTP TTL has already elapsed, via the
+    // by_otp_expires index — instead of a full-table scan every 30 minutes.
+    // Rows with otpExpiresAt === undefined sort before all numbers and are
+    // included by `.lt(now)`, so skip those cheaply (they have no OTP to clear).
+    const expiredRecipients = await ctx.db
+      .query("shareRecipients")
+      .withIndex("by_otp_expires", (q) => q.lt("otpExpiresAt", now))
+      .collect();
 
     let cleaned = 0;
-    for (const recipient of allRecipients) {
-      if (
-        recipient.otpCode &&
-        recipient.otpExpiresAt &&
-        recipient.otpExpiresAt < now
-      ) {
-        await ctx.db.patch(recipient._id, {
-          otpCode: undefined,
-          otpExpiresAt: undefined,
-        });
-        cleaned++;
-      }
+    for (const recipient of expiredRecipients) {
+      if (recipient.otpExpiresAt == null) continue;
+      if (!recipient.otpCode) continue;
+      await ctx.db.patch(recipient._id, {
+        otpCode: undefined,
+        otpExpiresAt: undefined,
+      });
+      cleaned++;
     }
 
     return { cleaned };

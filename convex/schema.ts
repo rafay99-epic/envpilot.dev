@@ -1206,7 +1206,9 @@ export default defineSchema({
   })
     .index("by_share", ["shareId"])
     .index("by_share_and_email", ["shareId", "email"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    // Bounds the every-30-min OTP cleanup cron to expired rows only
+    .index("by_otp_expires", ["otpExpiresAt"]),
 
   // ==========================================
   // ADMIN SETTINGS (Platform-wide configuration)
@@ -1295,7 +1297,10 @@ export default defineSchema({
     eventType: v.string(),
     // When the event was processed
     processedAt: v.number(),
-  }).index("by_webhook_id", ["webhookId"]),
+  })
+    .index("by_webhook_id", ["webhookId"])
+    // Bounds the 6-hourly processed-webhook cleanup cron to old rows only
+    .index("by_processed_at", ["processedAt"]),
 
   // ==========================================
   // PAYMENT PRODUCTS (Provider-agnostic product mapping)
