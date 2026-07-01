@@ -6,34 +6,127 @@ import {
   MutationCtx,
   QueryCtx,
 } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { batchGetUsers, userInfo } from "./helpers";
 import { isCronPaused } from "./tierLimits";
 import { checkBooleanFeature } from "./featureRegistry";
+import {
+  assertProjectAction,
+  assertCanManageUser,
+  normalizeOrgRole,
+  roleLevel,
+  type OrgRole,
+} from "./authz";
 
 /**
- * Role hierarchy for permission management
- * Admin > Team Lead > Member
+ * Unified authorization for variable-permission management.
+ *
+ * ALL mutations in this file authorize through the same path:
+ * assertProjectAction(ctx, actor, projectId, "project:manage_permissions")
+ * — owners bypass assignment, project managers and team leads must be
+ * assigned to the variable's project. Developers can never manage grants.
  */
-const ROLE_HIERARCHY: Record<string, number> = {
-  admin: 3,
-  team_lead: 2,
-  member: 1,
-};
 
 type PermissionCheckResult = {
   canManage: boolean;
   reason?: string;
   membership?: {
-    role: string;
+    role: OrgRole;
     organizationId: Id<"organizations">;
     userId: Id<"users">;
   };
 };
 
+/** Grantable permission levels. "admin" is legacy — treated as write, never granted. */
+const GRANTABLE_PERMISSIONS = ["read", "write"] as const;
+
+function assertGrantablePermission(permission: string): void {
+  if (permission === "admin") {
+    throw new Error(
+      'The "admin" permission level can no longer be granted. Grant "read" or "write" instead.'
+    );
+  }
+}
+
 /**
- * Check if a user can manage permissions for a variable
- * Returns the user's membership and whether they can manage permissions
+ * Authorize an actor to manage permissions on a variable's project and
+ * resolve the owning organization. Throws on failure.
+ */
+async function authorizePermissionManager(
+  ctx: MutationCtx | QueryCtx,
+  actorId: Id<"users">,
+  projectId: Id<"projects">
+): Promise<{ orgRole: OrgRole; organizationId: Id<"organizations"> }> {
+  const project = await ctx.db.get(projectId);
+  if (!project || project.deletedAt) {
+    throw new Error("Project not found");
+  }
+
+  const { orgRole } = await assertProjectAction(
+    ctx,
+    actorId,
+    projectId,
+    "project:manage_permissions"
+  );
+
+  return { orgRole, organizationId: project.organizationId };
+}
+
+/**
+ * Target rule — identical in every mutation:
+ * the target must be a member of the same organization, and their normalized
+ * role level must be strictly below the actor's. Owners can target anyone.
+ *
+ * Note: targets do NOT need a project assignment — per-variable grants to
+ * unassigned org members are the read-only "viewer sharing" feature
+ * (getVariableAccess caps unassigned users at read).
+ */
+async function assertGrantTarget(
+  ctx: MutationCtx | QueryCtx,
+  organizationId: Id<"organizations">,
+  actorRole: OrgRole,
+  targetUserId: Id<"users">,
+  action: string
+): Promise<void> {
+  const targetMembership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", organizationId).eq("userId", targetUserId)
+    )
+    .first();
+
+  if (!targetMembership) {
+    throw new Error("Target user is not a member of the organization");
+  }
+
+  if (actorRole !== "owner") {
+    assertCanManageUser(actorRole, targetMembership.role, action);
+  }
+}
+
+/**
+ * Find the target's active grant on a variable (isActive only — expiry is
+ * handled by checkPermission / getVariableAccess and the cleanup cron).
+ */
+async function findActiveGrant(
+  ctx: MutationCtx | QueryCtx,
+  variableId: Id<"environmentVariables">,
+  userId: Id<"users">
+): Promise<Doc<"variablePermissions"> | null> {
+  const grants = await ctx.db
+    .query("variablePermissions")
+    .withIndex("by_variable_and_user", (q) =>
+      q.eq("variableId", variableId).eq("userId", userId)
+    )
+    .collect();
+
+  return grants.find((g) => g.isActive) ?? null;
+}
+
+/**
+ * Check if a user can manage permissions for a variable (non-throwing).
+ * Backed by the exact same path the mutations enforce, so frontend answers
+ * always match backend enforcement.
  */
 async function checkCanManagePermissions(
   ctx: MutationCtx | QueryCtx,
@@ -50,61 +143,69 @@ async function checkCanManagePermissions(
     return { canManage: false, reason: "Project not found" };
   }
 
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId)
-    )
-    .first();
+  try {
+    const { orgRole } = await assertProjectAction(
+      ctx,
+      userId,
+      variable.projectId,
+      "project:manage_permissions"
+    );
 
-  if (!membership) {
+    return {
+      canManage: true,
+      membership: {
+        role: orgRole,
+        organizationId: project.organizationId,
+        userId,
+      },
+    };
+  } catch {
     return {
       canManage: false,
-      reason: "User is not a member of the organization",
+      reason:
+        "Only owners, project managers, and team leads assigned to the project can manage variable permissions",
     };
   }
-
-  // Admins and team leads can manage via org role
-  if (membership.role === "admin" || membership.role === "team_lead") {
-    return {
-      canManage: true,
-      membership: {
-        role: membership.role,
-        organizationId: membership.organizationId,
-        userId: membership.userId,
-      },
-    };
-  }
-
-  // Project managers can also manage permissions within their project
-  const projectMembership = await ctx.db
-    .query("projectMembers")
-    .withIndex("by_project_and_user", (q) =>
-      q.eq("projectId", project._id).eq("userId", userId)
-    )
-    .first();
-
-  if (projectMembership?.role === "manager") {
-    return {
-      canManage: true,
-      membership: {
-        role: "project_manager",
-        organizationId: membership.organizationId,
-        userId: membership.userId,
-      },
-    };
-  }
-
-  return {
-    canManage: false,
-    reason:
-      "Only admins, team leads, and project managers can manage variable permissions",
-  };
 }
 
 /**
  * Permission Queries and Mutations
  */
+
+// Full variablePermissions doc shape, for `returns` validators that spread docs
+const permissionDocFields = {
+  _id: v.id("variablePermissions"),
+  _creationTime: v.number(),
+  variableId: v.id("environmentVariables"),
+  userId: v.id("users"),
+  permission: v.union(
+    v.literal("read"),
+    v.literal("write"),
+    v.literal("admin")
+  ),
+  grantedBy: v.id("users"),
+  grantedAt: v.number(),
+  expiresAt: v.optional(v.number()),
+  isActive: v.boolean(),
+  revokedAt: v.optional(v.number()),
+  revokedBy: v.optional(v.id("users")),
+};
+
+const userInfoValidator = v.union(
+  v.object({
+    _id: v.id("users"),
+    name: v.optional(v.string()),
+    email: v.string(),
+  }),
+  v.null()
+);
+
+const orgRoleValidator = v.union(
+  v.literal("owner"),
+  v.literal("project_manager"),
+  v.literal("team_lead"),
+  v.literal("developer")
+);
 
 // ==========================================
 // QUERIES
@@ -112,6 +213,20 @@ async function checkCanManagePermissions(
 
 export const getForVariable = query({
   args: { variableId: v.id("environmentVariables") },
+  returns: v.array(
+    v.object({
+      ...permissionDocFields,
+      user: userInfoValidator,
+      grantedByUser: v.union(
+        v.object({ name: v.optional(v.string()), email: v.string() }),
+        v.null()
+      ),
+      revokedByUser: v.union(
+        v.object({ name: v.optional(v.string()), email: v.string() }),
+        v.null()
+      ),
+    })
+  ),
   handler: async (ctx, args) => {
     const permissions = await ctx.db
       .query("variablePermissions")
@@ -147,6 +262,24 @@ export const getForVariable = query({
 
 export const getForUser = query({
   args: { userId: v.id("users") },
+  returns: v.array(
+    v.object({
+      ...permissionDocFields,
+      variable: v.object({
+        _id: v.id("environmentVariables"),
+        key: v.string(),
+        description: v.optional(v.string()),
+      }),
+      project: v.union(
+        v.object({
+          _id: v.id("projects"),
+          name: v.string(),
+          slug: v.string(),
+        }),
+        v.null()
+      ),
+    })
+  ),
   handler: async (ctx, args) => {
     const permissions = await ctx.db
       .query("variablePermissions")
@@ -199,7 +332,7 @@ export const getForUser = query({
             : null,
         };
       })
-      .filter(Boolean);
+      .filter((entry) => entry !== null);
   },
 });
 
@@ -213,16 +346,18 @@ export const checkPermission = query({
       v.literal("admin")
     ),
   },
+  returns: v.object({
+    hasPermission: v.boolean(),
+    reason: v.optional(v.string()),
+    grantedPermission: v.optional(
+      v.union(v.literal("read"), v.literal("write"), v.literal("admin"))
+    ),
+    expiresAt: v.optional(v.number()),
+  }),
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    const permission = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId)
-      )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .first();
+    const permission = await findActiveGrant(ctx, args.variableId, args.userId);
 
     if (!permission) {
       return { hasPermission: false, reason: "No permission granted" };
@@ -254,6 +389,13 @@ export const getHistory = query({
     variableId: v.id("environmentVariables"),
     limit: v.optional(v.number()),
   },
+  returns: v.array(
+    v.object({
+      ...permissionDocFields,
+      userName: v.string(),
+      grantedByName: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     const permissions = await ctx.db
       .query("variablePermissions")
@@ -280,15 +422,29 @@ export const getHistory = query({
 });
 
 /**
- * Get members who can be assigned permissions for a variable
- * For Team Leads: only members
- * For Admins: all members except themselves
+ * Get org members who can be granted a permission on a variable.
+ *
+ * Eligibility mirrors the mutation target rule exactly: the member must be
+ * strictly below the requester's role level (owners can grant to anyone),
+ * must not be the requester, and must not already hold an active grant on
+ * the variable. Members do NOT need a project assignment — unassigned
+ * members receive read-only "viewer" access via their grant.
  */
 export const getAssignableMembers = query({
   args: {
     variableId: v.id("environmentVariables"),
     requestingUserId: v.id("users"),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("users"),
+      email: v.string(),
+      name: v.optional(v.string()),
+      avatarUrl: v.optional(v.string()),
+      role: orgRoleValidator,
+      isAssignedToProject: v.boolean(),
+    })
+  ),
   handler: async (ctx, args) => {
     const variable = await ctx.db.get(args.variableId);
     if (!variable || variable.deletedAt) {
@@ -300,174 +456,139 @@ export const getAssignableMembers = query({
       return [];
     }
 
-    // Get the requesting user's membership
-    const requesterMembership = await ctx.db
+    // Requester must be able to manage permissions on this variable
+    let requesterRole: OrgRole;
+    try {
+      const auth = await assertProjectAction(
+        ctx,
+        args.requestingUserId,
+        variable.projectId,
+        "project:manage_permissions"
+      );
+      requesterRole = auth.orgRole;
+    } catch {
+      return [];
+    }
+
+    // All org members are candidates — grants can target users who are not
+    // assigned to the project (per-variable viewer sharing)
+    const orgMembers = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.requestingUserId)
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", project.organizationId)
       )
-      .first();
-
-    if (!requesterMembership) {
-      return [];
-    }
-
-    // Check if requester can manage permissions (org admin, team lead, or project manager)
-    const isOrgAdmin = requesterMembership.role === "admin";
-    const isTeamLead = requesterMembership.role === "team_lead";
-
-    let isProjectManager = false;
-    if (!isOrgAdmin && !isTeamLead) {
-      const requesterProjectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", project._id).eq("userId", args.requestingUserId)
-        )
-        .first();
-
-      isProjectManager = requesterProjectMembership?.role === "manager";
-    }
-
-    if (!isOrgAdmin && !isTeamLead && !isProjectManager) {
-      return [];
-    }
-
-    // Get project members (scoped to this project, not all org members)
-    const projectMembers = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id))
       .collect();
 
-    // Get existing permissions for this variable
-    const existingPermissions = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+    // Existing active grants for this variable
+    const existingPermissions = (
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
+        .collect()
+    ).filter((p) => p.isActive);
 
     const usersWithPermissions = new Set(
       existingPermissions.map((p) => p.userId.toString())
     );
 
-    // Filter project members
-    const assignableMembers = await Promise.all(
-      projectMembers
-        .filter((pm) => {
-          if (usersWithPermissions.has(pm.userId.toString())) return false;
-          if (pm.userId === args.requestingUserId) return false;
-          return true;
-        })
-        .map(async (pm) => {
-          const user = await ctx.db.get(pm.userId);
-          const orgMembership = await ctx.db
-            .query("organizationMembers")
-            .withIndex("by_org_and_user", (q) =>
-              q
-                .eq("organizationId", project.organizationId)
-                .eq("userId", pm.userId)
-            )
-            .first();
-
-          return user
-            ? {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-                avatarUrl: user.avatarUrl,
-                role: orgMembership?.role ?? "member",
-                projectRole: pm.role,
-              }
-            : null;
-        })
+    // Project assignments, so the UI can distinguish assigned members from
+    // grant-only viewers
+    const projectMembers = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+    const assignedUserIds = new Set(
+      projectMembers.map((pm) => pm.userId.toString())
     );
 
-    return assignableMembers.filter(Boolean);
+    const eligibleMembers = orgMembers.filter((member) => {
+      if (member.userId === args.requestingUserId) return false;
+      if (usersWithPermissions.has(member.userId.toString())) return false;
+      // Owners can grant to anyone; everyone else only strictly below their level
+      if (
+        requesterRole !== "owner" &&
+        roleLevel(member.role) >= roleLevel(requesterRole)
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const assignableMembers = await Promise.all(
+      eligibleMembers.map(async (member) => {
+        const user = await ctx.db.get(member.userId);
+        return user
+          ? {
+              _id: user._id,
+              email: user.email,
+              name: user.name,
+              avatarUrl: user.avatarUrl,
+              role: normalizeOrgRole(member.role),
+              isAssignedToProject: assignedUserIds.has(
+                member.userId.toString()
+              ),
+            }
+          : null;
+      })
+    );
+
+    return assignableMembers.filter((member) => member !== null);
   },
 });
 
 /**
- * Check if a user can manage permissions for a specific variable
+ * Check if a user can manage permissions for a specific variable.
+ * Backed by the same authorization path the mutations enforce.
  */
 export const canManageVariablePermissions = query({
   args: {
     variableId: v.id("environmentVariables"),
     userId: v.id("users"),
   },
+  returns: v.object({
+    canManage: v.boolean(),
+    reason: v.optional(v.string()),
+    role: v.optional(orgRoleValidator),
+    allowedPermissions: v.optional(
+      v.array(v.union(v.literal("read"), v.literal("write")))
+    ),
+  }),
   handler: async (ctx, args) => {
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      return { canManage: false, reason: "Variable not found" };
-    }
+    const check = await checkCanManagePermissions(
+      ctx,
+      args.variableId,
+      args.userId
+    );
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project || project.deletedAt) {
-      return { canManage: false, reason: "Project not found" };
-    }
-
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
-      )
-      .first();
-
-    if (!membership) {
-      return {
-        canManage: false,
-        reason: "User is not a member of the organization",
-      };
-    }
-
-    if (membership.role === "admin") {
-      return {
-        canManage: true,
-        role: membership.role,
-        allowedPermissions: ["read", "write", "admin"],
-      };
-    }
-
-    if (membership.role === "team_lead") {
-      return {
-        canManage: true,
-        role: membership.role,
-        allowedPermissions: ["read", "write"],
-      };
-    }
-
-    // Check if user is a project manager
-    const projectMembership = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", project._id).eq("userId", args.userId)
-      )
-      .first();
-
-    if (projectMembership?.role === "manager") {
-      return {
-        canManage: true,
-        role: "project_manager",
-        allowedPermissions: ["read", "write"],
-      };
+    if (!check.canManage || !check.membership) {
+      return { canManage: false, reason: check.reason };
     }
 
     return {
-      canManage: false,
-      reason:
-        "Only admins, team leads, and project managers can manage variable permissions",
+      canManage: true,
+      role: check.membership.role,
+      // "admin" is legacy and no longer grantable by anyone
+      allowedPermissions: [...GRANTABLE_PERMISSIONS],
     };
   },
 });
 
 export const getUsersWithProjectAccess = query({
   args: { projectId: v.id("projects") },
+  returns: v.array(
+    v.object({
+      user: userInfoValidator,
+      variables: v.array(v.object({ key: v.string(), permission: v.string() })),
+      totalVariables: v.number(),
+    })
+  ),
   handler: async (ctx, args) => {
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    const variables = (
+      await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect()
+    ).filter((variable) => !variable.deletedAt);
 
     const userPermissions = new Map<
       string,
@@ -475,11 +596,12 @@ export const getUsersWithProjectAccess = query({
     >();
 
     for (const variable of variables) {
-      const permissions = await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+      const permissions = (
+        await ctx.db
+          .query("variablePermissions")
+          .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+          .collect()
+      ).filter((p) => p.isActive);
 
       for (const perm of permissions) {
         const userIdStr = perm.userId.toString();
@@ -529,55 +651,30 @@ export const grant = mutation({
     grantedBy: v.id("users"),
     expiresAt: v.optional(v.number()),
   },
+  returns: v.id("variablePermissions"),
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    // Get variable and project first
     const variable = await ctx.db.get(args.variableId);
     if (!variable || variable.deletedAt) {
       throw new Error("Variable not found");
     }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
+    // Unified authorization: owner (bypass), or project manager / team lead
+    // assigned to the variable's project
+    const { orgRole, organizationId } = await authorizePermissionManager(
+      ctx,
+      args.grantedBy,
+      variable.projectId
+    );
 
-    // Check if the granter has permission to manage variable permissions
-    const granterMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.grantedBy)
-      )
-      .first();
-
-    if (!granterMembership) {
-      throw new Error(
-        "Not authorized: User is not a member of the organization"
-      );
-    }
-
-    // Only admins and team leads can manage permissions
-    if (
-      granterMembership.role !== "admin" &&
-      granterMembership.role !== "team_lead"
-    ) {
-      throw new Error(
-        "Only admins and team leads can manage variable permissions"
-      );
-    }
-
-    // Team leads can only grant read/write permissions, not admin
-    if (granterMembership.role === "team_lead" && args.permission === "admin") {
-      throw new Error("Team leads can only grant read or write permissions");
-    }
+    // Only read/write are grantable going forward
+    assertGrantablePermission(args.permission);
 
     // Check granular_permissions feature gate
     const permCheck = await checkBooleanFeature(
       ctx.db,
-      project.organizationId,
+      organizationId,
       "granular_permissions"
     );
     if (!permCheck.allowed) {
@@ -586,35 +683,20 @@ export const grant = mutation({
       );
     }
 
-    // Validate target user is part of the org
-    const targetMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
-      )
-      .first();
+    // Target rule: org member, strictly below the actor (owners exempt)
+    await assertGrantTarget(
+      ctx,
+      organizationId,
+      orgRole,
+      args.userId,
+      "grant variable permissions"
+    );
 
-    if (!targetMembership) {
-      throw new Error("Target user is not a member of the organization");
-    }
-
-    // Team leads can only grant permissions to members, not to other team leads or admins
-    if (granterMembership.role === "team_lead") {
-      const targetRoleLevel = ROLE_HIERARCHY[targetMembership.role] ?? 0;
-      const granterRoleLevel = ROLE_HIERARCHY[granterMembership.role] ?? 0;
-
-      if (targetRoleLevel >= granterRoleLevel) {
-        throw new Error("Team leads can only manage permissions for members");
-      }
-    }
-
-    const existingPermission = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId)
-      )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .first();
+    const existingPermission = await findActiveGrant(
+      ctx,
+      args.variableId,
+      args.userId
+    );
 
     if (existingPermission) {
       throw new Error(
@@ -636,7 +718,7 @@ export const grant = mutation({
     const targetUser = await ctx.db.get(args.userId);
 
     await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
+      organizationId,
       projectId: variable.projectId,
       variableId: args.variableId,
       userId: args.grantedBy,
@@ -664,6 +746,7 @@ export const update = mutation({
     expiresAt: v.optional(v.number()),
     updatedBy: v.id("users"),
   },
+  returns: v.id("variablePermissions"),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -676,40 +759,28 @@ export const update = mutation({
       throw new Error("Cannot update an inactive permission");
     }
 
-    // Check if the updater has permission to manage variable permissions
-    const authCheck = await checkCanManagePermissions(
-      ctx,
-      existingPerm.variableId,
-      args.updatedBy
-    );
-    if (!authCheck.canManage) {
-      throw new Error(
-        authCheck.reason ?? "Not authorized to manage permissions"
-      );
-    }
-
-    // Team leads cannot update to admin permission level
-    if (
-      authCheck.membership?.role === "team_lead" &&
-      args.permission === "admin"
-    ) {
-      throw new Error("Team leads can only grant read or write permissions");
-    }
-
     const variable = await ctx.db.get(existingPerm.variableId);
     if (!variable) {
       throw new Error("Variable not found");
     }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project) {
-      throw new Error("Project not found");
+    // Unified authorization: owner (bypass), or project manager / team lead
+    // assigned to the variable's project
+    const { orgRole, organizationId } = await authorizePermissionManager(
+      ctx,
+      args.updatedBy,
+      variable.projectId
+    );
+
+    // Only read/write are grantable going forward
+    if (args.permission !== undefined) {
+      assertGrantablePermission(args.permission);
     }
 
     // Check granular_permissions feature gate
     const updatePermCheck = await checkBooleanFeature(
       ctx.db,
-      project.organizationId,
+      organizationId,
       "granular_permissions"
     );
     if (!updatePermCheck.allowed) {
@@ -718,26 +789,14 @@ export const update = mutation({
       );
     }
 
-    // Team leads can only update permissions for members
-    if (authCheck.membership?.role === "team_lead") {
-      const targetMembership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q
-            .eq("organizationId", project.organizationId)
-            .eq("userId", existingPerm.userId)
-        )
-        .first();
-
-      if (targetMembership) {
-        const targetRoleLevel = ROLE_HIERARCHY[targetMembership.role] ?? 0;
-        const updaterRoleLevel = ROLE_HIERARCHY[authCheck.membership.role] ?? 0;
-
-        if (targetRoleLevel >= updaterRoleLevel) {
-          throw new Error("Team leads can only manage permissions for members");
-        }
-      }
-    }
+    // Target rule: org member, strictly below the actor (owners exempt)
+    await assertGrantTarget(
+      ctx,
+      organizationId,
+      orgRole,
+      existingPerm.userId,
+      "update variable permissions"
+    );
 
     const updateData: Record<string, unknown> = {};
     if (args.permission !== undefined) updateData.permission = args.permission;
@@ -749,7 +808,7 @@ export const update = mutation({
     const targetUser = await ctx.db.get(existingPerm.userId);
 
     await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
+      organizationId,
       projectId: variable.projectId,
       variableId: existingPerm.variableId,
       userId: args.updatedBy,
@@ -774,6 +833,7 @@ export const revoke = mutation({
     userId: v.id("users"),
     revokedBy: v.id("users"),
   },
+  returns: v.id("variablePermissions"),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -782,68 +842,28 @@ export const revoke = mutation({
       throw new Error("Variable not found");
     }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
+    // Unified authorization: owner (bypass), or project manager / team lead
+    // assigned to the variable's project
+    const { orgRole, organizationId } = await authorizePermissionManager(
+      ctx,
+      args.revokedBy,
+      variable.projectId
+    );
 
-    // Check if the revoker has permission to manage variable permissions
-    const revokerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy)
-      )
-      .first();
-
-    if (!revokerMembership) {
-      throw new Error(
-        "Not authorized: User is not a member of the organization"
-      );
-    }
-
-    if (
-      revokerMembership.role !== "admin" &&
-      revokerMembership.role !== "team_lead"
-    ) {
-      throw new Error(
-        "Only admins and team leads can manage variable permissions"
-      );
-    }
-
-    const permission = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_variable_and_user", (q) =>
-        q.eq("variableId", args.variableId).eq("userId", args.userId)
-      )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .first();
+    const permission = await findActiveGrant(ctx, args.variableId, args.userId);
 
     if (!permission) {
       throw new Error("No active permission found");
     }
 
-    // Team leads can only revoke permissions they can manage (members only)
-    if (revokerMembership.role === "team_lead") {
-      const targetMembership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q
-            .eq("organizationId", project.organizationId)
-            .eq("userId", args.userId)
-        )
-        .first();
-
-      if (targetMembership) {
-        const targetRoleLevel = ROLE_HIERARCHY[targetMembership.role] ?? 0;
-        const revokerRoleLevel = ROLE_HIERARCHY[revokerMembership.role] ?? 0;
-
-        if (targetRoleLevel >= revokerRoleLevel) {
-          throw new Error("Team leads can only manage permissions for members");
-        }
-      }
-    }
+    // Target rule: org member, strictly below the actor (owners exempt)
+    await assertGrantTarget(
+      ctx,
+      organizationId,
+      orgRole,
+      args.userId,
+      "revoke variable permissions"
+    );
 
     await ctx.db.patch(permission._id, {
       isActive: false,
@@ -855,7 +875,7 @@ export const revoke = mutation({
     const targetUser = await ctx.db.get(args.userId);
 
     await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
+      organizationId,
       projectId: variable.projectId,
       variableId: args.variableId,
       userId: args.revokedBy,
@@ -885,6 +905,10 @@ export const bulkGrant = mutation({
     grantedBy: v.id("users"),
     expiresAt: v.optional(v.number()),
   },
+  returns: v.object({
+    granted: v.array(v.id("variablePermissions")),
+    skipped: v.array(v.id("users")),
+  }),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -893,35 +917,21 @@ export const bulkGrant = mutation({
       throw new Error("Variable not found");
     }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
-
-    // Authorization check - only admins and team leads can bulk grant
-    const authCheck = await checkCanManagePermissions(
+    // Unified authorization: owner (bypass), or project manager / team lead
+    // assigned to the variable's project
+    const { orgRole, organizationId } = await authorizePermissionManager(
       ctx,
-      args.variableId,
-      args.grantedBy
+      args.grantedBy,
+      variable.projectId
     );
-    if (!authCheck.canManage) {
-      throw new Error(
-        authCheck.reason ?? "Not authorized to manage permissions"
-      );
-    }
 
-    // Team leads cannot grant admin permission
-    if (
-      authCheck.membership?.role === "team_lead" &&
-      args.permission === "admin"
-    ) {
-      throw new Error("Team leads can only grant read or write permissions");
-    }
+    // Only read/write are grantable going forward
+    assertGrantablePermission(args.permission);
 
     // Check granular_permissions feature gate
     const bulkPermCheck = await checkBooleanFeature(
       ctx.db,
-      project.organizationId,
+      organizationId,
       "granular_permissions"
     );
     if (!bulkPermCheck.allowed) {
@@ -930,17 +940,38 @@ export const bulkGrant = mutation({
       );
     }
 
-    const grantedIds = [];
-    const skippedIds = [];
+    const grantedIds: Id<"variablePermissions">[] = [];
+    const skippedIds: Id<"users">[] = [];
 
     for (const userId of args.userIds) {
-      const existing = await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_variable_and_user", (q) =>
-          q.eq("variableId", args.variableId).eq("userId", userId)
+      // Target rule — same as single grant; ineligible targets are skipped
+      // instead of failing the whole batch
+      const targetMembership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("organizationId", organizationId).eq("userId", userId)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
         .first();
+
+      if (!targetMembership) {
+        skippedIds.push(userId);
+        continue;
+      }
+
+      if (orgRole !== "owner") {
+        try {
+          assertCanManageUser(
+            orgRole,
+            targetMembership.role,
+            "grant variable permissions"
+          );
+        } catch {
+          skippedIds.push(userId);
+          continue;
+        }
+      }
+
+      const existing = await findActiveGrant(ctx, args.variableId, userId);
 
       if (existing) {
         skippedIds.push(userId);
@@ -961,7 +992,7 @@ export const bulkGrant = mutation({
     }
 
     await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
+      organizationId,
       projectId: variable.projectId,
       variableId: args.variableId,
       userId: args.grantedBy,
@@ -985,6 +1016,7 @@ export const bulkRevokeForUser = mutation({
     userId: v.id("users"),
     revokedBy: v.id("users"),
   },
+  returns: v.object({ revokedCount: v.number() }),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -993,48 +1025,23 @@ export const bulkRevokeForUser = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization check - only admins and team leads can bulk revoke
-    const revokerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy)
-      )
-      .first();
+    // Unified authorization: owner (bypass), or project manager / team lead
+    // assigned to the project
+    const { orgRole } = await assertProjectAction(
+      ctx,
+      args.revokedBy,
+      args.projectId,
+      "project:manage_permissions"
+    );
 
-    if (!revokerMembership) {
-      throw new Error(
-        "Not authorized: User is not a member of the organization"
-      );
-    }
-
-    if (
-      revokerMembership.role !== "admin" &&
-      revokerMembership.role !== "team_lead"
-    ) {
-      throw new Error(
-        "Only admins and team leads can manage variable permissions"
-      );
-    }
-
-    // Get target user's membership to check role hierarchy
-    const targetMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
-      )
-      .first();
-
-    // Team leads can only revoke permissions for members
-    if (revokerMembership.role === "team_lead" && targetMembership) {
-      const targetRoleLevel = ROLE_HIERARCHY[targetMembership.role] ?? 0;
-      const revokerRoleLevel = ROLE_HIERARCHY[revokerMembership.role] ?? 0;
-
-      if (targetRoleLevel >= revokerRoleLevel) {
-        throw new Error("Team leads can only manage permissions for members");
-      }
-    }
+    // Target rule: org member, strictly below the actor (owners exempt)
+    await assertGrantTarget(
+      ctx,
+      project.organizationId,
+      orgRole,
+      args.userId,
+      "revoke variable permissions"
+    );
 
     const variables = await ctx.db
       .query("environmentVariables")
@@ -1044,13 +1051,14 @@ export const bulkRevokeForUser = mutation({
     let revokedCount = 0;
 
     for (const variable of variables) {
-      const permissions = await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_variable_and_user", (q) =>
-          q.eq("variableId", variable._id).eq("userId", args.userId)
-        )
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+      const permissions = (
+        await ctx.db
+          .query("variablePermissions")
+          .withIndex("by_variable_and_user", (q) =>
+            q.eq("variableId", variable._id).eq("userId", args.userId)
+          )
+          .collect()
+      ).filter((p) => p.isActive);
 
       for (const perm of permissions) {
         await ctx.db.patch(perm._id, {
@@ -1088,6 +1096,7 @@ export const revokeAllForVariable = mutation({
     variableId: v.id("environmentVariables"),
     revokedBy: v.id("users"),
   },
+  returns: v.object({ revokedCount: v.number() }),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -1096,38 +1105,26 @@ export const revokeAllForVariable = mutation({
       throw new Error("Variable not found");
     }
 
-    const project = await ctx.db.get(variable.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
+    // Unified authorization, then tightened: this is a destructive operation,
+    // so only owners and project managers may revoke everything at once
+    const { orgRole, organizationId } = await authorizePermissionManager(
+      ctx,
+      args.revokedBy,
+      variable.projectId
+    );
 
-    // Authorization check - only admins can revoke all permissions
-    // (This is a destructive operation, so we limit it to admins only)
-    const revokerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.revokedBy)
-      )
-      .first();
-
-    if (!revokerMembership) {
+    if (orgRole === "team_lead") {
       throw new Error(
-        "Not authorized: User is not a member of the organization"
+        "Only owners and project managers can revoke all permissions for a variable"
       );
     }
 
-    // Only admins can revoke all permissions at once (destructive operation)
-    if (revokerMembership.role !== "admin") {
-      throw new Error("Only admins can revoke all permissions for a variable");
-    }
-
-    const permissions = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+    const permissions = (
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
+        .collect()
+    ).filter((p) => p.isActive);
 
     for (const perm of permissions) {
       await ctx.db.patch(perm._id, {
@@ -1138,7 +1135,7 @@ export const revokeAllForVariable = mutation({
     }
 
     await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
+      organizationId,
       projectId: variable.projectId,
       variableId: args.variableId,
       userId: args.revokedBy,
@@ -1162,18 +1159,18 @@ export const revokeAllForVariable = mutation({
  */
 export const cleanupExpired = internalMutation({
   args: {},
+  returns: v.object({ cleanedUp: v.number() }),
   handler: async (ctx) => {
-    if (await isCronPaused(ctx.db, "cron_pause_cleanup_permissions")) return;
+    if (await isCronPaused(ctx.db, "cron_pause_cleanup_permissions")) {
+      return { cleanedUp: 0 };
+    }
 
     const now = Date.now();
 
-    const allPermissions = await ctx.db
-      .query("variablePermissions")
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+    const allPermissions = await ctx.db.query("variablePermissions").collect();
 
     const expiredPermissions = allPermissions.filter(
-      (p) => p.expiresAt && p.expiresAt < now
+      (p) => p.isActive && p.expiresAt && p.expiresAt < now
     );
 
     for (const perm of expiredPermissions) {

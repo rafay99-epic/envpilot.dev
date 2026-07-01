@@ -9,6 +9,7 @@ import {
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { createSecret } from "@/lib/vault";
+import { resolveLegacyRoles } from "../_lib/legacy-roles";
 
 const createRequestSchema = z.object({
   key: z
@@ -138,40 +139,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Resolve project-level role
-    let projectRole: string | null = null;
-    if (membership.role !== "admin") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: projectId as Id<"projects">,
-          userId: convexUser._id,
-        }
-      );
-      if (projectMembership) {
-        projectRole = projectMembership.role;
+    // Unified role model: only developers assigned to the project submit
+    // variable requests. Owners/project managers/team leads create directly;
+    // unassigned users (including per-variable viewer grants) are blocked.
+    const legacy = await resolveLegacyRoles(convex, {
+      userId: convexUser._id,
+      projectId: projectId as Id<"projects">,
+      orgRole: membership.role,
+    });
+
+    if (!legacy.assigned) {
+      if (legacy.grantOnly) {
+        return NextResponse.json(
+          {
+            error:
+              "You have Viewer access to this project. Variable requests are not allowed.",
+          },
+          { status: 403 }
+        );
       }
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const isViewer = projectRole === "viewer";
-    const canWriteDirectly =
-      membership.role === "admin" ||
-      membership.role === "team_lead" ||
-      projectRole === "manager";
-
-    // Viewers are hard-blocked
-    if (isViewer) {
-      return NextResponse.json(
-        {
-          error:
-            "You have Viewer access to this project. Variable requests are not allowed.",
-        },
-        { status: 403 }
-      );
-    }
-
-    // Admins, team leads, and managers should use direct variable creation
-    if (canWriteDirectly) {
+    // Owners, project managers, and team leads should create directly
+    if (legacy.role !== "developer") {
       return NextResponse.json(
         {
           error:

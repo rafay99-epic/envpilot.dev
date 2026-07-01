@@ -26,6 +26,7 @@ import {
   useConvexUser,
 } from "@/hooks";
 import { useFeatureGate, usePagination } from "@/hooks";
+import { normalizeOrgRole } from "@/lib/roles";
 
 interface Organization {
   _id: string;
@@ -33,7 +34,7 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  role: "admin" | "team_lead" | "member";
+  role: string;
   settings?: {
     teamLeadsCanCreateProjects: boolean;
   };
@@ -248,13 +249,13 @@ export default function OrganizationSettingsPage({
     );
   }
 
-  if (organization?.role !== "admin") {
+  if (!organization || normalizeOrgRole(organization.role) !== "owner") {
     return (
       <div className="mx-auto max-w-2xl">
         <TerminalCard className="border-amber-500/30">
           <h3 className="font-semibold text-amber-400">Permission Denied</h3>
           <p className="mt-1 text-sm text-amber-400/80">
-            Only organization admins can access settings.
+            Only organization owners can access settings.
           </p>
           <Link
             href={`/organizations/${slug}`}
@@ -500,7 +501,8 @@ function AccessControlSettings({
                 Allow team leads to create projects
               </p>
               <p className="text-xs text-zinc-500">
-                When disabled, only admins can create new projects.
+                When disabled, only owners and project managers can create new
+                projects.
               </p>
             </div>
             <button
@@ -571,7 +573,7 @@ function DangerZoneSettings({
           Transfer Ownership
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Transfer this organization to another user. They will become the admin
+          Transfer this organization to another user. They will become the owner
           and all current members will be removed.
         </p>
 
@@ -596,7 +598,7 @@ function DangerZoneSettings({
                   This action cannot be undone.
                 </p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-400">
-                  <li>New owner becomes admin</li>
+                  <li>New owner takes over the organization</li>
                   <li>You will be removed from the organization</li>
                   <li>All other members retain their roles and access</li>
                   <li>All projects, variables, and settings stay intact</li>

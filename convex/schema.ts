@@ -93,10 +93,15 @@ export default defineSchema({
     organizationId: v.id("organizations"),
     // Reference to the user
     userId: v.id("users"),
-    // Role within the organization
+    // Unified role within the organization (single source of truth for what
+    // the user can do; project scope comes from projectMembers assignments)
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration): admin → owner, member → developer
+      v.literal("admin"),
       v.literal("member")
     ),
     // When the member joined
@@ -156,11 +161,11 @@ export default defineSchema({
     projectId: v.id("projects"),
     // Reference to the user
     userId: v.id("users"),
-    // Project-level role
-    role: v.union(
-      v.literal("viewer"), // Can view variables they have explicit permission to
-      v.literal("developer"), // Can view all variables, create/edit variables
-      v.literal("manager") // Can also manage project members
+    // LEGACY project-level role — the unified role model derives project
+    // capabilities from organizationMembers.role; this field is ignored by
+    // new code and only kept so pre-migration rows validate.
+    role: v.optional(
+      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
     // Who added this member to the project
     addedBy: v.id("users"),
@@ -380,15 +385,19 @@ export default defineSchema({
     email: v.string(),
     // Organization they're invited to
     organizationId: v.id("organizations"),
-    // Role they'll receive upon accepting
+    // Unified role they'll receive upon accepting
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration)
+      v.literal("admin"),
       v.literal("member")
     ),
     // Optional: projects to assign the invited user to upon acceptance
     projectIds: v.optional(v.array(v.id("projects"))),
-    // Optional: project-level role for the assigned projects
+    // LEGACY: project-level role — ignored by the unified role model
     projectRole: v.optional(
       v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { handleApiError } from "@/lib/api-errors";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -64,7 +65,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json({
-      organization: { ...organization, role: membership.role },
+      organization: {
+        ...organization,
+        role: normalizeOrgRole(membership.role),
+      },
     });
   } catch (error) {
     console.error("Error fetching organization:", error);

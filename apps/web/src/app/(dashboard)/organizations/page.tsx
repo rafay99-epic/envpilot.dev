@@ -11,6 +11,7 @@ import { usePagination, useConvexUser } from "@/hooks";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 
 interface Organization {
@@ -19,7 +20,7 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  role: "admin" | "team_lead" | "member";
+  role: string;
   createdAt: number;
 }
 
@@ -52,7 +53,9 @@ export default function OrganizationsPage() {
   const enforcing = useEnforcementEnabled();
 
   // Check if org creation is blocked based on tier limits.
-  const ownedOrgs = organizations.filter((o) => o.role === "admin");
+  const ownedOrgs = organizations.filter(
+    (o) => normalizeOrgRole(o.role) === "owner"
+  );
   const firstOwnedOrgId = ownedOrgs[0]?._id;
   const orgLimitGate = useFeatureGate(
     firstOwnedOrgId ? (firstOwnedOrgId as Id<"organizations">) : undefined,
@@ -158,16 +161,16 @@ export default function OrganizationsPage() {
                 <div className="mt-4 flex items-center justify-between">
                   <span
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      org.role === "admin"
+                      normalizeOrgRole(org.role) === "owner"
                         ? "border border-green-500/30 bg-green-500/10 text-green-400"
-                        : org.role === "team_lead"
-                          ? "border border-blue-500/30 bg-blue-500/10 text-blue-400"
-                          : "border border-zinc-700 bg-zinc-800 text-zinc-400"
+                        : normalizeOrgRole(org.role) === "project_manager"
+                          ? "border border-amber-500/30 bg-amber-500/10 text-amber-400"
+                          : normalizeOrgRole(org.role) === "team_lead"
+                            ? "border border-blue-500/30 bg-blue-500/10 text-blue-400"
+                            : "border border-zinc-700 bg-zinc-800 text-zinc-400"
                     }`}
                   >
-                    {org.role === "team_lead"
-                      ? "Team Lead"
-                      : org.role.charAt(0).toUpperCase() + org.role.slice(1)}
+                    {ORG_ROLE_LABELS[normalizeOrgRole(org.role)]}
                   </span>
                   <ChevronRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-1 group-hover:text-zinc-400" />
                 </div>

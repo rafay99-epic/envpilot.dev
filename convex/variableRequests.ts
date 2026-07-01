@@ -2,10 +2,9 @@ import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
+import { assertOrgMembership, assertProjectAction } from "./authz";
 
-type MembershipRole = "admin" | "team_lead" | "member";
-
-async function getProjectAndMembership(
+async function getProjectAndOrgRole(
   ctx: MutationCtx | QueryCtx,
   projectId: Id<"projects">,
   userId: Id<"users">
@@ -15,21 +14,35 @@ async function getProjectAndMembership(
     throw new Error("Project not found");
   }
 
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId)
-    )
-    .first();
+  const { membership } = await assertOrgMembership(
+    ctx,
+    userId,
+    project.organizationId
+  );
 
-  if (!membership) {
-    throw new Error("Not a member of this organization");
+  return { project, orgRole: membership.role };
+}
+
+/**
+ * Non-throwing check: can this user review (approve/reject) requests?
+ * Reviewers are owners, or PMs/team leads assigned to the project.
+ */
+async function canReviewRequests(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  projectId: Id<"projects">
+): Promise<boolean> {
+  try {
+    await assertProjectAction(
+      ctx,
+      userId,
+      projectId,
+      "project:update_variable"
+    );
+    return true;
+  } catch {
+    return false;
   }
-
-  return {
-    project,
-    membership: membership as typeof membership & { role: MembershipRole },
-  };
 }
 
 export const listForProject = query({
@@ -46,7 +59,7 @@ export const listForProject = query({
     ),
   },
   handler: async (ctx, args) => {
-    const { project, membership } = await getProjectAndMembership(
+    const { project } = await getProjectAndOrgRole(
       ctx,
       args.projectId,
       args.userId
@@ -64,10 +77,12 @@ export const listForProject = query({
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
           .collect();
 
-    const visibleRequests =
-      membership.role === "member"
-        ? requests.filter((request) => request.requestedBy === args.userId)
-        : requests;
+    // Reviewers (owner, assigned PM/team lead) see every request;
+    // everyone else only sees their own.
+    const canReview = await canReviewRequests(ctx, args.userId, args.projectId);
+    const visibleRequests = canReview
+      ? requests
+      : requests.filter((request) => request.requestedBy === args.userId);
 
     const sortedRequests = [...visibleRequests].sort(
       (a, b) => b.createdAt - a.createdAt
@@ -115,13 +130,13 @@ export const getById = query({
       return null;
     }
 
-    const { membership } = await getProjectAndMembership(
-      ctx,
-      request.projectId,
-      args.userId
-    );
+    await getProjectAndOrgRole(ctx, request.projectId, args.userId);
 
-    if (membership.role === "member" && request.requestedBy !== args.userId) {
+    // Non-reviewers may only view their own requests
+    if (
+      request.requestedBy !== args.userId &&
+      !(await canReviewRequests(ctx, args.userId, request.projectId))
+    ) {
       throw new Error("Not authorized to view this request");
     }
 
@@ -163,14 +178,23 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    const { project, membership } = await getProjectAndMembership(
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new Error("Project not found");
+    }
+
+    // Requester must be assigned to the project (owners bypass assignment)
+    const { orgRole } = await assertProjectAction(
       ctx,
+      args.requestedBy,
       args.projectId,
-      args.requestedBy
+      "project:read"
     );
 
-    if (membership.role !== "member") {
-      throw new Error("Only members can create variable requests");
+    if (orgRole !== "developer") {
+      throw new Error(
+        "Only developers can create variable requests — owners, project managers, and team leads can create variables directly"
+      );
     }
 
     const existingVariable = await ctx.db
@@ -254,28 +278,21 @@ export const review = mutation({
       throw new Error(`Request has already been ${request.status}`);
     }
 
-    const { project, membership } = await getProjectAndMembership(
+    const { project } = await getProjectAndOrgRole(
       ctx,
       request.projectId,
       args.reviewedBy
     );
 
-    // Check if the reviewer is a project manager
-    const projectMembership = await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", request.projectId).eq("userId", args.reviewedBy)
-      )
-      .first();
-    const isProjectManager = projectMembership?.role === "manager";
-
-    if (
-      membership.role !== "admin" &&
-      membership.role !== "team_lead" &&
-      !isProjectManager
-    ) {
+    // Reviewers: owner, or PM/team lead assigned to the project
+    const canReview = await canReviewRequests(
+      ctx,
+      args.reviewedBy,
+      request.projectId
+    );
+    if (!canReview) {
       throw new Error(
-        "Only admins, team leads, and project managers can review variable requests"
+        "Only owners, project managers, and team leads can review variable requests"
       );
     }
 
@@ -343,6 +360,17 @@ export const review = mutation({
       changedBy: args.reviewedBy,
       changeReason: `Approved request ${args.requestId}`,
       createdAt: now,
+    });
+
+    // The requester (a developer with no blanket write access) keeps write
+    // access to the variable they requested via an automatic grant.
+    await ctx.db.insert("variablePermissions", {
+      variableId,
+      userId: request.requestedBy,
+      permission: "write",
+      grantedBy: args.reviewedBy,
+      grantedAt: now,
+      isActive: true,
     });
 
     await ctx.db.patch(args.requestId, {
@@ -413,16 +441,13 @@ export const cancel = mutation({
       );
     }
 
-    const { membership } = await getProjectAndMembership(
-      ctx,
-      request.projectId,
-      args.canceledBy
-    );
+    await getProjectAndOrgRole(ctx, request.projectId, args.canceledBy);
 
+    // The requester may cancel their own request; otherwise the caller
+    // must be a reviewer (owner, or assigned PM/team lead)
     const canCancel =
       request.requestedBy === args.canceledBy ||
-      membership.role === "admin" ||
-      membership.role === "team_lead";
+      (await canReviewRequests(ctx, args.canceledBy, request.projectId));
 
     if (!canCancel) {
       throw new Error("Not authorized to cancel this request");

@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const listSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -138,11 +139,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (membership.role !== "member") {
+    // Explicit variable requests are a developer workflow — higher roles
+    // create/update variables directly.
+    if (normalizeOrgRole(membership.role) !== "developer") {
       return NextResponse.json(
         {
           error:
-            "Only members can submit variable requests. Use direct variable creation instead.",
+            "Only developers can submit variable requests. Use direct variable creation instead.",
         },
         { status: 403 }
       );

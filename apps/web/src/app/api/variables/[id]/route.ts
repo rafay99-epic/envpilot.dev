@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { updateSecret } from "@/lib/vault";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const updateVariableSchema = z.object({
   value: z.string().min(1).optional(),
@@ -74,8 +75,8 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Members can only view variables they can access.
-    if (membership.role === "member") {
+    // Developers can only view variables they hold a grant on.
+    if (normalizeOrgRole(membership.role) === "developer") {
       const accessibleVariables = await convex.query(
         api.variables.listWithAccess,
         {
@@ -172,14 +173,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check permission (admin or team_lead can update variables)
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
-      return NextResponse.json(
-        { error: "Insufficient permissions to update variables" },
-        { status: 403 }
-      );
-    }
-
+    // No role gate here: owners/project managers/team leads can update, and
+    // developers holding a write grant on this variable can too. The Convex
+    // mutation enforces the full access rules (getVariableAccess).
     const {
       value,
       description,
@@ -226,10 +222,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ variable: updatedVariable });
   } catch (error) {
     console.error("[PATCH /api/variables/[id]]", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes("Insufficient") ||
+      message.includes("permission") ||
+      message.includes("No access")
+    ) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
     return NextResponse.json(
       {
         error: "Failed to update variable",
-        details: error instanceof Error ? error.message : String(error),
+        details: message,
       },
       { status: 500 }
     );
@@ -282,8 +286,9 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check permission (admin or team_lead can delete variables)
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Delete requires owner / project_manager / team_lead (Convex enforces
+    // project-assignment scoping for non-owners).
+    if (roleLevel(membership.role) < ROLE_LEVEL.team_lead) {
       return NextResponse.json(
         { error: "Insufficient permissions to delete variables" },
         { status: 403 }

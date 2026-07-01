@@ -6,12 +6,25 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
+import {
+  normalizeOrgRole,
+  roleLevel,
+  ROLE_LEVEL,
+  ORG_ROLE_LABELS,
+  type OrgRole,
+} from "@/lib/roles";
 
+// Project membership is a pure assignment ("who is on this project").
+// What a member can do here follows from their organization role, so the
+// role shown next to each member is a read-only badge.
 interface ProjectMember {
   _id: string;
   projectId: string;
   userId: string;
-  role: "viewer" | "developer" | "manager" | "admin";
+  /** The member's organization role (new API shape). */
+  orgRole?: string;
+  /** Legacy field — older API responses put the role here. */
+  role?: string;
   addedAt: number;
   user: {
     _id: string;
@@ -41,18 +54,23 @@ interface Project {
   organizationId: string;
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Org Admin",
-  viewer: "Viewer",
-  developer: "Developer",
-  manager: "Manager",
-};
+function memberOrgRole(member: ProjectMember): OrgRole {
+  if (member.isOrgAdmin) return "owner";
+  return normalizeOrgRole(member.orgRole ?? member.role);
+}
 
-const ROLE_DESCRIPTIONS: Record<string, string> = {
-  viewer: "Can view variables with explicit permissions only",
-  developer: "Can view all variables, create and edit variables",
-  manager: "Full project access, can manage project members",
-};
+function roleBadgeClasses(role: OrgRole): string {
+  switch (role) {
+    case "owner":
+      return "border-green-500/20 bg-green-500/10 text-green-400";
+    case "project_manager":
+      return "border-amber-500/20 bg-amber-500/10 text-amber-400";
+    case "team_lead":
+      return "border-blue-500/20 bg-blue-500/10 text-blue-400";
+    case "developer":
+      return "border-zinc-500/20 bg-zinc-500/10 text-zinc-400";
+  }
+}
 
 export default function ProjectMembersPage({
   params,
@@ -74,10 +92,23 @@ export default function ProjectMembersPage({
   // Add member form
   const [showAddMember, setShowAddMember] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedRole, setSelectedRole] = useState<
-    "viewer" | "developer" | "manager"
-  >("developer");
   const [isAdding, setIsAdding] = useState(false);
+
+  // Gates from the actor's org role: owners and project managers manage
+  // anyone below them; team leads manage developers only.
+  const myRole = normalizeOrgRole(organization?.role);
+  const canManageMembers =
+    !!organization?.role && roleLevel(myRole) >= ROLE_LEVEL.team_lead;
+  const canManageTarget = (targetRole: OrgRole): boolean => {
+    if (!canManageMembers) return false;
+    if (myRole === "team_lead") return targetRole === "developer";
+    return roleLevel(targetRole) < roleLevel(myRole);
+  };
+
+  // Team leads can only add developers to their projects.
+  const addableMembers = assignableMembers.filter((m) =>
+    canManageTarget(normalizeOrgRole(m.orgRole))
+  );
 
   async function fetchData() {
     try {
@@ -134,10 +165,7 @@ export default function ProjectMembersPage({
       const response = await fetch(`/api/projects/${project._id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: selectedUserId,
-          role: selectedRole,
-        }),
+        body: JSON.stringify({ userId: selectedUserId }),
       });
 
       const data = await response.json();
@@ -148,40 +176,11 @@ export default function ProjectMembersPage({
       setSuccessMessage("Member added successfully");
       setShowAddMember(false);
       setSelectedUserId("");
-      setSelectedRole("developer");
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsAdding(false);
-    }
-  }
-
-  async function handleUpdateRole(
-    userId: string,
-    newRole: "viewer" | "developer" | "manager"
-  ) {
-    if (!project) return;
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/projects/${project._id}/members`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update role");
-      }
-
-      setMembers((prev) =>
-        prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m))
-      );
-      setSuccessMessage("Role updated");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
     }
   }
 
@@ -232,7 +231,7 @@ export default function ProjectMembersPage({
           </p>
         </div>
 
-        {assignableMembers && assignableMembers.length > 0 && (
+        {canManageMembers && addableMembers.length > 0 && (
           <button
             onClick={() => setShowAddMember(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
@@ -273,8 +272,8 @@ export default function ProjectMembersPage({
       {/* Info banner */}
       <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
         <p className="text-sm text-blue-400">
-          Organization admins have implicit access to all projects. Their access
-          cannot be removed at the project level.
+          Organization owners have implicit access to all projects. What each
+          member can do here follows from their organization role.
         </p>
       </div>
 
@@ -296,78 +295,66 @@ export default function ProjectMembersPage({
               className="divide-y divide-zinc-100 dark:divide-zinc-800"
               pageKey={membersPagination.currentPage}
             >
-              {membersPagination.pageItems.map((member) => (
-                <div
-                  key={member._id}
-                  className="flex items-center justify-between px-6 py-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
-                      {member.user.name
-                        ? member.user.name.charAt(0).toUpperCase()
-                        : member.user.email.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        {member.user.name || member.user.email}
-                      </p>
-                      {member.user.name && (
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {member.user.email}
+              {membersPagination.pageItems.map((member) => {
+                const targetRole = memberOrgRole(member);
+                return (
+                  <div
+                    key={member._id}
+                    className="flex items-center justify-between px-6 py-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-sm font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300">
+                        {member.user.name
+                          ? member.user.name.charAt(0).toUpperCase()
+                          : member.user.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {member.user.name || member.user.email}
                         </p>
-                      )}
+                        {member.user.name && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {member.user.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(
+                          targetRole
+                        )}`}
+                      >
+                        {ORG_ROLE_LABELS[targetRole]}
+                      </span>
+
+                      {targetRole !== "owner" &&
+                        canManageTarget(targetRole) && (
+                          <button
+                            onClick={() => handleRemoveMember(member.userId)}
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                            title="Remove from project"
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    {member.isOrgAdmin ? (
-                      <span className="inline-flex items-center rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
-                        Org Admin
-                      </span>
-                    ) : (
-                      <>
-                        <select
-                          value={member.role}
-                          onChange={(e) =>
-                            handleUpdateRole(
-                              member.userId,
-                              e.target.value as
-                                | "viewer"
-                                | "developer"
-                                | "manager"
-                            )
-                          }
-                          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                        >
-                          <option value="viewer">Viewer</option>
-                          <option value="developer">Developer</option>
-                          <option value="manager">Manager</option>
-                        </select>
-
-                        <button
-                          onClick={() => handleRemoveMember(member.userId)}
-                          className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                          title="Remove from project"
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </AnimatedList>
             <Pagination
               currentPage={membersPagination.currentPage}
@@ -393,7 +380,8 @@ export default function ProjectMembersPage({
               Add Project Member
             </h3>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Add an organization member to this project.
+              Assign an organization member to this project. Their abilities
+              here follow from their organization role.
             </p>
 
             <form onSubmit={handleAddMember} className="mt-6 space-y-4">
@@ -409,49 +397,13 @@ export default function ProjectMembersPage({
                   className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 >
                   <option value="">Select a member...</option>
-                  {assignableMembers.map((m) => (
+                  {addableMembers.map((m) => (
                     <option key={m._id} value={m._id}>
                       {m.name || m.email} {m.name ? `(${m.email})` : ""} -{" "}
-                      {m.orgRole}
+                      {ORG_ROLE_LABELS[normalizeOrgRole(m.orgRole)]}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {/* Role selection */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Project Role
-                </label>
-                <div className="mt-2 space-y-2">
-                  {(["viewer", "developer", "manager"] as const).map((role) => (
-                    <label
-                      key={role}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                        selectedRole === role
-                          ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
-                          : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        value={role}
-                        checked={selectedRole === role}
-                        onChange={() => setSelectedRole(role)}
-                        className="mt-0.5 h-4 w-4"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                          {ROLE_LABELS[role]}
-                        </p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {ROLE_DESCRIPTIONS[role]}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
               </div>
 
               {/* Actions */}
@@ -461,7 +413,6 @@ export default function ProjectMembersPage({
                   onClick={() => {
                     setShowAddMember(false);
                     setSelectedUserId("");
-                    setSelectedRole("developer");
                   }}
                   className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >

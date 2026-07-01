@@ -9,6 +9,7 @@ import { useVariableSelectionStore } from "@/stores/variable-selection-store";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
@@ -68,7 +69,7 @@ interface Variable {
   createdAt: number;
   updatedAt: number;
   vaultRef?: string;
-  permission?: "read" | "write" | "admin" | null;
+  permission?: "read" | "write" | null;
   rotationFrequencyDays?: number;
   expiresAt?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
@@ -88,11 +89,18 @@ interface VersionRecord {
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
   const { canDo, organization, user } = useAuthContext();
-  const canCreateVariable = canDo("org:create_project");
-  const canUpdateVariable = canDo("org:create_project");
-  const canDeleteVariable = canDo("org:create_project");
-  const canReviewRequests = canDo("org:create_project");
-  const canRequestVariable = organization?.role === "member";
+  // Project-scoped gates follow from the unified org role (assignment is
+  // enforced server-side): every assigned member can create variables;
+  // team leads and above have full variable CRUD; developers edit only
+  // variables they hold a write grant on and can submit requests.
+  const orgRole = normalizeOrgRole(organization?.role);
+  const hasOrgRole = !!organization?.role;
+  const canCreateVariable = hasOrgRole;
+  const canUpdateVariable =
+    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
+  const canDeleteVariable = canUpdateVariable;
+  const canReviewRequests = canUpdateVariable;
+  const canRequestVariable = hasOrgRole && orgRole === "developer";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
@@ -803,7 +811,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     onReveal={() => handleRevealValue(variable)}
                     revealedValue={revealedValues[variable._id] ?? null}
                     isRevealing={revealingIds.has(variable._id)}
-                    canEdit={canUpdateVariable}
+                    canEdit={
+                      canUpdateVariable || variable.permission === "write"
+                    }
                     canDelete={canDeleteVariable}
                     permissionLevel={variable.permission ?? null}
                     onShare={
@@ -1089,7 +1099,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             currentVersion={historyVariableVersion}
             history={(historyData?.history ?? []) as VersionRecord[]}
             onRollback={handleRollback}
-            canRollback={canDo("org:delete_project")}
+            canRollback={canDo("org:rollback_variable")}
             isLoading={isLoadingHistory}
             error={
               historyQueryError

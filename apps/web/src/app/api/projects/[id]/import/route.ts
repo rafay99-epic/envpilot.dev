@@ -7,6 +7,7 @@ import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { handleApiError } from "@/lib/api-errors";
 import { createSecret, readSecret } from "@/lib/vault";
 import { parse, ALL_FORMATS, type FormatType } from "@/lib/format-converter";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -118,35 +119,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Determine write permissions
-    let projectRole: string | null = null;
-    if (membership.role !== "admin") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: id as Id<"projects">,
-          userId: convexUser._id,
-        }
-      );
-      if (projectMembership) {
-        projectRole = projectMembership.role;
-      }
-    }
-
-    const canWriteDirectly =
-      membership.role === "admin" ||
-      membership.role === "team_lead" ||
-      projectRole === "manager";
-
-    if (projectRole === "viewer") {
-      return NextResponse.json(
-        {
-          error:
-            "You have Viewer access to this project. Import is not allowed.",
-        },
-        { status: 403 }
-      );
-    }
+    // Unified RBAC: owner / project_manager / team_lead write directly;
+    // developers go through variable requests. Convex mutations enforce
+    // project-assignment scoping for non-owners.
+    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.team_lead;
 
     // Parse the content
     let parsedVars: Record<string, string>;
@@ -179,7 +155,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // For members/developers, create pending requests
+    // For developers, create pending requests
     if (!canWriteDirectly) {
       let requested = 0;
       let skipped = 0;

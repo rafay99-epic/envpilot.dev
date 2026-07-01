@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const bulkDeleteSchema = z.object({
   variableIds: z.array(z.string()).min(1).max(50),
@@ -57,8 +58,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check permission (admin or team_lead can bulk delete)
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Bulk delete requires owner / project_manager / team_lead (Convex
+    // enforces project-assignment scoping for non-owners).
+    if (roleLevel(membership.role) < ROLE_LEVEL.team_lead) {
       return NextResponse.json(
         { error: "Insufficient permissions to delete variables" },
         { status: 403 }

@@ -13,9 +13,30 @@ import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
 import type { Id } from "@convex/_generated/dataModel";
+import {
+  normalizeOrgRole,
+  roleLevel,
+  ROLE_LEVEL,
+  ORG_ROLE_LABELS,
+  assignableRoles,
+  type OrgRole,
+} from "@/lib/roles";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("app/dashboard/organization-members");
+
+function roleBadgeClasses(role: OrgRole): string {
+  switch (role) {
+    case "owner":
+      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+    case "project_manager":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    case "team_lead":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    case "developer":
+      return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
+  }
+}
 
 interface SearchUser {
   _id: string;
@@ -61,14 +82,14 @@ export default function OrganizationMembersPage({
   const members = (membersData ?? []) as Array<{
     _id: string;
     userId: string;
-    role: "admin" | "team_lead" | "member";
+    role: string;
     joinedAt: number;
     user: { _id: string; email: string; name?: string; avatarUrl?: string };
   }>;
   const invitations = (invitationsData ?? []) as Array<{
     _id: string;
     email: string;
-    role: "admin" | "team_lead" | "member";
+    role: string;
     expiresAt: number;
     createdAt: number;
     invitedByUser?: { name?: string; email: string };
@@ -92,16 +113,11 @@ export default function OrganizationMembersPage({
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<
-    "admin" | "team_lead" | "member"
-  >("member");
+  const [inviteRole, setInviteRole] = useState<OrgRole>("developer");
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-  const [inviteProjectRole, setInviteProjectRole] = useState<
-    "viewer" | "developer" | "manager"
-  >("developer");
 
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -170,8 +186,8 @@ export default function OrganizationMembersPage({
         body: JSON.stringify({
           email: inviteEmail,
           role: inviteRole,
-          ...(inviteRole !== "admin" && selectedProjectIds.length > 0
-            ? { projectIds: selectedProjectIds, projectRole: inviteProjectRole }
+          ...(inviteRole !== "owner" && selectedProjectIds.length > 0
+            ? { projectIds: selectedProjectIds }
             : {}),
         }),
       });
@@ -190,9 +206,8 @@ export default function OrganizationMembersPage({
 
       setShowInviteModal(false);
       setInviteEmail("");
-      setInviteRole("member");
+      setInviteRole("developer");
       setSelectedProjectIds([]);
-      setInviteProjectRole("developer");
 
       if (data.emailSent) {
         setNotice("Invitation sent successfully! Email delivered.");
@@ -211,7 +226,6 @@ export default function OrganizationMembersPage({
           email: inviteEmail,
           inviteRole,
           projectIds: selectedProjectIds,
-          projectRole: inviteProjectRole,
         },
         err
       );
@@ -221,10 +235,7 @@ export default function OrganizationMembersPage({
     }
   }
 
-  async function handleRoleChange(
-    userId: string,
-    newRole: "admin" | "team_lead" | "member"
-  ) {
+  async function handleRoleChange(userId: string, newRole: OrgRole) {
     try {
       const response = await fetch(`/api/organizations/${slug}/members`, {
         method: "PATCH",
@@ -470,8 +481,17 @@ export default function OrganizationMembersPage({
   const membersPagination = usePagination(members, { pageSize: 10 });
   const invitationsPagination = usePagination(invitations, { pageSize: 10 });
 
-  const canInvite = userRole === "admin" || userRole === "team_lead";
-  const isAdmin = userRole === "admin";
+  // Unified role gates — legacy role values are normalized via normalizeOrgRole
+  const hasRole = !!currentUserMember;
+  // org:invite_member — owner, project_manager, team_lead
+  const canInvite = hasRole && roleLevel(userRole) >= ROLE_LEVEL.team_lead;
+  // org:change_role — owner only
+  const canChangeRoles = hasRole && normalizeOrgRole(userRole) === "owner";
+  // org:remove_member / org:view_sessions — owner, project_manager
+  const canRemoveMembers =
+    hasRole && roleLevel(userRole) >= ROLE_LEVEL.project_manager;
+  const canManageSessions = canRemoveMembers;
+  const inviteRoleOptions = assignableRoles(userRole);
 
   if (isLoading) {
     return (
@@ -663,38 +683,33 @@ export default function OrganizationMembersPage({
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {isAdmin ? (
+                  {canChangeRoles ? (
                     <select
-                      value={member.role}
+                      value={normalizeOrgRole(member.role)}
                       onChange={(e) =>
                         handleRoleChange(
                           member.user._id,
-                          e.target.value as "admin" | "team_lead" | "member"
+                          e.target.value as OrgRole
                         )
                       }
                       className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                     >
-                      <option value="admin">Admin</option>
-                      <option value="team_lead">Team Lead</option>
-                      <option value="member">Member</option>
+                      {assignableRoles(userRole).map((role) => (
+                        <option key={role} value={role}>
+                          {ORG_ROLE_LABELS[role]}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        member.role === "admin"
-                          ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                          : member.role === "team_lead"
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(
+                        normalizeOrgRole(member.role)
+                      )}`}
                     >
-                      {member.role === "team_lead"
-                        ? "Team Lead"
-                        : member.role.charAt(0).toUpperCase() +
-                          member.role.slice(1)}
+                      {ORG_ROLE_LABELS[normalizeOrgRole(member.role)]}
                     </span>
                   )}
-                  {canInvite && (
+                  {canManageSessions && (
                     <button
                       onClick={() => toggleSessions(member.user._id)}
                       className={`rounded-md p-1.5 transition-colors ${
@@ -719,7 +734,7 @@ export default function OrganizationMembersPage({
                       </svg>
                     </button>
                   )}
-                  {isAdmin && (
+                  {canRemoveMembers && (
                     <button
                       onClick={() => handleRemoveMember(member.user._id)}
                       className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
@@ -988,18 +1003,11 @@ export default function OrganizationMembersPage({
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      invitation.role === "admin"
-                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                        : invitation.role === "team_lead"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-                    }`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(
+                      normalizeOrgRole(invitation.role)
+                    )}`}
                   >
-                    {invitation.role === "team_lead"
-                      ? "Team Lead"
-                      : invitation.role.charAt(0).toUpperCase() +
-                        invitation.role.slice(1)}
+                    {ORG_ROLE_LABELS[normalizeOrgRole(invitation.role)]}
                   </span>
                   {canInvite && (
                     <>
@@ -1183,19 +1191,17 @@ export default function OrganizationMembersPage({
                 <select
                   id="role"
                   value={inviteRole}
-                  onChange={(e) =>
-                    setInviteRole(
-                      e.target.value as "admin" | "team_lead" | "member"
-                    )
-                  }
+                  onChange={(e) => setInviteRole(e.target.value as OrgRole)}
                   className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                 >
-                  {isAdmin && <option value="admin">Admin</option>}
-                  <option value="team_lead">Team Lead</option>
-                  <option value="member">Member</option>
+                  {inviteRoleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {ORG_ROLE_LABELS[role]}
+                    </option>
+                  ))}
                 </select>
               </div>
-              {inviteRole !== "admin" && projects.length === 0 && (
+              {inviteRole !== "owner" && projects.length === 0 && (
                 <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     No projects available. Create a project first to assign
@@ -1203,14 +1209,15 @@ export default function OrganizationMembersPage({
                   </p>
                 </div>
               )}
-              {inviteRole !== "admin" && projects.length > 0 && (
+              {inviteRole !== "owner" && projects.length > 0 && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       Assign to Projects
                     </label>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Select which projects this member can access.
+                      Select which projects this member is assigned to. What
+                      they can do there follows from their organization role.
                     </p>
                     <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
                       {projects.map((project) => (
@@ -1254,36 +1261,6 @@ export default function OrganizationMembersPage({
                       ))}
                     </div>
                   </div>
-                  {selectedProjectIds.length > 0 && (
-                    <div>
-                      <label
-                        htmlFor="projectRole"
-                        className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-                      >
-                        Project Role
-                      </label>
-                      <select
-                        id="projectRole"
-                        value={inviteProjectRole}
-                        onChange={(e) =>
-                          setInviteProjectRole(
-                            e.target.value as "viewer" | "developer" | "manager"
-                          )
-                        }
-                        className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                      >
-                        <option value="viewer">
-                          Viewer - Read-only access
-                        </option>
-                        <option value="developer">
-                          Developer - Add and edit variables
-                        </option>
-                        <option value="manager">
-                          Manager - Manage project members
-                        </option>
-                      </select>
-                    </div>
-                  )}
                 </>
               )}
               <div className="flex justify-end gap-3 pt-4">
@@ -1292,9 +1269,8 @@ export default function OrganizationMembersPage({
                   onClick={() => {
                     setShowInviteModal(false);
                     setInviteEmail("");
-                    setInviteRole("member");
+                    setInviteRole("developer");
                     setSelectedProjectIds([]);
-                    setInviteProjectRole("developer");
                     setInviteError(null);
                     setSearchResults([]);
                     setShowSearchResults(false);

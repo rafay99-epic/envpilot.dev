@@ -9,6 +9,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const updateTagSchema = z.object({
   name: z
@@ -28,7 +29,7 @@ interface RouteContext {
 }
 
 /**
- * Shared helper — resolves tag + validates admin/team_lead membership.
+ * Shared helper — resolves tag + validates owner/project_manager/team_lead membership.
  * Returns { tag, membership, convexUser } or a NextResponse error.
  */
 async function resolveTagWithAuth(tagId: string) {
@@ -64,10 +65,11 @@ async function resolveTagWithAuth(tagId: string) {
     };
   }
 
-  if (membership.role !== "admin" && membership.role !== "team_lead") {
+  // Tag management requires owner / project_manager / team_lead
+  if (roleLevel(membership.role) < ROLE_LEVEL.team_lead) {
     return {
       error: NextResponse.json(
-        { error: "Only admins and team leads can manage tags" },
+        { error: "Insufficient permissions to manage tags" },
         { status: 403 }
       ),
     };

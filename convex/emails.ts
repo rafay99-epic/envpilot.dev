@@ -4,6 +4,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
+import { roleLevel, ROLE_LEVEL } from "./authz";
 
 // ============================================================
 // Helpers
@@ -150,8 +151,12 @@ export const sendInvitationEmail = action({
     inviterName: v.string(),
     organizationName: v.string(),
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration)
+      v.literal("admin"),
       v.literal("member")
     ),
     token: v.string(),
@@ -169,10 +174,15 @@ export const sendInvitationEmail = action({
         day: "numeric",
       }
     );
-    const roleDisplay =
-      args.role === "team_lead"
-        ? "Team Lead"
-        : args.role.charAt(0).toUpperCase() + args.role.slice(1);
+    const ROLE_DISPLAY: Record<string, string> = {
+      owner: "Owner",
+      project_manager: "Project Manager",
+      team_lead: "Team Lead",
+      developer: "Developer",
+      admin: "Owner",
+      member: "Developer",
+    };
+    const roleDisplay = ROLE_DISPLAY[args.role] ?? "Developer";
 
     const safeInviter = escapeHtml(args.inviterName);
     const safeOrg = escapeHtml(args.organizationName);
@@ -630,8 +640,9 @@ export const sendRotationReminderEmail = internalAction({
 
     for (const member of members) {
       if (!member?.user?.email) continue;
-      // Only notify admins and team leads — they can act on rotation
-      if (member.role !== "admin" && member.role !== "team_lead") continue;
+      // Only notify members with at least the team_lead role
+      // (owner / project_manager / team_lead) — they can act on rotation
+      if (roleLevel(member.role) < ROLE_LEVEL.team_lead) continue;
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(
@@ -768,8 +779,10 @@ export const sendAnomalyAlertEmail = internalAction({
     if (members) {
       for (const member of members) {
         if (!member?.user?.email) continue;
-        if (member.role !== "admin") continue;
-        // Don't send duplicate if admin is the affected user
+        // Only owners and project managers can view/act on anomalies
+        // (matches ORG_ACTIONS["org:view_anomalies"])
+        if (roleLevel(member.role) < ROLE_LEVEL.project_manager) continue;
+        // Don't send duplicate if the recipient is the affected user
         if (member.user._id === args.userId) continue;
 
         await sendEmail(member.user.email, subject, html, text).catch((err) =>

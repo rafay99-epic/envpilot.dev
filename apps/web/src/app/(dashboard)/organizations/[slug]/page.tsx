@@ -8,6 +8,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 
 interface Organization {
   _id: string;
@@ -15,7 +16,7 @@ interface Organization {
   slug: string;
   description?: string;
   logoUrl?: string;
-  role: "admin" | "team_lead" | "member";
+  role: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -114,9 +115,8 @@ export default function OrganizationPage({
     );
   }
 
-  const isAdmin = organization.role === "admin";
-  const canInvite =
-    organization.role === "admin" || organization.role === "team_lead";
+  const role = normalizeOrgRole(organization.role);
+  const isOwner = role === "owner";
 
   return (
     <div className="space-y-8">
@@ -160,17 +160,16 @@ export default function OrganizationPage({
         <div className="flex items-center gap-2">
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
-              organization.role === "admin"
+              role === "owner"
                 ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                : organization.role === "team_lead"
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                : role === "project_manager"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  : role === "team_lead"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
             }`}
           >
-            {organization.role === "team_lead"
-              ? "Team Lead"
-              : organization.role.charAt(0).toUpperCase() +
-                organization.role.slice(1)}
+            {ORG_ROLE_LABELS[role]}
           </span>
         </div>
       </div>
@@ -219,7 +218,7 @@ export default function OrganizationPage({
           </svg>
         </Link>
 
-        {isAdmin && (
+        {isOwner && (
           <Link
             href={`/organizations/${slug}/settings`}
             className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"

@@ -5,6 +5,7 @@ import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
 import { checkBooleanFeature, checkNumericLimit } from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
+import { assertOrgMembership } from "./authz";
 
 /**
  * Shared Secrets — Convex Mutations & Queries
@@ -394,7 +395,8 @@ export const verifyOtp = mutation({
 });
 
 /**
- * Revoke a shared secret. The creator, org admins, and team leads can revoke.
+ * Revoke a shared secret. The creator, or any org member with at least the
+ * team_lead role (owner / project_manager / team_lead), can revoke.
  */
 export const revokeShare = mutation({
   args: {
@@ -407,19 +409,17 @@ export const revokeShare = mutation({
       throw new Error("Share not found.");
     }
 
-    // Check if user is creator OR org admin/owner
+    // Check if user is creator OR at least a team lead in the org
     const isCreator = share.createdBy === args.userId;
     if (!isCreator) {
-      const membership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q.eq("organizationId", share.organizationId).eq("userId", args.userId)
-        )
-        .first();
-
-      const isAdmin =
-        membership?.role === "admin" || membership?.role === "team_lead";
-      if (!isAdmin) {
+      try {
+        await assertOrgMembership(
+          ctx,
+          args.userId,
+          share.organizationId,
+          "team_lead"
+        );
+      } catch {
         throw new Error("Not authorized to revoke this share.");
       }
     }
@@ -502,13 +502,14 @@ export const listActiveByOrg = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const shares = await ctx.db
-      .query("sharedSecrets")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("status"), "active"))
-      .collect();
+    const shares = (
+      await ctx.db
+        .query("sharedSecrets")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect()
+    ).filter((share) => share.status === "active");
 
     const result = await Promise.all(
       shares.map(async (share) => {
@@ -592,13 +593,14 @@ export const countActiveByOrg = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const shares = await ctx.db
-      .query("sharedSecrets")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("status"), "active"))
-      .collect();
+    const shares = (
+      await ctx.db
+        .query("sharedSecrets")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect()
+    ).filter((share) => share.status === "active");
     return shares.length;
   },
 });
@@ -611,11 +613,14 @@ export async function countActiveShares(
   db: DatabaseReader,
   organizationId: Id<"organizations">
 ): Promise<number> {
-  const shares = await db
-    .query("sharedSecrets")
-    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .filter((q) => q.eq(q.field("status"), "active"))
-    .collect();
+  const shares = (
+    await db
+      .query("sharedSecrets")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", organizationId)
+      )
+      .collect()
+  ).filter((share) => share.status === "active");
   return shares.length;
 }
 

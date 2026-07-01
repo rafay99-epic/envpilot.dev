@@ -9,17 +9,14 @@ import {
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
 import { handleApiError } from "@/lib/api-errors";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
+// Project membership is a pure assignment in the unified RBAC model —
+// what a user can do in the project is derived from their org role.
 const addMemberSchema = z.object({
   userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
-  role: z.enum(["viewer", "developer", "manager"]),
-});
-
-const updateRoleSchema = z.object({
-  userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
-  role: z.enum(["viewer", "developer", "manager"]),
 });
 
 interface RouteParams {
@@ -62,30 +59,32 @@ export async function GET(_request: Request, { params }: RouteParams) {
       projectId: id as Id<"projects">,
     });
 
-    // Fetch org admins who have implicit access to all projects
+    // Fetch org owners who have implicit access to all projects
     const orgMembers = await convex.query(api.organizations.getMembers, {
       organizationId: project.organizationId,
     });
-    const adminMembers = (orgMembers ?? [])
+    const ownerMembers = (orgMembers ?? [])
       .filter(
-        (m): m is NonNullable<typeof m> => m != null && m.role === "admin"
+        (m): m is NonNullable<typeof m> =>
+          m != null && normalizeOrgRole(m.role) === "owner"
       )
       .map((m) => ({
-        _id: `admin_${m.userId}`,
+        _id: `owner_${m.userId}`,
         projectId: id,
         userId: m.userId,
-        role: "admin" as const,
+        role: "owner" as const,
         addedAt: m.joinedAt,
         user: m.user,
-        isOrgAdmin: true,
+        isOrgAdmin: true, // legacy field name kept for response compatibility
       }));
 
-    // Combine: org admins first, then explicit project members
-    const allMembers = [...adminMembers, ...members];
+    // Combine: org owners first, then explicit project members
+    const allMembers = [...ownerMembers, ...members];
 
-    // Also get assignable members if user can manage
+    // Also get assignable members if user can manage (owner / project_manager /
+    // team_lead — Convex enforces project-assignment scoping for non-owners).
     let assignableMembers = null;
-    if (membership.role === "admin" || membership.role === "team_lead") {
+    if (roleLevel(membership.role) >= ROLE_LEVEL.team_lead) {
       assignableMembers = await convex.query(
         api.projectMembers.getAssignableOrgMembers,
         {
@@ -93,24 +92,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
           requestingUserId: convexUser._id,
         }
       );
-    } else {
-      // Check if project manager
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: id as Id<"projects">,
-          userId: convexUser._id,
-        }
-      );
-      if (projectMembership?.role === "manager") {
-        assignableMembers = await convex.query(
-          api.projectMembers.getAssignableOrgMembers,
-          {
-            projectId: id as Id<"projects">,
-            requestingUserId: convexUser._id,
-          }
-        );
-      }
     }
 
     return NextResponse.json({ members: allMembers, assignableMembers });
@@ -150,7 +131,6 @@ export async function POST(request: Request, { params }: RouteParams) {
     const membershipId = await convex.mutation(api.projectMembers.addMember, {
       projectId: id as Id<"projects">,
       userId: validation.data.userId as Id<"users">,
-      role: validation.data.role,
       addedBy: convexUser._id,
     });
 
@@ -162,41 +142,20 @@ export async function POST(request: Request, { params }: RouteParams) {
 }
 
 /**
- * PATCH /api/projects/[id]/members - Update a member's project role
+ * PATCH /api/projects/[id]/members - Gone.
+ *
+ * Project-level roles no longer exist: project membership is a pure
+ * assignment, and what a user can do in a project is derived from their
+ * organization role. Change the member's organization role instead.
  */
-export async function PATCH(request: Request, { params }: RouteParams) {
-  try {
-    const { user } = await withAuth();
-    const { id } = await params;
-
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validation = updateRoleSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: validation.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
-    await convex.mutation(api.projectMembers.updateMemberRole, {
-      projectId: id as Id<"projects">,
-      userId: validation.data.userId as Id<"users">,
-      newRole: validation.data.role,
-      updatedBy: convexUser._id,
-    });
-
-    return NextResponse.json({ updated: true });
-  } catch (error) {
-    console.error("Error updating project member role:", error);
-    return handleApiError(error, "Failed to update role");
-  }
+export async function PATCH() {
+  return NextResponse.json(
+    {
+      error:
+        "Project-level roles have been removed. Project membership is now an assignment only; a member's capabilities are determined by their organization role. Update the member's organization role instead.",
+    },
+    { status: 410 }
+  );
 }
 
 /**

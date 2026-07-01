@@ -129,7 +129,8 @@ export default function AnalyticsPage() {
     | Id<"organizations">
     | undefined;
 
-  // Only admin and team lead can access analytics — redirect members to dashboard
+  // Only owners and project managers can access analytics — others are
+  // redirected to the dashboard
   const canViewAnalytics = canDo("org:create_project");
 
   // Single unified query — no duplicate audit log fetches

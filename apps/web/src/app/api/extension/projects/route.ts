@@ -5,6 +5,28 @@ import type { Id } from "@convex/_generated/dataModel";
 import { checkOrganizationMembership } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { clientIp, createLogger, isRateLimitError, since } from "@/lib/logger";
+import {
+  normalizeOrgRole,
+  toLegacyOrgRole,
+  toLegacyProjectRole,
+} from "@/lib/roles";
+
+// Old extension builds only understand the legacy role strings and derive
+// .env file protection from them. Non-owners only receive projects they are
+// assigned to, so assignment is implied; owners get projectRole null exactly
+// like legacy admins did (their org role already grants write access).
+function legacyRolesForProject(orgRole: string | null | undefined): {
+  userRole: string;
+  projectRole: string | null;
+} {
+  return {
+    userRole: toLegacyOrgRole(orgRole),
+    projectRole:
+      normalizeOrgRole(orgRole) === "owner"
+        ? null
+        : toLegacyProjectRole(orgRole, true),
+  };
+}
 
 /**
  * GET /api/extension/projects - List projects for the authenticated user
@@ -72,8 +94,7 @@ export async function GET(request: Request) {
             organizationId: project.organizationId,
             icon: project.icon || null,
             color: project.color || null,
-            userRole: project.userRole ?? null,
-            projectRole: project.projectRole ?? null,
+            ...legacyRolesForProject(membership.role),
           })),
         },
       });
@@ -110,8 +131,7 @@ export async function GET(request: Request) {
             organizationId: project.organizationId,
             icon: project.icon || null,
             color: project.color || null,
-            userRole: project.userRole ?? null,
-            projectRole: project.projectRole ?? null,
+            ...legacyRolesForProject(project.userRole),
           })
         ),
       },

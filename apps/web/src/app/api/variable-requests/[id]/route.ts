@@ -17,8 +17,8 @@ interface RouteContext {
 
 /**
  * PATCH /api/variable-requests/[id]
- * - approve/reject: admin/team_lead
- * - cancel: requester (or admin/team_lead)
+ * - approve/reject: owner/project_manager/team_lead (enforced in Convex)
+ * - cancel: requester (or owner/project_manager/team_lead)
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
@@ -82,6 +82,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       message.includes("Not authorized") ||
+      message.includes("Insufficient") ||
       message.includes("Only admins and team leads")
     ) {
       return NextResponse.json({ error: message }, { status: 403 });

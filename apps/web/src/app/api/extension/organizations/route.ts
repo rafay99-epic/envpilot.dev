@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { toLegacyOrgRole } from "@/lib/roles";
 
 /**
  * GET /api/extension/organizations - List organizations for the authenticated user
@@ -44,7 +45,8 @@ export async function GET(request: Request) {
             name: org!.name,
             slug: org!.slug,
             tier: orgTiers[index]?.tierName ?? "free",
-            role: org!.role || "member",
+            // Old extension builds only understand the legacy role strings.
+            role: toLegacyOrgRole(org!.role),
             extensionAccess: features.extension_access?.value === true,
           };
         }),

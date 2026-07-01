@@ -114,7 +114,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const decrypted: Record<string, string> = {};
     for (const variable of accessible) {
       try {
-        const value = await readSecret(variable.vaultRef);
+        // vaultRef is only returned for entries with hasAccess (filtered above)
+        const value = variable.vaultRef
+          ? await readSecret(variable.vaultRef)
+          : "";
         decrypted[variable.key] = value || "";
       } catch {
         decrypted[variable.key] = "[DECRYPTION_FAILED]";

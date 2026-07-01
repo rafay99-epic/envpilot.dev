@@ -329,7 +329,7 @@ const FEATURES = [
   {
     icon: Users,
     title: "Role-Based Access",
-    desc: "Three-tier RBAC with per-variable permissions. Members request access; leads and admins approve.",
+    desc: "Role-based access with per-variable permissions. Developers request access; leads, managers, and owners approve.",
   },
   {
     icon: Eye,

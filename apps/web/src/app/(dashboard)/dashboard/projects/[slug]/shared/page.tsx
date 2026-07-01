@@ -26,6 +26,7 @@ import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { useProjects } from "@/hooks";
 import { useRevokeShare } from "@/hooks/useShareSecret";
 import { ConfirmDialog } from "@/components/ui";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 /* ─── Types ────────────────────────────────────────────────────────── */
 
@@ -353,8 +354,10 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
 
   const revokeShare = useRevokeShare();
 
+  // Revoking shares requires team lead or above (variables CRUD scope)
   const isOrgAdmin =
-    organization?.role === "admin" || organization?.role === "team_lead";
+    !!organization?.role &&
+    roleLevel(organization.role) >= ROLE_LEVEL.team_lead;
 
   // ── UI state ──
   const [filter, setFilter] = useState<FilterKey>("all");

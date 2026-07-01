@@ -7,7 +7,11 @@ import {
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { batchGetUsers } from "./helpers";
-import { assertOrgAction, assertCanManageUser } from "./authz";
+import {
+  assertOrgAction,
+  assertCanAssignRole,
+  normalizeOrgRole,
+} from "./authz";
 
 /**
  * Invitation Queries and Mutations
@@ -31,8 +35,8 @@ export const listPendingByOrganization = query({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.status === "pending"));
 
     const now = Date.now();
     const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
@@ -60,8 +64,8 @@ export const getForEmail = query({
     const invitations = await ctx.db
       .query("invitations")
       .withIndex("by_email", (q) => q.eq("email", args.email))
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.status === "pending"));
 
     const now = Date.now();
     const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
@@ -116,19 +120,17 @@ export const create = mutation({
     email: v.string(),
     organizationId: v.id("organizations"),
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("developer")
     ),
     projectIds: v.optional(v.array(v.id("projects"))),
-    projectRole: v.optional(
-      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
-    ),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can invite
+    // Authorization: owners, project managers, and team leads can invite
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.invitedBy,
@@ -136,8 +138,8 @@ export const create = mutation({
       "org:invite_member"
     );
 
-    // Hierarchy: team_leads can only invite roles below them (member only)
-    assertCanManageUser(callerMembership.role, args.role, "invite member");
+    // Hierarchy: can only invite roles below your own (owners may invite any)
+    assertCanAssignRole(callerMembership.role, args.role);
 
     // Rate limit: prevent invitation spam
     await rateLimiter.limit(ctx, "invitationCreate", {
@@ -175,13 +177,10 @@ export const create = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "pending"),
-          q.gt(q.field("expiresAt"), now)
-        )
-      )
-      .collect();
+      .collect()
+      .then((rows) =>
+        rows.filter((doc) => doc.status === "pending" && doc.expiresAt > now)
+      );
     const inviteCheck = await checkNumericLimit(
       ctx.db,
       args.organizationId,
@@ -215,13 +214,15 @@ export const create = mutation({
     const existingInvitation = await ctx.db
       .query("invitations")
       .withIndex("by_email", (q) => q.eq("email", args.email))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "pending"),
-          q.eq(q.field("organizationId"), args.organizationId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) =>
+              doc.status === "pending" &&
+              doc.organizationId === args.organizationId
+          ) ?? null
+      );
 
     if (existingInvitation && existingInvitation.expiresAt > now) {
       throw new Error("An invitation is already pending");
@@ -234,7 +235,6 @@ export const create = mutation({
       organizationId: args.organizationId,
       role: args.role,
       projectIds: args.projectIds,
-      projectRole: args.projectRole,
       token,
       invitedBy: args.invitedBy,
       status: "pending",
@@ -299,28 +299,30 @@ export const accept = mutation({
       throw new Error("Already a member");
     }
 
+    const invitedRole = normalizeOrgRole(invitation.role);
+
     await ctx.db.insert("organizationMembers", {
       organizationId: invitation.organizationId,
       userId: args.userId,
-      role: invitation.role,
+      role: invitedRole,
       joinedAt: now,
       invitedBy: invitation.invitedBy,
     });
 
-    // Create project memberships if projects were specified in the invitation
+    // Create project assignments if projects were specified in the invitation.
+    // Owners have implicit access to every project, so no assignments needed.
     if (
       invitation.projectIds &&
       invitation.projectIds.length > 0 &&
-      invitation.role !== "admin"
+      invitedRole !== "owner"
     ) {
-      const projectRole = invitation.projectRole ?? "developer";
       for (const projectId of invitation.projectIds) {
         const project = await ctx.db.get(projectId);
         if (project && !project.deletedAt) {
+          // Pure scope assignment — capabilities come from the org role
           await ctx.db.insert("projectMembers", {
             projectId,
             userId: args.userId,
-            role: projectRole,
             addedBy: invitation.invitedBy,
             addedAt: now,
           });
@@ -339,9 +341,8 @@ export const accept = mutation({
       action: "invitation.accepted",
       details: JSON.stringify({
         invitationId: invitation._id,
-        role: invitation.role,
+        role: invitedRole,
         projectIds: invitation.projectIds,
-        projectRole: invitation.projectRole,
       }),
       createdAt: now,
     });
@@ -471,8 +472,8 @@ export const cleanupExpired = internalMutation({
     const expiredInvitations = await ctx.db
       .query("invitations")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .filter((q) => q.lt(q.field("expiresAt"), now))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.expiresAt < now));
 
     for (const invitation of expiredInvitations) {
       await ctx.db.patch(invitation._id, {

@@ -13,6 +13,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const createTagSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -114,10 +115,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Only admin/team_lead can create tags
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Tag management requires owner / project_manager / team_lead
+    if (roleLevel(membership.role) < ROLE_LEVEL.team_lead) {
       return NextResponse.json(
-        { error: "Only admins and team leads can manage tags" },
+        { error: "Insufficient permissions to manage tags" },
         { status: 403 }
       );
     }

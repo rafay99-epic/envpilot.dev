@@ -144,7 +144,7 @@ export default function AnomalyRulesPage() {
         <TerminalWindow title="Anomaly Rules">
           <TerminalEmptyState
             command="access denied"
-            message="Access restricted — anomaly detection is available to admins and team leads only."
+            message="Access restricted — anomaly detection is available to owners and project managers only."
           />
         </TerminalWindow>
       }

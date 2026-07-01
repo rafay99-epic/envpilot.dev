@@ -23,6 +23,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -513,12 +514,15 @@ function TeamMemberRow({
     user: { _id: unknown; name?: string; email: string; avatarUrl?: string };
   };
 }) {
+  const role = normalizeOrgRole(member.role);
   const roleColor =
-    member.role === "admin"
+    role === "owner"
       ? "purple"
-      : member.role === "team_lead"
-        ? "blue"
-        : ("zinc" as const);
+      : role === "project_manager"
+        ? "amber"
+        : role === "team_lead"
+          ? "blue"
+          : ("zinc" as const);
 
   return (
     <div className="flex items-center justify-between px-5 py-2.5">
@@ -538,9 +542,7 @@ function TeamMemberRow({
           {member.user.name || member.user.email}
         </span>
       </div>
-      <TerminalBadge color={roleColor}>
-        {member.role.replace("_", " ")}
-      </TerminalBadge>
+      <TerminalBadge color={roleColor}>{ORG_ROLE_LABELS[role]}</TerminalBadge>
     </div>
   );
 }

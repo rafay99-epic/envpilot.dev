@@ -5,6 +5,7 @@ import { Id } from "./_generated/dataModel";
 import { SEED_CHANGELOG } from "./changelog";
 import { SEED_FEATURE_REQUESTS } from "./featureRequests";
 import { runAnomalyDetectionTest } from "./anomalyDetection";
+import { normalizeOrgRole } from "./authz";
 
 // ==========================================
 // HELPERS
@@ -2102,6 +2103,118 @@ export const runMigration = mutation({
       });
     }
 
+    if (args.name === "migrate-unified-roles") {
+      const results = {
+        orgMembersToOwner: 0,
+        orgMembersToProjectManager: 0,
+        orgMembersToTeamLead: 0,
+        orgMembersToDeveloper: 0,
+        orgMembersSkipped: 0,
+        invitationsMigrated: 0,
+        invitationsSkipped: 0,
+        variablePermissionsMigrated: 0,
+        variablePermissionsSkipped: 0,
+      };
+
+      const orgMembers = await ctx.db.query("organizationMembers").collect();
+
+      // "team_lead" exists in BOTH the legacy and the unified model, so it is
+      // ambiguous on its own. An un-migrated org always contains at least one
+      // legacy "admin" row (the creator) or "member" row; an org with neither
+      // is already on the unified model, so its "team_lead" rows are new-model
+      // values and must be left alone. This keeps the migration idempotent.
+      const legacyOrgIds = new Set<string>();
+      for (const member of orgMembers) {
+        if (member.role === "admin" || member.role === "member") {
+          legacyOrgIds.add(member.organizationId.toString());
+        }
+      }
+
+      // a. organizationMembers:
+      //    admin → owner; team_lead → project_manager (legacy orgs only);
+      //    member → team_lead if they hold a legacy "manager" project role on
+      //    a non-deleted project in the same org, else developer.
+      for (const member of orgMembers) {
+        if (member.role === "admin") {
+          await ctx.db.patch(member._id, { role: "owner" });
+          results.orgMembersToOwner++;
+        } else if (
+          member.role === "team_lead" &&
+          legacyOrgIds.has(member.organizationId.toString())
+        ) {
+          await ctx.db.patch(member._id, { role: "project_manager" });
+          results.orgMembersToProjectManager++;
+        } else if (member.role === "member") {
+          let promoted = false;
+          const projectMemberships = await ctx.db
+            .query("projectMembers")
+            .withIndex("by_user", (q) => q.eq("userId", member.userId))
+            .collect();
+          for (const pm of projectMemberships) {
+            if (pm.role !== "manager") continue;
+            const project = await ctx.db.get(pm.projectId);
+            if (
+              project &&
+              !project.deletedAt &&
+              project.organizationId === member.organizationId
+            ) {
+              promoted = true;
+              break;
+            }
+          }
+          if (promoted) {
+            await ctx.db.patch(member._id, { role: "team_lead" });
+            results.orgMembersToTeamLead++;
+          } else {
+            await ctx.db.patch(member._id, { role: "developer" });
+            results.orgMembersToDeveloper++;
+          }
+        } else {
+          // Already on a unified-model value
+          results.orgMembersSkipped++;
+        }
+      }
+
+      // b. Pending invitations: admin → owner; team_lead → project_manager
+      //    (legacy orgs only, same ambiguity rule as above); member → developer
+      const pendingInvitations = await ctx.db
+        .query("invitations")
+        .withIndex("by_status", (q) => q.eq("status", "pending"))
+        .collect();
+      for (const invitation of pendingInvitations) {
+        if (invitation.role === "admin") {
+          await ctx.db.patch(invitation._id, { role: "owner" });
+          results.invitationsMigrated++;
+        } else if (
+          invitation.role === "team_lead" &&
+          legacyOrgIds.has(invitation.organizationId.toString())
+        ) {
+          await ctx.db.patch(invitation._id, { role: "project_manager" });
+          results.invitationsMigrated++;
+        } else if (invitation.role === "member") {
+          await ctx.db.patch(invitation._id, { role: "developer" });
+          results.invitationsMigrated++;
+        } else {
+          results.invitationsSkipped++;
+        }
+      }
+
+      // c. variablePermissions: legacy "admin" permission → "write"
+      const allVariablePermissions = await ctx.db
+        .query("variablePermissions")
+        .collect();
+      for (const perm of allVariablePermissions) {
+        if (perm.permission === "admin") {
+          await ctx.db.patch(perm._id, { permission: "write" });
+          results.variablePermissionsMigrated++;
+        } else {
+          results.variablePermissionsSkipped++;
+        }
+      }
+
+      return { success: true, ...results };
+    }
+
     throw new Error(`Unknown migration: ${args.name}`);
   },
 });
@@ -2634,8 +2747,10 @@ export const listUserTiers = query({
         const ownedOrgs = await ctx.db
           .query("organizationMembers")
           .withIndex("by_user", (q) => q.eq("userId", ut.userId))
-          .filter((q) => q.eq(q.field("role"), "admin"))
-          .collect();
+          .collect()
+          .then((rows) =>
+            rows.filter((doc) => normalizeOrgRole(doc.role) === "owner")
+          );
 
         // Check grace period
         const grace = await ctx.db
@@ -2978,8 +3093,8 @@ export const listRotationVariables = query({
     // Convex filters on optional fields can be unreliable with undefined checks
     const allVariables = await ctx.db
       .query("environmentVariables")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     const variables = allVariables.filter(
       (v) =>

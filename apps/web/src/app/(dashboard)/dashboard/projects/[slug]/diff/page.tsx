@@ -109,7 +109,7 @@ interface Variable {
   createdAt: number;
   updatedAt: number;
   vaultRef?: string;
-  permission?: "read" | "write" | "admin" | null;
+  permission?: "read" | "write" | null;
 }
 
 type DiffStatus = "matching" | "changed" | "missing";

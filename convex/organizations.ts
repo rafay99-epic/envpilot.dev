@@ -8,7 +8,12 @@ import {
 } from "./featureRegistry";
 import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
-import { assertOrgAction, assertCanManageUser } from "./authz";
+import {
+  assertOrgAction,
+  assertCanManageUser,
+  assertCanAssignRole,
+  normalizeOrgRole,
+} from "./authz";
 
 /**
  * Organization Queries and Mutations
@@ -179,8 +184,10 @@ export const create = mutation({
     const userMemberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", args.createdBy))
-      .filter((q) => q.eq(q.field("role"), "admin"))
-      .collect();
+      .collect()
+      .then((rows) =>
+        rows.filter((doc) => normalizeOrgRole(doc.role) === "owner")
+      );
 
     const orgResolved = await resolveFeatureForUser(
       ctx.db,
@@ -233,7 +240,7 @@ export const create = mutation({
     await ctx.db.insert("organizationMembers", {
       organizationId,
       userId: args.createdBy,
-      role: "admin",
+      role: "owner",
       joinedAt: now,
     });
 
@@ -352,8 +359,8 @@ export const remove = mutation({
       const variables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
       for (const variable of variables) {
         await ctx.db.patch(variable._id, { deletedAt: now, updatedAt: now });
@@ -371,8 +378,8 @@ export const remove = mutation({
         const permissions = await ctx.db
           .query("variablePermissions")
           .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-          .filter((q) => q.eq(q.field("isActive"), true))
-          .collect();
+          .collect()
+          .then((rows) => rows.filter((doc) => doc.isActive === true));
         for (const perm of permissions) {
           await ctx.db.patch(perm._id, {
             isActive: false,
@@ -395,8 +402,8 @@ export const remove = mutation({
       const accessTokens = await ctx.db
         .query("projectAccess")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
       for (const token of accessTokens) {
         await ctx.db.patch(token._id, { isActive: false });
         await ctx.db.insert("permissionRevocationEvents", {
@@ -494,14 +501,15 @@ export const addMember = mutation({
     organizationId: v.id("organizations"),
     userId: v.id("users"),
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("developer")
     ),
     invitedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can add members
+    // Authorization: owners, project managers, and team leads can add members
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.invitedBy,
@@ -509,8 +517,8 @@ export const addMember = mutation({
       "org:invite_member"
     );
 
-    // Hierarchy: team_leads can only add members, not equal/higher roles
-    assertCanManageUser(callerMembership.role, args.role, "invite member");
+    // Hierarchy: can only assign roles below your own (owners may assign any)
+    assertCanAssignRole(callerMembership.role, args.role);
 
     const now = Date.now();
 
@@ -603,6 +611,24 @@ export const removeMember = mutation({
       throw new Error("User is not a member of this organization");
     }
 
+    // Prevent removing the last owner of the organization
+    if (normalizeOrgRole(membership.role) === "owner") {
+      const allMembers = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect();
+      const ownerCount = allMembers.filter(
+        (m) => normalizeOrgRole(m.role) === "owner"
+      ).length;
+      if (ownerCount <= 1) {
+        throw new Error(
+          "Cannot remove the last owner of the organization. Transfer ownership or promote another member to owner first."
+        );
+      }
+    }
+
     // Hierarchy: when removing others, cannot remove a user at or above your level
     if (!isSelfRemoval && callerMembership) {
       assertCanManageUser(
@@ -619,8 +645,8 @@ export const removeMember = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     let revokedTokenCount = 0;
 
@@ -630,8 +656,8 @@ export const removeMember = mutation({
         .withIndex("by_project_and_user", (q) =>
           q.eq("projectId", project._id).eq("userId", args.userId)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
 
       for (const token of activeTokens) {
         await ctx.db.patch(token._id, { isActive: false });
@@ -729,14 +755,15 @@ export const updateMemberRole = mutation({
     organizationId: v.id("organizations"),
     userId: v.id("users"),
     newRole: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("developer")
     ),
     updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins can change roles
+    // Authorization: only owners can change roles
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.updatedBy,
@@ -757,21 +784,44 @@ export const updateMemberRole = mutation({
       throw new Error("User is not a member of this organization");
     }
 
+    const oldRoleNormalized = normalizeOrgRole(membership.role);
+
+    // Prevent demoting the last owner of the organization
+    if (oldRoleNormalized === "owner" && args.newRole !== "owner") {
+      const allMembers = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect();
+      const ownerCount = allMembers.filter(
+        (m) => normalizeOrgRole(m.role) === "owner"
+      ).length;
+      if (ownerCount <= 1) {
+        throw new Error(
+          "Cannot demote the last owner of the organization. Promote another member to owner first."
+        );
+      }
+    }
+
     // Hierarchy: cannot change role of someone at or above your level
     assertCanManageUser(callerMembership.role, membership.role, "change role");
 
+    // Hierarchy: can only assign roles below your own (owners may assign any)
+    assertCanAssignRole(callerMembership.role, args.newRole);
+
     const oldRole = membership.role;
 
-    // When demoting from admin to non-admin, auto-create projectMembers
-    // for all org projects so the user doesn't lose access
-    if (oldRole === "admin" && args.newRole !== "admin") {
+    // When demoting from owner to a non-owner role, auto-create projectMembers
+    // assignments for all org projects so the user doesn't lose access
+    if (oldRoleNormalized === "owner" && args.newRole !== "owner") {
       const orgProjects = await ctx.db
         .query("projects")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
       for (const project of orgProjects) {
         const existingPm = await ctx.db
@@ -782,10 +832,10 @@ export const updateMemberRole = mutation({
           .first();
 
         if (!existingPm) {
+          // Pure scope assignment — capabilities come from the org role
           await ctx.db.insert("projectMembers", {
             projectId: project._id,
             userId: args.userId,
-            role: args.newRole === "team_lead" ? "manager" : "developer",
             addedBy: args.updatedBy,
             addedAt: now,
           });
@@ -866,23 +916,13 @@ export const getMemberSessions = query({
     callerUserId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify caller is admin or team_lead
-    const callerMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("userId", args.callerUserId)
-      )
-      .first();
-
-    if (
-      !callerMembership ||
-      (callerMembership.role !== "admin" &&
-        callerMembership.role !== "team_lead")
-    ) {
-      throw new Error("Only admins and team leads can view member sessions");
-    }
+    // Authorization: only roles allowed to view sessions (owner, project_manager)
+    await assertOrgAction(
+      ctx,
+      args.callerUserId,
+      args.organizationId,
+      "org:view_sessions"
+    );
 
     // Verify target is a member of this org
     const targetMembership = await ctx.db
@@ -921,8 +961,8 @@ export const getMemberSessions = query({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     const extensionSessions = [];
     for (const project of projects) {
@@ -931,8 +971,8 @@ export const getMemberSessions = query({
         .withIndex("by_project_and_user", (q) =>
           q.eq("projectId", project._id).eq("userId", args.targetUserId)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
 
       for (const access of accessRecords) {
         extensionSessions.push({
@@ -1118,8 +1158,8 @@ export const revokeAllMemberSessions = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     for (const project of projects) {
       const activeTokens = await ctx.db
@@ -1127,8 +1167,8 @@ export const revokeAllMemberSessions = mutation({
         .withIndex("by_project_and_user", (q) =>
           q.eq("projectId", project._id).eq("userId", args.targetUserId)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
 
       for (const token of activeTokens) {
         await ctx.db.patch(token._id, { isActive: false });
@@ -1208,7 +1248,7 @@ export const transferOwnership = mutation({
     // Tier check — ownership transfer is allowed for all tiers
     // (removed hardcoded pro-only restriction)
 
-    // Add or promote target user to admin
+    // Add or promote target user to owner
     const targetMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -1219,12 +1259,12 @@ export const transferOwnership = mutation({
       .first();
 
     if (targetMembership) {
-      await ctx.db.patch(targetMembership._id, { role: "admin" });
+      await ctx.db.patch(targetMembership._id, { role: "owner" });
     } else {
       await ctx.db.insert("organizationMembers", {
         organizationId: args.organizationId,
         userId: args.targetUserId,
-        role: "admin",
+        role: "owner",
         joinedAt: now,
         invitedBy: args.transferredBy,
       });

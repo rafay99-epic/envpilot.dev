@@ -8,6 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const createTemplateSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -125,8 +126,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Only admins and team leads can create templates
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Template creation requires owner or project_manager
+    if (roleLevel(membership.role) < ROLE_LEVEL.project_manager) {
       return NextResponse.json(
         { error: "Insufficient permissions to create templates" },
         { status: 403 }

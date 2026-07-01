@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuthContext } from "./auth-provider";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 import { LogOut, LayoutDashboard, Settings } from "lucide-react";
 
 export function UserButton({ collapsed }: { collapsed?: boolean }) {
@@ -97,8 +98,8 @@ export function UserButton({ collapsed }: { collapsed?: boolean }) {
               </p>
             )}
             {user.role && (
-              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400 capitalize">
-                {user.role === "team_lead" ? "Team Lead" : user.role}
+              <span className="mt-2 inline-block rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
+                {ORG_ROLE_LABELS[normalizeOrgRole(user.role)]}
               </span>
             )}
           </div>

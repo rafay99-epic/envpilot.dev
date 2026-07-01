@@ -28,7 +28,7 @@ interface VariableListItemProps {
   canEdit?: boolean;
   canDelete?: boolean;
   canManagePermissions?: boolean;
-  permissionLevel?: "read" | "write" | "admin" | null;
+  permissionLevel?: "read" | "write" | null;
   onShare?: () => void;
   activeShareCount?: number;
   showCheckbox?: boolean;
@@ -117,11 +117,9 @@ export function VariableListItem({
               {permissionLevel && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    permissionLevel === "admin"
-                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                      : permissionLevel === "write"
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    permissionLevel === "write"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   }`}
                 >
                   {permissionLevel}

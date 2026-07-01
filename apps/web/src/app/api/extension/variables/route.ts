@@ -7,6 +7,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
 
 /**
@@ -149,7 +150,8 @@ export async function GET(request: Request) {
             isSensitive: variable.isSensitive,
             version: variable.version,
           })),
-          role: userRole,
+          // Old extension builds only understand the legacy role strings.
+          role: toLegacyOrgRole(userRole),
         },
       });
     }
@@ -157,6 +159,11 @@ export async function GET(request: Request) {
     const variablesWithValues = await Promise.all(
       variables.map(async (variable) => {
         try {
+          // listWithAccess only includes vaultRef when hasAccess is true;
+          // the filter above guarantees it, but narrow the type explicitly.
+          if (!variable.vaultRef) {
+            throw new Error("Missing vault reference");
+          }
           const value = await readSecret(variable.vaultRef);
           return {
             _id: variable._id,
@@ -204,7 +211,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       data: {
         variables: variablesWithValues,
-        role: userRole,
+        // Old extension builds only understand the legacy role strings.
+        role: toLegacyOrgRole(userRole),
       },
     });
   } catch (error) {

@@ -154,45 +154,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Encrypt value in Vault first. The same encrypted value is used for direct create
-    // or for a pending member request.
+    // Encrypt value in Vault first.
     const vaultResult = await createSecret(key, value, {
       organizationId,
       projectId,
     });
     const vaultRef = vaultResult.id;
 
-    // Members cannot write directly; they create approval requests.
-    if (membership.role === "member") {
-      const requestId = await convex.mutation(api.variableRequests.create, {
-        key,
-        vaultRef,
-        description,
-        environments,
-        projectId: projectId as Id<"projects">,
-        isSensitive,
-        requestedBy: convexUser._id,
-      });
-
-      // Notify admins/team leads about the access request (non-blocking)
-      notifyAccessRequest(
-        convexUser._id,
-        convexUser.name || convexUser.email || "A team member",
-        key,
-        projectId as Id<"projects">,
-        organizationId
-      );
-
-      return NextResponse.json(
-        {
-          requested: true,
-          requestId,
-          message: "Variable request submitted for admin approval",
-        },
-        { status: 202 }
-      );
-    }
-
+    // Unified RBAC: assigned developers create variables directly (they get a
+    // write grant on variables they create). Authorization — including project
+    // assignment scoping — is enforced by the Convex mutation.
     const variableId = await convex.mutation(api.variables.create, {
       key,
       vaultRef,
@@ -269,49 +240,5 @@ async function notifyVariableChange(
     }
   } catch (err) {
     console.warn("[EMAIL] Error sending variable notifications:", err);
-  }
-}
-
-/**
- * Send access request notification emails to admins/team leads (non-blocking).
- */
-async function notifyAccessRequest(
-  requesterUserId: Id<"users">,
-  requesterName: string,
-  variableName: string,
-  projectId: Id<"projects">,
-  organizationId: Id<"organizations">
-) {
-  try {
-    const project = await convex.query(api.projects.getById, { projectId });
-    const org = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
-    });
-
-    const projectName = project?.name || "Unknown project";
-    const orgName = org?.name || "Unknown organization";
-
-    for (const member of members) {
-      if (!member?.user?.email || member.user._id === requesterUserId) continue;
-      if (member.role !== "admin" && member.role !== "team_lead") continue;
-
-      convex
-        .action(api.emails.sendAccessRequestEmail, {
-          userId: member.user._id,
-          to: member.user.email,
-          requesterName,
-          variableName,
-          projectName,
-          organizationName: orgName,
-        })
-        .catch((err: unknown) =>
-          console.warn("[EMAIL] Access request notification failed:", err)
-        );
-    }
-  } catch (err) {
-    console.warn("[EMAIL] Error sending access request notifications:", err);
   }
 }

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { MAX_BULK_IMPORT_SIZE, isCronPaused } from "./tierLimits";
 import {
   checkNumericLimit,
@@ -13,10 +13,15 @@ import {
   createAuditLog,
   logVariableAccess,
   logBulkOperation,
-  logSecurityEvent,
 } from "./auditHelpers";
 import { rateLimiter } from "./rateLimits";
-import { authorizeVariableAccess } from "./authHelpers";
+import { authorizeVariableAccess, requireVariableAccess } from "./authHelpers";
+import {
+  assertOrgAction,
+  getActiveVariableGrant,
+  normalizeOrgRole,
+  toLegacyProjectRole,
+} from "./authz";
 
 /**
  * Environment Variable Queries and Mutations
@@ -32,11 +37,13 @@ export const listByProject = query({
     environment: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const variables = await ctx.db
+    const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const variables = allVariables.filter(
+      (variable) => variable.deletedAt === undefined
+    );
 
     if (args.environment) {
       return variables.filter((v) =>
@@ -53,21 +60,25 @@ export const listByOrganization = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter(
+      (project) => project.deletedAt === undefined
+    );
 
     const variablesNested = await Promise.all(
       projects.map(async (project) => {
-        const variables = await ctx.db
+        const allVariables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
+        const variables = allVariables.filter(
+          (variable) => variable.deletedAt === undefined
+        );
 
         return variables.map((variable) => ({
           ...variable,
@@ -164,12 +175,15 @@ export const getVersion = query({
 });
 
 /**
- * List variables with role-based and per-variable access information
+ * List variables with unified-role and per-variable access information
  *
- * Access rules:
- * - Admins: Full access to all variables
- * - Team Leads: Full access to all variables
- * - Members: Only variables with explicit per-variable permissions
+ * Access rules (unified model — see convex/authz.ts):
+ * - Owners: write access to every variable
+ * - Project managers / team leads assigned to the project: write access
+ * - Developers assigned to the project: value access via per-variable
+ *   grants; they still see metadata (no vault refs) for ungranted variables
+ * - Unassigned org members: read-only on variables explicitly shared with
+ *   them via an active grant (per-variable viewer sharing)
  */
 export const listWithAccess = query({
   args: {
@@ -182,7 +196,7 @@ export const listWithAccess = query({
       return [];
     }
 
-    // Get user's org membership to determine their role
+    // Get user's org membership to determine their unified role
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -194,97 +208,77 @@ export const listWithAccess = query({
       return [];
     }
 
-    const isOrgAdmin = membership.role === "admin";
+    const orgRole = normalizeOrgRole(membership.role);
+    const isOwner = orgRole === "owner";
 
-    // For non-admins, check project membership
-    let projectRole: string | null = null;
-    if (!isOrgAdmin) {
+    // Assignment is a pure scope check — projectMembers.role is legacy
+    // and never consulted for authorization.
+    let assigned = false;
+    if (!isOwner) {
       const projectMembership = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>
           q.eq("projectId", args.projectId).eq("userId", args.userId)
         )
         .first();
-
-      if (!projectMembership) {
-        return []; // No project access
-      }
-      projectRole = projectMembership.role;
+      assigned = !!projectMembership;
     }
 
-    const variables = await ctx.db
+    // Owners and assigned PMs/team leads have blanket write access
+    const roleAccess =
+      isOwner ||
+      (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
+    const canManagePermissions = roleAccess;
+    const projectRole = toLegacyProjectRole(orgRole, assigned);
+
+    const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const variables = allVariables.filter(
+      (variable) => variable.deletedAt === undefined
+    );
 
     const variablesWithAccess = await Promise.all(
       variables.map(async (variable) => {
-        const permission = await ctx.db
-          .query("variablePermissions")
-          .withIndex("by_variable_and_user", (q) =>
-            q.eq("variableId", variable._id).eq("userId", args.userId)
-          )
-          .filter((q) => q.eq(q.field("isActive"), true))
-          .first();
+        const grant = await getActiveVariableGrant(
+          ctx,
+          args.userId,
+          variable._id
+        );
 
-        const now = Date.now();
-        const isPermissionValid =
-          permission && (!permission.expiresAt || permission.expiresAt > now);
-
-        // Determine access based on org role + project role
-        let hasAccess = false;
-        let effectivePermission: string | null = null;
-        let roleAccess = false;
-        let canManagePermissions = false;
-
-        if (isOrgAdmin) {
-          // Org admins: full access to everything
-          hasAccess = true;
-          roleAccess = true;
-          canManagePermissions = true;
-          effectivePermission = "admin";
-        } else if (projectRole === "manager") {
-          // Project managers: full read/write + manage permissions
-          hasAccess = true;
-          roleAccess = true;
-          canManagePermissions = true;
-          effectivePermission = "admin";
-        } else if (projectRole === "developer") {
-          // Developers: can read all variables
-          hasAccess = true;
-          roleAccess = true;
-          effectivePermission = isPermissionValid
-            ? permission.permission
-            : "read";
-        } else if (projectRole === "viewer") {
-          // Viewers: only variables with explicit per-variable permissions
-          hasAccess = !!isPermissionValid;
-          effectivePermission = isPermissionValid
-            ? permission.permission
-            : null;
+        // Mirrors getVariableAccess: owner → write; assigned PM/TL → write;
+        // developers per grant; unassigned grant holders capped at read.
+        let access: "write" | "read" | null = null;
+        if (roleAccess) {
+          access = "write";
+        } else if (grant) {
+          access = !assigned || grant.permission === "read" ? "read" : "write";
         }
 
-        // Explicit permission overrides role-based access
-        if (isPermissionValid) {
-          effectivePermission = permission.permission;
-          hasAccess = true;
-        }
+        const hasAccess = access !== null;
+        const effectivePermission = roleAccess ? "admin" : access;
+
+        // Vault refs are only returned for variables the user can access;
+        // assigned members still see metadata for the rest.
+        const { vaultRef, ...metadata } = variable;
 
         return {
-          ...variable,
+          ...metadata,
+          ...(hasAccess ? { vaultRef } : {}),
           hasAccess,
           permission: effectivePermission,
           roleAccess,
-          userRole: membership.role,
+          userRole: orgRole,
           projectRole,
           canManagePermissions,
         };
       })
     );
 
-    // Filter out variables the user can't access
-    if (!isOrgAdmin && projectRole !== "manager") {
+    // Assigned members (and owners) may list metadata for every variable;
+    // grant-only viewers see just the variables shared with them.
+    if (!isOwner && !assigned) {
       return variablesWithAccess.filter((v) => v.hasAccess);
     }
 
@@ -303,11 +297,13 @@ export const listMetadataByProject = query({
     environment: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const variables = await ctx.db
+    const allVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const variables = allVariables.filter(
+      (variable) => variable.deletedAt === undefined
+    );
 
     const filtered = args.environment
       ? variables.filter((v) => v.environments.includes(args.environment!))
@@ -331,23 +327,27 @@ export const search = query({
     searchTerm: v.string(),
   },
   handler: async (ctx, args) => {
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter(
+      (project) => project.deletedAt === undefined
+    );
 
     const searchLower = args.searchTerm.toLowerCase();
     const results = [];
 
     for (const project of projects) {
-      const variables = await ctx.db
+      const allVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .collect();
+      const variables = allVariables.filter(
+        (variable) => variable.deletedAt === undefined
+      );
 
       const matches = variables.filter(
         (v) =>
@@ -403,23 +403,65 @@ export const globalSearchWithAccess = query({
       { _id: string; name: string; color: string }
     >();
 
+    const cacheTagsFor = async (variable: Doc<"environmentVariables">) => {
+      if (!variable.tagIds) return;
+      for (const tagId of variable.tagIds) {
+        const tagIdStr = tagId as string;
+        if (!tagCache.has(tagIdStr)) {
+          const tag = await ctx.db.get(tagId);
+          if (tag && !tag.deletedAt) {
+            tagCache.set(tagIdStr, {
+              _id: tagIdStr,
+              name: tag.name,
+              color: tag.color,
+            });
+          }
+        }
+      }
+    };
+
+    const resolveTagsFor = (variable: Doc<"environmentVariables">) => {
+      const resolvedTags: Array<{ _id: string; name: string; color: string }> =
+        [];
+      if (variable.tagIds) {
+        for (const tagId of variable.tagIds) {
+          const cached = tagCache.get(tagId as string);
+          if (cached) resolvedTags.push(cached);
+        }
+      }
+      return resolvedTags;
+    };
+
+    const matchesSearch = (variable: Doc<"environmentVariables">) => {
+      const tagNames =
+        variable.tagIds
+          ?.map((id) => tagCache.get(id as string)?.name ?? "")
+          .filter(Boolean) ?? [];
+      return (
+        variable.key.toLowerCase().includes(searchLower) ||
+        variable.description?.toLowerCase().includes(searchLower) ||
+        variable.environments?.some((e) =>
+          e.toLowerCase().includes(searchLower)
+        ) ||
+        tagNames.some((name) => name.toLowerCase().includes(searchLower))
+      );
+    };
+
     // Get all org memberships for this user
     const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Pre-fetch project memberships once (used for non-admin/non-team-lead roles)
+    // Pre-fetch project assignments once. projectMembers is a pure scope
+    // assignment — its legacy role field is never consulted.
     const allProjectMemberships = await ctx.db
       .query("projectMembers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
-    // Group project memberships by org (resolved lazily)
-    const projectMembershipsByOrg = new Map<
-      string,
-      Array<{ projectId: Id<"projects">; role: string }>
-    >();
+    // Group project assignments by org (resolved lazily)
+    const assignedProjectsByOrg = new Map<string, Array<Id<"projects">>>();
     const resolvedProjects = new Map<
       string,
       {
@@ -451,169 +493,170 @@ export const globalSearchWithAccess = query({
       const project = resolvedProjects.get(pm.projectId);
       if (project && !project.deletedAt) {
         const orgId = project.organizationId;
-        if (!projectMembershipsByOrg.has(orgId)) {
-          projectMembershipsByOrg.set(orgId, []);
+        if (!assignedProjectsByOrg.has(orgId)) {
+          assignedProjectsByOrg.set(orgId, []);
         }
-        projectMembershipsByOrg.get(orgId)!.push({
-          projectId: pm.projectId,
-          role: pm.role,
-        });
+        assignedProjectsByOrg.get(orgId)!.push(pm.projectId);
       }
     }
+
+    // Projects already covered by role/assignment access (used to avoid
+    // double-processing in the grant-holder pass below)
+    const coveredProjectIds = new Set<string>();
 
     for (const membership of memberships) {
       const org = await ctx.db.get(membership.organizationId);
       if (!org) continue;
 
-      const isAdmin = membership.role === "admin";
-      const isTeamLead = membership.role === "team_lead";
+      const orgRole = normalizeOrgRole(membership.role);
+      const isOwner = orgRole === "owner";
 
-      // Get projects accessible to this user in this org
-      let projectsWithRole: Array<{
+      // Metadata visibility: owners see all org projects, everyone else
+      // sees the projects they are assigned to.
+      let accessibleProjects: Array<{
         _id: Id<"projects">;
         name: string;
         slug: string;
         icon?: string;
         color?: string;
-        projectRole?: string;
       }> = [];
 
-      if (isAdmin || isTeamLead) {
-        // Admins and team leads can see all projects
-        const projects = await ctx.db
+      if (isOwner) {
+        const allOrgProjects = await ctx.db
           .query("projects")
           .withIndex("by_organization", (q) =>
             q.eq("organizationId", membership.organizationId)
           )
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
-        projectsWithRole = projects.map((p) => ({
-          _id: p._id,
-          name: p.name,
-          slug: p.slug,
-          icon: p.icon,
-          color: p.color,
-        }));
+        accessibleProjects = allOrgProjects
+          .filter((p) => p.deletedAt === undefined)
+          .map((p) => ({
+            _id: p._id,
+            name: p.name,
+            slug: p.slug,
+            icon: p.icon,
+            color: p.color,
+          }));
       } else {
-        // Members: use pre-fetched project memberships
-        const orgPMs =
-          projectMembershipsByOrg.get(membership.organizationId) ?? [];
-        for (const pm of orgPMs) {
-          const project = resolvedProjects.get(pm.projectId);
+        const assignedIds =
+          assignedProjectsByOrg.get(membership.organizationId) ?? [];
+        for (const projectId of assignedIds) {
+          const project = resolvedProjects.get(projectId);
           if (project) {
-            projectsWithRole.push({
+            accessibleProjects.push({
               _id: project._id,
               name: project.name,
               slug: project.slug,
               icon: project.icon,
               color: project.color,
-              projectRole: pm.role,
             });
           }
         }
       }
 
-      for (const project of projectsWithRole) {
-        const variables = await ctx.db
+      for (const project of accessibleProjects) {
+        coveredProjectIds.add(project._id as string);
+
+        const allVariables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
+        const variables = allVariables.filter(
+          (variable) => variable.deletedAt === undefined
+        );
 
         // Resolve tags for variables in this project batch
         for (const variable of variables) {
-          if (variable.tagIds) {
-            for (const tagId of variable.tagIds) {
-              const tagIdStr = tagId as string;
-              if (!tagCache.has(tagIdStr)) {
-                const tag = await ctx.db.get(tagId);
-                if (tag && !tag.deletedAt) {
-                  tagCache.set(tagIdStr, {
-                    _id: tagIdStr,
-                    name: tag.name,
-                    color: tag.color,
-                  });
-                }
-              }
-            }
-          }
+          await cacheTagsFor(variable);
         }
 
-        const matches = variables.filter((v) => {
-          const tagNames =
-            v.tagIds
-              ?.map((id) => tagCache.get(id as string)?.name ?? "")
-              .filter(Boolean) ?? [];
-          return (
-            v.key.toLowerCase().includes(searchLower) ||
-            v.description?.toLowerCase().includes(searchLower) ||
-            v.environments?.some((e) =>
-              e.toLowerCase().includes(searchLower)
-            ) ||
-            tagNames.some((name) => name.toLowerCase().includes(searchLower))
-          );
-        });
+        const matches = variables.filter(matchesSearch);
 
         for (const variable of matches) {
-          // RBAC: admins and team leads always have access
-          let hasAccess = isAdmin || isTeamLead;
+          // Owners and assigned project members may list variable metadata
+          const resolvedTags = resolveTagsFor(variable);
 
-          if (!hasAccess) {
-            const role = project.projectRole;
-            if (role === "manager" || role === "developer") {
-              hasAccess = true;
-            } else if (role === "viewer") {
-              // Viewers need explicit per-variable permission
-              const perm = await ctx.db
-                .query("variablePermissions")
-                .withIndex("by_variable_and_user", (q) =>
-                  q.eq("variableId", variable._id).eq("userId", args.userId)
-                )
-                .filter((q) => q.eq(q.field("isActive"), true))
-                .first();
-              hasAccess =
-                !!perm && (!perm.expiresAt || perm.expiresAt > Date.now());
-            }
-          }
-
-          if (hasAccess) {
-            // Resolve tags for this variable
-            const resolvedTags: Array<{
-              _id: string;
-              name: string;
-              color: string;
-            }> = [];
-            if (variable.tagIds) {
-              for (const tagId of variable.tagIds) {
-                const cached = tagCache.get(tagId as string);
-                if (cached) resolvedTags.push(cached);
-              }
-            }
-
-            results.push({
-              _id: variable._id as string,
-              key: variable.key,
-              description: variable.description,
-              environments: variable.environments,
-              isSensitive: variable.isSensitive,
-              tagIds: variable.tagIds as string[] | undefined,
-              tags: resolvedTags.length > 0 ? resolvedTags : undefined,
-              projectId: project._id as string,
-              projectName: project.name,
-              projectSlug: project.slug,
-              projectIcon: project.icon,
-              projectColor: project.color,
-              organizationId: org._id as string,
-              organizationName: org.name,
-              organizationSlug: org.slug,
-            });
-          }
+          results.push({
+            _id: variable._id as string,
+            key: variable.key,
+            description: variable.description,
+            environments: variable.environments,
+            isSensitive: variable.isSensitive,
+            tagIds: variable.tagIds as string[] | undefined,
+            tags: resolvedTags.length > 0 ? resolvedTags : undefined,
+            projectId: project._id as string,
+            projectName: project.name,
+            projectSlug: project.slug,
+            projectIcon: project.icon,
+            projectColor: project.color,
+            organizationId: org._id as string,
+            organizationName: org.name,
+            organizationSlug: org.slug,
+          });
 
           if (results.length >= 50) break;
         }
         if (results.length >= 50) break;
       }
       if (results.length >= 50) break;
+    }
+
+    // Per-variable viewer sharing: grant holders may list metadata for
+    // variables explicitly shared with them, even without an assignment.
+    if (results.length < 50) {
+      const grants = await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_user_active", (q) =>
+          q.eq("userId", args.userId).eq("isActive", true)
+        )
+        .collect();
+
+      const now = Date.now();
+      const memberOrgIds = new Set(
+        memberships.map((m) => m.organizationId as string)
+      );
+      const seenVariableIds = new Set(results.map((r) => r._id));
+
+      for (const grant of grants) {
+        if (results.length >= 50) break;
+        if (grant.expiresAt && grant.expiresAt <= now) continue;
+        if (seenVariableIds.has(grant.variableId as string)) continue;
+
+        const variable = await ctx.db.get(grant.variableId);
+        if (!variable || variable.deletedAt) continue;
+        if (coveredProjectIds.has(variable.projectId as string)) continue;
+
+        const project = await ctx.db.get(variable.projectId);
+        if (!project || project.deletedAt) continue;
+        if (!memberOrgIds.has(project.organizationId as string)) continue;
+
+        const org = await ctx.db.get(project.organizationId);
+        if (!org) continue;
+
+        await cacheTagsFor(variable);
+        if (!matchesSearch(variable)) continue;
+
+        const resolvedTags = resolveTagsFor(variable);
+
+        results.push({
+          _id: variable._id as string,
+          key: variable.key,
+          description: variable.description,
+          environments: variable.environments,
+          isSensitive: variable.isSensitive,
+          tagIds: variable.tagIds as string[] | undefined,
+          tags: resolvedTags.length > 0 ? resolvedTags : undefined,
+          projectId: project._id as string,
+          projectName: project.name,
+          projectSlug: project.slug,
+          projectIcon: project.icon,
+          projectColor: project.color,
+          organizationId: org._id as string,
+          organizationName: org.name,
+          organizationSlug: org.slug,
+        });
+        seenVariableIds.add(variable._id as string);
+      }
     }
 
     return results;
@@ -644,13 +687,11 @@ export const create = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
-    await authorizeVariableAccess(ctx, {
+    // Authorization: owner, or assigned PM / team lead / developer
+    const { orgRole } = await authorizeVariableAccess(ctx, {
       userId: args.createdBy,
-      organizationId: project.organizationId,
       projectId: args.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager", "developer"],
+      action: "project:create_variable",
     });
 
     // Rate limit: prevent excessive variable creation
@@ -789,6 +830,19 @@ export const create = mutation({
       createdAt: now,
     });
 
+    // Developers have no blanket write access — an automatic grant keeps
+    // write access to the variables they create.
+    if (orgRole === "developer") {
+      await ctx.db.insert("variablePermissions", {
+        variableId,
+        userId: args.createdBy,
+        permission: "write",
+        grantedBy: args.createdBy,
+        grantedAt: now,
+        isActive: true,
+      });
+    }
+
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: args.projectId,
@@ -842,14 +896,9 @@ export const update = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
-    await authorizeVariableAccess(ctx, {
-      userId: updatedBy,
-      organizationId: project.organizationId,
-      projectId: variable.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager", "developer"],
-    });
+    // Authorization: effective write access — owner, assigned PM/team lead,
+    // or a developer holding a write grant on this variable
+    await requireVariableAccess(ctx, updatedBy, variable, "write");
 
     // Validate rotation frequency bounds
     if (rotationFrequencyDays !== undefined) {
@@ -1045,13 +1094,11 @@ export const remove = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
+    // Authorization: owner, or assigned PM / team lead
     await authorizeVariableAccess(ctx, {
       userId: args.deletedBy,
-      organizationId: project.organizationId,
       projectId: variable.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager"],
+      action: "project:delete_variable",
     });
 
     await ctx.db.patch(args.variableId, {
@@ -1059,11 +1106,11 @@ export const remove = mutation({
       updatedAt: now,
     });
 
-    const permissions = await ctx.db
+    const allPermissions = await ctx.db
       .query("variablePermissions")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
+    const permissions = allPermissions.filter((perm) => perm.isActive);
 
     for (const perm of permissions) {
       await ctx.db.patch(perm._id, {
@@ -1122,13 +1169,11 @@ export const bulkDelete = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
+    // Authorization: owner, or assigned PM / team lead
     await authorizeVariableAccess(ctx, {
       userId: args.deletedBy,
-      organizationId: project.organizationId,
       projectId: firstVariable.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager"],
+      action: "project:delete_variable",
     });
 
     // Check bulk_delete feature gate
@@ -1160,11 +1205,11 @@ export const bulkDelete = mutation({
       });
 
       // Revoke active permissions
-      const permissions = await ctx.db
+      const allPermissions = await ctx.db
         .query("variablePermissions")
         .withIndex("by_variable", (q) => q.eq("variableId", variableId))
-        .filter((q) => q.eq(q.field("isActive"), true))
         .collect();
+      const permissions = allPermissions.filter((perm) => perm.isActive);
 
       for (const perm of permissions) {
         await ctx.db.patch(perm._id, {
@@ -1220,13 +1265,11 @@ export const restore = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
+    // Authorization: owner, or assigned PM / team lead
     await authorizeVariableAccess(ctx, {
       userId: args.restoredBy,
-      organizationId: project.organizationId,
       projectId: variable.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager"],
+      action: "project:delete_variable",
     });
 
     await ctx.db.patch(args.variableId, {
@@ -1283,13 +1326,13 @@ export const rollback = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: admin only
-    await authorizeVariableAccess(ctx, {
-      userId: args.rolledBackBy,
-      organizationId: project.organizationId,
-      projectId: variable.projectId,
-      requiredOrgRoles: ["admin"],
-    });
+    // Authorization: owner only
+    await assertOrgAction(
+      ctx,
+      args.rolledBackBy,
+      project.organizationId,
+      "org:rollback_variable"
+    );
 
     const newVersion = variable.version + 1;
 
@@ -1358,14 +1401,9 @@ export const logAccess = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: any member with project access
-    await authorizeVariableAccess(ctx, {
-      userId: args.accessedBy,
-      organizationId: project.organizationId,
-      projectId: variable.projectId,
-      requiredOrgRoles: ["admin", "team_lead", "member"],
-      requiredProjectRoles: ["manager", "developer", "viewer"],
-    });
+    // Authorization: anyone with effective access to this variable
+    // (role-based write, or an active read/write grant)
+    await requireVariableAccess(ctx, args.accessedBy, variable, "read");
 
     await logVariableAccess(ctx, {
       organizationId: project.organizationId,
@@ -1414,13 +1452,11 @@ export const bulkCreate = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: verify caller has permission
-    await authorizeVariableAccess(ctx, {
+    // Authorization: owner, or assigned PM / team lead / developer
+    const { orgRole } = await authorizeVariableAccess(ctx, {
       userId: args.createdBy,
-      organizationId: project.organizationId,
       projectId: args.projectId,
-      requiredOrgRoles: ["admin", "team_lead"],
-      requiredProjectRoles: ["manager", "developer"],
+      action: "project:create_variable",
     });
 
     // Rate limit: bulk import is expensive
@@ -1498,6 +1534,19 @@ export const bulkCreate = mutation({
         createdAt: now,
       });
 
+      // Developers have no blanket write access — an automatic grant keeps
+      // write access to the variables they create.
+      if (orgRole === "developer") {
+        await ctx.db.insert("variablePermissions", {
+          variableId,
+          userId: args.createdBy,
+          permission: "write",
+          grantedBy: args.createdBy,
+          grantedAt: now,
+          isActive: true,
+        });
+      }
+
       createdIds.push(variableId);
     }
 
@@ -1549,13 +1598,15 @@ export const listExpiringVariables = query({
     );
     if (!rotationCheck.allowed) return [];
 
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter(
+      (project) => project.deletedAt === undefined
+    );
 
     const sevenDaysFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
     const results: Array<{
@@ -1569,11 +1620,13 @@ export const listExpiringVariables = query({
     }> = [];
 
     for (const project of projects) {
-      const variables = await ctx.db
+      const allVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
         .collect();
+      const variables = allVariables.filter(
+        (variable) => variable.deletedAt === undefined
+      );
 
       for (const v of variables) {
         if (
@@ -1653,12 +1706,10 @@ export const processRotationExpiry = internalMutation({
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const oneDay = 24 * 60 * 60 * 1000;
 
-    // Fetch all non-deleted variables and filter in JS —
-    // Convex filters on optional fields can miss documents where the field doesn't exist
-    const allVars = await ctx.db
-      .query("environmentVariables")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    // Fetch all variables and filter in JS — deletedAt is an optional field,
+    // so the non-deleted check happens after collection
+    const allDocs = await ctx.db.query("environmentVariables").collect();
+    const allVars = allDocs.filter((doc) => doc.deletedAt === undefined);
 
     const rotatingVariables = allVars.filter(
       (v) =>
