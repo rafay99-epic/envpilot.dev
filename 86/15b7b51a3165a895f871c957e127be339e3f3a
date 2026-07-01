@@ -1,0 +1,207 @@
+apps/web/src/components/landing/LandingPage.tsx
+  s_e8fb00d5812ee1::t_ce2a5ae8a5a726 72
+convex/schema.ts
+  s_e8fb00d5812ee1::t_d78e3137839964 950-954,978-979
+apps/web/src/app/api/variables/[id]/route.ts
+  s_e8fb00d5812ee1::t_ee5abc8e91d7bd 108
+apps/web/src/components/dashboard/dashboard-nav.tsx
+  s_e8fb00d5812ee1::t_8e9bf9939516a4 25
+  s_e8fb00d5812ee1::t_8bb2ee3258e2c8 78,83-88
+  s_e8fb00d5812ee1::t_b042df5d18921e 120-121,124-126,130-141,150-165
+apps/web/src/app/faq/page.tsx
+  s_e8fb00d5812ee1::t_cdba2b43b0e73b 133
+apps/web/src/app/(dashboard)/dashboard/audit/page.tsx
+  s_e8fb00d5812ee1::t_91e6ec6f699fe1 4
+  s_e8fb00d5812ee1::t_39ad5a4c5314eb 96-97,99-101
+  s_e8fb00d5812ee1::t_8cda35824ab734 120-127
+apps/web/src/app/api/users/search/route.ts
+  s_e8fb00d5812ee1::t_07737018857eba 6
+  s_e8fb00d5812ee1::t_ba57a3128c96f2 58-61,74
+convex/featureRegistry.ts
+  s_e8fb00d5812ee1::t_624edbde3695db 304,315,337-340,348,352,362
+apps/web/src/app/api/variables/[id]/history/route.ts
+  s_e8fb00d5812ee1::t_70a139ff73e568 91
+convex/organizations.ts
+  s_e8fb00d5812ee1::t_59744d2dde0906 1079-1080,1101-1110,1114-1120
+  s_e8fb00d5812ee1::t_1016370e974b2b 1005-1006,1031-1048
+  s_e8fb00d5812ee1::t_8331466995ce80 1201-1206,1215-1216,1221-1222
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 1111-1113,1217-1220
+  s_e8fb00d5812ee1::t_04c9a53807befa 1165-1166,1190-1196
+  s_e8fb00d5812ee1::t_a061003e733513 1020-1030
+  s_e8fb00d5812ee1::t_0eb362f93801ba 1049,1121,1197
+apps/web/src/components/dashboard/shared-secrets-widget.tsx
+  s_e8fb00d5812ee1::t_c32a8c066ee52e 19,24,26-29
+apps/web/tests/e2e/env.ts
+  s_e8fb00d5812ee1::t_fa662fe19590e6 1-52
+  s_e8fb00d5812ee1::t_624edbde3695db 53
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_e8fb00d5812ee1::t_63b9976faea2c1 212,217
+  s_e8fb00d5812ee1::t_7f7409cc89c4ef 148-151
+  s_e8fb00d5812ee1::t_0078547d3b7c9c 196-197
+docs/RBAC.md
+  s_e8fb00d5812ee1::t_0e7075ca88d66e 17
+convex/users.ts
+  s_e8fb00d5812ee1::t_e27a2f7d64fc83 3,159-161,167-168,202-204,215-216,227-240,242-245,247-253,259-300,307-309,315,322-323
+apps/vscode-extension/src/services/convex.ts
+  s_e8fb00d5812ee1::t_965a2e4a023193 164-166,168-171,174
+apps/web/src/hooks/useDashboard.ts
+  s_e8fb00d5812ee1::t_d0a8008fba2e53 64-66,69-70,74,79
+  s_e8fb00d5812ee1::t_4efca2c144dc7a 27-29,31-34,36-37,42
+convex/identity.ts
+  s_e8fb00d5812ee1::t_7041b2739b5697 1-71
+convex/invitations.ts
+  s_e8fb00d5812ee1::t_1e57115ed84da9 501-502,509-511
+  s_e8fb00d5812ee1::t_b74f115c3e3c65 88-92,94
+  s_e8fb00d5812ee1::t_2962f34ab89b4f 32-36,38-40,58-60,63
+  s_e8fb00d5812ee1::t_eec7bcf812f71a 318-327,329-330
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 328
+  s_e8fb00d5812ee1::t_2ead28c7d8acfb 12
+  s_e8fb00d5812ee1::t_f923688e1556ff 512
+apps/web/src/app/(dashboard)/dashboard/analytics/page.tsx
+  s_e8fb00d5812ee1::t_41122b74a6169f 4
+  s_e8fb00d5812ee1::t_94f114836c677d 124-132,139
+docs/CONVEX_AUTH_MIGRATION.md
+  s_e8fb00d5812ee1::t_4d755cf6deafeb 1-28,35-67,69-181,211-291
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 29-34,68,182-210
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_e8fb00d5812ee1::t_5824487b5aad22 353
+  s_e8fb00d5812ee1::t_097946c6bce52f 332-333
+  s_e8fb00d5812ee1::t_40ff0792ec7f5c 26
+convex/dashboard.ts
+  s_e8fb00d5812ee1::t_9998853ad450a5 6,22,28,32-33,36,40,105-111,116,119-143,150-156,158-161,164,201,207-210,214,218-220,287,293,304,306,323,326,328,380,386
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 37-39,157
+.gitignore
+  s_e8fb00d5812ee1::t_2b499ca5b5426c 57-58
+apps/web/src/components/auth/index.ts
+  s_e8fb00d5812ee1::t_9f8ced2b3a6177 11
+apps/web/src/app/(dashboard)/organizations/[slug]/settings/page.tsx
+  s_e8fb00d5812ee1::t_8406f44e6be008 45-55
+  s_e8fb00d5812ee1::t_c8ad064bf14f21 9
+apps/web/tests/e2e/README.md
+  s_e8fb00d5812ee1::t_4755881e0e3c0e 1-5,11-56
+  s_e8fb00d5812ee1::t_624edbde3695db 6-10
+apps/web/src/hooks/useVariables.ts
+  s_e8fb00d5812ee1::t_71c096f074a8b3 40-42,46,51
+  s_e8fb00d5812ee1::t_ed210c0732e14a 8-13,17,20-22,24-27
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_e8fb00d5812ee1::t_2895546956925d 78-81
+convex/cliSessions.ts
+  s_e8fb00d5812ee1::t_f077ad39bef68a 3,123-136,168-170,179-181,192-197,452-461,496-498
+apps/web/src/components/members/__tests__/environment-scope-selector.test.ts
+  s_e8fb00d5812ee1::t_7a3d4af2c89a23 63,66-71
+apps/web/src/app/(dashboard)/organizations/[slug]/members/page.tsx
+  s_e8fb00d5812ee1::t_41461d47458c97 56-66
+  s_e8fb00d5812ee1::t_f404a3373e726f 87-89
+  s_e8fb00d5812ee1::t_35a86459f65a97 16
+apps/web/src/app/privacy/page.tsx
+  s_e8fb00d5812ee1::t_6492d4b980657a 106-107
+convex/variables.ts
+  s_e8fb00d5812ee1::t_b73123ebd9eaf4 1838-1855,1863-1865
+  s_e8fb00d5812ee1::t_256b466a1ac107 322,326-335
+  s_e8fb00d5812ee1::t_b4aa834b9e3396 22
+  s_e8fb00d5812ee1::t_1e7e4315791882 271,280-289
+  s_e8fb00d5812ee1::t_bed832636ac656 112-240
+  s_e8fb00d5812ee1::t_95aa19280122ad 1880-1884,1889,1891-1893
+apps/web/src/components/members/environment-scope-selector.tsx
+  s_e8fb00d5812ee1::t_aa433a7e528faa 24-27
+apps/web/src/app/api/shares/route.ts
+  s_e8fb00d5812ee1::t_3d93bd9783ac16 153
+package.json
+  s_e8fb00d5812ee1::t_f8dc10d5898e98 3
+apps/web/src/components/variables/import-dialog.tsx
+  s_e8fb00d5812ee1::t_3e180e506a0be0 164-165
+apps/web/src/components/auth/require-role.tsx
+  s_e8fb00d5812ee1::t_bf60b2d039c089 1-78
+apps/web/src/app/(dashboard)/dashboard/usage/page.tsx
+  s_e8fb00d5812ee1::t_d3d88e011a586a 21-28
+  s_e8fb00d5812ee1::t_6b8574b537dd77 3
+convex/projectAccess.ts
+  s_e8fb00d5812ee1::t_42d1e2628cb9bf 238-247
+  s_e8fb00d5812ee1::t_82143db4e5b097 7
+  s_e8fb00d5812ee1::t_6507c38d4c9b9f 700-713
+  s_e8fb00d5812ee1::t_6429dec39d5f24 292-313,317-320
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 314-316
+  s_e8fb00d5812ee1::t_6e9cdeff1b4e59 365-391
+  s_e8fb00d5812ee1::t_c2a3eedc9b49be 181-202
+convex/permissionRevocationEvents.ts
+  s_e8fb00d5812ee1::t_3d94cf90e355a6 14-21,61-62,98-99,118-123,126-129,136-139,150-154,157-160,167,195,203-207,209,238-239
+convex/admin.ts
+  s_e8fb00d5812ee1::t_62e288ee8efbcb 1237-1245
+apps/web/tests/e2e/authenticated/invite-panel.spec.ts
+  s_e8fb00d5812ee1::t_624edbde3695db 89-91,93-100,187-190
+  s_e8fb00d5812ee1::t_3dd4a95e7a0595 1-31,47-88,92,101-186,191-192
+  s_e8fb00d5812ee1::t_eece253c05d921 32-46
+apps/web/src/app/api/extension/variables/route.ts
+  s_e8fb00d5812ee1::t_3ad47f64c50282 193
+apps/web/src/app/api/cli/variables/route.ts
+  s_e8fb00d5812ee1::t_2a87b6b261af51 143
+convex/auth.config.ts
+  s_e8fb00d5812ee1::t_5bb42c5f2419cb 1-3,30-31,33
+  s_e8fb00d5812ee1::t_994a9ba2dc4813 4-29,32
+apps/web/package.json
+  s_e8fb00d5812ee1::t_f8dc10d5898e98 3
+convex/featureRequests.ts
+  s_e8fb00d5812ee1::t_c415b0c9c91450 3,410,435-437,440-443,445,466,487-489,492-495,497,551,565-567,570-573,575
+apps/web/src/app/(dashboard)/organizations/[slug]/page.tsx
+  s_e8fb00d5812ee1::t_76d722f9b7d661 125-126
+  s_e8fb00d5812ee1::t_859bfc890b73cd 186-213,215,224,227-228
+  s_e8fb00d5812ee1::t_37cfc8af5b4dc2 11-16
+convex/projects.ts
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 624
+  s_e8fb00d5812ee1::t_163c57ae82ae52 622-623
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_e8fb00d5812ee1::t_c0963ba3ccab0a 280-283
+  s_e8fb00d5812ee1::t_2353160f4fecef 37-40
+apps/web/src/app/api/organizations/[slug]/members/route.ts
+  s_e8fb00d5812ee1::t_b8c38ee400a192 81
+apps/admin/src/routes/_authenticated/migrations.tsx
+  s_e8fb00d5812ee1::t_a30cbc257aec0e 37
+  s_e8fb00d5812ee1::t_25f29780df6e1a 85-94,97-106
+convex/sharedSecrets.ts
+  s_e8fb00d5812ee1::t_19545fd10da9e9 597,600-611,620-622,624-628,654-656
+  s_e8fb00d5812ee1::t_9f7e17336b9744 475-479,484,487-496,510-512,514
+  s_e8fb00d5812ee1::t_8a52f106eecf45 46-58
+  s_e8fb00d5812ee1::t_66f19ce98101d1 8
+  s_e8fb00d5812ee1::t_19dfc5fae75425 535,538-547,557,559-564,584-586
+apps/admin/package.json
+  s_e8fb00d5812ee1::t_9cb29a29047f0f 3
+apps/web/src/app/api/organizations/[slug]/invitations/[invitationId]/route.ts
+  s_e8fb00d5812ee1::t_dcd72375399a27 45
+  s_e8fb00d5812ee1::t_331744ebcacf55 115
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_e8fb00d5812ee1::t_2b1dcc045a8563 168-170
+  s_e8fb00d5812ee1::t_9da406dd8cc4e5 211-212
+apps/web/tests/e2e/auth.setup.ts
+  s_e8fb00d5812ee1::t_274ac64dbaa46a 1-75,107-112
+  s_e8fb00d5812ee1::t_96aa6995c68d89 76-106
+apps/web/src/lib/convex-client.ts
+  s_e8fb00d5812ee1::t_7e5b536298bf80 15-41
+apps/web/playwright.config.ts
+  s_e8fb00d5812ee1::t_513cafa3a9cf0b 3-6,19-27,31-43
+apps/web/src/app/terms/page.tsx
+  s_e8fb00d5812ee1::t_40c6f911f1b46a 137,140,144-145,148-153
+  s_e8fb00d5812ee1::t_6640ad888346d3 95-96
+  s_e8fb00d5812ee1::t_04303b0af75706 157
+  s_e8fb00d5812ee1::t_e60bcf122ca730 372
+apps/web/src/app/api/extension/acknowledge-revocation/route.ts
+  s_e8fb00d5812ee1::t_48ed9523ce41dd 68-70
+  s_e8fb00d5812ee1::t_7e067b44a6f0a5 65-67,71-79,84
+convex/_generated/api.d.ts
+  s_e8fb00d5812ee1::t_89401b75be10ca 27,75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "8615b7b51a3165a895f871c957e127be339e3f3a",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
