@@ -126,6 +126,11 @@ export const create = mutation({
       v.literal("developer")
     ),
     projectIds: v.optional(v.array(v.id("projects"))),
+    // Environment scope applied to the created project assignments on
+    // acceptance — only applied when the invited role is developer
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
@@ -140,6 +145,12 @@ export const create = mutation({
 
     // Hierarchy: can only invite roles below your own (owners may invite any)
     assertCanAssignRole(callerMembership.role, args.role);
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
 
     // Rate limit: prevent invitation spam
     await rateLimiter.limit(ctx, "invitationCreate", {
@@ -235,6 +246,7 @@ export const create = mutation({
       organizationId: args.organizationId,
       role: args.role,
       projectIds: args.projectIds,
+      environments: args.environments,
       token,
       invitedBy: args.invitedBy,
       status: "pending",
@@ -249,6 +261,7 @@ export const create = mutation({
       details: JSON.stringify({
         email: args.email,
         role: args.role,
+        environments: args.environments ?? "all",
       }),
       createdAt: now,
     });
@@ -316,6 +329,11 @@ export const accept = mutation({
       invitation.projectIds.length > 0 &&
       invitedRole !== "owner"
     ) {
+      // Environment scope only constrains developers — owners, PMs, and team
+      // leads are always unrestricted, so a scope on the invitation is ignored
+      const environmentScope =
+        invitedRole === "developer" ? invitation.environments : undefined;
+
       for (const projectId of invitation.projectIds) {
         const project = await ctx.db.get(projectId);
         if (project && !project.deletedAt) {
@@ -323,6 +341,7 @@ export const accept = mutation({
           await ctx.db.insert("projectMembers", {
             projectId,
             userId: args.userId,
+            ...(environmentScope ? { environments: environmentScope } : {}),
             addedBy: invitation.invitedBy,
             addedAt: now,
           });
@@ -343,6 +362,10 @@ export const accept = mutation({
         invitationId: invitation._id,
         role: invitedRole,
         projectIds: invitation.projectIds,
+        environments:
+          invitedRole === "developer"
+            ? (invitation.environments ?? "all")
+            : "all",
       }),
       createdAt: now,
     });
@@ -418,6 +441,18 @@ export const cancel = mutation({
 
     await ctx.db.delete(args.invitationId);
 
+    await ctx.db.insert("auditLogs", {
+      organizationId: invitation.organizationId,
+      userId: args.cancelledBy,
+      action: "invitation.canceled",
+      details: JSON.stringify({
+        invitationId: args.invitationId,
+        email: invitation.email,
+        role: invitation.role,
+      }),
+      createdAt: Date.now(),
+    });
+
     return args.invitationId;
   },
 });
@@ -456,6 +491,19 @@ export const resend = mutation({
       token: newToken,
       expiresAt,
       invitedBy: args.resentBy,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: invitation.organizationId,
+      userId: args.resentBy,
+      action: "invitation.resent",
+      details: JSON.stringify({
+        invitationId: args.invitationId,
+        email: invitation.email,
+        role: invitation.role,
+        expiresAt,
+      }),
+      createdAt: now,
     });
 
     return { invitationId: args.invitationId, token: newToken };

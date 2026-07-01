@@ -18,7 +18,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev:next",
+    // "dev" runs `next dev` for this workspace only (Convex functions live on
+    // the cloud dev deployment, so the Next.js server alone is sufficient).
+    command: "bun run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

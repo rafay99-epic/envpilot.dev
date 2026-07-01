@@ -178,6 +178,10 @@ export const addMember = mutation({
     userId: v.id("users"),
     // LEGACY: ignored — capabilities come from the member's org role
     role: v.optional(LEGACY_PROJECT_ROLE_VALIDATOR),
+    // Environment scope for the assignment — only applied to developers
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
@@ -232,10 +236,24 @@ export const addMember = mutation({
       throw new Error("User is already a member of this project");
     }
 
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
+
+    // Environment scope only constrains developers — owners, PMs, and team
+    // leads are always unrestricted, so a scope on their assignment is ignored
+    const environmentScope =
+      normalizeOrgRole(targetOrgMembership.role) === "developer"
+        ? args.environments
+        : undefined;
+
     // Pure scope assignment — capabilities come from the org role
     const membershipId = await ctx.db.insert("projectMembers", {
       projectId: args.projectId,
       userId: args.userId,
+      ...(environmentScope ? { environments: environmentScope } : {}),
       addedBy: args.addedBy,
       addedAt: now,
     });
@@ -251,6 +269,7 @@ export const addMember = mutation({
         addedUserId: args.userId,
         addedUserEmail: targetUser?.email,
         orgRole: normalizeOrgRole(targetOrgMembership.role),
+        environments: environmentScope ?? "all",
       }),
       createdAt: now,
     });
@@ -391,6 +410,111 @@ export const removeMember = mutation({
 });
 
 /**
+ * Set (or clear) the environment scope on a developer's project assignment.
+ *
+ * A scoped developer can only access variables whose environments are ALL
+ * inside the scope (see authz.isEnvironmentScopeAllowed) — e.g. a scope of
+ * ["development", "staging"] makes production variables invisible and
+ * untouchable. Omitting `environments` clears the scope (unrestricted).
+ * Only meaningful for developers — owners, project managers, and team leads
+ * are always unrestricted.
+ *
+ * Hierarchy rule: the actor may only modify users whose org role is strictly
+ * below their own.
+ */
+export const setMemberEnvironments = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    requestingUserId: v.id("users"),
+    // Omit to clear the scope (all environments); must not be empty
+    environments: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    // Authorization: owners, project managers, and team leads (assigned)
+    const { orgRole: actorRole } = await assertProjectAction(
+      ctx,
+      args.requestingUserId,
+      args.projectId,
+      "project:manage_members"
+    );
+
+    const now = Date.now();
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new Error("Project not found");
+    }
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
+
+    const targetOrgMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+
+    if (!targetOrgMembership) {
+      throw new Error("Target user is not a member of the organization");
+    }
+
+    // Environment scopes only constrain developers — everyone else always
+    // has access to all environments
+    if (normalizeOrgRole(targetOrgMembership.role) !== "developer") {
+      throw new Error(
+        "Environment scopes only apply to developers — owners, project managers, and team leads always have access to all environments"
+      );
+    }
+
+    // Hierarchy: can only modify users whose org role is strictly below your own
+    assertCanManageUser(
+      actorRole,
+      targetOrgMembership.role,
+      "change environment scope"
+    );
+
+    const membership = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
+      )
+      .first();
+
+    if (!membership) {
+      throw new Error("User is not a member of this project");
+    }
+
+    const previousScope = membership.environments;
+
+    // Patching with undefined clears the field (unrestricted)
+    await ctx.db.patch(membership._id, { environments: args.environments });
+
+    const targetUser = await ctx.db.get(args.userId);
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: args.requestingUserId,
+      action: "project.member_environments_changed",
+      details: JSON.stringify({
+        targetUserId: args.userId,
+        targetUserEmail: targetUser?.email,
+        environments: args.environments ?? "all",
+        previous: previousScope ?? "all",
+      }),
+      createdAt: now,
+    });
+
+    return membership._id;
+  },
+});
+
+/**
  * DEPRECATED — project-level roles were removed by the unified role model.
  *
  * Kept as an export because the web API route still references it; it now
@@ -424,6 +548,10 @@ export const bulkAddMembers = mutation({
     userIds: v.array(v.id("users")),
     // LEGACY: ignored — capabilities come from each member's org role
     role: v.optional(LEGACY_PROJECT_ROLE_VALIDATOR),
+    // Environment scope for the assignments — only applied to developers
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
@@ -440,6 +568,12 @@ export const bulkAddMembers = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
+    }
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
     }
 
     const addedIds: Id<"projectMembers">[] = [];
@@ -470,10 +604,18 @@ export const bulkAddMembers = mutation({
       // Hierarchy: skip users at or above the actor's role
       if (roleLevel(orgMembership.role) >= roleLevel(actorRole)) continue;
 
+      // Environment scope only constrains developers — a scope on a PM/team
+      // lead assignment is ignored (they are always unrestricted)
+      const environmentScope =
+        normalizeOrgRole(orgMembership.role) === "developer"
+          ? args.environments
+          : undefined;
+
       // Pure scope assignment — capabilities come from the org role
       const id = await ctx.db.insert("projectMembers", {
         projectId: args.projectId,
         userId,
+        ...(environmentScope ? { environments: environmentScope } : {}),
         addedBy: args.addedBy,
         addedAt: now,
       });
@@ -490,6 +632,7 @@ export const bulkAddMembers = mutation({
         details: JSON.stringify({
           bulkAdd: true,
           count: addedIds.length,
+          environments: args.environments ?? "all",
         }),
         createdAt: now,
       });

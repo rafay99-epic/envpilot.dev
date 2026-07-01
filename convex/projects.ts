@@ -507,6 +507,15 @@ export const restore = mutation({
       updatedAt: now,
     });
 
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: args.restoredBy,
+      action: "project.restored",
+      details: JSON.stringify({ name: project.name, slug: project.slug }),
+      createdAt: now,
+    });
+
     return args.projectId;
   },
 });

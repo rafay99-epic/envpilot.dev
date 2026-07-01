@@ -18,6 +18,11 @@ const inviteMemberSchema = z.object({
   role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
   // Project assignments only — project-level roles no longer exist.
   projectIds: z.array(z.string()).optional(),
+  // Developer environment scope — omitted means unrestricted access.
+  environments: z
+    .array(z.enum(["development", "staging", "production"]))
+    .min(1, "Select at least one environment")
+    .optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -122,7 +127,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanAssignRole)
-    const { email, role, projectIds } = validation.data;
+    const { email, role, projectIds, environments } = validation.data;
 
     // Get organization details for the email
     const organization = await convex.query(api.organizations.getById, {
@@ -150,6 +155,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       organizationId,
       role,
       projectIds: projectIds as Id<"projects">[] | undefined,
+      // Developer environment scope — omitted means unrestricted.
+      ...(environments ? { environments } : {}),
       invitedBy: convexUser._id,
     });
 

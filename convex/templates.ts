@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { assertOrgMembership } from "./authz";
+import { createAuditLog } from "./auditHelpers";
 
 /**
  * Environment Template Queries and Mutations
@@ -363,6 +364,18 @@ export const create = mutation({
       });
     }
 
+    await createAuditLog(ctx, {
+      organizationId: args.organizationId,
+      userId: args.createdBy,
+      action: "template.created",
+      details: {
+        templateName: args.name,
+        projectType: args.projectType,
+        variableCount: args.variables.length,
+        isPublished: args.isPublished ?? false,
+      },
+    });
+
     return templateId;
   },
 });
@@ -422,6 +435,16 @@ export const update = mutation({
       updateData.isPublished = updates.isPublished;
 
     await ctx.db.patch(templateId, updateData);
+
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        updatedFields: Object.keys(updateData).filter((k) => k !== "updatedAt"),
+      },
+    });
 
     return templateId;
   },
@@ -507,6 +530,16 @@ export const addVariable = mutation({
     // Update template timestamp
     await ctx.db.patch(args.templateId, { updatedAt: Date.now() });
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableAdded: args.key,
+      },
+    });
+
     return variableId;
   },
 });
@@ -580,6 +613,17 @@ export const updateVariable = mutation({
     // Update template timestamp
     await ctx.db.patch(variable.templateId, { updatedAt: Date.now() });
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableUpdated: variable.key,
+        updatedFields: Object.keys(updateData),
+      },
+    });
+
     return variableId;
   },
 });
@@ -625,6 +669,16 @@ export const removeVariable = mutation({
     // Update template timestamp
     await ctx.db.patch(variable.templateId, { updatedAt: Date.now() });
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableRemoved: variable.key,
+      },
+    });
+
     return args.variableId;
   },
 });
@@ -663,6 +717,16 @@ export const remove = mutation({
     await ctx.db.patch(args.templateId, {
       deletedAt: Date.now(),
       updatedAt: Date.now(),
+    });
+
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.deletedBy,
+      action: "template.deleted",
+      details: {
+        templateName: template.name,
+        projectType: template.projectType,
+      },
     });
 
     return args.templateId;
@@ -734,6 +798,18 @@ export const duplicate = mutation({
         order: variable.order,
       });
     }
+
+    await createAuditLog(ctx, {
+      organizationId: args.organizationId,
+      userId: args.createdBy,
+      action: "template.created",
+      details: {
+        templateName: args.newName,
+        duplicatedFrom: args.templateId,
+        sourceTemplateName: sourceTemplate.name,
+        variableCount: sourceVariables.length,
+      },
+    });
 
     return newTemplateId;
   },

@@ -7,6 +7,12 @@ import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
 import {
+  EnvironmentScopeSelector,
+  allEnvironments,
+  formatEnvironmentScope,
+  scopeToPayload,
+} from "@/components/members/environment-scope-selector";
+import {
   normalizeOrgRole,
   roleLevel,
   ROLE_LEVEL,
@@ -25,6 +31,8 @@ interface ProjectMember {
   orgRole?: string;
   /** Legacy field — older API responses put the role here. */
   role?: string;
+  /** Environment scope for developers — absent/empty means unrestricted. */
+  environments?: string[];
   addedAt: number;
   user: {
     _id: string;
@@ -93,6 +101,14 @@ export default function ProjectMembersPage({
   const [showAddMember, setShowAddMember] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  // Environment scope for developers being added — all checked = unrestricted.
+  const [addEnvScope, setAddEnvScope] = useState<string[]>(allEnvironments());
+
+  // Edit environment scope for an existing developer member
+  const [editingScopeMember, setEditingScopeMember] =
+    useState<ProjectMember | null>(null);
+  const [editEnvScope, setEditEnvScope] = useState<string[]>(allEnvironments());
+  const [isSavingScope, setIsSavingScope] = useState(false);
 
   // Gates from the actor's org role: owners and project managers manage
   // anyone below them; team leads manage developers only.
@@ -109,6 +125,14 @@ export default function ProjectMembersPage({
   const addableMembers = assignableMembers.filter((m) =>
     canManageTarget(normalizeOrgRole(m.orgRole))
   );
+
+  // Environment scoping only applies to developer targets.
+  const selectedAddTarget = addableMembers.find(
+    (m) => m._id === selectedUserId
+  );
+  const addEnvScopeApplies =
+    !!selectedAddTarget &&
+    normalizeOrgRole(selectedAddTarget.orgRole) === "developer";
 
   async function fetchData() {
     try {
@@ -161,11 +185,19 @@ export default function ProjectMembersPage({
     setIsAdding(true);
     setError(null);
 
+    // All environments checked = unrestricted = send nothing.
+    const environments = addEnvScopeApplies
+      ? scopeToPayload(addEnvScope)
+      : undefined;
+
     try {
       const response = await fetch(`/api/projects/${project._id}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUserId }),
+        body: JSON.stringify({
+          userId: selectedUserId,
+          ...(environments ? { environments } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -176,11 +208,56 @@ export default function ProjectMembersPage({
       setSuccessMessage("Member added successfully");
       setShowAddMember(false);
       setSelectedUserId("");
+      setAddEnvScope(allEnvironments());
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  function openScopeEditor(member: ProjectMember) {
+    setEditingScopeMember(member);
+    setEditEnvScope(
+      member.environments && member.environments.length > 0
+        ? [...member.environments]
+        : allEnvironments()
+    );
+  }
+
+  async function handleSaveScope(e: React.FormEvent) {
+    e.preventDefault();
+    if (!project || !editingScopeMember) return;
+
+    setIsSavingScope(true);
+    setError(null);
+
+    // Omitting `environments` clears the scope (unrestricted).
+    const environments = scopeToPayload(editEnvScope);
+
+    try {
+      const response = await fetch(`/api/projects/${project._id}/members`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: editingScopeMember.userId,
+          ...(environments ? { environments } : {}),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update environment access");
+      }
+
+      setSuccessMessage("Environment access updated");
+      setEditingScopeMember(null);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsSavingScope(false);
     }
   }
 
@@ -329,6 +406,39 @@ export default function ProjectMembersPage({
                         {ORG_ROLE_LABELS[targetRole]}
                       </span>
 
+                      {/* Environment scope — only meaningful for developers */}
+                      {targetRole === "developer" && (
+                        <span
+                          className="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/10 px-2 py-0.5 text-xs font-medium text-zinc-400"
+                          title="Environment access"
+                        >
+                          {formatEnvironmentScope(member.environments)}
+                        </span>
+                      )}
+
+                      {targetRole === "developer" &&
+                        canManageTarget(targetRole) && (
+                          <button
+                            onClick={() => openScopeEditor(member)}
+                            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                            title="Edit environment access"
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+
                       {targetRole !== "owner" &&
                         canManageTarget(targetRole) && (
                           <button
@@ -406,6 +516,15 @@ export default function ProjectMembersPage({
                 </select>
               </div>
 
+              {/* Environment access — developers only */}
+              {addEnvScopeApplies && (
+                <EnvironmentScopeSelector
+                  selected={addEnvScope}
+                  onChange={setAddEnvScope}
+                  disabled={isAdding}
+                />
+              )}
+
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-2">
                 <button
@@ -413,6 +532,7 @@ export default function ProjectMembersPage({
                   onClick={() => {
                     setShowAddMember(false);
                     setSelectedUserId("");
+                    setAddEnvScope(allEnvironments());
                   }}
                   className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 >
@@ -420,10 +540,56 @@ export default function ProjectMembersPage({
                 </button>
                 <button
                   type="submit"
-                  disabled={isAdding || !selectedUserId}
+                  disabled={
+                    isAdding ||
+                    !selectedUserId ||
+                    (addEnvScopeApplies && addEnvScope.length === 0)
+                  }
                   className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 >
                   {isAdding ? "Adding..." : "Add Member"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Environment Access Modal */}
+      {editingScopeMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              Edit Environment Access
+            </h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Limit which environments{" "}
+              {editingScopeMember.user.name || editingScopeMember.user.email}{" "}
+              can work in on this project. Check all environments to remove the
+              restriction.
+            </p>
+
+            <form onSubmit={handleSaveScope} className="mt-6 space-y-4">
+              <EnvironmentScopeSelector
+                selected={editEnvScope}
+                onChange={setEditEnvScope}
+                disabled={isSavingScope}
+              />
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingScopeMember(null)}
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingScope || editEnvScope.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {isSavingScope ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>

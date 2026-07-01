@@ -22,6 +22,32 @@ Per-variable **viewer sharing**: any org member — even without a project
 assignment — can be granted access to a specific variable. Unassigned users
 are always capped at read.
 
+## Environment scoping (developers)
+
+A developer's project assignment can carry an environment scope
+(`projectMembers.environments`, e.g. `["development", "staging"]`). Subset
+semantics: a variable is accessible only if **all** of its environments are
+inside the scope — a variable tagged `production` is invisible and untouchable
+(no metadata, no search hits, no grants override it), and a scoped developer
+cannot create variables in, or move variables into, excluded environments.
+Absent scope = unrestricted. Scope never applies to owners/PMs/team leads.
+
+Set it in the invite panel (role Developer + projects selected), when adding a
+developer to a project, or via the edit control on the project members page
+(`projectMembers.setMemberEnvironments`). Changes log the
+`project.member_environments_changed` audit action.
+
+## Audit logging
+
+Every state-changing mutation writes an `auditLogs` entry via
+`convex/auditHelpers.ts` (`createAuditLog` and friends). When adding a
+mutation, add a log call; if no existing action literal fits, extend the
+`auditLogs.action` union in `convex/schema.ts` (naming:
+`resource.verb_past_tense`) plus the severity/resource maps in
+`auditHelpers.ts`, and add display labels in
+`apps/web/src/components/audit/AuditLogList.tsx`,
+`dashboard/audit/page.tsx`, and `dashboard/page.tsx`.
+
 ## Rules of thumb
 
 - Hierarchy is strict: you can only manage/invite/grant-to users **below**

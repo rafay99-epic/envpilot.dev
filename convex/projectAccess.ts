@@ -26,8 +26,8 @@ export const listByProject = query({
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     const userMap = await batchGetUsers(
       ctx,
@@ -48,8 +48,8 @@ export const listByUser = query({
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     // Batch fetch projects
     const projIds = [...new Set(tokens.map((t) => t.projectId.toString()))];
@@ -183,13 +183,14 @@ export const getByProjectAndUser = query({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const records = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .first();
+      .collect();
+
+    return records.find((doc) => doc.isActive === true) ?? null;
   },
 });
 
@@ -305,8 +306,8 @@ export const revokeAllForUser = mutation({
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     for (const token of tokens) {
       await ctx.db.patch(token._id, {
@@ -383,8 +384,8 @@ export const updateLastUsed = mutation({
         .withIndex("by_access_token", (q) =>
           q.eq("accessToken", access.accessToken)
         )
-        .filter((q) => q.eq(q.field("acknowledged"), false))
-        .first();
+        .collect()
+        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
       if (!pendingRevocation) {
         await ctx.db.insert("permissionRevocationEvents", {
@@ -462,8 +463,8 @@ export const refresh = mutation({
         .withIndex("by_access_token", (q) =>
           q.eq("accessToken", access.accessToken)
         )
-        .filter((q) => q.eq(q.field("acknowledged"), false))
-        .first();
+        .collect()
+        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
       if (!pendingRevocation) {
         await ctx.db.insert("permissionRevocationEvents", {
@@ -484,6 +485,18 @@ export const refresh = mutation({
     await ctx.db.patch(access._id, {
       expiresAt: newExpiresAt,
       lastUsedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: access.projectId,
+      userId: access.userId,
+      action: "access.token_refreshed",
+      details: JSON.stringify({
+        deviceName: access.deviceName,
+        newExpiresAt,
+      }),
+      createdAt: now,
     });
 
     return { expiresAt: newExpiresAt };
@@ -519,13 +532,13 @@ export const linkExtension = mutation({
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) => doc.isActive === true && doc.deviceId === args.deviceId
+          ) ?? null
+      );
 
     if (existingAccess) {
       await ctx.db.patch(existingAccess._id, {
@@ -533,6 +546,21 @@ export const linkExtension = mutation({
         deviceName: args.deviceName,
         lastUsedAt: now,
       });
+
+      await ctx.db.insert("auditLogs", {
+        organizationId: project.organizationId,
+        projectId: args.projectId,
+        userId: args.userId,
+        action: "access.token_refreshed",
+        details: JSON.stringify({
+          relink: true,
+          deviceId: args.deviceId,
+          deviceName: args.deviceName,
+          newExpiresAt: expiresAt,
+        }),
+        createdAt: now,
+      });
+
       return {
         accessId: existingAccess._id,
         accessToken: existingAccess.accessToken,
@@ -585,13 +613,13 @@ export const unlinkExtension = mutation({
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) => doc.isActive === true && doc.deviceId === args.deviceId
+          ) ?? null
+      );
 
     if (!access) {
       throw new Error("Extension not linked");
@@ -640,10 +668,10 @@ export const cleanupExpired = internalMutation({
 
     const expiredTokens = await ctx.db
       .query("projectAccess")
-      .filter((q) =>
-        q.and(q.eq(q.field("isActive"), true), q.lt(q.field("expiresAt"), now))
-      )
-      .collect();
+      .collect()
+      .then((rows) =>
+        rows.filter((doc) => doc.isActive === true && doc.expiresAt < now)
+      );
 
     for (const token of expiredTokens) {
       await ctx.db.patch(token._id, {

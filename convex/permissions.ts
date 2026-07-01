@@ -1173,10 +1173,39 @@ export const cleanupExpired = internalMutation({
       (p) => p.isActive && p.expiresAt && p.expiresAt < now
     );
 
+    // Cache project lookups so repeated variables don't re-fetch
+    const projectCache = new Map<string, Doc<"projects"> | null>();
+
     for (const perm of expiredPermissions) {
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,
+      });
+
+      // Audit: permission expired (user-visible loss of access)
+      const variable = await ctx.db.get(perm.variableId);
+      if (!variable) continue;
+
+      let project = projectCache.get(variable.projectId.toString());
+      if (project === undefined) {
+        project = await ctx.db.get(variable.projectId);
+        projectCache.set(variable.projectId.toString(), project);
+      }
+      if (!project) continue;
+
+      await ctx.db.insert("auditLogs", {
+        organizationId: project.organizationId,
+        projectId: variable.projectId,
+        variableId: perm.variableId,
+        userId: perm.userId,
+        action: "permission.expired",
+        details: JSON.stringify({
+          permission: perm.permission,
+          variableKey: variable.key,
+          expiresAt: perm.expiresAt,
+          grantedBy: perm.grantedBy,
+        }),
+        createdAt: now,
       });
     }
 

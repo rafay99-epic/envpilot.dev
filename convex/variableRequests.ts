@@ -2,7 +2,11 @@ import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
-import { assertOrgMembership, assertProjectAction } from "./authz";
+import {
+  assertOrgMembership,
+  assertProjectAction,
+  isEnvironmentScopeAllowed,
+} from "./authz";
 
 async function getProjectAndOrgRole(
   ctx: MutationCtx | QueryCtx,
@@ -184,7 +188,7 @@ export const create = mutation({
     }
 
     // Requester must be assigned to the project (owners bypass assignment)
-    const { orgRole } = await assertProjectAction(
+    const { orgRole, environmentScope } = await assertProjectAction(
       ctx,
       args.requestedBy,
       args.projectId,
@@ -194,6 +198,14 @@ export const create = mutation({
     if (orgRole !== "developer") {
       throw new Error(
         "Only developers can create variable requests — owners, project managers, and team leads can create variables directly"
+      );
+    }
+
+    // Environment scope: scoped developers may only request variables whose
+    // environments all fall inside their assignment scope
+    if (!isEnvironmentScopeAllowed(environmentScope, args.environments)) {
+      throw new Error(
+        `Your access is limited to these environments: ${(environmentScope ?? []).join(", ")}`
       );
     }
 

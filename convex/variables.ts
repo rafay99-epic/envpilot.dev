@@ -19,6 +19,7 @@ import { authorizeVariableAccess, requireVariableAccess } from "./authHelpers";
 import {
   assertOrgAction,
   getActiveVariableGrant,
+  isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
 } from "./authz";
@@ -26,6 +27,21 @@ import {
 /**
  * Environment Variable Queries and Mutations
  */
+
+/**
+ * Throw when a scoped developer touches environments outside their assignment
+ * scope. No-op for unrestricted (undefined) scopes — see authz.ts.
+ */
+function assertWithinEnvironmentScope(
+  scope: string[] | undefined,
+  environments: string[]
+): void {
+  if (!isEnvironmentScopeAllowed(scope, environments)) {
+    throw new Error(
+      `Your access is limited to these environments: ${(scope ?? []).join(", ")}`
+    );
+  }
+}
 
 // ==========================================
 // QUERIES
@@ -214,6 +230,7 @@ export const listWithAccess = query({
     // Assignment is a pure scope check — projectMembers.role is legacy
     // and never consulted for authorization.
     let assigned = false;
+    let environmentScope: string[] | undefined;
     if (!isOwner) {
       const projectMembership = await ctx.db
         .query("projectMembers")
@@ -222,6 +239,10 @@ export const listWithAccess = query({
         )
         .first();
       assigned = !!projectMembership;
+      // Environment scope only constrains assigned developers
+      if (orgRole === "developer") {
+        environmentScope = projectMembership?.environments;
+      }
     }
 
     // Owners and assigned PMs/team leads have blanket write access
@@ -235,8 +256,12 @@ export const listWithAccess = query({
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
+    // Scoped developers never receive out-of-scope variables at all —
+    // not even their metadata/keys
     const variables = allVariables.filter(
-      (variable) => variable.deletedAt === undefined
+      (variable) =>
+        variable.deletedAt === undefined &&
+        isEnvironmentScopeAllowed(environmentScope, variable.environments)
     );
 
     const variablesWithAccess = await Promise.all(
@@ -475,7 +500,11 @@ export const globalSearchWithAccess = query({
       }
     >();
 
+    // Environment scope per assignment (constrains developers only)
+    const scopeByProject = new Map<string, string[] | undefined>();
+
     for (const pm of allProjectMemberships) {
+      scopeByProject.set(pm.projectId as string, pm.environments);
       if (!resolvedProjects.has(pm.projectId)) {
         const project = await ctx.db.get(pm.projectId);
         if (project) {
@@ -570,7 +599,20 @@ export const globalSearchWithAccess = query({
           await cacheTagsFor(variable);
         }
 
-        const matches = variables.filter(matchesSearch);
+        // Scoped developers never receive out-of-scope variables at all —
+        // not even their metadata/keys
+        const environmentScope =
+          orgRole === "developer"
+            ? scopeByProject.get(project._id as string)
+            : undefined;
+
+        const matches = variables.filter(
+          (variable) =>
+            isEnvironmentScopeAllowed(
+              environmentScope,
+              variable.environments
+            ) && matchesSearch(variable)
+        );
 
         for (const variable of matches) {
           // Owners and assigned project members may list variable metadata
@@ -688,11 +730,15 @@ export const create = mutation({
     }
 
     // Authorization: owner, or assigned PM / team lead / developer
-    const { orgRole } = await authorizeVariableAccess(ctx, {
+    const { orgRole, environmentScope } = await authorizeVariableAccess(ctx, {
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_variable",
     });
+
+    // Environment scope: scoped developers may only create variables whose
+    // environments all fall inside their assignment scope
+    assertWithinEnvironmentScope(environmentScope, args.environments);
 
     // Rate limit: prevent excessive variable creation
     await rateLimiter.limit(ctx, "variableCreate", {
@@ -899,6 +945,36 @@ export const update = mutation({
     // Authorization: effective write access — owner, assigned PM/team lead,
     // or a developer holding a write grant on this variable
     await requireVariableAccess(ctx, updatedBy, variable, "write");
+
+    // Environment scope: getVariableAccess already blocks scoped developers
+    // from touching out-of-scope variables, but the NEW environments must
+    // also stay inside the scope — a scoped developer must not be able to
+    // move a variable into production
+    if (updates.environments !== undefined) {
+      const editorMembership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("organizationId", project.organizationId).eq("userId", updatedBy)
+        )
+        .first();
+
+      if (
+        editorMembership &&
+        normalizeOrgRole(editorMembership.role) === "developer"
+      ) {
+        const editorAssignment = await ctx.db
+          .query("projectMembers")
+          .withIndex("by_project_and_user", (q) =>
+            q.eq("projectId", variable.projectId).eq("userId", updatedBy)
+          )
+          .first();
+
+        assertWithinEnvironmentScope(
+          editorAssignment?.environments,
+          updates.environments
+        );
+      }
+    }
 
     // Validate rotation frequency bounds
     if (rotationFrequencyDays !== undefined) {
@@ -1453,11 +1529,20 @@ export const bulkCreate = mutation({
     }
 
     // Authorization: owner, or assigned PM / team lead / developer
-    const { orgRole } = await authorizeVariableAccess(ctx, {
+    const { orgRole, environmentScope } = await authorizeVariableAccess(ctx, {
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_variable",
     });
+
+    // Environment scope: scoped developers may only import variables whose
+    // environments all fall inside their assignment scope — validate the
+    // whole batch up front so nothing is partially imported
+    if (environmentScope) {
+      for (const varData of args.variables) {
+        assertWithinEnvironmentScope(environmentScope, varData.environments);
+      }
+    }
 
     // Rate limit: bulk import is expensive
     await rateLimiter.limit(ctx, "bulkImport", {

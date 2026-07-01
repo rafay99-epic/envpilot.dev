@@ -15,8 +15,21 @@ const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 // Project membership is a pure assignment in the unified RBAC model —
 // what a user can do in the project is derived from their org role.
+// Developers can additionally be scoped to a subset of environments.
+const environmentsSchema = z
+  .array(z.enum(["development", "staging", "production"]))
+  .min(1, "Select at least one environment");
+
 const addMemberSchema = z.object({
   userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
+  // Developer environment scope — omitted means unrestricted access.
+  environments: environmentsSchema.optional(),
+});
+
+const setEnvironmentsSchema = z.object({
+  userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
+  // Providing an array sets the scope; omitting it clears the restriction.
+  environments: environmentsSchema.optional(),
 });
 
 interface RouteParams {
@@ -131,6 +144,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     const membershipId = await convex.mutation(api.projectMembers.addMember, {
       projectId: id as Id<"projects">,
       userId: validation.data.userId as Id<"users">,
+      // Developer environment scope — omitted means unrestricted.
+      ...(validation.data.environments
+        ? { environments: validation.data.environments }
+        : {}),
       addedBy: convexUser._id,
     });
 
@@ -142,20 +159,50 @@ export async function POST(request: Request, { params }: RouteParams) {
 }
 
 /**
- * PATCH /api/projects/[id]/members - Gone.
+ * PATCH /api/projects/[id]/members - Set a developer's environment scope.
  *
- * Project-level roles no longer exist: project membership is a pure
- * assignment, and what a user can do in a project is derived from their
- * organization role. Change the member's organization role instead.
+ * Project-level roles no longer exist; the only per-member setting on a
+ * project is the environment scope for developer targets. Providing
+ * `environments` (non-empty) restricts the member to those environments;
+ * omitting it clears the restriction (unrestricted access).
  */
-export async function PATCH() {
-  return NextResponse.json(
-    {
-      error:
-        "Project-level roles have been removed. Project membership is now an assignment only; a member's capabilities are determined by their organization role. Update the member's organization role instead.",
-    },
-    { status: 410 }
-  );
+export async function PATCH(request: Request, { params }: RouteParams) {
+  try {
+    const { user } = await withAuth();
+    const { id } = await params;
+
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validation = setEnvironmentsSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const convexUser = await getOrCreateConvexUser(convex, user);
+
+    // Authorization (actor can manage target, target must be a developer)
+    // is enforced in the Convex mutation.
+    await convex.mutation(api.projectMembers.setMemberEnvironments, {
+      projectId: id as Id<"projects">,
+      userId: validation.data.userId as Id<"users">,
+      requestingUserId: convexUser._id,
+      ...(validation.data.environments
+        ? { environments: validation.data.environments }
+        : {}),
+    });
+
+    return NextResponse.json({ updated: true });
+  } catch (error) {
+    console.error("Error updating member environment scope:", error);
+    return handleApiError(error, "Failed to update environment access");
+  }
 }
 
 /**

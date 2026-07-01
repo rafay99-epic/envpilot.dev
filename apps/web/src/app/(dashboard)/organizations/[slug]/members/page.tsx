@@ -4,7 +4,12 @@ import { useState, use, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { ConfirmDialog, ProjectIcon } from "@/components/ui";
+import { ConfirmDialog, DrawerPanel, ProjectIcon } from "@/components/ui";
+import {
+  EnvironmentScopeSelector,
+  allEnvironments,
+  scopeToPayload,
+} from "@/components/members/environment-scope-selector";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination, useConvexUser } from "@/hooks";
@@ -18,6 +23,7 @@ import {
   roleLevel,
   ROLE_LEVEL,
   ORG_ROLE_LABELS,
+  ORG_ROLE_DESCRIPTIONS,
   assignableRoles,
   type OrgRole,
 } from "@/lib/roles";
@@ -118,6 +124,9 @@ export default function OrganizationMembersPage({
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  // Environment scope for developer invites — all checked = unrestricted.
+  const [inviteEnvScope, setInviteEnvScope] =
+    useState<string[]>(allEnvironments());
 
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -174,10 +183,30 @@ export default function OrganizationMembersPage({
   // auto-updates queries after backend data changes (no manual refetch needed)
   // ---------------------------------------------------------------------------
 
+  // Environment scoping only applies to developer invites with project
+  // assignments. All environments checked = unrestricted = send nothing.
+  const inviteEnvScopeApplies =
+    inviteRole === "developer" && selectedProjectIds.length > 0;
+
+  function resetInviteForm() {
+    setShowInviteModal(false);
+    setInviteEmail("");
+    setInviteRole("developer");
+    setSelectedProjectIds([]);
+    setInviteEnvScope(allEnvironments());
+    setInviteError(null);
+    setSearchResults([]);
+    setShowSearchResults(false);
+  }
+
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     setIsInviting(true);
     setInviteError(null);
+
+    const environments = inviteEnvScopeApplies
+      ? scopeToPayload(inviteEnvScope)
+      : undefined;
 
     try {
       const response = await fetch(`/api/organizations/${slug}/members`, {
@@ -189,6 +218,7 @@ export default function OrganizationMembersPage({
           ...(inviteRole !== "owner" && selectedProjectIds.length > 0
             ? { projectIds: selectedProjectIds }
             : {}),
+          ...(environments ? { environments } : {}),
         }),
       });
 
@@ -204,10 +234,7 @@ export default function OrganizationMembersPage({
         throw new Error(data.error || "Failed to send invitation");
       }
 
-      setShowInviteModal(false);
-      setInviteEmail("");
-      setInviteRole("developer");
-      setSelectedProjectIds([]);
+      resetInviteForm();
 
       if (data.emailSent) {
         setNotice("Invitation sent successfully! Email delivered.");
@@ -1082,215 +1109,219 @@ export default function OrganizationMembersPage({
         variant="danger"
       />
 
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Invite Team Member
-            </h3>
-            <form onSubmit={handleInvite} className="mt-4 space-y-4">
-              {inviteError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-900/20">
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    {inviteError}
-                  </p>
+      {/* Invite Side Panel — slides in from the right */}
+      <DrawerPanel
+        isOpen={showInviteModal}
+        onClose={resetInviteForm}
+        title="Invite Team Member"
+        side="right"
+        width="md"
+        preventClose={isInviting}
+      >
+        <form onSubmit={handleInvite} className="space-y-4">
+          {inviteError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-900/20">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {inviteError}
+              </p>
+            </div>
+          )}
+          <div className="relative">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+            >
+              Email Address
+            </label>
+            <div className="relative mt-2">
+              <input
+                ref={searchInputRef}
+                type="email"
+                id="email"
+                value={inviteEmail}
+                onChange={(e) => handleEmailChange(e.target.value)}
+                onFocus={() =>
+                  inviteEmail.length >= 2 && setShowSearchResults(true)
+                }
+                onBlur={() =>
+                  setTimeout(() => setShowSearchResults(false), 200)
+                }
+                placeholder="Search by email or name..."
+                required
+                autoComplete="off"
+                className="block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+              {isSearching && (
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
                 </div>
               )}
-              <div className="relative">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-                >
-                  Email Address
-                </label>
-                <div className="relative mt-2">
-                  <input
-                    ref={searchInputRef}
-                    type="email"
-                    id="email"
-                    value={inviteEmail}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    onFocus={() =>
-                      inviteEmail.length >= 2 && setShowSearchResults(true)
-                    }
-                    onBlur={() =>
-                      setTimeout(() => setShowSearchResults(false), 200)
-                    }
-                    placeholder="Search by email or name..."
-                    required
-                    autoComplete="off"
-                    className="block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                  {isSearching && (
-                    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-400" />
-                    </div>
-                  )}
-                </div>
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-                    <ul className="max-h-60 overflow-auto py-1">
-                      {searchResults.map((user) => (
-                        <li key={user._id}>
-                          <button
-                            type="button"
-                            onClick={() => selectUser(user)}
-                            disabled={
-                              user.isMember || user.hasPendingInvitation
-                            }
-                            className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-700"
-                          >
-                            {user.avatarUrl ? (
-                              <img
-                                src={user.avatarUrl}
-                                alt={user.name || user.email}
-                                className="h-8 w-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700">
-                                <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                                  {(user.name || user.email)
-                                    .charAt(0)
-                                    .toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {user.name || "Unnamed User"}
-                              </p>
-                              <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                                {user.email}
-                              </p>
-                            </div>
-                            {user.isMember && (
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                Member
-                              </span>
-                            )}
-                            {user.hasPendingInvitation && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                Pending
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="role"
-                  className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
-                >
-                  Role
-                </label>
-                <select
-                  id="role"
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as OrgRole)}
-                  className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  {inviteRoleOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {ORG_ROLE_LABELS[role]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {inviteRole !== "owner" && projects.length === 0 && (
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    No projects available. Create a project first to assign
-                    project-level access during invitation.
-                  </p>
-                </div>
-              )}
-              {inviteRole !== "owner" && projects.length > 0 && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      Assign to Projects
-                    </label>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Select which projects this member is assigned to. What
-                      they can do there follows from their organization role.
-                    </p>
-                    <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
-                      {projects.map((project) => (
-                        <label
-                          key={project._id}
-                          className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedProjectIds.includes(project._id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedProjectIds([
-                                  ...selectedProjectIds,
-                                  project._id,
-                                ]);
-                              } else {
-                                setSelectedProjectIds(
-                                  selectedProjectIds.filter(
-                                    (id) => id !== project._id
-                                  )
-                                );
-                              }
-                            }}
-                            className="h-4 w-4"
+            </div>
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+                <ul className="max-h-60 overflow-auto py-1">
+                  {searchResults.map((user) => (
+                    <li key={user._id}>
+                      <button
+                        type="button"
+                        onClick={() => selectUser(user)}
+                        disabled={user.isMember || user.hasPendingInvitation}
+                        className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-zinc-700"
+                      >
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt={user.name || user.email}
+                            className="h-8 w-8 rounded-full object-cover"
                           />
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="flex h-6 w-6 items-center justify-center rounded"
-                              style={{
-                                backgroundColor: project.color || "#71717a",
-                              }}
-                            >
-                              <ProjectIcon icon={project.icon} size={14} />
-                            </span>
-                            <span className="text-sm text-zinc-900 dark:text-zinc-100">
-                              {project.name}
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700">
+                            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                              {(user.name || user.email)
+                                .charAt(0)
+                                .toUpperCase()}
                             </span>
                           </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowInviteModal(false);
-                    setInviteEmail("");
-                    setInviteRole("developer");
-                    setSelectedProjectIds([]);
-                    setInviteError(null);
-                    setSearchResults([]);
-                    setShowSearchResults(false);
-                  }}
-                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isInviting || !inviteEmail}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  {isInviting ? "Sending..." : "Send Invitation"}
-                </button>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                            {user.name || "Unnamed User"}
+                          </p>
+                          <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                            {user.email}
+                          </p>
+                        </div>
+                        {user.isMember && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Member
+                          </span>
+                        )}
+                        {user.hasPendingInvitation && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            Pending
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </form>
+            )}
           </div>
-        </div>
-      )}
+          <div>
+            <label
+              htmlFor="role"
+              className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+            >
+              Role
+            </label>
+            <select
+              id="role"
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as OrgRole)}
+              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              {inviteRoleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {ORG_ROLE_LABELS[role]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {ORG_ROLE_DESCRIPTIONS[inviteRole]}
+            </p>
+          </div>
+          {inviteRole !== "owner" && projects.length === 0 && (
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                No projects available. Create a project first to assign
+                project-level access during invitation.
+              </p>
+            </div>
+          )}
+          {inviteRole !== "owner" && projects.length > 0 && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  Assign to Projects
+                </label>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  Select which projects this member is assigned to. What they
+                  can do there follows from their organization role.
+                </p>
+                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-700">
+                  {projects.map((project) => (
+                    <label
+                      key={project._id}
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProjectIds.includes(project._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedProjectIds([
+                              ...selectedProjectIds,
+                              project._id,
+                            ]);
+                          } else {
+                            setSelectedProjectIds(
+                              selectedProjectIds.filter(
+                                (id) => id !== project._id
+                              )
+                            );
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="flex h-6 w-6 items-center justify-center rounded"
+                          style={{
+                            backgroundColor: project.color || "#71717a",
+                          }}
+                        >
+                          <ProjectIcon icon={project.icon} size={14} />
+                        </span>
+                        <span className="text-sm text-zinc-900 dark:text-zinc-100">
+                          {project.name}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+          {inviteEnvScopeApplies && (
+            <EnvironmentScopeSelector
+              selected={inviteEnvScope}
+              onChange={setInviteEnvScope}
+              disabled={isInviting}
+            />
+          )}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={resetInviteForm}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={
+                isInviting ||
+                !inviteEmail ||
+                (inviteEnvScopeApplies && inviteEnvScope.length === 0)
+              }
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              {isInviting ? "Sending..." : "Send Invitation"}
+            </button>
+          </div>
+        </form>
+      </DrawerPanel>
     </div>
   );
 }

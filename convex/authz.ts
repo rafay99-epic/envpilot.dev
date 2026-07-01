@@ -186,6 +186,32 @@ interface ProjectAuthResult {
   orgRole: OrgRole;
   /** Whether the user has an explicit projectMembers assignment. Owners may not. */
   assigned: boolean;
+  /**
+   * Environment scope of the assignment (developers only). Undefined =
+   * unrestricted. Callers creating/updating variables must check this via
+   * isEnvironmentScopeAllowed.
+   */
+  environmentScope?: string[];
+}
+
+// ─── Environment scoping ──────────────────────────────────────────────────────
+
+/**
+ * Whether an environment scope permits a variable.
+ *
+ * Subset semantics: EVERY environment the variable belongs to must be inside
+ * the allowed scope. A variable tagged ["development", "production"] is NOT
+ * accessible to a scope of ["development", "staging"] — its value is live in
+ * production, so a production-excluded developer must never see it.
+ *
+ * An undefined scope means unrestricted.
+ */
+export function isEnvironmentScopeAllowed(
+  scope: string[] | undefined,
+  variableEnvironments: string[]
+): boolean {
+  if (!scope) return true;
+  return variableEnvironments.every((env) => scope.includes(env));
 }
 
 // ─── Core assertion helpers ───────────────────────────────────────────────────
@@ -287,7 +313,13 @@ export async function assertProjectAction(
     );
   }
 
-  return { orgRole: role, assigned: true };
+  return {
+    orgRole: role,
+    assigned: true,
+    // Environment scope only constrains developers; managers are unrestricted
+    environmentScope:
+      role === "developer" ? projectMembership.environments : undefined,
+  };
 }
 
 /**
@@ -474,6 +506,20 @@ export async function getVariableAccess(
     (role === "project_manager" || role === "team_lead")
   ) {
     return "write";
+  }
+
+  // Environment scope: an assigned developer restricted to e.g.
+  // ["development", "staging"] never gets access to a variable that lives in
+  // production — grants included.
+  if (
+    projectMembership &&
+    role === "developer" &&
+    !isEnvironmentScopeAllowed(
+      projectMembership.environments,
+      variable.environments
+    )
+  ) {
+    return null;
   }
 
   // Developers (and any grant-only viewers) fall through to explicit grants

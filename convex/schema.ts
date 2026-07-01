@@ -167,6 +167,10 @@ export default defineSchema({
     role: v.optional(
       v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
+    // Environment scope for this assignment (developers only). A variable is
+    // accessible only if ALL of its environments are in this list. Absent =
+    // unrestricted (all environments).
+    environments: v.optional(v.array(v.string())),
     // Who added this member to the project
     addedBy: v.id("users"),
     // When the member was added
@@ -397,6 +401,9 @@ export default defineSchema({
     ),
     // Optional: projects to assign the invited user to upon acceptance
     projectIds: v.optional(v.array(v.id("projects"))),
+    // Optional: environment scope applied to the created assignments
+    // (developers only; e.g. ["development", "staging"])
+    environments: v.optional(v.array(v.string())),
     // LEGACY: project-level role — ignored by the unified role model
     projectRole: v.optional(
       v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
@@ -560,7 +567,11 @@ export default defineSchema({
       v.literal("project.member_added"),
       v.literal("project.member_removed"),
       v.literal("project.member_role_changed"),
+      v.literal("project.member_environments_changed"),
       v.literal("project.moved"),
+      v.literal("project.restored"),
+      v.literal("project.favorited"),
+      v.literal("project.unfavorited"),
       // Variable actions
       v.literal("variable.created"),
       v.literal("variable.updated"),
@@ -599,6 +610,7 @@ export default defineSchema({
       v.literal("invitation.declined"),
       v.literal("invitation.expired"),
       v.literal("invitation.resent"),
+      v.literal("invitation.canceled"),
       // Access actions
       v.literal("access.token_created"),
       v.literal("access.token_revoked"),
@@ -627,7 +639,15 @@ export default defineSchema({
       v.literal("share.expired"),
       v.literal("share.revoked"),
       v.literal("share.otp_sent"),
-      v.literal("share.otp_failed")
+      v.literal("share.otp_failed"),
+      // Tag actions
+      v.literal("tag.created"),
+      v.literal("tag.updated"),
+      v.literal("tag.deleted"),
+      // Template actions
+      v.literal("template.created"),
+      v.literal("template.updated"),
+      v.literal("template.deleted")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),

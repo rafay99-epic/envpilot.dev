@@ -10,6 +10,8 @@ interface DrawerPanelProps {
   children: ReactNode;
   width?: "md" | "lg" | "xl";
   preventClose?: boolean;
+  /** Which edge of the screen the panel slides in from. */
+  side?: "left" | "right";
 }
 
 const widthClasses = {
@@ -25,6 +27,7 @@ export function DrawerPanel({
   children,
   width = "lg",
   preventClose = false,
+  side = "right",
 }: DrawerPanelProps) {
   const safeClose = useCallback(() => {
     if (!preventClose) {
@@ -70,11 +73,11 @@ export function DrawerPanel({
 
           {/* Panel */}
           <motion.div
-            initial={{ x: "100%" }}
+            initial={{ x: side === "left" ? "-100%" : "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            exit={{ x: side === "left" ? "-100%" : "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className={`fixed inset-y-0 right-0 ${widthClasses[width]} max-w-full`}
+            className={`fixed inset-y-0 ${side === "left" ? "left-0" : "right-0"} ${widthClasses[width]} max-w-full`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="drawer-title"
