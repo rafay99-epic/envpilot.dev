@@ -14,7 +14,7 @@ Web mirror: `apps/web/src/lib/roles.ts`.
 | Role              | Level | Scope                                                                                                                                                                |
 | ----------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `owner`           | 4     | Everything, org-wide. Implicit access to every project. Billing, settings, role changes, deletes, rollback.                                                          |
-| `project_manager` | 3     | Full control of **assigned** projects (can be many): members, variables, grants. Creates projects. Sessions/anomalies views.                                         |
+| `project_manager` | 3     | Full control of **assigned** projects (can be many): members, variables, grants. Creates projects. Sessions, audit, and analytics views.                             |
 | `team_lead`       | 2     | Assigned project(s): variable CRUD, add/remove developers, grant per-variable read/write. Invites developers.                                                        |
 | `developer`       | 1     | Assigned project(s): creates variables (auto-granted write on them), edits variables they hold a write grant on, views granted variables, submits variable requests. |
 

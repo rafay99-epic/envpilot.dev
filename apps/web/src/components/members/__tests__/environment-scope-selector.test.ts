@@ -60,10 +60,15 @@ describe("scopeToPayload", () => {
 });
 
 describe("formatEnvironmentScope", () => {
-  it("reads 'All environments' for missing or empty scopes", () => {
+  it("reads 'All environments' for a missing (unrestricted) scope", () => {
     expect(formatEnvironmentScope(undefined)).toBe("All environments");
     expect(formatEnvironmentScope(null)).toBe("All environments");
-    expect(formatEnvironmentScope([])).toBe("All environments");
+  });
+
+  it("reads 'No environments' for an explicit empty (deny-all) scope", () => {
+    // Backend rejects [] on write, but a legacy row could carry it — the
+    // badge must show deny-all, not the opposite (unrestricted).
+    expect(formatEnvironmentScope([])).toBe("No environments");
   });
 
   it("lists known environments in canonical order", () => {

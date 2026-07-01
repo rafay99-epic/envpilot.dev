@@ -165,8 +165,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const rawVariables = useProjectVariables(projectId);
-  const isLoadingVariables = rawVariables === undefined && !!projectId;
+  const rawVariables = useProjectVariables(projectId, convexUserId);
+  const isLoadingVariables =
+    rawVariables === undefined && !!projectId && !!convexUserId;
   const variables = (rawVariables ?? []) as Variable[];
 
   const { requests } = useVariableRequests(projectId, convexUserId);
@@ -207,7 +208,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const rawHistory = useConvexVariableHistory(
     historyVariableId
       ? (historyVariableId as Id<"environmentVariables">)
-      : undefined
+      : undefined,
+    convexUserId
   );
   const historyData = rawHistory
     ? { history: rawHistory as VersionRecord[] }

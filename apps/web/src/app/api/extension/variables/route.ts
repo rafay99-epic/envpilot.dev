@@ -190,7 +190,7 @@ export async function GET(request: Request) {
       })
     );
 
-    // Fire-and-forget: log access for anomaly detection (non-blocking)
+    // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues
         .filter((v) => v.value !== "[DECRYPTION_FAILED]")

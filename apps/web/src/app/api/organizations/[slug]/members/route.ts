@@ -78,6 +78,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       api.invitations.listPendingByOrganization,
       {
         organizationId,
+        requestingUserId: convexUser._id,
       }
     );
 

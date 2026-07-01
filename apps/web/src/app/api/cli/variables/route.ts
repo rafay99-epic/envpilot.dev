@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fire-and-forget: log access for anomaly detection (non-blocking)
+    // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues.map((v) =>
         convex.mutation(api.variables.logAccess, {

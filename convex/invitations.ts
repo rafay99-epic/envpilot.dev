@@ -9,6 +9,7 @@ import { isCronPaused } from "./tierLimits";
 import { batchGetUsers } from "./helpers";
 import {
   assertOrgAction,
+  assertOrgMembership,
   assertCanAssignRole,
   normalizeOrgRole,
 } from "./authz";
@@ -28,8 +29,15 @@ function generateToken(): string {
 }
 
 export const listPendingByOrganization = query({
-  args: { organizationId: v.id("organizations") },
+  args: {
+    organizationId: v.id("organizations"),
+    // Caller must be a member of the org to see its pending invitations.
+    requestingUserId: v.id("users"),
+  },
   handler: async (ctx, args) => {
+    // Authorization: only members of the org may list its pending invitations.
+    await assertOrgMembership(ctx, args.requestingUserId, args.organizationId);
+
     const invitations = await ctx.db
       .query("invitations")
       .withIndex("by_organization", (q) =>
@@ -47,9 +55,12 @@ export const listPendingByOrganization = query({
     );
 
     return validInvitations.map((inv) => {
+      // Never expose the invitation token to org listings — it grants
+      // acceptance and must only travel via the emailed accept link.
+      const { token: _token, ...safe } = inv;
       const inviter = userMap.get(inv.invitedBy.toString());
       return {
-        ...inv,
+        ...safe,
         invitedByUser: inviter
           ? { name: inviter.name, email: inviter.email }
           : null,
@@ -74,8 +85,13 @@ export const getForEmail = query({
       validInvitations.map(async (inv) => {
         const org = await ctx.db.get(inv.organizationId);
         const inviter = await ctx.db.get(inv.invitedBy);
+        // Strip the invitation token: this "you have a pending invite" lookup
+        // only needs display fields. The token grants acceptance and must only
+        // reach the invitee via the emailed accept link (getByToken), never a
+        // by-email listing.
+        const { token: _token, ...safe } = inv;
         return {
-          ...inv,
+          ...safe,
           organization: org
             ? { name: org.name, slug: org.slug, logoUrl: org.logoUrl }
             : null,
@@ -299,6 +315,19 @@ export const accept = mutation({
       throw new Error("Invitation has expired");
     }
 
+    // The accepting user's email must match the invited email — an invitation
+    // is addressed to a specific person, not a bearer token.
+    const acceptingUser = await ctx.db.get(args.userId);
+    if (!acceptingUser) {
+      throw new Error("User not found");
+    }
+    if (
+      (acceptingUser.email ?? "").toLowerCase() !==
+      invitation.email.toLowerCase()
+    ) {
+      throw new Error("This invitation was sent to a different email address.");
+    }
+
     const existingMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -469,13 +498,17 @@ export const resend = mutation({
       throw new Error("Invitation not found");
     }
 
-    // Authorization: only admins and team_leads can resend invitations
-    await assertOrgAction(
+    // Authorization: owners, project managers, and team leads can resend
+    const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.resentBy,
       invitation.organizationId,
       "org:invite_member"
     );
+
+    // Hierarchy: cannot re-arm an invitation for a role at or above your own
+    // (e.g. a team_lead must not resend an owner/PM invitation).
+    assertCanAssignRole(callerMembership.role, invitation.role);
 
     const now = Date.now();
     const expiresInDays = args.expiresInDays ?? 7;

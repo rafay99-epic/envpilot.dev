@@ -161,11 +161,17 @@ export class ConvexService {
 
   /**
    * Acknowledge revocation events via mutation (skip HTTP middleman).
+   *
+   * `userId` is the extension user's Convex id — the backend now requires it
+   * and rejects acknowledging events that belong to another user.
    */
-  async acknowledgeRevocations(eventIds: string[]): Promise<void> {
+  async acknowledgeRevocations(
+    eventIds: string[],
+    userId: string
+  ): Promise<void> {
     await this.client.mutation(
       anyApi.permissionRevocationEvents.acknowledgeMultiple,
-      { eventIds }
+      { eventIds, userId }
     );
   }
 

@@ -5,7 +5,7 @@ import { Id } from "./_generated/dataModel";
 import { createAuditLog } from "./auditHelpers";
 import { checkBooleanFeature, checkNumericLimit } from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
-import { assertOrgMembership } from "./authz";
+import { assertOrgMembership, getVariableAccess } from "./authz";
 
 /**
  * Shared Secrets — Convex Mutations & Queries
@@ -42,6 +42,19 @@ export const createShare = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+
+    // 0. Authorization: the caller must be a member of the org AND have at
+    // least read access to the variable being shared. Without this a member
+    // could mint a share link for a variable they cannot see.
+    await assertOrgMembership(ctx, args.userId, args.organizationId);
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable || variable.deletedAt) {
+      throw new Error("Variable not found");
+    }
+    const access = await getVariableAccess(ctx, args.userId, variable);
+    if (!access) {
+      throw new Error("You do not have access to this variable");
+    }
 
     // 1. Feature gate: secret_sharing boolean
     const boolGate = await checkBooleanFeature(
@@ -459,12 +472,28 @@ export const revokeShare = mutation({
 
 /**
  * List shares for a specific variable, including recipient status.
+ *
+ * Authorization: the caller must have at least read access to the underlying
+ * variable. The returned rows are stripped of the share `token` and `vaultRef`
+ * — the UI only lists share status and never needs the lookup token or the
+ * vault ciphertext reference.
  */
 export const listByVariable = query({
   args: {
     variableId: v.id("environmentVariables"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Authorization: require variable access (read or write).
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable || variable.deletedAt) {
+      throw new Error("Variable not found");
+    }
+    const access = await getVariableAccess(ctx, args.userId, variable);
+    if (!access) {
+      throw new Error("You do not have access to this variable");
+    }
+
     const shares = await ctx.db
       .query("sharedSecrets")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
@@ -478,8 +507,11 @@ export const listByVariable = query({
           .withIndex("by_share", (q) => q.eq("shareId", share._id))
           .collect();
 
+        // Strip the share token and vaultRef — never surfaced to the listing.
+        const { token: _token, vaultRef: _vaultRef, ...safe } = share;
+
         return {
-          ...share,
+          ...safe,
           recipients: recipients.map((r) => ({
             email: r.email,
             hasViewed: r.hasViewed,
@@ -500,8 +532,19 @@ export const listByVariable = query({
 export const listActiveByOrg = query({
   args: {
     organizationId: v.id("organizations"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Require org membership; each share also exposes a variableKey, so it is
+    // only surfaced when the caller has access to the underlying variable.
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
     const shares = (
       await ctx.db
         .query("sharedSecrets")
@@ -511,8 +554,14 @@ export const listActiveByOrg = query({
         .collect()
     ).filter((share) => share.status === "active");
 
-    const result = await Promise.all(
+    const enriched = await Promise.all(
       shares.map(async (share) => {
+        // Drop shares whose underlying variable the caller can't access.
+        const variable = await ctx.db.get(share.variableId);
+        if (!variable || variable.deletedAt) return null;
+        const access = await getVariableAccess(ctx, args.userId, variable);
+        if (access === null) return null;
+
         const recipients = await ctx.db
           .query("shareRecipients")
           .withIndex("by_share", (q) => q.eq("shareId", share._id))
@@ -532,7 +581,9 @@ export const listActiveByOrg = query({
       })
     );
 
-    return result;
+    return enriched.filter(
+      (row): row is NonNullable<typeof row> => row !== null
+    );
   },
 });
 
@@ -543,8 +594,21 @@ export const listActiveByOrg = query({
 export const listByProject = query({
   args: {
     projectId: v.id("projects"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) return [];
+
+    // Require org membership before surfacing share metadata.
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
     const shares = await ctx.db
       .query("sharedSecrets")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -553,9 +617,15 @@ export const listByProject = query({
     // Sort by createdAt descending (most recent first)
     shares.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Enrich with recipient data
-    const result = await Promise.all(
+    // Enrich with recipient data — drop shares whose underlying variable the
+    // caller can't access (each row exposes variableKey + recipients).
+    const enriched = await Promise.all(
       shares.map(async (share) => {
+        const variable = await ctx.db.get(share.variableId);
+        if (!variable || variable.deletedAt) return null;
+        const access = await getVariableAccess(ctx, args.userId, variable);
+        if (access === null) return null;
+
         const recipients = await ctx.db
           .query("shareRecipients")
           .withIndex("by_share", (q) => q.eq("shareId", share._id))
@@ -581,7 +651,9 @@ export const listByProject = query({
       })
     );
 
-    return result;
+    return enriched.filter(
+      (row): row is NonNullable<typeof row> => row !== null
+    );
   },
 });
 

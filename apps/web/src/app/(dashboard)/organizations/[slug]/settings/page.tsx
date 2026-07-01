@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import {
   TerminalCard,
   TerminalInput,
@@ -42,7 +42,17 @@ interface Organization {
 
 type OrgSettingsTab = "general" | "access" | "tags" | "danger";
 
-export default function OrganizationSettingsPage({
+export default function OrganizationSettingsPage(props: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <RequireRole minimum="owner">
+      <OrganizationSettingsPageContent {...props} />
+    </RequireRole>
+  );
+}
+
+function OrganizationSettingsPageContent({
   params,
 }: {
   params: Promise<{ slug: string }>;

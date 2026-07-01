@@ -103,7 +103,8 @@ export default function PrivacyPolicyPage() {
                 <ul className="mt-2 space-y-1 pl-4">
                   <Li>Organization name, description, and logo</Li>
                   <Li>
-                    Membership details (your role: admin, team lead, or member)
+                    Membership details (your role: owner, project manager, team
+                    lead, or developer)
                   </Li>
                   <Li>
                     Invitation records (invitee email, assigned role, status,

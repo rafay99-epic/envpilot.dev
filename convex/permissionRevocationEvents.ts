@@ -11,7 +11,14 @@ import { isCronPaused } from "./tierLimits";
 const EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Create a new revocation event when a token is revoked
+ * Create a new revocation event when a token is revoked.
+ *
+ * NOTE: This is called only by trusted server code (API routes that have
+ * already validated a session / bearer token). All in-app revocation paths
+ * insert the event inline via ctx.db.insert rather than calling this mutation.
+ * It is kept public for those server routes; the actor is supplied as
+ * `revokedBy`, which the calling route MUST populate from the authenticated
+ * session — not from untrusted request input.
  */
 export const create = mutation({
   args: {
@@ -51,8 +58,8 @@ export const checkForToken = query({
       .withIndex("by_access_token", (q) =>
         q.eq("accessToken", args.accessToken)
       )
-      .filter((q) => q.eq(q.field("acknowledged"), false))
-      .first();
+      .collect()
+      .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
     if (!event) {
       return null;
@@ -88,8 +95,8 @@ export const checkForTokens = query({
       const event = await ctx.db
         .query("permissionRevocationEvents")
         .withIndex("by_access_token", (q) => q.eq("accessToken", accessToken))
-        .filter((q) => q.eq(q.field("acknowledged"), false))
-        .first();
+        .collect()
+        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
       if (event) {
         events.push({
@@ -108,14 +115,26 @@ export const checkForTokens = query({
 });
 
 /**
- * Acknowledge a revocation event (marks it as processed)
+ * Acknowledge a revocation event (marks it as processed).
+ *
+ * Authorization: a revocation event is only ever acknowledged by the client
+ * (CLI/extension) belonging to the user whose access was revoked. The caller
+ * MUST pass its own user id; acknowledging another user's event is rejected so
+ * one client can't clear (and thereby suppress) another user's revocation.
  */
 export const acknowledge = mutation({
-  args: { eventId: v.id("permissionRevocationEvents") },
+  args: {
+    eventId: v.id("permissionRevocationEvents"),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId);
     if (!event) {
       return false;
+    }
+
+    if (event.userId !== args.userId) {
+      throw new Error("You can only acknowledge your own revocation events");
     }
 
     await ctx.db.patch(args.eventId, {
@@ -128,17 +147,24 @@ export const acknowledge = mutation({
 });
 
 /**
- * Acknowledge multiple revocation events at once
+ * Acknowledge multiple revocation events at once.
+ *
+ * Authorization: same as `acknowledge` — the caller may only acknowledge
+ * events that belong to it. Events owned by another user are skipped rather
+ * than throwing, so a partially-mismatched batch still clears what it may.
  */
 export const acknowledgeMultiple = mutation({
-  args: { eventIds: v.array(v.id("permissionRevocationEvents")) },
+  args: {
+    eventIds: v.array(v.id("permissionRevocationEvents")),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
     const now = Date.now();
     let count = 0;
 
     for (const eventId of args.eventIds) {
       const event = await ctx.db.get(eventId);
-      if (event && !event.acknowledged) {
+      if (event && !event.acknowledged && event.userId === args.userId) {
         await ctx.db.patch(eventId, {
           acknowledged: true,
           acknowledgedAt: now,
@@ -166,8 +192,7 @@ export const cleanup = internalMutation({
     // Get all expired events
     const expiredEvents = await ctx.db
       .query("permissionRevocationEvents")
-      .withIndex("by_expires_at")
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
       .collect();
 
     // Get all acknowledged events older than 1 hour
@@ -175,13 +200,13 @@ export const cleanup = internalMutation({
     const acknowledgedEvents = await ctx.db
       .query("permissionRevocationEvents")
       .withIndex("by_acknowledged", (q) => q.eq("acknowledged", true))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("acknowledged"), true),
-          q.lt(q.field("acknowledgedAt"), oneHourAgo)
+      .collect()
+      .then((rows) =>
+        rows.filter(
+          (doc) =>
+            doc.acknowledgedAt !== undefined && doc.acknowledgedAt < oneHourAgo
         )
-      )
-      .collect();
+      );
 
     // Delete expired events
     for (const event of expiredEvents) {
@@ -210,8 +235,8 @@ export const getPendingForUser = query({
     const events = await ctx.db
       .query("permissionRevocationEvents")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("acknowledged"), false))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.acknowledged === false));
 
     return events.map((event) => ({
       eventId: event._id,

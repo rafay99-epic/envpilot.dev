@@ -619,6 +619,9 @@ export const duplicate = mutation({
       await ctx.db.insert("projectMembers", {
         projectId: newProjectId,
         userId: member.userId,
+        // Preserve environment scope so a scoped developer's access is not
+        // silently widened in the duplicated project.
+        ...(member.environments ? { environments: member.environments } : {}),
         addedBy: args.createdBy,
         addedAt: now,
       });

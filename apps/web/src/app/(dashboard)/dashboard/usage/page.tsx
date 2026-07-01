@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import { useCachedTierData } from "@/hooks/useTierStore";
 import { useAllFeatures, useConvexUser } from "@/hooks";
 import { useUserOrganizations } from "@/hooks/useOrganizations";
@@ -18,6 +18,14 @@ const CHECKOUT_URL =
   "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
 
 export default function UsagePage() {
+  return (
+    <RequireRole minimum="owner">
+      <UsagePageContent />
+    </RequireRole>
+  );
+}
+
+function UsagePageContent() {
   const { organization, user } = useAuthContext();
   const paymentsEnabled = usePaymentsEnabled();
   const { isLoading, tier, usage, isFree, enforcementEnabled } =

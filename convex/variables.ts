@@ -19,6 +19,7 @@ import { authorizeVariableAccess, requireVariableAccess } from "./authHelpers";
 import {
   assertOrgAction,
   getActiveVariableGrant,
+  getVariableAccess,
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
@@ -108,6 +109,135 @@ export const listByOrganization = query({
   },
 });
 
+/**
+ * Access-aware org-wide variable listing for the global Variables page.
+ *
+ * Unlike listByOrganization (which returns every org vaultRef unfiltered),
+ * this enumerates only the projects the caller can see (owner → all;
+ * everyone else → assigned projects), applies environment scope for
+ * developers, and returns vaultRef ONLY for variables the caller can
+ * actually access. Variables the caller has no access to are omitted
+ * entirely — the page shows keys/metadata only for what they may touch.
+ *
+ * Shape mirrors listByOrganization's rows (variable fields + projectName/
+ * projectSlug) plus a `hasAccess`/`permission` pair, so the page's
+ * filtering/search keeps working. vaultRef is present only when hasAccess.
+ */
+export const listOrgVariablesWithAccess = query({
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Resolve the caller's org role — non-members get nothing.
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
+    const orgRole = normalizeOrgRole(membership.role);
+    const isOwner = orgRole === "owner";
+
+    // Determine accessible projects and (for developers) their env scope.
+    const allProjects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    const liveProjects = allProjects.filter((p) => p.deletedAt === undefined);
+
+    // Env scope per assigned project (only constrains developers).
+    const scopeByProject = new Map<string, string[] | undefined>();
+    const assignedProjectIds = new Set<string>();
+    if (!isOwner) {
+      const assignments = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const pm of assignments) {
+        assignedProjectIds.add(pm.projectId as string);
+        scopeByProject.set(pm.projectId as string, pm.environments);
+      }
+    }
+
+    const accessibleProjects = isOwner
+      ? liveProjects
+      : liveProjects.filter((p) => assignedProjectIds.has(p._id as string));
+
+    // Owners and assigned PMs/TLs have blanket write; developers depend on
+    // per-variable grants (resolved below).
+    const roleWrite =
+      isOwner || orgRole === "project_manager" || orgRole === "team_lead";
+
+    const results: Array<
+      Omit<Doc<"environmentVariables">, "vaultRef"> & {
+        vaultRef?: string;
+        projectName: string;
+        projectSlug: string;
+        hasAccess: boolean;
+        permission: "write" | "read" | null;
+      }
+    > = [];
+
+    for (const project of accessibleProjects) {
+      const environmentScope =
+        orgRole === "developer"
+          ? scopeByProject.get(project._id as string)
+          : undefined;
+
+      const allVariables = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .collect();
+
+      // Scoped developers never receive out-of-scope variables at all.
+      const variables = allVariables.filter(
+        (variable) =>
+          variable.deletedAt === undefined &&
+          isEnvironmentScopeAllowed(environmentScope, variable.environments)
+      );
+
+      for (const variable of variables) {
+        let access: "write" | "read" | null = null;
+        if (roleWrite) {
+          access = "write";
+        } else {
+          // Developer — resolve per-variable grant
+          const grant = await getActiveVariableGrant(
+            ctx,
+            args.userId,
+            variable._id
+          );
+          if (grant) {
+            access = grant.permission === "read" ? "read" : "write";
+          }
+        }
+
+        const hasAccess = access !== null;
+        // Developers only ever see variables they can access; owners/PMs/TLs
+        // see everything in their accessible projects (with write access).
+        if (!hasAccess) continue;
+
+        const { vaultRef, ...metadata } = variable;
+        results.push({
+          ...metadata,
+          vaultRef,
+          projectName: project.name,
+          projectSlug: project.slug,
+          hasAccess,
+          permission: access,
+        });
+      }
+    }
+
+    return results;
+  },
+});
+
 export const getById = query({
   args: { variableId: v.id("environmentVariables") },
   handler: async (ctx, args) => {
@@ -138,6 +268,7 @@ export const getByKey = query({
 export const getVersionHistory = query({
   args: {
     variableId: v.id("environmentVariables"),
+    userId: v.id("users"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -146,6 +277,16 @@ export const getVersionHistory = query({
     if (!variable) return [];
     const project = await ctx.db.get(variable.projectId);
     if (!project) return [];
+
+    // Access control: version rows carry per-version vaultRefs, so a caller
+    // must have effective access to the parent variable (owner / assigned
+    // PM/TL / developer with a grant, env-scope respected). Never leak
+    // history for variables outside the caller's access.
+    const access = await getVariableAccess(ctx, args.userId, variable);
+    if (access === null) {
+      throw new Error("No access to this variable");
+    }
+
     const versionHistoryCheck = await checkBooleanFeature(
       ctx.db,
       project.organizationId,
@@ -178,9 +319,20 @@ export const getVersionHistory = query({
 export const getVersion = query({
   args: {
     variableId: v.id("environmentVariables"),
+    userId: v.id("users"),
     version: v.number(),
   },
   handler: async (ctx, args) => {
+    // A single version row still carries a vaultRef — gate on effective
+    // access to the parent variable before returning it.
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable) return null;
+
+    const access = await getVariableAccess(ctx, args.userId, variable);
+    if (access === null) {
+      throw new Error("No access to this variable");
+    }
+
     return await ctx.db
       .query("variableVersions")
       .withIndex("by_variable_and_version", (q) =>
@@ -1683,6 +1835,24 @@ export const listExpiringVariables = query({
     );
     if (!rotationCheck.allowed) return [];
 
+    const orgRole = normalizeOrgRole(membership.role);
+    const isOwner = orgRole === "owner";
+
+    // Non-owners only see expiring variables in projects they're assigned to,
+    // and developers are further constrained by their environment scope.
+    const scopeByProject = new Map<string, string[] | undefined>();
+    const assignedProjectIds = new Set<string>();
+    if (!isOwner) {
+      const assignments = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const pm of assignments) {
+        assignedProjectIds.add(pm.projectId as string);
+        scopeByProject.set(pm.projectId as string, pm.environments);
+      }
+    }
+
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -1690,7 +1860,9 @@ export const listExpiringVariables = query({
       )
       .collect();
     const projects = allProjects.filter(
-      (project) => project.deletedAt === undefined
+      (project) =>
+        project.deletedAt === undefined &&
+        (isOwner || assignedProjectIds.has(project._id as string))
     );
 
     const sevenDaysFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
@@ -1705,12 +1877,20 @@ export const listExpiringVariables = query({
     }> = [];
 
     for (const project of projects) {
+      const environmentScope =
+        orgRole === "developer"
+          ? scopeByProject.get(project._id as string)
+          : undefined;
+
       const allVariables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
         .collect();
+      // Scoped developers never receive out-of-scope variables.
       const variables = allVariables.filter(
-        (variable) => variable.deletedAt === undefined
+        (variable) =>
+          variable.deletedAt === undefined &&
+          isEnvironmentScopeAllowed(environmentScope, variable.environments)
       );
 
       for (const v of variables) {

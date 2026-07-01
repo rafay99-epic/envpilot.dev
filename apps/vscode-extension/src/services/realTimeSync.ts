@@ -145,6 +145,10 @@ export class RealTimeSyncService {
       );
 
       const eventIds: string[] = [];
+      // Every revocation event delivered to this extension belongs to the
+      // signed-in user, so any event's userId identifies the acknowledging
+      // user for the backend ownership check.
+      const revocationUserId = events[0]?.userId;
 
       // Deduplicate events by access token — process each token only once
       const seen = new Set<string>();
@@ -189,8 +193,8 @@ export class RealTimeSyncService {
       }
 
       // Acknowledge events with retry (up to 3 attempts)
-      if (eventIds.length > 0 && this.convexService) {
-        await this.acknowledgeWithRetry(eventIds, 3);
+      if (eventIds.length > 0 && this.convexService && revocationUserId) {
+        await this.acknowledgeWithRetry(eventIds, revocationUserId, 3);
       }
 
       // Refresh subscriptions since projects were removed
@@ -205,11 +209,12 @@ export class RealTimeSyncService {
    */
   private async acknowledgeWithRetry(
     eventIds: string[],
+    userId: string,
     maxAttempts: number
   ): Promise<void> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.convexService!.acknowledgeRevocations(eventIds);
+        await this.convexService!.acknowledgeRevocations(eventIds, userId);
         return;
       } catch (error) {
         console.debug(

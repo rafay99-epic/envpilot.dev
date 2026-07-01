@@ -75,7 +75,10 @@ export default function VariablesPage() {
     | Id<"organizations">
     | undefined;
   const { convexUserId } = useConvexUser(user?.id);
-  const { variables, isLoading } = useVariables(activeOrganizationId);
+  const { variables, isLoading } = useVariables(
+    activeOrganizationId,
+    convexUserId
+  );
   const { projects } = useProjects(activeOrganizationId, convexUserId);
   const canCreateVariable = canDo("org:create_project");
   const canUpdateVariable = canDo("org:create_project");

@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { Id, Doc } from "./_generated/dataModel";
 
 /**
@@ -256,24 +255,6 @@ export async function logSecurityEvent(
     involvesSensitiveData: true,
   });
 
-  // Schedule anomaly detection for security events
-  await ctx.scheduler.runAfter(
-    0,
-    internal.anomalyDetection.detectAnomaliesAfterAudit,
-    {
-      auditLogId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action: input.action,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      involvesSensitiveData: true,
-      createdAt: Date.now(),
-      details: JSON.stringify(input.details),
-      projectId: input.projectId,
-    }
-  );
-
   return auditLogId;
 }
 
@@ -321,28 +302,6 @@ export async function logVariableAccess(
     involvesSensitiveData: input.isSensitive,
     resourceType: "variable",
   });
-
-  // Schedule anomaly detection (non-blocking, separate transaction)
-  await ctx.scheduler.runAfter(
-    0,
-    internal.anomalyDetection.detectAnomaliesAfterAudit,
-    {
-      auditLogId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      involvesSensitiveData: input.isSensitive,
-      createdAt: Date.now(),
-      details: JSON.stringify({
-        variableKey: input.variableKey,
-        accessType: input.accessType,
-        environment: input.environment,
-      }),
-      projectId: input.projectId,
-    }
-  );
 
   return auditLogId;
 }

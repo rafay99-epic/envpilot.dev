@@ -161,8 +161,8 @@ export function ImportDialog({
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400">
               {result.requested ? (
                 <p>
-                  Created {result.requested} pending request(s). An Admin or
-                  Team Lead will need to approve them.
+                  Created {result.requested} pending request(s). A Project
+                  Manager or Team Lead will need to approve them.
                 </p>
               ) : (
                 <p>

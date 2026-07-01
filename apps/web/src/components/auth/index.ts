@@ -8,3 +8,4 @@ export {
   RequireAnyPermission,
   RequireAllPermissions,
 } from "./require-permission";
+export { RequireRole, useRequireRole } from "./require-role";

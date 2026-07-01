@@ -8,7 +8,12 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
-import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import {
+  normalizeOrgRole,
+  ORG_ROLE_LABELS,
+  ROLE_LEVEL,
+  roleLevel,
+} from "@/lib/roles";
 
 interface Organization {
   _id: string;
@@ -117,6 +122,8 @@ export default function OrganizationPage({
 
   const role = normalizeOrgRole(organization.role);
   const isOwner = role === "owner";
+  // Developers cannot open the members page — hide the card to match the guard
+  const isTeamLeadPlus = roleLevel(role) >= ROLE_LEVEL.team_lead;
 
   return (
     <div className="space-y-8">
@@ -176,13 +183,36 @@ export default function OrganizationPage({
 
       {/* Quick Actions */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          href={`/organizations/${slug}/members`}
-          className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-        >
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+        {isTeamLeadPlus && (
+          <Link
+            href={`/organizations/${slug}/members`}
+            className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Members
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {memberCount} member{memberCount !== 1 ? "s" : ""}
+              </p>
+            </div>
             <svg
-              className="h-6 w-6"
+              className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -191,32 +221,11 @@ export default function OrganizationPage({
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                d="M9 5l7 7-7 7"
               />
             </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">
-              Members
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {memberCount} member{memberCount !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <svg
-            className="h-5 w-5 text-zinc-400 transition-transform group-hover:translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </Link>
+          </Link>
+        )}
 
         {isOwner && (
           <Link

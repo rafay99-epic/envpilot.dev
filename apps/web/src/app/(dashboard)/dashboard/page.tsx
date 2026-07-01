@@ -34,8 +34,10 @@ export default function DashboardPage() {
   const { convexUserId } = useConvexUser(user?.id);
   const { stats, isLoading: statsLoading } =
     useDashboardStats(activeOrganizationId);
-  const { activity, isLoading: activityLoading } =
-    useRecentActivity(activeOrganizationId);
+  const { activity, isLoading: activityLoading } = useRecentActivity(
+    activeOrganizationId,
+    convexUserId
+  );
   const { projects, isLoading: projectsLoading } =
     useRecentProjects(activeOrganizationId);
   const { members, isLoading: membersLoading } =
@@ -275,7 +277,10 @@ export default function DashboardPage() {
           {/* Shared Secrets — deferred section */}
           <Suspense fallback={null}>
             {showSharing && activeOrganizationId && (
-              <SharedSecretsWidget organizationId={activeOrganizationId} />
+              <SharedSecretsWidget
+                organizationId={activeOrganizationId}
+                userId={convexUserId}
+              />
             )}
           </Suspense>
         </div>

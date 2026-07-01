@@ -3,6 +3,7 @@ import { query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers } from "./helpers";
 import { resolveFeatureValue } from "./featureRegistry";
+import { normalizeOrgRole } from "./authz";
 
 /**
  * Dashboard Statistics Queries
@@ -18,23 +19,25 @@ export const getStats = query({
   },
   handler: async (ctx, args) => {
     // Get org projects (not deleted)
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
     // Get variables only for projects in this organization
     const variablesNested = await Promise.all(
-      projects.map((project) =>
-        ctx.db
+      projects.map(async (project) => {
+        const projectVars = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .collect()
-      )
+          .collect();
+        return projectVars.filter(
+          (variable) => variable.deletedAt === undefined
+        );
+      })
     );
     const variables = variablesNested.flat();
 
@@ -99,23 +102,66 @@ export const getStats = query({
 });
 
 /**
- * Get recent activity for the dashboard
+ * Get recent activity for the dashboard.
+ *
+ * Audit entries surface variableKey/environment details, so this is
+ * access-gated: the caller must be an org member, and developers only see
+ * entries for projects they are assigned to (org-level entries with no
+ * project, e.g. member changes, remain visible to all members). Owners /
+ * project managers / team leads see the full org feed.
  */
 export const getRecentActivity = query({
   args: {
     organizationId: v.id("organizations"),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Require org membership before surfacing any activity.
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return [];
+
+    const orgRole = normalizeOrgRole(membership.role);
+
+    // Developers are scoped to the projects they're assigned to. Resolve the
+    // assigned project set once so we can drop out-of-scope entries.
+    let assignedProjectIds: Set<string> | null = null;
+    if (orgRole === "developer") {
+      const assignments = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      assignedProjectIds = new Set(
+        assignments.map((pm) => pm.projectId as string)
+      );
+    }
+
+    // Over-fetch so that after scope filtering we can still return ~10 rows.
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
       .order("desc")
-      .take(10);
+      .take(assignedProjectIds ? 100 : 10);
+
+    // Developer scope: keep org-level entries (no projectId) and entries for
+    // assigned projects only.
+    const scoped = assignedProjectIds
+      ? logs.filter(
+          (log) =>
+            !log.projectId || assignedProjectIds!.has(log.projectId as string)
+        )
+      : logs;
+
+    const visible = scoped.slice(0, 10);
 
     const logsWithDetails = await Promise.all(
-      logs.map(async (log) => {
+      visible.map(async (log) => {
         const user = await ctx.db.get(log.userId);
         const project = log.projectId ? await ctx.db.get(log.projectId) : null;
 
@@ -152,22 +198,26 @@ export const getRecentProjects = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const projects = await ctx.db
+    const recentProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .order("desc")
-      .take(5);
+      .take(50);
+    const projects = recentProjects
+      .filter((p) => p.deletedAt === undefined)
+      .slice(0, 5);
 
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
-        const variables = await ctx.db
+        const projectVars = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
           .collect();
+        const variables = projectVars.filter(
+          (variable) => variable.deletedAt === undefined
+        );
 
         return {
           _id: project._id,
@@ -234,13 +284,13 @@ export const getOnboardingStatus = query({
   },
   handler: async (ctx, args) => {
     // Check if any projects exist
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
     const projectCount = projects.length;
     const projectIds = new Set(projects.map((project) => project._id));
@@ -251,10 +301,9 @@ export const getOnboardingStatus = query({
       const vars = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", projectId))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .take(1);
+        .take(50);
 
-      if (vars.length > 0) {
+      if (vars.some((variable) => variable.deletedAt === undefined)) {
         hasVariables = true;
         break;
       }
@@ -271,13 +320,12 @@ export const getOnboardingStatus = query({
     // Check if any project access tokens exist (CLI/IDE integration) for org projects
     let hasIntegrations = false;
     for (const projectId of projectIds) {
-      const accessTokenCount = await ctx.db
+      const accessTokens = await ctx.db
         .query("projectAccess")
         .withIndex("by_project", (q) => q.eq("projectId", projectId))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .take(1);
+        .take(50);
 
-      if (accessTokenCount.length > 0) {
+      if (accessTokens.some((token) => token.isActive)) {
         hasIntegrations = true;
         break;
       }
@@ -329,13 +377,13 @@ export const getAnalytics = query({
       .collect();
 
     // Fetch all non-deleted projects
-    const projects = await ctx.db
+    const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
+    const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
     // === Summary aggregations (replaces separate getSummary call) ===
     const actionCounts: Record<string, number> = {};

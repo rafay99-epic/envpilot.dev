@@ -13,7 +13,7 @@ import {
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination, useConvexUser } from "@/hooks";
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
@@ -53,7 +53,17 @@ interface SearchUser {
   hasPendingInvitation?: boolean;
 }
 
-export default function OrganizationMembersPage({
+export default function OrganizationMembersPage(props: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <RequireRole minimum="team_lead">
+      <OrganizationMembersPageContent {...props} />
+    </RequireRole>
+  );
+}
+
+function OrganizationMembersPageContent({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -74,7 +84,9 @@ export default function OrganizationMembersPage({
   );
   const invitationsData = useQuery(
     api.invitations.listPendingByOrganization,
-    orgId ? { organizationId: orgId } : "skip"
+    orgId && convexUserId
+      ? { organizationId: orgId, requestingUserId: convexUserId }
+      : "skip"
   );
   const projectsData = useQuery(
     api.projects.listByOrganization,

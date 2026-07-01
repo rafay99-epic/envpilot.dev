@@ -130,7 +130,7 @@ const FAQ_DATA = [
       {
         question: "Who can access my variables?",
         answer:
-          "Access is controlled through role-based permissions (Admin, Team Lead, Member) and optional per-variable granular permissions. Only explicitly authorized users can view or modify variables. All access is audit logged.",
+          "Access is controlled through unified organization roles (Owner, Project Manager, Team Lead, Developer) and optional per-variable granular permissions. Only explicitly authorized users can view or modify variables. All access is audit logged.",
       },
     ],
   },

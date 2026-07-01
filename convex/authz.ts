@@ -104,9 +104,6 @@ export const ORG_ACTIONS = {
     "developer",
   ] as OrgRole[],
   "org:manage_tag": ["owner", "project_manager", "team_lead"] as OrgRole[],
-
-  // Anomaly detection (security feature)
-  "org:view_anomalies": ["owner", "project_manager"] as OrgRole[],
 } as const;
 
 // Project actions are checked against the user's ORG role, gated on their

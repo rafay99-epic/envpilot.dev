@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import {
   useOrganizationAuditLogs,
   useOrganizationAuditLogCount,
@@ -93,7 +93,12 @@ const actionCategories = [
   { value: "variable", label: "Variables" },
   { value: "permission", label: "Permissions" },
   { value: "invitation", label: "Invitations" },
+  { value: "tag", label: "Tags" },
+  { value: "template", label: "Templates" },
   { value: "access", label: "Access" },
+  { value: "billing", label: "Billing" },
+  { value: "audit", label: "Audit" },
+  { value: "system", label: "System" },
   { value: "security", label: "Security" },
 ];
 
@@ -112,6 +117,14 @@ const dateRangeMs: Record<string, number> = {
 };
 
 export default function AuditPage() {
+  return (
+    <RequireRole minimum="project_manager">
+      <AuditPageContent />
+    </RequireRole>
+  );
+}
+
+function AuditPageContent() {
   const { organization } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">

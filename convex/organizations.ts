@@ -1002,8 +1002,8 @@ export const revokeMemberCliToken = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can revoke sessions
-    await assertOrgAction(
+    // Authorization: owners and project managers can revoke sessions
+    const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.revokedBy,
       args.organizationId,
@@ -1016,6 +1016,36 @@ export const revokeMemberCliToken = mutation({
     if (!token || !token.isActive) {
       throw new Error("Token not found or already revoked");
     }
+
+    // When a token carries an organizationId (newer tokens), reject one that
+    // belongs to a different org outright. Legacy tokens leave it unset and
+    // fall back to the membership check below.
+    if (token.organizationId && token.organizationId !== args.organizationId) {
+      throw new Error("Token does not belong to this organization");
+    }
+
+    // cliTokens created before organizationId existed are not org-scoped — a
+    // token ID from another org could be passed here. Verify the token's owner
+    // is a member of THIS org, which both rejects cross-org token IDs and gives
+    // us the target's role for the hierarchy check below.
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", token.userId)
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error("Token does not belong to a member of this organization");
+    }
+
+    // Hierarchy: cannot revoke sessions of someone at or above your own level
+    // (e.g. a project_manager must not revoke an owner's session).
+    assertCanManageUser(
+      callerMembership.role,
+      targetMembership.role,
+      "revoke session"
+    );
 
     await ctx.db.patch(args.tokenId, { isActive: false, revokedAt: now });
 
@@ -1046,8 +1076,8 @@ export const revokeMemberExtensionSession = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can revoke sessions
-    await assertOrgAction(
+    // Authorization: owners and project managers can revoke sessions
+    const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.revokedBy,
       args.organizationId,
@@ -1067,6 +1097,27 @@ export const revokeMemberExtensionSession = mutation({
     if (!project || project.organizationId !== args.organizationId) {
       throw new Error("Project does not belong to this organization");
     }
+
+    // Hierarchy: cannot revoke sessions of someone at or above your own level
+    // (e.g. a project_manager must not revoke an owner's session).
+    const targetMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", access.userId)
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error(
+        "Session does not belong to a member of this organization"
+      );
+    }
+
+    assertCanManageUser(
+      callerMembership.role,
+      targetMembership.role,
+      "revoke session"
+    );
 
     await ctx.db.patch(args.projectAccessId, { isActive: false });
 
@@ -1111,8 +1162,8 @@ export const revokeAllMemberSessions = mutation({
     revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can revoke sessions
-    await assertOrgAction(
+    // Authorization: owners and project managers can revoke sessions
+    const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.revokedBy,
       args.organizationId,
@@ -1136,10 +1187,23 @@ export const revokeAllMemberSessions = mutation({
       throw new Error("User is not a member of this organization");
     }
 
+    // Hierarchy: cannot revoke sessions of someone at or above your own level
+    // (e.g. a project_manager must not revoke an owner's sessions).
+    assertCanManageUser(
+      callerMembership.role,
+      targetMembership.role,
+      "revoke session"
+    );
+
     let revokedCliCount = 0;
     let revokedExtensionCount = 0;
 
-    // Revoke all active CLI tokens
+    // Revoke active CLI tokens.
+    // cliTokens now carry an OPTIONAL organizationId. When a token records this
+    // org we scope the revocation to it. Legacy tokens with no organizationId
+    // remain un-scoped and are still revoked here (we cannot attribute them to
+    // a single org), preserving the previous behavior for old rows. The
+    // hierarchy check above still guards WHO may trigger this.
     const activeCliTokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
@@ -1148,6 +1212,14 @@ export const revokeAllMemberSessions = mutation({
       .collect();
 
     for (const token of activeCliTokens) {
+      // Skip tokens explicitly scoped to a DIFFERENT org; revoke org-matching
+      // tokens and legacy (unset) tokens.
+      if (
+        token.organizationId &&
+        token.organizationId !== args.organizationId
+      ) {
+        continue;
+      }
       await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
       revokedCliCount++;
     }

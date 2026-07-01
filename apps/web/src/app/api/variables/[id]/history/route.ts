@@ -88,6 +88,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const history = await convex.query(api.variables.getVersionHistory, {
       variableId: id as Id<"environmentVariables">,
+      userId: convexUser._id,
       limit,
     });
 

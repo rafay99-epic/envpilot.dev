@@ -23,7 +23,7 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
-import { useProjects } from "@/hooks";
+import { useProjects, useConvexUser } from "@/hooks";
 import { useRevokeShare } from "@/hooks/useShareSecret";
 import { ConfirmDialog } from "@/components/ui";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
@@ -329,7 +329,8 @@ function ShareCard({
 
 export default function SharedVariablesPage({ params }: SharedPageProps) {
   const { slug } = use(params);
-  const { organization, isLoading: isAuthLoading } = useAuthContext();
+  const { organization, user, isLoading: isAuthLoading } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
 
   // Stable timestamp for relative time formatting — refreshes every 60s
   const [now, setNow] = useState(() => Date.now());
@@ -349,7 +350,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
 
   const projectShares = useConvexQuery(
     api.sharedSecrets.listByProject,
-    projectId ? { projectId } : "skip"
+    projectId && convexUserId ? { projectId, userId: convexUserId } : "skip"
   );
 
   const revokeShare = useRevokeShare();

@@ -34,14 +34,7 @@ interface Migration {
 
 interface MigrationResult {
   success: boolean;
-  total?: number;
-  migrated?: number;
-  created?: number;
-  skipped?: number;
-  deleted?: number;
-  deletedRequests?: number;
-  deletedVotes?: number;
-  duplicatesRemoved?: number;
+  [key: string]: unknown;
 }
 
 const CATEGORY_CONFIG: Record<
@@ -89,18 +82,28 @@ const CATEGORY_CONFIG: Record<
   },
 };
 
+/** Turn a camelCase result key into a readable label, e.g. "orgMembersToOwner" → "Org members to owner". */
+function humanizeKey(key: string): string {
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Generic key/value rendering of whatever the migration returned (minus `success`). */
 function formatResult(result: MigrationResult): string {
   const parts: string[] = [];
-  if (result.total != null) parts.push(`Total: ${result.total}`);
-  if (result.migrated != null) parts.push(`Migrated: ${result.migrated}`);
-  if (result.created != null) parts.push(`Created: ${result.created}`);
-  if (result.skipped != null) parts.push(`Skipped: ${result.skipped}`);
-  if (result.deleted != null) parts.push(`Deleted: ${result.deleted}`);
-  if (result.deletedRequests != null)
-    parts.push(`Requests: ${result.deletedRequests}`);
-  if (result.deletedVotes != null) parts.push(`Votes: ${result.deletedVotes}`);
-  if (result.duplicatesRemoved != null)
-    parts.push(`Deduped: ${result.duplicatesRemoved}`);
+  for (const [key, value] of Object.entries(result)) {
+    if (key === "success" || value == null) continue;
+    if (
+      typeof value === "number" ||
+      typeof value === "string" ||
+      typeof value === "boolean"
+    ) {
+      parts.push(`${humanizeKey(key)}: ${value}`);
+    }
+  }
   return parts.length > 0 ? parts.join(" · ") : "Migration completed";
 }
 

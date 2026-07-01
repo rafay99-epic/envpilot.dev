@@ -150,6 +150,7 @@ export async function GET(request: Request) {
 
     const shares = await convex.query(api.sharedSecrets.listByVariable, {
       variableId: variableId as Id<"environmentVariables">,
+      userId: convexUser._id,
     });
 
     return NextResponse.json(shares);

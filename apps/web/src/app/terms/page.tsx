@@ -92,8 +92,8 @@ export default function TermsOfServicePage() {
                   </Li>
                   <Li>
                     <Term>
-                      &ldquo;Admin,&rdquo; &ldquo;Team Lead,&rdquo;
-                      &ldquo;Member&rdquo;
+                      &ldquo;Owner,&rdquo; &ldquo;Project Manager,&rdquo;
+                      &ldquo;Team Lead,&rdquo; &ldquo;Developer&rdquo;
                     </Term>{" "}
                     &mdash; role-based access tiers within an Organization.
                   </Li>
@@ -134,23 +134,27 @@ export default function TermsOfServicePage() {
               </Subsection>
 
               <Subsection title="4.3 Roles and Permissions">
-                <p>Three-tier role-based access control:</p>
+                <p>Unified organization-wide role-based access control:</p>
                 <ul className="mt-2 space-y-1 pl-4">
                   <Li>
-                    <Term>Admin:</Term> full access including rollback,
+                    <Term>Owner:</Term> full access including rollback,
                     permission management, billing, and org settings.
                   </Li>
                   <Li>
-                    <Term>Team Lead:</Term> manage projects and variables,
-                    grant/revoke per-variable access.
+                    <Term>Project Manager:</Term> full control of their assigned
+                    projects, including members and variables.
                   </Li>
                   <Li>
-                    <Term>Member:</Term> read-only projects; requires explicit
-                    per-variable permission grants.
+                    <Term>Team Lead:</Term> manage variables and developer
+                    access within their assigned projects.
+                  </Li>
+                  <Li>
+                    <Term>Developer:</Term> work in assigned projects; variable
+                    values require explicit per-variable access grants.
                   </Li>
                 </ul>
                 <p className="mt-2">
-                  Organization Admins are responsible for managing roles and
+                  Organization Owners are responsible for managing roles and
                   ensuring appropriate access levels.
                 </p>
               </Subsection>
@@ -365,7 +369,7 @@ export default function TermsOfServicePage() {
               <p>
                 All actions are recorded in audit logs, including action type,
                 user identity, timestamp, IP address, and user-agent. Audit logs
-                are retained for 2 years and accessible to Organization Admins.
+                are retained for 2 years and accessible to Organization Owners.
                 This monitoring is essential for security, compliance, and
                 incident investigation.
               </p>

@@ -21,7 +21,10 @@ export function scopeToPayload(selected: string[]): string[] | undefined {
 
 /** Human-readable scope for badges: "development, staging" or "All environments". */
 export function formatEnvironmentScope(environments?: string[] | null): string {
-  if (!environments || environments.length === 0) return "All environments";
+  // Absent scope = unrestricted; an explicit empty array = deny-all (backend
+  // rejects it on write, but a legacy row could carry it — show the truth).
+  if (environments == null) return "All environments";
+  if (environments.length === 0) return "No environments";
   const known = ENVIRONMENTS.filter((env) => environments.includes(env));
   const extras = environments.filter(
     (env) => !(ENVIRONMENTS as readonly string[]).includes(env)
