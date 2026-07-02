@@ -276,6 +276,215 @@ export const listOrgVariablesWithAccess = query({
   },
 });
 
+/**
+ * Cross-project, cursor-paginated variant of listOrgVariablesWithAccess for the
+ * global variables page. Paginates variables across ALL of a caller's accessible
+ * projects using a COMPOSITE cursor, without any schema change (no org index on
+ * environmentVariables) and without depending on any data migration.
+ *
+ * Access resolution mirrors listOrgVariablesWithAccess (owner → all live org
+ * projects; else assigned projects via projectMembers; developer env-scope;
+ * per-variable grant via the prefetched by_user_active map). Non-accessible
+ * variables are skipped entirely, exactly like the non-paginated sibling.
+ *
+ * COMPOSITE CURSOR FORMAT: JSON.stringify({ pi, ic }) where
+ *   - pi = index into the deterministically ordered accessibleProjects list
+ *   - ic = the inner per-project Convex cursor (string) or null to start a project
+ * Empty string ("") means the stream is exhausted (isDone). Because pi indexes a
+ * snapshot-ordered project list (stable sort by _id), adding/removing projects
+ * between calls can shift the index — the same limitation as any snapshot
+ * pagination; it is accepted here rather than encoding ids in the cursor.
+ */
+export const listOrgVariablesWithAccessPaginated = query({
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const empty = { page: [], isDone: true, continueCursor: "" };
+
+    // Resolve the caller's org role — non-members get nothing.
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+      )
+      .first();
+    if (!membership) return empty;
+
+    const orgRole = normalizeOrgRole(membership.role);
+    const isOwner = orgRole === "owner";
+
+    // Determine accessible projects and (for developers) their env scope.
+    const allProjects = await ctx.db
+      .query("projects")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    const liveProjects = allProjects.filter((p) => p.deletedAt === undefined);
+
+    // Env scope per assigned project (only constrains developers).
+    const scopeByProject = new Map<string, string[] | undefined>();
+    const assignedProjectIds = new Set<string>();
+    if (!isOwner) {
+      const assignments = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const pm of assignments) {
+        assignedProjectIds.add(pm.projectId as string);
+        scopeByProject.set(pm.projectId as string, pm.environments);
+      }
+    }
+
+    // Deterministic, stable order so the cursor's pi points at the same project
+    // on every call: sort by _id string.
+    const accessibleProjects = (
+      isOwner
+        ? liveProjects
+        : liveProjects.filter((p) => assignedProjectIds.has(p._id as string))
+    )
+      .slice()
+      .sort((a, b) => {
+        const ai = a._id as string;
+        const bi = b._id as string;
+        return ai < bi ? -1 : ai > bi ? 1 : 0;
+      });
+
+    // For a non-owner, every accessible project is an assigned project (the list
+    // above is filtered to assignedProjectIds). Owners are never "assigned".
+    const assigned = !isOwner;
+    const roleAccess =
+      isOwner ||
+      (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
+    const canManagePermissions = roleAccess;
+    const projectRole = toLegacyProjectRole(orgRole, assigned);
+
+    // Prefetch the caller's active grants ONCE (only developers consult them).
+    const grantByVariable = buildActiveGrantMap(
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_user_active", (q) =>
+          q.eq("userId", args.userId).eq("isActive", true)
+        )
+        .collect()
+    );
+
+    type Row = Omit<Doc<"environmentVariables">, "vaultRef"> & {
+      vaultRef?: string;
+      hasAccess: boolean;
+      permission: "admin" | "write" | "read" | null;
+      roleAccess: boolean;
+      userRole: typeof orgRole;
+      projectRole: typeof projectRole;
+      canManagePermissions: boolean;
+      projectName: string;
+      projectSlug: string;
+    };
+
+    const numItems = args.paginationOpts.numItems;
+    const page: Row[] = [];
+
+    // Parse the incoming composite cursor. Defensive: any malformed cursor or
+    // out-of-range pi is treated as an exhausted stream.
+    let pi = 0;
+    let ic: string | null = null;
+    const rawCursor = args.paginationOpts.cursor;
+    if (rawCursor) {
+      try {
+        const parsed = JSON.parse(rawCursor) as {
+          pi?: unknown;
+          ic?: unknown;
+        };
+        if (typeof parsed.pi === "number" && parsed.pi >= 0) {
+          pi = parsed.pi;
+          ic = typeof parsed.ic === "string" ? parsed.ic : null;
+        } else {
+          pi = accessibleProjects.length;
+        }
+      } catch {
+        pi = accessibleProjects.length;
+      }
+    }
+
+    // Convex allows only ONE `.paginate()` per query execution, so we paginate
+    // exactly one project per call. When the current project is exhausted the
+    // returned cursor points at the NEXT project (isDone stays false), and
+    // usePaginatedQuery calls again — walking project by project. Pages may be
+    // smaller than numItems (or empty) after access filtering; that is expected
+    // and the cursor always advances, so there is no empty-page stall.
+    let isDone = false;
+    let continueCursor = "";
+
+    if (pi >= accessibleProjects.length) {
+      // Cursor already past the last project — nothing left.
+      isDone = true;
+    } else {
+      const project = accessibleProjects[pi];
+      const environmentScope =
+        orgRole === "developer"
+          ? scopeByProject.get(project._id as string)
+          : undefined;
+
+      const inner = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .order("desc")
+        .paginate({ numItems, cursor: ic });
+
+      for (const variable of inner.page) {
+        // Scoped developers never receive out-of-scope variables at all.
+        if (variable.deletedAt !== undefined) continue;
+        if (!isEnvironmentScopeAllowed(environmentScope, variable.environments))
+          continue;
+
+        // Mirrors listOrgVariablesWithAccess: owner/PM/TL → write; developers
+        // per grant; unassigned grant holders capped at read.
+        const grant = grantByVariable.get(variable._id as string) ?? null;
+        let access: "write" | "read" | null = null;
+        if (roleAccess) {
+          access = "write";
+        } else if (grant) {
+          access = !assigned || grant.permission === "read" ? "read" : "write";
+        }
+
+        // Not accessible → skip entirely (identical to the non-paginated list).
+        if (access === null) continue;
+
+        const effectivePermission = roleAccess ? "admin" : access;
+        const { vaultRef, ...metadata } = variable;
+        page.push({
+          ...metadata,
+          // Only accessible rows reach here, so the vault ref is always kept.
+          vaultRef,
+          hasAccess: true,
+          permission: effectivePermission,
+          roleAccess,
+          userRole: orgRole,
+          projectRole,
+          canManagePermissions,
+          projectName: project.name,
+          projectSlug: project.slug,
+        });
+      }
+
+      if (inner.isDone) {
+        // Current project exhausted — resume at the next project next call.
+        const nextPi = pi + 1;
+        isDone = nextPi >= accessibleProjects.length;
+        continueCursor = isDone ? "" : JSON.stringify({ pi: nextPi, ic: null });
+      } else {
+        // More variables remain in this project — resume from its inner cursor.
+        continueCursor = JSON.stringify({ pi, ic: inner.continueCursor });
+      }
+    }
+
+    return { page, isDone, continueCursor };
+  },
+});
+
 export const getById = query({
   args: { variableId: v.id("environmentVariables") },
   handler: async (ctx, args) => {
