@@ -300,9 +300,8 @@ export async function countActiveProjects(
   const projects = await db
     .query("projects")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .filter((q) => q.eq(q.field("deletedAt"), undefined))
     .collect();
-  return projects.length;
+  return projects.filter((p) => p.deletedAt === undefined).length;
 }
 
 export async function countActiveVariables(
@@ -312,9 +311,8 @@ export async function countActiveVariables(
   const vars = await db
     .query("environmentVariables")
     .withIndex("by_project", (q) => q.eq("projectId", projectId))
-    .filter((q) => q.eq(q.field("deletedAt"), undefined))
     .collect();
-  return vars.length;
+  return vars.filter((v) => v.deletedAt === undefined).length;
 }
 
 export async function countMembersAndPendingInvites(
@@ -334,15 +332,12 @@ export async function countMembersAndPendingInvites(
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", organizationId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "pending"),
-          q.gt(q.field("expiresAt"), now)
-        )
-      )
       .collect(),
   ]);
-  return members.length + invites.length;
+  const pendingInvites = invites.filter(
+    (i) => i.status === "pending" && i.expiresAt > now
+  );
+  return members.length + pendingInvites.length;
 }
 
 export async function countRotationEnabledVariables(
@@ -350,21 +345,21 @@ export async function countRotationEnabledVariables(
   organizationId: Id<"organizations">,
   excludeVariableId?: Id<"environmentVariables">
 ): Promise<number> {
-  const projects = await db
+  const allProjects = await db
     .query("projects")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .filter((q) => q.eq(q.field("deletedAt"), undefined))
     .collect();
+  const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
   let count = 0;
   for (const project of projects) {
     const vars = await db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", project._id))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
       .collect();
 
     for (const v of vars) {
+      if (v.deletedAt !== undefined) continue;
       if (v.rotationFrequencyDays === undefined || v.rotationFrequencyDays <= 0)
         continue;
       if (excludeVariableId && v._id === excludeVariableId) continue;
@@ -968,26 +963,6 @@ const SEED_FEATURES = [
     sortOrder: 0,
   },
 
-  // Security — Anomaly Detection (Dual-Gate: boolean + numeric limit)
-  {
-    key: "anomaly_detection",
-    displayName: "Anomaly Detection",
-    valueType: "boolean" as const,
-    category: "Security",
-    defaultValue: "false",
-    resettable: false,
-    sortOrder: 5,
-  },
-  {
-    key: "anomaly_detection_limit",
-    displayName: "Anomaly Detection Rules",
-    valueType: "numeric" as const,
-    category: "Security",
-    defaultValue: "0",
-    resettable: false,
-    sortOrder: 6,
-  },
-
   // Support
   {
     key: "priority_support",
@@ -1097,8 +1072,6 @@ export const seedDefaultTierFeatures = internalMutation({
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
-        anomaly_detection: "false",
-        anomaly_detection_limit: "0",
         priority_support: "false",
       },
       pro: {
@@ -1125,8 +1098,6 @@ export const seedDefaultTierFeatures = internalMutation({
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",
-        anomaly_detection: "true",
-        anomaly_detection_limit: "null",
         priority_support: "true",
       },
     };

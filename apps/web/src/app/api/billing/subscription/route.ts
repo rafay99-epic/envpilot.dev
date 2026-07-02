@@ -4,6 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
+import { normalizeOrgRole } from "@/lib/roles";
 
 /**
  * GET /api/billing/subscription?organizationId=xxx
@@ -127,7 +128,7 @@ export async function GET(request: Request) {
           }
         : null,
       hasBillingCustomer: !!polarCustomer,
-      canManageBilling: membership.role === "admin",
+      canManageBilling: normalizeOrgRole(membership.role) === "owner",
     });
   } catch (error) {
     console.error("Error getting subscription:", error);

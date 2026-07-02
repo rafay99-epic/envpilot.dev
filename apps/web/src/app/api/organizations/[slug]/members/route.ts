@@ -8,20 +8,26 @@ import { z } from "zod";
 
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { ORG_ROLE_LABELS } from "@/lib/roles";
 
 // Convex ID pattern - alphanumeric characters only
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
-  role: z.enum(["admin", "team_lead", "member"]),
+  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
+  // Project assignments only — project-level roles no longer exist.
   projectIds: z.array(z.string()).optional(),
-  projectRole: z.enum(["viewer", "developer", "manager"]).optional(),
+  // Developer environment scope — omitted means unrestricted access.
+  environments: z
+    .array(z.enum(["development", "staging", "production"]))
+    .min(1, "Select at least one environment")
+    .optional(),
 });
 
 const updateRoleSchema = z.object({
   userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
-  role: z.enum(["admin", "team_lead", "member"]),
+  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
 });
 
 type RouteParams = { params: Promise<{ slug: string }> };
@@ -72,6 +78,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       api.invitations.listPendingByOrganization,
       {
         organizationId,
+        requestingUserId: convexUser._id,
       }
     );
 
@@ -120,8 +127,8 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanManageUser)
-    const { email, role, projectIds, projectRole } = validation.data;
+    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanAssignRole)
+    const { email, role, projectIds, environments } = validation.data;
 
     // Get organization details for the email
     const organization = await convex.query(api.organizations.getById, {
@@ -149,7 +156,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       organizationId,
       role,
       projectIds: projectIds as Id<"projects">[] | undefined,
-      projectRole,
+      // Developer environment scope — omitted means unrestricted.
+      ...(environments ? { environments } : {}),
       invitedBy: convexUser._id,
     });
 
@@ -256,7 +264,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    // Authorization is enforced in the Convex mutation (assertOrgAction + assertCanManageUser)
+    // Authorization is enforced in the Convex mutation (org:change_role is owner-only)
     const { userId: targetUserId, role } = validation.data;
 
     // Get target user info before updating
@@ -272,10 +280,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     });
 
     // Notify org members about the role change (non-blocking)
-    const roleDisplay =
-      role === "team_lead"
-        ? "Team Lead"
-        : role.charAt(0).toUpperCase() + role.slice(1);
+    const roleDisplay = ORG_ROLE_LABELS[role];
     notifyMemberUpdate(
       targetUserId as Id<"users">,
       targetUser?.name || targetUser?.email || "A member",

@@ -3,6 +3,7 @@ import {
   withAuth,
   signOut,
 } from "@workos-inc/authkit-nextjs";
+import type { OrgRole, LegacyProjectRole } from "./roles";
 
 // Re-export auth utilities for consistent imports
 export { authkitMiddleware, withAuth, signOut };
@@ -46,5 +47,17 @@ export interface AuthSession {
   };
 }
 
-export type MembershipRole = "admin" | "team_lead" | "member";
-export type ProjectRole = "viewer" | "developer" | "manager";
+/**
+ * Unified org role ("owner" | "project_manager" | "team_lead" | "developer").
+ * Kept under the old alias name so existing imports don't break.
+ * Legacy values ("admin"/"member") may still flow through from old data —
+ * always compare via normalizeOrgRole()/roleLevel() from "@/lib/roles".
+ */
+export type MembershipRole = OrgRole;
+
+/**
+ * @deprecated Project-level roles are gone in the unified RBAC model —
+ * projectMembers is a pure assignment and capability = f(org role).
+ * Only kept for legacy CLI/extension compatibility (see "@/lib/roles").
+ */
+export type ProjectRole = LegacyProjectRole;

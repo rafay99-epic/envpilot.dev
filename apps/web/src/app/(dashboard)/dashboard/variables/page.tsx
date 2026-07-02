@@ -1,13 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import {
-  useVariables,
-  useProjects,
-  useConvexUser,
-  usePagination,
-  useFeatureGate,
-} from "@/hooks";
+import { usePaginatedQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { useProjects, useConvexUser, useFeatureGate } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -20,7 +16,6 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
-import { Pagination } from "@/components/dashboard/pagination";
 import { staggeredRow } from "@/components/dashboard/animated-list";
 import {
   VariableEditModal,
@@ -52,6 +47,8 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("app/dashboard/variables");
 
+const PAGE_SIZE = 50;
+
 interface Variable {
   _id: Id<"environmentVariables">;
   key: string;
@@ -75,7 +72,21 @@ export default function VariablesPage() {
     | Id<"organizations">
     | undefined;
   const { convexUserId } = useConvexUser(user?.id);
-  const { variables, isLoading } = useVariables(activeOrganizationId);
+  // Fetch variables via Convex cursor pagination (incremental "load more").
+  // `results` accumulates every loaded page; client-side filters below
+  // operate over this accumulated array exactly as before.
+  const {
+    results: variables,
+    status: variablesStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.variables.listOrgVariablesWithAccessPaginated,
+    activeOrganizationId && convexUserId
+      ? { organizationId: activeOrganizationId, userId: convexUserId }
+      : "skip",
+    { initialNumItems: PAGE_SIZE }
+  );
+  const isLoading = variablesStatus === "LoadingFirstPage";
   const { projects } = useProjects(activeOrganizationId, convexUserId);
   const canCreateVariable = canDo("org:create_project");
   const canUpdateVariable = canDo("org:create_project");
@@ -140,8 +151,6 @@ export default function VariablesPage() {
 
     return matchesSearch && matchesProject && matchesEnvironment && matchesTags;
   });
-
-  const pagination = usePagination(filteredVariables, { pageSize: 15 });
 
   const handleRevealValue = async (variable: Variable) => {
     if (revealedValues[variable._id]) return;
@@ -419,7 +428,7 @@ export default function VariablesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {pagination.pageItems.map((variable, i) => (
+                {filteredVariables.map((variable, i) => (
                   <VariableRow
                     key={variable._id}
                     variable={variable}
@@ -454,18 +463,18 @@ export default function VariablesPage() {
               </tbody>
             </table>
           </div>
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            hasNextPage={pagination.hasNextPage}
-            hasPrevPage={pagination.hasPrevPage}
-            onNextPage={pagination.nextPage}
-            onPrevPage={pagination.prevPage}
-            onGoToPage={pagination.goToPage}
-            startIndex={pagination.startIndex}
-            endIndex={pagination.endIndex}
-            totalItems={pagination.totalItems}
-          />
+          {(variablesStatus === "CanLoadMore" ||
+            variablesStatus === "LoadingMore") && (
+            <div className="flex justify-center border-t border-zinc-800/50 px-5 py-4">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => loadMore(PAGE_SIZE)}
+                disabled={variablesStatus === "LoadingMore"}
+              >
+                {variablesStatus === "LoadingMore" ? "Loading..." : "Load more"}
+              </TerminalButton>
+            </div>
+          )}
         </TerminalWindow>
       )}
 

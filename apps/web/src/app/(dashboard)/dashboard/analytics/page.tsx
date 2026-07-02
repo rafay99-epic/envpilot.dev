@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import { useAnalytics } from "@/hooks";
 import type { Id } from "@convex/_generated/dataModel";
 import { TerminalEmptyState } from "@/components/dashboard/terminal-ui";
@@ -122,29 +121,25 @@ function getPermissionChangeCount(
 }
 
 export default function AnalyticsPage() {
-  const router = useRouter();
-  const { organization, canDo } = useAuthContext();
+  return (
+    <RequireRole minimum="project_manager">
+      <AnalyticsPageContent />
+    </RequireRole>
+  );
+}
+
+function AnalyticsPageContent() {
+  const { organization } = useAuthContext();
   const [daysBack, setDaysBack] = useState<TimeRange>(30);
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
 
-  // Only admin and team lead can access analytics — redirect members to dashboard
-  const canViewAnalytics = canDo("org:create_project");
-
   // Single unified query — no duplicate audit log fetches
-  const { analytics, isLoading } = useAnalytics(
-    canViewAnalytics ? activeOrganizationId : undefined,
-    daysBack
-  );
+  const { analytics, isLoading } = useAnalytics(activeOrganizationId, daysBack);
 
   const maxRetentionDays =
     (analytics?.maxRetentionDays as number | undefined) ?? null;
-
-  if (!organization || !canViewAnalytics) {
-    router.replace("/dashboard");
-    return null;
-  }
 
   if (isLoading) {
     return (

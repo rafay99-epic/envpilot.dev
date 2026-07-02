@@ -23,6 +23,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -33,8 +34,10 @@ export default function DashboardPage() {
   const { convexUserId } = useConvexUser(user?.id);
   const { stats, isLoading: statsLoading } =
     useDashboardStats(activeOrganizationId);
-  const { activity, isLoading: activityLoading } =
-    useRecentActivity(activeOrganizationId);
+  const { activity, isLoading: activityLoading } = useRecentActivity(
+    activeOrganizationId,
+    convexUserId
+  );
   const { projects, isLoading: projectsLoading } =
     useRecentProjects(activeOrganizationId);
   const { members, isLoading: membersLoading } =
@@ -274,7 +277,10 @@ export default function DashboardPage() {
           {/* Shared Secrets — deferred section */}
           <Suspense fallback={null}>
             {showSharing && activeOrganizationId && (
-              <SharedSecretsWidget organizationId={activeOrganizationId} />
+              <SharedSecretsWidget
+                organizationId={activeOrganizationId}
+                userId={convexUserId}
+              />
             )}
           </Suspense>
         </div>
@@ -458,6 +464,11 @@ const actionLabels: Record<string, string> = {
   "project.created": "created project",
   "project.updated": "updated project",
   "project.deleted": "deleted project",
+  "project.restored": "restored project",
+  "project.moved": "moved project",
+  "project.member_added": "added project member",
+  "project.member_removed": "removed project member",
+  "project.member_environments_changed": "changed environment access",
   "variable.created": "added variable",
   "variable.updated": "updated variable",
   "variable.deleted": "deleted variable",
@@ -469,6 +480,14 @@ const actionLabels: Record<string, string> = {
   "invitation.sent": "sent invitation",
   "invitation.accepted": "accepted invitation",
   "invitation.declined": "declined invitation",
+  "invitation.canceled": "canceled invitation",
+  "invitation.resent": "resent invitation",
+  "tag.created": "created tag",
+  "tag.updated": "updated tag",
+  "tag.deleted": "deleted tag",
+  "template.created": "created template",
+  "template.updated": "updated template",
+  "template.deleted": "deleted template",
   "access.token_created": "created access token",
   "access.token_revoked": "revoked access token",
   "access.extension_linked": "linked extension",
@@ -513,12 +532,15 @@ function TeamMemberRow({
     user: { _id: unknown; name?: string; email: string; avatarUrl?: string };
   };
 }) {
+  const role = normalizeOrgRole(member.role);
   const roleColor =
-    member.role === "admin"
+    role === "owner"
       ? "purple"
-      : member.role === "team_lead"
-        ? "blue"
-        : ("zinc" as const);
+      : role === "project_manager"
+        ? "amber"
+        : role === "team_lead"
+          ? "blue"
+          : ("zinc" as const);
 
   return (
     <div className="flex items-center justify-between px-5 py-2.5">
@@ -538,9 +560,7 @@ function TeamMemberRow({
           {member.user.name || member.user.email}
         </span>
       </div>
-      <TerminalBadge color={roleColor}>
-        {member.role.replace("_", " ")}
-      </TerminalBadge>
+      <TerminalBadge color={roleColor}>{ORG_ROLE_LABELS[role]}</TerminalBadge>
     </div>
   );
 }

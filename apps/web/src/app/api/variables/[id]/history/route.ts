@@ -8,6 +8,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { normalizeOrgRole } from "@/lib/roles";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -63,7 +64,8 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (membership.role === "member") {
+    // Developers can only view history for variables they hold a grant on.
+    if (normalizeOrgRole(membership.role) === "developer") {
       const accessibleVariables = await convex.query(
         api.variables.listWithAccess,
         {
@@ -86,6 +88,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const history = await convex.query(api.variables.getVersionHistory, {
       variableId: id as Id<"environmentVariables">,
+      userId: convexUser._id,
       limit,
     });
 

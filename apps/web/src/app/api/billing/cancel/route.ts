@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const cancelSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -91,9 +92,10 @@ export async function POST(request: Request) {
       userId: convexUser._id,
     });
 
-    if (!membership || membership.role !== "admin") {
+    // Billing management is owner-only (org:manage_billing)
+    if (!membership || normalizeOrgRole(membership.role) !== "owner") {
       return NextResponse.json(
-        { error: "Only organization admins can cancel subscriptions" },
+        { error: "Only the organization owner can cancel subscriptions" },
         { status: 403 }
       );
     }

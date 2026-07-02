@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
-import { assertOrgAction, assertProjectAction } from "./authz";
+import {
+  assertOrgAction,
+  assertProjectAction,
+  normalizeOrgRole,
+  toLegacyProjectRole,
+} from "./authz";
 
 /**
  * Project Queries and Mutations
@@ -19,8 +24,8 @@ export const listByOrganization = query({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
   },
 });
 
@@ -62,15 +67,14 @@ export const listWithStats = query({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
-    // Resolve org membership and project memberships for role data
+    // Resolve org membership and project assignments for visibility.
+    // Owners see all org projects; everyone else only sees projects they
+    // are assigned to via projectMembers.
     let userRole: string | null = null;
-    let projectMemberships: Array<{
-      projectId: { toString(): string };
-      role: string;
-    }> = [];
+    const assignedProjectIds = new Set<string>();
 
     if (args.userId) {
       const userId = args.userId;
@@ -82,19 +86,19 @@ export const listWithStats = query({
         .first();
 
       if (membership) {
-        userRole = membership.role;
+        userRole = normalizeOrgRole(membership.role);
       }
 
-      if (membership && membership.role !== "admin") {
-        // Get user's project memberships
-        projectMemberships = await ctx.db
+      if (membership && normalizeOrgRole(membership.role) !== "owner") {
+        // Get user's project assignments
+        const projectMemberships = await ctx.db
           .query("projectMembers")
           .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect();
 
-        const assignedProjectIds = new Set(
-          projectMemberships.map((pm) => pm.projectId.toString())
-        );
+        for (const pm of projectMemberships) {
+          assignedProjectIds.add(pm.projectId.toString());
+        }
 
         projects = projects.filter((p) =>
           assignedProjectIds.has(p._id.toString())
@@ -102,26 +106,25 @@ export const listWithStats = query({
       }
     }
 
-    // Build a lookup map for project roles
-    const projectRoleMap = new Map(
-      projectMemberships.map((pm) => [pm.projectId.toString(), pm.role])
-    );
-
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
         const variables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .collect();
+          .collect()
+          .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
         return {
           ...project,
           variableCount: variables.length,
           userRole: userRole as string | null,
-          projectRole:
-            (projectRoleMap.get(project._id.toString()) as string | null) ??
-            null,
+          // Legacy compatibility: derived from the unified org role + assignment
+          projectRole: userRole
+            ? (toLegacyProjectRole(
+                normalizeOrgRole(userRole),
+                assignedProjectIds.has(project._id.toString())
+              ) as string | null)
+            : null,
         };
       })
     );
@@ -140,24 +143,26 @@ export const listForUser = query({
 
     const allProjects = await Promise.all(
       memberships.map(async (membership) => {
-        // Admins see all projects in the org
-        if (membership.role === "admin") {
+        const orgRole = normalizeOrgRole(membership.role);
+
+        // Owners see all projects in the org
+        if (orgRole === "owner") {
           const projects = await ctx.db
             .query("projects")
             .withIndex("by_organization", (q) =>
               q.eq("organizationId", membership.organizationId)
             )
-            .filter((q) => q.eq(q.field("deletedAt"), undefined))
-            .collect();
+            .collect()
+            .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
           return projects.map((project) => ({
             ...project,
-            userRole: membership.role,
+            userRole: orgRole as string,
             projectRole: null as string | null,
           }));
         }
 
-        // Team leads and members only see projects they're assigned to
+        // Everyone else only sees projects they're assigned to
         const projectMemberships = await ctx.db
           .query("projectMembers")
           .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -175,8 +180,9 @@ export const listForUser = query({
             }
             return {
               ...project,
-              userRole: membership.role,
-              projectRole: pm.role as string | null,
+              userRole: orgRole as string,
+              // Legacy compatibility: derived from the unified org role
+              projectRole: toLegacyProjectRole(orgRole, true) as string | null,
             };
           })
         );
@@ -206,7 +212,7 @@ export const create = mutation({
     createdBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: admins and team_leads can create projects
+    // Authorization: owners and project managers can create projects
     const { membership: creatorMembership } = await assertOrgAction(
       ctx,
       args.createdBy,
@@ -216,21 +222,9 @@ export const create = mutation({
 
     const now = Date.now();
 
-    // Check tier limits for project creation
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
       throw new Error("Organization not found");
-    }
-
-    // Check if team leads are allowed to create projects (org setting override)
-    if (creatorMembership.role === "team_lead") {
-      const teamLeadsCanCreate =
-        org.settings?.teamLeadsCanCreateProjects ?? true;
-      if (!teamLeadsCanCreate) {
-        throw new Error(
-          "Project creation is restricted to admins in this organization"
-        );
-      }
     }
 
     // Check tier limits for project creation
@@ -268,12 +262,12 @@ export const create = mutation({
       updatedAt: now,
     });
 
-    // Auto-add the creator as a project manager (unless they're an admin)
-    if (creatorMembership && creatorMembership.role !== "admin") {
+    // Auto-assign the creator to the project. Owners have implicit access to
+    // every project; project managers need an explicit assignment.
+    if (creatorMembership.role === "project_manager") {
       await ctx.db.insert("projectMembers", {
         projectId,
         userId: args.createdBy,
-        role: "manager",
         addedBy: args.createdBy,
         addedAt: now,
       });
@@ -372,8 +366,8 @@ export const remove = mutation({
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     for (const variable of variables) {
       await ctx.db.patch(variable._id, {
@@ -401,8 +395,8 @@ export const remove = mutation({
       const permissions = await ctx.db
         .query("variablePermissions")
         .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
       for (const perm of permissions) {
         await ctx.db.patch(perm._id, {
           isActive: false,
@@ -427,8 +421,8 @@ export const remove = mutation({
     const accessTokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
     for (const token of accessTokens) {
       await ctx.db.patch(token._id, { isActive: false });
       await ctx.db.insert("permissionRevocationEvents", {
@@ -513,6 +507,15 @@ export const restore = mutation({
       updatedAt: now,
     });
 
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: args.restoredBy,
+      action: "project.restored",
+      details: JSON.stringify({ name: project.name, slug: project.slug }),
+      createdAt: now,
+    });
+
     return args.projectId;
   },
 });
@@ -531,8 +534,8 @@ export const duplicate = mutation({
       throw new Error("Source project not found");
     }
 
-    // Authorization: admins and team_leads can duplicate (same as create)
-    await assertOrgAction(
+    // Authorization: owners and project managers can duplicate (same as create)
+    const { membership: creatorMembership } = await assertOrgAction(
       ctx,
       args.createdBy,
       sourceProject.organizationId,
@@ -585,8 +588,8 @@ export const duplicate = mutation({
       const variables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
       for (const variable of variables) {
         await ctx.db.insert("environmentVariables", {
@@ -605,7 +608,8 @@ export const duplicate = mutation({
       }
     }
 
-    // Copy project members from source project
+    // Copy project assignments from source project (pure scope assignments —
+    // capabilities come from each member's org role)
     const sourceMembers = await ctx.db
       .query("projectMembers")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -615,23 +619,17 @@ export const duplicate = mutation({
       await ctx.db.insert("projectMembers", {
         projectId: newProjectId,
         userId: member.userId,
-        role: member.role,
+        // Preserve environment scope so a scoped developer's access is not
+        // silently widened in the duplicated project.
+        ...(member.environments ? { environments: member.environments } : {}),
         addedBy: args.createdBy,
         addedAt: now,
       });
     }
 
-    // Auto-add the creator as manager if not already a member and not admin
-    const creatorMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", sourceProject.organizationId)
-          .eq("userId", args.createdBy)
-      )
-      .first();
-
-    if (creatorMembership && creatorMembership.role !== "admin") {
+    // Auto-assign the creator if not already assigned. Owners have implicit
+    // access; project managers need an explicit assignment.
+    if (creatorMembership.role === "project_manager") {
       const creatorAlreadyMember = sourceMembers.some(
         (m) => m.userId === args.createdBy
       );
@@ -639,7 +637,6 @@ export const duplicate = mutation({
         await ctx.db.insert("projectMembers", {
           projectId: newProjectId,
           userId: args.createdBy,
-          role: "manager",
           addedBy: args.createdBy,
           addedAt: now,
         });
@@ -695,33 +692,20 @@ export const move = mutation({
       throw new Error("Target organization not found");
     }
 
-    // Verify caller is admin in source org
-    const sourceMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.movedBy)
-      )
-      .first();
-
-    if (!sourceMembership || sourceMembership.role !== "admin") {
-      throw new Error("You must be an admin in the source organization");
-    }
-
-    // Verify caller is admin in target org
-    const targetMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", args.targetOrganizationId)
-          .eq("userId", args.movedBy)
-      )
-      .first();
-
-    if (!targetMembership || targetMembership.role !== "admin") {
-      throw new Error("You must be an admin of the target organization");
-    }
+    // Authorization: moving a project removes it from the source org
+    // (delete-level power) and creates it in the target org (create-level power)
+    await assertOrgAction(
+      ctx,
+      args.movedBy,
+      project.organizationId,
+      "org:delete_project"
+    );
+    await assertOrgAction(
+      ctx,
+      args.movedBy,
+      args.targetOrganizationId,
+      "org:create_project"
+    );
 
     // Check if target org has room for another project
     const targetProjectCount = await countActiveProjects(
@@ -748,8 +732,8 @@ export const move = mutation({
           .eq("organizationId", args.targetOrganizationId)
           .eq("slug", project.slug)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .first();
+      .collect()
+      .then((rows) => rows.find((doc) => doc.deletedAt === undefined) ?? null);
 
     if (existingSlug) {
       throw new Error(
@@ -780,8 +764,8 @@ export const move = mutation({
     const accessTokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
     for (const token of accessTokens) {
       await ctx.db.patch(token._id, { isActive: false });
       await ctx.db.insert("permissionRevocationEvents", {
@@ -802,15 +786,15 @@ export const move = mutation({
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     for (const variable of variables) {
       const permissions = await ctx.db
         .query("variablePermissions")
         .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
       for (const perm of permissions) {
         await ctx.db.patch(perm._id, {
           isActive: false,

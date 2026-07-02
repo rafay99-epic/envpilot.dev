@@ -8,13 +8,14 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
+import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
 
 interface Organization {
   _id: string;
   name: string;
   slug: string;
   logoUrl?: string;
-  role: "admin" | "team_lead" | "member";
+  role: string;
 }
 
 function OrgProBadge({ orgId }: { orgId: string }) {
@@ -36,9 +37,7 @@ interface OrganizationSwitcherProps {
 }
 
 function formatRole(role: string): string {
-  return role === "team_lead"
-    ? "Team Lead"
-    : role.charAt(0).toUpperCase() + role.slice(1);
+  return ORG_ROLE_LABELS[normalizeOrgRole(role)];
 }
 
 export function OrganizationSwitcher({

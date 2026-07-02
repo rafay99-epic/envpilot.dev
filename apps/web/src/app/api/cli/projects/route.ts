@@ -7,6 +7,11 @@ import {
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/cli-auth";
+import {
+  normalizeOrgRole,
+  toLegacyOrgRole,
+  toLegacyProjectRole,
+} from "@/lib/roles";
 
 /**
  * GET /api/cli/projects
@@ -41,11 +46,21 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Get projects (filtered by membership for non-admins)
+    // Get projects (filtered to the user's assigned projects for non-owners)
     const projects = await convex.query(api.projects.listWithStats, {
       organizationId: organizationId as Id<"organizations">,
       userId: authResult.userId,
     });
+
+    // Old CLI builds only understand the legacy role strings. Non-owners only
+    // receive projects they are assigned to, so assignment is implied; owners
+    // get projectRole null exactly like legacy admins did (their org role
+    // already grants write access on old clients).
+    const isOwner = normalizeOrgRole(membership.role) === "owner";
+    const legacyUserRole = toLegacyOrgRole(membership.role);
+    const legacyProjectRole = isOwner
+      ? null
+      : toLegacyProjectRole(membership.role, true);
 
     return NextResponse.json({
       success: true,
@@ -59,8 +74,8 @@ export async function GET(request: NextRequest) {
         organizationId: project.organizationId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        userRole: project.userRole ?? null,
-        projectRole: project.projectRole ?? null,
+        userRole: legacyUserRole,
+        projectRole: legacyProjectRole,
       })),
     });
   } catch (error) {

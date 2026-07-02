@@ -7,7 +7,12 @@ import {
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { batchGetUsers } from "./helpers";
-import { assertOrgAction, assertCanManageUser } from "./authz";
+import {
+  assertOrgAction,
+  assertOrgMembership,
+  assertCanAssignRole,
+  normalizeOrgRole,
+} from "./authz";
 
 /**
  * Invitation Queries and Mutations
@@ -24,15 +29,22 @@ function generateToken(): string {
 }
 
 export const listPendingByOrganization = query({
-  args: { organizationId: v.id("organizations") },
+  args: {
+    organizationId: v.id("organizations"),
+    // Caller must be a member of the org to see its pending invitations.
+    requestingUserId: v.id("users"),
+  },
   handler: async (ctx, args) => {
+    // Authorization: only members of the org may list its pending invitations.
+    await assertOrgMembership(ctx, args.requestingUserId, args.organizationId);
+
     const invitations = await ctx.db
       .query("invitations")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.status === "pending"));
 
     const now = Date.now();
     const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
@@ -43,9 +55,12 @@ export const listPendingByOrganization = query({
     );
 
     return validInvitations.map((inv) => {
+      // Never expose the invitation token to org listings — it grants
+      // acceptance and must only travel via the emailed accept link.
+      const { token: _token, ...safe } = inv;
       const inviter = userMap.get(inv.invitedBy.toString());
       return {
-        ...inv,
+        ...safe,
         invitedByUser: inviter
           ? { name: inviter.name, email: inviter.email }
           : null,
@@ -60,8 +75,8 @@ export const getForEmail = query({
     const invitations = await ctx.db
       .query("invitations")
       .withIndex("by_email", (q) => q.eq("email", args.email))
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.status === "pending"));
 
     const now = Date.now();
     const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
@@ -70,8 +85,13 @@ export const getForEmail = query({
       validInvitations.map(async (inv) => {
         const org = await ctx.db.get(inv.organizationId);
         const inviter = await ctx.db.get(inv.invitedBy);
+        // Strip the invitation token: this "you have a pending invite" lookup
+        // only needs display fields. The token grants acceptance and must only
+        // reach the invitee via the emailed accept link (getByToken), never a
+        // by-email listing.
+        const { token: _token, ...safe } = inv;
         return {
-          ...inv,
+          ...safe,
           organization: org
             ? { name: org.name, slug: org.slug, logoUrl: org.logoUrl }
             : null,
@@ -116,19 +136,22 @@ export const create = mutation({
     email: v.string(),
     organizationId: v.id("organizations"),
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
-      v.literal("member")
+      v.literal("developer")
     ),
     projectIds: v.optional(v.array(v.id("projects"))),
-    projectRole: v.optional(
-      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
-    ),
+    // Environment scope applied to the created project assignments on
+    // acceptance — only applied when the invited role is developer
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Authorization: only admins and team_leads can invite
+    // Authorization: owners, project managers, and team leads can invite
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.invitedBy,
@@ -136,8 +159,14 @@ export const create = mutation({
       "org:invite_member"
     );
 
-    // Hierarchy: team_leads can only invite roles below them (member only)
-    assertCanManageUser(callerMembership.role, args.role, "invite member");
+    // Hierarchy: can only invite roles below your own (owners may invite any)
+    assertCanAssignRole(callerMembership.role, args.role);
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
 
     // Rate limit: prevent invitation spam
     await rateLimiter.limit(ctx, "invitationCreate", {
@@ -175,13 +204,10 @@ export const create = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "pending"),
-          q.gt(q.field("expiresAt"), now)
-        )
-      )
-      .collect();
+      .collect()
+      .then((rows) =>
+        rows.filter((doc) => doc.status === "pending" && doc.expiresAt > now)
+      );
     const inviteCheck = await checkNumericLimit(
       ctx.db,
       args.organizationId,
@@ -215,13 +241,15 @@ export const create = mutation({
     const existingInvitation = await ctx.db
       .query("invitations")
       .withIndex("by_email", (q) => q.eq("email", args.email))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("status"), "pending"),
-          q.eq(q.field("organizationId"), args.organizationId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) =>
+              doc.status === "pending" &&
+              doc.organizationId === args.organizationId
+          ) ?? null
+      );
 
     if (existingInvitation && existingInvitation.expiresAt > now) {
       throw new Error("An invitation is already pending");
@@ -234,7 +262,7 @@ export const create = mutation({
       organizationId: args.organizationId,
       role: args.role,
       projectIds: args.projectIds,
-      projectRole: args.projectRole,
+      environments: args.environments,
       token,
       invitedBy: args.invitedBy,
       status: "pending",
@@ -249,6 +277,7 @@ export const create = mutation({
       details: JSON.stringify({
         email: args.email,
         role: args.role,
+        environments: args.environments ?? "all",
       }),
       createdAt: now,
     });
@@ -286,6 +315,19 @@ export const accept = mutation({
       throw new Error("Invitation has expired");
     }
 
+    // The accepting user's email must match the invited email — an invitation
+    // is addressed to a specific person, not a bearer token.
+    const acceptingUser = await ctx.db.get(args.userId);
+    if (!acceptingUser) {
+      throw new Error("User not found");
+    }
+    if (
+      (acceptingUser.email ?? "").toLowerCase() !==
+      invitation.email.toLowerCase()
+    ) {
+      throw new Error("This invitation was sent to a different email address.");
+    }
+
     const existingMembership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -299,28 +341,36 @@ export const accept = mutation({
       throw new Error("Already a member");
     }
 
+    const invitedRole = normalizeOrgRole(invitation.role);
+
     await ctx.db.insert("organizationMembers", {
       organizationId: invitation.organizationId,
       userId: args.userId,
-      role: invitation.role,
+      role: invitedRole,
       joinedAt: now,
       invitedBy: invitation.invitedBy,
     });
 
-    // Create project memberships if projects were specified in the invitation
+    // Create project assignments if projects were specified in the invitation.
+    // Owners have implicit access to every project, so no assignments needed.
     if (
       invitation.projectIds &&
       invitation.projectIds.length > 0 &&
-      invitation.role !== "admin"
+      invitedRole !== "owner"
     ) {
-      const projectRole = invitation.projectRole ?? "developer";
+      // Environment scope only constrains developers — owners, PMs, and team
+      // leads are always unrestricted, so a scope on the invitation is ignored
+      const environmentScope =
+        invitedRole === "developer" ? invitation.environments : undefined;
+
       for (const projectId of invitation.projectIds) {
         const project = await ctx.db.get(projectId);
         if (project && !project.deletedAt) {
+          // Pure scope assignment — capabilities come from the org role
           await ctx.db.insert("projectMembers", {
             projectId,
             userId: args.userId,
-            role: projectRole,
+            ...(environmentScope ? { environments: environmentScope } : {}),
             addedBy: invitation.invitedBy,
             addedAt: now,
           });
@@ -339,9 +389,12 @@ export const accept = mutation({
       action: "invitation.accepted",
       details: JSON.stringify({
         invitationId: invitation._id,
-        role: invitation.role,
+        role: invitedRole,
         projectIds: invitation.projectIds,
-        projectRole: invitation.projectRole,
+        environments:
+          invitedRole === "developer"
+            ? (invitation.environments ?? "all")
+            : "all",
       }),
       createdAt: now,
     });
@@ -417,6 +470,18 @@ export const cancel = mutation({
 
     await ctx.db.delete(args.invitationId);
 
+    await ctx.db.insert("auditLogs", {
+      organizationId: invitation.organizationId,
+      userId: args.cancelledBy,
+      action: "invitation.canceled",
+      details: JSON.stringify({
+        invitationId: args.invitationId,
+        email: invitation.email,
+        role: invitation.role,
+      }),
+      createdAt: Date.now(),
+    });
+
     return args.invitationId;
   },
 });
@@ -433,13 +498,17 @@ export const resend = mutation({
       throw new Error("Invitation not found");
     }
 
-    // Authorization: only admins and team_leads can resend invitations
-    await assertOrgAction(
+    // Authorization: owners, project managers, and team leads can resend
+    const { membership: callerMembership } = await assertOrgAction(
       ctx,
       args.resentBy,
       invitation.organizationId,
       "org:invite_member"
     );
+
+    // Hierarchy: cannot re-arm an invitation for a role at or above your own
+    // (e.g. a team_lead must not resend an owner/PM invitation).
+    assertCanAssignRole(callerMembership.role, invitation.role);
 
     const now = Date.now();
     const expiresInDays = args.expiresInDays ?? 7;
@@ -457,6 +526,19 @@ export const resend = mutation({
       invitedBy: args.resentBy,
     });
 
+    await ctx.db.insert("auditLogs", {
+      organizationId: invitation.organizationId,
+      userId: args.resentBy,
+      action: "invitation.resent",
+      details: JSON.stringify({
+        invitationId: args.invitationId,
+        email: invitation.email,
+        role: invitation.role,
+        expiresAt,
+      }),
+      createdAt: now,
+    });
+
     return { invitationId: args.invitationId, token: newToken };
   },
 });
@@ -471,8 +553,8 @@ export const cleanupExpired = internalMutation({
     const expiredInvitations = await ctx.db
       .query("invitations")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .filter((q) => q.lt(q.field("expiresAt"), now))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.expiresAt < now));
 
     for (const invitation of expiredInvitations) {
       await ctx.db.patch(invitation._id, {

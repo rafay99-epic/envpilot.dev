@@ -12,7 +12,6 @@ import {
   Share2,
   Users,
   ClipboardList,
-  ShieldAlert,
   BarChart3,
   Gauge,
   Settings,
@@ -23,6 +22,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { ROLE_LEVEL, roleLevel } from "@/lib/roles";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/components/command-palette";
 
@@ -75,16 +75,17 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization, canDo } = useAuthContext();
+  const { organization } = useAuthContext();
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
 
-  // Analytics is restricted to admin/team_lead
-  const canViewAnalytics = canDo("org:create_project");
-
-  // Anomaly detection is restricted to admin/team_lead
-  const canViewAnomalies = canDo("org:view_anomalies");
+  // Mirror the per-page <RequireRole> guards so the nav only shows pages the
+  // current role can actually open (unknown/loading role → developer level).
+  const level = roleLevel(organization?.role);
+  const isOwner = level >= ROLE_LEVEL.owner;
+  const isProjectManagerPlus = level >= ROLE_LEVEL.project_manager;
+  const isTeamLeadPlus = level >= ROLE_LEVEL.team_lead;
 
   // Detect project context from pathname
   const projectSlugMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
@@ -116,28 +117,28 @@ export function DashboardNav() {
       label: "Projects",
       icon: <FolderOpen className="h-4 w-4" />,
     },
-    {
-      href: orgTeamHref,
-      label: "Team",
-      icon: <Users className="h-4 w-4" />,
-    },
-    {
-      href: "/dashboard/audit",
-      label: "Audit Logs",
-      icon: <ClipboardList className="h-4 w-4" />,
-    },
-    // Anomalies visible only to admin/team_lead (security feature)
-    ...(canViewAnomalies
+    // Team management is team_lead+ (developers cannot invite or manage anyone)
+    ...(isTeamLeadPlus
       ? [
           {
-            href: "/dashboard/anomalies",
-            label: "Anomalies",
-            icon: <ShieldAlert className="h-4 w-4" />,
+            href: orgTeamHref,
+            label: "Team",
+            icon: <Users className="h-4 w-4" />,
           },
         ]
       : []),
-    // Analytics visible only to admin/team_lead
-    ...(canViewAnalytics
+    // Audit logs are project_manager+
+    ...(isProjectManagerPlus
+      ? [
+          {
+            href: "/dashboard/audit",
+            label: "Audit Logs",
+            icon: <ClipboardList className="h-4 w-4" />,
+          },
+        ]
+      : []),
+    // Analytics is project_manager+
+    ...(isProjectManagerPlus
       ? [
           {
             href: "/dashboard/analytics",
@@ -146,16 +147,22 @@ export function DashboardNav() {
           },
         ]
       : []),
-    {
-      href: "/dashboard/usage",
-      label: "Usage & Plan",
-      icon: <Gauge className="h-4 w-4" />,
-    },
-    {
-      href: orgSettingsHref,
-      label: "Settings",
-      icon: <Settings className="h-4 w-4" />,
-    },
+    // Billing/usage and org settings are owner-only (personal settings stay
+    // reachable via the user menu)
+    ...(isOwner
+      ? [
+          {
+            href: "/dashboard/usage",
+            label: "Usage & Plan",
+            icon: <Gauge className="h-4 w-4" />,
+          },
+          {
+            href: orgSettingsHref,
+            label: "Settings",
+            icon: <Settings className="h-4 w-4" />,
+          },
+        ]
+      : []),
   ];
 
   // Project-level nav items

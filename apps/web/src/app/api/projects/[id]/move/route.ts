@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const moveProjectSchema = z.object({
   targetOrganizationId: z.string().min(1, "Target organization ID is required"),
@@ -58,9 +59,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     );
 
-    if (!sourceMembership || sourceMembership.role !== "admin") {
+    if (
+      !sourceMembership ||
+      normalizeOrgRole(sourceMembership.role) !== "owner"
+    ) {
       return NextResponse.json(
-        { error: "Only admins can move projects" },
+        { error: "Only the organization owner can move projects" },
         { status: 403 }
       );
     }
@@ -74,9 +78,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     );
 
-    if (!targetMembership || targetMembership.role !== "admin") {
+    if (
+      !targetMembership ||
+      normalizeOrgRole(targetMembership.role) !== "owner"
+    ) {
       return NextResponse.json(
-        { error: "You must be an admin of the target organization" },
+        { error: "You must be the owner of the target organization" },
         { status: 403 }
       );
     }
@@ -97,7 +104,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         organizationId: targetOrganizationId as Id<"organizations">,
       });
 
-      const adminMembers = targetMembers.filter((m) => m && m.role === "admin");
+      const adminMembers = targetMembers.filter(
+        (m) => m && normalizeOrgRole(m.role) === "owner"
+      );
       const userName =
         user.firstName && user.lastName
           ? `${user.firstName} ${user.lastName}`

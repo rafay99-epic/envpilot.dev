@@ -29,7 +29,7 @@ export function useUserPermissions(userId: Id<"users"> | undefined) {
 export function useCheckPermission(
   variableId: Id<"environmentVariables"> | undefined,
   userId: Id<"users"> | undefined,
-  requiredPermission: "read" | "write" | "admin"
+  requiredPermission: "read" | "write"
 ) {
   return useQuery(
     api.permissions.checkPermission,

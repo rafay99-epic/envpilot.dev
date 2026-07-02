@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { assertOrgMembership } from "./authz";
+import { createAuditLog } from "./auditHelpers";
 
 /**
  * Environment Template Queries and Mutations
@@ -29,19 +31,19 @@ export const listAll = query({
 
     if (args.projectType) {
       // Filter by project type
-      templates = await ctx.db
-        .query("environmentTemplates")
-        .withIndex("by_project_type", (q) =>
-          q.eq("projectType", args.projectType!)
-        )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+      templates = (
+        await ctx.db
+          .query("environmentTemplates")
+          .withIndex("by_project_type", (q) =>
+            q.eq("projectType", args.projectType!)
+          )
+          .collect()
+      ).filter((template) => !template.deletedAt);
     } else {
       // Get all templates
-      templates = await ctx.db
-        .query("environmentTemplates")
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+      templates = (await ctx.db.query("environmentTemplates").collect()).filter(
+        (template) => !template.deletedAt
+      );
     }
 
     // Filter to show:
@@ -111,13 +113,14 @@ export const getById = query({
 export const listByOrganization = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const templates = await ctx.db
-      .query("environmentTemplates")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    const templates = (
+      await ctx.db
+        .query("environmentTemplates")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId)
+        )
+        .collect()
+    ).filter((template) => !template.deletedAt);
 
     const templatesWithVariables = await Promise.all(
       templates.map(async (template) => {
@@ -150,24 +153,21 @@ export const listBuiltIn = query({
     let templates;
 
     if (args.projectType) {
-      templates = await ctx.db
-        .query("environmentTemplates")
-        .withIndex("by_project_type", (q) =>
-          q.eq("projectType", args.projectType!)
-        )
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("isBuiltIn"), true),
-            q.eq(q.field("deletedAt"), undefined)
+      templates = (
+        await ctx.db
+          .query("environmentTemplates")
+          .withIndex("by_project_type", (q) =>
+            q.eq("projectType", args.projectType!)
           )
-        )
-        .collect();
+          .collect()
+      ).filter((template) => template.isBuiltIn && !template.deletedAt);
     } else {
-      templates = await ctx.db
-        .query("environmentTemplates")
-        .withIndex("by_is_built_in", (q) => q.eq("isBuiltIn", true))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+      templates = (
+        await ctx.db
+          .query("environmentTemplates")
+          .withIndex("by_is_built_in", (q) => q.eq("isBuiltIn", true))
+          .collect()
+      ).filter((template) => !template.deletedAt);
     }
 
     const templatesWithVariables = await Promise.all(
@@ -202,10 +202,9 @@ export const search = query({
     const searchLower = args.query.toLowerCase();
 
     // Get all accessible templates
-    const allTemplates = await ctx.db
-      .query("environmentTemplates")
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+    const allTemplates = (
+      await ctx.db.query("environmentTemplates").collect()
+    ).filter((template) => !template.deletedAt);
 
     // Filter by access and search query
     const matchingTemplates = allTemplates.filter((template) => {
@@ -259,7 +258,8 @@ export const search = query({
 
 /**
  * Create a new custom template
- * Requires authentication and organization membership (admin or team_lead).
+ * Requires authentication and organization membership with at least the
+ * team_lead role (owner / project_manager / team_lead).
  * The createdBy parameter must match a valid user who is a member of the organization.
  */
 export const create = mutation({
@@ -313,21 +313,13 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    // Verify user has permission in the organization (admin or team_lead)
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.createdBy)
-      )
-      .first();
-
-    if (!membership) {
-      throw new Error("User is not a member of this organization");
-    }
-
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
-      throw new Error("Only admins and team leads can create templates");
-    }
+    // Verify user has at least the team_lead role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.createdBy,
+      args.organizationId,
+      "team_lead"
+    );
 
     // Check for duplicate variable keys within the template
     const variableKeys = new Set<string>();
@@ -372,12 +364,25 @@ export const create = mutation({
       });
     }
 
+    await createAuditLog(ctx, {
+      organizationId: args.organizationId,
+      userId: args.createdBy,
+      action: "template.created",
+      details: {
+        templateName: args.name,
+        projectType: args.projectType,
+        variableCount: args.variables.length,
+        isPublished: args.isPublished ?? false,
+      },
+    });
+
     return templateId;
   },
 });
 
 /**
  * Update an existing template
+ * Requires at least the project_manager role in the template's organization.
  */
 export const update = mutation({
   args: {
@@ -390,6 +395,7 @@ export const update = mutation({
     version: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     isPublished: v.optional(v.boolean()),
+    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
     const template = await ctx.db.get(args.templateId);
@@ -400,6 +406,18 @@ export const update = mutation({
     if (template.isBuiltIn) {
       throw new Error("Cannot modify built-in templates");
     }
+
+    if (!template.organizationId) {
+      throw new Error("Template has no organization");
+    }
+
+    // Verify user has at least the project_manager role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.updatedBy,
+      template.organizationId,
+      "project_manager"
+    );
 
     const { templateId, ...updates } = args;
     const updateData: Record<string, unknown> = { updatedAt: Date.now() };
@@ -418,12 +436,23 @@ export const update = mutation({
 
     await ctx.db.patch(templateId, updateData);
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        updatedFields: Object.keys(updateData).filter((k) => k !== "updatedAt"),
+      },
+    });
+
     return templateId;
   },
 });
 
 /**
  * Add a variable to a template
+ * Requires at least the project_manager role in the template's organization.
  */
 export const addVariable = mutation({
   args: {
@@ -436,6 +465,7 @@ export const addVariable = mutation({
     isSensitive: v.boolean(),
     isRequired: v.boolean(),
     category: v.string(),
+    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
     const template = await ctx.db.get(args.templateId);
@@ -446,6 +476,18 @@ export const addVariable = mutation({
     if (template.isBuiltIn) {
       throw new Error("Cannot modify built-in templates");
     }
+
+    if (!template.organizationId) {
+      throw new Error("Template has no organization");
+    }
+
+    // Verify user has at least the project_manager role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.updatedBy,
+      template.organizationId,
+      "project_manager"
+    );
 
     // Check for duplicate key
     const existing = await ctx.db
@@ -488,12 +530,23 @@ export const addVariable = mutation({
     // Update template timestamp
     await ctx.db.patch(args.templateId, { updatedAt: Date.now() });
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableAdded: args.key,
+      },
+    });
+
     return variableId;
   },
 });
 
 /**
  * Update a template variable
+ * Requires at least the project_manager role in the template's organization.
  */
 export const updateVariable = mutation({
   args: {
@@ -507,6 +560,7 @@ export const updateVariable = mutation({
     isRequired: v.optional(v.boolean()),
     category: v.optional(v.string()),
     order: v.optional(v.number()),
+    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
     const variable = await ctx.db.get(args.variableId);
@@ -522,6 +576,18 @@ export const updateVariable = mutation({
     if (template.isBuiltIn) {
       throw new Error("Cannot modify built-in templates");
     }
+
+    if (!template.organizationId) {
+      throw new Error("Template has no organization");
+    }
+
+    // Verify user has at least the project_manager role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.updatedBy,
+      template.organizationId,
+      "project_manager"
+    );
 
     const { variableId, ...updates } = args;
     const updateData: Record<string, unknown> = {};
@@ -547,16 +613,29 @@ export const updateVariable = mutation({
     // Update template timestamp
     await ctx.db.patch(variable.templateId, { updatedAt: Date.now() });
 
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableUpdated: variable.key,
+        updatedFields: Object.keys(updateData),
+      },
+    });
+
     return variableId;
   },
 });
 
 /**
  * Remove a variable from a template
+ * Requires at least the project_manager role in the template's organization.
  */
 export const removeVariable = mutation({
   args: {
     variableId: v.id("templateVariables"),
+    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
     const variable = await ctx.db.get(args.variableId);
@@ -573,10 +652,32 @@ export const removeVariable = mutation({
       throw new Error("Cannot modify built-in templates");
     }
 
+    if (!template.organizationId) {
+      throw new Error("Template has no organization");
+    }
+
+    // Verify user has at least the project_manager role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.updatedBy,
+      template.organizationId,
+      "project_manager"
+    );
+
     await ctx.db.delete(args.variableId);
 
     // Update template timestamp
     await ctx.db.patch(variable.templateId, { updatedAt: Date.now() });
+
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.updatedBy,
+      action: "template.updated",
+      details: {
+        templateName: template.name,
+        variableRemoved: variable.key,
+      },
+    });
 
     return args.variableId;
   },
@@ -584,10 +685,12 @@ export const removeVariable = mutation({
 
 /**
  * Soft delete a template
+ * Requires at least the project_manager role in the template's organization.
  */
 export const remove = mutation({
   args: {
     templateId: v.id("environmentTemplates"),
+    deletedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
     const template = await ctx.db.get(args.templateId);
@@ -599,9 +702,31 @@ export const remove = mutation({
       throw new Error("Cannot delete built-in templates");
     }
 
+    if (!template.organizationId) {
+      throw new Error("Template has no organization");
+    }
+
+    // Verify user has at least the project_manager role in the organization
+    await assertOrgMembership(
+      ctx,
+      args.deletedBy,
+      template.organizationId,
+      "project_manager"
+    );
+
     await ctx.db.patch(args.templateId, {
       deletedAt: Date.now(),
       updatedAt: Date.now(),
+    });
+
+    await createAuditLog(ctx, {
+      organizationId: template.organizationId,
+      userId: args.deletedBy,
+      action: "template.deleted",
+      details: {
+        templateName: template.name,
+        projectType: template.projectType,
+      },
     });
 
     return args.templateId;
@@ -610,6 +735,8 @@ export const remove = mutation({
 
 /**
  * Duplicate a template (for customization)
+ * Requires at least the team_lead role in the destination organization
+ * (same rule as creating a template).
  */
 export const duplicate = mutation({
   args: {
@@ -623,6 +750,14 @@ export const duplicate = mutation({
     if (!sourceTemplate || sourceTemplate.deletedAt) {
       throw new Error("Source template not found");
     }
+
+    // Verify user has at least the team_lead role in the destination org
+    await assertOrgMembership(
+      ctx,
+      args.createdBy,
+      args.organizationId,
+      "team_lead"
+    );
 
     const now = Date.now();
 
@@ -663,6 +798,18 @@ export const duplicate = mutation({
         order: variable.order,
       });
     }
+
+    await createAuditLog(ctx, {
+      organizationId: args.organizationId,
+      userId: args.createdBy,
+      action: "template.created",
+      details: {
+        templateName: args.newName,
+        duplicatedFrom: args.templateId,
+        sourceTemplateName: sourceTemplate.name,
+        variableCount: sourceVariables.length,
+      },
+    });
 
     return newTemplateId;
   },
@@ -705,17 +852,15 @@ export const seedBuiltInTemplates = internalMutation({
     const createdIds: string[] = [];
 
     for (const templateData of args.templates) {
-      // Check if template with same name already exists
-      const existingTemplates = await ctx.db
-        .query("environmentTemplates")
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("name"), templateData.name),
-            q.eq(q.field("isBuiltIn"), true),
-            q.eq(q.field("deletedAt"), undefined)
-          )
-        )
-        .collect();
+      // Check if a built-in template with the same name already exists
+      const existingTemplates = (
+        await ctx.db
+          .query("environmentTemplates")
+          .withIndex("by_is_built_in", (q) => q.eq("isBuiltIn", true))
+          .collect()
+      ).filter(
+        (template) => template.name === templateData.name && !template.deletedAt
+      );
 
       if (existingTemplates.length > 0) {
         // Skip if already exists

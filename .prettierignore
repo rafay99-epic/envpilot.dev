@@ -13,3 +13,5 @@ bun.lock
 *.vsix
 **/routeTree.gen.ts
 .agents
+test-results
+playwright-report

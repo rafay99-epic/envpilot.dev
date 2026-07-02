@@ -16,14 +16,17 @@ import { Eye, Clock, Flame } from "lucide-react";
 
 interface SharedSecretsWidgetProps {
   organizationId: Id<"organizations">;
+  userId: Id<"users"> | undefined;
 }
 
 export function SharedSecretsWidget({
   organizationId,
+  userId,
 }: SharedSecretsWidgetProps) {
-  const shares = useQuery(api.sharedSecrets.listActiveByOrg, {
-    organizationId,
-  });
+  const shares = useQuery(
+    api.sharedSecrets.listActiveByOrg,
+    userId ? { organizationId, userId } : "skip"
+  );
 
   const isLoading = shares === undefined;
 

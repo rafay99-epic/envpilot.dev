@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
 
 // Convex ID pattern - alphanumeric characters only
@@ -54,6 +55,10 @@ export async function GET(request: Request) {
     const { q, organizationId, limit } = validation.data;
     const orgId = organizationId as Id<"organizations">;
 
+    // Resolve the authenticated Convex user for the org-membership check on the
+    // invitations listing.
+    const convexUser = await getOrCreateConvexUser(convex, user);
+
     // Search for users scoped to the organization
     const users = await convex.query(api.users.search, {
       searchTerm: q,
@@ -66,6 +71,7 @@ export async function GET(request: Request) {
       convex.query(api.organizations.getMembers, { organizationId: orgId }),
       convex.query(api.invitations.listPendingByOrganization, {
         organizationId: orgId,
+        requestingUserId: convexUser._id,
       }),
     ]);
 

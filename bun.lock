@@ -86,7 +86,7 @@
     },
     "apps/vscode-extension": {
       "name": "envpilot",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "dependencies": {
         "@sentry/node": "^10.43.0",
         "axios": "^1.6.2",
@@ -108,7 +108,7 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.13.1",
+      "version": "1.16.1",
       "dependencies": {
         "@polar-sh/nextjs": "^0.9.5",
         "@polar-sh/sdk": "^0.46.6",
@@ -155,6 +155,7 @@
         "eslint-config-next": "16.1.6",
         "tailwindcss": "^4",
         "typescript": "^5",
+        "vitest": "^3.0.4",
       },
     },
     "packages/eslint-config": {

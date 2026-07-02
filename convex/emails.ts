@@ -4,6 +4,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
+import { roleLevel, ROLE_LEVEL } from "./authz";
 
 // ============================================================
 // Helpers
@@ -150,8 +151,12 @@ export const sendInvitationEmail = action({
     inviterName: v.string(),
     organizationName: v.string(),
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration)
+      v.literal("admin"),
       v.literal("member")
     ),
     token: v.string(),
@@ -169,10 +174,15 @@ export const sendInvitationEmail = action({
         day: "numeric",
       }
     );
-    const roleDisplay =
-      args.role === "team_lead"
-        ? "Team Lead"
-        : args.role.charAt(0).toUpperCase() + args.role.slice(1);
+    const ROLE_DISPLAY: Record<string, string> = {
+      owner: "Owner",
+      project_manager: "Project Manager",
+      team_lead: "Team Lead",
+      developer: "Developer",
+      admin: "Owner",
+      member: "Developer",
+    };
+    const roleDisplay = ROLE_DISPLAY[args.role] ?? "Developer";
 
     const safeInviter = escapeHtml(args.inviterName);
     const safeOrg = escapeHtml(args.organizationName);
@@ -630,8 +640,9 @@ export const sendRotationReminderEmail = internalAction({
 
     for (const member of members) {
       if (!member?.user?.email) continue;
-      // Only notify admins and team leads — they can act on rotation
-      if (member.role !== "admin" && member.role !== "team_lead") continue;
+      // Only notify members with at least the team_lead role
+      // (owner / project_manager / team_lead) — they can act on rotation
+      if (roleLevel(member.role) < ROLE_LEVEL.team_lead) continue;
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(
@@ -643,139 +654,6 @@ export const sendRotationReminderEmail = internalAction({
       await sendEmail(member.user.email, subject, html, text).catch((err) =>
         console.warn("[EMAIL] Rotation reminder failed:", err)
       );
-    }
-  },
-});
-
-// ============================================================
-// Anomaly Detection Alert Emails
-// ============================================================
-
-export const sendAnomalyAlertEmail = internalAction({
-  args: {
-    userId: v.id("users"),
-    organizationId: v.id("organizations"),
-    userName: v.string(),
-    userEmail: v.string(),
-    orgName: v.string(),
-    ruleName: v.string(),
-    severity: v.union(
-      v.literal("info"),
-      v.literal("warning"),
-      v.literal("critical")
-    ),
-    details: v.string(),
-    detectedAt: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const safeUser = escapeHtml(args.userName);
-    const safeOrg = escapeHtml(args.orgName);
-    const safeRule = escapeHtml(args.ruleName);
-
-    let parsedDetails: Record<string, string> = {};
-    try {
-      parsedDetails = JSON.parse(args.details);
-    } catch {
-      // Use empty object
-    }
-
-    const detectedDate = new Date(args.detectedAt).toLocaleString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
-
-    const severityColors: Record<string, string> = {
-      critical: "#dc2626",
-      warning: "#f59e0b",
-      info: "#3b82f6",
-    };
-    const bgColor = severityColors[args.severity] || "#18181b";
-
-    const severityLabel =
-      args.severity.charAt(0).toUpperCase() + args.severity.slice(1);
-
-    // Build details table rows
-    const detailRows = [
-      `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">What</td><td style="padding: 8px 12px; color: #18181b; border-bottom: 1px solid #f4f4f5;">${safeRule}</td></tr>`,
-      `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">Severity</td><td style="padding: 8px 12px; color: ${bgColor}; font-weight: 600; border-bottom: 1px solid #f4f4f5;">${severityLabel}</td></tr>`,
-      `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">User</td><td style="padding: 8px 12px; color: #18181b; border-bottom: 1px solid #f4f4f5;">${safeUser}</td></tr>`,
-      `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">Organization</td><td style="padding: 8px 12px; color: #18181b; border-bottom: 1px solid #f4f4f5;">${safeOrg}</td></tr>`,
-      `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">When</td><td style="padding: 8px 12px; color: #18181b; border-bottom: 1px solid #f4f4f5;">${detectedDate}</td></tr>`,
-    ];
-
-    if (parsedDetails.newIp) {
-      detailRows.push(
-        `<tr><td style="padding: 8px 12px; font-weight: 600; color: #52525b; border-bottom: 1px solid #f4f4f5;">IP Address</td><td style="padding: 8px 12px; color: #18181b; border-bottom: 1px solid #f4f4f5;">${escapeHtml(String(parsedDetails.newIp))} (new)</td></tr>`
-      );
-    }
-
-    const detailsTable = `<table role="presentation" style="width: 100%; border-collapse: collapse; background: #fafafa; border-radius: 8px; overflow: hidden; margin: 0 auto;">${detailRows.join("")}</table>`;
-
-    const message =
-      parsedDetails.message ||
-      `An unusual access pattern was detected: ${args.ruleName}`;
-
-    const config = getEmailConfig();
-    const appUrl = config?.appUrl || "http://localhost:3000";
-
-    const subject = `Security Alert — ${args.ruleName}`;
-
-    const html = emailWrapper(
-      "Security Alert",
-      [
-        iconRow("!", bgColor),
-        headingRow("Unusual Access Pattern Detected"),
-        paragraphRow(escapeHtml(String(message))),
-        `<tr><td style="padding: 0 40px 30px 40px;">${detailsTable}</td></tr>`,
-        buttonRow(`${appUrl}/dashboard/anomalies`, "Review Activity"),
-        paragraphRow(
-          "If this wasn't you, we recommend revoking your CLI/extension tokens immediately.",
-          "font-size: 14px; line-height: 1.5; color: #dc2626; font-weight: 500;"
-        ),
-        footerRow(
-          'You received this because security alerts are enabled. <a href="' +
-            appUrl +
-            '/dashboard/settings" style="color: #71717a;">Manage preferences</a>'
-        ),
-      ].join("")
-    );
-
-    const text = `Security Alert — ${args.ruleName}\n\n${message}\n\nUser: ${args.userName}\nOrganization: ${args.orgName}\nWhen: ${detectedDate}\n\nReview activity: ${appUrl}/dashboard/anomalies\n\nIf this wasn't you, revoke your CLI/extension tokens immediately.`;
-
-    // Send to the affected user (if security alerts preference is ON)
-    if (args.userEmail) {
-      const prefs = await ctx.runQuery(
-        internal.userPreferences.getByUserIdInternal,
-        { userId: args.userId }
-      );
-      if (prefs?.emailNotifications?.securityAlerts !== false) {
-        await sendEmail(args.userEmail, subject, html, text).catch((err) =>
-          console.warn("[EMAIL] Anomaly alert to user failed:", err)
-        );
-      }
-    }
-
-    // Send to all org admins (always)
-    const members = await ctx.runQuery(
-      internal.organizations.getMembersInternal,
-      { organizationId: args.organizationId }
-    );
-
-    if (members) {
-      for (const member of members) {
-        if (!member?.user?.email) continue;
-        if (member.role !== "admin") continue;
-        // Don't send duplicate if admin is the affected user
-        if (member.user._id === args.userId) continue;
-
-        await sendEmail(member.user.email, subject, html, text).catch((err) =>
-          console.warn("[EMAIL] Anomaly alert to admin failed:", err)
-        );
-      }
     }
   },
 });

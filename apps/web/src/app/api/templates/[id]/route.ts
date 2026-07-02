@@ -8,6 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
+import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const updateTemplateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -121,7 +122,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
+    // Template updates require owner or project_manager
+    if (roleLevel(membership.role) < ROLE_LEVEL.project_manager) {
       return NextResponse.json(
         { error: "Insufficient permissions to update templates" },
         { status: 403 }
@@ -130,6 +132,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     await convex.mutation(api.templates.update, {
       templateId: id as Id<"environmentTemplates">,
+      updatedBy: convexUser._id,
       ...validation.data,
     });
 
@@ -197,15 +200,17 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (membership.role !== "admin") {
+    // Template deletion requires owner or project_manager (matches backend)
+    if (roleLevel(membership.role) < ROLE_LEVEL.project_manager) {
       return NextResponse.json(
-        { error: "Only admins can delete templates" },
+        { error: "Insufficient permissions to delete templates" },
         { status: 403 }
       );
     }
 
     await convex.mutation(api.templates.remove, {
       templateId: id as Id<"environmentTemplates">,
+      deletedBy: convexUser._id,
     });
 
     return NextResponse.json({ success: true });

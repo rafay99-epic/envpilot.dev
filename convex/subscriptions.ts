@@ -8,8 +8,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { DatabaseReader } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { getDefaultTierName, isCronPaused } from "./tierLimits";
 import { getUserTier } from "./featureRegistry";
+import { normalizeOrgRole } from "./authz";
 
 /**
  * Subscription Management for Polar.sh Integration
@@ -294,7 +296,7 @@ export const createSubscription = internalMutation({
     }
 
     // Create new subscription
-    return await ctx.db.insert("subscriptions", {
+    const subscriptionId = await ctx.db.insert("subscriptions", {
       organizationId: args.organizationId,
       userId: args.userId,
       polarCustomerId: args.polarCustomerId,
@@ -310,6 +312,21 @@ export const createSubscription = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // Audit: new subscription activated
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      userId: args.userId,
+      action: "billing.subscription_created",
+      details: JSON.stringify({
+        polarSubscriptionId: args.polarSubscriptionId,
+        polarProductId: args.polarProductId,
+        status: args.status,
+      }),
+      createdAt: now,
+    });
+
+    return subscriptionId;
   },
 });
 
@@ -363,6 +380,32 @@ export const updateSubscription = internalMutation({
 
     await ctx.db.patch(subscription._id, updateData);
 
+    // Audit: subscription lifecycle change
+    const actorUserId =
+      subscription.userId ??
+      (await ctx.db.get(subscription.organizationId))?.createdBy;
+
+    if (actorUserId) {
+      const becameInactive =
+        (args.status === "canceled" || args.status === "revoked") &&
+        subscription.status !== args.status;
+
+      await ctx.db.insert("auditLogs", {
+        organizationId: subscription.organizationId,
+        userId: actorUserId,
+        action: becameInactive
+          ? "billing.subscription_canceled"
+          : "billing.subscription_updated",
+        details: JSON.stringify({
+          polarSubscriptionId: args.polarSubscriptionId,
+          previousStatus: subscription.status,
+          newStatus: args.status,
+          cancelAtPeriodEnd: args.cancelAtPeriodEnd,
+        }),
+        createdAt: now,
+      });
+    }
+
     return subscription._id;
   },
 });
@@ -384,6 +427,24 @@ export const deleteSubscription = internalMutation({
 
     if (subscription) {
       await ctx.db.delete(subscription._id);
+
+      // Audit: subscription removed (customer deleted in Polar)
+      const actorUserId =
+        subscription.userId ??
+        (await ctx.db.get(subscription.organizationId))?.createdBy;
+
+      if (actorUserId) {
+        await ctx.db.insert("auditLogs", {
+          organizationId: subscription.organizationId,
+          userId: actorUserId,
+          action: "billing.subscription_canceled",
+          details: JSON.stringify({
+            polarSubscriptionId: args.polarSubscriptionId,
+            deleted: true,
+          }),
+          createdAt: Date.now(),
+        });
+      }
     }
   },
 });
@@ -437,8 +498,8 @@ export const _resetUsageCounters = internalMutation({
     // Only reset counters for features marked as resettable in the registry
     const resettableFeatures = await ctx.db
       .query("featureRegistry")
-      .filter((q) => q.eq(q.field("resettable"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.resettable === true));
     const resettableKeys = new Set(resettableFeatures.map((f) => f.key));
 
     const counters = await ctx.db
@@ -536,6 +597,10 @@ export const expireGracePeriods = internalMutation({
     const now = Date.now();
     const defaultTier = await getDefaultTierName(ctx.db);
 
+    // Lazily loaded org list for audit-log context
+    // (organizations has no index on createdBy)
+    let allOrgs: Doc<"organizations">[] | null = null;
+
     for (const g of active) {
       if (g.gracePeriodEnd <= now) {
         // Grace period expired → downgrade to default tier
@@ -559,6 +624,25 @@ export const expireGracePeriods = internalMutation({
             tier: defaultTier,
             updatedAt: now,
             reason: "billing.grace_period_expired",
+          });
+        }
+
+        // Audit: tier downgraded after grace period expiry
+        if (allOrgs === null) {
+          allOrgs = await ctx.db.query("organizations").collect();
+        }
+        const ownedOrg = allOrgs.find((o) => o.createdBy === g.userId);
+        if (ownedOrg) {
+          await ctx.db.insert("auditLogs", {
+            organizationId: ownedOrg._id,
+            userId: g.userId,
+            action: "billing.tier_downgraded",
+            details: JSON.stringify({
+              previousTier: g.previousTier,
+              newTier: defaultTier,
+              reason: "grace_period_expired",
+            }),
+            createdAt: now,
           });
         }
       }
@@ -1242,8 +1326,8 @@ export const _getUserOwnedOrgs = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("organizations")
-      .filter((q) => q.eq(q.field("createdBy"), args.userId))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.createdBy === args.userId));
   },
 });
 
@@ -1302,7 +1386,7 @@ export const cleanupProcessedWebhooks = internalMutation({
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const oldEvents = await ctx.db
       .query("processedWebhookEvents")
-      .filter((q) => q.lt(q.field("processedAt"), sevenDaysAgo))
+      .withIndex("by_processed_at", (q) => q.lt("processedAt", sevenDaysAgo))
       .collect();
 
     for (const event of oldEvents) {
@@ -1354,7 +1438,7 @@ export const prepareCheckout = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify user has admin access to the organization
+    // Verify user is the organization owner
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
@@ -1362,8 +1446,8 @@ export const prepareCheckout = mutation({
       )
       .first();
 
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Only organization admins can manage billing");
+    if (!membership || normalizeOrgRole(membership.role) !== "owner") {
+      throw new Error("Only the organization owner can manage billing");
     }
 
     // Check if user already has active subscription

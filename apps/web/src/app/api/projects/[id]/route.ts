@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
 import { handleApiError } from "@/lib/api-errors";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const updateProjectSchema = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
@@ -65,8 +66,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // For non-admins, verify project membership
-    if (membership.role !== "admin") {
+    // Owners bypass assignment; everyone else needs a project assignment
+    if (normalizeOrgRole(membership.role) !== "owner") {
       const projectMembership = await convex.query(
         api.projectMembers.getProjectMembership,
         {
@@ -138,23 +139,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check if user has permission to update projects
-    // Admins, team_leads, and project managers can update
-    if (membership.role !== "admin" && membership.role !== "team_lead") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: id as Id<"projects">,
-          userId: convexUser._id,
-        }
+    // Project update requires owner or project_manager (project:update).
+    // Convex enforces project-assignment scoping for non-owners.
+    if (roleLevel(membership.role) < ROLE_LEVEL.project_manager) {
+      return NextResponse.json(
+        { error: "Insufficient permissions to update projects" },
+        { status: 403 }
       );
-
-      if (!projectMembership || projectMembership.role !== "manager") {
-        return NextResponse.json(
-          { error: "Insufficient permissions to update projects" },
-          { status: 403 }
-        );
-      }
     }
 
     const { name, description, icon, color } = validation.data;
@@ -214,10 +205,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Only admins can delete projects
-    if (membership.role !== "admin") {
+    // Deleting a project is owner-only (org:delete_project)
+    if (normalizeOrgRole(membership.role) !== "owner") {
       return NextResponse.json(
-        { error: "Only admins can delete projects" },
+        { error: "Only the organization owner can delete projects" },
         { status: 403 }
       );
     }

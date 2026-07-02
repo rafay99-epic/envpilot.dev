@@ -24,18 +24,22 @@ export function useProjects(
 }
 
 /**
- * Hook for dashboard variables - returns all variables accessible to the current user
- * This is a simplified wrapper for dashboard UI
+ * Hook for dashboard variables - returns only the variables the current user
+ * can access (env scope + per-variable grants applied), never leaking vault
+ * refs for inaccessible variables. Requires the current Convex user id.
  */
-export function useVariables(organizationId: Id<"organizations"> | undefined) {
+export function useVariables(
+  organizationId: Id<"organizations"> | undefined,
+  userId: Id<"users"> | undefined
+) {
   const variables = useQuery(
-    api.variables.listByOrganization,
-    organizationId ? { organizationId } : "skip"
+    api.variables.listOrgVariablesWithAccess,
+    organizationId && userId ? { organizationId, userId } : "skip"
   );
 
   return {
     variables: variables ?? [],
-    isLoading: organizationId ? variables === undefined : false,
+    isLoading: organizationId && userId ? variables === undefined : false,
   };
 }
 
@@ -57,19 +61,22 @@ export function useDashboardStats(
 }
 
 /**
- * Hook for recent activity on the dashboard
+ * Hook for recent activity on the dashboard. Access-gated: requires the
+ * current Convex user id; developers only see activity for projects they are
+ * assigned to.
  */
 export function useRecentActivity(
-  organizationId: Id<"organizations"> | undefined
+  organizationId: Id<"organizations"> | undefined,
+  userId: Id<"users"> | undefined
 ) {
   const activity = useQuery(
     api.dashboard.getRecentActivity,
-    organizationId ? { organizationId } : "skip"
+    organizationId && userId ? { organizationId, userId } : "skip"
   );
 
   return {
     activity: activity ?? [],
-    isLoading: organizationId ? activity === undefined : false,
+    isLoading: organizationId && userId ? activity === undefined : false,
   };
 }
 

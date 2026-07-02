@@ -277,13 +277,6 @@ These are the lowest-effort, highest-impact items because the schema already exi
 
 ### Audit & Security
 
-- **Anomaly detection**
-  - Flag unusual access patterns:
-    - user pulling all prod secrets for first time
-    - off-hours access
-    - new IP
-  - Send email alerts.
-
 - **Breach response workflow**
   - One-click: “rotate all secrets in this project”
   - Automated coordinator for connected services.

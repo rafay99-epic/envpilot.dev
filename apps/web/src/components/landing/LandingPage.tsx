@@ -69,7 +69,7 @@ const HERO_SCENES: TerminalScene[] = [
   {
     command: "envpilot audit --days 7 --format json",
     output: [
-      { text: "✓ 142 events · 0 anomalies detected", tone: "ok" },
+      { text: "✓ 142 events across 6 team members", tone: "ok" },
       { text: "exported → audit-report.json", tone: "dim" },
     ],
   },
@@ -329,7 +329,7 @@ const FEATURES = [
   {
     icon: Users,
     title: "Role-Based Access",
-    desc: "Three-tier RBAC with per-variable permissions. Members request access; leads and admins approve.",
+    desc: "Role-based access with per-variable permissions. Developers request access; leads, managers, and owners approve.",
   },
   {
     icon: Eye,

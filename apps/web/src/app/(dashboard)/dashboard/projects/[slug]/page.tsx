@@ -2,6 +2,8 @@
 
 import { useState, use } from "react";
 import Link from "next/link";
+import { usePaginatedQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -9,6 +11,7 @@ import { useVariableSelectionStore } from "@/stores/variable-selection-store";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
@@ -21,10 +24,7 @@ import {
   useVariableRequests,
   useResolveVariableRequest,
 } from "@/hooks";
-import {
-  useProjectVariables,
-  useVariableHistory as useConvexVariableHistory,
-} from "@/hooks";
+import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
 import { ProjectIcon } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui";
@@ -68,7 +68,7 @@ interface Variable {
   createdAt: number;
   updatedAt: number;
   vaultRef?: string;
-  permission?: "read" | "write" | "admin" | null;
+  permission?: "read" | "write" | null;
   rotationFrequencyDays?: number;
   expiresAt?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
@@ -88,11 +88,18 @@ interface VersionRecord {
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
   const { canDo, organization, user } = useAuthContext();
-  const canCreateVariable = canDo("org:create_project");
-  const canUpdateVariable = canDo("org:create_project");
-  const canDeleteVariable = canDo("org:create_project");
-  const canReviewRequests = canDo("org:create_project");
-  const canRequestVariable = organization?.role === "member";
+  // Project-scoped gates follow from the unified org role (assignment is
+  // enforced server-side): every assigned member can create variables;
+  // team leads and above have full variable CRUD; developers edit only
+  // variables they hold a write grant on and can submit requests.
+  const orgRole = normalizeOrgRole(organization?.role);
+  const hasOrgRole = !!organization?.role;
+  const canCreateVariable = hasOrgRole;
+  const canUpdateVariable =
+    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
+  const canDeleteVariable = canUpdateVariable;
+  const canReviewRequests = canUpdateVariable;
+  const canRequestVariable = hasOrgRole && orgRole === "developer";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");
@@ -157,9 +164,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const rawVariables = useProjectVariables(projectId);
-  const isLoadingVariables = rawVariables === undefined && !!projectId;
-  const variables = (rawVariables ?? []) as Variable[];
+  // Convex cursor pagination: `results` accumulates every loaded page.
+  // All downstream filtering (env tab, tags), reveal, and per-variable
+  // access flags operate over this accumulated array, unchanged.
+  const {
+    results: rawVariables,
+    status: variablesStatus,
+    loadMore: loadMoreVariables,
+  } = usePaginatedQuery(
+    api.variables.listWithAccessPaginated,
+    projectId && convexUserId ? { projectId, userId: convexUserId } : "skip",
+    { initialNumItems: 50 }
+  );
+  const isLoadingVariables = variablesStatus === "LoadingFirstPage";
+  const variables = rawVariables as Variable[];
 
   const { requests } = useVariableRequests(projectId, convexUserId);
 
@@ -199,7 +217,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const rawHistory = useConvexVariableHistory(
     historyVariableId
       ? (historyVariableId as Id<"environmentVariables">)
-      : undefined
+      : undefined,
+    convexUserId
   );
   const historyData = rawHistory
     ? { history: rawHistory as VersionRecord[] }
@@ -492,7 +511,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     return true;
   });
 
-  const variablePagination = usePagination(filteredVariables, { pageSize: 10 });
   const requestPagination = usePagination(requests, { pageSize: 5 });
 
   const formatDate = (timestamp: number) =>
@@ -782,11 +800,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </div>
           ) : (
             <>
-              <AnimatedList
-                className="divide-y divide-zinc-200 dark:divide-zinc-800"
-                pageKey={variablePagination.currentPage}
-              >
-                {variablePagination.pageItems.map((variable) => (
+              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {filteredVariables.map((variable) => (
                   <VariableListItem
                     key={variable._id}
                     variable={{
@@ -803,7 +818,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                     onReveal={() => handleRevealValue(variable)}
                     revealedValue={revealedValues[variable._id] ?? null}
                     isRevealing={revealingIds.has(variable._id)}
-                    canEdit={canUpdateVariable}
+                    canEdit={
+                      canUpdateVariable || variable.permission === "write"
+                    }
                     canDelete={canDeleteVariable}
                     permissionLevel={variable.permission ?? null}
                     onShare={
@@ -815,18 +832,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   />
                 ))}
               </AnimatedList>
-              <Pagination
-                currentPage={variablePagination.currentPage}
-                totalPages={variablePagination.totalPages}
-                hasNextPage={variablePagination.hasNextPage}
-                hasPrevPage={variablePagination.hasPrevPage}
-                onNextPage={variablePagination.nextPage}
-                onPrevPage={variablePagination.prevPage}
-                onGoToPage={variablePagination.goToPage}
-                startIndex={variablePagination.startIndex}
-                endIndex={variablePagination.endIndex}
-                totalItems={variablePagination.totalItems}
-              />
+              {(variablesStatus === "CanLoadMore" ||
+                variablesStatus === "LoadingMore") && (
+                <div className="flex justify-center border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                  <button
+                    onClick={() => loadMoreVariables(50)}
+                    disabled={variablesStatus === "LoadingMore"}
+                    className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  >
+                    {variablesStatus === "LoadingMore"
+                      ? "Loading..."
+                      : "Load more"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1089,7 +1108,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             currentVersion={historyVariableVersion}
             history={(historyData?.history ?? []) as VersionRecord[]}
             onRollback={handleRollback}
-            canRollback={canDo("org:delete_project")}
+            canRollback={canDo("org:rollback_variable")}
             isLoading={isLoadingHistory}
             error={
               historyQueryError

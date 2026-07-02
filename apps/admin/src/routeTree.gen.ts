@@ -22,7 +22,6 @@ import { Route as AuthenticatedMessagesRouteImport } from "./routes/_authenticat
 import { Route as AuthenticatedFeatureRequestsRouteImport } from "./routes/_authenticated/feature-requests"
 import { Route as AuthenticatedDataRouteImport } from "./routes/_authenticated/data"
 import { Route as AuthenticatedChangelogRouteImport } from "./routes/_authenticated/changelog"
-import { Route as AuthenticatedAnomalyDetectionRouteImport } from "./routes/_authenticated/anomaly-detection"
 
 const LoginRoute = LoginRouteImport.update({
   id: "/login",
@@ -90,17 +89,10 @@ const AuthenticatedChangelogRoute = AuthenticatedChangelogRouteImport.update({
   path: "/changelog",
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAnomalyDetectionRoute =
-  AuthenticatedAnomalyDetectionRouteImport.update({
-    id: "/anomaly-detection",
-    path: "/anomaly-detection",
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   "/": typeof AuthenticatedIndexRoute
   "/login": typeof LoginRoute
-  "/anomaly-detection": typeof AuthenticatedAnomalyDetectionRoute
   "/changelog": typeof AuthenticatedChangelogRoute
   "/data": typeof AuthenticatedDataRoute
   "/feature-requests": typeof AuthenticatedFeatureRequestsRoute
@@ -114,7 +106,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/login": typeof LoginRoute
-  "/anomaly-detection": typeof AuthenticatedAnomalyDetectionRoute
   "/changelog": typeof AuthenticatedChangelogRoute
   "/data": typeof AuthenticatedDataRoute
   "/feature-requests": typeof AuthenticatedFeatureRequestsRoute
@@ -131,7 +122,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/_authenticated": typeof AuthenticatedRouteWithChildren
   "/login": typeof LoginRoute
-  "/_authenticated/anomaly-detection": typeof AuthenticatedAnomalyDetectionRoute
   "/_authenticated/changelog": typeof AuthenticatedChangelogRoute
   "/_authenticated/data": typeof AuthenticatedDataRoute
   "/_authenticated/feature-requests": typeof AuthenticatedFeatureRequestsRoute
@@ -149,7 +139,6 @@ export interface FileRouteTypes {
   fullPaths:
     | "/"
     | "/login"
-    | "/anomaly-detection"
     | "/changelog"
     | "/data"
     | "/feature-requests"
@@ -163,7 +152,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/login"
-    | "/anomaly-detection"
     | "/changelog"
     | "/data"
     | "/feature-requests"
@@ -179,7 +167,6 @@ export interface FileRouteTypes {
     | "__root__"
     | "/_authenticated"
     | "/login"
-    | "/_authenticated/anomaly-detection"
     | "/_authenticated/changelog"
     | "/_authenticated/data"
     | "/_authenticated/feature-requests"
@@ -291,18 +278,10 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedChangelogRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    "/_authenticated/anomaly-detection": {
-      id: "/_authenticated/anomaly-detection"
-      path: "/anomaly-detection"
-      fullPath: "/anomaly-detection"
-      preLoaderRoute: typeof AuthenticatedAnomalyDetectionRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
   }
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedAnomalyDetectionRoute: typeof AuthenticatedAnomalyDetectionRoute
   AuthenticatedChangelogRoute: typeof AuthenticatedChangelogRoute
   AuthenticatedDataRoute: typeof AuthenticatedDataRoute
   AuthenticatedFeatureRequestsRoute: typeof AuthenticatedFeatureRequestsRoute
@@ -317,7 +296,6 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAnomalyDetectionRoute: AuthenticatedAnomalyDetectionRoute,
   AuthenticatedChangelogRoute: AuthenticatedChangelogRoute,
   AuthenticatedDataRoute: AuthenticatedDataRoute,
   AuthenticatedFeatureRequestsRoute: AuthenticatedFeatureRequestsRoute,

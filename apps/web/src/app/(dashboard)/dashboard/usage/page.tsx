@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuthContext } from "@/components/auth";
+import { RequireRole, useAuthContext } from "@/components/auth";
 import { useCachedTierData } from "@/hooks/useTierStore";
 import { useAllFeatures, useConvexUser } from "@/hooks";
 import { useUserOrganizations } from "@/hooks/useOrganizations";
@@ -12,11 +12,20 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { UsageLayoutProps } from "./usage-data";
 import { LayoutC } from "./layout-c";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const CHECKOUT_URL =
   "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
 
 export default function UsagePage() {
+  return (
+    <RequireRole minimum="owner">
+      <UsagePageContent />
+    </RequireRole>
+  );
+}
+
+function UsagePageContent() {
   const { organization, user } = useAuthContext();
   const paymentsEnabled = usePaymentsEnabled();
   const { isLoading, tier, usage, isFree, enforcementEnabled } =
@@ -33,7 +42,9 @@ export default function UsagePage() {
   const allOrgs = useUserOrganizations(convexUserId);
   const orgCount =
     allOrgs !== undefined
-      ? allOrgs.filter((o) => o !== null && o.role === "admin").length
+      ? allOrgs.filter(
+          (o) => o !== null && normalizeOrgRole(o.role) === "owner"
+        ).length
       : null;
 
   // -----------------------------------------------------------------------

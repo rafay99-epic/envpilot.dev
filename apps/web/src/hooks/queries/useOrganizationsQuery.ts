@@ -112,7 +112,6 @@ export function useInviteMember(slug: string) {
       email: string;
       role: string;
       projectIds?: string[];
-      projectRole?: string;
     }) => api.post(`/api/organizations/${slug}/members`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({

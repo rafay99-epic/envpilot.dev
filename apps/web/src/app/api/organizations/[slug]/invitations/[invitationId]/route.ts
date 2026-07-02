@@ -42,6 +42,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       api.invitations.listPendingByOrganization,
       {
         organizationId,
+        requestingUserId: convexUser._id,
       }
     );
 
@@ -111,6 +112,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       api.invitations.listPendingByOrganization,
       {
         organizationId,
+        requestingUserId: convexUser._id,
       }
     );
 

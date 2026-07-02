@@ -1,17 +1,27 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-import { assertProjectAction } from "./authz";
+import {
+  assertProjectAction,
+  assertCanManageUser,
+  normalizeOrgRole,
+  roleLevel,
+} from "./authz";
 
 /**
  * Project Members - Project-level access control
  *
- * Controls which users have access to specific projects.
- * Admins have implicit access to all projects (no projectMembers record needed).
- * Team leads and members must be explicitly assigned to projects.
+ * projectMembers rows are pure scope ASSIGNMENTS under the unified role model:
+ * what a user can do inside an assigned project is derived from their
+ * organizationMembers.role. Owners have implicit access to all projects
+ * (no projectMembers record needed); everyone else must be explicitly
+ * assigned. The legacy per-row `role` field is neither written nor read by
+ * this module anymore.
  */
 
-const PROJECT_ROLE_VALIDATOR = v.union(
+// Legacy project-level role values — accepted (and ignored) for backward
+// compatibility with older clients that still send them.
+const LEGACY_PROJECT_ROLE_VALIDATOR = v.union(
   v.literal("viewer"),
   v.literal("developer"),
   v.literal("manager")
@@ -88,32 +98,19 @@ export const getAssignableOrgMembers = query({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) return [];
 
-    // Get requesting user's org membership
-    const requesterMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q
-          .eq("organizationId", project.organizationId)
-          .eq("userId", args.requestingUserId)
-      )
-      .first();
-
-    if (!requesterMembership) return [];
-
-    // Must be org admin or project manager to assign members
-    const isOrgAdmin = requesterMembership.role === "admin";
-    if (!isOrgAdmin) {
-      // Check if they're a project manager
-      const projectMembership = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", args.requestingUserId)
-        )
-        .first();
-
-      if (!projectMembership || projectMembership.role !== "manager") {
-        return [];
-      }
+    // Must be allowed to manage project members (owner bypasses assignment;
+    // project managers and team leads need an assignment)
+    let requesterRole: string;
+    try {
+      const auth = await assertProjectAction(
+        ctx,
+        args.requestingUserId,
+        args.projectId,
+        "project:manage_members"
+      );
+      requesterRole = auth.orgRole;
+    } catch {
+      return [];
     }
 
     // Get all org members
@@ -134,13 +131,16 @@ export const getAssignableOrgMembers = query({
       existingProjectMembers.map((m) => m.userId.toString())
     );
 
-    // Filter: exclude admins (implicit access), already-assigned, and self
+    // Filter: exclude owners (implicit access), already-assigned, self, and
+    // anyone at or above the requester's role (hierarchy: you may only assign
+    // users strictly below your own role)
     const assignable = await Promise.all(
       allOrgMembers
         .filter((member) => {
-          if (member.role === "admin") return false;
+          if (normalizeOrgRole(member.role) === "owner") return false;
           if (assignedUserIds.has(member.userId.toString())) return false;
           if (member.userId === args.requestingUserId) return false;
+          if (roleLevel(member.role) >= roleLevel(requesterRole)) return false;
           return true;
         })
         .map(async (member) => {
@@ -151,7 +151,7 @@ export const getAssignableOrgMembers = query({
                 email: user.email,
                 name: user.name,
                 avatarUrl: user.avatarUrl,
-                orgRole: member.role,
+                orgRole: normalizeOrgRole(member.role),
               }
             : null;
         })
@@ -166,18 +166,27 @@ export const getAssignableOrgMembers = query({
 // ==========================================
 
 /**
- * Add a member to a project
+ * Add a member to a project (pure scope assignment).
+ *
+ * Hierarchy rule: the actor may only add users whose org role is strictly
+ * below their own. Owners are never added — they have implicit access.
+ * The legacy `role` arg is accepted for API compatibility but ignored.
  */
 export const addMember = mutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
-    role: PROJECT_ROLE_VALIDATOR,
+    // LEGACY: ignored — capabilities come from the member's org role
+    role: v.optional(LEGACY_PROJECT_ROLE_VALIDATOR),
+    // Environment scope for the assignment — only applied to developers
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: org admins or project managers can add members
-    await assertProjectAction(
+    // Authorization: owners, project managers, and team leads (assigned)
+    const { orgRole: actorRole } = await assertProjectAction(
       ctx,
       args.addedBy,
       args.projectId,
@@ -203,10 +212,17 @@ export const addMember = mutation({
       throw new Error("Target user is not a member of the organization");
     }
 
-    // Admins don't need project membership (implicit access)
-    if (targetOrgMembership.role === "admin") {
-      throw new Error("Admins have implicit access to all projects");
+    // Owners don't need project assignments (implicit access) — no-op
+    if (normalizeOrgRole(targetOrgMembership.role) === "owner") {
+      return null;
     }
+
+    // Hierarchy: can only add users whose org role is strictly below your own
+    assertCanManageUser(
+      actorRole,
+      targetOrgMembership.role,
+      "add project member"
+    );
 
     // Check for existing project membership
     const existing = await ctx.db
@@ -220,10 +236,24 @@ export const addMember = mutation({
       throw new Error("User is already a member of this project");
     }
 
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
+
+    // Environment scope only constrains developers — owners, PMs, and team
+    // leads are always unrestricted, so a scope on their assignment is ignored
+    const environmentScope =
+      normalizeOrgRole(targetOrgMembership.role) === "developer"
+        ? args.environments
+        : undefined;
+
+    // Pure scope assignment — capabilities come from the org role
     const membershipId = await ctx.db.insert("projectMembers", {
       projectId: args.projectId,
       userId: args.userId,
-      role: args.role,
+      ...(environmentScope ? { environments: environmentScope } : {}),
       addedBy: args.addedBy,
       addedAt: now,
     });
@@ -238,7 +268,8 @@ export const addMember = mutation({
       details: JSON.stringify({
         addedUserId: args.userId,
         addedUserEmail: targetUser?.email,
-        projectRole: args.role,
+        orgRole: normalizeOrgRole(targetOrgMembership.role),
+        environments: environmentScope ?? "all",
       }),
       createdAt: now,
     });
@@ -249,7 +280,10 @@ export const addMember = mutation({
 
 /**
  * Remove a member from a project
- * Also revokes their variable permissions and project access tokens
+ * Also revokes their variable permissions and project access tokens.
+ *
+ * Hierarchy rule: the actor may only remove users whose org role is strictly
+ * below their own.
  */
 export const removeMember = mutation({
   args: {
@@ -258,8 +292,8 @@ export const removeMember = mutation({
     removedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: org admins or project managers can remove members
-    await assertProjectAction(
+    // Authorization: owners, project managers, and team leads (assigned)
+    const { orgRole: actorRole } = await assertProjectAction(
       ctx,
       args.removedBy,
       args.projectId,
@@ -285,12 +319,29 @@ export const removeMember = mutation({
       throw new Error("User is not a member of this project");
     }
 
+    // Hierarchy: can only remove users whose org role is strictly below your
+    // own. (If the target no longer has an org membership, allow cleanup.)
+    const targetOrgMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+
+    if (targetOrgMembership) {
+      assertCanManageUser(
+        actorRole,
+        targetOrgMembership.role,
+        "remove project member"
+      );
+    }
+
     // Revoke variable permissions for this project's variables
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     let revokedPermissions = 0;
     for (const variable of variables) {
@@ -299,8 +350,8 @@ export const removeMember = mutation({
         .withIndex("by_variable_and_user", (q) =>
           q.eq("variableId", variable._id).eq("userId", args.userId)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
 
       for (const perm of perms) {
         await ctx.db.patch(perm._id, {
@@ -318,8 +369,8 @@ export const removeMember = mutation({
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     for (const token of activeTokens) {
       await ctx.db.patch(token._id, { isActive: false });
@@ -359,20 +410,31 @@ export const removeMember = mutation({
 });
 
 /**
- * Update a project member's role
+ * Set (or clear) the environment scope on a developer's project assignment.
+ *
+ * A scoped developer can only access variables whose environments are ALL
+ * inside the scope (see authz.isEnvironmentScopeAllowed) — e.g. a scope of
+ * ["development", "staging"] makes production variables invisible and
+ * untouchable. Omitting `environments` clears the scope (unrestricted).
+ * Only meaningful for developers — owners, project managers, and team leads
+ * are always unrestricted.
+ *
+ * Hierarchy rule: the actor may only modify users whose org role is strictly
+ * below their own.
  */
-export const updateMemberRole = mutation({
+export const setMemberEnvironments = mutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
-    newRole: PROJECT_ROLE_VALIDATOR,
-    updatedBy: v.id("users"),
+    requestingUserId: v.id("users"),
+    // Omit to clear the scope (all environments); must not be empty
+    environments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    // Authorization: org admins or project managers can change project roles
-    await assertProjectAction(
+    // Authorization: owners, project managers, and team leads (assigned)
+    const { orgRole: actorRole } = await assertProjectAction(
       ctx,
-      args.updatedBy,
+      args.requestingUserId,
       args.projectId,
       "project:manage_members"
     );
@@ -383,6 +445,38 @@ export const updateMemberRole = mutation({
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
+    }
+
+    const targetOrgMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+
+    if (!targetOrgMembership) {
+      throw new Error("Target user is not a member of the organization");
+    }
+
+    // Environment scopes only constrain developers — everyone else always
+    // has access to all environments
+    if (normalizeOrgRole(targetOrgMembership.role) !== "developer") {
+      throw new Error(
+        "Environment scopes only apply to developers — owners, project managers, and team leads always have access to all environments"
+      );
+    }
+
+    // Hierarchy: can only modify users whose org role is strictly below your own
+    assertCanManageUser(
+      actorRole,
+      targetOrgMembership.role,
+      "change environment scope"
+    );
 
     const membership = await ctx.db
       .query("projectMembers")
@@ -395,18 +489,23 @@ export const updateMemberRole = mutation({
       throw new Error("User is not a member of this project");
     }
 
-    const oldRole = membership.role;
-    await ctx.db.patch(membership._id, { role: args.newRole });
+    const previousScope = membership.environments;
+
+    // Patching with undefined clears the field (unrestricted)
+    await ctx.db.patch(membership._id, { environments: args.environments });
+
+    const targetUser = await ctx.db.get(args.userId);
 
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.updatedBy,
-      action: "project.member_role_changed",
+      userId: args.requestingUserId,
+      action: "project.member_environments_changed",
       details: JSON.stringify({
         targetUserId: args.userId,
-        oldRole,
-        newRole: args.newRole,
+        targetUserEmail: targetUser?.email,
+        environments: args.environments ?? "all",
+        previous: previousScope ?? "all",
       }),
       createdAt: now,
     });
@@ -416,19 +515,48 @@ export const updateMemberRole = mutation({
 });
 
 /**
- * Bulk add members to a project
- * Used during project creation and invitation acceptance
+ * DEPRECATED — project-level roles were removed by the unified role model.
+ *
+ * Kept as an export because the web API route still references it; it now
+ * throws unconditionally. Change the member's ORGANIZATION role instead
+ * (organizations.updateMemberRole).
+ */
+export const updateMemberRole = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    newRole: LEGACY_PROJECT_ROLE_VALIDATOR,
+    updatedBy: v.id("users"),
+  },
+  handler: async () => {
+    throw new Error(
+      "Project-level roles were replaced by the unified organization role; change the member's organization role instead."
+    );
+  },
+});
+
+/**
+ * Bulk add members to a project (pure scope assignments).
+ *
+ * Hierarchy rule: only users whose org role is strictly below the actor's
+ * are added; owners and out-of-hierarchy users are silently skipped.
+ * The legacy `role` arg is accepted for API compatibility but ignored.
  */
 export const bulkAddMembers = mutation({
   args: {
     projectId: v.id("projects"),
     userIds: v.array(v.id("users")),
-    role: PROJECT_ROLE_VALIDATOR,
+    // LEGACY: ignored — capabilities come from each member's org role
+    role: v.optional(LEGACY_PROJECT_ROLE_VALIDATOR),
+    // Environment scope for the assignments — only applied to developers
+    // (owners/PMs/team leads are always unrestricted). Omit for all
+    // environments.
+    environments: v.optional(v.array(v.string())),
     addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Authorization: org admins or project managers can bulk-add members
-    await assertProjectAction(
+    // Authorization: owners, project managers, and team leads (assigned)
+    const { orgRole: actorRole } = await assertProjectAction(
       ctx,
       args.addedBy,
       args.projectId,
@@ -440,6 +568,12 @@ export const bulkAddMembers = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
+    }
+
+    if (args.environments && args.environments.length === 0) {
+      throw new Error(
+        "Environment scope cannot be empty — omit it to allow all environments"
+      );
     }
 
     const addedIds: Id<"projectMembers">[] = [];
@@ -455,7 +589,6 @@ export const bulkAddMembers = mutation({
 
       if (existing) continue;
 
-      // Skip admins (implicit access)
       const orgMembership = await ctx.db
         .query("organizationMembers")
         .withIndex("by_org_and_user", (q) =>
@@ -463,12 +596,26 @@ export const bulkAddMembers = mutation({
         )
         .first();
 
-      if (!orgMembership || orgMembership.role === "admin") continue;
+      // Skip non-members and owners (implicit access)
+      if (!orgMembership || normalizeOrgRole(orgMembership.role) === "owner") {
+        continue;
+      }
 
+      // Hierarchy: skip users at or above the actor's role
+      if (roleLevel(orgMembership.role) >= roleLevel(actorRole)) continue;
+
+      // Environment scope only constrains developers — a scope on a PM/team
+      // lead assignment is ignored (they are always unrestricted)
+      const environmentScope =
+        normalizeOrgRole(orgMembership.role) === "developer"
+          ? args.environments
+          : undefined;
+
+      // Pure scope assignment — capabilities come from the org role
       const id = await ctx.db.insert("projectMembers", {
         projectId: args.projectId,
         userId,
-        role: args.role,
+        ...(environmentScope ? { environments: environmentScope } : {}),
         addedBy: args.addedBy,
         addedAt: now,
       });
@@ -485,7 +632,7 @@ export const bulkAddMembers = mutation({
         details: JSON.stringify({
           bulkAdd: true,
           count: addedIds.length,
-          projectRole: args.role,
+          environments: args.environments ?? "all",
         }),
         createdAt: now,
       });

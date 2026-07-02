@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { normalizeOrgRole } from "./authz";
 
 /**
  * Feature Requests (Wishlist) Queries and Mutations
@@ -406,7 +407,7 @@ export const unvote = mutation({
 
 /**
  * Update feature request status (admin only)
- * Requires authenticated user with admin privileges
+ * Requires authenticated user with org-owner privileges
  */
 export const updateStatus = mutation({
   args: {
@@ -431,14 +432,17 @@ export const updateStatus = mutation({
       throw new Error("User not found");
     }
 
-    // Check if user is admin (has admin membership in any organization)
-    const adminMembership = await ctx.db
+    // Check if user is an org owner (any organization). After the unified-role
+    // migration there are no "admin" rows — owners hold that authority.
+    const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("role"), "admin"))
-      .first();
+      .collect();
+    const ownerMembership = memberships.find(
+      (m) => normalizeOrgRole(m.role) === "owner"
+    );
 
-    if (!adminMembership) {
+    if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");
     }
 
@@ -459,7 +463,7 @@ export const updateStatus = mutation({
 
 /**
  * Update feature request details (admin only)
- * Requires authenticated user with admin privileges
+ * Requires authenticated user with org-owner privileges
  */
 export const update = mutation({
   args: {
@@ -480,14 +484,17 @@ export const update = mutation({
       throw new Error("User not found");
     }
 
-    // Check if user is admin (has admin membership in any organization)
-    const adminMembership = await ctx.db
+    // Check if user is an org owner (any organization). After the unified-role
+    // migration there are no "admin" rows — owners hold that authority.
+    const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("role"), "admin"))
-      .first();
+      .collect();
+    const ownerMembership = memberships.find(
+      (m) => normalizeOrgRole(m.role) === "owner"
+    );
 
-    if (!adminMembership) {
+    if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");
     }
 
@@ -541,7 +548,7 @@ export const update = mutation({
 
 /**
  * Delete a feature request (admin only)
- * Requires authenticated user with admin privileges
+ * Requires authenticated user with org-owner privileges
  */
 export const remove = mutation({
   args: {
@@ -555,14 +562,17 @@ export const remove = mutation({
       throw new Error("User not found");
     }
 
-    // Check if user is admin (has admin membership in any organization)
-    const adminMembership = await ctx.db
+    // Check if user is an org owner (any organization). After the unified-role
+    // migration there are no "admin" rows — owners hold that authority.
+    const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("role"), "admin"))
-      .first();
+      .collect();
+    const ownerMembership = memberships.find(
+      (m) => normalizeOrgRole(m.role) === "owner"
+    );
 
-    if (!adminMembership) {
+    if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");
     }
 

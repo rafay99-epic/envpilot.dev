@@ -12,6 +12,7 @@ import {
   selectActiveOrganization,
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
+import { normalizeOrgRole } from "@/lib/roles";
 
 // GET /api/auth/me - Get current authenticated user
 export async function GET(request: Request) {
@@ -58,7 +59,9 @@ export async function GET(request: Request) {
       lastName: user.lastName ?? null,
       profilePictureUrl: user.profilePictureUrl ?? null,
       organizationId: activeOrganization?._id ?? null,
-      role: activeOrganization?.role ?? null,
+      role: activeOrganization
+        ? normalizeOrgRole(activeOrganization.role)
+        : null,
       // permissions are computed from backend authz → actions[]
       createdAt: new Date(user.createdAt),
       updatedAt: new Date(user.updatedAt),
@@ -95,7 +98,7 @@ export async function GET(request: Request) {
           name: activeOrganization.name,
           slug: activeOrganization.slug,
           tier: activeTierData?.tierName ?? "free",
-          role: activeOrganization.role,
+          role: normalizeOrgRole(activeOrganization.role),
           createdAt: new Date(activeOrganization.createdAt),
           updatedAt: new Date(activeOrganization.updatedAt),
         }
@@ -111,7 +114,7 @@ export async function GET(request: Request) {
           name: org.name,
           slug: org.slug,
           tier: orgTiers[index]?.tierName ?? "free",
-          role: org.role,
+          role: normalizeOrgRole(org.role),
         })),
         accessToken,
         impersonator: impersonator

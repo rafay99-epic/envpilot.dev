@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { batchGetUsers, userInfo } from "./helpers";
+import { assertOrgAction, assertCanManageUser } from "./authz";
 
 /**
  * Project Access Queries and Mutations (for extension linking)
@@ -26,8 +27,8 @@ export const listByProject = query({
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     const userMap = await batchGetUsers(
       ctx,
@@ -48,8 +49,8 @@ export const listByUser = query({
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     // Batch fetch projects
     const projIds = [...new Set(tokens.map((t) => t.projectId.toString()))];
@@ -177,19 +178,42 @@ export const getByAccessToken = query({
   },
 });
 
+/**
+ * Resolve the owning user of an access token regardless of active/expired
+ * state. Used by the extension acknowledge-revocation route to supply the
+ * acknowledging user id — the token being acknowledged has usually just been
+ * revoked, so getByAccessToken (which requires isActive) would return null.
+ */
+export const getOwnerByAccessToken = query({
+  args: { accessToken: v.string() },
+  handler: async (ctx, args) => {
+    const access = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_access_token", (q) =>
+        q.eq("accessToken", args.accessToken)
+      )
+      .first();
+
+    if (!access) return null;
+
+    return { userId: access.userId };
+  },
+});
+
 export const getByProjectAndUser = query({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const records = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .first();
+      .collect();
+
+    return records.find((doc) => doc.isActive === true) ?? null;
   },
 });
 
@@ -210,6 +234,16 @@ export const create = mutation({
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    // Authorization: `userId` is the grantee AND the acting user — this mints a
+    // token for the caller themselves (self-service extension/CLI linking). The
+    // caller must be an org member permitted to link, in the project's org.
+    await assertOrgAction(
+      ctx,
+      args.userId,
+      project.organizationId,
+      "org:link_extension"
+    );
 
     const accessToken = generateAccessToken();
 
@@ -255,6 +289,35 @@ export const revoke = mutation({
 
     const project = await ctx.db.get(access.projectId);
 
+    // Authorization: the caller may revoke their OWN token freely; revoking
+    // someone else's token requires org:revoke_session in the token's org plus
+    // the hierarchy check (cannot revoke a peer/superior's session).
+    if (args.revokedBy !== access.userId) {
+      if (!project) {
+        throw new Error("Project not found");
+      }
+      const { membership: caller } = await assertOrgAction(
+        ctx,
+        args.revokedBy,
+        project.organizationId,
+        "org:revoke_session"
+      );
+      const targetMembership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", project.organizationId)
+            .eq("userId", access.userId)
+        )
+        .first();
+      if (!targetMembership) {
+        throw new Error(
+          "Token does not belong to a member of this organization"
+        );
+      }
+      assertCanManageUser(caller.role, targetMembership.role, "revoke session");
+    }
+
     await ctx.db.patch(args.accessId, {
       isActive: false,
     });
@@ -299,14 +362,41 @@ export const revokeAllForUser = mutation({
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new Error("Project not found");
+    }
+
+    // Authorization: the caller may revoke their OWN tokens freely; revoking
+    // another user's tokens requires org:revoke_session in the project's org
+    // plus the hierarchy check.
+    if (args.revokedBy !== args.userId) {
+      const { membership: caller } = await assertOrgAction(
+        ctx,
+        args.revokedBy,
+        project.organizationId,
+        "org:revoke_session"
+      );
+      const targetMembership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", project.organizationId)
+            .eq("userId", args.userId)
+        )
+        .first();
+      if (!targetMembership) {
+        throw new Error("User is not a member of this organization");
+      }
+      assertCanManageUser(caller.role, targetMembership.role, "revoke session");
+    }
 
     const tokens = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
 
     for (const token of tokens) {
       await ctx.db.patch(token._id, {
@@ -383,8 +473,8 @@ export const updateLastUsed = mutation({
         .withIndex("by_access_token", (q) =>
           q.eq("accessToken", access.accessToken)
         )
-        .filter((q) => q.eq(q.field("acknowledged"), false))
-        .first();
+        .collect()
+        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
       if (!pendingRevocation) {
         await ctx.db.insert("permissionRevocationEvents", {
@@ -462,8 +552,8 @@ export const refresh = mutation({
         .withIndex("by_access_token", (q) =>
           q.eq("accessToken", access.accessToken)
         )
-        .filter((q) => q.eq(q.field("acknowledged"), false))
-        .first();
+        .collect()
+        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
 
       if (!pendingRevocation) {
         await ctx.db.insert("permissionRevocationEvents", {
@@ -484,6 +574,18 @@ export const refresh = mutation({
     await ctx.db.patch(access._id, {
       expiresAt: newExpiresAt,
       lastUsedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: access.projectId,
+      userId: access.userId,
+      action: "access.token_refreshed",
+      details: JSON.stringify({
+        deviceName: access.deviceName,
+        newExpiresAt,
+      }),
+      createdAt: now,
     });
 
     return { expiresAt: newExpiresAt };
@@ -519,13 +621,13 @@ export const linkExtension = mutation({
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) => doc.isActive === true && doc.deviceId === args.deviceId
+          ) ?? null
+      );
 
     if (existingAccess) {
       await ctx.db.patch(existingAccess._id, {
@@ -533,6 +635,21 @@ export const linkExtension = mutation({
         deviceName: args.deviceName,
         lastUsedAt: now,
       });
+
+      await ctx.db.insert("auditLogs", {
+        organizationId: project.organizationId,
+        projectId: args.projectId,
+        userId: args.userId,
+        action: "access.token_refreshed",
+        details: JSON.stringify({
+          relink: true,
+          deviceId: args.deviceId,
+          deviceName: args.deviceName,
+          newExpiresAt: expiresAt,
+        }),
+        createdAt: now,
+      });
+
       return {
         accessId: existingAccess._id,
         accessToken: existingAccess.accessToken,
@@ -580,18 +697,32 @@ export const unlinkExtension = mutation({
 
     const project = await ctx.db.get(args.projectId);
 
+    // Authorization: this is a self-service unlink — `userId` is the acting
+    // caller. The lookup is scoped to (projectId, userId), so a caller can only
+    // ever unlink a token that belongs to THEM; a token owned by another user
+    // is simply not found. The caller must still be an org member permitted to
+    // link/unlink their own extension in the project's org.
+    if (project && !project.deletedAt) {
+      await assertOrgAction(
+        ctx,
+        args.userId,
+        project.organizationId,
+        "org:link_extension"
+      );
+    }
+
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
         q.eq("projectId", args.projectId).eq("userId", args.userId)
       )
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("isActive"), true),
-          q.eq(q.field("deviceId"), args.deviceId)
-        )
-      )
-      .first();
+      .collect()
+      .then(
+        (rows) =>
+          rows.find(
+            (doc) => doc.isActive === true && doc.deviceId === args.deviceId
+          ) ?? null
+      );
 
     if (!access) {
       throw new Error("Extension not linked");
@@ -640,8 +771,8 @@ export const cleanupExpired = internalMutation({
 
     const expiredTokens = await ctx.db
       .query("projectAccess")
-      .filter((q) =>
-        q.and(q.eq(q.field("isActive"), true), q.lt(q.field("expiresAt"), now))
+      .withIndex("by_active_and_expires", (q) =>
+        q.eq("isActive", true).lt("expiresAt", now)
       )
       .collect();
 

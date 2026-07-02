@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { Id, Doc } from "./_generated/dataModel";
 
 /**
@@ -64,6 +63,18 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "share.revoked": "info",
   "share.otp_sent": "info",
   "share.otp_failed": "warning",
+  // Project lifecycle
+  "project.restored": "info",
+  "project.favorited": "info",
+  "project.unfavorited": "info",
+  // Tag actions
+  "tag.created": "info",
+  "tag.updated": "info",
+  "tag.deleted": "info",
+  // Template actions
+  "template.created": "info",
+  "template.updated": "info",
+  "template.deleted": "info",
 };
 
 // Resource type mapping for different action types
@@ -82,6 +93,9 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "project.updated": "project",
   "project.deleted": "project",
   "project.moved": "project",
+  "project.restored": "project",
+  "project.favorited": "project",
+  "project.unfavorited": "project",
 
   // Variable
   "variable.created": "variable",
@@ -145,6 +159,14 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "share.revoked": "security",
   "share.otp_sent": "security",
   "share.otp_failed": "security",
+  // Tags (org-scoped labels)
+  "tag.created": "organization",
+  "tag.updated": "organization",
+  "tag.deleted": "organization",
+  // Templates (org-scoped)
+  "template.created": "organization",
+  "template.updated": "organization",
+  "template.deleted": "organization",
 };
 
 export interface AuditLogInput {
@@ -233,24 +255,6 @@ export async function logSecurityEvent(
     involvesSensitiveData: true,
   });
 
-  // Schedule anomaly detection for security events
-  await ctx.scheduler.runAfter(
-    0,
-    internal.anomalyDetection.detectAnomaliesAfterAudit,
-    {
-      auditLogId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action: input.action,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      involvesSensitiveData: true,
-      createdAt: Date.now(),
-      details: JSON.stringify(input.details),
-      projectId: input.projectId,
-    }
-  );
-
   return auditLogId;
 }
 
@@ -298,28 +302,6 @@ export async function logVariableAccess(
     involvesSensitiveData: input.isSensitive,
     resourceType: "variable",
   });
-
-  // Schedule anomaly detection (non-blocking, separate transaction)
-  await ctx.scheduler.runAfter(
-    0,
-    internal.anomalyDetection.detectAnomaliesAfterAudit,
-    {
-      auditLogId,
-      userId: input.userId,
-      organizationId: input.organizationId,
-      action,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      involvesSensitiveData: input.isSensitive,
-      createdAt: Date.now(),
-      details: JSON.stringify({
-        variableKey: input.variableKey,
-        accessType: input.accessType,
-        environment: input.environment,
-      }),
-      projectId: input.projectId,
-    }
-  );
 
   return auditLogId;
 }
@@ -484,6 +466,7 @@ export const logSecurityEventMutation = mutation({
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   },
+  returns: v.id("auditLogs"),
   handler: async (ctx, args) => {
     return logSecurityEvent(ctx, {
       organizationId: args.organizationId,
@@ -515,6 +498,7 @@ export const logAuditExport = mutation({
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   },
+  returns: v.id("auditLogs"),
   handler: async (ctx, args) => {
     return createAuditLog(ctx, {
       organizationId: args.organizationId,

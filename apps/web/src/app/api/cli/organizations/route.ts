@@ -6,6 +6,7 @@ import {
   unauthorizedResponse,
   getUserOrganizations,
 } from "@/lib/cli-auth";
+import { toLegacyOrgRole } from "@/lib/roles";
 
 /**
  * GET /api/cli/organizations
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
         name: org.name,
         slug: org.slug,
         tier: orgTiers[index]?.tierName ?? "free",
-        role: org.role,
+        // Old CLI builds only understand the legacy role strings.
+        role: toLegacyOrgRole(org.role),
         description: org.description,
         logoUrl: org.logoUrl,
       })),

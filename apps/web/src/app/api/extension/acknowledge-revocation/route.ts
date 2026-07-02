@@ -62,14 +62,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Acknowledge the events
-    // Note: In a more secure implementation, we could verify each event
-    // belongs to this token, but since acknowledging just marks it as processed,
-    // and events auto-expire, this is acceptable
+    // Resolve the token's owning user (works even for revoked/expired tokens).
+    // The backend now requires the acknowledging user and rejects events that
+    // belong to someone else, so we bind acknowledgement to the token's owner.
+    const owner = await convex.query(api.projectAccess.getOwnerByAccessToken, {
+      accessToken,
+    });
+    if (!owner) {
+      return NextResponse.json(
+        { error: "Invalid access token" },
+        { status: 401 }
+      );
+    }
+
+    // Acknowledge the events. The mutation verifies each event belongs to
+    // `userId` before clearing it, so events for other users are skipped.
     const result = await convex.mutation(
       api.permissionRevocationEvents.acknowledgeMultiple,
       {
         eventIds: eventIds as Id<"permissionRevocationEvents">[],
+        userId: owner.userId,
       }
     );
 

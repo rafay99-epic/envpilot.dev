@@ -50,3 +50,9 @@ package-lock.json
 # automaker
 .automaker/
 .env
+
+# playwright artifacts
+test-results/
+playwright-report/
+# saved e2e auth sessions (contain live session cookies)
+apps/web/tests/e2e/.auth/

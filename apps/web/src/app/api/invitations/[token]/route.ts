@@ -7,6 +7,7 @@ import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
+import { normalizeOrgRole } from "@/lib/roles";
 
 type RouteParams = { params: Promise<{ token: string }> };
 
@@ -50,7 +51,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({
       invitation: {
         email: invitation.email,
-        role: invitation.role,
+        role: normalizeOrgRole(invitation.role),
         organization: invitation.organization,
         invitedBy: invitation.invitedByUser,
         expiresAt: invitation.expiresAt,

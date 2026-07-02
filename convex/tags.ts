@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { checkBooleanFeature } from "./featureRegistry";
 import { createAuditLog } from "./auditHelpers";
+import { normalizeOrgRole } from "./authz";
 import { rateLimiter } from "./rateLimits";
 
 /**
@@ -42,6 +43,19 @@ function isValidHexColor(color: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(color);
 }
 
+/** Full variableTags doc shape, for `returns` validators */
+const tagDocValidator = v.object({
+  _id: v.id("variableTags"),
+  _creationTime: v.number(),
+  organizationId: v.id("organizations"),
+  name: v.string(),
+  color: v.string(),
+  createdBy: v.id("users"),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+  deletedAt: v.optional(v.number()),
+});
+
 /** Verify that the caller is an org member and return their role */
 async function requireOrgMembership(
   ctx: { db: any },
@@ -65,11 +79,12 @@ async function requireOrgMembership(
     throw new Error("Not authorized");
   }
 
-  if (requiredRoles && !requiredRoles.includes(membership.role)) {
+  const role = normalizeOrgRole(membership.role);
+  if (requiredRoles && !requiredRoles.includes(role)) {
     throw new Error("Insufficient permissions");
   }
 
-  return { role: membership.role };
+  return { role };
 }
 
 // ==========================================
@@ -84,14 +99,15 @@ export const listByOrganization = query({
   args: {
     organizationId: v.id("organizations"),
   },
+  returns: v.array(tagDocValidator),
   handler: async (ctx, args) => {
     const tags = await ctx.db
       .query("variableTags")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     return tags.sort((a, b) => a.name.localeCompare(b.name));
   },
@@ -104,6 +120,7 @@ export const getById = query({
   args: {
     tagId: v.id("variableTags"),
   },
+  returns: v.union(tagDocValidator, v.null()),
   handler: async (ctx, args) => {
     const tag = await ctx.db.get(args.tagId);
     if (!tag || tag.deletedAt) return null;
@@ -126,6 +143,7 @@ export const create = mutation({
     color: v.string(),
     createdBy: v.id("users"),
   },
+  returns: v.id("variableTags"),
   handler: async (ctx, args) => {
     const now = Date.now();
 
@@ -174,8 +192,8 @@ export const create = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     if (existing.length >= MAX_TAGS_PER_ORG) {
       throw new Error(
@@ -204,9 +222,8 @@ export const create = mutation({
     await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: args.createdBy,
-      action: "org.updated",
-      details: { tagCreated: trimmedName, color: args.color },
-      resourceType: "organization",
+      action: "tag.created",
+      details: { tagName: trimmedName, color: args.color },
     });
 
     return tagId;
@@ -224,6 +241,7 @@ export const update = mutation({
     color: v.optional(v.string()),
     updatedBy: v.id("users"),
   },
+  returns: v.id("variableTags"),
   handler: async (ctx, args) => {
     const tag = await ctx.db.get(args.tagId);
     if (!tag || tag.deletedAt) {
@@ -232,7 +250,8 @@ export const update = mutation({
 
     // Auth: verify caller is admin or team_lead in the org
     await requireOrgMembership(ctx, args.updatedBy, tag.organizationId, [
-      "admin",
+      "owner",
+      "project_manager",
       "team_lead",
     ]);
 
@@ -263,8 +282,8 @@ export const update = mutation({
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", tag.organizationId)
         )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect();
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
       const duplicate = existing.find(
         (t) =>
@@ -294,13 +313,12 @@ export const update = mutation({
     await createAuditLog(ctx, {
       organizationId: tag.organizationId,
       userId: args.updatedBy,
-      action: "org.updated",
+      action: "tag.updated",
       details: {
-        tagUpdated: tag.name,
+        tagName: tag.name,
         newName: args.name,
         newColor: args.color,
       },
-      resourceType: "organization",
     });
 
     return args.tagId;
@@ -316,6 +334,7 @@ export const remove = mutation({
     tagId: v.id("variableTags"),
     deletedBy: v.id("users"),
   },
+  returns: v.object({ deleted: v.boolean(), variablesAffected: v.number() }),
   handler: async (ctx, args) => {
     const tag = await ctx.db.get(args.tagId);
     if (!tag || tag.deletedAt) {
@@ -324,7 +343,8 @@ export const remove = mutation({
 
     // Auth: verify caller is admin or team_lead in the org
     await requireOrgMembership(ctx, args.deletedBy, tag.organizationId, [
-      "admin",
+      "owner",
+      "project_manager",
       "team_lead",
     ]);
 
@@ -347,8 +367,8 @@ export const remove = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", tag.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     let strippedCount = 0;
     let totalProcessed = 0;
@@ -359,8 +379,8 @@ export const remove = mutation({
       const variables = await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .take(CASCADE_BATCH_SIZE);
+        .take(CASCADE_BATCH_SIZE)
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
       for (const variable of variables) {
         if (totalProcessed >= MAX_CASCADE_UPDATES) break;
@@ -381,12 +401,11 @@ export const remove = mutation({
     await createAuditLog(ctx, {
       organizationId: tag.organizationId,
       userId: args.deletedBy,
-      action: "org.updated",
+      action: "tag.deleted",
       details: {
-        tagDeleted: tag.name,
+        tagName: tag.name,
         variablesAffected: strippedCount,
       },
-      resourceType: "organization",
     });
 
     return { deleted: true, variablesAffected: strippedCount };
@@ -403,12 +422,13 @@ export const seedSystemTags = mutation({
     organizationId: v.id("organizations"),
     createdBy: v.id("users"),
   },
+  returns: v.object({ created: v.number(), skipped: v.number() }),
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    // Auth: only admins can seed system tags
+    // Auth: only owners can seed system tags
     await requireOrgMembership(ctx, args.createdBy, args.organizationId, [
-      "admin",
+      "owner",
     ]);
 
     // Rate limit
@@ -422,14 +442,16 @@ export const seedSystemTags = mutation({
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .filter((q) => q.eq(q.field("deletedAt"), undefined))
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
 
     const existingNames = new Set(existing.map((t) => t.name.toLowerCase()));
     let created = 0;
 
     // Respect max tags per org limit when seeding
     const availableSlots = MAX_TAGS_PER_ORG - existing.length;
+
+    const createdNames: string[] = [];
 
     for (const tag of SYSTEM_TAGS) {
       if (created >= availableSlots) break;
@@ -443,7 +465,21 @@ export const seedSystemTags = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      createdNames.push(tag.name);
       created++;
+    }
+
+    if (created > 0) {
+      await createAuditLog(ctx, {
+        organizationId: args.organizationId,
+        userId: args.createdBy,
+        action: "tag.created",
+        details: {
+          systemSeed: true,
+          createdCount: created,
+          tagNames: createdNames,
+        },
+      });
     }
 
     return { created, skipped: SYSTEM_TAGS.length - created };

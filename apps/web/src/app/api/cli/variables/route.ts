@@ -9,6 +9,7 @@ import {
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import { z } from "zod";
+import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
 
 const createVariableSchema = z.object({
   projectId: z.string().min(1),
@@ -89,6 +90,11 @@ export async function GET(request: NextRequest) {
 
     const settled = await Promise.allSettled(
       accessible.map(async (variable) => {
+        // listWithAccess only includes vaultRef when hasAccess is true;
+        // the filter above guarantees it, but narrow the type explicitly.
+        if (!variable.vaultRef) {
+          throw new Error("Missing vault reference");
+        }
         const value = await readSecret(variable.vaultRef);
         return {
           _id: variable._id,
@@ -134,7 +140,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fire-and-forget: log access for anomaly detection (non-blocking)
+    // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues.map((v) =>
         convex.mutation(api.variables.logAccess, {
@@ -150,20 +156,15 @@ export async function GET(request: NextRequest) {
       // Swallow errors — audit logging must never break variable fetch
     });
 
-    // Resolve project role for the user
-    let projectRole: string | null = null;
-    if (membership.role !== "admin") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: projectId as Id<"projects">,
-          userId: authResult.userId,
-        }
-      );
-      if (projectMembership) {
-        projectRole = projectMembership.role;
-      }
-    }
+    // Translate the unified role model into the legacy strings old CLI
+    // builds derive .env file protection from. Owners get projectRole null
+    // exactly like legacy admins did; grant-only users (per-variable viewer
+    // sharing, no assignment) get "viewer" so files stay strictly read-only.
+    const legacy = await resolveLegacyRoles(convex, {
+      userId: authResult.userId,
+      projectId: projectId as Id<"projects">,
+      orgRole: membership.role,
+    });
 
     return NextResponse.json({
       success: true,
@@ -171,8 +172,8 @@ export async function GET(request: NextRequest) {
       meta: {
         total: variablesWithValues.length,
         environment: environment || "all",
-        role: membership.role,
-        projectRole,
+        role: legacy.legacyRole,
+        projectRole: legacy.role === "owner" ? null : legacy.legacyProjectRole,
         // Non-empty only when vault decryption failed for specific keys.
         // These variables were skipped — they will NOT be injected.
         decryptionFailures:
@@ -233,66 +234,31 @@ export async function POST(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Resolve project-level role
-    let projectRole: string | null = null;
-    if (membership.role !== "admin") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: projectId as Id<"projects">,
-          userId: authResult.userId,
-        }
-      );
-      if (projectMembership) {
-        projectRole = projectMembership.role;
+    // Unified role model: owners/project managers/team leads AND assigned
+    // developers all create variables directly (the backend auto-grants
+    // developers write on variables they create). Users without a project
+    // assignment are blocked; grant-only users (per-variable viewer sharing)
+    // get the strict read-only treatment old clients expect.
+    const legacy = await resolveLegacyRoles(convex, {
+      userId: authResult.userId,
+      projectId: projectId as Id<"projects">,
+      orgRole: membership.role,
+    });
+
+    if (!legacy.assigned) {
+      if (legacy.grantOnly) {
+        return forbiddenResponse(
+          "You have Viewer access to this project. Variable creation is not allowed."
+        );
       }
-    }
-
-    // Determine effective write permission
-    const canWriteDirectly =
-      membership.role === "admin" ||
-      membership.role === "team_lead" ||
-      projectRole === "manager";
-
-    const isViewer = projectRole === "viewer";
-
-    // Viewers are hard-blocked from writing
-    if (isViewer) {
       return forbiddenResponse(
-        "You have Viewer access to this project. Variable creation is not allowed."
+        "You are not assigned to this project. Variable creation is not allowed."
       );
     }
 
     const environments = Array.isArray(environment)
       ? environment
       : [environment];
-
-    // Members and developers create pending requests instead of writing directly.
-    if (!canWriteDirectly) {
-      const vaultResult = await createSecret(key, value, {
-        organizationId: project.organizationId,
-        projectId: projectId,
-      });
-      const requestId = await convex.mutation(api.variableRequests.create, {
-        key,
-        vaultRef: vaultResult.id,
-        description,
-        environments,
-        projectId: projectId as Id<"projects">,
-        isSensitive: isSensitive ?? false,
-        requestedBy: authResult.userId,
-      });
-
-      return NextResponse.json(
-        {
-          success: true,
-          requested: true,
-          data: { requestId },
-          message: "Variable request submitted for admin approval",
-        },
-        { status: 202 }
-      );
-    }
 
     // Store value in vault
     const vaultResult = await createSecret(key, value, {
@@ -325,6 +291,13 @@ export async function POST(request: NextRequest) {
       message.includes("already exists")
     ) {
       return NextResponse.json({ error: message }, { status: 409 });
+    }
+    // The Convex mutation is the source of truth for authorization —
+    // translate its rejections into the standard FORBIDDEN response.
+    if (isAuthorizationError(error)) {
+      return forbiddenResponse(
+        "You do not have permission to create variables in this project"
+      );
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

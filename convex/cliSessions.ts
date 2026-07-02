@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { Doc, Id } from "./_generated/dataModel";
+import { Doc } from "./_generated/dataModel";
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 
@@ -120,7 +120,20 @@ export const getByCode = query({
 });
 
 /**
- * Authenticate a CLI session (called from browser after user confirms)
+ * Authenticate a CLI session (called from browser after user confirms).
+ *
+ * TRUST BOUNDARY: the device flow binds the freshly issued CLI tokens to
+ * `userId`. This mutation cannot itself prove the caller IS that user — the
+ * pending cliSessions row records no intended user (it is created anonymously
+ * by `initiate`). Therefore the browser route that calls this MUST pass the
+ * withAuth() session user as `userId`, never a client-supplied value.
+ * Confirmed caller: apps/web/src/app/cli/auth/page.tsx passes
+ * `convexUser._id`, resolved from the authenticated WorkOS session — sound.
+ * (Fully closable once ctx.auth lands and userId is derived server-side.)
+ *
+ * Defense in depth here: verify the pending session exists, is unconsumed
+ * (status "pending") and not expired, then flip it to "authenticated"
+ * atomically so the same code cannot be redeemed twice.
  */
 export const authenticate = mutation({
   args: {
@@ -152,7 +165,9 @@ export const authenticate = mutation({
     const accessToken = generateToken("env_");
     const refreshToken = generateToken("env_refresh_");
 
-    // Update session with authentication info
+    // Consume the session atomically: flip status to "authenticated" and bind
+    // the user. The status guard above + this patch mean a second redemption
+    // of the same code hits status !== "pending" and is rejected.
     await ctx.db.patch(session._id, {
       status: "authenticated",
       userId: args.userId,
@@ -161,7 +176,9 @@ export const authenticate = mutation({
       authenticatedAt: now,
     });
 
-    // Create CLI token record for long-term tracking
+    // Create CLI token record for long-term tracking.
+    // organizationId is intentionally left unset — the CLI device flow is not
+    // org-scoped, so there is no known org to attach here.
     await ctx.db.insert("cliTokens", {
       userId: args.userId,
       accessToken,
@@ -171,6 +188,12 @@ export const authenticate = mutation({
       isActive: true,
       createdAt: now,
     });
+
+    // NOTE: the auditLogs table requires an organizationId, but CLI device
+    // auth has no org context (it authenticates a user, not an org action), so
+    // an org-scoped audit row cannot be written here without fabricating an
+    // org. The authenticated session is instead traceable via the cliSessions
+    // (authenticatedAt) and cliTokens (createdAt) records themselves.
 
     return {
       accessToken,
@@ -426,7 +449,16 @@ export const revokeAllUserTokens = mutation({
 });
 
 /**
- * Store a token for the VS Code extension (reuses cliTokens table)
+ * Store a token for the VS Code extension (reuses cliTokens table).
+ *
+ * TRUST BOUNDARY: this inserts an ACTIVE token bound to `userId`. It is called
+ * only from the trusted extension OAuth callback route
+ * (apps/web/src/app/api/extension/auth/callback/route.ts) via ConvexHttpClient,
+ * which passes the withAuth() session user as `userId` and generates the
+ * access/refresh tokens server-side. Because ConvexHttpClient cannot invoke
+ * internalMutation, this must remain a public mutation; the calling route is
+ * the trust boundary. The `userId` MUST come from the authenticated session,
+ * never from untrusted request input. (Fully closable once ctx.auth lands.)
  */
 export const storeExtensionToken = mutation({
   args: {
@@ -461,8 +493,9 @@ export const cleanupExpiredSessions = internalMutation({
     // Find expired pending sessions
     const expiredSessions = await ctx.db
       .query("cliSessions")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .withIndex("by_status_and_expires", (q) =>
+        q.eq("status", "pending").lt("expiresAt", now)
+      )
       .collect();
 
     // Update status to expired

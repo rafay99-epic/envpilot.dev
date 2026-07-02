@@ -93,10 +93,15 @@ export default defineSchema({
     organizationId: v.id("organizations"),
     // Reference to the user
     userId: v.id("users"),
-    // Role within the organization
+    // Unified role within the organization (single source of truth for what
+    // the user can do; project scope comes from projectMembers assignments)
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration): admin → owner, member → developer
+      v.literal("admin"),
       v.literal("member")
     ),
     // When the member joined
@@ -156,12 +161,16 @@ export default defineSchema({
     projectId: v.id("projects"),
     // Reference to the user
     userId: v.id("users"),
-    // Project-level role
-    role: v.union(
-      v.literal("viewer"), // Can view variables they have explicit permission to
-      v.literal("developer"), // Can view all variables, create/edit variables
-      v.literal("manager") // Can also manage project members
+    // LEGACY project-level role — the unified role model derives project
+    // capabilities from organizationMembers.role; this field is ignored by
+    // new code and only kept so pre-migration rows validate.
+    role: v.optional(
+      v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
+    // Environment scope for this assignment (developers only). A variable is
+    // accessible only if ALL of its environments are in this list. Absent =
+    // unrestricted (all environments).
+    environments: v.optional(v.array(v.string())),
     // Who added this member to the project
     addedBy: v.id("users"),
     // When the member was added
@@ -380,15 +389,22 @@ export default defineSchema({
     email: v.string(),
     // Organization they're invited to
     organizationId: v.id("organizations"),
-    // Role they'll receive upon accepting
+    // Unified role they'll receive upon accepting
     role: v.union(
-      v.literal("admin"),
+      v.literal("owner"),
+      v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("developer"),
+      // Legacy values (pre unified-roles migration)
+      v.literal("admin"),
       v.literal("member")
     ),
     // Optional: projects to assign the invited user to upon acceptance
     projectIds: v.optional(v.array(v.id("projects"))),
-    // Optional: project-level role for the assigned projects
+    // Optional: environment scope applied to the created assignments
+    // (developers only; e.g. ["development", "staging"])
+    environments: v.optional(v.array(v.string())),
+    // LEGACY: project-level role — ignored by the unified role model
     projectRole: v.optional(
       v.union(v.literal("viewer"), v.literal("developer"), v.literal("manager"))
     ),
@@ -551,7 +567,11 @@ export default defineSchema({
       v.literal("project.member_added"),
       v.literal("project.member_removed"),
       v.literal("project.member_role_changed"),
+      v.literal("project.member_environments_changed"),
       v.literal("project.moved"),
+      v.literal("project.restored"),
+      v.literal("project.favorited"),
+      v.literal("project.unfavorited"),
       // Variable actions
       v.literal("variable.created"),
       v.literal("variable.updated"),
@@ -590,6 +610,7 @@ export default defineSchema({
       v.literal("invitation.declined"),
       v.literal("invitation.expired"),
       v.literal("invitation.resent"),
+      v.literal("invitation.canceled"),
       // Access actions
       v.literal("access.token_created"),
       v.literal("access.token_revoked"),
@@ -618,7 +639,15 @@ export default defineSchema({
       v.literal("share.expired"),
       v.literal("share.revoked"),
       v.literal("share.otp_sent"),
-      v.literal("share.otp_failed")
+      v.literal("share.otp_failed"),
+      // Tag actions
+      v.literal("tag.created"),
+      v.literal("tag.updated"),
+      v.literal("tag.deleted"),
+      // Template actions
+      v.literal("template.created"),
+      v.literal("template.updated"),
+      v.literal("template.deleted")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -918,6 +947,11 @@ export default defineSchema({
   cliTokens: defineTable({
     // User who owns this token
     userId: v.id("users"),
+    // Organization this token was issued for (optional/additive — legacy rows
+    // predate this field and leave it unset). When present it lets session
+    // revocation be scoped to a single org instead of sweeping the user's
+    // tokens across every org they belong to. Never backfilled or required.
+    organizationId: v.optional(v.id("organizations")),
     // The access token
     accessToken: v.string(),
     // The refresh token
@@ -941,7 +975,8 @@ export default defineSchema({
     .index("by_access_token", ["accessToken"])
     .index("by_refresh_token", ["refreshToken"])
     .index("by_device_id", ["deviceId"])
-    .index("by_user_active", ["userId", "isActive"]),
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_org_and_user", ["organizationId", "userId"]),
 
   // ==========================================
   // ENVIRONMENT TEMPLATES
@@ -1171,7 +1206,9 @@ export default defineSchema({
   })
     .index("by_share", ["shareId"])
     .index("by_share_and_email", ["shareId", "email"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    // Bounds the every-30-min OTP cleanup cron to expired rows only
+    .index("by_otp_expires", ["otpExpiresAt"]),
 
   // ==========================================
   // ADMIN SETTINGS (Platform-wide configuration)
@@ -1260,7 +1297,10 @@ export default defineSchema({
     eventType: v.string(),
     // When the event was processed
     processedAt: v.number(),
-  }).index("by_webhook_id", ["webhookId"]),
+  })
+    .index("by_webhook_id", ["webhookId"])
+    // Bounds the 6-hourly processed-webhook cleanup cron to old rows only
+    .index("by_processed_at", ["processedAt"]),
 
   // ==========================================
   // PAYMENT PRODUCTS (Provider-agnostic product mapping)
@@ -1284,137 +1324,4 @@ export default defineSchema({
     .index("by_provider", ["provider"])
     .index("by_tier_and_provider", ["tierName", "provider"])
     .index("by_product_id", ["productId"]),
-
-  // ==========================================
-  // ACCESS BASELINES (Per-user behavioral profile for anomaly detection)
-  // ==========================================
-  accessBaselines: defineTable({
-    // The user this baseline belongs to
-    userId: v.id("users"),
-    // Organization context
-    organizationId: v.id("organizations"),
-    // Known IP addresses from last 30 days (capped at 50)
-    knownIps: v.array(v.string()),
-    // Known user agents from last 30 days (capped at 20)
-    knownUserAgents: v.array(v.string()),
-    // Typical working hours (UTC)
-    typicalHoursStart: v.number(),
-    typicalHoursEnd: v.number(),
-    // Typical working days (0=Sun, 1=Mon, ..., 6=Sat)
-    typicalDays: v.array(v.number()),
-    // Environments the user has accessed
-    accessedEnvironments: v.array(v.string()),
-    // Whether the user has ever exported production secrets
-    hasPulledProd: v.boolean(),
-    // Rolling average of daily accesses
-    avgDailyAccesses: v.number(),
-    // Total accesses analyzed for this baseline
-    totalAccessCount: v.number(),
-    // Number of distinct days with activity
-    daysOfHistory: v.number(),
-    // Timestamps
-    lastUpdated: v.number(),
-    createdAt: v.number(),
-  })
-    .index("by_user_and_org", ["userId", "organizationId"])
-    .index("by_organization", ["organizationId"]),
-
-  // ==========================================
-  // ANOMALY RULES (Configurable detection rule parameters)
-  // ==========================================
-  anomalyRules: defineTable({
-    // Machine ID: "new_ip", "off_hours", "first_prod_bulk_pull", etc.
-    ruleId: v.string(),
-    // Human-readable name
-    displayName: v.string(),
-    // Description of what this rule detects
-    description: v.string(),
-    // Whether this rule is currently active
-    isEnabled: v.boolean(),
-    // Alert severity when triggered
-    severity: v.union(
-      v.literal("info"),
-      v.literal("warning"),
-      v.literal("critical")
-    ),
-    // JSON string of rule-specific thresholds (e.g. {"bufferHours":2})
-    thresholds: v.string(),
-    // Minimum days of baseline history before rule activates
-    minHistoryDays: v.number(),
-    // Whether to send email alerts when triggered
-    emailAlertEnabled: v.boolean(),
-    // Minimum minutes between duplicate alerts for same rule+user
-    alertCooldownMinutes: v.number(),
-    // Timestamps
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_rule_id", ["ruleId"])
-    .index("by_enabled", ["isEnabled"]),
-
-  // ==========================================
-  // ANOMALY EVENTS (Detected anomaly records)
-  // ==========================================
-  anomalyEvents: defineTable({
-    // Organization where anomaly was detected
-    organizationId: v.id("organizations"),
-    // User whose activity triggered the anomaly
-    userId: v.id("users"),
-    // Which rule matched
-    ruleId: v.string(),
-    // Human-readable rule name
-    ruleName: v.string(),
-    // Severity level
-    severity: v.union(
-      v.literal("info"),
-      v.literal("warning"),
-      v.literal("critical")
-    ),
-    // Current status
-    status: v.union(
-      v.literal("open"),
-      v.literal("acknowledged"),
-      v.literal("dismissed"),
-      v.literal("resolved")
-    ),
-    // JSON string with contextual details (IP, action, environment, etc.)
-    details: v.string(),
-    // Link to the triggering audit log entry
-    auditLogId: v.optional(v.id("auditLogs")),
-    // Optional project context
-    projectId: v.optional(v.id("projects")),
-    // Resolution info
-    resolvedBy: v.optional(v.id("users")),
-    resolvedAt: v.optional(v.number()),
-    resolutionNote: v.optional(v.string()),
-    // When the anomaly was detected
-    detectedAt: v.number(),
-    // Timestamps
-    createdAt: v.number(),
-  })
-    .index("by_organization", ["organizationId"])
-    .index("by_org_and_status", ["organizationId", "status"])
-    .index("by_org_and_detected", ["organizationId", "detectedAt"])
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"])
-    .index("by_rule_and_user", ["ruleId", "userId"]),
-
-  // ==========================================
-  // ANOMALY DISMISSALS ("This Was Me" acknowledgments)
-  // ==========================================
-  anomalyDismissals: defineTable({
-    // The anomaly event that was dismissed
-    anomalyEventId: v.id("anomalyEvents"),
-    // User who dismissed the anomaly
-    dismissedBy: v.id("users"),
-    // Optional reason for dismissal
-    reason: v.optional(v.string()),
-    // Optional JSON pattern to suppress future similar alerts
-    // e.g. {"type":"ip","value":"1.2.3.4"}
-    suppressFuturePattern: v.optional(v.string()),
-    // When the dismissal occurred
-    dismissedAt: v.number(),
-  })
-    .index("by_event", ["anomalyEventId"])
-    .index("by_user", ["dismissedBy"]),
 });

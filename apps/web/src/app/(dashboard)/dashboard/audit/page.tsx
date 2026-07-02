@@ -1,13 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAuthContext } from "@/components/auth";
-import {
-  useOrganizationAuditLogs,
-  useOrganizationAuditLogCount,
-  useAuditLogSummary,
-  useAuditLogsForExport,
-} from "@/hooks";
+import { usePaginatedQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { RequireRole, useAuthContext } from "@/components/auth";
+import { useAuditLogSummary, useAuditLogsForExport } from "@/hooks";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   TerminalWindow,
@@ -17,7 +14,6 @@ import {
   TerminalButton,
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
-import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {
   Download,
@@ -29,7 +25,7 @@ import {
 } from "lucide-react";
 import { AuditExportDialog } from "@/components/audit/export-dialog";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
 
 const actionLabels: Record<string, string> = {
   "org.created": "Organization created",
@@ -41,6 +37,13 @@ const actionLabels: Record<string, string> = {
   "project.created": "Project created",
   "project.updated": "Project updated",
   "project.deleted": "Project deleted",
+  "project.restored": "Project restored",
+  "project.moved": "Project moved",
+  "project.favorited": "Project favorited",
+  "project.unfavorited": "Project unfavorited",
+  "project.member_added": "Project member added",
+  "project.member_removed": "Project member removed",
+  "project.member_environments_changed": "Environment access changed",
   "variable.created": "Variable created",
   "variable.updated": "Variable updated",
   "variable.deleted": "Variable deleted",
@@ -50,14 +53,24 @@ const actionLabels: Record<string, string> = {
   "permission.granted": "Permission granted",
   "permission.revoked": "Permission revoked",
   "permission.updated": "Permission updated",
+  "permission.expired": "Permission expired",
   "permission.bulk_granted": "Bulk permissions granted",
   "permission.bulk_revoked": "Bulk permissions revoked",
   "invitation.sent": "Invitation sent",
   "invitation.accepted": "Invitation accepted",
   "invitation.declined": "Invitation declined",
   "invitation.expired": "Invitation expired",
+  "invitation.resent": "Invitation resent",
+  "invitation.canceled": "Invitation canceled",
+  "tag.created": "Tag created",
+  "tag.updated": "Tag updated",
+  "tag.deleted": "Tag deleted",
+  "template.created": "Template created",
+  "template.updated": "Template updated",
+  "template.deleted": "Template deleted",
   "access.token_created": "Access token created",
   "access.token_revoked": "Access token revoked",
+  "access.token_refreshed": "Access token refreshed",
   "access.token_used": "Access token used",
   "access.extension_linked": "Extension linked",
   "access.extension_unlinked": "Extension unlinked",
@@ -76,7 +89,12 @@ const actionCategories = [
   { value: "variable", label: "Variables" },
   { value: "permission", label: "Permissions" },
   { value: "invitation", label: "Invitations" },
+  { value: "tag", label: "Tags" },
+  { value: "template", label: "Templates" },
   { value: "access", label: "Access" },
+  { value: "billing", label: "Billing" },
+  { value: "audit", label: "Audit" },
+  { value: "system", label: "System" },
   { value: "security", label: "Security" },
 ];
 
@@ -95,6 +113,14 @@ const dateRangeMs: Record<string, number> = {
 };
 
 export default function AuditPage() {
+  return (
+    <RequireRole minimum="project_manager">
+      <AuditPageContent />
+    </RequireRole>
+  );
+}
+
+function AuditPageContent() {
   const { organization } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
@@ -103,7 +129,6 @@ export default function AuditPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [dateRange, setDateRange] = useState("30d");
-  const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "json">("json");
@@ -112,14 +137,18 @@ export default function AuditPage() {
     end: number;
   } | null>(null);
 
-  const offset = (currentPage - 1) * PAGE_SIZE;
-
-  // Fetch paginated logs from Convex (server-side pagination)
-  const logs = useOrganizationAuditLogs(activeOrganizationId, {
-    limit: PAGE_SIZE,
-    offset,
-  });
-  const totalCount = useOrganizationAuditLogCount(activeOrganizationId);
+  // Fetch logs via Convex cursor pagination (incremental "load more").
+  // `results` accumulates every loaded page; client-side filters below
+  // operate over this accumulated array exactly as before.
+  const {
+    results: logs,
+    status: logsStatus,
+    loadMore: loadMoreLogs,
+  } = usePaginatedQuery(
+    api.auditLogs.listByOrganizationPaginated,
+    activeOrganizationId ? { organizationId: activeOrganizationId } : "skip",
+    { initialNumItems: PAGE_SIZE }
+  );
 
   // Summary stats
   const daysBack =
@@ -135,14 +164,10 @@ export default function AuditPage() {
     true
   );
 
-  const isLoading = logs === undefined || totalCount === undefined;
-  const totalPages =
-    totalCount !== undefined
-      ? Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-      : 1;
+  const isLoading = logsStatus === "LoadingFirstPage";
 
-  // Client-side filtering on the current page of server data
-  const filteredLogs = (logs ?? []).filter((log) => {
+  // Client-side filtering over the accumulated (multi-page) results
+  const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       searchQuery === "" ||
       log.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -224,10 +249,6 @@ export default function AuditPage() {
     setIsExporting(false);
     setExportRange(null);
   }
-
-  const goToPage = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
 
   return (
     <div className="space-y-6">
@@ -372,39 +393,35 @@ export default function AuditPage() {
             ))}
           </div>
         </TerminalWindow>
-      ) : filteredLogs.length === 0 ? (
-        <TerminalWindow title="audit-log">
-          <TerminalEmptyState
-            command={`envpilot audit --days ${daysBack}`}
-            message={
-              totalCount && totalCount > 0
-                ? "No matching events on this page. Try adjusting your search or filters."
-                : "No audit events yet. Activity will be recorded as you use Envpilot."
-            }
-          />
-        </TerminalWindow>
       ) : (
         <TerminalWindow title="audit-log">
-          <AnimatedList
-            className="divide-y divide-zinc-800/50"
-            pageKey={currentPage}
-          >
-            {filteredLogs.map((log) => (
-              <AuditLogRow key={log._id} log={log} />
-            ))}
-          </AnimatedList>
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            hasNextPage={currentPage < totalPages}
-            hasPrevPage={currentPage > 1}
-            onNextPage={() => goToPage(currentPage + 1)}
-            onPrevPage={() => goToPage(currentPage - 1)}
-            onGoToPage={goToPage}
-            startIndex={offset + 1}
-            endIndex={Math.min(offset + PAGE_SIZE, totalCount ?? 0)}
-            totalItems={totalCount ?? 0}
-          />
+          {filteredLogs.length === 0 ? (
+            <TerminalEmptyState
+              command={`envpilot audit --days ${daysBack}`}
+              message={
+                logs.length > 0
+                  ? "No matching events. Try adjusting your search or filters."
+                  : "No audit events yet. Activity will be recorded as you use Envpilot."
+              }
+            />
+          ) : (
+            <AnimatedList className="divide-y divide-zinc-800/50">
+              {filteredLogs.map((log) => (
+                <AuditLogRow key={log._id} log={log} />
+              ))}
+            </AnimatedList>
+          )}
+          {(logsStatus === "CanLoadMore" || logsStatus === "LoadingMore") && (
+            <div className="flex justify-center border-t border-zinc-800/50 px-5 py-4">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => loadMoreLogs(PAGE_SIZE)}
+                disabled={logsStatus === "LoadingMore"}
+              >
+                {logsStatus === "LoadingMore" ? "Loading..." : "Load more"}
+              </TerminalButton>
+            </div>
+          )}
         </TerminalWindow>
       )}
 

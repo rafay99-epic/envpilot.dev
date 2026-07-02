@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const rollbackSchema = z.object({
   targetVersion: z.number().int().positive(),
@@ -75,10 +76,10 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check permission (admin only can rollback)
-    if (membership.role !== "admin") {
+    // Rollback is an owner-only power feature (org:rollback_variable)
+    if (normalizeOrgRole(membership.role) !== "owner") {
       return NextResponse.json(
-        { error: "Only admins can rollback variables" },
+        { error: "Only the organization owner can rollback variables" },
         { status: 403 }
       );
     }
