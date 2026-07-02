@@ -1,0 +1,30 @@
+apps/cli/src/lib/roles.ts
+  s_e8fb00d5812ee1::t_9181d84caa2514 87-90
+apps/cli/src/commands/pull.ts
+  s_e8fb00d5812ee1::t_c60bf19aacbe00 70,72-74,76-78
+apps/cli/tests/roles.test.ts
+  s_e8fb00d5812ee1::t_50fbdb4f98e89b 93,105-113
+  s_e8fb00d5812ee1::t_4a2a91476386cf 114-115
+apps/cli/src/commands/sync.ts
+  s_e8fb00d5812ee1::t_d5a56dac48f733 56,58-60,62-64
+apps/cli/src/commands/list.ts
+  s_e8fb00d5812ee1::t_7c593047243541 152
+apps/cli/package.json
+  s_e8fb00d5812ee1::t_99046cb1d281dd 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "43b685c05a202cb18d50bfb8c24bfb54f77a6e3f",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
