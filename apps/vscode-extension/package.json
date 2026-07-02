@@ -137,7 +137,7 @@
         "command": "envpilot.switchAccount",
         "title": "Switch Account",
         "category": "Envpilot",
-        "icon": "$(accounts)"
+        "icon": "$(account)"
       },
       {
         "command": "envpilot.signOutAll",
