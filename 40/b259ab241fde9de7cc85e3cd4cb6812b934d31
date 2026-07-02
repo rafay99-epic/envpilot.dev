@@ -1,0 +1,36 @@
+apps/web/tests/e2e/authenticated/audit-log.spec.ts
+  s_e8fb00d5812ee1::t_1ce6cfd6b50de7 1-18,22-25,29-88
+  s_e8fb00d5812ee1::t_1a0acdfd2cf69f 19-21,26-28
+apps/web/tests/e2e/authenticated/project-members-drawer.spec.ts
+  s_e8fb00d5812ee1::t_3f95c0e251df8c 38-45,50
+  s_e8fb00d5812ee1::t_0998f0bdfb074e 4-8
+  s_e8fb00d5812ee1::t_5929e066eb7eea 1-3,9-37,46-49,51-121
+apps/web/tests/e2e/authenticated/support.ts
+  s_e8fb00d5812ee1::t_b3359abc99f9a8 1-72,109-113,115-117,119-123
+  s_e8fb00d5812ee1::t_1a0acdfd2cf69f 124-125
+  s_e8fb00d5812ee1::t_a00324832b5201 73-108,114,118
+apps/web/tests/e2e/authenticated/invite-role-dropdown.spec.ts
+  s_e8fb00d5812ee1::t_f8676c3a59db01 1-56
+apps/web/tests/e2e/authenticated/owner-guards.spec.ts
+  s_e8fb00d5812ee1::t_1a0acdfd2cf69f 4-8
+  s_e8fb00d5812ee1::t_d47909be1fd737 1-3,9-97
+apps/web/tests/e2e/authenticated/variables-pagination.spec.ts
+  s_e8fb00d5812ee1::t_1a0acdfd2cf69f 28-30
+  s_e8fb00d5812ee1::t_335ecd08391534 1-27,31-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "40b259ab241fde9de7cc85e3cd4cb6812b934d31",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
