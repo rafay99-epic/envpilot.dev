@@ -1,0 +1,24 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/members/page.tsx
+  s_e8fb00d5812ee1::t_2db299ac103575 563-574,605-607
+  s_e8fb00d5812ee1::t_74a051d6646126 9
+  s_e8fb00d5812ee1::t_aeda05848a021a 486-502,504-523,526-561
+  s_e8fb00d5812ee1::t_5320f74cf409ba 562
+apps/web/package.json
+  s_e8fb00d5812ee1::t_1b20d4f1707b21 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "6b8fef891738f5c4cab4e8019c9eef9d321aa735",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
