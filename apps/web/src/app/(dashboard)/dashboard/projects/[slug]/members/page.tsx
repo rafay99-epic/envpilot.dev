@@ -6,6 +6,7 @@ import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { usePagination } from "@/hooks";
+import { DrawerPanel } from "@/components/ui";
 import {
   EnvironmentScopeSelector,
   allEnvironments,
@@ -482,87 +483,95 @@ export default function ProjectMembersPage({
         )}
       </div>
 
-      {/* Add Member Modal */}
-      {showAddMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Add Project Member
-            </h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Assign an organization member to this project. Their abilities
-              here follow from their organization role.
-            </p>
+      {/* Add Member — slide-over panel */}
+      <DrawerPanel
+        isOpen={showAddMember}
+        onClose={() => {
+          setShowAddMember(false);
+          setSelectedUserId("");
+          setAddEnvScope(allEnvironments());
+        }}
+        title="Add Project Member"
+        side="right"
+        width="md"
+        preventClose={isAdding}
+      >
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Assign an organization member to this project. Their abilities here
+          follow from their organization role.
+        </p>
 
-            <form onSubmit={handleAddMember} className="mt-6 space-y-4">
-              {/* User selection */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Member
-                </label>
-                <select
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  required
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                >
-                  <option value="">Select a member...</option>
-                  {addableMembers.map((m) => (
-                    <option key={m._id} value={m._id}>
-                      {m.name || m.email} {m.name ? `(${m.email})` : ""} -{" "}
-                      {ORG_ROLE_LABELS[normalizeOrgRole(m.orgRole)]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Environment access — developers only */}
-              {addEnvScopeApplies && (
-                <EnvironmentScopeSelector
-                  selected={addEnvScope}
-                  onChange={setAddEnvScope}
-                  disabled={isAdding}
-                />
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddMember(false);
-                    setSelectedUserId("");
-                    setAddEnvScope(allEnvironments());
-                  }}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    isAdding ||
-                    !selectedUserId ||
-                    (addEnvScopeApplies && addEnvScope.length === 0)
-                  }
-                  className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  {isAdding ? "Adding..." : "Add Member"}
-                </button>
-              </div>
-            </form>
+        <form onSubmit={handleAddMember} className="mt-6 space-y-4">
+          {/* User selection */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Member
+            </label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              required
+              className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            >
+              <option value="">Select a member...</option>
+              {addableMembers.map((m) => (
+                <option key={m._id} value={m._id}>
+                  {m.name || m.email} {m.name ? `(${m.email})` : ""} -{" "}
+                  {ORG_ROLE_LABELS[normalizeOrgRole(m.orgRole)]}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
 
-      {/* Edit Environment Access Modal */}
-      {editingScopeMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Edit Environment Access
-            </h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {/* Environment access — developers only */}
+          {addEnvScopeApplies && (
+            <EnvironmentScopeSelector
+              selected={addEnvScope}
+              onChange={setAddEnvScope}
+              disabled={isAdding}
+            />
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddMember(false);
+                setSelectedUserId("");
+                setAddEnvScope(allEnvironments());
+              }}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={
+                isAdding ||
+                !selectedUserId ||
+                (addEnvScopeApplies && addEnvScope.length === 0)
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              {isAdding ? "Adding..." : "Add Member"}
+            </button>
+          </div>
+        </form>
+      </DrawerPanel>
+
+      {/* Edit Environment Access — slide-over panel */}
+      <DrawerPanel
+        isOpen={editingScopeMember !== null}
+        onClose={() => setEditingScopeMember(null)}
+        title="Edit Environment Access"
+        side="right"
+        width="md"
+        preventClose={isSavingScope}
+      >
+        {editingScopeMember && (
+          <>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
               Limit which environments{" "}
               {editingScopeMember.user.name || editingScopeMember.user.email}{" "}
               can work in on this project. Check all environments to remove the
@@ -593,9 +602,9 @@ export default function ProjectMembersPage({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </DrawerPanel>
     </div>
   );
 }
