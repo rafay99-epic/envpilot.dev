@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { AuthService } from "../services/auth";
 import { SyncService, type SyncConnectionState } from "../services/sync";
+import type { StorageService } from "../utils/storage";
 import type { LinkedProject, LinkedProjectV2, SyncResult } from "../types";
 import * as output from "../utils/outputChannel";
 
@@ -8,13 +9,26 @@ export class StatusBarProvider {
   private statusBarItem: vscode.StatusBarItem;
   private authService: AuthService;
   private syncService: SyncService;
+  private storageService: StorageService;
   private isSyncing = false;
   private lastSyncResult: SyncResult | null = null;
   private errorClearTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Cached from the last update() call so tooltip/text building stays sync —
+   * refreshed once per update() (itself only invoked on auth/sync/manual
+   * refresh events, not on a render loop) rather than re-queried per call.
+   */
+  private activeAccountEmail: string | undefined;
+  private accountCount = 0;
 
-  constructor(authService: AuthService, syncService: SyncService) {
+  constructor(
+    authService: AuthService,
+    syncService: SyncService,
+    storageService: StorageService
+  ) {
     this.authService = authService;
     this.syncService = syncService;
+    this.storageService = storageService;
 
     this.statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
@@ -50,11 +64,17 @@ export class StatusBarProvider {
 
     const allLinkedProjects = await this.syncService.getAllLinkedProjectsV2();
     const linkedProject = await this.syncService.getLinkedProject();
+    await this.refreshAccountInfo();
 
     if (allLinkedProjects.length === 0 && !linkedProject) {
       this.statusBarItem.text = "$(shield) Envpilot";
-      this.statusBarItem.tooltip =
-        "Signed in \u2014 no project linked\nClick to link a project";
+      const lines = [
+        "Signed in \u2014 no project linked",
+        "Click to link a project",
+      ];
+      const accountHint = this.buildAccountHintText();
+      if (accountHint) lines.push("", accountHint);
+      this.statusBarItem.tooltip = lines.join("\n");
       this.statusBarItem.command = "envpilot.linkProject";
       this.statusBarItem.backgroundColor = undefined;
       return;
@@ -69,7 +89,10 @@ export class StatusBarProvider {
           ? allLinkedProjects[0].projectName
           : linkedProject?.projectName;
       this.statusBarItem.text = `$(sync~spin) ${name}`;
-      this.statusBarItem.tooltip = "Syncing variables\u2026";
+      const syncingLines = ["Syncing variables\u2026"];
+      const syncingAccountHint = this.buildAccountHintText();
+      if (syncingAccountHint) syncingLines.push("", syncingAccountHint);
+      this.statusBarItem.tooltip = syncingLines.join("\n");
       this.statusBarItem.backgroundColor = undefined;
       return;
     }
@@ -109,6 +132,7 @@ export class StatusBarProvider {
       this.statusBarItem.tooltip = md;
     }
 
+    this.appendAccountInfo();
     this.applyConnectionIndicator();
 
     if (
@@ -147,6 +171,51 @@ export class StatusBarProvider {
     if (this.statusBarItem.tooltip instanceof vscode.MarkdownString) {
       this.statusBarItem.tooltip.appendMarkdown(`\n\n---\n\n${note}`);
     }
+  }
+
+  /**
+   * Refresh the cached active-account email and total account count. Called
+   * once per update() (itself only invoked on sign-in/out/switch and other
+   * discrete UI-refresh events, never on a render loop), so this stays a
+   * single pair of lightweight storage reads rather than a per-paint cost.
+   */
+  private async refreshAccountInfo(): Promise<void> {
+    const [accounts, activeAccountId] = await Promise.all([
+      this.storageService.listAccounts(),
+      this.storageService.getActiveAccountId(),
+    ]);
+    const activeAccount =
+      accounts.find((account) => account.user.id === activeAccountId) ||
+      accounts[0];
+    this.activeAccountEmail = activeAccount?.user.email;
+    this.accountCount = accounts.length;
+  }
+
+  /** Plain-text account line for tooltips that aren't MarkdownStrings. */
+  private buildAccountHintText(): string | undefined {
+    if (!this.activeAccountEmail) {
+      return undefined;
+    }
+    return this.accountCount > 1
+      ? `Signed in as ${this.activeAccountEmail} (${this.accountCount} accounts — run "Envpilot: Switch Account" to switch)`
+      : `Signed in as ${this.activeAccountEmail}`;
+  }
+
+  /** Appends the active-account line (and multi-account hint) to a MarkdownString tooltip. */
+  private appendAccountInfo(): void {
+    if (
+      !this.activeAccountEmail ||
+      !(this.statusBarItem.tooltip instanceof vscode.MarkdownString)
+    ) {
+      return;
+    }
+
+    const hint =
+      this.accountCount > 1
+        ? `$(account) ${this.activeAccountEmail} · ${this.accountCount} accounts — run "Envpilot: Switch Account" to switch`
+        : `$(account) ${this.activeAccountEmail}`;
+
+    this.statusBarItem.tooltip.appendMarkdown(`\n\n---\n\n${hint}`);
   }
 
   private buildMultiProjectTooltip(

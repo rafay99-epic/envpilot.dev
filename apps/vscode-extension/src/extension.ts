@@ -185,7 +185,11 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize UI providers
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
-  statusBarProvider = new StatusBarProvider(authService, syncService);
+  statusBarProvider = new StatusBarProvider(
+    authService,
+    syncService,
+    storageService
+  );
   envCodeLensProvider = new EnvCodeLensProvider(storageService);
   dashboardPanelProvider = new DashboardPanelProvider(
     context.extensionUri,
@@ -222,6 +226,14 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.signOut",
       wrapCommand(handleSignOut)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.switchAccount",
+      wrapCommand(handleSwitchAccount)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.signOutAll",
+      wrapCommand(handleSignOutAll)
     ),
     vscode.commands.registerCommand(
       "envpilot.linkProject",
@@ -375,6 +387,17 @@ export async function activate(context: vscode.ExtensionContext) {
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
   if (success) {
+    // If sign-in added a new account alongside existing ones, point the user
+    // at the switcher — AuthService.signIn() already showed the plain
+    // "Signed in as <email>" toast for the single-account case.
+    const user = await authService.getCurrentUser();
+    const accounts = await storageService.listAccounts();
+    if (user && accounts.length > 1) {
+      vscode.window.showInformationMessage(
+        `Signed in as ${user.email}. You have ${accounts.length} accounts — use "Envpilot: Switch Account" to switch.`
+      );
+    }
+
     // Show progress while loading initial data
     await vscode.window.withProgress(
       {
@@ -403,6 +426,163 @@ async function handleSignOut(): Promise<void> {
   realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
+
+  // authService.signOut() only ever removes the active account, so another
+  // account may now be active. Restore the "signed in" UI state for it
+  // instead of leaving things in the signed-out state the auth-state-changed
+  // handler just applied.
+  const remainingSession = await storageService.getAuthSession();
+  if (remainingSession) {
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.isAuthenticated",
+      true
+    );
+    projectsTreeProvider.setAuthenticated(true);
+    statusBarProvider.update();
+    dashboardPanelProvider.refresh();
+    await updateContextFlags();
+
+    if (shouldAutoSync()) {
+      await syncService.refreshSubscriptions();
+      await realTimeSyncService.refreshSubscriptions();
+      syncService.startPeriodicSync();
+      realTimeSyncService.startRealTimeSync();
+    }
+
+    vscode.window.showInformationMessage(
+      `Envpilot: Now signed in as ${remainingSession.user.email}.`
+    );
+  } else {
+    vscode.window.showInformationMessage("Signed out.");
+  }
+}
+
+/**
+ * Switch the active account among all accounts signed in to this machine.
+ * Mirrors the post-auth refresh handleSignIn performs (tree/status bar/
+ * dashboard refresh + subscription restart) since switching accounts changes
+ * which organization/project data and access tokens are in scope, just like
+ * a fresh sign-in does.
+ */
+async function handleSwitchAccount(): Promise<void> {
+  const accounts = await storageService.listAccounts();
+
+  if (accounts.length === 0) {
+    vscode.window.showInformationMessage(
+      "Not signed in — run Envpilot: Sign In."
+    );
+    return;
+  }
+
+  if (accounts.length === 1) {
+    vscode.window.showInformationMessage(
+      `Only one account (${accounts[0].user.email}). Sign in again to add another.`
+    );
+    return;
+  }
+
+  const activeAccountId = await storageService.getActiveAccountId();
+
+  const picked = await vscode.window.showQuickPick(
+    accounts.map((account) => ({
+      label:
+        account.user.id === activeAccountId
+          ? `$(check) ${account.user.email}`
+          : account.user.email,
+      description:
+        account.user.id === activeAccountId
+          ? `${account.user.name || ""} (current)`.trim()
+          : account.user.name || "",
+      account,
+    })),
+    { placeHolder: "Select an account to switch to" }
+  );
+
+  if (!picked || picked.account.user.id === activeAccountId) {
+    return;
+  }
+
+  const switched = await storageService.setActiveAccount(
+    picked.account.user.id
+  );
+  if (!switched) {
+    vscode.window.showErrorMessage("Envpilot: Failed to switch account.");
+    return;
+  }
+
+  apiService.clearCache();
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Envpilot: Switching account...",
+    },
+    async (progress) => {
+      progress.report({ message: "Loading projects and variables..." });
+      projectsTreeProvider.refresh();
+      variablesTreeProvider.refresh();
+      statusBarProvider.update();
+      dashboardPanelProvider.refresh();
+      await updateContextFlags();
+
+      if (shouldAutoSync()) {
+        progress.report({ message: "Starting sync..." });
+        await syncService.refreshSubscriptions();
+        await realTimeSyncService.refreshSubscriptions();
+        syncService.startPeriodicSync();
+        realTimeSyncService.startRealTimeSync();
+      }
+    }
+  );
+
+  vscode.window.showInformationMessage(
+    `Switched to ${picked.account.user.email}.`
+  );
+}
+
+/** Sign out of every account stored on this machine. */
+async function handleSignOutAll(): Promise<void> {
+  const accounts = await storageService.listAccounts();
+
+  if (accounts.length === 0) {
+    vscode.window.showInformationMessage("Envpilot: Not signed in.");
+    return;
+  }
+
+  const confirm = await vscode.window.showWarningMessage(
+    accounts.length > 1
+      ? `Sign out of all ${accounts.length} Envpilot accounts on this machine?`
+      : "Sign out of Envpilot?",
+    { modal: true },
+    "Sign Out of All"
+  );
+
+  if (confirm !== "Sign Out of All") {
+    return;
+  }
+
+  await storageService.clearAllAccounts();
+
+  // Mirror handleSignOut's teardown plus the context/UI refresh that
+  // AuthService.onAuthStateChanged normally drives, since clearAllAccounts()
+  // bypasses authService.signOut() (which only removes the active account
+  // and shows a single-account message).
+  apiService.clearCache();
+  syncService.stopPeriodicSync();
+  realTimeSyncService.stopRealTimeSync();
+  vscode.commands.executeCommand(
+    "setContext",
+    "envpilot.isAuthenticated",
+    false
+  );
+  projectsTreeProvider.setAuthenticated(false);
+  variablesTreeProvider.refresh();
+  statusBarProvider.update();
+  dashboardPanelProvider.refresh();
+  await updateContextFlags();
+
+  vscode.window.showInformationMessage("Signed out of all Envpilot accounts.");
 }
 
 async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {

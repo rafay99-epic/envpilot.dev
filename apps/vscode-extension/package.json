@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -132,6 +132,18 @@
         "title": "Open Dashboard Panel",
         "category": "Envpilot",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "envpilot.switchAccount",
+        "title": "Switch Account",
+        "category": "Envpilot",
+        "icon": "$(accounts)"
+      },
+      {
+        "command": "envpilot.signOutAll",
+        "title": "Sign Out of All Accounts",
+        "category": "Envpilot",
+        "icon": "$(close-all)"
       }
     ],
     "viewsContainers": {
@@ -195,9 +207,19 @@
           "group": "overflow@1"
         },
         {
-          "command": "envpilot.signOut",
+          "command": "envpilot.switchAccount",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "overflow@2"
+        },
+        {
+          "command": "envpilot.signOut",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "overflow@3"
+        },
+        {
+          "command": "envpilot.signOutAll",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "overflow@4"
         },
         {
           "command": "envpilot.pullVariables",
