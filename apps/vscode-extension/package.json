@@ -202,14 +202,14 @@
           "group": "navigation@3"
         },
         {
+          "command": "envpilot.switchAccount",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "navigation@4"
+        },
+        {
           "command": "envpilot.openDashboard",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "overflow@1"
-        },
-        {
-          "command": "envpilot.switchAccount",
-          "when": "view == envpilot.projects && envpilot.isAuthenticated",
-          "group": "overflow@2"
         },
         {
           "command": "envpilot.signOut",

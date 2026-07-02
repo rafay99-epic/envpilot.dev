@@ -468,44 +468,69 @@ async function handleSignOut(): Promise<void> {
 async function handleSwitchAccount(): Promise<void> {
   const accounts = await storageService.listAccounts();
 
+  // Nothing to switch between yet — go straight to sign-in.
   if (accounts.length === 0) {
-    vscode.window.showInformationMessage(
-      "Not signed in — run Envpilot: Sign In."
-    );
-    return;
-  }
-
-  if (accounts.length === 1) {
-    vscode.window.showInformationMessage(
-      `Only one account (${accounts[0].user.email}). Sign in again to add another.`
-    );
+    await handleSignIn();
     return;
   }
 
   const activeAccountId = await storageService.getActiveAccountId();
 
-  const picked = await vscode.window.showQuickPick(
-    accounts.map((account) => ({
-      label:
-        account.user.id === activeAccountId
-          ? `$(check) ${account.user.email}`
-          : account.user.email,
-      description:
-        account.user.id === activeAccountId
-          ? `${account.user.name || ""} (current)`.trim()
-          : account.user.name || "",
-      account,
-    })),
-    { placeHolder: "Select an account to switch to" }
+  const ADD_ACCOUNT = "$(add) Add Account";
+  type AccountPick = vscode.QuickPickItem & {
+    accountId?: string;
+    isAdd?: boolean;
+  };
+
+  const items: AccountPick[] = accounts.map((account) => ({
+    label:
+      account.user.id === activeAccountId
+        ? `$(check) ${account.user.email}`
+        : `$(account) ${account.user.email}`,
+    description:
+      account.user.id === activeAccountId
+        ? `${account.user.name || ""} (current)`.trim()
+        : account.user.name || "",
+    accountId: account.user.id,
+  }));
+
+  items.push(
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
+    { label: ADD_ACCOUNT, description: "Sign in to another account", isAdd: true }
   );
 
-  if (!picked || picked.account.user.id === activeAccountId) {
+  const picked = await vscode.window.showQuickPick(items, {
+    title: "Envpilot Accounts",
+    placeHolder:
+      accounts.length > 1
+        ? "Switch account or add a new one"
+        : "Add another account",
+  });
+
+  if (!picked) {
     return;
   }
 
-  const switched = await storageService.setActiveAccount(
-    picked.account.user.id
-  );
+  if (picked.isAdd) {
+    await handleSignIn();
+    return;
+  }
+
+  // Selecting the account already active is a no-op.
+  if (!picked.accountId || picked.accountId === activeAccountId) {
+    return;
+  }
+
+  await switchToAccount(picked.accountId);
+}
+
+/**
+ * Make `accountId` the active account and refresh every surface (tree, status
+ * bar, dashboard, subscriptions). Shared by the account picker and any other
+ * caller that needs to switch the active session.
+ */
+async function switchToAccount(accountId: string): Promise<void> {
+  const switched = await storageService.setActiveAccount(accountId);
   if (!switched) {
     vscode.window.showErrorMessage("Envpilot: Failed to switch account.");
     return;
@@ -536,8 +561,9 @@ async function handleSwitchAccount(): Promise<void> {
     }
   );
 
+  const active = await authService.getCurrentUser();
   vscode.window.showInformationMessage(
-    `Switched to ${picked.account.user.email}.`
+    `Switched to ${active?.email ?? "account"}.`
   );
 }
 
