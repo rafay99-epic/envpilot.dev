@@ -1,0 +1,194 @@
+apps/cli/src/commands/init.ts
+  s_e8fb00d5812ee1::t_6c85e6db72852e 4,8,11,13-18
+  s_e8fb00d5812ee1::t_b6501dbc763b5d 35-45
+  s_e8fb00d5812ee1::t_950374dd2c86c8 136-138,140-141,150,152,154-156,159-162
+  s_e8fb00d5812ee1::t_7d750c35976d8d 113
+  s_e8fb00d5812ee1::t_ebf50d24a22b72 410-416
+  s_e8fb00d5812ee1::t_41069dec76fb5a 417
+apps/cli/src/lib/ui.ts
+  s_e8fb00d5812ee1::t_01fa114c0f5f94 3
+  s_e8fb00d5812ee1::t_8bdfdda2b80063 192-193,195-201,203-205,210-214,216-217,220,227-228,231-232,234,238-241,243-244,247
+apps/cli/src/lib/command-catalog.ts
+  s_e8fb00d5812ee1::t_e977fa8d92ec5d 185,192-193
+apps/web/src/app/api/cli/variables/bulk/route.ts
+  s_e8fb00d5812ee1::t_20751abfdd9552 174
+  s_e8fb00d5812ee1::t_dec73c5b292743 186,198
+  s_e8fb00d5812ee1::t_5c49616fff42ec 213-215
+  s_e8fb00d5812ee1::t_9e819ff2326e58 102-105
+apps/cli/src/commands/pull.ts
+  s_e8fb00d5812ee1::t_78b58230b31714 208
+  s_e8fb00d5812ee1::t_0634f44b421267 18
+  s_e8fb00d5812ee1::t_71799a056ac16c 258
+  s_e8fb00d5812ee1::t_0587636df85b75 45-50,61-66,68-79
+  s_e8fb00d5812ee1::t_3d0b35e63cab22 51-60,67
+  s_e8fb00d5812ee1::t_2de634955b4d6d 390-394,400-401,403,407-411,413-414
+  s_e8fb00d5812ee1::t_7ec6731038b169 144-149,168
+  s_e8fb00d5812ee1::t_70ea85cfba37c7 270,282,290,298,303-309,415
+  s_e8fb00d5812ee1::t_2eac970b18c10b 39-44
+  s_e8fb00d5812ee1::t_691eeb5ae0557d 310
+apps/cli/src/commands/sync.ts
+  s_e8fb00d5812ee1::t_610c7e85aeb312 198,207,213,220-224
+  s_e8fb00d5812ee1::t_44109c453c0c2d 277-279,281-284,290-301,303-305
+  s_e8fb00d5812ee1::t_ce660621d4c0ff 15,30-35,40-71
+  s_e8fb00d5812ee1::t_969e5b0213972c 162
+  s_e8fb00d5812ee1::t_e02a5d03ded4e5 280
+  s_e8fb00d5812ee1::t_faafd655a0f1b0 225
+apps/cli/src/lib/version-check.ts
+  s_e8fb00d5812ee1::t_e4716e585f60fe 33-48,74-76
+apps/cli/src/commands/push.ts
+  s_e8fb00d5812ee1::t_f0b7f949848b96 38
+  s_e8fb00d5812ee1::t_61c23179be5d6b 300
+  s_e8fb00d5812ee1::t_22c49f91ac0fb3 173-175,189,191,196-210
+  s_e8fb00d5812ee1::t_eaba9e3d089af8 13
+  s_e8fb00d5812ee1::t_8958da8fb3f595 316-329,331-332,334-335,338-340
+  s_e8fb00d5812ee1::t_1b56bbf86b8193 211
+apps/cli/package.json
+  s_e8fb00d5812ee1::t_6def06efa423a5 29,41
+  s_fb939681667ec3::t_465c89a6182079 3
+apps/cli/src/lib/format-converter.ts
+  s_e8fb00d5812ee1::t_77a56baee4330e 503-505,508-509
+apps/cli/tests/validators.test.ts
+  s_e8fb00d5812ee1::t_7ee8ba91bad8cc 1-98
+apps/cli/tests/format-converter.test.ts
+  s_e8fb00d5812ee1::t_7d21cbb2d383e3 71-72
+  s_e8fb00d5812ee1::t_d74c2beda17223 1-70,73-83
+apps/cli/tsup.config.ts
+  s_e8fb00d5812ee1::t_76cc2034375c23 1-3,6-16,24
+apps/cli/src/lib/roles.ts
+  s_e8fb00d5812ee1::t_86121ffef2ad9e 1-96
+apps/cli/src/commands/whoami.ts
+  s_e8fb00d5812ee1::t_b747e042e918fb 43
+  s_e8fb00d5812ee1::t_c56b2a2c986178 9,12
+apps/web/src/app/api/cli/organizations/route.ts
+  s_e8fb00d5812ee1::t_f1119023439ca3 44-45
+  s_e8fb00d5812ee1::t_024eb18f8ae9e4 9
+apps/cli/src/lib/project-config.ts
+  s_e8fb00d5812ee1::t_97b9ac0ef169a1 348,363
+  s_e8fb00d5812ee1::t_6dbfd5d5f42d06 1-7
+  s_e8fb00d5812ee1::t_f6927de1b54a82 131
+  s_e8fb00d5812ee1::t_227a7bd6baeda1 338
+  s_ba6e35213797dd::t_9e59374433c029 22-41
+apps/cli/src/types/index.ts
+  s_e8fb00d5812ee1::t_89e8c4965b8964 51-54
+  s_e8fb00d5812ee1::t_6aabf9d1d416d4 124-128
+  s_e8fb00d5812ee1::t_3c95ace5a3df0c 80-82,87-106
+  s_e8fb00d5812ee1::t_48907b43aef23f 31-32
+  s_e8fb00d5812ee1::t_e209ed76ec9012 149-153
+  s_e8fb00d5812ee1::t_b41235c0f95d89 107
+apps/cli/src/lib/env-file.ts
+  s_e8fb00d5812ee1::t_8701be8fc6c595 225-255,266
+  s_e8fb00d5812ee1::t_47f34f06888b6b 290-299,303-304,308-311,313-315,317-319
+  s_e8fb00d5812ee1::t_086fa13e7236a1 1-7,9-13
+  s_e8fb00d5812ee1::t_46c64bae686130 35-40
+  s_e8fb00d5812ee1::t_54b39f4818e9f7 61-78,80-86
+apps/cli/src/commands/run.ts
+  s_e8fb00d5812ee1::t_1406783ae04b17 46-51
+  s_e8fb00d5812ee1::t_49afe17088c5a7 187-189,201-202,206-208,212-216
+  s_e8fb00d5812ee1::t_4bd778f0f99bbb 76-79,85-86
+  s_e8fb00d5812ee1::t_c970ea190023b6 283-286
+  s_e8fb00d5812ee1::t_ae6422399e2fc5 363-374,379,381-391,394-398,400,403,406-409,435-437,439,442,444,446-447,450,457-459,461
+  s_e8fb00d5812ee1::t_f36020ff23d35e 127-132,134-135
+  s_e8fb00d5812ee1::t_025db69e672c01 2-3
+  s_e8fb00d5812ee1::t_fb0c1e5dca4bf4 351-355,357-360
+apps/web/src/app/api/cli/_lib/legacy-roles.ts
+  s_e8fb00d5812ee1::t_5110a61ae4881c 112
+  s_e8fb00d5812ee1::t_8ecaf8ae7f95fc 43-50
+  s_e8fb00d5812ee1::t_a8eec6ac881080 73-75,82-84
+apps/cli/src/lib/variables-cache.ts
+  s_e8fb00d5812ee1::t_25278bf679aa21 40-48,61-68
+  s_e8fb00d5812ee1::t_ef253b82dc7f63 357-362
+  s_e8fb00d5812ee1::t_e2f1ab42219391 109-112,116
+  s_e8fb00d5812ee1::t_4b62dfe49d283c 143-153
+  s_e8fb00d5812ee1::t_a11540b19f4201 300-320,363
+  s_e8fb00d5812ee1::t_90157e96a91e34 187-195,202,205-206,211
+  s_e8fb00d5812ee1::t_93d8c7af604070 29
+  s_e8fb00d5812ee1::t_c31530d15d66bd 246-247,249
+  s_e8fb00d5812ee1::t_287c6dbc350ec5 242-245,248
+  s_e8fb00d5812ee1::t_9cfd57af02319a 69,353,364-365
+apps/cli/src/lib/commit-guard.ts
+  s_e8fb00d5812ee1::t_658f1e7e7bc3b0 193
+  s_e8fb00d5812ee1::t_6f596748514337 175
+  s_e8fb00d5812ee1::t_fcc16aecbc0ed0 8,14-37
+  s_e8fb00d5812ee1::t_3af94ec8b577fe 43
+  s_e8fb00d5812ee1::t_432e2b6e887a1f 240
+  s_e8fb00d5812ee1::t_155f7c9da47ab9 38
+apps/web/src/app/api/cli/variables/route.ts
+  s_e8fb00d5812ee1::t_ffd79ee56a21d0 175-189,198-204
+  s_e8fb00d5812ee1::t_6ccebf6d57b1c1 130
+  s_e8fb00d5812ee1::t_bfcc71183c1124 111-115
+apps/cli/src/commands/list.ts
+  s_e8fb00d5812ee1::t_a374c969b72d97 12-13,20-25
+  s_e8fb00d5812ee1::t_d93096371d5a5c 321
+  s_e8fb00d5812ee1::t_44bb918af3bb9e 226-228
+  s_e8fb00d5812ee1::t_01c37cf41dec04 264,275,277
+  s_e8fb00d5812ee1::t_387246250e8479 339-340
+  s_e8fb00d5812ee1::t_8d2d294d992263 241-242
+  s_e8fb00d5812ee1::t_62a1ce1c7a7939 322,335,337,341,343
+apps/cli/src/commands/switch.ts
+  s_e8fb00d5812ee1::t_5caca7a5d7224c 17,19-23,35-38
+  s_e8fb00d5812ee1::t_afbb1bbdbdd7af 220-221
+  s_e8fb00d5812ee1::t_72bbf37c06e4b1 141,148-151
+  s_e8fb00d5812ee1::t_ef6e97f0f0e609 392,394-397,402-403
+  s_e8fb00d5812ee1::t_a477e3ee82293c 205
+  s_e8fb00d5812ee1::t_d417fe9fc31e9a 39
+apps/cli/tests/env-file.test.ts
+  s_e8fb00d5812ee1::t_1527bed4d4a364 97-99
+  s_e8fb00d5812ee1::t_97c0a64dba0b7e 1-96,100-107
+apps/cli/src/lib/api.ts
+  s_e8fb00d5812ee1::t_31515e0613c662 1-8
+  s_e8fb00d5812ee1::t_ca9628423210c6 169-242,247-248,250-253,256-259,261-262,269-270,272-276,278-279,286-287,289-293,295-296,303-304,306-310,312-313,320-321,323-326,328-331
+  s_e8fb00d5812ee1::t_b3a27f43bcb105 385-388,393,397,402-416,418
+  s_e8fb00d5812ee1::t_a41a5cfb48ca43 53-55
+apps/cli/tests/roles.test.ts
+  s_e8fb00d5812ee1::t_f0a06c978cf9ea 1-132
+apps/cli/vitest.config.ts
+  s_e8fb00d5812ee1::t_4322a35362c2e2 1-9
+apps/cli/src/lib/config.ts
+  s_e8fb00d5812ee1::t_728b3428090e24 225
+  s_e8fb00d5812ee1::t_72693806d91385 3
+  s_e8fb00d5812ee1::t_c450800b32c1a4 174-175,182-183,189-203,205
+  s_e8fb00d5812ee1::t_ef49aab2d2819e 4
+  s_e8fb00d5812ee1::t_b85acebb6e34b5 222-224,226-228
+  s_e8fb00d5812ee1::t_63d528f297f4d8 204
+  s_e8fb00d5812ee1::t_4acc80865b45a8 206
+apps/web/src/app/api/cli/projects/route.ts
+  s_e8fb00d5812ee1::t_d37e3abdbd0c10 59-61,67-99,102-124
+.gitignore
+  s_e8fb00d5812ee1::t_11c5f604ce1f0b 59
+apps/cli/src/commands/config.ts
+  s_e8fb00d5812ee1::t_f8da9772bbfaf3 14-17,21-44,100-103,130-143,154,174-209,213,218-228
+bun.lock
+  s_e8fb00d5812ee1::t_e7a13e3c9aa0fd 23,67,79,113,828-829
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "e4ab984296b9751503548ad7ff6aceea257b85c9",
+  "prompts": {},
+  "sessions": {
+    "s_ba6e35213797dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a612935d86d1be83a",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_fb939681667ec3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a42fae075fb09c3e1",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
