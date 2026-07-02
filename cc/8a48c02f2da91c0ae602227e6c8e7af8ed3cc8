@@ -1,0 +1,19 @@
+.env.example
+  s_e8fb00d5812ee1::t_6348f86d304db3 29-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "cc8a48c02f2da91c0ae602227e6c8e7af8ed3cc8",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
