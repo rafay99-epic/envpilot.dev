@@ -21,6 +21,23 @@ export const userSchema = z.object({
 
 export type User = z.infer<typeof userSchema>;
 
+// Account types — one per logged-in identity for multi-account support.
+// The account id is the user's id (account.id === account.user.id). apiUrl is
+// intentionally NOT part of an account: it is a single global CLI setting.
+export const accountSchema = z.object({
+  id: z.string(),
+  user: userSchema,
+  accessToken: z.string(),
+  refreshToken: z.string().optional(),
+  // Stored role string (legacy or unified); normalized on read.
+  role: z.string().optional(),
+  // Per-account active org/project selection.
+  activeOrganizationId: z.string().optional(),
+  activeProjectId: z.string().optional(),
+});
+
+export type Account = z.infer<typeof accountSchema>;
+
 // Organization types
 export const organizationSchema = z.object({
   _id: z.string(),
@@ -115,7 +132,16 @@ export type Environment = z.infer<typeof environmentSchema>;
 
 // CLI Config schema
 export const cliConfigSchema = z.object({
+  // Global CLI setting — shared across all accounts.
   apiUrl: z.string().url(),
+  // Multi-account store. Keyed by account id (== user id).
+  accounts: z.record(z.string(), accountSchema).optional(),
+  // The currently active account id.
+  activeAccountId: z.string().optional(),
+  // --- Legacy single-account fields ---
+  // Retained ONLY so pre-multi-account configs still parse and can be migrated
+  // into `accounts` by migrateLegacyConfig(). After migration these are deleted
+  // so `accounts` is the single source of truth. Do not read/write directly.
   accessToken: z.string().optional(),
   refreshToken: z.string().optional(),
   activeProjectId: z.string().optional(),

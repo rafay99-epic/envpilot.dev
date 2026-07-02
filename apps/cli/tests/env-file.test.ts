@@ -61,9 +61,7 @@ describe("stringifyEnv", () => {
   });
 
   it("sorts keys when requested", () => {
-    expect(stringifyEnv({ B: "2", A: "1" }, { sort: true })).toBe(
-      "A=1\nB=2\n"
-    );
+    expect(stringifyEnv({ B: "2", A: "1" }, { sort: true })).toBe("A=1\nB=2\n");
   });
 
   it("quotes values containing spaces, hashes, or newlines", () => {

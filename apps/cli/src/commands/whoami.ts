@@ -8,6 +8,7 @@ import {
   getUser,
   getUnifiedRole,
   isAuthenticated,
+  listAccounts,
 } from "../lib/config.js";
 import { formatRoleLabel } from "../lib/roles.js";
 import {
@@ -48,6 +49,16 @@ export const whoamiCommand = new Command("whoami")
         ],
         ["Environment", activeProject?.environment],
       ]);
+      const accounts = listAccounts();
+      if (accounts.length > 1) {
+        blank();
+        console.log(
+          chalk.dim(
+            `Accounts: ${accounts.length} (use \`envpilot accounts\` to switch)`
+          )
+        );
+      }
+
       blank();
       console.log(chalk.dim("Token verified against the CLI auth endpoint."));
     } catch (err) {

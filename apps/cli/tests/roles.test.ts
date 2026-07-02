@@ -46,7 +46,9 @@ describe("roleLevel", () => {
 
   it("is strictly descending across the hierarchy", () => {
     expect(roleLevel("owner")).toBeGreaterThan(roleLevel("project_manager"));
-    expect(roleLevel("project_manager")).toBeGreaterThan(roleLevel("team_lead"));
+    expect(roleLevel("project_manager")).toBeGreaterThan(
+      roleLevel("team_lead")
+    );
     expect(roleLevel("team_lead")).toBeGreaterThan(roleLevel("developer"));
   });
 
@@ -102,11 +104,7 @@ describe("isFileWritable", () => {
   });
 
   it("assigned owner / project_manager / team_lead are always writable", () => {
-    for (const role of [
-      "owner",
-      "project_manager",
-      "team_lead",
-    ] as OrgRole[]) {
+    for (const role of ["owner", "project_manager", "team_lead"] as OrgRole[]) {
       // writable regardless of hasWriteAccess
       expect(
         isFileWritable(access({ role, assigned: true, hasWriteAccess: false }))
