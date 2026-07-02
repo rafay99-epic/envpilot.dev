@@ -108,6 +108,11 @@ export async function GET(request: NextRequest) {
           version: variable.version,
           createdAt: variable.createdAt,
           updatedAt: variable.updatedAt,
+          // Additive: per-variable unified access. listWithAccess maps a
+          // caller's blanket write to "admin"; collapse that to "write".
+          access: (variable.permission === "admin"
+            ? "write"
+            : variable.permission) as "read" | "write",
         };
       })
     );
@@ -122,6 +127,7 @@ export async function GET(request: NextRequest) {
       version?: number;
       createdAt?: number;
       updatedAt?: number;
+      access: "read" | "write";
     }> = [];
     const decryptionFailures: string[] = [];
 
@@ -166,6 +172,21 @@ export async function GET(request: NextRequest) {
       orgRole: membership.role,
     });
 
+    // Additive unified-model meta for new CLIs. Old CLIs read only role /
+    // projectRole and ignore these keys.
+    const roleHasBlanketWrite =
+      (legacy.role === "owner" ||
+        legacy.role === "project_manager" ||
+        legacy.role === "team_lead") &&
+      legacy.assigned;
+    const hasWriteAccess =
+      roleHasBlanketWrite ||
+      variablesWithValues.some((v) => v.access === "write");
+    const scopeRestricted =
+      legacy.role === "developer" &&
+      legacy.assigned &&
+      legacy.environmentScope !== null;
+
     return NextResponse.json({
       success: true,
       data: variablesWithValues,
@@ -174,6 +195,13 @@ export async function GET(request: NextRequest) {
         environment: environment || "all",
         role: legacy.legacyRole,
         projectRole: legacy.role === "owner" ? null : legacy.legacyProjectRole,
+        // Additive unified-model fields:
+        unifiedRole: legacy.role,
+        assigned: legacy.assigned,
+        grantOnly: legacy.grantOnly,
+        environmentScope: legacy.environmentScope,
+        hasWriteAccess,
+        scopeRestricted,
         // Non-empty only when vault decryption failed for specific keys.
         // These variables were skipped — they will NOT be injected.
         decryptionFailures:

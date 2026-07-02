@@ -7,18 +7,22 @@ import {
   header,
   withSpinner,
   maskValue,
-  formatRole,
-  formatProjectRole,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated, getRole } from "../lib/config.js";
+import { isAuthenticated, getUnifiedRole } from "../lib/config.js";
+import { formatRoleLabel } from "../lib/roles.js";
 import {
   readProjectConfig,
   readProjectConfigV2,
 } from "../lib/project-config.js";
 import { getEnvPathForEnvironment } from "../lib/env-file.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
-import type { Organization, Project, Variable } from "../types/index.js";
+import type {
+  Organization,
+  Project,
+  Variable,
+  VariablesMeta,
+} from "../types/index.js";
 
 export const listCommand = new Command("list")
   .description("List resources")
@@ -219,10 +223,9 @@ async function listProjects(
       name: project.name,
       slug: project.slug,
       description: project.description || chalk.dim("-"),
-      role:
-        project.userRole === "admin"
-          ? formatRole("admin")
-          : formatProjectRole(project.projectRole),
+      role: formatRoleLabel(
+        project.unifiedRole ?? project.userRole ?? project.projectRole
+      ),
       active: projectConfig?.projectId === project._id ? chalk.green("✓") : "",
     })),
     [
@@ -235,11 +238,8 @@ async function listProjects(
     ]
   );
 
-  const role = getRole();
-  if (role) {
-    console.log();
-    console.log(chalk.dim(`Your org role: ${formatRole(role)}`));
-  }
+  console.log();
+  console.log(chalk.dim(`Your org role: ${formatRoleLabel(getUnifiedRole())}`));
 }
 
 async function listVariables(
@@ -261,7 +261,7 @@ async function listVariables(
     process.exit(1);
   }
 
-  let metaProjectRole: string | null | undefined;
+  let meta: VariablesMeta | undefined;
 
   const variables = await withSpinner("Fetching variables...", async () => {
     const params: Record<string, string> = { projectId };
@@ -272,14 +272,9 @@ async function listVariables(
     const response = await api.get<{
       success: boolean;
       data: Variable[];
-      meta: {
-        total: number;
-        environment: string;
-        role?: string;
-        projectRole?: string | null;
-      };
+      meta?: VariablesMeta;
     }>("/api/cli/variables", params);
-    metaProjectRole = response.meta?.projectRole;
+    meta = response.meta;
     return response.data || [];
   });
 
@@ -323,7 +318,8 @@ async function listVariables(
       tags: hasTags
         ? variable.tags?.map((t) => t.name).join(", ") || chalk.dim("-")
         : "",
-      version: `v${variable.version}`,
+      version:
+        typeof variable.version === "number" ? `v${variable.version}` : "",
     })),
     [
       { key: "key", header: "Key" },
@@ -336,18 +332,15 @@ async function listVariables(
 
   console.log();
   console.log(chalk.dim(`Total: ${filtered.length} variables`));
+  console.log(chalk.dim(`Your org role: ${formatRoleLabel(getUnifiedRole())}`));
 
-  const role = getRole();
-  if (role) {
-    console.log(chalk.dim(`Your org role: ${formatRole(role)}`));
-  }
-  if (metaProjectRole) {
+  if (meta?.scopeRestricted && meta.environmentScope?.length) {
     console.log(
-      chalk.dim(`Your project role: ${formatProjectRole(metaProjectRole)}`)
+      chalk.dim(
+        `Your access is scoped to ${meta.environmentScope.join(", ")}; variables in other environments are withheld.`
+      )
     );
-  }
-
-  if (role === "member" || metaProjectRole === "viewer") {
+  } else if (meta?.grantOnly) {
     console.log(
       chalk.dim("You may only see variables you have been granted access to.")
     );

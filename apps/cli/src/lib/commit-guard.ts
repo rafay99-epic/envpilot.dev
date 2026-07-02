@@ -5,16 +5,42 @@ import {
   mkdirSync,
   chmodSync,
   unlinkSync,
+  renameSync,
   statSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { execSync } from "node:child_process";
 
+/**
+ * Atomically write a hook file with the given mode: write a sibling temp file,
+ * set its mode, then rename it into place. Prevents a crash from leaving a
+ * truncated (and possibly executable) pre-commit hook behind.
+ */
+function atomicWriteFileSync(
+  filePath: string,
+  content: string,
+  mode: number
+): void {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmpPath, content, "utf-8");
+    chmodSync(tmpPath, mode);
+    renameSync(tmpPath, filePath);
+  } catch (err) {
+    try {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
+    } catch {
+      // Ignore cleanup failure.
+    }
+    throw err;
+  }
+}
+
 const HOOK_START_MARKER = "# ENVPILOT_GUARD_START";
 const HOOK_END_MARKER = "# ENVPILOT_GUARD_END";
 
 const HOOK_BLOCK = `${HOOK_START_MARKER} - Do not remove. Installed by Envpilot CLI.
-ENV_FILES=$(git diff --cached --name-only | grep -E '(^|/)\\.env($|\\.)' || true)
+ENV_FILES=$(git diff --cached --name-only | grep -E '(^|/)\\.env($|\\.)' | grep -vE '\\.(example|sample|template|dist)$' || true)
 if [ -n "$ENV_FILES" ]; then
   echo ""
   echo "\\033[1;31mERROR:\\033[0m Envpilot commit guard blocked this commit."
@@ -146,8 +172,7 @@ export function installCommitGuard(repoRoot?: string): {
         existingContent.substring(0, startIdx) +
         HOOK_BLOCK +
         existingContent.substring(endIdx);
-      writeFileSync(hookPath, updated, "utf-8");
-      chmodSync(hookPath, 0o755);
+      atomicWriteFileSync(hookPath, updated, 0o755);
       return {
         installed: true,
         hookPath,
@@ -165,8 +190,7 @@ export function installCommitGuard(repoRoot?: string): {
       newContent = "#!/bin/sh\n\n" + HOOK_BLOCK + "\n";
     }
 
-    writeFileSync(hookPath, newContent, "utf-8");
-    chmodSync(hookPath, 0o755);
+    atomicWriteFileSync(hookPath, newContent, 0o755);
 
     return {
       installed: true,
@@ -213,7 +237,7 @@ export function removeCommitGuard(repoRoot?: string): boolean {
     if (cleaned === "#!/bin/sh" || cleaned === "") {
       unlinkSync(hookPath);
     } else {
-      writeFileSync(hookPath, cleaned + "\n", "utf-8");
+      atomicWriteFileSync(hookPath, cleaned + "\n", 0o755);
     }
 
     return true;

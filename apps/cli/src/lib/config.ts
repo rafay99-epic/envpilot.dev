@@ -1,5 +1,7 @@
 import Conf from "conf";
 import type { CLIConfig, User } from "../types/index.js";
+import { normalizeOrgRole, type OrgRole } from "./roles.js";
+import { clearRunCache } from "./variables-cache.js";
 
 // Default API URL - production by default, can be overridden via config
 const DEFAULT_API_URL = "https://www.envpilot.dev";
@@ -169,16 +171,36 @@ export function setUser(user: User): void {
 }
 
 /**
- * Get the current user's role in the active organization
+ * Get the raw stored role string (legacy or unified) without normalization.
+ * Thin back-compat wrapper — prefer getUnifiedRole() for access decisions.
  */
 export function getRole(): string | undefined {
   return config.get("role");
 }
 
 /**
- * Set the current user's role in the active organization
+ * Store a role string verbatim. Thin back-compat wrapper — prefer
+ * setUnifiedRole() so callers pass a unified OrgRole.
  */
 export function setRole(role: string): void {
+  config.set("role", role);
+}
+
+/**
+ * Get the current user's role in the active organization, normalized onto the
+ * unified model. A stored legacy value ("admin"/"member"/…) is mapped to its
+ * unified equivalent ("owner"/"developer"/…) so callers never see legacy roles.
+ * Falls back to "developer" (least privilege) when nothing is stored.
+ */
+export function getUnifiedRole(): OrgRole {
+  return normalizeOrgRole(config.get("role"));
+}
+
+/**
+ * Persist the current user's unified org role. Written to the same `role`
+ * field so getRole()/getUnifiedRole() both read it back.
+ */
+export function setUnifiedRole(role: OrgRole): void {
   config.set("role", role);
 }
 
@@ -197,6 +219,13 @@ export function clearAuth(): void {
   config.delete("refreshToken");
   config.delete("user");
   config.delete("role");
+  // Purge the fingerprint-gated run cache so a different user (or a re-login)
+  // can never be served another account's decrypted secrets.
+  try {
+    clearRunCache();
+  } catch {
+    // Non-fatal — cache is a performance aid, not load-bearing.
+  }
 }
 
 /**

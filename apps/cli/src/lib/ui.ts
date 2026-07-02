@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import ora, { type Ora } from "ora";
+import { formatRoleLabel, normalizeOrgRole } from "./roles.js";
 
 /**
  * Create a spinner with a message
@@ -188,60 +189,62 @@ export function blank(): void {
 }
 
 /**
- * Format a role name with color
+ * Format a role name with color. Accepts any legacy or unified role string and
+ * renders the unified label (never "Unknown") via roles.ts normalization.
  */
-export function formatRole(role: string | undefined): string {
-  switch (role) {
-    case "admin":
-      return chalk.green("Admin");
+export function formatRole(role: string | null | undefined): string {
+  const label = formatRoleLabel(role);
+  switch (normalizeOrgRole(role)) {
+    case "owner":
+      return chalk.green(label);
+    case "project_manager":
+      return chalk.magenta(label);
     case "team_lead":
-      return chalk.blue("Team Lead");
-    case "member":
-      return chalk.yellow("Member");
-    default:
-      return chalk.dim("Unknown");
+      return chalk.blue(label);
+    case "developer":
+      return chalk.yellow(label);
   }
 }
 
 /**
- * Print a role-based access notice for members
+ * Print a role-based access notice for developers.
+ *
+ * Under the unified model there are no pending approval requests: a developer
+ * simply needs a per-variable write grant to change a value, and an
+ * environment-scoped assignment may withhold production entirely.
  */
-export function roleNotice(role: string | undefined): void {
-  if (role === "member") {
+export function roleNotice(role: string | null | undefined): void {
+  if (normalizeOrgRole(role) === "developer") {
     console.log(
       chalk.yellow(
-        "  You have Member access. Write operations will create pending requests for approval."
+        "  You have Developer access. You can read the variables assigned to you and write only those you hold a write grant for; keys without a grant are skipped, not queued for approval."
       )
     );
   }
 }
 
 /**
- * Format a project role name with color
+ * Format a project-level role name with color. Kept for callers that surface a
+ * per-project role string; normalizes onto the unified label set.
  */
 export function formatProjectRole(role: string | null | undefined): string {
-  switch (role) {
-    case "manager":
-      return chalk.green("Manager");
-    case "developer":
-      return chalk.blue("Developer");
-    case "viewer":
-      return chalk.yellow("Viewer");
-    default:
-      return chalk.dim("-");
+  if (role === undefined || role === null || role === "") {
+    return chalk.dim("-");
   }
+  return formatRole(role);
 }
 
 /**
- * Print a project role notice for viewers
+ * Print an access notice for a developer's project view.
+ *
+ * Developers read only the variables granted to them; a scoped assignment can
+ * also withhold whole environments (e.g. production).
  */
-export function projectRoleNotice(
-  projectRole: string | null | undefined
-): void {
-  if (projectRole === "viewer") {
+export function projectRoleNotice(role: string | null | undefined): void {
+  if (normalizeOrgRole(role) === "developer") {
     console.log(
       chalk.yellow(
-        "  You have Viewer access to this project. You can only view variables you have been explicitly granted access to."
+        "  You have Developer access to this project. You can only see variables you have been granted, and your assignment may exclude some environments such as production."
       )
     );
   }

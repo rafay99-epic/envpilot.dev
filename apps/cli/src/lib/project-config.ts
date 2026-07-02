@@ -1,4 +1,10 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  unlinkSync,
+  renameSync,
+} from "node:fs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 import {
@@ -12,6 +18,26 @@ import {
 
 // Project config file name
 const CONFIG_FILE_NAME = ".envpilot";
+
+/**
+ * Atomically write a text file: write a sibling temp file, then rename it into
+ * place. renameSync is atomic within a filesystem, so a crash mid-write can
+ * never leave a half-written .envpilot / .gitignore / hook file on disk.
+ */
+function atomicWriteFileSync(filePath: string, content: string): void {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmpPath, content, "utf-8");
+    renameSync(tmpPath, filePath);
+  } catch (err) {
+    try {
+      if (existsSync(tmpPath)) unlinkSync(tmpPath);
+    } catch {
+      // Ignore cleanup failure.
+    }
+    throw err;
+  }
+}
 
 /**
  * Get the path to the project config file
@@ -102,7 +128,7 @@ export function writeProjectConfigV2(
   directory: string = process.cwd()
 ): void {
   const configPath = getProjectConfigPath(directory);
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+  atomicWriteFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
 // ── V2 Helpers ───────────────────────────────────────────────────────
@@ -309,7 +335,7 @@ export function addToGitignore(directory: string = process.cwd()): void {
     ? content + ".envpilot\n"
     : content + "\n.envpilot\n";
 
-  writeFileSync(gitignorePath, newContent, "utf-8");
+  atomicWriteFileSync(gitignorePath, newContent);
 }
 
 /**
@@ -319,7 +345,7 @@ export function ensureEnvInGitignore(directory: string = process.cwd()): void {
   const gitignorePath = join(directory, ".gitignore");
 
   if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath, ".env\n.env.local\n", "utf-8");
+    atomicWriteFileSync(gitignorePath, ".env\n.env.local\n");
     return;
   }
 
@@ -334,7 +360,7 @@ export function ensureEnvInGitignore(directory: string = process.cwd()): void {
     ? content + ".env\n"
     : content + "\n.env\n";
 
-  writeFileSync(gitignorePath, newContent, "utf-8");
+  atomicWriteFileSync(gitignorePath, newContent);
 }
 
 /**

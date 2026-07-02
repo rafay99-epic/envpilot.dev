@@ -6,8 +6,10 @@ import {
   getActiveOrganizationId,
   getActiveProjectId,
   getUser,
+  getUnifiedRole,
   isAuthenticated,
 } from "../lib/config.js";
+import { formatRoleLabel } from "../lib/roles.js";
 import {
   readProjectConfigV2,
   getActiveProject,
@@ -38,6 +40,7 @@ export const whoamiCommand = new Command("whoami")
         ["Name", remoteUser.name || localUser?.name],
         ["API URL", getApiUrl()],
         ["Active Organization", getActiveOrganizationId()],
+        ["Org Role", formatRoleLabel(getUnifiedRole())],
         ["Active Project", getActiveProjectId()],
         [
           "Linked Project",

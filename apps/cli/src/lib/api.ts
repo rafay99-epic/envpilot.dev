@@ -1,4 +1,11 @@
-import { getApiUrl, getAccessToken, clearAuth } from "./config.js";
+import {
+  getApiUrl,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+  clearAuth,
+} from "./config.js";
 import type {
   ApiResponse,
   Organization,
@@ -43,6 +50,9 @@ export class APIError extends Error {
 export class APIClient {
   private baseUrl: string;
   private accessToken: string | undefined;
+  // Re-entrancy guard: true while a token refresh is in flight so a 401 from
+  // the refresh endpoint itself can never trigger another refresh (no loops).
+  private refreshing = false;
 
   constructor(options?: { baseUrl?: string; accessToken?: string }) {
     this.baseUrl = options?.baseUrl ?? getApiUrl();
@@ -157,84 +167,168 @@ export class APIClient {
   }
 
   /**
+   * Attempt a one-shot access-token refresh using the stored refresh token.
+   * Persists the rotated tokens and updates this client's in-memory token on
+   * success. Returns false (without throwing) when there is no refresh token,
+   * a refresh is already in flight, or the refresh call fails — the caller
+   * then treats the session as dead.
+   */
+  private async tryRefreshToken(): Promise<boolean> {
+    if (this.refreshing) return false;
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+
+    this.refreshing = true;
+    try {
+      const result = await this.refreshToken(refreshToken);
+      setAccessToken(result.accessToken);
+      setRefreshToken(result.refreshToken);
+      this.accessToken = result.accessToken;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
+  /**
+   * Run a request thunk with automatic one-shot token refresh on a genuine 401.
+   *
+   * - An AUTH_REDIRECT (HTML sign-in page) is NOT a rejected token — rethrow
+   *   without clearing creds or refreshing.
+   * - A genuine 401 triggers a single refresh attempt. On success the request
+   *   is retried once with the rotated token; on failure (or a second 401) the
+   *   local credentials are cleared so the user is prompted to log in again.
+   *
+   * The thunk rebuilds its headers on each call, so the retry automatically
+   * picks up the refreshed access token.
+   */
+  private async withAuthRetry<T>(exec: () => Promise<T>): Promise<T> {
+    try {
+      return await exec();
+    } catch (err) {
+      if (
+        !(err instanceof APIError) ||
+        err.statusCode !== 401 ||
+        err.code === "AUTH_REDIRECT" ||
+        this.refreshing
+      ) {
+        throw err;
+      }
+
+      const refreshed = await this.tryRefreshToken();
+      if (!refreshed) {
+        clearAuth();
+        throw err;
+      }
+
+      try {
+        return await exec();
+      } catch (retryErr) {
+        // Refresh succeeded but the retried request still failed auth — the
+        // session is genuinely dead.
+        if (
+          retryErr instanceof APIError &&
+          retryErr.statusCode === 401 &&
+          retryErr.code !== "AUTH_REDIRECT"
+        ) {
+          clearAuth();
+        }
+        throw retryErr;
+      }
+    }
+  }
+
+  /**
    * Make a GET request
    */
   async get<T>(path: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(path, this.baseUrl);
+    return this.withAuthRetry(async () => {
+      const url = new URL(path, this.baseUrl);
 
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        url.searchParams.set(key, value);
+      if (params) {
+        for (const [key, value] of Object.entries(params)) {
+          url.searchParams.set(key, value);
+        }
       }
-    }
 
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method: "GET",
-      headers: this.getHeaders(),
+      const response = await this.fetchWithSafeRedirects(url.toString(), {
+        method: "GET",
+        headers: this.getHeaders(),
+      });
+
+      return this.handleResponse<T>(response);
     });
-
-    return this.handleResponse<T>(response);
   }
 
   /**
    * Make a POST request
    */
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const url = new URL(path, this.baseUrl);
+    return this.withAuthRetry(async () => {
+      const url = new URL(path, this.baseUrl);
 
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method: "POST",
-      headers: this.getHeaders(),
-      body: body ? JSON.stringify(body) : undefined,
+      const response = await this.fetchWithSafeRedirects(url.toString(), {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      return this.handleResponse<T>(response);
     });
-
-    return this.handleResponse<T>(response);
   }
 
   /**
    * Make a PUT request
    */
   async put<T>(path: string, body?: unknown): Promise<T> {
-    const url = new URL(path, this.baseUrl);
+    return this.withAuthRetry(async () => {
+      const url = new URL(path, this.baseUrl);
 
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method: "PUT",
-      headers: this.getHeaders(),
-      body: body ? JSON.stringify(body) : undefined,
+      const response = await this.fetchWithSafeRedirects(url.toString(), {
+        method: "PUT",
+        headers: this.getHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      return this.handleResponse<T>(response);
     });
-
-    return this.handleResponse<T>(response);
   }
 
   /**
    * Make a PATCH request
    */
   async patch<T>(path: string, body?: unknown): Promise<T> {
-    const url = new URL(path, this.baseUrl);
+    return this.withAuthRetry(async () => {
+      const url = new URL(path, this.baseUrl);
 
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method: "PATCH",
-      headers: this.getHeaders(),
-      body: body ? JSON.stringify(body) : undefined,
+      const response = await this.fetchWithSafeRedirects(url.toString(), {
+        method: "PATCH",
+        headers: this.getHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      return this.handleResponse<T>(response);
     });
-
-    return this.handleResponse<T>(response);
   }
 
   /**
    * Make a DELETE request
    */
   async delete(path: string): Promise<void> {
-    const url = new URL(path, this.baseUrl);
+    return this.withAuthRetry(async () => {
+      const url = new URL(path, this.baseUrl);
 
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method: "DELETE",
-      headers: this.getHeaders(),
+      const response = await this.fetchWithSafeRedirects(url.toString(), {
+        method: "DELETE",
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        await this.handleError(response);
+      }
     });
-
-    if (!response.ok) {
-      await this.handleError(response);
-    }
   }
 
   /**
@@ -288,25 +382,40 @@ export class APIClient {
    * Handle API errors
    */
   private async handleError(response: Response): Promise<never> {
+    // Read the body ONCE as text so we can both parse JSON errors and run the
+    // HTML sign-in-page detection below without consuming the stream twice.
+    const bodyText = await response.text();
+
     let message = `Request failed with status ${response.status}`;
     let code: string | undefined;
 
     try {
-      const data = (await response.json()) as Record<string, string>;
+      const data = JSON.parse(bodyText) as Record<string, string>;
       message = data.error || data.message || message;
       code = data.code;
     } catch {
-      // Ignore JSON parsing errors
+      // Ignore JSON parsing errors — non-JSON error bodies fall through.
     }
 
     // Handle authentication errors.
-    // A 401 from the server means the token is definitively rejected —
-    // always wipe local credentials so `isAuthenticated()` reflects
-    // reality and the user isn't stuck in a failing loop.
     if (response.status === 401) {
-      clearAuth();
+      // Same detection as the ok-path (handleResponse): if the "401" body is
+      // actually an HTML sign-in page, the auth middleware redirected us — the
+      // stored token may be perfectly valid. Surface AUTH_REDIRECT WITHOUT
+      // clearing creds so a CDN/edge misroute can't log the user out.
+      if (this.isAuthRedirect(response, bodyText)) {
+        throw new APIError(
+          "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
+          401,
+          "AUTH_REDIRECT"
+        );
+      }
+
+      // Genuine 401 — the token was rejected. Do NOT clearAuth() here; the
+      // withAuthRetry wrapper first tries a one-shot token refresh and only
+      // clears credentials if that fails.
       throw new APIError(
-        "Authentication failed. Please run `envpilot login`.",
+        message || "Authentication failed. Please run `envpilot login`.",
         401,
         code || "UNAUTHORIZED"
       );

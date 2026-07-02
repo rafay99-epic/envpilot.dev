@@ -182,14 +182,15 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     title: "Push variables",
     category: "Sync",
     description:
-      "Upload local variables back to Envpilot with approval-aware write behavior.",
+      "Upload local variables back to Envpilot, writing only the keys you have access to.",
     argv: ["push"],
     args: "[--env <environment>] [--file <path>] [--merge|--replace]",
     examples: [["push"], ["push", "--replace"]],
     websiteSurface:
       "Maps to `/api/cli/variables` and `/api/cli/variables/bulk` for writes.",
     notes: [
-      "Managers/admins write directly; lower roles create requests for approval.",
+      "Owners, project managers, and team leads write across the project; developers write only the variables they hold a write grant for.",
+      "Keys you cannot write are skipped — push does not create approval requests.",
       "Compares local and remote variables before applying changes.",
     ],
     keywords: ["upload", "bulk", "merge", "replace"],

@@ -30,15 +30,28 @@ export function checkForUpdate(): void {
 
   const apiUrl = getApiUrl();
 
-  fetch(`${apiUrl}/api/version`, { signal: AbortSignal.timeout(5000) })
+  // Record the check timestamp UP FRONT (before any network I/O). Otherwise an
+  // offline machine — where the fetch rejects and we never reach the old
+  // in-`.then` cache.set — would re-attempt (and re-hang) on every single
+  // command. Writing first means we only try once per CHECK_INTERVAL even when
+  // the network is down.
+  cache.set("lastVersionCheck", Date.now());
+
+  // Use a manually-unref'd timeout instead of AbortSignal.timeout(): the latter
+  // keeps a referenced timer on the event loop for the full 5s, which makes a
+  // fast, already-finished command hang until the timer fires. unref() lets the
+  // process exit as soon as the real work is done.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  timer.unref?.();
+
+  fetch(`${apiUrl}/api/version`, { signal: controller.signal })
     .then((res) => {
       if (!res.ok) return;
       return res.json() as Promise<{ cli?: string }>;
     })
     .then((data) => {
       if (!data?.cli) return;
-
-      cache.set("lastVersionCheck", Date.now());
 
       if (data.cli !== CLI_VERSION) {
         console.log();
@@ -58,5 +71,8 @@ export function checkForUpdate(): void {
     })
     .catch(() => {
       // Silent — no network shouldn't break the CLI
+    })
+    .finally(() => {
+      clearTimeout(timer);
     });
 }

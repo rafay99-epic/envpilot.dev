@@ -5,7 +5,6 @@ import {
   success,
   error,
   withSpinner,
-  formatRole,
   formatProjectRole,
   roleNotice,
   projectRoleNotice,
@@ -15,8 +14,13 @@ import {
   isAuthenticated,
   setActiveOrganizationId,
   setActiveProjectId,
-  setRole,
+  setUnifiedRole,
 } from "../lib/config.js";
+import {
+  formatRoleLabel,
+  normalizeOrgRole,
+  type OrgRole,
+} from "../lib/roles.js";
 import {
   readProjectConfig,
   readProjectConfigV2,
@@ -27,6 +31,11 @@ import {
 } from "../lib/project-config.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
 import type { Organization, Project, Environment } from "../types/index.js";
+
+/** Resolve an organization's unified role from its additive/legacy fields. */
+function orgUnifiedRole(org: Organization): OrgRole {
+  return normalizeOrgRole(org.unifiedRole ?? org.role);
+}
 
 export const switchCommand = new Command("switch")
   .description("Switch project, environment, or active linked project")
@@ -129,19 +138,17 @@ export const switchCommand = new Command("switch")
         }
 
         setActiveOrganizationId(org._id);
-        if (org.role) {
-          setRole(org.role);
-        }
+        setUnifiedRole(orgUnifiedRole(org));
 
         if (projectConfig) {
           updateProjectConfig({ organizationId: org._id });
         }
 
         success(`Switched to organization: ${chalk.bold(org.name)}`);
-        if (org.role) {
-          console.log(chalk.dim(`  Role: ${formatRole(org.role)}`));
-          roleNotice(org.role);
-        }
+        console.log(
+          chalk.dim(`  Role: ${formatRoleLabel(orgUnifiedRole(org))}`)
+        );
+        roleNotice(orgUnifiedRole(org));
         return;
       }
 
@@ -195,9 +202,7 @@ export const switchCommand = new Command("switch")
 
           if (organizations.length === 1) {
             organizationId = organizations[0]._id;
-            if (organizations[0].role) {
-              setRole(organizations[0].role);
-            }
+            setUnifiedRole(orgUnifiedRole(organizations[0]));
           } else {
             const { orgId } = await inquirer.prompt([
               {
@@ -212,8 +217,8 @@ export const switchCommand = new Command("switch")
             ]);
             organizationId = orgId;
             const selectedOrg = organizations.find((o) => o._id === orgId);
-            if (selectedOrg?.role) {
-              setRole(selectedOrg.role);
+            if (selectedOrg) {
+              setUnifiedRole(orgUnifiedRole(selectedOrg));
             }
           }
         }
@@ -384,20 +389,18 @@ export const switchCommand = new Command("switch")
           if (switchType === "organization") {
             setActiveOrganizationId(orgId);
             const org = organizations.find((o) => o._id === orgId)!;
-            if (org.role) {
-              setRole(org.role);
-            }
+            setUnifiedRole(orgUnifiedRole(org));
             success(`Switched to organization: ${chalk.bold(org.name)}`);
-            if (org.role) {
-              console.log(chalk.dim(`  Role: ${formatRole(org.role)}`));
-              roleNotice(org.role);
-            }
+            console.log(
+              chalk.dim(`  Role: ${formatRoleLabel(orgUnifiedRole(org))}`)
+            );
+            roleNotice(orgUnifiedRole(org));
             return;
           }
 
           const selectedOrg = organizations.find((o) => o._id === orgId);
-          if (selectedOrg?.role) {
-            setRole(selectedOrg.role);
+          if (selectedOrg) {
+            setUnifiedRole(orgUnifiedRole(selectedOrg));
           }
 
           const projects = await withSpinner(

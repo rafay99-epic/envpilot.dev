@@ -1,5 +1,6 @@
 import { Command } from "commander";
-import { spawn } from "node:child_process";
+import crossSpawn from "cross-spawn";
+import { constants as osConstants } from "node:os";
 import chalk from "chalk";
 import { info, error, warning, withSpinner, success } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
@@ -42,7 +43,12 @@ interface RunOptions {
 
 export const runCommand = new Command("run")
   .description(
-    "Run a command with project secrets injected as environment variables (no .env file written)"
+    "Run a command with project secrets injected as environment variables. " +
+      "Secrets are injected into the child process in-memory (no .env file is " +
+      "written), but a decrypted copy is cached locally at " +
+      "~/.config/envpilot/run-cache (mode 0600, same protection as a .env) to " +
+      "avoid re-fetching on every run. Use --no-cache to skip the cache, or " +
+      "`envpilot logout` to purge it."
   )
   .argument("[command...]", "Command and arguments to execute")
   .option(
@@ -67,13 +73,17 @@ export const runCommand = new Command("run")
   )
   .option(
     "--shell",
-    "Run the command through the user's shell (enables pipes, &&, $VAR expansion)"
+    'Run the command string through your shell ($SHELL or /bin/sh -c "..."), ' +
+      "enabling pipes, &&, and $VAR expansion. Without this flag the command is " +
+      "executed directly with no shell, so arguments are passed through verbatim " +
+      "(safe from shell injection)."
   )
   .option("-q, --quiet", "Suppress informational messages")
   .option("--no-cache", "Skip cache and always fetch fresh secrets from server")
   .option(
     "--cache-ttl <seconds>",
-    "How long cached secrets stay fresh before a fingerprint check (default: 3600s / 1h)",
+    "How long cached secrets stay fresh before a fingerprint check " +
+      "(default: 3600s / 1h; 0 = always fingerprint-check)",
     String(DEFAULT_TTL)
   )
   .passThroughOptions()
@@ -114,10 +124,15 @@ export const runCommand = new Command("run")
 
       const environment = options.env || project.environment;
       const organizationId = options.organization || project.organizationId;
-      const ttl = Math.max(
-        1,
-        parseInt(options.cacheTtl ?? String(DEFAULT_TTL), 10) || DEFAULT_TTL
+      // Parse the TTL honestly: 0 is a valid value meaning "always
+      // fingerprint-check", so we must NOT fall back to the default on 0.
+      // Only a non-finite / negative parse falls back to DEFAULT_TTL.
+      const parsedTtl = Number.parseInt(
+        options.cacheTtl ?? String(DEFAULT_TTL),
+        10
       );
+      const ttl =
+        Number.isFinite(parsedTtl) && parsedTtl >= 0 ? parsedTtl : DEFAULT_TTL;
 
       // ── Fingerprint-gated stale-while-revalidate cache ───────────────────
       let variables: Variable[];
@@ -169,7 +184,9 @@ export const runCommand = new Command("run")
               cacheHit = true;
               cacheAge = formatAge(probe.entry.fetchedAt);
             } else {
-              // Variables changed — full fetch required.
+              // Variables changed — full fetch required. Store the server's
+              // fingerprint verbatim so the next stale check is guaranteed to
+              // match (no divergent client-side recomputation).
               variables = await doFetch(
                 project,
                 environment,
@@ -181,15 +198,22 @@ export const runCommand = new Command("run")
                 project.projectId,
                 environment,
                 organizationId,
-                variables
+                variables,
+                serverFingerprint
               );
             }
           } catch {
-            // Fingerprint check failed (e.g. offline) — serve stale cache.
-            // The next run will retry the fingerprint check.
+            // Fingerprint check failed (e.g. offline) — fall back to stale
+            // cache, but say so out loud. readCache already refuses to return
+            // entries past the hard max-age, so we never serve indefinitely.
             variables = probe.entry.variables;
             cacheHit = true;
             cacheAge = formatAge(probe.entry.fetchedAt);
+            if (!options.quiet) {
+              warning(
+                `Using offline cache (age ${cacheAge}) — could not reach the server to verify freshness.`
+              );
+            }
           }
         } else {
           // ── MISS: first run or cache cleared ──────────────────────────
@@ -256,8 +280,10 @@ export const runCommand = new Command("run")
         console.log();
       }
 
-      // Spawn child process
-      await runChild(commandArgs, finalEnv, options);
+      // Spawn child process. runChild resolves with the exit code (never calls
+      // process.exit itself), so we set process.exitCode and let Node drain
+      // streams and exit cleanly.
+      process.exitCode = await runChild(commandArgs, finalEnv, options);
     } catch (err) {
       await handleError(err);
     }
@@ -322,41 +348,65 @@ function printInjectionPreview(
   success("Dry run — no command executed.");
 }
 
+/**
+ * Mask a secret for the --print preview. Reveals at most the 2 leading
+ * characters (never any trailing characters), and fully masks anything shorter
+ * than ~12 chars so short secrets (PINs, short tokens) aren't partially leaked.
+ */
 function maskForPreview(value: string): string {
-  if (value.length <= 6) return "******";
-  return `${value.slice(0, 4)}…${value.slice(-2)} (${value.length} chars)`;
+  const len = value.length;
+  const dots = "•".repeat(6);
+  if (len < 12) return `${dots} (${len} chars)`;
+  return `${value.slice(0, 2)}${dots} (${len} chars)`;
 }
 
+/**
+ * Spawn the child command with secrets injected, and resolve with the exit
+ * code the parent process should adopt. Never calls process.exit itself — the
+ * caller sets process.exitCode so Node can flush stdio and exit cleanly.
+ *
+ * Resolution codes follow shell conventions:
+ *   - normal exit  → the child's own exit code
+ *   - killed by N  → 128 + N (matches how a shell reports signal deaths)
+ *   - ENOENT       → 127 (command not found)
+ *   - EACCES       → 126 (found but not executable)
+ *   - other spawn  → 1
+ */
 function runChild(
   commandArgs: string[],
   env: NodeJS.ProcessEnv,
   options: RunOptions
-): Promise<void> {
+): Promise<number> {
   return new Promise((resolve) => {
-    const [command, ...args] = commandArgs;
-    if (!command) {
-      // Should be guarded earlier, but be defensive.
-      process.exit(1);
+    // Resolve the command + args. In the default (no --shell) path we pass argv
+    // straight through with shell:false — cross-spawn resolves Windows
+    // .cmd/.exe and escapes args correctly, and no shell means no injection
+    // surface. With --shell the user explicitly opts into shell semantics.
+    let command: string;
+    let args: string[];
+    if (options.shell) {
+      command = process.env.SHELL || "/bin/sh";
+      args = ["-c", commandArgs.join(" ")];
+    } else {
+      [command, ...args] = commandArgs;
     }
 
-    // On Windows, .cmd / .bat / .ps1 require shell to resolve.
-    // Auto-enable shell on Windows for ergonomic parity with Unix.
-    const isWindows = process.platform === "win32";
-    const useShell = options.shell === true || isWindows;
+    if (!command) {
+      // Guarded earlier, but stay defensive rather than spawning "".
+      resolve(1);
+      return;
+    }
 
-    const child = spawn(command, args, {
+    const child = crossSpawn(command, args, {
       stdio: "inherit",
       env,
-      shell: useShell,
+      shell: false,
     });
 
-    // Forward common signals to the child so Ctrl-C, SIGTERM, etc. propagate.
-    const signals: NodeJS.Signals[] = [
-      "SIGINT",
-      "SIGTERM",
-      "SIGHUP",
-      "SIGQUIT",
-    ];
+    // Forward only SIGTERM/SIGHUP. SIGINT (Ctrl-C) and SIGQUIT are already
+    // delivered by the terminal to the entire foreground process group, so the
+    // child receives them directly — re-forwarding here would double-signal it.
+    const signals: NodeJS.Signals[] = ["SIGTERM", "SIGHUP"];
 
     const forward: Partial<Record<NodeJS.Signals, () => void>> = {};
     for (const sig of signals) {
@@ -382,33 +432,34 @@ function runChild(
 
     child.on("error", (err) => {
       cleanup();
+      // With shell:false, ENOENT surfaces reliably on the error event across
+      // all platforms (including Windows), so these friendly messages actually
+      // fire everywhere.
       const code = (err as NodeJS.ErrnoException).code;
+      const displayCommand = options.shell ? commandArgs.join(" ") : command;
       if (code === "ENOENT") {
         error(
-          `Command not found: ${command}. Make sure it is installed and on your PATH.`
+          `Command not found: ${displayCommand}. Make sure it is installed and on your PATH.`
         );
+        resolve(127);
       } else if (code === "EACCES") {
-        error(`Permission denied executing: ${command}`);
+        error(`Permission denied executing: ${displayCommand}`);
+        resolve(126);
       } else {
         error(`Failed to spawn process: ${err.message}`);
+        resolve(1);
       }
-      process.exit(1);
     });
 
     child.on("exit", (code, signal) => {
       cleanup();
       if (signal) {
-        // Re-raise the signal so parent shells observe the same exit cause.
-        // Fall back to exit(1) if re-raising is not possible.
-        try {
-          process.kill(process.pid, signal);
-        } catch {
-          process.exit(1);
-        }
+        // Report signal deaths the way a shell does: 128 + signal number.
+        const signum = osConstants.signals[signal] ?? 0;
+        resolve(128 + signum);
       } else {
-        process.exit(code ?? 0);
+        resolve(code ?? 0);
       }
-      resolve();
     });
   });
 }

@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
     let updated = 0;
     let deleted = 0;
     let skipped = 0;
+    // Keys skipped specifically because the Convex mutation rejected the
+    // caller for authorization / scope / grant reasons — distinct from keys
+    // skipped for invalid formatting. Additive field for new CLIs.
+    const deniedKeys: string[] = [];
 
     // Process each variable
     for (const variable of variables as BulkVariable[]) {
@@ -167,6 +171,7 @@ export async function POST(request: NextRequest) {
           throw error;
         }
         skipped++;
+        deniedKeys.push(variable.key);
       }
 
       if (existing) {
@@ -178,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     // If mode is 'replace', delete variables that weren't in the push
     if (mode === "replace") {
-      for (const [_key, variable] of existingByKey) {
+      for (const [key, variable] of existingByKey) {
         try {
           await convex.mutation(api.variables.remove, {
             variableId: variable._id,
@@ -190,6 +195,7 @@ export async function POST(request: NextRequest) {
             throw error;
           }
           skipped++;
+          deniedKeys.push(key);
         }
       }
     }
@@ -204,6 +210,9 @@ export async function POST(request: NextRequest) {
         // Additive field: only present when operations were skipped
         // (invalid keys or missing write access). Old clients ignore it.
         ...(skipped > 0 ? { skipped } : {}),
+        // Additive: subset of skipped keys rejected specifically for
+        // authorization / scope / grant reasons (not invalid formatting).
+        ...(deniedKeys.length > 0 ? { deniedKeys } : {}),
       },
     });
   } catch (error) {

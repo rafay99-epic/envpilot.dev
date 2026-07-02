@@ -1,5 +1,16 @@
-import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  chmodSync,
+  renameSync,
+} from "node:fs";
 import { join } from "node:path";
+import { isFileWritable, type ProjectAccess } from "./roles.js";
+
+// Re-export so command callers can build a ProjectAccess and pass it straight
+// into applyFileProtection without importing roles.ts separately.
+export type { ProjectAccess } from "./roles.js";
 
 /**
  * Parse a .env file content into a key-value object
@@ -21,7 +32,12 @@ export function parseEnvFile(content: string): Record<string, string> {
       continue;
     }
 
-    const key = line.substring(0, equalsIndex).trim();
+    // Strip an optional leading `export ` prefix (`export FOO=bar`) so shell
+    // dotenv files parse instead of being silently dropped by key validation.
+    const key = line
+      .substring(0, equalsIndex)
+      .trim()
+      .replace(/^export\s+/, "");
     let value = line.substring(equalsIndex + 1);
 
     // Handle quoted values
@@ -42,27 +58,32 @@ export function parseEnvFile(content: string): Record<string, string> {
 function parseValue(value: string): string {
   value = value.trim();
 
-  // Handle double-quoted strings
-  if (value.startsWith('"') && value.endsWith('"')) {
-    value = value.slice(1, -1);
-    // Unescape common escape sequences
-    value = value
-      .replace(/\\n/g, "\n")
-      .replace(/\\r/g, "\r")
-      .replace(/\\t/g, "\t")
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, "\\");
-  }
-  // Handle single-quoted strings (no escape processing)
-  else if (value.startsWith("'") && value.endsWith("'")) {
-    value = value.slice(1, -1);
-  }
-  // Handle inline comments for unquoted values
-  else {
-    const commentIndex = value.indexOf(" #");
-    if (commentIndex !== -1) {
-      value = value.substring(0, commentIndex).trim();
+  // Quoted value (double or single). Read up to the matching closing quote so
+  // that a trailing inline comment — e.g. KEY="value" # comment — is dropped
+  // rather than left glued onto the value. Double quotes process escapes;
+  // single quotes are literal.
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    const closingIndex = value.indexOf(quote, 1);
+    if (closingIndex !== -1) {
+      const inner = value.slice(1, closingIndex);
+      if (quote === '"') {
+        return inner
+          .replace(/\\n/g, "\n")
+          .replace(/\\r/g, "\r")
+          .replace(/\\t/g, "\t")
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, "\\");
+      }
+      return inner;
     }
+    // No closing quote — fall through and treat as an unquoted value.
+  }
+
+  // Unquoted value — strip a trailing inline comment (` #...`).
+  const commentIndex = value.indexOf(" #");
+  if (commentIndex !== -1) {
+    value = value.substring(0, commentIndex).trim();
   }
 
   return value;
@@ -201,7 +222,37 @@ export function readEnvFile(filePath: string): Record<string, string> | null {
 }
 
 /**
- * Write a .env file to disk
+ * Atomically write a file: write a sibling temp file (with the requested mode)
+ * then rename it into place. renameSync is atomic within a filesystem, so a
+ * crash mid-write can never leave a truncated/partial .env on disk. The temp
+ * file is created with the target mode so the secret is never briefly exposed
+ * with default (world-readable) permissions.
+ */
+function atomicWriteFileSync(
+  filePath: string,
+  content: string,
+  mode: number
+): void {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmpPath, content, { encoding: "utf-8", mode });
+    renameSync(tmpPath, filePath);
+  } catch (err) {
+    // Best-effort cleanup of the temp file if the rename never happened.
+    try {
+      if (existsSync(tmpPath)) chmodSync(tmpPath, 0o600);
+    } catch {
+      // Ignore.
+    }
+    throw err;
+  }
+}
+
+/**
+ * Write a .env file to disk.
+ *
+ * The file is created owner-only (0o600) so secrets are never world-readable
+ * from the moment of creation, and the write is atomic (temp file + rename).
  */
 export function writeEnvFile(
   filePath: string,
@@ -212,7 +263,7 @@ export function writeEnvFile(
   }
 ): void {
   const content = stringifyEnv(vars, options);
-  writeFileSync(filePath, content, "utf-8");
+  atomicWriteFileSync(filePath, content, 0o600);
 }
 
 /**
@@ -236,22 +287,34 @@ export function getEnvPathForEnvironment(
 }
 
 /**
- * Apply role-based file protection after sync.
- * Makes files read-only for non-admin/non-team-lead roles.
+ * Apply access-based file protection to a pulled .env file.
+ *
+ * Permissions are always OWNER-ONLY — a .env holds decrypted secrets and must
+ * never be group/world readable (0o644/0o444 would leak secrets to every user
+ * on the box). We only vary the owner's write bit:
+ *
+ *   protection === "never"  → 0o600  (owner read/write — force writable)
+ *   protection === "always" → 0o400  (owner read-only — force read-only)
+ *   protection === "auto"   → 0o600 when the caller can write the variables
+ *                             (isFileWritable), else 0o400
  */
 export function applyFileProtection(
   filePath: string,
-  role?: string,
-  projectRole?: string | null
+  access: ProjectAccess,
+  protection: "auto" | "always" | "never" = "auto"
 ): void {
   if (!existsSync(filePath)) return;
 
-  const isWritable =
-    role === "admin" || role === "team_lead" || projectRole === "manager";
-
-  if (isWritable) {
-    chmodSync(filePath, 0o644); // read-write
-  } else {
-    chmodSync(filePath, 0o444); // read-only
+  if (protection === "never") {
+    chmodSync(filePath, 0o600); // owner read/write
+    return;
   }
+
+  if (protection === "always") {
+    chmodSync(filePath, 0o400); // owner read-only
+    return;
+  }
+
+  // auto — derive from the caller's resolved access.
+  chmodSync(filePath, isFileWritable(access) ? 0o600 : 0o400);
 }
