@@ -1,0 +1,58 @@
+apps/cli/tests/env-file.test.ts
+  s_e8fb00d5812ee1::t_28c7efac6cbca9 64
+apps/cli/tests/roles.test.ts
+  s_e8fb00d5812ee1::t_28c7efac6cbca9 49-51,107
+apps/cli/src/commands/logout.ts
+  s_e8fb00d5812ee1::t_5fe830e770c193 3-10,15-16,23-45,55-56,58-68
+apps/cli/src/lib/command-catalog.ts
+  s_e8fb00d5812ee1::t_c747c31dcfa708 14
+  s_e8fb00d5812ee1::t_1d0676fad1ca57 380-401
+  s_e8fb00d5812ee1::t_032a7222b459c1 379
+apps/cli/src/commands/accounts.ts
+  s_e8fb00d5812ee1::t_28c7efac6cbca9 65,103
+  s_e8fb00d5812ee1::t_16126bdc8ac388 1-64,66-102,104-154
+apps/cli/tests/accounts.test.ts
+  s_e8fb00d5812ee1::t_f54b48a096a6ba 1-57
+apps/cli/src/commands/login.ts
+  s_e8fb00d5812ee1::t_8c0379ac756a19 2,4,22-32
+  s_e8fb00d5812ee1::t_47e646b6b5708f 33
+apps/cli/src/commands/whoami.ts
+  s_e8fb00d5812ee1::t_07411ef8f9ce6f 52-61
+  s_e8fb00d5812ee1::t_620315031b41d3 11
+apps/cli/package.json
+  s_e8fb00d5812ee1::t_0768f16a84cc2c 3
+.gitignore
+  s_e8fb00d5812ee1::t_ee5649f6647c74 60
+apps/cli/src/lib/auth-flow.ts
+  s_bdd5c3c0c56cf5::t_45dd7c369297a1 6-7,100-118
+apps/cli/src/lib/config.ts
+  s_bdd5c3c0c56cf5::t_d50961745ca328 2,57-153,155-245,248,251-258,263-266,269-271,273-294,297-300,322,325,329,332,336,339,343,346,350,353,357,360,364,367,371,374,378,381,385,388,396,404,414,418-419,422,426,429,433-435,437-439,447
+apps/cli/src/types/index.ts
+  s_bdd5c3c0c56cf5::t_d4b158a26dbf7c 24-40,135,137-144
+apps/cli/tests/config-migration.test.ts
+  s_bdd5c3c0c56cf5::t_31e4fed923234c 1-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "7eb33f666d7e6f1e361148f843158fc14980d786",
+  "prompts": {},
+  "sessions": {
+    "s_bdd5c3c0c56cf5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a57d5603cf8627c7f",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
