@@ -149,7 +149,7 @@ async function listOrganizations(
       name: org.name,
       slug: org.slug,
       tier: org.tier === "pro" ? chalk.green("Pro") : chalk.dim("Free"),
-      role: org.role,
+      role: formatRoleLabel(org.unifiedRole ?? org.role),
     })),
     [
       { key: "name", header: "Name" },

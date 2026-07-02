@@ -53,11 +53,15 @@ function accessFromMeta(
   meta: CliVariablesMeta | undefined,
   variables: Variable[]
 ): ProjectAccess {
+  const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
   return {
-    role: normalizeOrgRole(meta?.unifiedRole ?? meta?.role),
+    role,
+    // Owners are implicitly assigned to every project. The legacy server sends
+    // no `assigned`/`projectRole` for owners, so fall back to true for them.
     assigned:
-      meta?.assigned ??
-      (meta?.projectRole !== null && meta?.projectRole !== undefined),
+      role === "owner" ||
+      (meta?.assigned ??
+        (meta?.projectRole !== null && meta?.projectRole !== undefined)),
     environmentScope: meta?.environmentScope ?? null,
     hasWriteAccess:
       meta?.hasWriteAccess ?? variables.some((v) => v.access === "write"),

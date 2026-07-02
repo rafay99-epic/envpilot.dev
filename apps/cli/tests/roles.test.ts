@@ -90,9 +90,8 @@ describe("isFileWritable", () => {
     ...partial,
   });
 
-  it("unassigned users always get a read-only file", () => {
+  it("unassigned non-owners always get a read-only file", () => {
     for (const role of [
-      "owner",
       "project_manager",
       "team_lead",
       "developer",
@@ -101,6 +100,17 @@ describe("isFileWritable", () => {
         isFileWritable(access({ role, assigned: false, hasWriteAccess: true }))
       ).toBe(false);
     }
+  });
+
+  it("owner is always writable, even when unassigned (implicit access)", () => {
+    // The legacy server sends no assignment info for owners; they must still
+    // get a writable file.
+    expect(isFileWritable(access({ role: "owner", assigned: false }))).toBe(
+      true
+    );
+    expect(isFileWritable(access({ role: "owner", assigned: true }))).toBe(
+      true
+    );
   });
 
   it("assigned owner / project_manager / team_lead are always writable", () => {

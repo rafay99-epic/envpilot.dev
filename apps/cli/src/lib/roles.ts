@@ -84,9 +84,12 @@ export interface ProjectAccess {
  * viewers, and unassigned users get a read-only file.
  */
 export function isFileWritable(access: ProjectAccess): boolean {
+  // Owners have implicit access to every project — never gated on assignment.
+  // (The legacy server sends no `assigned`/`projectRole` for owners, so gating
+  // on `assigned` here would wrongly lock an owner's pulled .env read-only.)
+  if (access.role === "owner") return true;
   if (!access.assigned) return false;
   switch (access.role) {
-    case "owner":
     case "project_manager":
     case "team_lead":
       return true;
