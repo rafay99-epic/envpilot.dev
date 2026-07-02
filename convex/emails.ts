@@ -32,20 +32,62 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => map[char]);
 }
 
-function emailWrapper(title: string, body: string): string {
+// ── Brand tokens ────────────────────────────────────────────────────────────
+// Envpilot's identity is a dark terminal aesthetic with a signature green
+// accent (mirrors apps/web globals.css + the `$ envpilot` prompt wordmark).
+const FONT_SANS =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+const FONT_MONO =
+  "'SF Mono', ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Roboto Mono', Menlo, Consolas, monospace";
+const BRAND_GREEN = "#22c55e";
+const PAGE_BG = "#09090b"; // zinc-950
+const CARD_BG = "#0a0a0a";
+const CHROME_BG = "#18181b"; // zinc-900
+const BORDER = "#27272a"; // zinc-800
+
+// Inline monospace token (e.g. a variable name) styled for the dark theme.
+const CODE_STYLE = `background:${CHROME_BG}; border:1px solid ${BORDER}; padding:2px 7px; border-radius:5px; color:#4ade80; font-family:${FONT_MONO}; font-size:13px;`;
+
+function emailWrapper(title: string, body: string, preheader = ""): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
   <title>${title}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+<body style="margin: 0; padding: 0; width: 100%; background-color: ${PAGE_BG}; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+  ${preheader ? `<div style="display:none; max-height:0; overflow:hidden; opacity:0; color:${PAGE_BG}; font-size:1px; line-height:1px;">${preheader}</div>` : ""}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${PAGE_BG};">
     <tr>
-      <td style="padding: 40px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: ${CARD_BG}; border: 1px solid ${BORDER}; border-radius: 14px; overflow: hidden;">
+          <tr>
+            <td style="padding: 14px 18px; background-color: ${CHROME_BG}; border-bottom: 1px solid ${BORDER};">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="70" valign="middle" style="line-height: 0;">
+                    <span style="display:inline-block; width:11px; height:11px; border-radius:50%; background-color:#ff5f56;">&nbsp;</span>
+                    <span style="display:inline-block; width:11px; height:11px; border-radius:50%; background-color:#febc2e; margin-left:6px;">&nbsp;</span>
+                    <span style="display:inline-block; width:11px; height:11px; border-radius:50%; background-color:#28c840; margin-left:6px;">&nbsp;</span>
+                  </td>
+                  <td valign="middle" align="center" style="font-family: ${FONT_MONO}; font-size: 12px; color: #71717a; letter-spacing: 0.02em;">bash — envpilot</td>
+                  <td width="70">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
           ${body}
+        </table>
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px;">
+          <tr>
+            <td align="center" style="padding: 26px 20px 0 20px;">
+              <span style="font-family: ${FONT_MONO}; font-size: 14px; font-weight: 600; color: #71717a;"><span style="color: ${BRAND_GREEN};">$</span> envpilot</span>
+              <div style="font-family: ${FONT_SANS}; font-size: 11px; color: #3f3f46; padding-top: 8px;">Secure environment variables for modern teams</div>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -54,47 +96,55 @@ function emailWrapper(title: string, body: string): string {
 </html>`;
 }
 
-function iconRow(initial: string, bgColor = "#18181b"): string {
+function iconRow(initial: string, accent = BRAND_GREEN): string {
   return `<tr>
-  <td style="padding: 40px 40px 20px 40px; text-align: center;">
-    <div style="display: inline-block; width: 64px; height: 64px; background-color: ${bgColor}; border-radius: 12px; line-height: 64px; text-align: center;">
-      <span style="color: #ffffff; font-size: 28px; font-weight: bold;">${escapeHtml(initial)}</span>
-    </div>
+  <td style="padding: 44px 40px 18px 40px; text-align: center;">
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto;">
+      <tr>
+        <td width="64" height="64" align="center" valign="middle" style="width: 64px; height: 64px; background-color: ${CHROME_BG}; border: 1px solid ${accent}59; border-radius: 16px; font-family: ${FONT_MONO}; font-size: 28px; font-weight: 700; color: ${accent};">${escapeHtml(initial)}</td>
+      </tr>
+    </table>
   </td>
 </tr>`;
 }
 
 function headingRow(text: string): string {
   return `<tr>
-  <td style="padding: 0 40px 20px 40px; text-align: center;">
-    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">${text}</h1>
+  <td style="padding: 0 40px 14px 40px; text-align: center;">
+    <h1 style="margin: 0; font-family: ${FONT_SANS}; font-size: 23px; font-weight: 700; letter-spacing: -0.02em; color: #fafafa;">${text}</h1>
   </td>
 </tr>`;
 }
 
 function paragraphRow(
   text: string,
-  style = "font-size: 16px; line-height: 1.5; color: #52525b;"
+  style = `font-size: 15px; line-height: 1.6; color: #a1a1aa;`
 ): string {
   return `<tr>
-  <td style="padding: 0 40px 30px 40px; text-align: center;">
-    <p style="margin: 0; ${style}">${text}</p>
+  <td style="padding: 0 40px 28px 40px; text-align: center;">
+    <p style="margin: 0; font-family: ${FONT_SANS}; ${style}">${text}</p>
   </td>
 </tr>`;
 }
 
 function buttonRow(href: string, label: string): string {
   return `<tr>
-  <td style="padding: 0 40px 30px 40px; text-align: center;">
-    <a href="${href}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">${label}</a>
+  <td style="padding: 4px 40px 30px 40px; text-align: center;">
+    <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto;">
+      <tr>
+        <td align="center" bgcolor="${BRAND_GREEN}" style="border-radius: 9px;">
+          <a href="${href}" style="display: inline-block; padding: 14px 34px; font-family: ${FONT_SANS}; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #06140b; text-decoration: none; border-radius: 9px;">${label}</a>
+        </td>
+      </tr>
+    </table>
   </td>
 </tr>`;
 }
 
 function footerRow(text: string): string {
   return `<tr>
-  <td style="padding: 20px 40px; border-top: 1px solid #e4e4e7; text-align: center;">
-    <p style="margin: 0; font-size: 12px; color: #a1a1aa;">${text}</p>
+  <td style="padding: 22px 40px; border-top: 1px solid ${BORDER}; text-align: center;">
+    <p style="margin: 0; font-family: ${FONT_SANS}; font-size: 12px; line-height: 1.6; color: #52525b;">${text}</p>
   </td>
 </tr>`;
 }
@@ -194,17 +244,18 @@ export const sendInvitationEmail = action({
         iconRow(orgInitial),
         headingRow(`Join ${safeOrg}`),
         paragraphRow(
-          `<strong>${safeInviter}</strong> has invited you to join <strong>${safeOrg}</strong> as a <strong>${roleDisplay}</strong>.`
+          `<strong style="color:#e4e4e7;">${safeInviter}</strong> has invited you to join <strong style="color:#e4e4e7;">${safeOrg}</strong> as a <strong style="color:#4ade80;">${roleDisplay}</strong>.`
         ),
         buttonRow(invitationUrl, "Accept Invitation"),
         paragraphRow(
-          `This invitation expires on <strong>${expirationDate}</strong>.`,
+          `This invitation expires on <strong style="color:#a1a1aa;">${expirationDate}</strong>.`,
           "font-size: 14px; color: #71717a;"
         ),
         footerRow(
-          `If you didn't expect this invitation, you can safely ignore this email.<br><br>Button not working? Copy this link:<br><a href="${invitationUrl}" style="color: #71717a; word-break: break-all;">${invitationUrl}</a>`
+          `If you didn't expect this invitation, you can safely ignore this email.<br><br>Button not working? Copy this link:<br><a href="${invitationUrl}" style="color: #22c55e; word-break: break-all;">${invitationUrl}</a>`
         ),
-      ].join("")
+      ].join(""),
+      `${args.inviterName} invited you to join ${args.organizationName} as a ${roleDisplay} on Envpilot.`
     );
 
     const text = `Join ${args.organizationName}\n\n${args.inviterName} has invited you to join ${args.organizationName} as a ${roleDisplay}.\n\nAccept the invitation by visiting:\n${invitationUrl}\n\nThis invitation expires on ${expirationDate}.\n\nIf you didn't expect this invitation, you can safely ignore this email.`;
@@ -438,7 +489,7 @@ export const sendVariableChangeEmail = action({
           `Variable ${args.changeType.charAt(0).toUpperCase() + args.changeType.slice(1)}`
         ),
         paragraphRow(
-          `<strong>${safeChangedBy}</strong> ${actionWord} <strong>${safeProject}</strong>.<br><br><span style="font-size: 14px; color: #71717a;">Variable: <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code></span>`
+          `<strong>${safeChangedBy}</strong> ${actionWord} <strong>${safeProject}</strong>.<br><br><span style="font-size: 14px; color: #71717a;">Variable: <code style="${CODE_STYLE}">${safeVar}</code></span>`
         ),
         footerRow(
           'You received this because you have variable change notifications enabled. <a href="#" style="color: #71717a;">Manage preferences</a>'
@@ -548,7 +599,7 @@ export const sendAccessRequestEmail = action({
         iconRow(orgInitial, "#f59e0b"),
         headingRow("Access Request"),
         paragraphRow(
-          `<strong>${safeRequester}</strong> is requesting access to the variable <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong>.`
+          `<strong>${safeRequester}</strong> is requesting access to the variable <code style="${CODE_STYLE}">${safeVar}</code> in project <strong>${safeProject}</strong>.`
         ),
         footerRow(
           'You received this because you have access request notifications enabled. <a href="#" style="color: #71717a;">Manage preferences</a>'
@@ -611,8 +662,8 @@ export const sendRotationReminderEmail = internalAction({
     const heading = isExpired ? "Secret Expired" : "Secret Expiring Soon";
 
     const description = isExpired
-      ? `The secret <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong> has expired and should be rotated immediately.`
-      : `The secret <code style="background: #f4f4f5; padding: 2px 6px; border-radius: 4px;">${safeVar}</code> in project <strong>${safeProject}</strong> will expire in <strong>${daysText}</strong> (${expirationDate}).`;
+      ? `The secret <code style="${CODE_STYLE}">${safeVar}</code> in project <strong>${safeProject}</strong> has expired and should be rotated immediately.`
+      : `The secret <code style="${CODE_STYLE}">${safeVar}</code> in project <strong>${safeProject}</strong> will expire in <strong>${daysText}</strong> (${expirationDate}).`;
 
     const subject = isExpired
       ? `Secret ${args.variableName} has expired in ${args.projectName}`
