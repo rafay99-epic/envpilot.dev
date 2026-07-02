@@ -26,6 +26,7 @@ import {
   existsSync,
   readdirSync,
   unlinkSync,
+  rmdirSync,
   statSync,
 } from "node:fs";
 import { join, dirname } from "node:path";
@@ -36,7 +37,15 @@ import { getConfigPath, getApiUrl, getAccessToken } from "./config.js";
 
 export interface CacheEntry {
   variables: Variable[];
-  fetchedAt: number; // Unix ms
+  fetchedAt: number; // Unix ms — reset on every freshness extension
+  /**
+   * Unix ms of the ORIGINAL server fetch. Never advanced by
+   * extendCacheFreshness, so it anchors the hard max-age ceiling: a cache
+   * entry can never be served (or extended) past HARD_MAX_AGE_MS after its
+   * first real fetch, no matter how many stale-check extensions occur.
+   * Optional for backwards compat with old cache files (falls back to fetchedAt).
+   */
+  firstFetchedAt?: number;
   projectId: string;
   environment: string;
   organizationId: string;
@@ -48,6 +57,15 @@ export interface CacheEntry {
    */
   fingerprint?: string;
 }
+
+/**
+ * Absolute ceiling on how long a cache entry may be served, measured from the
+ * first real fetch (firstFetchedAt). Even if the server is unreachable and we
+ * keep falling back to stale cache, once an entry is older than this we refuse
+ * to serve it — forcing a fresh fetch (which fails loudly when offline) so that
+ * revoked or rotated secrets can never be served indefinitely.
+ */
+export const HARD_MAX_AGE_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export type CacheResult =
   | { hit: true; fresh: true; entry: CacheEntry }
@@ -88,10 +106,14 @@ function getCachePath(key: string): string {
  * cached variables.
  */
 export function computeFingerprint(variables: Variable[]): string {
+  // MUST stay byte-identical to apps/web/src/app/api/cli/variables/fingerprint
+  // /route.ts: `${v._id}:${v.version}:${v.updatedAt}`, sorted, joined with "|",
+  // sha256, first 16 hex chars. Do NOT coalesce version/updatedAt to 0 — the
+  // server does not, and any divergence makes every stale check refetch.
   return createHash("sha256")
     .update(
       variables
-        .map((v) => `${v._id}:${v.version ?? 0}:${v.updatedAt ?? 0}`)
+        .map((v) => `${v._id}:${v.version}:${v.updatedAt}`)
         .sort()
         .join("|")
     )
@@ -118,6 +140,17 @@ export function readCache(
     const entry = JSON.parse(raw) as CacheEntry;
     // Invalidate if the API server changed.
     if (entry.apiUrl !== getApiUrl()) return null;
+    // Hard ceiling: never serve an entry older than HARD_MAX_AGE_MS since its
+    // first fetch — delete it so a fresh fetch is forced (and fails loudly when
+    // offline) rather than serving potentially-revoked secrets forever.
+    if (!isWithinHardMaxAge(entry)) {
+      try {
+        unlinkSync(path);
+      } catch {
+        // Ignore — best effort cleanup.
+      }
+      return null;
+    }
     return entry;
   } catch {
     return null;
@@ -151,21 +184,31 @@ export function writeCache(
   projectId: string,
   environment: string,
   organizationId: string,
-  variables: Variable[]
+  variables: Variable[],
+  /**
+   * The fingerprint the server reported for this exact variable set, if we
+   * happen to have it (e.g. the stale-path fingerprint check that triggered
+   * this refetch). Stored verbatim so the next stale check is guaranteed to
+   * match. When omitted, we compute it locally with the server-identical
+   * formula.
+   */
+  serverFingerprint?: string
 ): void {
   try {
     const cacheDir = getCacheDir();
     mkdirSync(cacheDir, { recursive: true, mode: 0o700 });
     const key = getCacheKey(projectId, environment, organizationId);
     const path = getCachePath(key);
+    const now = Date.now();
     const entry: CacheEntry = {
       variables,
-      fetchedAt: Date.now(),
+      fetchedAt: now,
+      firstFetchedAt: now,
       projectId,
       environment,
       organizationId,
       apiUrl: getApiUrl(),
-      fingerprint: computeFingerprint(variables),
+      fingerprint: serverFingerprint ?? computeFingerprint(variables),
     };
     writeFileSync(path, JSON.stringify(entry, null, 2), {
       encoding: "utf-8",
@@ -196,6 +239,14 @@ export function extendCacheFreshness(
     if (!existsSync(path)) return;
     const raw = readFileSync(path, "utf-8");
     const entry = JSON.parse(raw) as CacheEntry;
+    // Never let a hot entry outlive the hard ceiling: if extending would push
+    // this entry past HARD_MAX_AGE_MS since its first fetch, leave it stale so
+    // the next run re-verifies (or, once fully expired, readCache deletes it).
+    if (!isWithinHardMaxAge(entry)) return;
+    // Anchor the hard-age ceiling to the earliest known fetch BEFORE advancing
+    // fetchedAt, so old cache files (no firstFetchedAt) still get a real ceiling.
+    if (entry.firstFetchedAt === undefined)
+      entry.firstFetchedAt = entry.fetchedAt;
     entry.fetchedAt = Date.now();
     writeFileSync(path, JSON.stringify(entry, null, 2), {
       encoding: "utf-8",
@@ -247,6 +298,27 @@ export function clearAllCache(): number {
 }
 
 /**
+ * Delete the entire run-cache directory contents (all decrypted-secret cache
+ * files). Called by config.clearAuth() on logout / account switch so a
+ * different user can never be served another account's cached secrets, and
+ * available as an explicit "wipe my local secret cache" primitive.
+ *
+ * Returns the number of cache files removed.
+ */
+export function clearRunCache(): number {
+  const removed = clearAllCache();
+  try {
+    const dir = getCacheDir();
+    if (existsSync(dir) && readdirSync(dir).length === 0) {
+      rmdirSync(dir);
+    }
+  } catch {
+    // Non-fatal — an empty directory left behind is harmless.
+  }
+  return removed;
+}
+
+/**
  * Return total number of cached entries and the directory path (for diagnostics).
  */
 export function getCacheStats(): {
@@ -278,7 +350,17 @@ export function getCacheStats(): {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function isFresh(entry: CacheEntry, ttlSeconds: number): boolean {
+  // ttlSeconds === 0 means "never fresh" → always fingerprint-check.
   return Date.now() - entry.fetchedAt < ttlSeconds * 1000;
+}
+
+/**
+ * Whether the entry is still within the absolute hard ceiling measured from its
+ * first fetch. Old cache files without firstFetchedAt fall back to fetchedAt.
+ */
+export function isWithinHardMaxAge(entry: CacheEntry): boolean {
+  const anchor = entry.firstFetchedAt ?? entry.fetchedAt;
+  return Date.now() - anchor < HARD_MAX_AGE_MS;
 }
 
 /** Human-readable cache age: "12s ago", "3m ago", "2h ago". */

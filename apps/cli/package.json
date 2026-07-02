@@ -1,6 +1,6 @@
 {
   "name": "@envpilot/cli",
-  "version": "1.7.2",
+  "version": "1.9.1",
   "description": "Envpilot CLI — sync and manage environment variables from the terminal",
   "type": "module",
   "bin": {
@@ -26,6 +26,7 @@
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "conf": "^13.0.1",
+    "cross-spawn": "^7.0.6",
     "dotenv": "^16.4.7",
     "ink": "^5.2.1",
     "inquirer": "^12.3.2",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
+    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.10.10",
     "@types/react": "^18.3.12",
     "eslint": "^9",

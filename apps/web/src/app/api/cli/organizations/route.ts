@@ -6,7 +6,7 @@ import {
   unauthorizedResponse,
   getUserOrganizations,
 } from "@/lib/cli-auth";
-import { toLegacyOrgRole } from "@/lib/roles";
+import { normalizeOrgRole, toLegacyOrgRole } from "@/lib/roles";
 
 /**
  * GET /api/cli/organizations
@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
         tier: orgTiers[index]?.tierName ?? "free",
         // Old CLI builds only understand the legacy role strings.
         role: toLegacyOrgRole(org.role),
+        // Additive: unified-model org role for new CLIs. Old CLIs ignore it.
+        unifiedRole: normalizeOrgRole(org.role),
         description: org.description,
         logoUrl: org.logoUrl,
       })),

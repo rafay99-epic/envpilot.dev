@@ -1,25 +1,21 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import {
-  success,
-  error,
-  info,
-  warning,
-  withSpinner,
-  formatRole,
-  formatProjectRole,
-  roleNotice,
-  projectRoleNotice,
-} from "../lib/ui.js";
+import { success, error, info, warning, withSpinner } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,
-  getRole,
+  getUnifiedRole,
   setActiveOrganizationId,
   setActiveProjectId,
-  setRole,
+  setUnifiedRole,
 } from "../lib/config.js";
+import {
+  normalizeOrgRole,
+  formatRoleLabel,
+  roleLevel,
+  ROLE_LEVEL,
+} from "../lib/roles.js";
 import {
   hasProjectConfig,
   readProjectConfigV2,
@@ -36,6 +32,17 @@ import type {
   Environment,
   ProjectConfigV2,
 } from "../types/index.js";
+import type { OrgRole } from "../lib/roles.js";
+
+/**
+ * Resolve an organization's unified role, preferring the additive unifiedRole
+ * field the server now returns and falling back to the legacy role string.
+ */
+function orgUnifiedRole(org: Organization): OrgRole {
+  const unified = (org as Organization & { unifiedRole?: string | null })
+    .unifiedRole;
+  return normalizeOrgRole(unified ?? org.role);
+}
 
 export const initCommand = new Command("init")
   .description("Initialize Envpilot in the current directory")
@@ -103,9 +110,7 @@ export const initCommand = new Command("init")
 
       setActiveOrganizationId(selectedOrg._id);
       setActiveProjectId(selectedProject._id);
-      if (selectedOrg.role) {
-        setRole(selectedOrg.role);
-      }
+      setUnifiedRole(orgUnifiedRole(selectedOrg));
 
       ensureEnvInGitignore();
       warnTrackedFiles();
@@ -128,11 +133,12 @@ async function addProject(
 ): Promise<void> {
   const api = createAPIClient();
 
-  // Role check — only admin and team_lead can link multiple projects
-  let role = getRole();
+  // Role gate — linking multiple projects requires team-lead level or above
+  // (owners, project managers, team leads). Developers are blocked.
+  let role: OrgRole = getUnifiedRole();
 
-  if (role !== "admin" && role !== "team_lead") {
-    // Verify against API in case cached role is stale
+  if (roleLevel(role) < ROLE_LEVEL.team_lead) {
+    // Verify against the API in case the cached role is stale.
     const orgs = await withSpinner("Checking permissions...", async () => {
       const response = await api.get<{
         success: boolean;
@@ -141,17 +147,19 @@ async function addProject(
       return response.data || [];
     });
 
-    const freshRole = orgs.find(
+    const freshOrg = orgs.find(
       (o) => o._id === existingConfig.projects[0]?.organizationId
-    )?.role;
+    );
 
-    if (freshRole) {
-      setRole(freshRole);
-      role = freshRole;
+    if (freshOrg) {
+      role = orgUnifiedRole(freshOrg);
+      setUnifiedRole(role);
     }
 
-    if (role !== "admin" && role !== "team_lead") {
-      error("Only admins and team leads can link multiple projects.");
+    if (roleLevel(role) < ROLE_LEVEL.team_lead) {
+      error(
+        `Only team leads and above can link multiple projects (your role: ${formatRoleLabel(role)}).`
+      );
       info("Unlink the current project first with `envpilot unlink`.");
       process.exit(1);
     }
@@ -399,17 +407,14 @@ function printPostInit(
 ): void {
   console.log();
   console.log(chalk.dim("Configuration saved to .envpilot"));
-  if (selectedOrg.role) {
-    console.log(chalk.dim(`  Org role: ${formatRole(selectedOrg.role)}`));
-    roleNotice(selectedOrg.role);
-  }
-  if (selectedProject.projectRole) {
-    console.log(
-      chalk.dim(
-        `  Project role: ${formatProjectRole(selectedProject.projectRole)}`
-      )
-    );
-    projectRoleNotice(selectedProject.projectRole);
+  console.log(
+    chalk.dim(`  Org role: ${formatRoleLabel(orgUnifiedRole(selectedOrg))}`)
+  );
+  // Under the unified model a developer's access can be scoped to specific
+  // environments; surface that so the user knows what they can pull/push.
+  const scope = selectedProject.environmentScope;
+  if (scope && scope.length > 0) {
+    console.log(chalk.dim(`  Environment scope: ${scope.join(", ")}`));
   }
   console.log();
   console.log("Next steps:");

@@ -10,7 +10,7 @@ import {
   diff as showDiff,
 } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
-import { isAuthenticated, getRole } from "../lib/config.js";
+import { isAuthenticated } from "../lib/config.js";
 import {
   readProjectConfig,
   readProjectConfigV2,
@@ -35,7 +35,7 @@ import {
   fileNotFound,
   handleError,
 } from "../lib/errors.js";
-import type { Variable } from "../types/index.js";
+import type { Variable, VariablesMeta } from "../types/index.js";
 
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
@@ -119,47 +119,6 @@ export const pushCommand = new Command("push")
 
       const api = createAPIClient();
 
-      // Check project role before proceeding
-      const projects = await api.get<{
-        success: boolean;
-        data: Array<{ _id: string; projectRole?: string | null }>;
-      }>("/api/cli/projects", { organizationId });
-      const currentProject = projects.data?.find((p) => p._id === projectId);
-      const projectRole = currentProject?.projectRole;
-
-      // Hard-block viewers from push
-      if (projectRole === "viewer") {
-        error(
-          "Unfortunately, as a member, you cannot push in any environment. Please access or request access to your team lead."
-        );
-        process.exit(1);
-      }
-
-      // Warn members before push
-      const role = getRole();
-      if (role === "member") {
-        warning(
-          "You have Member access. Push will create pending requests that require Admin or Team Lead approval."
-        );
-        console.log();
-
-        if (!options.force) {
-          const { proceed } = await inquirer.prompt([
-            {
-              type: "confirm",
-              name: "proceed",
-              message: "Continue with creating approval requests?",
-              default: true,
-            },
-          ]);
-
-          if (!proceed) {
-            info("Push cancelled.");
-            return;
-          }
-        }
-      }
-
       const environment = options.env || defaultEnvironment || "development";
       const fmt = (options.format || "env") as FormatType;
       if (!ALL_FORMATS.includes(fmt)) {
@@ -211,7 +170,9 @@ export const pushCommand = new Command("push")
         return;
       }
 
-      // Fetch current remote variables for comparison
+      // Fetch current remote variables for comparison (and the caller's access
+      // meta for the target environment, used to gate the push).
+      let meta: VariablesMeta | undefined;
       const remoteVariables = await withSpinner(
         "Fetching current variables...",
         async () => {
@@ -225,10 +186,28 @@ export const pushCommand = new Command("push")
           const response = await api.get<{
             success: boolean;
             data: Variable[];
+            meta?: VariablesMeta;
           }>("/api/cli/variables", params);
+          meta = response.meta;
           return response.data || [];
         }
       );
+
+      // Gate the push under the unified model. Only block when the user has no
+      // write path: a scoped developer whose assignment excludes this env, or an
+      // otherwise read-only caller. A legacy server that omits meta leaves both
+      // checks inert (undefined), preserving the previous permissive behavior.
+      const scope = meta?.environmentScope;
+      if (Array.isArray(scope) && !scope.includes(environment)) {
+        error(
+          `Your developer access is scoped to ${scope.join(", ")}. ${environment} variables are withheld.`
+        );
+        process.exit(1);
+      }
+      if (meta?.hasWriteAccess === false) {
+        error(`You have read-only access to ${environment} in this project.`);
+        process.exit(1);
+      }
 
       // Convert remote vars to object
       const remoteVars: Record<string, string> = {};
@@ -312,14 +291,13 @@ export const pushCommand = new Command("push")
         async () => {
           const response = await api.post<{
             success: boolean;
-            requested?: boolean;
             data: {
               created: number;
               updated: number;
               deleted: number;
               total: number;
-              requested?: number;
               skipped?: number;
+              deniedKeys?: string[];
             };
           }>("/api/cli/variables/bulk", {
             projectId,
@@ -335,31 +313,30 @@ export const pushCommand = new Command("push")
         }
       );
 
-      if (result?.requested && result.requested > 0) {
-        success(
-          `Created ${result.requested} pending request(s) for ${chalk.bold(environment)}`
-        );
+      success(
+        `Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`
+      );
+      console.log();
+      console.log(chalk.dim(`  Created: ${result?.created || 0}`));
+      console.log(chalk.dim(`  Updated: ${result?.updated || 0}`));
+      if (mode === "replace") {
+        console.log(chalk.dim(`  Deleted: ${result?.deleted || 0}`));
+      }
+
+      // Surface keys the server refused for authorization/scope reasons. These
+      // were NOT written — report them plainly instead of counting as success.
+      const deniedKeys = result?.deniedKeys ?? [];
+      if (deniedKeys.length > 0) {
         console.log();
-        console.log(
-          chalk.yellow(
-            "  These changes require approval from an Admin or Team Lead."
-          )
+        warning(
+          `${deniedKeys.length} variable(s) were NOT written (access denied):`
         );
-        console.log();
-        console.log(chalk.dim(`  Requested: ${result.requested}`));
-        if (result?.skipped && result.skipped > 0) {
-          console.log(chalk.dim(`  Skipped:   ${result.skipped}`));
+        for (const key of deniedKeys) {
+          console.log(chalk.red(`  ✗ ${key}`));
         }
-      } else {
-        success(
-          `Pushed ${result?.total || Object.keys(valid).length} variables to ${chalk.bold(environment)}`
-        );
-        console.log();
-        console.log(chalk.dim(`  Created: ${result?.created || 0}`));
-        console.log(chalk.dim(`  Updated: ${result?.updated || 0}`));
-        if (mode === "replace") {
-          console.log(chalk.dim(`  Deleted: ${result?.deleted || 0}`));
-        }
+      }
+      if (result?.skipped && result.skipped > 0) {
+        console.log(chalk.dim(`  Skipped: ${result.skipped}`));
       }
     } catch (err) {
       await handleError(err);

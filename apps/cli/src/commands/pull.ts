@@ -15,6 +15,7 @@ import {
   readProjectConfig,
   readProjectConfigV2,
   resolveProject,
+  getActiveProject,
   getTrackedEnvFiles,
 } from "../lib/project-config.js";
 import {
@@ -30,13 +31,56 @@ import {
   ALL_FORMATS,
   type FormatType,
 } from "../lib/format-converter.js";
-import { getRole } from "../lib/config.js";
 import {
   notAuthenticated,
   notInitialized,
   handleError,
 } from "../lib/errors.js";
-import type { Variable, ProjectEntry } from "../types/index.js";
+import {
+  normalizeOrgRole,
+  formatRoleLabel,
+  isFileWritable,
+  type ProjectAccess,
+} from "../lib/roles.js";
+import type { Variable, ProjectEntry, VariablesMeta } from "../types/index.js";
+
+/** How a project's pulled .env permissions are managed. */
+type FileProtection = "auto" | "always" | "never";
+
+/**
+ * The /api/cli/variables meta block, including the legacy role/projectRole
+ * fields the server still returns (passthrough keys not surfaced by the typed
+ * VariablesMeta schema).
+ */
+type CliVariablesMeta = VariablesMeta & {
+  role?: string | null;
+  projectRole?: string | null;
+};
+
+/**
+ * Build a ProjectAccess for THIS request from the /api/cli/variables meta.
+ * Deriving from the per-request meta (not a stale global role) is what fixes
+ * the cross-org bug where an owner-in-org-A value made a read-only developer's
+ * file writable.
+ */
+function accessFromMeta(
+  meta: CliVariablesMeta | undefined,
+  variables: Variable[]
+): ProjectAccess {
+  const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
+  return {
+    role,
+    // Owners are implicitly assigned to every project. The legacy server sends
+    // no `assigned`/`projectRole` for owners, so fall back to true for them.
+    assigned:
+      role === "owner" ||
+      (meta?.assigned ??
+        (meta?.projectRole !== null && meta?.projectRole !== undefined)),
+    environmentScope: meta?.environmentScope ?? null,
+    hasWriteAccess:
+      meta?.hasWriteAccess ?? variables.some((v) => v.access === "write"),
+  };
+}
 
 export const pullCommand = new Command("pull")
   .description("Download environment variables to local .env file")
@@ -101,6 +145,12 @@ export const pullCommand = new Command("pull")
       // Check for .env files tracked by git
       checkTrackedFiles();
 
+      // Resolve the active V2 entry to honor its fileProtection preference.
+      const configV2ForActive = readProjectConfigV2();
+      const activeEntry = configV2ForActive
+        ? getActiveProject(configV2ForActive)
+        : null;
+
       const environment =
         options.env || projectConfig.environment || "development";
       const fmt = (options.format || "env") as FormatType;
@@ -119,6 +169,7 @@ export const pullCommand = new Command("pull")
           projectId: projectConfig.projectId,
           organizationId: projectConfig.organizationId,
           environment,
+          fileProtection: activeEntry?.fileProtection,
         },
         outputPath,
         options
@@ -158,6 +209,7 @@ async function pullAllProjects(options: {
           projectId: project.projectId,
           organizationId: project.organizationId,
           environment: project.environment,
+          fileProtection: project.fileProtection,
         },
         outputPath,
         options
@@ -207,6 +259,7 @@ async function pullSingleProject(
       projectId: project.projectId,
       organizationId: project.organizationId,
       environment,
+      fileProtection: project.fileProtection,
     },
     outputPath,
     options
@@ -218,6 +271,7 @@ async function pullProject(
     projectId: string;
     organizationId: string;
     environment: string;
+    fileProtection?: FileProtection;
   },
   outputPath: string,
   options: {
@@ -229,7 +283,7 @@ async function pullProject(
 ): Promise<void> {
   const api = createAPIClient();
 
-  let metaProjectRole: string | null | undefined;
+  let meta: CliVariablesMeta | undefined;
 
   const variables = await withSpinner(
     `Fetching ${chalk.bold(project.environment)} variables...`,
@@ -237,12 +291,7 @@ async function pullProject(
       const response = await api.get<{
         success: boolean;
         data: Variable[];
-        meta: {
-          total: number;
-          environment: string;
-          role?: string;
-          projectRole?: string | null;
-        };
+        meta?: CliVariablesMeta;
       }>("/api/cli/variables", {
         projectId: project.projectId,
         environment: project.environment,
@@ -250,10 +299,18 @@ async function pullProject(
           organizationId: project.organizationId,
         }),
       });
-      metaProjectRole = response.meta?.projectRole;
+      meta = response.meta;
       return response.data || [];
     }
   );
+
+  // Environment-scope notice for scoped developers (server withholds vars
+  // outside the developer's assigned environments).
+  if (meta?.scopeRestricted && meta.environmentScope?.length) {
+    info(
+      `Your access is scoped to ${meta.environmentScope.join(", ")}; variables in other environments are withheld.`
+    );
+  }
 
   if (variables.length === 0) {
     warning(`No variables found for ${project.environment} environment.`);
@@ -334,26 +391,32 @@ async function pullProject(
     fs.writeFileSync(outputPath, output, "utf-8");
   }
 
-  // Apply role-based file protection (matches extension behavior)
-  const role = getRole();
-  applyFileProtection(outputPath, role, metaProjectRole);
+  // Apply access-based file protection derived from THIS request's meta (never
+  // a stale global role), honoring the project's fileProtection preference.
+  const access = accessFromMeta(meta, variables);
+  const protection = project.fileProtection ?? "auto";
+  applyFileProtection(outputPath, access, protection);
 
   success(
     `Downloaded ${variables.length} variables to ${chalk.bold(outputPath)}`
   );
 
-  if (metaProjectRole === "viewer") {
+  // Grant-only users only see variables explicitly shared with them.
+  if (meta?.grantOnly) {
     info(
-      "You have Viewer access to this project. You may only see variables you have been explicitly granted access to."
+      "You have grant-only access to this project. You only see variables explicitly shared with you."
     );
   }
 
-  // Show protection status
-  const isProtected =
-    role !== "admin" && role !== "team_lead" && metaProjectRole !== "manager";
-  if (isProtected) {
+  // Show protection status.
+  const writable =
+    protection === "never" ||
+    (protection !== "always" && isFileWritable(access));
+  if (!writable) {
     info(
-      `File is read-only (your role: ${role || metaProjectRole || "member"}).`
+      `File is read-only (your role: ${formatRoleLabel(access.role)}${
+        access.assigned ? "" : ", not assigned to this project"
+      }).`
     );
   }
 

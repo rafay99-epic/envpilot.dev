@@ -3,7 +3,8 @@ import chalk from "chalk";
 import { hostname } from "node:os";
 import { createAPIClient } from "./api.js";
 import { createSpinner, success, info } from "./ui.js";
-import { setAccessToken, setRefreshToken, setUser } from "./config.js";
+import { upsertAccount, setActiveAccount } from "./config.js";
+import type { Account } from "../types/index.js";
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_ATTEMPTS = 150; // 5 minutes
@@ -96,16 +97,25 @@ export async function performLogin(options?: {
           );
         }
 
-        setAccessToken(pollResponse.accessToken);
-        setRefreshToken(pollResponse.refreshToken);
-
-        if (pollResponse.user) {
-          setUser({
-            id: pollResponse.user.id,
-            email: pollResponse.user.email,
-            name: pollResponse.user.name,
-          });
-        }
+        // Build an account keyed by user id and make it active. This ADDS the
+        // account without clobbering any other logged-in accounts.
+        const accountId =
+          pollResponse.user?.id ??
+          `session-${pollResponse.accessToken.slice(0, 8)}`;
+        const account: Account = {
+          id: accountId,
+          user: pollResponse.user
+            ? {
+                id: pollResponse.user.id,
+                email: pollResponse.user.email,
+                name: pollResponse.user.name,
+              }
+            : { id: accountId, email: `${accountId}@cli.local` },
+          accessToken: pollResponse.accessToken,
+          refreshToken: pollResponse.refreshToken,
+        };
+        upsertAccount(account);
+        setActiveAccount(account.id);
 
         console.log();
         success(`Logged in as ${chalk.bold(pollResponse.user?.email)}`);

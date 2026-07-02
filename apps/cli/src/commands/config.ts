@@ -11,9 +11,37 @@ import {
 } from "../lib/config.js";
 import {
   readProjectConfig,
+  readProjectConfigV2,
+  getActiveProject,
+  updateProjectInConfig,
+  writeProjectConfigV2,
   getProjectConfigPath,
 } from "../lib/project-config.js";
 import { handleError } from "../lib/errors.js";
+import type { ProjectEntry } from "../types/index.js";
+
+const FILE_PROTECTION_VALUES = ["auto", "always", "never"] as const;
+const ENVIRONMENT_VALUES = ["development", "staging", "production"] as const;
+
+/**
+ * Apply an update to the active project's entry in the linked .envpilot config.
+ * Throws with a clear message when no project is initialized in this directory.
+ */
+function updateActiveProjectEntry(updates: Partial<ProjectEntry>): void {
+  const v2 = readProjectConfigV2();
+  if (!v2) {
+    error(
+      "No project initialized in this directory. Run `envpilot init` first."
+    );
+    process.exit(1);
+  }
+  const active = getActiveProject(v2);
+  if (!active) {
+    error("No active project found in this directory.");
+    process.exit(1);
+  }
+  writeProjectConfigV2(updateProjectInConfig(v2, active.projectId, updates));
+}
 
 export const configCommand = new Command("config")
   .description("Manage CLI configuration")
@@ -69,6 +97,10 @@ async function handleGet(key: string | undefined) {
     console.log("  user                Current authenticated user");
     console.log("  activeProjectId     Currently active project");
     console.log("  activeOrganizationId Currently active organization");
+    console.log(
+      "  fileProtection      Active project .env protection (auto|always|never)"
+    );
+    console.log("  defaultEnvironment  Active project's default environment");
     process.exit(1);
   }
 
@@ -95,6 +127,20 @@ async function handleGet(key: string | undefined) {
       console.log(config.activeOrganizationId || chalk.dim("(not set)"));
       break;
 
+    case "fileProtection": {
+      const v2 = readProjectConfigV2();
+      const active = v2 ? getActiveProject(v2) : null;
+      console.log(active?.fileProtection ?? "auto");
+      break;
+    }
+
+    case "defaultEnvironment": {
+      const v2 = readProjectConfigV2();
+      const active = v2 ? getActiveProject(v2) : null;
+      console.log(active?.environment || chalk.dim("(not set)"));
+      break;
+    }
+
     default:
       error(`Unknown key: ${key}`);
       process.exit(1);
@@ -105,8 +151,7 @@ async function handleSet(key: string | undefined, value: string | undefined) {
   if (!key || value === undefined) {
     error("Missing key or value. Usage: envpilot config set <key> <value>");
     console.log();
-    console.log("Settable keys:");
-    console.log("  apiUrl    API endpoint URL");
+    printSettableKeys();
     process.exit(1);
   }
 
@@ -126,13 +171,59 @@ async function handleSet(key: string | undefined, value: string | undefined) {
       break;
     }
 
+    case "fileProtection": {
+      if (
+        !FILE_PROTECTION_VALUES.includes(
+          value as (typeof FILE_PROTECTION_VALUES)[number]
+        )
+      ) {
+        error(
+          `Invalid fileProtection value: ${value}. Expected one of: ${FILE_PROTECTION_VALUES.join(", ")}`
+        );
+        process.exit(1);
+      }
+      updateActiveProjectEntry({
+        fileProtection: value as (typeof FILE_PROTECTION_VALUES)[number],
+      });
+      success(`Set fileProtection to ${value} for the active project`);
+      break;
+    }
+
+    case "defaultEnvironment": {
+      if (
+        !ENVIRONMENT_VALUES.includes(
+          value as (typeof ENVIRONMENT_VALUES)[number]
+        )
+      ) {
+        error(
+          `Invalid defaultEnvironment value: ${value}. Expected one of: ${ENVIRONMENT_VALUES.join(", ")}`
+        );
+        process.exit(1);
+      }
+      updateActiveProjectEntry({
+        environment: value as (typeof ENVIRONMENT_VALUES)[number],
+      });
+      success(`Set defaultEnvironment to ${value} for the active project`);
+      break;
+    }
+
     default:
       error(`Cannot set key: ${key}`);
       console.log();
-      console.log("Settable keys:");
-      console.log("  apiUrl    API endpoint URL");
+      printSettableKeys();
       process.exit(1);
   }
+}
+
+function printSettableKeys(): void {
+  console.log("Settable keys:");
+  console.log("  apiUrl              API endpoint URL");
+  console.log(
+    "  fileProtection      Active project .env protection (auto|always|never)"
+  );
+  console.log(
+    "  defaultEnvironment  Active project default environment (development|staging|production)"
+  );
 }
 
 async function handleList() {

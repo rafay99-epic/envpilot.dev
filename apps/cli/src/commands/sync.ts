@@ -10,10 +10,9 @@ import {
 import { createAPIClient } from "../lib/api.js";
 import {
   isAuthenticated,
-  getRole,
   setActiveOrganizationId,
   setActiveProjectId,
-  setRole,
+  setUnifiedRole,
 } from "../lib/config.js";
 import {
   readProjectConfigV2,
@@ -28,11 +27,52 @@ import {
   diffEnvVars,
   applyFileProtection,
 } from "../lib/env-file.js";
+import {
+  normalizeOrgRole,
+  formatRoleLabel,
+  isFileWritable,
+  type ProjectAccess,
+} from "../lib/roles.js";
 import { performLogin } from "../lib/auth-flow.js";
 import { selectOrgProjectEnv } from "./init.js";
 import { installCommitGuard } from "../lib/commit-guard.js";
 import { handleError } from "../lib/errors.js";
-import type { Variable, Environment } from "../types/index.js";
+import type {
+  Variable,
+  Environment,
+  Organization,
+  VariablesMeta,
+} from "../types/index.js";
+
+type CliVariablesMeta = VariablesMeta & {
+  role?: string | null;
+  projectRole?: string | null;
+};
+
+function accessFromMeta(
+  meta: CliVariablesMeta | undefined,
+  variables: Variable[]
+): ProjectAccess {
+  const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
+  return {
+    role,
+    // Owners are implicitly assigned to every project. The legacy server sends
+    // no `assigned`/`projectRole` for owners, so fall back to true for them.
+    assigned:
+      role === "owner" ||
+      (meta?.assigned ??
+        (meta?.projectRole !== null && meta?.projectRole !== undefined)),
+    environmentScope: meta?.environmentScope ?? null,
+    hasWriteAccess:
+      meta?.hasWriteAccess ?? variables.some((v) => v.access === "write"),
+  };
+}
+
+function orgUnifiedRole(org: Organization): ProjectAccess["role"] {
+  const unified = (org as Organization & { unifiedRole?: string | null })
+    .unifiedRole;
+  return normalizeOrgRole(unified ?? org.role);
+}
 
 export const syncCommand = new Command("sync")
   .description(
@@ -123,9 +163,7 @@ export const syncCommand = new Command("sync")
         projectName = selection.selectedProject.name;
         organizationName = selection.selectedOrg.name;
 
-        if (selection.selectedOrg.role) {
-          setRole(selection.selectedOrg.role);
-        }
+        setUnifiedRole(orgUnifiedRole(selection.selectedOrg));
 
         // Save config
         writeProjectConfigV2({
@@ -161,7 +199,7 @@ export const syncCommand = new Command("sync")
 
       // ── Step 4: Pull variables ─────────────────────────────────────
       console.log();
-      let metaProjectRole: string | null | undefined;
+      let meta: CliVariablesMeta | undefined;
 
       const variables = await withSpinner(
         `Fetching ${chalk.bold(environment)} variables...`,
@@ -170,23 +208,24 @@ export const syncCommand = new Command("sync")
           const response = await api.get<{
             success: boolean;
             data: Variable[];
-            meta: {
-              total: number;
-              environment: string;
-              role?: string;
-              projectRole?: string | null;
-            };
+            meta?: CliVariablesMeta;
           }>("/api/cli/variables", {
             projectId,
             environment,
             ...(organizationId && { organizationId }),
           });
-          metaProjectRole = response.meta?.projectRole;
+          meta = response.meta;
           return response.data || [];
         }
       );
 
       const outputPath = getEnvPathForEnvironment(environment);
+
+      if (meta?.scopeRestricted && meta.environmentScope?.length) {
+        info(
+          `Your access is scoped to ${meta.environmentScope.join(", ")}; variables in other environments are withheld.`
+        );
+      }
 
       if (variables.length === 0) {
         warning(`No variables found for ${environment} environment.`);
@@ -239,22 +278,35 @@ export const syncCommand = new Command("sync")
       }
       writeEnvFile(outputPath, remoteVars, { sort: true, comments });
 
-      // Apply role-based file protection
-      const role = getRole();
-      applyFileProtection(outputPath, role, metaProjectRole);
+      // Apply access-based file protection derived from THIS request's meta
+      // (never a stale global role), honoring the project's fileProtection
+      // preference.
+      const access = accessFromMeta(meta, variables);
+      const protection =
+        existingConfig?.projects.find((p) => p.projectId === projectId)
+          ?.fileProtection ?? "auto";
+      applyFileProtection(outputPath, access, protection);
 
       success(
         `Synced ${variables.length} variables to ${chalk.bold(outputPath)}`
       );
 
-      // Show protection status
-      const isProtected =
-        role !== "admin" &&
-        role !== "team_lead" &&
-        metaProjectRole !== "manager";
-      if (isProtected) {
+      // Grant-only users only see variables explicitly shared with them.
+      if (meta?.grantOnly) {
         info(
-          `File is read-only (your role: ${role || metaProjectRole || "member"}).`
+          "You have grant-only access to this project. You only see variables explicitly shared with you."
+        );
+      }
+
+      // Show protection status.
+      const writable =
+        protection === "never" ||
+        (protection !== "always" && isFileWritable(access));
+      if (!writable) {
+        info(
+          `File is read-only (your role: ${formatRoleLabel(access.role)}${
+            access.assigned ? "" : ", not assigned to this project"
+          }).`
         );
       }
 

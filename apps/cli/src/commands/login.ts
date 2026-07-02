@@ -1,7 +1,7 @@
 import { Command } from "commander";
-import { info } from "../lib/ui.js";
+import { info, success } from "../lib/ui.js";
 import { handleError } from "../lib/errors.js";
-import { setApiUrl } from "../lib/config.js";
+import { setApiUrl, listAccounts, getActiveAccount } from "../lib/config.js";
 import { performLogin } from "../lib/auth-flow.js";
 
 export const loginCommand = new Command("login")
@@ -18,6 +18,18 @@ export const loginCommand = new Command("login")
       await performLogin({
         browser: options.browser !== false,
       });
+
+      const activeAccount = getActiveAccount();
+      if (activeAccount) {
+        success(`Signed in as ${activeAccount.user.email}.`);
+      }
+
+      const accounts = listAccounts();
+      if (accounts.length > 1) {
+        info(
+          `You have ${accounts.length} accounts — use \`envpilot accounts\` to list/switch.`
+        );
+      }
 
       console.log();
       console.log("Next steps:");

@@ -500,10 +500,13 @@ function parseNetlify(content: string): Record<string, string> {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Check for section headers
+    // Check for section headers. Netlify exposes env vars both under the
+    // global [build.environment] block and under context-scoped blocks like
+    // [context.production.environment] or [context.deploy-preview.environment].
     if (trimmed.startsWith("[")) {
       inBuildEnv =
-        trimmed === "[build.environment]" || trimmed === "[build.environment]";
+        trimmed === "[build.environment]" ||
+        /^\[context\.[^.\]]+\.environment\]$/.test(trimmed);
       continue;
     }
 

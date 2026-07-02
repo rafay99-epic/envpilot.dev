@@ -11,6 +11,7 @@ import { unlinkCommand } from "../commands/unlink.js";
 import { syncCommand } from "../commands/sync.js";
 import { usageCommand } from "../commands/usage.js";
 import { whoamiCommand } from "../commands/whoami.js";
+import { accountsCommand } from "../commands/accounts.js";
 import { runCommand } from "../commands/run.js";
 import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
@@ -182,14 +183,15 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     title: "Push variables",
     category: "Sync",
     description:
-      "Upload local variables back to Envpilot with approval-aware write behavior.",
+      "Upload local variables back to Envpilot, writing only the keys you have access to.",
     argv: ["push"],
     args: "[--env <environment>] [--file <path>] [--merge|--replace]",
     examples: [["push"], ["push", "--replace"]],
     websiteSurface:
       "Maps to `/api/cli/variables` and `/api/cli/variables/bulk` for writes.",
     notes: [
-      "Managers/admins write directly; lower roles create requests for approval.",
+      "Owners, project managers, and team leads write across the project; developers write only the variables they hold a write grant for.",
+      "Keys you cannot write are skipped — push does not create approval requests.",
       "Compares local and remote variables before applying changes.",
     ],
     keywords: ["upload", "bulk", "merge", "replace"],
@@ -373,6 +375,29 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["user", "identity", "session", "auth"],
     topLevel: true,
     createCommand: () => whoamiCommand,
+  },
+  {
+    id: "accounts",
+    title: "Manage accounts",
+    category: "Account",
+    description:
+      "List authenticated accounts and switch or remove them without logging out.",
+    argv: ["accounts"],
+    args: "[list|switch <identifier>|remove <identifier>]",
+    examples: [
+      ["accounts"],
+      ["accounts", "switch", "you@example.com"],
+      ["accounts", "remove", "you@example.com"],
+    ],
+    websiteSurface:
+      "Local multi-account state — each `envpilot login` adds an account instead of replacing the current session.",
+    notes: [
+      "Identifiers can be an account id or the account's email (case-insensitive).",
+      "Switching accounts does not log anyone out; use `envpilot logout` to remove the active session.",
+    ],
+    keywords: ["accounts", "multi-account", "switch", "remove", "identity"],
+    topLevel: true,
+    createCommand: () => accountsCommand,
   },
   {
     id: "config",
