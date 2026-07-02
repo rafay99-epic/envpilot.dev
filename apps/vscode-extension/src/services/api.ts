@@ -6,6 +6,7 @@ import axios, {
 } from "axios";
 import { getServerUrl } from "../utils/config";
 import { StorageService } from "../utils/storage";
+import { SingleFlight } from "../utils/singleFlight";
 import { getActiveAuthService } from "./auth";
 import type {
   Organization,
@@ -54,6 +55,14 @@ export class ApiService {
   private responseCache: Map<string, { at: number; value: unknown }> =
     new Map();
   private static readonly CACHE_TTL_MS = 30_000;
+  /**
+   * In-flight GET coalescing keyed by cache key. The 30s response cache only
+   * helps AFTER a response lands — when a sync fans out to many directories
+   * and subscriptions at once, several identical cold-cache fetches would
+   * otherwise stampede the server. This makes concurrent callers for the same
+   * key share one HTTP request (single-flight).
+   */
+  private inflight = new SingleFlight();
   /** Guards against stacking multiple "session expired" prompts at once. */
   private reauthPromptActive = false;
 
@@ -156,9 +165,21 @@ export class ApiService {
     this.responseCache.set(key, { at: Date.now(), value });
   }
 
+  /**
+   * Run `fetcher` under single-flight for `key`: if an identical request is
+   * already in flight, return its promise instead of issuing a second one.
+   */
+  private coalesce<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    return this.inflight.run(key, fetcher);
+  }
+
   /** Drop all cached responses (manual refresh, sign-out). */
   clearCache(): void {
     this.responseCache.clear();
+    // Stop new callers from joining a request that was issued under the
+    // previous session/token; the in-flight promises still settle for their
+    // original callers.
+    this.inflight.clear();
   }
 
   // Organizations
@@ -166,12 +187,14 @@ export class ApiService {
     const cached = this.getCached<Organization[]>("orgs");
     if (cached) return cached;
 
-    const response = await this.client.get<
-      ApiResponse<{ organizations: Organization[] }>
-    >("/api/extension/organizations");
-    const organizations = response.data.data?.organizations || [];
-    this.setCached("orgs", organizations);
-    return organizations;
+    return this.coalesce("orgs", async () => {
+      const response = await this.client.get<
+        ApiResponse<{ organizations: Organization[] }>
+      >("/api/extension/organizations");
+      const organizations = response.data.data?.organizations || [];
+      this.setCached("orgs", organizations);
+      return organizations;
+    });
   }
 
   // Projects
@@ -180,25 +203,27 @@ export class ApiService {
     const cached = this.getCached<Project[]>(cacheKey);
     if (cached) return cached;
 
-    const response = await this.client.get<
-      ApiResponse<{ projects: Project[] }>
-    >("/api/extension/projects", {
-      params: organizationId ? { organizationId } : undefined,
+    return this.coalesce(cacheKey, async () => {
+      const response = await this.client.get<
+        ApiResponse<{ projects: Project[] }>
+      >("/api/extension/projects", {
+        params: organizationId ? { organizationId } : undefined,
+      });
+      const projects = response.data.data?.projects || [];
+
+      // Cache both org-level and project-level roles from the response
+      for (const project of projects) {
+        if (project.userRole) {
+          this.roleCache.set(project._id, project.userRole);
+        }
+        if (project.projectRole) {
+          this.projectRoleCache.set(project._id, project.projectRole);
+        }
+      }
+
+      this.setCached(cacheKey, projects);
+      return projects;
     });
-    const projects = response.data.data?.projects || [];
-
-    // Cache both org-level and project-level roles from the response
-    for (const project of projects) {
-      if (project.userRole) {
-        this.roleCache.set(project._id, project.userRole);
-      }
-      if (project.projectRole) {
-        this.projectRoleCache.set(project._id, project.projectRole);
-      }
-    }
-
-    this.setCached(cacheKey, projects);
-    return projects;
   }
 
   async getProject(projectId: string): Promise<Project | null> {
@@ -226,40 +251,42 @@ export class ApiService {
       if (cached) return cached;
     }
 
-    const headers: Record<string, string> = {};
-    if (accessToken) {
-      headers["X-Access-Token"] = accessToken;
-    }
+    return this.coalesce(cacheKey, async () => {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers["X-Access-Token"] = accessToken;
+      }
 
-    const params: Record<string, string> = { projectId, environment };
-    if (organizationId) {
-      params.organizationId = organizationId;
-    }
+      const params: Record<string, string> = { projectId, environment };
+      if (organizationId) {
+        params.organizationId = organizationId;
+      }
 
-    const response = await this.client.get<
-      ApiResponse<{
-        variables: EnvironmentVariable[];
-        role?: MembershipRole;
-        unifiedRole?: string;
-        assigned?: boolean;
-        environmentScope?: string[] | null;
-        hasWriteAccess?: boolean;
-        scopeRestricted?: boolean;
-      }>
-    >("/api/extension/variables", {
-      params,
-      headers,
+      const response = await this.client.get<
+        ApiResponse<{
+          variables: EnvironmentVariable[];
+          role?: MembershipRole;
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }>
+      >("/api/extension/variables", {
+        params,
+        headers,
+      });
+
+      // Cache the user's role for this project
+      if (response.data.data?.role) {
+        this.roleCache.set(projectId, response.data.data.role);
+      }
+      this.cacheAccessMeta(projectId, response.data.data);
+
+      const variables = response.data.data?.variables || [];
+      this.setCached(cacheKey, variables);
+      return variables;
     });
-
-    // Cache the user's role for this project
-    if (response.data.data?.role) {
-      this.roleCache.set(projectId, response.data.data.role);
-    }
-    this.cacheAccessMeta(projectId, response.data.data);
-
-    const variables = response.data.data?.variables || [];
-    this.setCached(cacheKey, variables);
-    return variables;
   }
 
   /** Store the additive unified access fields from a variables response. */
@@ -324,43 +351,45 @@ export class ApiService {
     const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
     if (cached) return cached;
 
-    const headers: Record<string, string> = {};
-    if (accessToken) {
-      headers["X-Access-Token"] = accessToken;
-    }
+    return this.coalesce(cacheKey, async () => {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers["X-Access-Token"] = accessToken;
+      }
 
-    const params: Record<string, string> = {
-      projectId,
-      environment,
-      metadataOnly: "true",
-    };
-    if (organizationId) {
-      params.organizationId = organizationId;
-    }
+      const params: Record<string, string> = {
+        projectId,
+        environment,
+        metadataOnly: "true",
+      };
+      if (organizationId) {
+        params.organizationId = organizationId;
+      }
 
-    const response = await this.client.get<
-      ApiResponse<{
-        variables: EnvironmentVariable[];
-        role?: MembershipRole;
-        unifiedRole?: string;
-        assigned?: boolean;
-        environmentScope?: string[] | null;
-        hasWriteAccess?: boolean;
-        scopeRestricted?: boolean;
-      }>
-    >("/api/extension/variables", {
-      params,
-      headers,
+      const response = await this.client.get<
+        ApiResponse<{
+          variables: EnvironmentVariable[];
+          role?: MembershipRole;
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }>
+      >("/api/extension/variables", {
+        params,
+        headers,
+      });
+
+      if (response.data.data?.role) {
+        this.roleCache.set(projectId, response.data.data.role);
+      }
+      this.cacheAccessMeta(projectId, response.data.data);
+
+      const variables = response.data.data?.variables || [];
+      this.setCached(cacheKey, variables);
+      return variables;
     });
-
-    if (response.data.data?.role) {
-      this.roleCache.set(projectId, response.data.data.role);
-    }
-    this.cacheAccessMeta(projectId, response.data.data);
-
-    const variables = response.data.data?.variables || [];
-    this.setCached(cacheKey, variables);
-    return variables;
   }
 
   /**

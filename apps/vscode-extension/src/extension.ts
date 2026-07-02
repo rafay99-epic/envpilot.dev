@@ -1191,6 +1191,7 @@ async function handleShowStatus(): Promise<void> {
   }
 
   const user = await authService.getCurrentUser();
+  const accounts = await storageService.listAccounts();
 
   // Get all linked projects (V2)
   const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
@@ -1198,10 +1199,19 @@ async function handleShowStatus(): Promise<void> {
   const items: vscode.QuickPickItem[] = [
     {
       label: "$(account) Signed in as",
-      description: user?.email || "Unknown",
+      description:
+        (user?.email || "Unknown") +
+        (accounts.length > 1 ? ` — ${accounts.length} accounts` : ""),
       alwaysShow: true,
     },
   ];
+
+  if (accounts.length > 1) {
+    items.push({
+      label: "$(arrow-swap) Switch Account",
+      description: "Switch to another signed-in account",
+    });
+  }
 
   if (allLinkedProjects.length > 0) {
     for (const linkedProjectV2 of allLinkedProjects) {
@@ -1308,7 +1318,9 @@ async function handleShowStatus(): Promise<void> {
     return;
   }
 
-  if (selected.label.includes("Pull Variables")) {
+  if (selected.label.includes("Switch Account")) {
+    await handleSwitchAccount();
+  } else if (selected.label.includes("Pull Variables")) {
     await handlePullVariables();
   } else if (selected.label.includes("Unlink Project")) {
     await handleUnlinkProject();
