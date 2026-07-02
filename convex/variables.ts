@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -508,6 +509,158 @@ export const listWithAccess = query({
     }
 
     return variablesWithAccess;
+  },
+});
+
+/**
+ * Cursor-paginated variant of listWithAccess for "load more on scroll".
+ *
+ * Reads exactly one page of the project's variables at a time via Convex
+ * `.paginate()` on the by_project index, instead of the take(limit) window
+ * listWithAccess uses. Authorization, environment scope, the ONE prefetched
+ * grant map, and the per-row access computation are IDENTICAL to
+ * listWithAccess — the returned row shape matches exactly (variable fields
+ * with vaultRef present only when hasAccess, plus hasAccess/permission/
+ * roleAccess/userRole/projectRole/canManagePermissions).
+ *
+ * IMPORTANT: for grant-only viewers (not owner, not assigned) inaccessible
+ * rows are filtered out of the page — exactly as listWithAccess does. That
+ * can yield fewer than paginationOpts.numItems rows in a page; that is
+ * expected with usePaginatedQuery (it requests more). isDone/continueCursor
+ * are taken verbatim from the raw paginate result so the cursor stays valid.
+ * Env-scoped developers never receive out-of-scope variables at all (the
+ * scope filter also shrinks the page, same as listWithAccess).
+ */
+export const listWithAccessPaginated = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: args.paginationOpts.cursor ?? "",
+      };
+    }
+
+    // Get user's org membership to determine their unified role
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+      )
+      .first();
+
+    if (!membership) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: args.paginationOpts.cursor ?? "",
+      };
+    }
+
+    const orgRole = normalizeOrgRole(membership.role);
+    const isOwner = orgRole === "owner";
+
+    // Assignment is a pure scope check — projectMembers.role is legacy
+    // and never consulted for authorization.
+    let assigned = false;
+    let environmentScope: string[] | undefined;
+    if (!isOwner) {
+      const projectMembership = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", args.projectId).eq("userId", args.userId)
+        )
+        .first();
+      assigned = !!projectMembership;
+      // Environment scope only constrains assigned developers
+      if (orgRole === "developer") {
+        environmentScope = projectMembership?.environments;
+      }
+    }
+
+    // Owners and assigned PMs/team leads have blanket write access
+    const roleAccess =
+      isOwner ||
+      (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
+    const canManagePermissions = roleAccess;
+    const projectRole = toLegacyProjectRole(orgRole, assigned);
+
+    // Prefetch the caller's active grants ONCE (same as listWithAccess).
+    const grantByVariable = buildActiveGrantMap(
+      await ctx.db
+        .query("variablePermissions")
+        .withIndex("by_user_active", (q) =>
+          q.eq("userId", args.userId).eq("isActive", true)
+        )
+        .collect()
+    );
+
+    // Paginate the project's variables. isDone/continueCursor come straight
+    // from this result and are never recomputed after filtering.
+    const result = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    // Scoped developers never receive out-of-scope variables at all —
+    // not even their metadata/keys (identical to listWithAccess).
+    const pageVariables = result.page.filter(
+      (variable) =>
+        variable.deletedAt === undefined &&
+        isEnvironmentScopeAllowed(environmentScope, variable.environments)
+    );
+
+    const mappedPage = pageVariables.map((variable) => {
+      const grant = grantByVariable.get(variable._id as string) ?? null;
+
+      // Mirrors getVariableAccess: owner → write; assigned PM/TL → write;
+      // developers per grant; unassigned grant holders capped at read.
+      let access: "write" | "read" | null = null;
+      if (roleAccess) {
+        access = "write";
+      } else if (grant) {
+        access = !assigned || grant.permission === "read" ? "read" : "write";
+      }
+
+      const hasAccess = access !== null;
+      const effectivePermission = roleAccess ? "admin" : access;
+
+      // Vault refs are only returned for variables the user can access;
+      // assigned members still see metadata for the rest.
+      const { vaultRef, ...metadata } = variable;
+
+      return {
+        ...metadata,
+        ...(hasAccess ? { vaultRef } : {}),
+        hasAccess,
+        permission: effectivePermission,
+        roleAccess,
+        userRole: orgRole,
+        projectRole,
+        canManagePermissions,
+      };
+    });
+
+    // Assigned members (and owners) may list metadata for every variable;
+    // grant-only viewers see just the variables shared with them. Filtering
+    // shrinks the page but the cursor from paginate() stays valid.
+    const finalPage =
+      !isOwner && !assigned
+        ? mappedPage.filter((v) => v.hasAccess)
+        : mappedPage;
+
+    return {
+      page: finalPage,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

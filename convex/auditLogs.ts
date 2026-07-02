@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { query } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { batchGetUsers, userDisplay } from "./helpers";
@@ -81,6 +82,55 @@ export const listByOrganization = query({
         parsedDetails: log.details ? JSON.parse(log.details) : null,
       };
     });
+  },
+});
+
+/**
+ * Cursor-paginated org-wide audit log listing for "load more on scroll".
+ *
+ * Reads exactly one page at a time via Convex `.paginate()` instead of the
+ * offset/take window listByOrganization uses. The retention cutoff is pushed
+ * into the by_org_and_created index range so the scan is still bounded — no
+ * post-fetch JS filtering that would change which rows land in a page (that
+ * would break cursor determinism). Enriches each page row EXACTLY like
+ * listByOrganization (same batchGetUsers lookup, same userDisplay spread,
+ * same parsedDetails), so the audit page renders identical rows.
+ */
+export const listByOrganizationPaginated = query({
+  args: {
+    organizationId: v.id("organizations"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
+
+    const result = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_org_and_created", (q) => {
+        const base = q.eq("organizationId", args.organizationId);
+        return cutoff ? base.gte("createdAt", cutoff) : base;
+      })
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const userMap = await batchGetUsers(
+      ctx,
+      result.page.map((l) => l.userId)
+    );
+    const enrichedPage = result.page.map((log) => {
+      const u = userMap.get(log.userId.toString());
+      return {
+        ...log,
+        ...userDisplay(u),
+        parsedDetails: log.details ? JSON.parse(log.details) : null,
+      };
+    });
+
+    return {
+      page: enrichedPage,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

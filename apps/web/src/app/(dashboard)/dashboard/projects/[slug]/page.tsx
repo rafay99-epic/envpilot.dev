@@ -2,6 +2,8 @@
 
 import { useState, use } from "react";
 import Link from "next/link";
+import { usePaginatedQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
@@ -22,10 +24,7 @@ import {
   useVariableRequests,
   useResolveVariableRequest,
 } from "@/hooks";
-import {
-  useProjectVariables,
-  useVariableHistory as useConvexVariableHistory,
-} from "@/hooks";
+import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
 import { ProjectIcon } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui";
@@ -165,10 +164,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
 
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const rawVariables = useProjectVariables(projectId, convexUserId);
-  const isLoadingVariables =
-    rawVariables === undefined && !!projectId && !!convexUserId;
-  const variables = (rawVariables ?? []) as Variable[];
+  // Convex cursor pagination: `results` accumulates every loaded page.
+  // All downstream filtering (env tab, tags), reveal, and per-variable
+  // access flags operate over this accumulated array, unchanged.
+  const {
+    results: rawVariables,
+    status: variablesStatus,
+    loadMore: loadMoreVariables,
+  } = usePaginatedQuery(
+    api.variables.listWithAccessPaginated,
+    projectId && convexUserId ? { projectId, userId: convexUserId } : "skip",
+    { initialNumItems: 50 }
+  );
+  const isLoadingVariables = variablesStatus === "LoadingFirstPage";
+  const variables = rawVariables as Variable[];
 
   const { requests } = useVariableRequests(projectId, convexUserId);
 
@@ -502,7 +511,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     return true;
   });
 
-  const variablePagination = usePagination(filteredVariables, { pageSize: 10 });
   const requestPagination = usePagination(requests, { pageSize: 5 });
 
   const formatDate = (timestamp: number) =>
@@ -792,11 +800,8 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
             </div>
           ) : (
             <>
-              <AnimatedList
-                className="divide-y divide-zinc-200 dark:divide-zinc-800"
-                pageKey={variablePagination.currentPage}
-              >
-                {variablePagination.pageItems.map((variable) => (
+              <AnimatedList className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {filteredVariables.map((variable) => (
                   <VariableListItem
                     key={variable._id}
                     variable={{
@@ -827,18 +832,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   />
                 ))}
               </AnimatedList>
-              <Pagination
-                currentPage={variablePagination.currentPage}
-                totalPages={variablePagination.totalPages}
-                hasNextPage={variablePagination.hasNextPage}
-                hasPrevPage={variablePagination.hasPrevPage}
-                onNextPage={variablePagination.nextPage}
-                onPrevPage={variablePagination.prevPage}
-                onGoToPage={variablePagination.goToPage}
-                startIndex={variablePagination.startIndex}
-                endIndex={variablePagination.endIndex}
-                totalItems={variablePagination.totalItems}
-              />
+              {(variablesStatus === "CanLoadMore" ||
+                variablesStatus === "LoadingMore") && (
+                <div className="flex justify-center border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                  <button
+                    onClick={() => loadMoreVariables(50)}
+                    disabled={variablesStatus === "LoadingMore"}
+                    className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  >
+                    {variablesStatus === "LoadingMore"
+                      ? "Loading..."
+                      : "Load more"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
