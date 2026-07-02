@@ -1,0 +1,39 @@
+apps/vscode-extension/src/services/auth.ts
+  s_e8fb00d5812ee1::t_c663d8a5da19f9 249-300
+apps/vscode-extension/package.json
+  s_e8fb00d5812ee1::t_33463fb02b7547 135-146
+  s_e8fb00d5812ee1::t_ef0d432750d980 210,214-223
+  s_e8fb00d5812ee1::t_68f0a96062d99e 5
+apps/vscode-extension/src/utils/storage.ts
+  s_e8fb00d5812ee1::t_1b7358b54dc07e 72-75,77-87
+  s_e8fb00d5812ee1::t_642ec0051770dc 934-935
+  s_e8fb00d5812ee1::t_ed30fd770f7073 11-16,53
+  s_e8fb00d5812ee1::t_e7af0b61169564 179-214,218-235,237-238,240-273,276-329,331-337,340-343,345-414
+  s_e8fb00d5812ee1::t_5ce8cbb2417c1f 54-63
+apps/vscode-extension/src/providers/statusBar.ts
+  s_e8fb00d5812ee1::t_c5ce5bb97fba58 67,71-77
+  s_e8fb00d5812ee1::t_75a1fddef6944e 135
+  s_e8fb00d5812ee1::t_cf23919a9c2656 176-220
+  s_e8fb00d5812ee1::t_5b66a4b8cd29d0 4,12,16-28,31
+  s_e8fb00d5812ee1::t_f73b33f4981250 92-95
+apps/vscode-extension/src/extension.ts
+  s_e8fb00d5812ee1::t_872bf14a1907bb 390-400,429-585
+  s_e8fb00d5812ee1::t_ed8a44fe07939d 188-192
+  s_e8fb00d5812ee1::t_8221b56e20ba11 230-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "bb5aecb274029802fc85de85c8de12979a4bcd6d",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
