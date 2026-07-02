@@ -1,0 +1,37 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_e8fb00d5812ee1::t_3416a4c6502c8f 803-804,835-848
+  s_e8fb00d5812ee1::t_5d6dd989bb4474 27
+  s_e8fb00d5812ee1::t_feee1abf53efb0 167-180
+  s_e8fb00d5812ee1::t_2afd70598a6898 5-6
+apps/web/src/app/(dashboard)/dashboard/audit/page.tsx
+  s_e8fb00d5812ee1::t_4b22de72bc0871 4-5,7
+  s_e8fb00d5812ee1::t_c3ed54f3b04c7e 28
+  s_e8fb00d5812ee1::t_5dbd20b87f4642 140-151
+  s_e8fb00d5812ee1::t_9defea60432085 167,169-170
+  s_e8fb00d5812ee1::t_97c4b587f65973 398-424
+convex/variables.ts
+  s_e8fb00d5812ee1::t_df7690c7c70a7b 2
+  s_e8fb00d5812ee1::t_5c08f1d1e0fca0 516-666
+  s_e8fb00d5812ee1::t_b6c7ac69dcd6a2 515
+convex/auditLogs.ts
+  s_e8fb00d5812ee1::t_120a05428be174 2
+  s_e8fb00d5812ee1::t_afcf60863b9471 88-136
+apps/web/package.json
+  s_e8fb00d5812ee1::t_6af43ae1cfd15b 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "6c12c9eb10cc7e1e07d5d1a31553228cf118ff5f",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
