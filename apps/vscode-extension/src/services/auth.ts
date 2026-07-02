@@ -15,6 +15,24 @@ function sessionPrefix(token: string): string {
 }
 
 /**
+ * The most recently constructed `AuthService` instance, if any.
+ *
+ * `ApiService` needs to trigger a token refresh / reauth prompt on a 401
+ * response, but it is only ever given a `StorageService` (see api.ts) and
+ * the extension wires services up purely via constructor injection in
+ * extension.ts. Rather than changing that wiring (which would ripple into
+ * extension.ts), `AuthService` publishes itself here so `api.ts` can reach
+ * it without a constructor change. There is only ever one live
+ * `AuthService` per extension host.
+ */
+let activeAuthService: AuthService | null = null;
+
+/** Get the currently active `AuthService`, if the extension has activated one. */
+export function getActiveAuthService(): AuthService | null {
+  return activeAuthService;
+}
+
+/**
  * Authentication service for the extension
  * Uses OAuth flow through the browser for secure authentication
  */
@@ -27,6 +45,10 @@ export class AuthService {
   constructor(context: vscode.ExtensionContext, storage: StorageService) {
     this.context = context;
     this.storage = storage;
+    // Intentional self-registration (see `getActiveAuthService` above), not
+    // an accidental `this` alias.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    activeAuthService = this;
   }
 
   /**
@@ -307,6 +329,9 @@ export class AuthService {
   }
 
   dispose(): void {
+    if (activeAuthService === this) {
+      activeAuthService = null;
+    }
     this._onAuthStateChanged.dispose();
   }
 }

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { AuthService } from "../services/auth";
-import { SyncService } from "../services/sync";
+import { SyncService, type SyncConnectionState } from "../services/sync";
 import type { LinkedProject, LinkedProjectV2, SyncResult } from "../types";
 import * as output from "../utils/outputChannel";
 
@@ -31,6 +31,7 @@ export class StatusBarProvider {
     this.syncService.onPermissionRevoked((project) =>
       this.handlePermissionRevoked(project)
     );
+    this.syncService.onConnectionStateChanged(() => this.update());
 
     this.update();
     this.statusBarItem.show();
@@ -108,8 +109,43 @@ export class StatusBarProvider {
       this.statusBarItem.tooltip = md;
     }
 
-    if (!this.errorClearTimer) {
+    this.applyConnectionIndicator();
+
+    if (
+      !this.errorClearTimer &&
+      this.syncService.getConnectionState() !== "disconnected"
+    ) {
       this.statusBarItem.backgroundColor = undefined;
+    } else if (this.syncService.getConnectionState() === "disconnected") {
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground"
+      );
+    }
+  }
+
+  /**
+   * Surface real-time sync connectivity so a silently-dead WebSocket isn't
+   * invisible (see RealTimeSyncService's bounded-backoff reconnect check).
+   * Only applies once a project is linked — this method runs after the
+   * "not authenticated" / "no project linked" early returns.
+   */
+  private applyConnectionIndicator(): void {
+    const state: SyncConnectionState = this.syncService.getConnectionState();
+    if (state === "connected") {
+      return;
+    }
+
+    const isReconnecting = state === "reconnecting";
+    this.statusBarItem.text += isReconnecting
+      ? " $(sync~spin)"
+      : " $(debug-disconnect)";
+
+    const note = isReconnecting
+      ? "$(sync~spin) Reconnecting to Envpilot… real-time updates are paused."
+      : "$(debug-disconnect) Real-time sync disconnected — retrying periodically in the background.";
+
+    if (this.statusBarItem.tooltip instanceof vscode.MarkdownString) {
+      this.statusBarItem.tooltip.appendMarkdown(`\n\n---\n\n${note}`);
     }
   }
 

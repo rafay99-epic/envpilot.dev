@@ -9,6 +9,7 @@ import {
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
+import { resolveLegacyRoles } from "../_lib/legacy-roles";
 
 /**
  * GET /api/extension/variables - List variables for a project (with decrypted values)
@@ -134,6 +135,33 @@ export async function GET(request: Request) {
       .filter((variable) => variable.hasAccess)
       .filter((variable) => variable.environments.includes(environment));
 
+    // Translate the unified role model into the legacy strings old extension
+    // builds derive .env file protection from. Owners get projectRole null
+    // exactly like legacy admins did; grant-only users (per-variable viewer
+    // sharing, no assignment) get "viewer" so files stay strictly read-only.
+    const legacy = await resolveLegacyRoles(convex, {
+      userId: authorizedUserId,
+      projectId: projectId as Id<"projects">,
+      orgRole: userRole,
+    });
+
+    // Additive unified-model meta for new extension builds. Old extension
+    // builds read only `role` and ignore these keys.
+    const roleHasBlanketWrite =
+      (legacy.role === "owner" ||
+        legacy.role === "project_manager" ||
+        legacy.role === "team_lead") &&
+      legacy.assigned;
+    const hasWriteAccess =
+      roleHasBlanketWrite ||
+      variables.some(
+        (v) => v.permission === "write" || v.permission === "admin"
+      );
+    const scopeRestricted =
+      legacy.role === "developer" &&
+      legacy.assigned &&
+      legacy.environmentScope !== null;
+
     // Metadata-only mode: no vault decryption and no "export" audit events.
     // Used by extension UI surfaces (tree view, dashboard) that display
     // names and metadata but never values.
@@ -149,9 +177,21 @@ export async function GET(request: Request) {
             projectId: variable.projectId,
             isSensitive: variable.isSensitive,
             version: variable.version,
+            // Additive: per-variable unified access. listWithAccess maps a
+            // caller's blanket write to "admin"; collapse that to "write".
+            access: (variable.permission === "admin"
+              ? "write"
+              : variable.permission) as "read" | "write",
           })),
           // Old extension builds only understand the legacy role strings.
           role: toLegacyOrgRole(userRole),
+          // Additive unified-model fields:
+          unifiedRole: legacy.role,
+          assigned: legacy.assigned,
+          grantOnly: legacy.grantOnly,
+          environmentScope: legacy.environmentScope,
+          hasWriteAccess,
+          scopeRestricted,
         },
       });
     }
@@ -174,6 +214,11 @@ export async function GET(request: Request) {
             projectId: variable.projectId,
             isSensitive: variable.isSensitive,
             version: variable.version,
+            // Additive: per-variable unified access. listWithAccess maps a
+            // caller's blanket write to "admin"; collapse that to "write".
+            access: (variable.permission === "admin"
+              ? "write"
+              : variable.permission) as "read" | "write",
           };
         } catch {
           return {
@@ -185,6 +230,9 @@ export async function GET(request: Request) {
             projectId: variable.projectId,
             isSensitive: variable.isSensitive,
             version: variable.version,
+            access: (variable.permission === "admin"
+              ? "write"
+              : variable.permission) as "read" | "write",
           };
         }
       })
@@ -213,6 +261,13 @@ export async function GET(request: Request) {
         variables: variablesWithValues,
         // Old extension builds only understand the legacy role strings.
         role: toLegacyOrgRole(userRole),
+        // Additive unified-model fields:
+        unifiedRole: legacy.role,
+        assigned: legacy.assigned,
+        grantOnly: legacy.grantOnly,
+        environmentScope: legacy.environmentScope,
+        hasWriteAccess,
+        scopeRestricted,
       },
     });
   } catch (error) {

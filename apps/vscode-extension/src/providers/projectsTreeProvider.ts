@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
 import { getDisplayPath } from "../utils/paths";
+import { formatRoleLabel } from "../roles";
 import type {
   Project,
   Organization,
@@ -17,17 +18,8 @@ export type ProjectTreeItemType =
   | "message"
   | "error";
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Admin",
-  team_lead: "Lead",
-  member: "Member",
-};
-
-const PROJECT_ROLE_LABELS: Record<string, string> = {
-  viewer: "Viewer",
-  developer: "Developer",
-  manager: "Manager",
-};
+/** Coalesce rapid-fire refresh() calls into a single tree-data event. */
+const REFRESH_DEBOUNCE_MS = 150;
 
 export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<
@@ -41,6 +33,7 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
   private projects: Map<string, Project[]> = new Map();
   private usageCache: Map<string, UsageInfo> = new Map();
   private isAuthenticated = false;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(api: ApiService, storage: StorageService) {
     this.api = api;
@@ -52,8 +45,21 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
     this.refresh();
   }
 
+  /**
+   * Requests a tree refresh. Multiple calls within REFRESH_DEBOUNCE_MS are
+   * coalesced into a single `onDidChangeTreeData` event — link/unlink,
+   * add/remove-directory, and auth-state changes can each fire several
+   * refreshes back-to-back for one user action, and every fire() makes VS
+   * Code re-invoke getChildren for the root and every expanded node.
+   */
   refresh(): void {
-    this._onDidChangeTreeData.fire();
+    if (this.refreshTimer) {
+      return;
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      this._onDidChangeTreeData.fire();
+    }, REFRESH_DEBOUNCE_MS);
   }
 
   getTreeItem(element: ProjectTreeItem): vscode.TreeItem {
@@ -207,6 +213,10 @@ export class ProjectsTreeProvider implements vscode.TreeDataProvider<ProjectTree
   }
 
   dispose(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
     this._onDidChangeTreeData.dispose();
   }
 }
@@ -300,8 +310,11 @@ export class ProjectTreeItem extends vscode.TreeItem {
     if (!org) return undefined;
     const parts: string[] = [];
     parts.push(org.tier === "pro" ? "Pro" : "Free");
-    if (org.role) {
-      parts.push(ROLE_LABELS[org.role] || org.role);
+    // Prefer the unified role once the server sends it; fall back to the
+    // legacy string. Either way, run it through formatRoleLabel \u2014 never
+    // compare/display raw "admin"/"member" strings directly.
+    if (org.unifiedRole || org.role) {
+      parts.push(formatRoleLabel(org.unifiedRole ?? org.role));
     }
     return parts.join(" \u00b7 ");
   }
@@ -315,13 +328,16 @@ export class ProjectTreeItem extends vscode.TreeItem {
     if (isLinked) {
       parts.push("Linked");
     }
-    // Show project-level role if available, otherwise show org role for admins
-    if (project.userRole === "admin") {
-      parts.push("Admin");
-    } else if (project.projectRole) {
-      parts.push(
-        PROJECT_ROLE_LABELS[project.projectRole] || project.projectRole
-      );
+    // Prefer the unified role; fall back to the legacy org role for this
+    // project. Legacy "viewer" project role means grant-only / not assigned
+    // \u2014 formatRoleLabel only knows org-level tiers, so annotate that here.
+    const roleSource = project.unifiedRole ?? project.userRole;
+    if (roleSource || project.projectRole) {
+      let label = formatRoleLabel(roleSource);
+      if (project.projectRole === "viewer") {
+        label += " (view-only)";
+      }
+      parts.push(label);
     }
     if (parts.length === 0 && project.description) {
       return project.description;
@@ -350,9 +366,9 @@ export class ProjectTreeItem extends vscode.TreeItem {
     md.appendMarkdown(
       `**Tier:** ${org.tier === "pro" ? "$(star-full) Pro" : "Free"}\n\n`
     );
-    if (org.role) {
+    if (org.unifiedRole || org.role) {
       md.appendMarkdown(
-        `**Your Role:** ${ROLE_LABELS[org.role] || org.role}\n\n`
+        `**Your Role:** ${formatRoleLabel(org.unifiedRole ?? org.role)}\n\n`
       );
     }
     md.appendMarkdown(`**Slug:** \`${org.slug}\`\n\n`);
@@ -414,17 +430,36 @@ export class ProjectTreeItem extends vscode.TreeItem {
       md.appendMarkdown(`${project.description}\n\n`);
     }
     md.appendMarkdown(`**Slug:** \`${project.slug}\`\n\n`);
-    if (project.userRole === "admin") {
-      md.appendMarkdown("**Your Role:** $(shield) Admin (full access)\n\n");
-    } else if (project.projectRole) {
+
+    // Unified role + description — keyed off the normalized label (never a
+    // raw legacy string), with the legacy "viewer" project role folded in
+    // as a view-only annotation since formatRoleLabel can't express
+    // assigned-vs-grant-only on its own.
+    const roleSource = project.unifiedRole ?? project.userRole;
+    if (roleSource || project.projectRole) {
+      const label = formatRoleLabel(roleSource);
+      const isViewOnly = project.projectRole === "viewer";
       const roleDescriptions: Record<string, string> = {
-        manager: "Manager (manage members, variables, and permissions)",
-        developer: "Developer (view and edit variables)",
-        viewer: "Viewer (view explicitly permitted variables only)",
+        Owner: "$(shield) Owner (full access)",
+        "Project Manager":
+          "Project Manager (manage members, variables, and permissions)",
+        "Team Lead": "Team Lead (manage members, variables, and permissions)",
+        Developer: isViewOnly
+          ? "Developer — view-only (view explicitly permitted variables only)"
+          : "Developer (view and edit variables)",
       };
       md.appendMarkdown(
-        `**Your Project Role:** ${roleDescriptions[project.projectRole] || project.projectRole}\n\n`
+        `**Your Role:** ${roleDescriptions[label] || label}\n\n`
       );
+      if (
+        project.environmentScope &&
+        project.environmentScope.length > 0 &&
+        label === "Developer"
+      ) {
+        md.appendMarkdown(
+          `**Scoped to:** ${project.environmentScope.join(", ")}\n\n`
+        );
+      }
     }
     return md;
   }

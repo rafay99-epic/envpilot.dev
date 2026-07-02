@@ -14,29 +14,16 @@ export async function getDeviceId(
   let deviceId = context.globalState.get<string>(DEVICE_ID_KEY);
 
   if (!deviceId) {
-    // Generate a unique device ID based on machine characteristics
-    const machineId = getMachineId();
-    deviceId = `vscode_${machineId}`;
+    // Generate a random, per-installation identifier and persist it. Deriving
+    // this from hostname/username/platform (as before) collides across VMs
+    // cloned from the same golden image or shared build boxes with a common
+    // service username — a random UUID, cached once in globalState, is
+    // unique per installation regardless of machine characteristics.
+    deviceId = `vscode_${crypto.randomUUID()}`;
     await context.globalState.update(DEVICE_ID_KEY, deviceId);
   }
 
   return deviceId;
-}
-
-/**
- * Generate a machine identifier based on hostname and username
- */
-function getMachineId(): string {
-  const hostname = os.hostname();
-  const username = os.userInfo().username;
-  const platform = os.platform();
-
-  const data = `${hostname}-${username}-${platform}`;
-  return crypto
-    .createHash("sha256")
-    .update(data)
-    .digest("hex")
-    .substring(0, 16);
 }
 
 /**

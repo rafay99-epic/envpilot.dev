@@ -13,6 +13,11 @@ import {
   shouldPreventCopyOnRevoke,
 } from "../utils/config";
 import { normalizePath, toPlatformPath, getDisplayPath } from "../utils/paths";
+import {
+  normalizeOrgRole,
+  fileProtectionMode,
+  type ProjectAccess as RoleAccess,
+} from "../roles";
 import type {
   LinkedProject,
   LinkedProjectV2,
@@ -24,6 +29,9 @@ import type {
   ConflictStrategy,
   LinkDirectoryOptions,
 } from "../types";
+
+/** WebSocket connectivity state, surfaced to the status bar. */
+export type SyncConnectionState = "connected" | "reconnecting" | "disconnected";
 
 const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 # DO NOT EDIT MANUALLY - Changes will be overwritten on next sync
@@ -47,13 +55,25 @@ export class SyncService {
   private metadataSubIds: string[] = [];
   private lastMetadataHash = new Map<string, string>();
   private syncDebounceTimers = new Map<string, NodeJS.Timeout>();
+  /** Serializes refreshSubscriptions() so concurrent callers can't race on
+   * subscription-id teardown/setup (mirrors StorageService.metadataWriteQueue). */
+  private refreshSubscriptionsQueue: Promise<void> = Promise.resolve();
+  /** Last time updateLastUsed() was called per access token — throttles the
+   * bookkeeping write so it doesn't self-trigger the token-validation
+   * subscription on every sync. */
+  private lastUsedAtByToken = new Map<string, number>();
+  private static readonly UPDATE_LAST_USED_MIN_INTERVAL_MS = 15 * 60 * 1000;
+  private connectionState: SyncConnectionState = "disconnected";
   private _onSyncComplete = new vscode.EventEmitter<SyncResult>();
   private _onPermissionRevoked = new vscode.EventEmitter<
     LinkedProject | LinkedProjectV2
   >();
+  private _onConnectionStateChanged =
+    new vscode.EventEmitter<SyncConnectionState>();
 
   readonly onSyncComplete = this._onSyncComplete.event;
   readonly onPermissionRevoked = this._onPermissionRevoked.event;
+  readonly onConnectionStateChanged = this._onConnectionStateChanged.event;
 
   constructor(api: ApiService, storage: StorageService) {
     this.api = api;
@@ -157,8 +177,19 @@ export class SyncService {
 
   /**
    * Refresh metadata subscriptions when projects are linked/unlinked.
+   * Queued (not just awaited) so concurrent callers — e.g. a revocation
+   * cleanup and a brand-new project link happening back to back — can't
+   * interleave teardown/setup and orphan or drop a subscription.
    */
   async refreshSubscriptions(): Promise<void> {
+    const task = this.refreshSubscriptionsQueue.then(() =>
+      this.doRefreshSubscriptions()
+    );
+    this.refreshSubscriptionsQueue = task.catch(() => {});
+    return task;
+  }
+
+  private async doRefreshSubscriptions(): Promise<void> {
     this.teardownMetadataSubscriptions();
     await this.setupMetadataSubscriptions();
   }
@@ -428,7 +459,10 @@ export class SyncService {
     await fs.writeFile(envFilePath, content, "utf-8");
 
     // Apply role-based file protection
-    const protectionMode = this.getProtectionMode(project.projectId);
+    const protectionMode = this.resolveProtectionMode(
+      project.projectId,
+      variables
+    );
     if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
       if (this.fileProtection) {
@@ -453,28 +487,85 @@ export class SyncService {
   }
 
   /**
-   * Determine the file protection mode based on org role and project role.
+   * Build a unified ProjectAccess for THIS sync request, mirroring the CLI's
+   * accessFromMeta (apps/cli/src/commands/pull.ts). Built fresh from the
+   * role/projectRole that were just populated by the getVariables() call
+   * this sync made (api.ts caches them as a side effect of that response),
+   * not from a cache that could hold a value left over from an unrelated
+   * project/org. `/api/extension/variables` doesn't send the additive
+   * `unifiedRole`/`assigned`/`environmentScope`/`hasWriteAccess`/per-variable
+   * `access` fields yet (unlike `/api/cli/variables`) — this reads them
+   * defensively so the extension picks them up automatically, additively,
+   * the moment the server route adds them, without another client change.
    */
-  private getProtectionMode(projectId: string): ProtectionMode {
-    const orgRole = this.api.getUserRole(projectId);
-
-    // Admins and team leads always get full access
-    if (orgRole === "admin" || orgRole === "team_lead") {
-      return "writable";
-    }
-
-    // For members, check project-level role
+  private buildProjectAccess(
+    projectId: string,
+    variables: EnvironmentVariable[]
+  ): RoleAccess {
+    // Prefer the authoritative unified fields the server returns alongside the
+    // variables (populated on the same request — never stale). Fall back to the
+    // legacy role/projectRole caches + per-variable access for older servers.
+    const meta = this.api.getAccessMeta(projectId);
     const projectRole = this.api.getProjectRole(projectId);
-    switch (projectRole) {
-      case "manager":
-        return "writable";
-      case "developer":
-        return "readonly-with-request";
-      case "viewer":
-        return "strict-readonly";
-      default:
-        return "readonly-with-request";
+    const role = normalizeOrgRole(
+      meta?.unifiedRole ?? this.api.getUserRole(projectId)
+    );
+    return {
+      role,
+      // Owners are implicitly assigned to every project — the legacy server
+      // sends no assignment info for them, so gating on projectRole here would
+      // wrongly lock an owner's file read-only.
+      assigned:
+        role === "owner" || (meta?.assigned ?? projectRole !== undefined),
+      environmentScope: meta?.environmentScope ?? null,
+      hasWriteAccess:
+        meta?.hasWriteAccess ?? variables.some((v) => v.access === "write"),
+    };
+  }
+
+  /**
+   * Determine the file protection mode for THIS sync's fetched variables —
+   * never from a stale projectId-keyed cache read at an unrelated point in
+   * time (see buildProjectAccess).
+   */
+  private resolveProtectionMode(
+    projectId: string,
+    variables: EnvironmentVariable[]
+  ): ProtectionMode {
+    return fileProtectionMode(this.buildProjectAccess(projectId, variables));
+  }
+
+  /**
+   * Throttle the `updateLastUsed` bookkeeping call — it patches the same
+   * projectAccess document a live token-validation subscription watches, so
+   * calling it on every sync self-triggers a needless Convex read/re-fire.
+   */
+  private maybeUpdateLastUsed(accessToken: string): void {
+    const now = Date.now();
+    const last = this.lastUsedAtByToken.get(accessToken) ?? 0;
+    if (now - last < SyncService.UPDATE_LAST_USED_MIN_INTERVAL_MS) {
+      return;
     }
+    this.lastUsedAtByToken.set(accessToken, now);
+    void this.api.updateLastUsed(accessToken).catch(() => {
+      // Don't suppress the next attempt for a full throttle window just
+      // because this one failed transiently.
+      this.lastUsedAtByToken.delete(accessToken);
+    });
+  }
+
+  /**
+   * Track WebSocket connectivity (set by RealTimeSyncService) so the status
+   * bar can surface a silent sync failure instead of going quiet forever.
+   */
+  setConnectionState(state: SyncConnectionState): void {
+    if (this.connectionState === state) return;
+    this.connectionState = state;
+    this._onConnectionStateChanged.fire(state);
+  }
+
+  getConnectionState(): SyncConnectionState {
+    return this.connectionState;
   }
 
   /**
@@ -871,8 +962,9 @@ export class SyncService {
         directory.directoryPath
       );
 
-      // Update last used on server — bookkeeping, don't block the sync on it
-      void this.api.updateLastUsed(project.accessToken).catch(() => {});
+      // Update last used on server — throttled (see maybeUpdateLastUsed) so
+      // routine syncs don't self-trigger the token-validation subscription.
+      this.maybeUpdateLastUsed(project.accessToken);
 
       return {
         success: true,
@@ -970,7 +1062,7 @@ export class SyncService {
 
     // Apply role-based file protection
     const protectionMode = projectId
-      ? this.getProtectionMode(projectId)
+      ? this.resolveProtectionMode(projectId, variables)
       : "readonly-with-request";
     if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
@@ -1286,5 +1378,6 @@ export class SyncService {
     this.stopPeriodicSync();
     this._onSyncComplete.dispose();
     this._onPermissionRevoked.dispose();
+    this._onConnectionStateChanged.dispose();
   }
 }

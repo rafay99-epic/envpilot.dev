@@ -29,6 +29,7 @@ import {
   isCommitGuardEnabled,
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
+import { roleLevel, ROLE_LEVEL } from "./roles";
 import * as output from "./utils/outputChannel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -540,6 +541,10 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
         projectsTreeProvider.refresh();
         variablesTreeProvider.refresh();
         statusBarProvider.update();
+
+        // Refresh WebSocket subscriptions so the new directory is reactive.
+        await syncService.refreshSubscriptions();
+        await realTimeSyncService.refreshSubscriptions();
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
@@ -552,17 +557,21 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
   // Check if other projects are already linked — enforce role-based limit
   const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
   if (allLinkedProjects.length > 0) {
-    // Fetch variables for the new project's org to populate role cache,
-    // then check if user is admin or team_lead in ANY linked org.
-    // This avoids order-dependent bugs where role from the wrong org is used.
-    const canLinkMultiple = allLinkedProjects.some((p) => {
-      const role = apiService.getUserRole(p.projectId);
-      return role === "admin" || role === "team_lead";
-    });
+    // Warm the role cache before gating — getUserRole() reads a lazily
+    // populated map, so a cold cache would false-negative for legit
+    // admins/team-leads. getProjects() populates roles as a side effect.
+    await apiService.getProjects();
+
+    // Check whether the user is team-lead-or-above in ANY linked project.
+    // roleLevel/normalizeOrgRole handle legacy role strings transparently.
+    const canLinkMultiple = allLinkedProjects.some(
+      (p) =>
+        roleLevel(apiService.getUserRole(p.projectId)) >= ROLE_LEVEL.team_lead
+    );
 
     if (!canLinkMultiple) {
       vscode.window.showWarningMessage(
-        "Only admins and team leads can link multiple projects. Unlink your current project first."
+        "Only owners, project managers, and team leads can link multiple projects. Unlink your current project first."
       );
       return;
     }
@@ -687,6 +696,10 @@ async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
 
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
+
+    // Refresh WebSocket subscriptions so the new directory is reactive.
+    await syncService.refreshSubscriptions();
+    await realTimeSyncService.refreshSubscriptions();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     vscode.window.showErrorMessage(`Failed to add directory: ${message}`);
@@ -848,6 +861,11 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       // Clean up all directories
       await syncService.cleanupAllDirectories(targetProject);
       await storageService.removeLinkedProjectV2(targetProject.projectId);
+
+      // Tear down the unlinked project's WebSocket subscriptions so no stale
+      // subscription lingers on the now-revoked access token.
+      await syncService.refreshSubscriptions();
+      await realTimeSyncService.refreshSubscriptions();
 
       vscode.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
@@ -1138,25 +1156,12 @@ async function handleRemoveCommitGuard(): Promise<void> {
 }
 
 export async function deactivate() {
-  // Clean up synced .env files to prevent secrets from persisting on disk
-  try {
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const projects = storageService.getLinkedProjectsMetadataV2();
-    for (const project of projects) {
-      for (const dir of project.directories) {
-        const envFilePath = path.resolve(dir.directoryPath, dir.targetFile);
-        try {
-          await fs.chmod(envFilePath, 0o644);
-          await fs.unlink(envFilePath);
-        } catch {
-          // File may not exist or be inaccessible
-        }
-      }
-    }
-  } catch {
-    // Best-effort cleanup — don't block deactivation
-  }
-  // Remaining cleanup handled by dispose subscriptions
+  // Deactivate must only release resources — it must NEVER delete the user's
+  // synced .env files. deactivate() runs on every extension-host shutdown
+  // (window close, reload, VS Code/extension update), so deleting files here
+  // caused guaranteed data loss (writable files hand-edited by owners/PMs/TLs
+  // were destroyed with no backup). Genuine sign-out / explicit unlink delete
+  // files through their own gated paths (shouldPreventCopyOnRevoke in sync.ts).
+  // Remaining resource cleanup is handled by dispose subscriptions.
   await closeSentry();
 }

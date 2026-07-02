@@ -326,7 +326,7 @@ export function getDashboardBody(): string {
           <div style="font-size: 32px; margin-bottom: 8px;">&#128274;</div>
           <div class="prompt-line"><span class="prompt">$</span> envpilot auth --login<span class="cursor"></span></div>
           <p>Sign in to securely manage and sync environment variables across your team.</p>
-          <button class="btn btn-primary" onclick="send('signIn')">Sign In to Envpilot</button>
+          <button class="btn btn-primary" data-action="signIn">Sign In to Envpilot</button>
         </div>
       </div>
     </div>
@@ -342,8 +342,8 @@ export function getDashboardBody(): string {
         </div>
         <div class="header-right">
           <span class="badge badge-green" id="user-badge"></span>
-          <button class="btn btn-secondary btn-sm" onclick="send('refresh')">Refresh</button>
-          <button class="btn btn-secondary btn-sm" onclick="send('signOut')">Sign Out</button>
+          <button class="btn btn-secondary btn-sm" data-action="refresh">Refresh</button>
+          <button class="btn btn-secondary btn-sm" data-action="signOut">Sign Out</button>
         </div>
       </div>
 
@@ -407,16 +407,16 @@ export function getDashboardBody(): string {
           <div class="terminal-body center-content">
             <div class="prompt-line"><span class="prompt">$</span> envpilot link --project<span class="cursor"></span></div>
             <p>No project linked to this workspace. Link a project to start syncing environment variables.</p>
-            <button class="btn btn-primary" onclick="send('linkProject')">Link Project</button>
+            <button class="btn btn-primary" data-action="linkProject">Link Project</button>
           </div>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="actions-bar">
-        <button class="btn btn-primary" onclick="send('pullVariables')">Pull Variables</button>
-        <button class="btn btn-secondary" onclick="send('linkProject')">Link Project</button>
-        <button class="btn btn-secondary" onclick="send('openDashboard')">Open Web Dashboard</button>
+        <button class="btn btn-primary" data-action="pullVariables">Pull Variables</button>
+        <button class="btn btn-secondary" data-action="linkProject">Link Project</button>
+        <button class="btn btn-secondary" data-action="openDashboard">Open Web Dashboard</button>
       </div>
     </div>
   `;
@@ -446,9 +446,65 @@ export function getDashboardJs(): string {
       return (Date.now() - lastSyncedAt) < 3600000 ? 'sync-fresh' : 'sync-stale';
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    // Build a directory row entirely via DOM APIs so that all dynamic values
+    // (paths, environment names, target files) are inserted as text or dataset
+    // entries — never string-interpolated into markup or JS. This eliminates
+    // any HTML/JS injection vector inside the privileged webview context.
+    function buildDirRow(dir, activeProject) {
+      var row = document.createElement('div');
+      row.className = 'dir-row';
+
+      var info = document.createElement('div');
+      info.className = 'dir-info';
+
+      var pathEl = document.createElement('div');
+      pathEl.className = 'dir-path';
+      pathEl.textContent = dir.displayName || dir.directoryPath || '';
+      info.appendChild(pathEl);
+
+      var meta = document.createElement('div');
+      meta.className = 'dir-meta';
+
+      var syncDot = document.createElement('span');
+      syncDot.className = 'sync-dot ' + syncClass(dir.lastSyncedAt);
+      meta.appendChild(syncDot);
+
+      var envs = (dir.environments || []).join(', ');
+      var envSpan = document.createElement('span');
+      envSpan.textContent = envs + ' \\u2192 ' + (dir.targetFile || '');
+      meta.appendChild(envSpan);
+
+      var sep = document.createElement('span');
+      sep.textContent = '\\u00B7';
+      meta.appendChild(sep);
+
+      var timeSpan = document.createElement('span');
+      timeSpan.textContent = formatTime(dir.lastSyncedAt);
+      meta.appendChild(timeSpan);
+
+      info.appendChild(meta);
+      row.appendChild(info);
+
+      var actions = document.createElement('div');
+      actions.className = 'dir-actions';
+
+      var syncBtn = document.createElement('button');
+      syncBtn.className = 'btn-icon';
+      syncBtn.title = 'Sync';
+      syncBtn.dataset.action = 'pullVariables';
+      syncBtn.textContent = '\\u21BB';
+      actions.appendChild(syncBtn);
+
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-icon';
+      removeBtn.dataset.action = 'removeDirectory';
+      removeBtn.dataset.projectId = activeProject.projectId || '';
+      removeBtn.dataset.directoryPath = dir.directoryPath || '';
+      removeBtn.textContent = '\\u2715';
+      actions.appendChild(removeBtn);
+
+      row.appendChild(actions);
+      return row;
     }
 
     function renderState(state) {
@@ -509,29 +565,17 @@ export function getDashboardJs(): string {
         const dirList = document.getElementById('directories-list');
         const dirs = activeProject.directories || [];
 
+        dirList.textContent = '';
         if (dirs.length === 0) {
-          dirList.innerHTML = '<div class="text-dim" style="padding: 12px 0;">No directories linked</div>';
+          var empty = document.createElement('div');
+          empty.className = 'text-dim';
+          empty.style.padding = '12px 0';
+          empty.textContent = 'No directories linked';
+          dirList.appendChild(empty);
         } else {
-          dirList.innerHTML = dirs.map(function(dir) {
-            var sc = syncClass(dir.lastSyncedAt);
-            var envs = (dir.environments || []).join(', ');
-            var path = escapeHtml(dir.displayName || dir.directoryPath);
-            return '<div class="dir-row">' +
-              '<div class="dir-info">' +
-                '<div class="dir-path">' + path + '</div>' +
-                '<div class="dir-meta">' +
-                  '<span class="sync-dot ' + sc + '"></span>' +
-                  '<span>' + envs + ' &rarr; ' + escapeHtml(dir.targetFile) + '</span>' +
-                  '<span>&middot;</span>' +
-                  '<span>' + formatTime(dir.lastSyncedAt) + '</span>' +
-                '</div>' +
-              '</div>' +
-              '<div class="dir-actions">' +
-                '<button class="btn-icon" onclick="send(\\'pullVariables\\')" title="Sync">&#8635;</button>' +
-                '<button class="btn-icon" onclick="send(\\'removeDirectory\\', {projectId:\\'' + escapeHtml(activeProject.projectId) + '\\', directoryPath:\\'' + escapeHtml(dir.directoryPath) + '\\'})">&#10005;</button>' +
-              '</div>' +
-            '</div>';
-          }).join('');
+          dirs.forEach(function(dir) {
+            dirList.appendChild(buildDirRow(dir, activeProject));
+          });
         }
       } else {
         activeSection.classList.add('hidden');
@@ -549,6 +593,22 @@ export function getDashboardJs(): string {
         if (indicator) indicator.innerHTML = '<div class="sync-spinning"></div>';
         if (text) text.textContent = 'Syncing...';
       }
+    });
+
+    // Single delegated click handler for every button (static + dynamic rows).
+    // Handler action and params are read from data-* attributes, replacing the
+    // former CSP-blocked inline onclick="send(...)" handlers. Runs inside the
+    // nonce'd <script>, so it is authorized by the strict CSP.
+    document.addEventListener('click', function(event) {
+      var target = event.target;
+      var el = target && target.closest ? target.closest('[data-action]') : null;
+      if (!el) return;
+      var action = el.dataset.action;
+      if (!action) return;
+      var params = {};
+      if (el.dataset.projectId != null) params.projectId = el.dataset.projectId;
+      if (el.dataset.directoryPath != null) params.directoryPath = el.dataset.directoryPath;
+      send(action, params);
     });
 
     document.addEventListener('DOMContentLoaded', function() {

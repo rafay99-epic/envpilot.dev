@@ -1,6 +1,12 @@
-import axios, { AxiosInstance, AxiosError } from "axios";
+import * as vscode from "vscode";
+import axios, {
+  AxiosInstance,
+  AxiosError,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { getServerUrl } from "../utils/config";
 import { StorageService } from "../utils/storage";
+import { getActiveAuthService } from "./auth";
 import type {
   Organization,
   Project,
@@ -24,6 +30,23 @@ export class ApiService {
   private roleCache: Map<string, MembershipRole> = new Map();
   private projectRoleCache: Map<string, ProjectRole> = new Map();
   /**
+   * Authoritative unified access facts returned alongside each getVariables
+   * response (additive server fields). Populated on the SAME request that
+   * fetches the variables, so it never goes stale relative to a sync — unlike
+   * projectRoleCache (populated only by getProjects). File protection reads
+   * this first; the legacy role/projectRole caches are the fallback.
+   */
+  private accessMetaCache: Map<
+    string,
+    {
+      unifiedRole?: string;
+      assigned?: boolean;
+      environmentScope?: string[] | null;
+      hasWriteAccess?: boolean;
+      scopeRestricted?: boolean;
+    }
+  > = new Map();
+  /**
    * Short-TTL response cache. One sync triggers refreshes of the variables
    * tree, dashboard panel, and status bar — without this, each refresh
    * re-fetches identical data (including vault-decrypted variables).
@@ -31,6 +54,8 @@ export class ApiService {
   private responseCache: Map<string, { at: number; value: unknown }> =
     new Map();
   private static readonly CACHE_TTL_MS = 30_000;
+  /** Guards against stacking multiple "session expired" prompts at once. */
+  private reauthPromptActive = false;
 
   constructor(storage: StorageService) {
     this.storage = storage;
@@ -51,11 +76,70 @@ export class ApiService {
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<{ error?: string }>) => {
+      async (error: AxiosError<{ error?: string }>) => {
+        const status = error.response?.status;
+        const config = error.config as
+          | (InternalAxiosRequestConfig & { _envpilotRetried?: boolean })
+          | undefined;
+
+        // On a 401, attempt a single token refresh + retry before giving up.
+        // The `_envpilotRetried` guard prevents an infinite retry loop if the
+        // refreshed token is itself rejected.
+        if (status === 401 && config && !config._envpilotRetried) {
+          config._envpilotRetried = true;
+          const refreshed = await this.tryRefreshSession();
+          if (refreshed) {
+            return this.client.request(config);
+          }
+          void this.promptReauth();
+        }
+
         const message = error.response?.data?.error || error.message;
-        throw new Error(message);
+        // Preserve the HTTP status so callers can distinguish auth failures
+        // (401) from transient/network errors instead of matching on message.
+        throw Object.assign(new Error(message), { status });
       }
     );
+  }
+
+  /**
+   * Attempt to refresh the current session's access token via
+   * `AuthService.refreshToken()`. Returns true only if a new token was
+   * persisted and the retried request can proceed.
+   */
+  private async tryRefreshSession(): Promise<boolean> {
+    const authService = getActiveAuthService();
+    if (!authService) {
+      return false;
+    }
+    try {
+      return await authService.refreshToken();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Surface a clear "session expired" prompt so the user knows to sign in
+   * again, instead of a generic error toast. Debounced so a burst of
+   * concurrent 401s (e.g. multiple in-flight requests) only shows one.
+   */
+  private async promptReauth(): Promise<void> {
+    if (this.reauthPromptActive) {
+      return;
+    }
+    this.reauthPromptActive = true;
+    try {
+      const action = await vscode.window.showWarningMessage(
+        "Envpilot: Session expired — sign in again to continue.",
+        "Sign In"
+      );
+      if (action === "Sign In") {
+        await vscode.commands.executeCommand("envpilot.signIn");
+      }
+    } finally {
+      this.reauthPromptActive = false;
+    }
   }
 
   private getCached<T>(key: string): T | undefined {
@@ -153,7 +237,15 @@ export class ApiService {
     }
 
     const response = await this.client.get<
-      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
+      ApiResponse<{
+        variables: EnvironmentVariable[];
+        role?: MembershipRole;
+        unifiedRole?: string;
+        assigned?: boolean;
+        environmentScope?: string[] | null;
+        hasWriteAccess?: boolean;
+        scopeRestricted?: boolean;
+      }>
     >("/api/extension/variables", {
       params,
       headers,
@@ -163,10 +255,57 @@ export class ApiService {
     if (response.data.data?.role) {
       this.roleCache.set(projectId, response.data.data.role);
     }
+    this.cacheAccessMeta(projectId, response.data.data);
 
     const variables = response.data.data?.variables || [];
     this.setCached(cacheKey, variables);
     return variables;
+  }
+
+  /** Store the additive unified access fields from a variables response. */
+  private cacheAccessMeta(
+    projectId: string,
+    data:
+      | {
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }
+      | undefined
+  ): void {
+    if (!data) return;
+    if (
+      data.unifiedRole !== undefined ||
+      data.assigned !== undefined ||
+      data.hasWriteAccess !== undefined ||
+      data.environmentScope !== undefined
+    ) {
+      this.accessMetaCache.set(projectId, {
+        unifiedRole: data.unifiedRole,
+        assigned: data.assigned,
+        environmentScope: data.environmentScope,
+        hasWriteAccess: data.hasWriteAccess,
+        scopeRestricted: data.scopeRestricted,
+      });
+    }
+  }
+
+  /**
+   * Authoritative unified access facts for a project (populated by
+   * getVariables). Undefined against a legacy server that omits them.
+   */
+  getAccessMeta(projectId: string):
+    | {
+        unifiedRole?: string;
+        assigned?: boolean;
+        environmentScope?: string[] | null;
+        hasWriteAccess?: boolean;
+        scopeRestricted?: boolean;
+      }
+    | undefined {
+    return this.accessMetaCache.get(projectId);
   }
 
   /**
@@ -200,7 +339,15 @@ export class ApiService {
     }
 
     const response = await this.client.get<
-      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
+      ApiResponse<{
+        variables: EnvironmentVariable[];
+        role?: MembershipRole;
+        unifiedRole?: string;
+        assigned?: boolean;
+        environmentScope?: string[] | null;
+        hasWriteAccess?: boolean;
+        scopeRestricted?: boolean;
+      }>
     >("/api/extension/variables", {
       params,
       headers,
@@ -209,6 +356,7 @@ export class ApiService {
     if (response.data.data?.role) {
       this.roleCache.set(projectId, response.data.data.role);
     }
+    this.cacheAccessMeta(projectId, response.data.data);
 
     const variables = response.data.data?.variables || [];
     this.setCached(cacheKey, variables);

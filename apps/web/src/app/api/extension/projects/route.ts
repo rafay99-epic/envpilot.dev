@@ -29,6 +29,41 @@ function legacyRolesForProject(orgRole: string | null | undefined): {
 }
 
 /**
+ * Additive unified-model fields for new extension builds. Owners are
+ * implicitly assigned to every project (no scope). For non-owners we look up
+ * the real projectMembers row per project to confirm assignment and read a
+ * developer's environment scope — this route used to hardcode
+ * `assigned: true` for every non-owner, which was wrong for grant-only
+ * viewers with no project assignment.
+ */
+async function resolveUnifiedProjectFields(
+  userId: Id<"users">,
+  projectId: Id<"projects">,
+  orgRole: string | null | undefined
+): Promise<{
+  unifiedRole: ReturnType<typeof normalizeOrgRole>;
+  assigned: boolean;
+  environmentScope: string[] | null;
+}> {
+  const unifiedRole = normalizeOrgRole(orgRole);
+  if (unifiedRole === "owner") {
+    return { unifiedRole, assigned: true, environmentScope: null };
+  }
+  const projectMembership = await convex.query(
+    api.projectMembers.getProjectMembership,
+    { projectId, userId }
+  );
+  return {
+    unifiedRole,
+    assigned: projectMembership !== null,
+    environmentScope:
+      unifiedRole === "developer"
+        ? (projectMembership?.environments ?? null)
+        : null,
+  };
+}
+
+/**
  * GET /api/extension/projects - List projects for the authenticated user
  */
 export async function GET(request: Request) {
@@ -84,18 +119,45 @@ export async function GET(request: Request) {
         duration_ms: since(start),
       });
 
+      // Additive unified-model fields per project (see
+      // resolveUnifiedProjectFields doc comment).
+      const unifiedByProject = new Map(
+        await Promise.all(
+          projects.map(
+            async (project) =>
+              [
+                project._id,
+                await resolveUnifiedProjectFields(
+                  convexUser._id,
+                  project._id as Id<"projects">,
+                  membership.role
+                ),
+              ] as const
+          )
+        )
+      );
+
       return NextResponse.json({
         data: {
-          projects: projects.map((project) => ({
-            _id: project._id,
-            name: project.name,
-            slug: project.slug,
-            description: project.description || null,
-            organizationId: project.organizationId,
-            icon: project.icon || null,
-            color: project.color || null,
-            ...legacyRolesForProject(membership.role),
-          })),
+          projects: projects.map((project) => {
+            const unified = unifiedByProject.get(project._id);
+            return {
+              _id: project._id,
+              name: project.name,
+              slug: project.slug,
+              description: project.description || null,
+              organizationId: project.organizationId,
+              icon: project.icon || null,
+              color: project.color || null,
+              ...legacyRolesForProject(membership.role),
+              // Additive unified-model fields for new extension builds. Old
+              // extension builds ignore them.
+              unifiedRole:
+                unified?.unifiedRole ?? normalizeOrgRole(membership.role),
+              assigned: unified?.assigned ?? false,
+              environmentScope: unified?.environmentScope ?? null,
+            };
+          }),
         },
       });
     }
@@ -110,6 +172,24 @@ export async function GET(request: Request) {
       duration_ms: since(start),
     });
 
+    // Additive unified-model fields per project (see
+    // resolveUnifiedProjectFields doc comment).
+    const unifiedByUserProject = new Map(
+      await Promise.all(
+        userProjects.map(
+          async (project: { _id: string; userRole?: string }) =>
+            [
+              project._id,
+              await resolveUnifiedProjectFields(
+                convexUser._id,
+                project._id as Id<"projects">,
+                project.userRole
+              ),
+            ] as const
+        )
+      )
+    );
+
     return NextResponse.json({
       data: {
         projects: userProjects.map(
@@ -123,16 +203,25 @@ export async function GET(request: Request) {
             color?: string;
             userRole?: string;
             projectRole?: string | null;
-          }) => ({
-            _id: project._id,
-            name: project.name,
-            slug: project.slug,
-            description: project.description || null,
-            organizationId: project.organizationId,
-            icon: project.icon || null,
-            color: project.color || null,
-            ...legacyRolesForProject(project.userRole),
-          })
+          }) => {
+            const unified = unifiedByUserProject.get(project._id);
+            return {
+              _id: project._id,
+              name: project.name,
+              slug: project.slug,
+              description: project.description || null,
+              organizationId: project.organizationId,
+              icon: project.icon || null,
+              color: project.color || null,
+              ...legacyRolesForProject(project.userRole),
+              // Additive unified-model fields for new extension builds. Old
+              // extension builds ignore them.
+              unifiedRole:
+                unified?.unifiedRole ?? normalizeOrgRole(project.userRole),
+              assigned: unified?.assigned ?? false,
+              environmentScope: unified?.environmentScope ?? null,
+            };
+          }
         ),
       },
     });

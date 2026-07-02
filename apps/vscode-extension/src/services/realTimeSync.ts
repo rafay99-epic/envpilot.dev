@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
 import { ConvexService } from "./convex";
+import { getConvexUrl, getServerUrl } from "../utils/config";
 import type { LinkedProjectV2 } from "../types";
 
 /**
@@ -19,6 +20,24 @@ export class RealTimeSyncService {
   private tokenSubIds: string[] = [];
   private isRunning = false;
   private isProcessingRevocation = false;
+  /** Serializes refreshSubscriptions() calls (mirrors sync.ts /
+   * StorageService.metadataWriteQueue) so concurrent callers — a revocation
+   * cleanup and a project link happening back to back — can't race on
+   * subscription-id teardown/setup. */
+  private refreshSubscriptionsQueue: Promise<void> = Promise.resolve();
+  /** True once startRealTimeSync() has been asked to run — distinct from
+   * `isRunning` (which reflects whether subscriptions are actually up), so
+   * the reconnect timer knows whether it should keep retrying after a
+   * connection that never came up, without resurrecting sync after an
+   * explicit stopRealTimeSync() (e.g. sign-out). */
+  private desiredRunning = false;
+  private reconnecting = false;
+  private reconnectTimer: ReturnType<typeof setInterval> | null = null;
+  /** Low-frequency bounded-backoff check — NOT a replacement for the
+   * WebSocket subscriptions, just a backstop for when Convex never connected
+   * in the first place (e.g. a proxy blocking the wss:// upgrade) or the
+   * connection got torn down without ever coming back up. */
+  private static readonly RECONNECT_CHECK_INTERVAL_MS = 3 * 60 * 1000;
 
   private _onRevocationDetected = new vscode.EventEmitter<{
     project: LinkedProjectV2;
@@ -43,13 +62,24 @@ export class RealTimeSyncService {
    * Start real-time sync via WebSocket subscriptions.
    */
   async startRealTimeSync(): Promise<void> {
+    this.desiredRunning = true;
+    // Always arm the reconnect backstop once sync is desired — even if this
+    // particular attempt no-ops below because Convex isn't ready yet, so a
+    // connection that never comes up gets retried instead of silently
+    // staying dead forever.
+    this.startReconnectTimer();
+
     if (this.isRunning || !this.convexService) {
+      if (!this.convexService) {
+        this.syncService.setConnectionState("disconnected");
+      }
       return;
     }
 
     console.log("[RealTimeSync] Starting WebSocket subscriptions");
     this.isRunning = true;
     await this.setupSubscriptions();
+    this.syncService.setConnectionState("connected");
   }
 
   /**
@@ -57,8 +87,90 @@ export class RealTimeSyncService {
    */
   stopRealTimeSync(): void {
     console.log("[RealTimeSync] Stopping WebSocket subscriptions");
+    this.desiredRunning = false;
     this.isRunning = false;
     this.teardownSubscriptions();
+    this.stopReconnectTimer();
+    this.syncService.setConnectionState("disconnected");
+  }
+
+  /**
+   * Low-frequency (every few minutes) check for whether the WebSocket
+   * connection is up; only acts when disconnected. Bounded and cheap — this
+   * is a backstop, not a polling replacement for the subscriptions.
+   */
+  private startReconnectTimer(): void {
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setInterval(() => {
+      void this.checkConnectionAndReconnect();
+    }, RealTimeSyncService.RECONNECT_CHECK_INTERVAL_MS);
+    // Never let this backstop timer keep the extension host process alive.
+    this.reconnectTimer.unref?.();
+  }
+
+  private stopReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearInterval(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  /**
+   * Retry establishing the Convex connection/subscriptions if real-time sync
+   * is supposed to be running but isn't currently connected. Handles both
+   * "Convex never connected at all" (auto-detect failed at activation, no
+   * retry existed before this) and "subscriptions got torn down without
+   * coming back up".
+   */
+  private async checkConnectionAndReconnect(): Promise<void> {
+    if (!this.desiredRunning || this.reconnecting) return;
+    if (this.convexService && this.isRunning) return; // already healthy
+
+    this.reconnecting = true;
+    this.syncService.setConnectionState("reconnecting");
+    try {
+      if (!this.convexService) {
+        const convexUrl = await this.resolveConvexUrl();
+        if (!convexUrl) {
+          this.syncService.setConnectionState("disconnected");
+          return;
+        }
+        const convexService = new ConvexService(convexUrl);
+        this.setConvexService(convexService);
+        this.syncService.setConvexService(convexService);
+      }
+
+      // Let startRealTimeSync (re-)establish subscriptions now that a
+      // connection exists.
+      this.isRunning = false;
+      await this.startRealTimeSync();
+      this.syncService.startPeriodicSync();
+    } catch (error) {
+      console.error("[RealTimeSync] Reconnect attempt failed:", error);
+      this.syncService.setConnectionState("disconnected");
+    } finally {
+      this.reconnecting = false;
+    }
+  }
+
+  /**
+   * Resolve the Convex URL the same way activation does: configured setting
+   * first, then auto-detect from the server config endpoint.
+   */
+  private async resolveConvexUrl(): Promise<string | null> {
+    const configured = getConvexUrl();
+    if (configured) return configured;
+
+    try {
+      const axios = (await import("axios")).default;
+      const response = await axios.get(
+        `${getServerUrl()}/api/extension/config`,
+        { timeout: 5000 }
+      );
+      return response.data?.convexUrl || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -111,9 +223,19 @@ export class RealTimeSyncService {
   }
 
   /**
-   * Refresh subscriptions when projects are linked/unlinked.
+   * Refresh subscriptions when projects are linked/unlinked. Queued (not
+   * just awaited) so concurrent callers can't interleave teardown/setup and
+   * orphan a live subscription or drop one that should exist.
    */
   async refreshSubscriptions(): Promise<void> {
+    const task = this.refreshSubscriptionsQueue.then(() =>
+      this.doRefreshSubscriptions()
+    );
+    this.refreshSubscriptionsQueue = task.catch(() => {});
+    return task;
+  }
+
+  private async doRefreshSubscriptions(): Promise<void> {
     if (!this.isRunning) return;
     this.teardownSubscriptions();
     await this.setupSubscriptions();
@@ -321,6 +443,12 @@ export class RealTimeSyncService {
 
   dispose(): void {
     this.stopRealTimeSync();
+    // If the bounded-backoff reconnect ever self-created a ConvexService
+    // (the original connection never came up at activation), extension.ts's
+    // own convexService?.dispose() call won't know about it — dispose it
+    // here too. ConvexService.dispose() is idempotent, so this is also safe
+    // in the common case where it's the same shared instance.
+    void this.convexService?.dispose();
     this._onRevocationDetected.dispose();
   }
 }
