@@ -1,0 +1,31 @@
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_e8fb00d5812ee1::t_884c1571cf2dca 466-477
+  s_e8fb00d5812ee1::t_952de2eb48d100 75-87,89
+  s_e8fb00d5812ee1::t_2aa7cba2777f71 50-51
+  s_e8fb00d5812ee1::t_93191e8aac0041 6
+  s_e8fb00d5812ee1::t_521a3e4eccd1ad 431
+  s_e8fb00d5812ee1::t_2a23a43c0d4e7c 4-5
+.vscode/settings.json
+  s_e8fb00d5812ee1::t_1fc20d605af1f0 1
+convex/variables.ts
+  s_e8fb00d5812ee1::t_20a41b2476c5ac 279-411,418,420,425-434,436-473,478,481-487
+  s_e8fb00d5812ee1::t_2211e12160ca8d 412-417,419,421-424,435,474-477,479-480
+apps/web/package.json
+  s_e8fb00d5812ee1::t_1a99cf79574216 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "fa6cedacc5ac8f7874f754bd49959b3134c038c0",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
