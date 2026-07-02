@@ -1,0 +1,127 @@
+apps/vscode-extension/src/types.ts
+  s_e8fb00d5812ee1::t_da81630146ec61 82-92
+  s_e8fb00d5812ee1::t_e9dfc276284552 111-132
+  s_e8fb00d5812ee1::t_b172f108964827 21-28
+apps/vscode-extension/src/services/clipboardGuard.ts
+  s_e8fb00d5812ee1::t_22e07083e81da6 46-52
+  s_e8fb00d5812ee1::t_d562499783c07a 2,13-17
+  s_e8fb00d5812ee1::t_1b6f97d22d9f0f 105-108,111-115,119-123
+  s_e8fb00d5812ee1::t_e764b525930605 3
+  s_e8fb00d5812ee1::t_71c047b7696f07 82-86,90-94
+  s_e8fb00d5812ee1::t_b2338a3e7f01e0 77-78,81,95,100-101,110,124,129
+  s_e8fb00d5812ee1::t_9b7b7accdb6b30 45
+apps/web/src/app/api/extension/variables/route.ts
+  s_e8fb00d5812ee1::t_194179a6024ba4 12
+  s_e8fb00d5812ee1::t_99211fb5f18ff7 217-221,233-235
+  s_e8fb00d5812ee1::t_99ae87996f99a2 264-270
+  s_e8fb00d5812ee1::t_870932cb5bd49e 138-164,180-184,188-194
+apps/vscode-extension/src/providers/dashboardHtml.ts
+  s_e8fb00d5812ee1::t_4b055970e4a1f7 449-507
+  s_e8fb00d5812ee1::t_5526c695b5d1ab 598-613
+  s_e8fb00d5812ee1::t_b27d27ce576872 417-419
+  s_e8fb00d5812ee1::t_70c57de49cf2be 345-346
+  s_e8fb00d5812ee1::t_52265a3cfdef67 410
+  s_e8fb00d5812ee1::t_d7cdd5b68dc23d 568,570-574,576-578
+  s_e8fb00d5812ee1::t_1890eb5c8763be 329
+apps/vscode-extension/package.json
+  s_e8fb00d5812ee1::t_da1130c0ba5c10 5
+apps/vscode-extension/src/extension.ts
+  s_e8fb00d5812ee1::t_800d76f1fb1b8e 32
+  s_e8fb00d5812ee1::t_55c1cae2804c0f 560-570,574
+  s_e8fb00d5812ee1::t_c7a79821df4608 699-702
+  s_e8fb00d5812ee1::t_251d163312b688 865-869
+  s_e8fb00d5812ee1::t_8657a3118d69e4 1159-1165
+  s_e8fb00d5812ee1::t_526dea3e1fd873 544-547
+apps/web/src/app/api/extension/projects/route.ts
+  s_e8fb00d5812ee1::t_fd7cb34c8fe31d 32-65
+  s_e8fb00d5812ee1::t_2f77a0897ac4d1 175-192,206-222
+  s_e8fb00d5812ee1::t_768443b1ca5b6b 122-139,142-159
+  s_e8fb00d5812ee1::t_4f309324aab63d 31,160,223-224
+apps/vscode-extension/src/services/gitCommitGuard.ts
+  s_e8fb00d5812ee1::t_61c01e827b8aa9 81-88
+  s_e8fb00d5812ee1::t_b4032d4c2ab05f 100-103,107-115
+  s_e8fb00d5812ee1::t_1a23087fa4ca7d 291-294
+  s_e8fb00d5812ee1::t_e5aadbba6f5497 40-41
+apps/vscode-extension/src/providers/projectsTreeProvider.ts
+  s_e8fb00d5812ee1::t_5a2306a9a12c12 216-219
+  s_e8fb00d5812ee1::t_ce54d32c13bbea 313-317,331-340
+  s_e8fb00d5812ee1::t_7de751892bcaf9 433-441,443-445,447-449,452,454-462
+  s_e8fb00d5812ee1::t_da1130c0ba5c10 446
+  s_e8fb00d5812ee1::t_5e07967dc1edb3 369,371
+  s_e8fb00d5812ee1::t_40c3557310586c 5,21-22,36,48-54,56-62
+apps/web/src/app/api/extension/_lib/legacy-roles.ts
+  s_e8fb00d5812ee1::t_d2835775145b91 112
+  s_e8fb00d5812ee1::t_2f340f2049ce64 43-50
+  s_e8fb00d5812ee1::t_07b6f6716d145f 73-75,82-84
+apps/vscode-extension/src/providers/statusBar.ts
+  s_e8fb00d5812ee1::t_6f14197df68248 34
+  s_e8fb00d5812ee1::t_4d3f05de779da7 112-113,119-132,134-148
+  s_e8fb00d5812ee1::t_af10dc16ae1c13 3
+  s_e8fb00d5812ee1::t_82433b52a4fcf5 133
+  s_e8fb00d5812ee1::t_8240a7e54f3345 114-117
+apps/vscode-extension/src/services/sync.ts
+  s_e8fb00d5812ee1::t_8d0cca38c710ba 180-182,185-192
+  s_e8fb00d5812ee1::t_da1130c0ba5c10 510-512,518-519
+  s_e8fb00d5812ee1::t_7d83c52150d37d 462-465
+  s_e8fb00d5812ee1::t_cdeb230f31d5cf 16-20,33-34
+  s_e8fb00d5812ee1::t_d258e0fe2ab43a 490-499,501-504,509,513-515,523-524,526-536,538-547,549-568
+  s_e8fb00d5812ee1::t_18dd5a668a981c 505-508,516-517,520-522
+  s_e8fb00d5812ee1::t_a5e2a9d4961d81 1381
+  s_e8fb00d5812ee1::t_e0179268bbb192 965-967
+  s_e8fb00d5812ee1::t_f3987ea2375695 1065
+  s_e8fb00d5812ee1::t_5f3ae480956ffe 58-66,71-72,76
+  s_e8fb00d5812ee1::t_6216cbd78be1b0 35
+apps/vscode-extension/src/providers/variablesTreeProvider.ts
+  s_e8fb00d5812ee1::t_6bbf8986759a8a 231-234
+  s_e8fb00d5812ee1::t_fecd504eaecd85 175-177
+  s_e8fb00d5812ee1::t_175562b15368d5 178-184
+  s_e8fb00d5812ee1::t_927c471946335b 4,7-9,18,25-31,33-39
+  s_e8fb00d5812ee1::t_1a667f430f74d7 114-116,121-128
+apps/vscode-extension/src/services/auth.ts
+  s_e8fb00d5812ee1::t_0f117f328cab41 51
+  s_e8fb00d5812ee1::t_ab663f33789b70 18-34
+  s_e8fb00d5812ee1::t_355bbd21d757cc 48-50
+  s_e8fb00d5812ee1::t_c13c28698e6289 332-334
+  s_e8fb00d5812ee1::t_ad7f092817f3f2 17
+apps/vscode-extension/src/roles.ts
+  s_e8fb00d5812ee1::t_128fc134af4788 1-121
+apps/web/src/app/api/extension/organizations/route.ts
+  s_e8fb00d5812ee1::t_0ec664e07df8b7 5
+  s_e8fb00d5812ee1::t_305ce8813fb5ea 50-52
+apps/vscode-extension/src/roles.test.ts
+  s_e8fb00d5812ee1::t_23b3a47a997f36 1-148,154-155,161-212
+  s_e8fb00d5812ee1::t_da1130c0ba5c10 149-153,156-160
+apps/vscode-extension/src/utils/device.ts
+  s_e8fb00d5812ee1::t_48a7e8d6408091 17-22
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_e8fb00d5812ee1::t_179b7b018af44a 226-228,231-238
+  s_e8fb00d5812ee1::t_9f484172565c3b 23-40
+  s_e8fb00d5812ee1::t_d1b4b349e83024 5
+  s_e8fb00d5812ee1::t_a3961e7478fd6e 65-71,73-75,82,90,93-173
+  s_e8fb00d5812ee1::t_1e8d4d6843b6c6 446-451
+apps/vscode-extension/src/services/api.ts
+  s_e8fb00d5812ee1::t_da7158678bc9fc 1,9
+  s_e8fb00d5812ee1::t_818f3200dd08b9 57-58
+  s_e8fb00d5812ee1::t_61050edae503bd 79-96,98-100,105-142
+  s_e8fb00d5812ee1::t_565b3ebc7632dd 32,143,240-248,258,265-309
+  s_e8fb00d5812ee1::t_89438d11a8d279 342-350,359
+  s_e8fb00d5812ee1::t_758cacf39b3680 33-48
+  s_e8fb00d5812ee1::t_da1130c0ba5c10 2-6
+  s_e8fb00d5812ee1::t_cc984d7efa7a77 144,310
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "bcf8f1c6824330fb6237f35ae7db0ab0b8efa695",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
