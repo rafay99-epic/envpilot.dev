@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { Project } from "../types";
 
 export interface VariableRequestInput {
   key: string;
@@ -18,16 +19,23 @@ export class RequestVariableDialog {
    * Show the variable request dialog and collect all inputs.
    * Returns undefined if the user cancels at any step.
    *
+   * `project` is the request target chosen upstream; its name pins every step
+   * title so the user always sees which project they are requesting against.
    * `allowedEnvironments` limits the environment picker for scoped
    * developers (e.g. ["development"]); omitted = all environments.
    */
   async showRequestDialog(
-    projectId: string,
+    project: Project,
     allowedEnvironments?: string[]
   ): Promise<VariableRequestInput | undefined> {
+    // Every step carries the project name for context (final confirmation is
+    // step 6/6, shown by the caller after this dialog returns).
+    const title = (step: number) =>
+      `Request Variable (${step}/5) · ${project.name}`;
+
     // Step 1: Key name
     const key = await vscode.window.showInputBox({
-      title: "Request Variable (1/5) - Key",
+      title: title(1),
       prompt: "Enter the variable key name",
       placeHolder: "e.g., API_KEY, DATABASE_URL",
       validateInput: (value) => {
@@ -49,7 +57,7 @@ export class RequestVariableDialog {
 
     // Step 2: Value
     const value = await vscode.window.showInputBox({
-      title: "Request Variable (2/5) - Value",
+      title: title(2),
       prompt: `Enter the value for ${key}`,
       placeHolder: "Variable value",
       validateInput: (v) => {
@@ -65,7 +73,7 @@ export class RequestVariableDialog {
 
     // Step 3: Description (optional)
     const description = await vscode.window.showInputBox({
-      title: "Request Variable (3/5) - Description",
+      title: title(3),
       prompt: "Enter a description (optional, press Enter to skip)",
       placeHolder: "What is this variable used for?",
     });
@@ -93,7 +101,7 @@ export class RequestVariableDialog {
     const envItems = await vscode.window.showQuickPick(
       envChoices.map((c, i) => ({ ...c, picked: i === 0 })),
       {
-        title: "Request Variable (4/5) - Environments",
+        title: title(4),
         placeHolder: allowedEnvironments
           ? "Select environments (limited to your access)"
           : "Select environments for this variable",
@@ -116,7 +124,7 @@ export class RequestVariableDialog {
         },
       ],
       {
-        title: "Request Variable (5/5) - Sensitive?",
+        title: title(5),
         placeHolder: "Is this a sensitive value (secret/credential)?",
       }
     );
@@ -129,7 +137,7 @@ export class RequestVariableDialog {
       value,
       description: description || undefined,
       environments,
-      projectId,
+      projectId: project._id,
       isSensitive: sensitiveChoice.value,
     };
   }

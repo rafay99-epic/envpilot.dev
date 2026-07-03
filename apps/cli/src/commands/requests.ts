@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { error, info, table, withSpinner } from "../lib/ui.js";
+import { error, header, info, table, withSpinner } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
@@ -8,7 +8,10 @@ import {
   notInitialized,
   handleError,
 } from "../lib/errors.js";
-import { formatRequestRows } from "../lib/variable-requests.js";
+import {
+  formatRequestRows,
+  formatRequestsListHeader,
+} from "../lib/variable-requests.js";
 import {
   variableRequestStatusSchema,
   type VariableRequestStatus,
@@ -59,6 +62,13 @@ export const requestsCommand = new Command("requests")
       const api = createAPIClient();
       const requests = await withSpinner("Fetching variable requests...", () =>
         api.listVariableRequests(project.projectId, status)
+      );
+
+      header(
+        formatRequestsListHeader({
+          projectName: project.projectName || project.projectId,
+          organizationName: project.organizationName || project.organizationId,
+        })
       );
 
       if (requests.length === 0) {

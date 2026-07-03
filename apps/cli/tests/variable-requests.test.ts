@@ -3,11 +3,21 @@ import {
   ALL_REQUEST_ENVIRONMENTS,
   allowedRequestEnvironments,
   buildCreateVariableRequestBody,
+  buildEligibleRequestTargets,
+  buildProjectChoices,
+  formatProjectChoiceLabel,
+  formatRequestContextBanner,
   formatRequestRow,
   formatRequestRows,
+  formatRequestsListHeader,
+  formatRequestSuccessMessage,
+  formatRequestSummary,
+  isRequestEligibleProject,
   validateRequestDescription,
   validateRequestKey,
   validateRequestValue,
+  type RequestProjectCandidate,
+  type RequestTarget,
 } from "../src/lib/variable-requests.js";
 
 describe("validateRequestKey", () => {
@@ -79,10 +89,8 @@ describe("allowedRequestEnvironments", () => {
     ]);
   });
 
-  it("returns all environments when scope is an empty array", () => {
-    expect(allowedRequestEnvironments([])).toEqual([
-      ...ALL_REQUEST_ENVIRONMENTS,
-    ]);
+  it("returns NO environments for an explicit empty scope (matches the server's subset check)", () => {
+    expect(allowedRequestEnvironments([])).toEqual([]);
   });
 
   it("filters to only the scoped environments, preserving canonical order", () => {
@@ -146,6 +154,254 @@ describe("buildCreateVariableRequestBody", () => {
 
     expect(body.isSensitive).toBe(true);
     expect(body.environments).toEqual(["development", "production"]);
+  });
+});
+
+describe("isRequestEligibleProject", () => {
+  it("accepts an assigned developer (unified role)", () => {
+    expect(
+      isRequestEligibleProject({ unifiedRole: "developer", assigned: true })
+    ).toBe(true);
+  });
+
+  it("accepts an assigned developer via the legacy `member` role", () => {
+    expect(isRequestEligibleProject({ role: "member", assigned: true })).toBe(
+      true
+    );
+  });
+
+  it("rejects a developer who is not assigned", () => {
+    expect(
+      isRequestEligibleProject({ unifiedRole: "developer", assigned: false })
+    ).toBe(false);
+    // Missing `assigned` is treated as not assigned.
+    expect(isRequestEligibleProject({ unifiedRole: "developer" })).toBe(false);
+  });
+
+  it("rejects owners, project managers, and team leads even when assigned", () => {
+    for (const role of ["owner", "project_manager", "team_lead"]) {
+      expect(
+        isRequestEligibleProject({ unifiedRole: role, assigned: true })
+      ).toBe(false);
+    }
+    // Legacy `admin` normalizes to owner → not eligible.
+    expect(isRequestEligibleProject({ role: "admin", assigned: true })).toBe(
+      false
+    );
+  });
+});
+
+describe("buildEligibleRequestTargets", () => {
+  const orgNames = { org_a: "Acme", org_b: "Beta" };
+
+  const projects: RequestProjectCandidate[] = [
+    {
+      _id: "p1",
+      name: "web",
+      organizationId: "org_a",
+      unifiedRole: "developer",
+      assigned: true,
+      environmentScope: ["development", "staging"],
+    },
+    {
+      // Not assigned → filtered out.
+      _id: "p2",
+      name: "infra",
+      organizationId: "org_a",
+      unifiedRole: "developer",
+      assigned: false,
+      environmentScope: null,
+    },
+    {
+      // Team lead → filtered out (creates variables directly).
+      _id: "p3",
+      name: "billing",
+      organizationId: "org_b",
+      unifiedRole: "team_lead",
+      assigned: true,
+      environmentScope: null,
+    },
+    {
+      _id: "p4",
+      name: "mobile",
+      organizationId: "org_b",
+      unifiedRole: "developer",
+      assigned: true,
+      environmentScope: null,
+    },
+  ];
+
+  it("keeps only assigned developers and labels them with org names", () => {
+    const targets = buildEligibleRequestTargets(projects, orgNames);
+    expect(targets).toEqual([
+      {
+        projectId: "p1",
+        projectName: "web",
+        organizationId: "org_a",
+        organizationName: "Acme",
+        environmentScope: ["development", "staging"],
+      },
+      {
+        projectId: "p4",
+        projectName: "mobile",
+        organizationId: "org_b",
+        organizationName: "Beta",
+        environmentScope: null,
+      },
+    ]);
+  });
+
+  it("falls back to the org id when the name is unknown", () => {
+    const targets = buildEligibleRequestTargets([projects[0]], {});
+    expect(targets[0].organizationName).toBe("org_a");
+  });
+
+  it("normalizes a missing environmentScope to null", () => {
+    const targets = buildEligibleRequestTargets(
+      [
+        {
+          _id: "p",
+          name: "x",
+          organizationId: "org_a",
+          role: "member",
+          assigned: true,
+        },
+      ],
+      orgNames
+    );
+    expect(targets[0].environmentScope).toBeNull();
+  });
+});
+
+describe("formatProjectChoiceLabel / buildProjectChoices", () => {
+  const targets: RequestTarget[] = [
+    {
+      projectId: "p1",
+      projectName: "web",
+      organizationId: "org_a",
+      organizationName: "Acme",
+    },
+    {
+      projectId: "p4",
+      projectName: "mobile",
+      organizationId: "org_b",
+      organizationName: "Beta",
+    },
+  ];
+
+  it("labels a target as '<project> — <org>'", () => {
+    expect(formatProjectChoiceLabel(targets[0])).toBe("web — Acme");
+  });
+
+  it("builds inquirer choices with projectId values", () => {
+    expect(buildProjectChoices(targets)).toEqual([
+      { name: "web — Acme", value: "p1" },
+      { name: "mobile — Beta", value: "p4" },
+    ]);
+  });
+});
+
+describe("formatRequestContextBanner", () => {
+  it("shows the account email and the project/org target", () => {
+    expect(
+      formatRequestContextBanner({
+        email: "dev@example.com",
+        projectName: "web",
+        organizationName: "Acme",
+      })
+    ).toBe(
+      "Requesting as dev@example.com\nProject: web  ·  Organization: Acme"
+    );
+  });
+});
+
+describe("formatRequestSummary", () => {
+  it("aligns labels and renders the target, environments, and sensitivity", () => {
+    const summary = formatRequestSummary({
+      key: "API_KEY",
+      projectName: "web",
+      organizationName: "Acme",
+      environments: ["development", "staging"],
+      isSensitive: false,
+    });
+    expect(summary).toBe(
+      [
+        "Key:           API_KEY",
+        "Project:       web — Acme",
+        "Environments:  development, staging",
+        "Sensitive:     no",
+      ].join("\n")
+    );
+  });
+
+  it("renders sensitive values as 'yes'", () => {
+    const summary = formatRequestSummary({
+      key: "API_KEY",
+      projectName: "web",
+      organizationName: "Acme",
+      environments: ["production"],
+      isSensitive: true,
+    });
+    expect(summary).toContain("Sensitive:     yes");
+  });
+});
+
+describe("formatRequestSuccessMessage / formatRequestsListHeader", () => {
+  it("names the key, project, and org in the success line", () => {
+    expect(
+      formatRequestSuccessMessage({
+        key: "API_KEY",
+        projectName: "web",
+        organizationName: "Acme",
+      })
+    ).toBe('Request "API_KEY" submitted for web (Acme) — pending review.');
+  });
+
+  it("names the project the requests listing is for", () => {
+    expect(
+      formatRequestsListHeader({ projectName: "web", organizationName: "Acme" })
+    ).toBe("Requests for web — Acme");
+  });
+});
+
+describe("scope filtering for a switched (picked) project", () => {
+  it("uses the picked project's scope, not the linked one", () => {
+    const targets = buildEligibleRequestTargets(
+      [
+        {
+          _id: "p1",
+          name: "web",
+          organizationId: "org_a",
+          unifiedRole: "developer",
+          assigned: true,
+          environmentScope: ["development"],
+        },
+      ],
+      { org_a: "Acme" }
+    );
+    // The env choices offered must derive from the picked target's scope.
+    expect(allowedRequestEnvironments(targets[0].environmentScope)).toEqual([
+      "development",
+    ]);
+  });
+
+  it("yields no environments (command exits) when the picked project's scope matches none", () => {
+    const targets = buildEligibleRequestTargets(
+      [
+        {
+          _id: "p1",
+          name: "web",
+          organizationId: "org_a",
+          unifiedRole: "developer",
+          assigned: true,
+          // A scope that intersects none of the three canonical request
+          // environments → the command reports "no environments" and exits.
+          environmentScope: ["preview"],
+        },
+      ],
+      { org_a: "Acme" }
+    );
+    expect(allowedRequestEnvironments(targets[0].environmentScope)).toEqual([]);
   });
 });
 

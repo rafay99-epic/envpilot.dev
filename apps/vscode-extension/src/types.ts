@@ -81,9 +81,9 @@ export interface Project {
   projectRole?: ProjectRole | null;
   /**
    * Additive unified-role fields, mirroring `apps/cli`'s `ProjectAccess`
-   * shape. Not sent by the extension's legacy `/api/extension/projects`
-   * route yet — always optional and safe to omit. When present, prefer
-   * these over `userRole`/`projectRole` via `normalizeOrgRole`/`formatRoleLabel`.
+   * shape. Sent by `/api/extension/projects`; still optional and safe to omit
+   * so legacy server deployments remain tolerated. When present, prefer these
+   * over `userRole`/`projectRole` via `normalizeOrgRole`/`formatRoleLabel`.
    */
   unifiedRole?: string;
   /** Whether the user is actually assigned to this project (vs. grant-only). */

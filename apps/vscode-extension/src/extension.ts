@@ -31,6 +31,8 @@ import {
 import { getDisplayPath } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
 import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
+import { groupProjectsForPicker } from "./utils/requestTarget";
+import type { Project } from "./types";
 import * as output from "./utils/outputChannel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -972,37 +974,52 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  // Get linked projects
-  const linkedProjects = await syncService.getAllLinkedProjectsV2();
-  if (linkedProjects.length === 0) {
-    vscode.window.showWarningMessage(
-      'No project linked. Use "Envpilot: Link Project" first.'
+  // Fetch every accessible project (no org arg = all orgs) plus org names for
+  // grouping, the active account email for the title, and the workspace's
+  // linked project so it can lead as the default. All are cached + coalesced.
+  const [projects, orgs, currentUser, currentLinked] = await Promise.all([
+    apiService.getProjects(),
+    apiService.getOrganizations(),
+    authService.getCurrentUser(),
+    syncService.getLinkedProjectV2ForWorkspace(),
+  ]);
+
+  const rows = groupProjectsForPicker(projects, orgs, currentLinked?.projectId);
+  const hasEligible = rows.some((r) => r.kind === "project");
+  if (!hasEligible) {
+    // Owners/PMs/team leads have direct write access — requests aren't for them.
+    vscode.window.showInformationMessage(
+      "You have direct write access in your projects — create variables from the dashboard."
     );
     return;
   }
 
-  // Pick project if multiple are linked
-  let linkedProject = linkedProjects[0];
-  if (linkedProjects.length > 1) {
-    const pick = await vscode.window.showQuickPick(
-      linkedProjects.map((p) => ({
-        label: p.projectName,
-        description: p.organizationName,
-        project: p,
-      })),
-      { placeHolder: "Select a project to request a variable for" }
-    );
-    if (!pick) return;
-    linkedProject = pick.project;
-  }
-
-  // Check role — only developers request; everyone else creates directly.
-  // Prefer the authoritative unified meta from the last variables response;
-  // normalizeOrgRole maps legacy "member" → "developer" transparently.
-  const meta = apiService.getAccessMeta(linkedProject.projectId);
-  const role = normalizeOrgRole(
-    meta?.unifiedRole ?? apiService.getUserRole(linkedProject.projectId)
+  // Map the pure rows onto QuickPickItems, carrying the Project on each pick.
+  type ProjectQuickPickItem = vscode.QuickPickItem & { project?: Project };
+  const items: ProjectQuickPickItem[] = rows.map((row) =>
+    row.kind === "separator"
+      ? { label: row.label, kind: vscode.QuickPickItemKind.Separator }
+      : {
+          label: row.label,
+          description: row.description,
+          project: row.project,
+        }
   );
+
+  const email = currentUser?.email ?? "unknown";
+  const pick = await vscode.window.showQuickPick(items, {
+    title: `Request Variable — choose project (signed in as ${email})`,
+    placeHolder: "Select the project this variable request targets",
+  });
+  if (!pick?.project) {
+    return;
+  }
+  const project = pick.project;
+
+  // Defense-in-depth: re-derive the developer guard from the PICKED project.
+  // groupProjectsForPicker already filtered to eligible projects, so this only
+  // fires if that invariant is ever violated.
+  const role = normalizeOrgRole(project.unifiedRole ?? project.userRole);
   if (role !== "developer") {
     vscode.window.showInformationMessage(
       "As an owner, project manager, or team lead you can create variables directly on the dashboard."
@@ -1010,19 +1027,44 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  // A scoped developer may only request environments inside their scope —
-  // the server enforces this too; filtering here just prevents a doomed pick.
-  const environmentScope =
-    meta?.environmentScope && meta.environmentScope.length > 0
-      ? meta.environmentScope
-      : undefined;
+  // Scope-aware environments come from the picked project. An explicit empty
+  // scope means the developer has no environment access here — bail before the
+  // dialog offers an impossible pick.
+  const scope = project.environmentScope;
+  if (scope && scope.length === 0) {
+    vscode.window.showWarningMessage(
+      "You don't have access to any environments in this project."
+    );
+    return;
+  }
+  const allowedEnvironments = scope && scope.length > 0 ? scope : undefined;
 
-  // Show the request dialog
   const input = await requestVariableDialog.showRequestDialog(
-    linkedProject.projectId,
-    environmentScope
+    project,
+    allowedEnvironments
   );
   if (!input) {
+    return;
+  }
+
+  // Step 6/6: modal confirmation summarizing the request before submitting.
+  const orgName =
+    orgs.find((o) => o._id === project.organizationId)?.name ??
+    project.organizationId;
+  const confirm = await vscode.window.showInformationMessage(
+    "Submit this variable request?",
+    {
+      modal: true,
+      detail: [
+        `Key: ${input.key}`,
+        `Project: ${project.name} — ${orgName}`,
+        `Environments: ${input.environments.join(", ")}`,
+        `Sensitive: ${input.isSensitive ? "Yes" : "No"}`,
+      ].join("\n"),
+    },
+    "Submit Request"
+  );
+  if (confirm !== "Submit Request") {
     return;
   }
 
@@ -1037,7 +1079,7 @@ async function handleRequestVariable(): Promise<void> {
       }
     );
     vscode.window.showInformationMessage(
-      `Variable request for "${input.key}" submitted for approval.`
+      `Variable request "${input.key}" submitted for ${project.name} (${orgName}) — pending review.`
     );
     variablesTreeProvider.refresh();
   } catch (error) {

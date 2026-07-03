@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import type { VariableRequest, VariableRequestStatus } from "../types/index.js";
+import { normalizeOrgRole } from "./roles.js";
 
 /** Mirrors the server's createRequestSchema (apps/web .../cli/variable-requests). */
 export const ALL_REQUEST_ENVIRONMENTS = [
@@ -79,14 +80,17 @@ export function validateRequestDescription(
 }
 
 /**
- * Environments a developer may choose from, given their environmentScope
- * from the /api/cli/variables meta block. A null/undefined/empty scope means
- * unrestricted access — offer all three environments.
+ * Environments a developer may choose from, given their environmentScope.
+ * null/undefined = unrestricted — offer all three. An explicit empty array
+ * means the assignment grants NO environments: the server's subset check
+ * (isEnvironmentScopeAllowed) rejects every environment for [], and the
+ * VS Code extension exits early on it — the CLI must mirror that instead of
+ * offering everything and letting the submit 403.
  */
 export function allowedRequestEnvironments(
   environmentScope: string[] | null | undefined
 ): RequestEnvironment[] {
-  if (!environmentScope || environmentScope.length === 0) {
+  if (environmentScope == null) {
     return [...ALL_REQUEST_ENVIRONMENTS];
   }
   return ALL_REQUEST_ENVIRONMENTS.filter((env) =>
@@ -115,6 +119,154 @@ export function buildCreateVariableRequestBody(input: {
     environments: input.environments as RequestEnvironment[],
     isSensitive: input.isSensitive ?? false,
   };
+}
+
+// ── Target resolution & display (the unified request-targeting UX) ────
+//
+// `envpilot request` must always show WHICH project/org a request targets and
+// let a developer switch to any project they're an assigned developer on. The
+// pure pieces of that flow (eligibility, choice labelling, banner/summary
+// formatting) live here so they can be unit tested without inquirer/network.
+
+/**
+ * The subset of a `/api/cli/projects` entry the request flow reasons about.
+ * Mirrors the additive unified fields that route returns (unifiedRole is the
+ * caller's ORG role; assigned/environmentScope are per-project).
+ */
+export interface RequestProjectCandidate {
+  _id: string;
+  name: string;
+  organizationId: string;
+  unifiedRole?: string | null;
+  role?: string | null;
+  assigned?: boolean;
+  environmentScope?: string[] | null;
+}
+
+/** A resolved request target with the display names the banner/summary need. */
+export interface RequestTarget {
+  projectId: string;
+  projectName: string;
+  organizationId: string;
+  organizationName: string;
+  environmentScope?: string[] | null;
+}
+
+/**
+ * A project is request-eligible when the caller is a *developer assigned to it*
+ * — owners, project managers, and team leads create variables directly and so
+ * never submit requests. The `/api/cli/projects` route only returns assigned
+ * projects to non-owners, but we check `assigned` explicitly so a stray
+ * unassigned entry can never leak into the picker.
+ */
+export function isRequestEligibleProject(
+  project: Pick<RequestProjectCandidate, "unifiedRole" | "role" | "assigned">
+): boolean {
+  const role = normalizeOrgRole(project.unifiedRole ?? project.role);
+  return role === "developer" && project.assigned === true;
+}
+
+/**
+ * Filter a project list to the request-eligible ones and shape them into
+ * `RequestTarget`s, resolving each project's org display name from the supplied
+ * id→name map (falling back to the raw org id when unknown).
+ */
+export function buildEligibleRequestTargets(
+  projects: RequestProjectCandidate[],
+  orgNameById: Record<string, string>
+): RequestTarget[] {
+  return projects.filter(isRequestEligibleProject).map((p) => ({
+    projectId: p._id,
+    projectName: p.name,
+    organizationId: p.organizationId,
+    organizationName: orgNameById[p.organizationId] ?? p.organizationId,
+    environmentScope: p.environmentScope ?? null,
+  }));
+}
+
+/** Label a target for a picker / summary as "<project> — <org>". */
+export function formatProjectChoiceLabel(
+  target: Pick<RequestTarget, "projectName" | "organizationName">
+): string {
+  return `${target.projectName} — ${target.organizationName}`;
+}
+
+/** Build inquirer `list` choices (value = projectId) from eligible targets. */
+export function buildProjectChoices(
+  targets: RequestTarget[]
+): Array<{ name: string; value: string }> {
+  return targets.map((t) => ({
+    name: formatProjectChoiceLabel(t),
+    value: t.projectId,
+  }));
+}
+
+/**
+ * The always-printed context banner shown before any prompt so the developer
+ * can see exactly who they are and which project/org the request targets.
+ */
+export function formatRequestContextBanner(input: {
+  email: string;
+  projectName: string;
+  organizationName: string;
+}): string {
+  return (
+    `Requesting as ${input.email}\n` +
+    `Project: ${input.projectName}  ·  Organization: ${input.organizationName}`
+  );
+}
+
+/** Pad a summary label to a fixed column so values line up. */
+const SUMMARY_LABEL_WIDTH = 15;
+
+/**
+ * The final confirmation summary printed before submit. Labels are padded to a
+ * fixed column so the values align:
+ *
+ *   Key:           API_KEY
+ *   Project:       my-app — Acme
+ *   Environments:  development, staging
+ *   Sensitive:     no
+ */
+export function formatRequestSummary(input: {
+  key: string;
+  projectName: string;
+  organizationName: string;
+  environments: string[];
+  isSensitive: boolean;
+}): string {
+  const rows: Array<[string, string]> = [
+    ["Key:", input.key],
+    [
+      "Project:",
+      formatProjectChoiceLabel({
+        projectName: input.projectName,
+        organizationName: input.organizationName,
+      }),
+    ],
+    ["Environments:", input.environments.join(", ")],
+    ["Sensitive:", input.isSensitive ? "yes" : "no"],
+  ];
+  return rows
+    .map(([label, value]) => `${label.padEnd(SUMMARY_LABEL_WIDTH)}${value}`)
+    .join("\n");
+}
+
+/** The success line shown after a request is submitted (checkmark added by the caller). */
+export function formatRequestSuccessMessage(input: {
+  key: string;
+  projectName: string;
+  organizationName: string;
+}): string {
+  return `Request "${input.key}" submitted for ${input.projectName} (${input.organizationName}) — pending review.`;
+}
+
+/** Header for the `envpilot requests` listing, naming the project it lists. */
+export function formatRequestsListHeader(input: {
+  projectName: string;
+  organizationName: string;
+}): string {
+  return `Requests for ${formatProjectChoiceLabel(input)}`;
 }
 
 /**

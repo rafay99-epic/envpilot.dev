@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
-import { success, error, info, warning } from "../lib/ui.js";
-import { createAPIClient, APIError } from "../lib/api.js";
-import { isAuthenticated } from "../lib/config.js";
+import { success, error, info, warning, withSpinner } from "../lib/ui.js";
+import { createAPIClient, APIClient, APIError } from "../lib/api.js";
+import { isAuthenticated, getUser } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
 import {
   notAuthenticated,
@@ -14,9 +14,15 @@ import { normalizeOrgRole } from "../lib/roles.js";
 import {
   allowedRequestEnvironments,
   buildCreateVariableRequestBody,
+  buildEligibleRequestTargets,
+  buildProjectChoices,
+  formatRequestContextBanner,
+  formatRequestSuccessMessage,
+  formatRequestSummary,
   validateRequestDescription,
   validateRequestKey,
   validateRequestValue,
+  type RequestTarget,
 } from "../lib/variable-requests.js";
 import type { ProjectEntry, Variable, VariablesMeta } from "../types/index.js";
 
@@ -44,33 +50,75 @@ export const requestCommand = new Command("request")
         throw notAuthenticated();
       }
 
-      const project = resolveLinkedProject(options.project);
-
+      const email = getUser()?.email ?? "unknown account";
       const api = createAPIClient();
+      const projectPassed = Boolean(options.project);
 
-      // Determine the caller's unified role + environment scope from the
-      // /api/cli/variables meta block (the same meta pull.ts already reads).
-      const metaResponse = await api.get<{
-        success: boolean;
-        data: Variable[];
-        meta?: CliVariablesMeta;
-      }>("/api/cli/variables", {
-        projectId: project.projectId,
-        ...(project.organizationId && {
-          organizationId: project.organizationId,
-        }),
-      });
-      const meta = metaResponse.meta;
-      const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
+      // Resolve the default target from the linked config (cwd / --project).
+      const defaultEntry = resolveDefaultEntry(options.project);
 
-      if (role !== "developer") {
-        warning(
-          "You have direct write access to this project. Use `envpilot push` or create the variable directly instead of submitting a request."
-        );
-        return;
+      // The chosen target + the developer's environment scope for it. Scope
+      // comes from the /api/cli/variables meta for the linked project, or from
+      // the /api/cli/projects listing when the user switches via the picker.
+      let target: RequestTarget | null = null;
+      let scope: string[] | null | undefined;
+
+      if (defaultEntry) {
+        const names = await resolveEntryNames(api, defaultEntry);
+        const defaultTarget: RequestTarget = {
+          projectId: defaultEntry.projectId,
+          projectName: names.projectName,
+          organizationId: defaultEntry.organizationId,
+          organizationName: names.organizationName,
+        };
+
+        printBanner(email, defaultTarget);
+
+        // --project is scripting-friendly: banner only, no confirm.
+        let useDefault = projectPassed;
+        if (!projectPassed) {
+          const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+            {
+              type: "confirm",
+              name: "proceed",
+              message: "Request a variable for this project?",
+              default: true,
+            },
+          ]);
+          useDefault = proceed;
+        }
+
+        if (useDefault) {
+          const meta = await fetchProjectMeta(api, defaultEntry);
+          const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
+          if (role !== "developer") {
+            warning(
+              "You have direct write access to this project. Use `envpilot push` or create the variable directly instead of submitting a request."
+            );
+            return;
+          }
+          target = defaultTarget;
+          scope = meta?.environmentScope;
+        }
       }
 
-      const envChoices = allowedRequestEnvironments(meta?.environmentScope);
+      // No linked project, or the user declined the default → interactive
+      // picker over every project they are an assigned developer on.
+      if (!target) {
+        const picked = await pickRequestTarget(api);
+        if (!picked) {
+          info(
+            "You have direct write access in your projects — create variables from the dashboard."
+          );
+          process.exit(0);
+        }
+        target = picked;
+        scope = picked.environmentScope;
+        printBanner(email, target);
+      }
+
+      // Environments the developer may request, scoped to the PICKED project.
+      const envChoices = allowedRequestEnvironments(scope);
       if (envChoices.length === 0) {
         error(
           "Your assignment does not include any environments in this project."
@@ -130,8 +178,35 @@ export const requestCommand = new Command("request")
         },
       ]);
 
+      // Final confirmation summary before submit.
+      console.log();
+      console.log(
+        formatRequestSummary({
+          key: answers.key.trim(),
+          projectName: target.projectName,
+          organizationName: target.organizationName,
+          environments: answers.environments,
+          isSensitive: answers.isSensitive,
+        })
+      );
+      console.log();
+
+      const { submit } = await inquirer.prompt<{ submit: boolean }>([
+        {
+          type: "confirm",
+          name: "submit",
+          message: "Submit this request?",
+          default: true,
+        },
+      ]);
+
+      if (!submit) {
+        info("Request canceled.");
+        return;
+      }
+
       const body = buildCreateVariableRequestBody({
-        projectId: project.projectId,
+        projectId: target.projectId,
         key: answers.key,
         value: answers.value,
         description: answers.description,
@@ -141,11 +216,14 @@ export const requestCommand = new Command("request")
 
       const created = await api.createVariableRequest(body);
 
-      success(`Request submitted: ${chalk.bold(created.key)}`);
-      info(`Status: ${created.status} · Id: ${created._id}`);
-      info(
-        "A project owner, project manager, or team lead must approve it before the variable is created."
+      success(
+        formatRequestSuccessMessage({
+          key: created.key,
+          projectName: target.projectName,
+          organizationName: target.organizationName,
+        })
       );
+      info(`Status: ${created.status} · Id: ${created._id}`);
     } catch (err) {
       // The server is the source of truth for authorization — surface its
       // 403 message directly instead of a generic stack trace.
@@ -157,20 +235,135 @@ export const requestCommand = new Command("request")
     }
   });
 
-function resolveLinkedProject(projectOption?: string): ProjectEntry {
+/**
+ * Resolve the default linked project from the .envpilot config. When --project
+ * is passed we require a config and a matching entry; without --project a
+ * missing config simply means "no default" (the caller falls back to the
+ * picker), so we return null rather than throwing.
+ */
+function resolveDefaultEntry(projectOption?: string): ProjectEntry | null {
   const configV2 = readProjectConfigV2();
-  if (!configV2) throw notInitialized();
+  if (!configV2) {
+    if (projectOption) throw notInitialized();
+    return null;
+  }
 
   const project = resolveProject(configV2, projectOption);
   if (!project) {
-    error(`Project not found: ${projectOption}`);
-    console.log();
-    console.log("Linked projects:");
-    for (const p of configV2.projects) {
-      console.log(`  ${p.projectName || p.projectId} (${p.environment})`);
+    if (projectOption) {
+      error(`Project not found: ${projectOption}`);
+      console.log();
+      console.log("Linked projects:");
+      for (const p of configV2.projects) {
+        console.log(`  ${p.projectName || p.projectId} (${p.environment})`);
+      }
+      process.exit(1);
     }
-    process.exit(1);
+    return null;
   }
 
   return project;
+}
+
+/** Print the always-visible context banner before any prompt. */
+function printBanner(email: string, target: RequestTarget): void {
+  console.log();
+  console.log(
+    chalk.dim(
+      formatRequestContextBanner({
+        email,
+        projectName: target.projectName,
+        organizationName: target.organizationName,
+      })
+    )
+  );
+  console.log();
+}
+
+/**
+ * Resolve display names for a linked project, filling any the config lacks
+ * (older/migrated .envpilot entries) from the API, and falling back to raw ids.
+ */
+async function resolveEntryNames(
+  api: APIClient,
+  entry: ProjectEntry
+): Promise<{ projectName: string; organizationName: string }> {
+  let projectName = entry.projectName;
+  let organizationName = entry.organizationName;
+
+  if (!projectName) {
+    try {
+      const project = await api.getProject(entry.projectId);
+      projectName = project.name;
+    } catch {
+      // Fall through to the id fallback below.
+    }
+  }
+
+  if (!organizationName) {
+    try {
+      const orgs = await api.listOrganizations();
+      organizationName =
+        orgs.find((o) => o._id === entry.organizationId)?.name ?? "";
+    } catch {
+      // Fall through to the id fallback below.
+    }
+  }
+
+  return {
+    projectName: projectName || entry.projectId,
+    organizationName: organizationName || entry.organizationId,
+  };
+}
+
+/** Fetch the caller's role + environment scope for a linked project. */
+async function fetchProjectMeta(
+  api: APIClient,
+  entry: ProjectEntry
+): Promise<CliVariablesMeta | undefined> {
+  const response = await api.get<{
+    success: boolean;
+    data: Variable[];
+    meta?: CliVariablesMeta;
+  }>("/api/cli/variables", {
+    projectId: entry.projectId,
+    ...(entry.organizationId && { organizationId: entry.organizationId }),
+  });
+  return response.meta;
+}
+
+/**
+ * Interactive picker over every project the user is an assigned developer on,
+ * across all their organizations. Returns the chosen target, or null when there
+ * are no eligible projects.
+ */
+async function pickRequestTarget(
+  api: APIClient
+): Promise<RequestTarget | null> {
+  const targets = await withSpinner(
+    "Finding projects you can request for...",
+    async () => {
+      const orgs = await api.listOrganizations();
+      const orgNameById = Object.fromEntries(orgs.map((o) => [o._id, o.name]));
+      const perOrg = await Promise.all(
+        orgs.map((org) => api.listProjects(org._id))
+      );
+      return perOrg.flatMap((projects) =>
+        buildEligibleRequestTargets(projects, orgNameById)
+      );
+    }
+  );
+
+  if (targets.length === 0) return null;
+
+  const { projectId } = await inquirer.prompt<{ projectId: string }>([
+    {
+      type: "list",
+      name: "projectId",
+      message: "Select a project to request for:",
+      choices: buildProjectChoices(targets),
+    },
+  ]);
+
+  return targets.find((t) => t.projectId === projectId) ?? null;
 }
