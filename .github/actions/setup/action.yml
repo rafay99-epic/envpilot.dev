@@ -1,0 +1,48 @@
+name: Setup toolchain
+description: >
+  Shared toolchain setup: Bun (pinned via packageManager), Node.js, dependency
+  cache, bun install, and Convex codegen. Checkout is the caller's
+  responsibility (callers need different fetch depths).
+
+inputs:
+  node:
+    description: Node.js version (needed by vsce/ovsx/npm tooling)
+    required: false
+    default: "22"
+  install:
+    description: Run `bun install --frozen-lockfile`
+    required: false
+    default: "true"
+  codegen:
+    description: Run `bunx convex codegen` (convex/_generated is gitignored)
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node }}
+
+    - name: Cache Bun dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    - name: Generate Convex types
+      if: inputs.install == 'true' && inputs.codegen == 'true'
+      shell: bash
+      run: bunx convex codegen
