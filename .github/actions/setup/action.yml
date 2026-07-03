@@ -1,8 +1,11 @@
 name: Setup toolchain
 description: >
   Shared toolchain setup: Bun (pinned via packageManager), Node.js, dependency
-  cache, bun install, and Convex codegen. Checkout is the caller's
-  responsibility (callers need different fetch depths).
+  cache, and bun install. Checkout is the caller's responsibility (callers need
+  different fetch depths). Convex generated types are committed to the repo
+  (convex/_generated), so no codegen step is needed here — `convex codegen`
+  requires a configured deployment and cannot run headlessly on a fresh CI
+  checkout.
 
 inputs:
   node:
@@ -11,10 +14,6 @@ inputs:
     default: "22"
   install:
     description: Run `bun install --frozen-lockfile`
-    required: false
-    default: "true"
-  codegen:
-    description: Run `bunx convex codegen` (convex/_generated is gitignored)
     required: false
     default: "true"
 
@@ -41,8 +40,3 @@ runs:
       if: inputs.install == 'true'
       shell: bash
       run: bun install --frozen-lockfile
-
-    - name: Generate Convex types
-      if: inputs.install == 'true' && inputs.codegen == 'true'
-      shell: bash
-      run: bunx convex codegen

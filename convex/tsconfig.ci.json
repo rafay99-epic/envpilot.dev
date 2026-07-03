@@ -1,0 +1,20 @@
+{
+  /* CI-only typecheck config for Convex functions.
+   *
+   * `convex/tsconfig.json` is the Convex-managed runtime config used by the
+   * Convex CLI, which injects ambient Node globals (process.env, etc.) during
+   * `convex dev` / `convex deploy`. A bare `tsc -p convex/tsconfig.json` lacks
+   * those globals and reports false `process` errors, so CI uses this config
+   * instead: it extends the runtime config and adds Node type roots so
+   * process.env usage in Convex functions typechecks headlessly — no Convex
+   * deployment or deploy key required (fork-PR safe). Run by the check-convex
+   * job as: `bunx tsc --noEmit -p convex/tsconfig.ci.json`.
+   */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../node_modules/@types", "../apps/web/node_modules/@types"],
+    "types": ["node"]
+  },
+  "include": ["./**/*"],
+  "exclude": ["./_generated"]
+}

@@ -23,8 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with:
-          codegen: "false"
       - name: Deploy Convex functions
         run: bunx convex deploy
         env:

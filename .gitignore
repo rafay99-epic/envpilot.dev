@@ -13,9 +13,6 @@ build/
 # fallow
 .fallow/
 
-# convex generated
-convex/_generated/
-
 # testing
 coverage/
 

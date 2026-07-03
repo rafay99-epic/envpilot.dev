@@ -158,8 +158,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with:
-          codegen: "false"
       - name: Prettier check
         run: bunx prettier --check .
 
@@ -216,7 +214,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Typecheck Convex functions
-        run: bunx tsc --noEmit -p convex/tsconfig.json
+        # CI config adds Node type roots so process.env usage resolves without
+        # a Convex deployment. See convex/tsconfig.ci.json.
+        run: bunx tsc --noEmit -p convex/tsconfig.ci.json
 
   react-doctor:
     name: React Doctor (advisory)
@@ -227,8 +227,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with:
-          codegen: "false"
       - name: Run react-doctor
         run: bunx -y react-doctor@latest apps/web --yes --offline --fail-on none --score
 
