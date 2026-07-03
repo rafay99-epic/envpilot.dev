@@ -7,7 +7,10 @@ import {
   ACTIVE_ORG_COOKIE_NAME,
   ACTIVE_ORG_COOKIE_TTL_SECONDS,
 } from "@/lib/organization-context";
+import { createLogger } from "@/lib/logger";
 import { normalizeOrgRole } from "@/lib/roles";
+
+const log = createLogger("api/invitations");
 
 type RouteParams = { params: Promise<{ token: string }> };
 
@@ -227,10 +230,18 @@ async function notifyMemberUpdate(
           role,
         })
         .catch((err: unknown) =>
-          console.warn("[EMAIL] Member update notification failed:", err)
+          log.error(
+            "member_update_email_failed",
+            { organizationId, updateType, subjectUserId },
+            err
+          )
         );
     }
   } catch (err) {
-    console.warn("[EMAIL] Error sending member update notifications:", err);
+    log.error(
+      "member_update_notification_failed",
+      { organizationId, updateType, subjectUserId },
+      err
+    );
   }
 }

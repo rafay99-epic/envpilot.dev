@@ -703,7 +703,14 @@ export const sendRotationReminderEmail = internalAction({
       if (prefs?.emailNotifications?.rotationReminders === false) continue;
 
       await sendEmail(member.user.email, subject, html, text).catch((err) =>
-        console.warn("[EMAIL] Rotation reminder failed:", err)
+        console.error("emails.sendRotationReminderEmail.sendFailed", {
+          organizationId: args.organizationId,
+          variableName: args.variableName,
+          projectName: args.projectName,
+          reminderType: args.reminderType,
+          recipient: member.user.email,
+          error: String(err),
+        })
       );
     }
   },

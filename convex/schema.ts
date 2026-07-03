@@ -353,6 +353,73 @@ export default defineSchema({
     .index("by_user_active", ["userId", "isActive"]),
 
   // ==========================================
+  // PROJECT ACCOUNTS (Shared service-account credentials)
+  // Username/password stored encrypted in WorkOS Vault (one JSON secret per
+  // account); Convex holds only the vault reference + non-secret metadata.
+  // RBAC + environment scoping mirror environmentVariables exactly.
+  // ==========================================
+  projectAccounts: defineTable({
+    // Display label, e.g. "Stripe Dashboard"
+    name: v.string(),
+    // Validated https?:// URL (optional)
+    websiteUrl: v.optional(v.string()),
+    // WorkOS Vault reference holding JSON {"username","password"}.
+    // This is NOT the actual credentials, just a reference ID.
+    vaultRef: v.string(),
+    // Optional human-readable description
+    description: v.optional(v.string()),
+    // Environment tags (e.g., ["development", "staging", "production"]); >= 1
+    environments: v.array(v.string()),
+    // Parent project
+    projectId: v.id("projects"),
+    // User who created the account
+    createdBy: v.id("users"),
+    // User who last modified the account
+    lastModifiedBy: v.id("users"),
+    // Current version number (for tracking changes)
+    version: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    // Soft delete support
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_name", ["projectId", "name"]),
+
+  // ==========================================
+  // ACCOUNT ACCESS PERMISSIONS (per-account grants)
+  // EXACT mirror of variablePermissions (no legacy "admin" level).
+  // ==========================================
+  accountPermissions: defineTable({
+    // Reference to the project account
+    accountId: v.id("projectAccounts"),
+    // Reference to the user granted access
+    userId: v.id("users"),
+    // Permission level
+    permission: v.union(
+      v.literal("read"), // Can view the account credentials
+      v.literal("write") // Can modify the account
+    ),
+    // Who granted this permission
+    grantedBy: v.id("users"),
+    // When the permission was granted
+    grantedAt: v.number(),
+    // Optional expiration (for temporary access)
+    expiresAt: v.optional(v.number()),
+    // Is this permission currently active?
+    isActive: v.boolean(),
+    // When the permission was revoked (if applicable)
+    revokedAt: v.optional(v.number()),
+    // Who revoked it
+    revokedBy: v.optional(v.id("users")),
+  })
+    .index("by_account", ["accountId"])
+    .index("by_user", ["userId"])
+    .index("by_account_and_user", ["accountId", "userId"])
+    .index("by_user_active", ["userId", "isActive"]),
+
+  // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
   projectAccess: defineTable({
@@ -647,7 +714,15 @@ export default defineSchema({
       // Template actions
       v.literal("template.created"),
       v.literal("template.updated"),
-      v.literal("template.deleted")
+      v.literal("template.deleted"),
+      // Shared account actions
+      v.literal("account.created"),
+      v.literal("account.updated"),
+      v.literal("account.deleted"),
+      v.literal("account.accessed"),
+      v.literal("account.permission_granted"),
+      v.literal("account.permission_revoked"),
+      v.literal("account.permission_updated")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -674,7 +749,8 @@ export default defineSchema({
         v.literal("access_token"),
         v.literal("invitation"),
         v.literal("billing"),
-        v.literal("security")
+        v.literal("security"),
+        v.literal("account")
       )
     ),
     // Whether this action involved sensitive data
@@ -1141,9 +1217,18 @@ export default defineSchema({
     token: v.string(),
     // WorkOS Vault reference holding the client-encrypted ciphertext
     vaultRef: v.string(),
-    // Source variable (for audit trail only — NOT used to re-fetch the value)
-    variableId: v.id("environmentVariables"),
-    // Variable key name (for display in emails/audit — NOT the value)
+    // Which kind of resource this share points at. Absent ⇒ "variable"
+    // (legacy rows created before shared accounts). Normalize on read.
+    resourceType: v.optional(
+      v.union(v.literal("variable"), v.literal("account"))
+    ),
+    // Source variable (for audit trail only — NOT used to re-fetch the value).
+    // Optional now that a share may instead reference a project account.
+    variableId: v.optional(v.id("environmentVariables")),
+    // Source account (for account shares — audit trail only)
+    accountId: v.optional(v.id("projectAccounts")),
+    // Display label for the shared resource (variable key OR account name).
+    // NOT the value. Required for both resource types.
     variableKey: v.string(),
     // Organization context (for audit logging and feature gating)
     organizationId: v.id("organizations"),
@@ -1176,6 +1261,7 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_variable", ["variableId"])
+    .index("by_account", ["accountId"])
     .index("by_organization", ["organizationId"])
     .index("by_created_by", ["createdBy"])
     .index("by_status_and_expires", ["status", "expiresAt"])

@@ -9,9 +9,20 @@ import { rateLimiter } from "./rateLimits";
 import {
   assertOrgMembership,
   getVariableAccess,
+  getAccountAccess,
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
 } from "./authz";
+
+/**
+ * Normalize a share's resource type. Legacy rows created before shared
+ * accounts have no `resourceType` field and are always variable shares.
+ */
+function normalizeResourceType(share: {
+  resourceType?: "variable" | "account";
+}): "variable" | "account" {
+  return share.resourceType ?? "variable";
+}
 
 // Upper bound on shares scanned by the list queries. Beyond this the oldest/
 // least-relevant rows are dropped rather than blowing the per-query read
@@ -166,6 +177,194 @@ async function buildVariableAccessMap(
 }
 
 /**
+ * Account analog of buildVariableAccessMap. Batch-resolves the caller's
+ * "read"/"write" access to a set of accountIds in the fewest reads possible,
+ * mirroring authz.getAccountAccess exactly. The returned map only contains
+ * entries the caller can access (deleted accounts, missing projects, and
+ * no-access cases are omitted).
+ */
+async function buildAccountAccessMap(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  accountIds: Id<"projectAccounts">[]
+): Promise<Map<string, "read" | "write">> {
+  const now = Date.now();
+
+  // Accounts (deduped), dropping deleted ones.
+  const uniqueAccountIds = [...new Set(accountIds.map((id) => id.toString()))];
+  const accountDocs = await Promise.all(
+    uniqueAccountIds.map((id) => ctx.db.get(id as Id<"projectAccounts">))
+  );
+  const acctMap = new Map<string, Doc<"projectAccounts">>();
+  for (const account of accountDocs) {
+    if (account && !account.deletedAt) {
+      acctMap.set(account._id.toString(), account);
+    }
+  }
+
+  // Projects (deduped), dropping deleted ones.
+  const projectIds = [
+    ...new Set([...acctMap.values()].map((a) => a.projectId.toString())),
+  ];
+  const projectDocs = await Promise.all(
+    projectIds.map((id) => ctx.db.get(id as Id<"projects">))
+  );
+  const projMap = new Map<string, Doc<"projects">>();
+  for (const project of projectDocs) {
+    if (project && !project.deletedAt) {
+      projMap.set(project._id.toString(), project);
+    }
+  }
+
+  // Caller's org membership, one lookup per distinct org.
+  const orgIds = [
+    ...new Set([...projMap.values()].map((p) => p.organizationId.toString())),
+  ];
+  const membershipMap = new Map<string, Doc<"organizationMembers"> | null>();
+  await Promise.all(
+    orgIds.map(async (orgId) => {
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q
+            .eq("organizationId", orgId as Id<"organizations">)
+            .eq("userId", userId)
+        )
+        .first();
+      membershipMap.set(orgId, membership);
+    })
+  );
+
+  // Caller's project membership, one lookup per distinct project.
+  const projMemberMap = new Map<string, Doc<"projectMembers"> | null>();
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const pm = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", projectId as Id<"projects">).eq("userId", userId)
+        )
+        .first();
+      projMemberMap.set(projectId, pm);
+    })
+  );
+
+  // Caller's active, unexpired account grants — a single indexed scan, keyed
+  // by accountId (mirrors authz.getActiveAccountGrant's active+unexpired rule).
+  const grants = await ctx.db
+    .query("accountPermissions")
+    .withIndex("by_user_active", (q) =>
+      q.eq("userId", userId).eq("isActive", true)
+    )
+    .collect();
+  const grantMap = new Map<string, Doc<"accountPermissions">>();
+  for (const grant of grants) {
+    if (grant.expiresAt && grant.expiresAt <= now) continue;
+    const key = grant.accountId.toString();
+    if (!grantMap.has(key)) grantMap.set(key, grant);
+  }
+
+  const accessMap = new Map<string, "read" | "write">();
+  for (const account of acctMap.values()) {
+    const project = projMap.get(account.projectId.toString());
+    if (!project) continue; // missing/deleted project → no access
+
+    const membership = membershipMap.get(project.organizationId.toString());
+    if (!membership) continue; // not an org member → no access
+
+    const role = normalizeOrgRole(membership.role);
+    if (role === "owner") {
+      accessMap.set(account._id.toString(), "write");
+      continue;
+    }
+
+    const projectMembership = projMemberMap.get(account.projectId.toString());
+
+    if (
+      projectMembership &&
+      (role === "project_manager" || role === "team_lead")
+    ) {
+      accessMap.set(account._id.toString(), "write");
+      continue;
+    }
+
+    // Developers scoped to specific environments never see out-of-scope accounts.
+    if (
+      projectMembership &&
+      role === "developer" &&
+      !isEnvironmentScopeAllowed(
+        projectMembership.environments,
+        account.environments
+      )
+    ) {
+      continue;
+    }
+
+    const grant = grantMap.get(account._id.toString());
+    if (!grant) continue; // no grant → no access
+
+    // Unassigned members are capped at read (per-account viewer sharing).
+    if (!projectMembership) {
+      accessMap.set(account._id.toString(), "read");
+      continue;
+    }
+
+    accessMap.set(
+      account._id.toString(),
+      grant.permission === "read" ? "read" : "write"
+    );
+  }
+
+  return accessMap;
+}
+
+/**
+ * Partition a batch of shares by resource type and resolve the caller's access
+ * to each underlying resource in one batched pass per type. Returns two maps
+ * (variableId → access, accountId → access) that isShareAccessible consults.
+ */
+async function buildShareAccessMaps(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  shares: Doc<"sharedSecrets">[]
+): Promise<{
+  variableAccess: Map<string, "read" | "write">;
+  accountAccess: Map<string, "read" | "write">;
+}> {
+  const variableIds: Id<"environmentVariables">[] = [];
+  const accountIds: Id<"projectAccounts">[] = [];
+  for (const share of shares) {
+    if (normalizeResourceType(share) === "account") {
+      if (share.accountId) accountIds.push(share.accountId);
+    } else if (share.variableId) {
+      variableIds.push(share.variableId);
+    }
+  }
+
+  const [variableAccess, accountAccess] = await Promise.all([
+    buildVariableAccessMap(ctx, userId, variableIds),
+    buildAccountAccessMap(ctx, userId, accountIds),
+  ]);
+
+  return { variableAccess, accountAccess };
+}
+
+/**
+ * Whether the caller can access the resource a share points at, using the
+ * pre-resolved access maps from buildShareAccessMaps.
+ */
+function isShareAccessible(
+  share: Doc<"sharedSecrets">,
+  variableAccess: Map<string, "read" | "write">,
+  accountAccess: Map<string, "read" | "write">
+): boolean {
+  if (normalizeResourceType(share) === "account") {
+    return !!share.accountId && accountAccess.has(share.accountId.toString());
+  }
+  return !!share.variableId && variableAccess.has(share.variableId.toString());
+}
+
+/**
  * Shared Secrets — Convex Mutations & Queries
  *
  * Provides secure, time-limited secret sharing with email-verified OTP access.
@@ -188,7 +387,16 @@ export const createShare = mutation({
   args: {
     token: v.string(),
     vaultRef: v.string(),
-    variableId: v.id("environmentVariables"),
+    // Which resource is being shared. Absent ⇒ "variable" (back-compat with
+    // existing API callers that only pass variableId).
+    resourceType: v.optional(
+      v.union(v.literal("variable"), v.literal("account"))
+    ),
+    // Present for variable shares
+    variableId: v.optional(v.id("environmentVariables")),
+    // Present for account shares
+    accountId: v.optional(v.id("projectAccounts")),
+    // Display label — variable key OR account name
     variableKey: v.string(),
     organizationId: v.id("organizations"),
     projectId: v.id("projects"),
@@ -200,18 +408,68 @@ export const createShare = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const resourceType = normalizeResourceType(args);
 
     // 0. Authorization: the caller must be a member of the org AND have at
-    // least read access to the variable being shared. Without this a member
-    // could mint a share link for a variable they cannot see.
+    // least read access to the resource being shared. Without this a member
+    // could mint a share link for a resource they cannot see.
     await assertOrgMembership(ctx, args.userId, args.organizationId);
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
+
+    if (resourceType === "account") {
+      if (!args.accountId) {
+        throw new Error("accountId is required for account shares");
+      }
+      const account = await ctx.db.get(args.accountId);
+      if (!account || account.deletedAt) {
+        throw new Error("Account not found");
+      }
+      // The share row's org/project context must match where the account
+      // actually lives — a member of two orgs must not be able to file a
+      // share under the wrong org (skews audit logs + active-share limits).
+      const accountProject = await ctx.db.get(account.projectId);
+      if (
+        account.projectId !== args.projectId ||
+        accountProject?.organizationId !== args.organizationId
+      ) {
+        throw new Error("Account not found");
+      }
+      const access = await getAccountAccess(ctx, args.userId, account);
+      if (!access) {
+        throw new Error("You do not have access to this account");
+      }
+    } else {
+      if (!args.variableId) {
+        throw new Error("variableId is required for variable shares");
+      }
+      const variable = await ctx.db.get(args.variableId);
+      if (!variable || variable.deletedAt) {
+        throw new Error("Variable not found");
+      }
+      // Same org/project consistency guard as the account branch
+      const variableProject = await ctx.db.get(variable.projectId);
+      if (
+        variable.projectId !== args.projectId ||
+        variableProject?.organizationId !== args.organizationId
+      ) {
+        throw new Error("Variable not found");
+      }
+      const access = await getVariableAccess(ctx, args.userId, variable);
+      if (!access) {
+        throw new Error("You do not have access to this variable");
+      }
     }
-    const access = await getVariableAccess(ctx, args.userId, variable);
-    if (!access) {
-      throw new Error("You do not have access to this variable");
+
+    // 0b. Reject self-sharing — the creator already has access to the resource,
+    // and mailing themselves an OTP link is never the intent. Checked against
+    // the creator's account email (case-insensitive), not just the current
+    // recipient list, so it holds regardless of what the client sends.
+    const creator = await ctx.db.get(args.userId);
+    const creatorEmail = creator?.email.toLowerCase().trim();
+    if (
+      creatorEmail &&
+      args.recipientEmails.some((e) => e.toLowerCase().trim() === creatorEmail)
+    ) {
+      throw new Error("You cannot share with your own email address.");
     }
 
     // 1. Feature gate: secret_sharing boolean
@@ -248,7 +506,9 @@ export const createShare = mutation({
     const shareId = await ctx.db.insert("sharedSecrets", {
       token: args.token,
       vaultRef: args.vaultRef,
+      resourceType,
       variableId: args.variableId,
+      accountId: args.accountId,
       variableKey: args.variableKey,
       organizationId: args.organizationId,
       projectId: args.projectId,
@@ -282,6 +542,8 @@ export const createShare = mutation({
       userId: args.userId,
       action: "share.created",
       details: {
+        resourceType,
+        accountId: args.accountId,
         variableKey: args.variableKey,
         mode: args.mode,
         recipientCount: args.recipientEmails.length,
@@ -372,6 +634,8 @@ export const verifyRecipientEmail = mutation({
       userId: share.createdBy,
       action: "share.otp_sent",
       details: {
+        resourceType: normalizeResourceType(share),
+        accountId: share.accountId,
         variableKey: share.variableKey,
         recipientEmail: email,
       },
@@ -476,6 +740,8 @@ export const verifyOtp = mutation({
         userId: share.createdBy,
         action: "share.otp_failed",
         details: {
+          resourceType: normalizeResourceType(share),
+          accountId: share.accountId,
           variableKey: share.variableKey,
           recipientEmail: email,
           attemptsUsed: newAttempts,
@@ -522,6 +788,8 @@ export const verifyOtp = mutation({
         userId: share.createdBy,
         action: "share.burned",
         details: {
+          resourceType: normalizeResourceType(share),
+          accountId: share.accountId,
           variableKey: share.variableKey,
           viewedByEmail: email,
           ipAddress: args.ipAddress,
@@ -546,6 +814,8 @@ export const verifyOtp = mutation({
       userId: share.createdBy,
       action: "share.viewed",
       details: {
+        resourceType: normalizeResourceType(share),
+        accountId: share.accountId,
         variableKey: share.variableKey,
         viewedByEmail: email,
         mode: share.mode,
@@ -561,6 +831,7 @@ export const verifyOtp = mutation({
       vaultRef: share.vaultRef,
       hasPassphrase: share.hasPassphrase,
       mode: share.mode,
+      resourceType: normalizeResourceType(share),
     };
   },
 });
@@ -590,7 +861,13 @@ export const revokeShare = mutation({
           share.organizationId,
           "team_lead"
         );
-      } catch {
+      } catch (err) {
+        console.error("sharedSecrets.revokeShare.denied", {
+          shareId: args.shareId,
+          userId: args.userId,
+          organizationId: share.organizationId,
+          error: String(err),
+        });
         throw new Error("Not authorized to revoke this share.");
       }
     }
@@ -613,6 +890,8 @@ export const revokeShare = mutation({
       userId: args.userId,
       action: "share.revoked",
       details: {
+        resourceType: normalizeResourceType(share),
+        accountId: share.accountId,
         variableKey: share.variableKey,
         mode: share.mode,
       },
@@ -714,18 +993,20 @@ export const listActiveByOrg = query({
         .take(MAX_SHARE_SCAN)
     ).filter((share) => share.status === "active");
 
-    // Resolve the caller's access to every referenced variable in one batched
-    // pass instead of a full getVariableAccess fan-out per share.
-    const accessMap = await buildVariableAccessMap(
+    // Resolve the caller's access to every referenced resource in one batched
+    // pass per type instead of a full getX-Access fan-out per share.
+    const { variableAccess, accountAccess } = await buildShareAccessMaps(
       ctx,
       args.userId,
-      shares.map((share) => share.variableId)
+      shares
     );
 
     const enriched = await Promise.all(
       shares.map(async (share) => {
-        // Drop shares whose underlying variable the caller can't access.
-        if (!accessMap.has(share.variableId.toString())) return null;
+        // Drop shares whose underlying resource the caller can't access.
+        if (!isShareAccessible(share, variableAccess, accountAccess)) {
+          return null;
+        }
 
         const recipients = await ctx.db
           .query("shareRecipients")
@@ -734,6 +1015,7 @@ export const listActiveByOrg = query({
 
         return {
           _id: share._id,
+          resourceType: normalizeResourceType(share),
           variableKey: share.variableKey,
           mode: share.mode,
           expiresAt: share.expiresAt,
@@ -783,19 +1065,21 @@ export const listByProject = query({
     // Sort by createdAt descending (most recent first)
     shares.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Resolve the caller's access to every referenced variable in one batched
-    // pass instead of a full getVariableAccess fan-out per share.
-    const accessMap = await buildVariableAccessMap(
+    // Resolve the caller's access to every referenced resource in one batched
+    // pass per type instead of a full getX-Access fan-out per share.
+    const { variableAccess, accountAccess } = await buildShareAccessMaps(
       ctx,
       args.userId,
-      shares.map((share) => share.variableId)
+      shares
     );
 
-    // Enrich with recipient data — drop shares whose underlying variable the
+    // Enrich with recipient data — drop shares whose underlying resource the
     // caller can't access (each row exposes variableKey + recipients).
     const enriched = await Promise.all(
       shares.map(async (share) => {
-        if (!accessMap.has(share.variableId.toString())) return null;
+        if (!isShareAccessible(share, variableAccess, accountAccess)) {
+          return null;
+        }
 
         const recipients = await ctx.db
           .query("shareRecipients")
@@ -804,6 +1088,7 @@ export const listByProject = query({
 
         return {
           _id: share._id,
+          resourceType: normalizeResourceType(share),
           variableKey: share.variableKey,
           mode: share.mode,
           status: share.status,
@@ -901,6 +1186,8 @@ export const cleanupExpiredShares = internalMutation({
         userId: share.createdBy,
         action: "share.expired",
         details: {
+          resourceType: normalizeResourceType(share),
+          accountId: share.accountId,
           variableKey: share.variableKey,
           mode: share.mode,
           expiresAt: share.expiresAt,

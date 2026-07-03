@@ -404,7 +404,13 @@ export const listOrgVariablesWithAccessPaginated = query({
         } else {
           pi = accessibleProjects.length;
         }
-      } catch {
+      } catch (err) {
+        console.error("variables.listPaginated.parseCursorFailed", {
+          field: "paginationOpts.cursor",
+          organizationId: args.organizationId,
+          userId: args.userId,
+          error: String(err),
+        });
         pi = accessibleProjects.length;
       }
     }

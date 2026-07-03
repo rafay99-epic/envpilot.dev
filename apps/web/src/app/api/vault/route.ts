@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@workos-inc/authkit-nextjs";
+import * as Sentry from "@sentry/nextjs";
 import {
   createSecret,
   readSecret,
@@ -69,8 +70,17 @@ const GENERIC_ERROR_MESSAGES: Record<VaultErrorCode, string> = {
 
 /**
  * Sanitized error logging - removes sensitive data
+ *
+ * Forwards to Sentry (this is the most security-critical route — raw Vault
+ * CRUD — and previously never reported failures). Only correlating ids
+ * (vaultRef, organizationId, operation) are attached; the secret value is
+ * never available here and must never be added.
  */
-function logError(operation: string, error: unknown): void {
+function logError(
+  operation: string,
+  error: unknown,
+  context?: { vaultRef?: string; organizationId?: string }
+): void {
   if (error instanceof VaultError) {
     console.error(`Vault ${operation} error:`, {
       code: error.code,
@@ -84,6 +94,14 @@ function logError(operation: string, error: unknown): void {
   } else {
     console.error(`Vault ${operation} error: Unknown error type`);
   }
+
+  Sentry.captureException(error, {
+    tags: { source: "vault-route", action: operation },
+    extra: {
+      vaultRef: context?.vaultRef,
+      organizationId: context?.organizationId,
+    },
+  });
 }
 
 /**
@@ -136,6 +154,7 @@ async function verifyOwnership(
  * POST /api/vault - Create a new encrypted secret
  */
 export async function POST(request: NextRequest) {
+  let organizationIdForLog: string | undefined;
   try {
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
@@ -161,6 +180,7 @@ export async function POST(request: NextRequest) {
       ...context,
       organizationId: organizationId || context.organizationId,
     };
+    organizationIdForLog = secureContext.organizationId;
 
     const vaultResult = await createSecret(name, value, secureContext);
 
@@ -172,7 +192,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    logError("create", error);
+    logError("create", error, { organizationId: organizationIdForLog });
 
     if (error instanceof VaultError) {
       return errorResponse(error.code, 500);
@@ -186,6 +206,8 @@ export async function POST(request: NextRequest) {
  * GET /api/vault?vaultRef=xxx&organizationId=xxx - Read an encrypted secret
  */
 export async function GET(request: NextRequest) {
+  let vaultRefForLog: string | undefined;
+  let organizationIdForLog: string | undefined;
   try {
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
@@ -207,8 +229,11 @@ export async function GET(request: NextRequest) {
       return errorResponse("VALIDATION_ERROR", 400);
     }
 
+    vaultRefForLog = result.data.vaultRef;
+
     // SECURITY: Verify the user's organization matches the requested org
     const authorizedOrgId = sessionOrgId || result.data.organizationId;
+    organizationIdForLog = authorizedOrgId;
 
     // SECURITY: Verify ownership before reading
     const ownership = await verifyOwnership(
@@ -229,7 +254,10 @@ export async function GET(request: NextRequest) {
       data: { value },
     });
   } catch (error) {
-    logError("read", error);
+    logError("read", error, {
+      vaultRef: vaultRefForLog,
+      organizationId: organizationIdForLog,
+    });
 
     if (error instanceof VaultError) {
       const status = error.code === "NOT_FOUND" ? 404 : 500;
@@ -244,6 +272,8 @@ export async function GET(request: NextRequest) {
  * PUT /api/vault - Update an encrypted secret
  */
 export async function PUT(request: NextRequest) {
+  let vaultRefForLog: string | undefined;
+  let organizationIdForLog: string | undefined;
   try {
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
@@ -264,9 +294,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const { vaultRef, value, organizationId, versionCheck } = result.data;
+    vaultRefForLog = vaultRef;
 
     // SECURITY: Verify the user's organization matches
     const authorizedOrgId = sessionOrgId || organizationId;
+    organizationIdForLog = authorizedOrgId;
 
     // SECURITY: Verify ownership before updating
     const ownership = await verifyOwnership(vaultRef, authorizedOrgId);
@@ -287,7 +319,10 @@ export async function PUT(request: NextRequest) {
       },
     });
   } catch (error) {
-    logError("update", error);
+    logError("update", error, {
+      vaultRef: vaultRefForLog,
+      organizationId: organizationIdForLog,
+    });
 
     if (error instanceof VaultError) {
       return errorResponse(error.code, 500);
@@ -301,6 +336,8 @@ export async function PUT(request: NextRequest) {
  * DELETE /api/vault - Delete an encrypted secret
  */
 export async function DELETE(request: NextRequest) {
+  let vaultRefForLog: string | undefined;
+  let organizationIdForLog: string | undefined;
   try {
     if (!isVaultConfigured()) {
       return errorResponse("NOT_CONFIGURED", 503);
@@ -321,9 +358,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { vaultRef, organizationId } = result.data;
+    vaultRefForLog = vaultRef;
 
     // SECURITY: Verify the user's organization matches
     const authorizedOrgId = sessionOrgId || organizationId;
+    organizationIdForLog = authorizedOrgId;
 
     // SECURITY: Verify ownership before deleting
     const ownership = await verifyOwnership(vaultRef, authorizedOrgId);
@@ -341,7 +380,10 @@ export async function DELETE(request: NextRequest) {
       message: "Secret deleted successfully",
     });
   } catch (error) {
-    logError("delete", error);
+    logError("delete", error, {
+      vaultRef: vaultRefForLog,
+      organizationId: organizationIdForLog,
+    });
 
     if (error instanceof VaultError) {
       return errorResponse(error.code, 500);

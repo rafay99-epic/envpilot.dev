@@ -72,7 +72,12 @@ async function canReviewRequests(
       "project:update_variable"
     );
     return true;
-  } catch {
+  } catch (err) {
+    console.error("variableRequests.canReviewRequests.denied", {
+      projectId,
+      userId,
+      error: String(err),
+    });
     return false;
   }
 }

@@ -4,6 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { createLogger } from "@/lib/logger";
 import { readSecret } from "@/lib/vault";
 import {
   serialize,
@@ -16,6 +17,8 @@ import {
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+const log = createLogger("api/projects/export");
 
 /**
  * GET /api/projects/[id]/export - Export environment variables
@@ -119,7 +122,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           ? await readSecret(variable.vaultRef)
           : "";
         decrypted[variable.key] = value || "";
-      } catch {
+      } catch (decryptErr) {
+        log.error(
+          "variable_decrypt_failed",
+          { variableId: variable._id, key: variable.key, projectId: id },
+          decryptErr
+        );
         decrypted[variable.key] = "[DECRYPTION_FAILED]";
       }
     }

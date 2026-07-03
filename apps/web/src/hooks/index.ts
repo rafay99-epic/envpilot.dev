@@ -49,6 +49,22 @@ export {
 // Vault hooks (WorkOS Vault integration)
 export { useVault } from "./useVault";
 
+// Shared account hooks (Convex reads + Vault-backed CRUD + permission grants)
+export {
+  useAccounts,
+  useAccountGrants,
+  useAssignableAccountMembers,
+  useCanManageAccountPermissions,
+  useGrantAccountPermission,
+  useUpdateAccountPermission,
+  useRevokeAccountPermission,
+  useCreateAccount,
+  useUpdateAccount,
+  useDeleteAccount,
+  useRevealAccount,
+  type Account,
+} from "./useAccounts";
+
 // Feature request hooks (Wishlist)
 export {
   useFeatureRequests,

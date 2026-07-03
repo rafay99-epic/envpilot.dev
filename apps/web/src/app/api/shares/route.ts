@@ -10,18 +10,30 @@ import { createSecret } from "@/lib/vault";
 import { handleApiError, sanitizeConvexError } from "@/lib/api-errors";
 import { sendShareNotificationEmail } from "@/lib/share-emails";
 
-const createShareSchema = z.object({
-  variableId: z.string(),
-  variableKey: z.string(),
-  organizationId: z.string(),
-  projectId: z.string(),
-  encryptedPayload: z.string().min(1).max(131072),
-  mode: z.enum(["one_time", "time_limited"]),
-  ttlMs: z.number().int().min(3_600_000).max(604_800_000),
-  hasPassphrase: z.boolean(),
-  recipientEmails: z.array(z.string().email()).min(1).max(10),
-  clientKeyBase64Url: z.string().min(1).max(256),
-});
+const createShareSchema = z
+  .object({
+    variableId: z.string().optional(),
+    accountId: z.string().optional(),
+    resourceType: z.enum(["variable", "account"]).default("variable"),
+    variableKey: z.string(),
+    organizationId: z.string(),
+    projectId: z.string(),
+    encryptedPayload: z.string().min(1).max(131072),
+    mode: z.enum(["one_time", "time_limited"]),
+    ttlMs: z.number().int().min(3_600_000).max(604_800_000),
+    hasPassphrase: z.boolean(),
+    recipientEmails: z.array(z.string().email()).min(1).max(10),
+    clientKeyBase64Url: z.string().min(1).max(256),
+  })
+  .refine(
+    (data) =>
+      data.resourceType === "account" ? !!data.accountId : !!data.variableId,
+    {
+      message:
+        'variableId is required when resourceType is "variable"; accountId is required when resourceType is "account"',
+      path: ["variableId"],
+    }
+  );
 
 /**
  * POST /api/shares - Create a new shared secret
@@ -71,7 +83,15 @@ export async function POST(request: Request) {
     const result = await convex.mutation(api.sharedSecrets.createShare, {
       token,
       vaultRef: vaultResult.id,
-      variableId: data.variableId as Id<"environmentVariables">,
+      resourceType: data.resourceType,
+      variableId:
+        data.resourceType === "variable"
+          ? (data.variableId as Id<"environmentVariables">)
+          : undefined,
+      accountId:
+        data.resourceType === "account"
+          ? (data.accountId as Id<"projectAccounts">)
+          : undefined,
       variableKey: data.variableKey,
       organizationId: data.organizationId as Id<"organizations">,
       projectId: data.projectId as Id<"projects">,
@@ -91,8 +111,11 @@ export async function POST(request: Request) {
     }
     const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
 
-    // Send notification emails to all recipients (best-effort, don't fail the request)
+    // Send notification emails to all recipients (best-effort, don't fail the
+    // request). Track which recipients we couldn't reach so the client can warn
+    // the creator — the share itself is already created and valid regardless.
     const senderName = convexUser.name || convexUser.email;
+    const emailsFailed: string[] = [];
     for (const email of data.recipientEmails) {
       try {
         await sendShareNotificationEmail({
@@ -102,8 +125,10 @@ export async function POST(request: Request) {
           mode: data.mode,
           expiresAt,
           shareUrl,
+          resourceType: data.resourceType,
         });
       } catch (emailErr) {
+        emailsFailed.push(email);
         Sentry.captureException(emailErr, {
           tags: { source: "share-email", action: "notification" },
           extra: { recipientEmail: email, token },
@@ -114,6 +139,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       token,
       shareId: result.shareId,
+      emailsFailed,
     });
   } catch (error) {
     return handleApiError(error, "Failed to create share");

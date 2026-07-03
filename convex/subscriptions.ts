@@ -742,7 +742,10 @@ export const processWebhookEvent = action({
         const userId = metadata.userId;
 
         if (!organizationId || !userId) {
-          console.error("Missing metadata in checkout:", eventData.id);
+          console.error("subscriptions.processWebhookEvent.missingMetadata", {
+            eventType: args.type,
+            eventId: eventData.id,
+          });
           return;
         }
 
@@ -751,7 +754,13 @@ export const processWebhookEvent = action({
           eventData.customerEmail || eventData.customer?.email;
 
         if (!customerId || !customerEmail) {
-          console.error("Missing customer data in checkout:", eventData.id);
+          console.error(
+            "subscriptions.processWebhookEvent.missingCustomerData",
+            {
+              eventType: args.type,
+              eventId: eventData.id,
+            }
+          );
           return;
         }
 
@@ -782,7 +791,10 @@ export const processWebhookEvent = action({
         const productId = eventData.productId as string;
 
         if (!productId) {
-          console.error("No product found in subscription:", eventData.id);
+          console.error("subscriptions.processWebhookEvent.noProduct", {
+            eventType: args.type,
+            eventId: eventData.id,
+          });
           return;
         }
 
@@ -818,12 +830,11 @@ export const processWebhookEvent = action({
         }
 
         if (!resolvedUserId) {
-          console.error(
-            "Could not resolve user for subscription:",
-            eventData.id,
-            "customerId:",
-            customerId
-          );
+          console.error("subscriptions.processWebhookEvent.unresolvedUser", {
+            eventType: args.type,
+            eventId: eventData.id,
+            customerId,
+          });
           return;
         }
 
@@ -840,8 +851,11 @@ export const processWebhookEvent = action({
 
         if (!resolvedOrgId) {
           console.error(
-            "Could not resolve organization for subscription:",
-            eventData.id
+            "subscriptions.processWebhookEvent.unresolvedOrganization",
+            {
+              eventType: args.type,
+              eventId: eventData.id,
+            }
           );
           return;
         }
@@ -927,7 +941,13 @@ export const processWebhookEvent = action({
 
           const productId = eventData.productId as string;
           if (!productId) {
-            console.error("No product found in subscription:", eventData.id);
+            console.error(
+              "subscriptions.processWebhookEvent.updateFallback.noProduct",
+              {
+                eventType: args.type,
+                eventId: eventData.id,
+              }
+            );
             return;
           }
 
@@ -957,8 +977,11 @@ export const processWebhookEvent = action({
 
           if (!resolvedUserId) {
             console.error(
-              "Could not resolve user for subscription (update fallback):",
-              eventData.id
+              "subscriptions.processWebhookEvent.updateFallback.unresolvedUser",
+              {
+                eventType: args.type,
+                eventId: eventData.id,
+              }
             );
             return;
           }
@@ -976,8 +999,11 @@ export const processWebhookEvent = action({
 
           if (!resolvedOrgId) {
             console.error(
-              "Could not resolve org for subscription (update fallback):",
-              eventData.id
+              "subscriptions.processWebhookEvent.updateFallback.unresolvedOrganization",
+              {
+                eventType: args.type,
+                eventId: eventData.id,
+              }
             );
             return;
           }
@@ -1078,8 +1104,11 @@ export const processWebhookEvent = action({
 
         if (!resolvedUserId) {
           console.error(
-            "Could not resolve user for subscription update:",
-            eventData.id
+            "subscriptions.processWebhookEvent.update.unresolvedUser",
+            {
+              eventType: args.type,
+              eventId: eventData.id,
+            }
           );
           return;
         }

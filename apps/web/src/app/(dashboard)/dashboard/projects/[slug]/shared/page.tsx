@@ -19,7 +19,10 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuthContext } from "@/components/auth";
-import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import {
+  TerminalLoading,
+  TerminalBadge,
+} from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
@@ -43,6 +46,7 @@ interface ShareRecipient {
 interface ShareData {
   _id: string;
   variableKey: string;
+  resourceType?: "variable" | "account";
   mode: "one_time" | "time_limited";
   status: ShareStatus;
   expiresAt: number;
@@ -241,6 +245,13 @@ function ShareCard({
             <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {share.variableKey}
             </code>
+
+            {/* Resource type badge */}
+            <TerminalBadge
+              color={share.resourceType === "account" ? "purple" : "zinc"}
+            >
+              {share.resourceType === "account" ? "account" : "variable"}
+            </TerminalBadge>
 
             {/* Mode badge */}
             {share.mode === "one_time" ? (

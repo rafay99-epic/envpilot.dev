@@ -51,6 +51,13 @@ crons.daily(
   internal.permissions.cleanupExpired
 );
 
+// Clean up expired account permissions daily at 3:10 AM UTC
+crons.daily(
+  "cleanup expired account permissions",
+  { hourUTC: 3, minuteUTC: 10 },
+  internal.accountPermissions.cleanupExpired
+);
+
 // Expire grace periods and downgrade users whose grace has ended
 crons.interval(
   "expire grace periods",

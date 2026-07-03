@@ -3,6 +3,7 @@ import {
   validateEvent,
   WebhookVerificationError,
 } from "@polar-sh/sdk/webhooks";
+import * as Sentry from "@sentry/nextjs";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getPolarWebhookSecret, isPaymentsEnabled } from "@/lib/polar";
@@ -87,6 +88,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Error processing webhook:", error);
+    // Money path — Convex dispatch failed after signature verification
+    // succeeded. Capture with event context (never the raw payload/secret).
+    Sentry.captureException(error, {
+      tags: { source: "polar-webhook", action: "dispatch" },
+      extra: {
+        eventType: event.type,
+        webhookId: request.headers.get("webhook-id") ?? undefined,
+      },
+    });
     return NextResponse.json(
       { error: "Webhook processing failed" },
       { status: 500 }

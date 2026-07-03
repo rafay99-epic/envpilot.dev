@@ -64,6 +64,7 @@ export function SharedSecretsWidget({
 interface ShareData {
   _id: unknown;
   variableKey: string;
+  resourceType?: "variable" | "account";
   mode: "one_time" | "time_limited";
   expiresAt: number;
   totalViewCount: number;
@@ -86,7 +87,14 @@ function SharedSecretRow({ share }: { share: ShareData }) {
           <Clock className="h-3.5 w-3.5 text-blue-400" />
         )}
         <div>
-          <p className="text-sm text-zinc-300">{share.variableKey}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-zinc-300">{share.variableKey}</p>
+            <TerminalBadge
+              color={share.resourceType === "account" ? "purple" : "zinc"}
+            >
+              {share.resourceType === "account" ? "account" : "variable"}
+            </TerminalBadge>
+          </div>
           <p className="text-zinc-600">
             {share.recipientCount}{" "}
             {share.recipientCount === 1 ? "recipient" : "recipients"}

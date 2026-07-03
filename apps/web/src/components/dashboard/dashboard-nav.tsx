@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Key,
+  KeyRound,
   Share2,
   Users,
   Inbox,
@@ -183,6 +184,11 @@ export function DashboardNav() {
           href: `/dashboard/projects/${projectSlug}`,
           label: "Variables",
           icon: <Key className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/accounts`,
+          label: "Accounts",
+          icon: <KeyRound className="h-4 w-4" />,
         },
         {
           href: `/dashboard/projects/${projectSlug}/shared`,

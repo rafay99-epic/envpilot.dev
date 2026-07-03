@@ -109,7 +109,12 @@ export const getAssignableOrgMembers = query({
         "project:manage_members"
       );
       requesterRole = auth.orgRole;
-    } catch {
+    } catch (err) {
+      console.error("projectMembers.getAssignableOrgMembers.denied", {
+        projectId: args.projectId,
+        requestingUserId: args.requestingUserId,
+        error: String(err),
+      });
       return [];
     }
 

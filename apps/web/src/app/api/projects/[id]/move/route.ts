@@ -5,7 +5,10 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { createLogger } from "@/lib/logger";
 import { normalizeOrgRole } from "@/lib/roles";
+
+const log = createLogger("api/projects/move");
 
 const moveProjectSchema = z.object({
   targetOrganizationId: z.string().min(1, "Target organization ID is required"),
@@ -122,15 +125,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               transferredByName: userName,
             })
             .catch((err: unknown) =>
-              console.warn(
-                "[EMAIL] Failed to send project transfer email:",
+              log.error(
+                "project_transfer_email_failed",
+                { projectId: id, targetOrganizationId },
                 err
               )
             );
         }
       }
     } catch (emailErr) {
-      console.warn("[EMAIL] Error sending transfer notifications:", emailErr);
+      log.error(
+        "project_transfer_notification_failed",
+        { projectId: id, targetOrganizationId },
+        emailErr
+      );
     }
 
     return NextResponse.json({ success: true, projectId: id });

@@ -10,7 +10,10 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
+import { createLogger } from "@/lib/logger";
 import { createSecret } from "@/lib/vault";
+
+const log = createLogger("api/variables");
 
 const createVariableSchema = z.object({
   key: z
@@ -235,10 +238,18 @@ async function notifyVariableChange(
           changeType,
         })
         .catch((err: unknown) =>
-          console.warn("[EMAIL] Variable notification failed:", err)
+          log.error(
+            "variable_notification_email_failed",
+            { variableName, projectId, changeType },
+            err
+          )
         );
     }
   } catch (err) {
-    console.warn("[EMAIL] Error sending variable notifications:", err);
+    log.error(
+      "variable_notification_failed",
+      { variableName, projectId, changeType },
+      err
+    );
   }
 }

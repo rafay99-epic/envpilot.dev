@@ -86,6 +86,7 @@ export async function POST(
     return NextResponse.json({
       encryptedPayload,
       hasPassphrase: result.hasPassphrase,
+      resourceType: result.resourceType,
     });
   } catch (error) {
     const message =

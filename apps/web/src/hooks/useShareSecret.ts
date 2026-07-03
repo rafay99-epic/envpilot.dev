@@ -15,7 +15,11 @@ const log = createLogger("hooks/useShareSecret");
  */
 
 interface CreateShareParams {
-  variableId: string;
+  // Variable shares pass `variableId`; account shares pass `accountId` +
+  // `resourceType: "account"`. `variableKey` is the universal display label.
+  variableId?: string;
+  accountId?: string;
+  resourceType?: "variable" | "account";
   variableKey: string;
   organizationId: string;
   projectId: string;
@@ -30,6 +34,8 @@ interface CreateShareParams {
 interface CreateShareResponse {
   token: string;
   shareId: string;
+  /** Recipients whose notification email failed to send (share still valid). */
+  emailsFailed?: string[];
 }
 
 interface VerifyEmailParams {
@@ -47,6 +53,7 @@ interface VerifyOtpParams {
 interface VerifyOtpResponse {
   encryptedPayload: string;
   hasPassphrase: boolean;
+  resourceType?: "variable" | "account";
 }
 
 /**

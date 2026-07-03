@@ -11,6 +11,7 @@ import {
   Mail,
   KeyRound,
   Eye,
+  EyeOff,
   Lock,
   RefreshCw,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import {
   decryptFromShare,
   sha256Hex,
 } from "@/lib/share-crypto";
+import { parseAccountShare } from "@/lib/account-payload";
 import { useVerifyShareEmail, useVerifyShareOtp } from "@/hooks/useShareSecret";
 import { createLogger } from "@/lib/logger";
 
@@ -38,6 +40,8 @@ export default function ShareViewerPage() {
   const [decryptedSecret, setDecryptedSecret] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showAccountPassword, setShowAccountPassword] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
   const [hasPassphrase, setHasPassphrase] = useState(false);
 
@@ -247,6 +251,20 @@ export default function ShareViewerPage() {
     }
   };
 
+  const handleCopyField = async (field: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (clipErr) {
+      log.warn("share_clipboard_write_failed", {
+        token,
+        reason:
+          clipErr instanceof Error ? clipErr.message : "restricted_context",
+      });
+    }
+  };
+
   const formatCountdown = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -445,6 +463,138 @@ export default function ShareViewerPage() {
           {step === "revealed" &&
             decryptedSecret &&
             (() => {
+              // Account shares serialize to JSON with a `t: "account"` marker;
+              // parseAccountShare is null-safe and returns null for the
+              // variable KEY=VALUE format, so we can call it unconditionally.
+              const accountPayload = parseAccountShare(decryptedSecret);
+
+              if (accountPayload) {
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-5 w-5 text-green-500" />
+                      <h2 className="font-mono text-sm font-semibold text-zinc-100">
+                        Account revealed
+                      </h2>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg bg-zinc-800 p-3">
+                      {/* Name */}
+                      <div>
+                        <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                          Account
+                        </span>
+                        <span className="font-mono text-sm text-zinc-100">
+                          {accountPayload.name}
+                        </span>
+                      </div>
+
+                      {/* URL — plain text, never a clickable link */}
+                      {accountPayload.url && (
+                        <div>
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                            URL
+                          </span>
+                          <span className="block break-all font-mono text-sm text-zinc-300">
+                            {accountPayload.url}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Username */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                            Username
+                          </span>
+                          <code className="block break-all font-mono text-sm text-green-400">
+                            {accountPayload.username}
+                          </code>
+                        </div>
+                        <button
+                          onClick={() =>
+                            handleCopyField("username", accountPayload.username)
+                          }
+                          className="shrink-0 rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                        >
+                          {copiedField === "username" ? (
+                            <span className="flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Copied
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <Copy className="h-3 w-3" /> Copy
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Password */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="block text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                            Password
+                          </span>
+                          <code className="block break-all font-mono text-sm text-green-400">
+                            {showAccountPassword
+                              ? accountPayload.password
+                              : "•".repeat(
+                                  Math.min(accountPayload.password.length, 24)
+                                )}
+                          </code>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            onClick={() =>
+                              setShowAccountPassword((prev) => !prev)
+                            }
+                            className="rounded-md bg-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-600"
+                            title={
+                              showAccountPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showAccountPassword ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleCopyField(
+                                "password",
+                                accountPayload.password
+                              )
+                            }
+                            className="rounded-md bg-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-600"
+                          >
+                            {copiedField === "password" ? (
+                              <span className="flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Copied
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <Copy className="h-3 w-3" /> Copy
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                      <p className="text-xs text-amber-400">
+                        These credentials have been permanently destroyed. Close
+                        this tab when done.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               // Parse KEY=VALUE format (first = is the delimiter)
               const eqIndex = decryptedSecret.indexOf("=");
               const secretKey =
