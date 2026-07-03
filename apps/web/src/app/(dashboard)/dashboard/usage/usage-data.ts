@@ -44,6 +44,7 @@ export interface UsageLayoutProps {
     }[];
     activeShares?: number;
     rotationEnabledVars?: number;
+    sharedAccounts?: number;
   } | null;
   meterLimits: {
     orgs: number | null;
@@ -53,6 +54,7 @@ export interface UsageLayoutProps {
     invitations: number | null;
     activeShares: number | null;
     rotationLimit: number | null;
+    sharedAccounts: number | null;
     auditDays: number;
     analyticsDays: number;
   };
@@ -237,6 +239,19 @@ export const featureCategories: FeatureCategory[] = [
         isNumeric: true,
       },
       {
+        key: "shared_accounts",
+        label: "Shared Accounts",
+        icon: KeySquare,
+        description: "Vault-encrypted service login credentials",
+      },
+      {
+        key: "shared_accounts_limit",
+        label: "Shared Account Slots",
+        icon: KeySquare,
+        description: "Shared accounts across the organization",
+        isNumeric: true,
+      },
+      {
         key: "sso_enabled",
         label: "SSO",
         icon: Shield,
@@ -315,6 +330,8 @@ export const PRO_VALUES: Record<string, string> = {
   secret_rotation_limit: "Unlimited",
   secret_sharing: "true",
   max_active_shares: "Unlimited",
+  shared_accounts: "true",
+  shared_accounts_limit: "Unlimited",
   keyboard_shortcuts_custom: "true",
   custom_branding: "true",
   analytics_retention_days: "30",
@@ -342,6 +359,8 @@ export const FREE_VALUES: Record<string, string> = {
   secret_rotation_limit: "7",
   secret_sharing: "false",
   max_active_shares: "0",
+  shared_accounts: "true",
+  shared_accounts_limit: "5",
   keyboard_shortcuts_custom: "true",
   custom_branding: "false",
   analytics_retention_days: "7",

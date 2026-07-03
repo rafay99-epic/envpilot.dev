@@ -18,6 +18,8 @@ export interface TierUsage {
   activeShares?: number;
   /** Number of variables with rotation enabled */
   rotationEnabledVars?: number;
+  /** Number of shared accounts (service login credentials) across the org */
+  sharedAccounts?: number;
 }
 
 /** Resolved feature value from the dynamic feature registry */

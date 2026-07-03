@@ -106,6 +106,9 @@ function UsagePageContent() {
     rotationLimit: enforcementEnabled
       ? (getLimit("secret_rotation_limit") ?? null)
       : null,
+    sharedAccounts: enforcementEnabled
+      ? (getLimit("shared_accounts_limit") ?? null)
+      : null,
     auditDays: enforcementEnabled
       ? typeof resolvedFeatures?.audit_log_retention_days?.value === "number"
         ? resolvedFeatures.audit_log_retention_days.value
@@ -137,6 +140,7 @@ function UsagePageContent() {
           variablesPerProject: usage.variablesPerProject,
           activeShares: usage.activeShares,
           rotationEnabledVars: usage.rotationEnabledVars,
+          sharedAccounts: usage.sharedAccounts,
         }
       : null,
     meterLimits,

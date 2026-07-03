@@ -387,6 +387,15 @@ function UsageSection({
       featureKey: "secret_rotation_limit",
       gateKey: "secret_rotation",
     },
+    {
+      icon: <KeySquare className="h-3.5 w-3.5" />,
+      label: "Shared Accounts",
+      current: usage?.sharedAccounts ?? 0,
+      limit: meterLimits.sharedAccounts,
+      proLimit: "Unlimited",
+      featureKey: "shared_accounts_limit",
+      gateKey: "shared_accounts",
+    },
   ];
 
   return (
