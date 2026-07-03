@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  s_79051da7be3ab6::t_b2a84b3504d617 217-219
+.github/actions/setup/action.yml
+  s_79051da7be3ab6::t_9356c0b431793d 4-8
+convex/tsconfig.ci.json
+  s_79051da7be3ab6::t_aa9e9d89c956b0 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "2801289a7604c585ddd664adfef4ff640fd74dc3",
+  "prompts": {},
+  "sessions": {
+    "s_79051da7be3ab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd1c26e1-3f19-4228-82fc-00ee357ebee9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
