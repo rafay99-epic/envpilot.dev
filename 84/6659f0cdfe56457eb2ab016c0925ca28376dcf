@@ -1,0 +1,34 @@
+convex/auditLogs.ts
+  s_a4b2d21b333179::t_bd0cb0d41d39fc 822-825
+  s_a4b2d21b333179::t_ce08c6ba977cf1 341-343
+convex/accounts.ts
+  s_a4b2d21b333179::t_76d7f8cb3d5d56 464-467
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_a4b2d21b333179::t_06917853659d5d 123-128
+convex/accountPermissions.ts
+  s_a4b2d21b333179::t_3099a5a80b0ffe 523
+apps/web/src/app/api/accounts/[id]/route.ts
+  s_a4b2d21b333179::t_54a65afa8cf058 7,9
+  s_a4b2d21b333179::t_19508977702d84 84-96
+  s_a4b2d21b333179::t_4a367faea252f5 114-119,121,133-157
+apps/web/src/components/accounts/account-list-item.tsx
+  s_a4b2d21b333179::t_7769e156ff0849 71-77
+apps/web/src/app/api/accounts/route.ts
+  s_a4b2d21b333179::t_cd836280f9f77d 18-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "846659f0cdfe56457eb2ab016c0925ca28376dcf",
+  "prompts": {},
+  "sessions": {
+    "s_a4b2d21b333179": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9525c4e-bb6e-4416-a0b5-14b910d032b2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
