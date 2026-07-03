@@ -1,0 +1,56 @@
+apps/web/src/app/(dashboard)/dashboard/requests/page.tsx
+  s_e8fb00d5812ee1::t_ee722a29fdd1a6 119
+  s_e8fb00d5812ee1::t_34161163989795 1-118,120-553
+apps/web/package.json
+  s_e8fb00d5812ee1::t_6e92a1e1751365 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_e8fb00d5812ee1::t_d3ceb8fb605b1b 931-936
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_e8fb00d5812ee1::t_c0c8b2c227dd3c 343-346
+  s_e8fb00d5812ee1::t_42200f42d8e130 318-319,321-323,325-327
+  s_e8fb00d5812ee1::t_60dfe8e9e1d853 362,369
+  s_e8fb00d5812ee1::t_2d70a0c244c0b0 313-316
+  s_e8fb00d5812ee1::t_bd8430d7601359 371-374,376-379
+  s_e8fb00d5812ee1::t_5b508d10367512 202
+  s_e8fb00d5812ee1::t_f2a149a134dab3 269-272
+  s_e8fb00d5812ee1::t_480c526712109f 356-359,363
+  s_e8fb00d5812ee1::t_b9b94688e6fc89 152-171
+  s_e8fb00d5812ee1::t_efe72331997bfe 1-151,172-201,203-211,216-219,224-241,246-268,273-280,286-301,303-312,317,320,324,328-342,347-355,360-361,364-368,370,375,380-384
+  s_e8fb00d5812ee1::t_7d587bc16d87cf 212-215,220-223
+  s_e8fb00d5812ee1::t_c7fd07a79eb75c 302
+  s_e8fb00d5812ee1::t_7db4bd0f0929df 242-245,281-285
+convex/variableRequests.ts
+  s_e8fb00d5812ee1::t_0042e28ba7c705 200-226,262-323,327-352
+  s_e8fb00d5812ee1::t_879dd383cb22f7 324-326
+  s_e8fb00d5812ee1::t_2e2037065d546a 227-261
+apps/web/src/proxy.ts
+  s_e8fb00d5812ee1::t_41cf2ae6704240 47-48
+apps/web/src/app/api/variable-requests/[id]/value/route.ts
+  s_e8fb00d5812ee1::t_5a5d1d2772bd10 1-65
+apps/web/src/components/dashboard/dashboard-nav.tsx
+  s_e8fb00d5812ee1::t_5a2ef0cef3f5b6 14
+  s_e8fb00d5812ee1::t_ce2d18ae035cae 121-130
+apps/web/src/app/api/cli/variable-requests/route.ts
+  s_e8fb00d5812ee1::t_55e6764f32c9cd 195,199-202
+  s_e8fb00d5812ee1::t_dd90633a429490 210-212,214
+apps/web/src/app/api/cli/_lib/legacy-roles.ts
+  s_e8fb00d5812ee1::t_f4ce7a21fe6755 123
+apps/web/src/app/api/extension/_lib/legacy-roles.ts
+  s_e8fb00d5812ee1::t_82fcea5c7e959e 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "5c4a0c7314a40373811ca9b4f80f256967233ae3",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
