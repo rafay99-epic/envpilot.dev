@@ -1,0 +1,26 @@
+apps/web/src/components/shared/share-link-form.tsx
+  s_a4b2d21b333179::t_ad566bb1ba1f94 92
+  s_a4b2d21b333179::t_c7cb45000ba50d 65
+  s_a4b2d21b333179::t_c0454b89b40dff 12
+  s_a4b2d21b333179::t_c812958a8e09fa 93-95
+  s_a4b2d21b333179::t_3ac933a2c47ac2 42-47
+  s_a4b2d21b333179::t_13e98747fe6f49 69-72
+convex/sharedSecrets.ts
+  s_a4b2d21b333179::t_9bce1fc42c0137 462-474
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "2ac15780b8de8c80d9a9e9bd5cb0f7d8bf02144a",
+  "prompts": {},
+  "sessions": {
+    "s_a4b2d21b333179": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9525c4e-bb6e-4416-a0b5-14b910d032b2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
