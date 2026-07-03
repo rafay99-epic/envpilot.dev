@@ -6,6 +6,7 @@ import {
   checkBooleanFeature,
   countActiveProjects,
   countActiveVariables,
+  countActiveAccounts,
   countMembersAndPendingInvites,
   countRotationEnabledVariables,
   getUserTier,
@@ -143,15 +144,17 @@ export const getOrganizationUsage = query({
 
     const tier = await getUserTier(ctx.db, org.createdBy);
 
-    // Parallel fetch: projects, members, pending invitations
+    // Parallel fetch: projects, members, pending invitations. The index
+    // narrows rows to the org; soft-delete/status refinement happens in JS
+    // over the already-fetched rows (same read cost as a query .filter).
     const [projects, members, pendingInvitations] = await Promise.all([
       ctx.db
         .query("projects")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect(),
+        .collect()
+        .then((rows) => rows.filter((p) => !p.deletedAt)),
       ctx.db
         .query("organizationMembers")
         .withIndex("by_organization", (q) =>
@@ -163,8 +166,8 @@ export const getOrganizationUsage = query({
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .filter((q) => q.eq(q.field("status"), "pending"))
-        .collect(),
+        .collect()
+        .then((rows) => rows.filter((i) => i.status === "pending")),
     ]);
 
     // Parallel fetch: variable counts per project
@@ -173,8 +176,8 @@ export const getOrganizationUsage = query({
         const variables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .collect();
+          .collect()
+          .then((rows) => rows.filter((v2) => !v2.deletedAt));
         return {
           projectId: project._id as string,
           projectName: project.name,
@@ -304,6 +307,7 @@ export const checkTierLimit = query({
  * Includes everything from getOrganizationUsage plus:
  * - Active secret shares
  * - Rotation-enabled variables
+ * - Shared accounts (service login credentials)
  * - Pending invitations (separate from team member count)
  */
 export const getExtendedUsage = query({
@@ -321,14 +325,15 @@ export const getExtendedUsage = query({
       pendingInvitations,
       activeShares,
       rotationEnabledVars,
+      sharedAccounts,
     ] = await Promise.all([
       ctx.db
         .query("projects")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .filter((q) => q.eq(q.field("deletedAt"), undefined))
-        .collect(),
+        .collect()
+        .then((rows) => rows.filter((p) => !p.deletedAt)),
       ctx.db
         .query("organizationMembers")
         .withIndex("by_organization", (q) =>
@@ -340,15 +345,13 @@ export const getExtendedUsage = query({
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId)
         )
-        .filter((q) =>
-          q.and(
-            q.eq(q.field("status"), "pending"),
-            q.gt(q.field("expiresAt"), Date.now())
-          )
-        )
-        .collect(),
+        .collect()
+        .then((rows) =>
+          rows.filter((i) => i.status === "pending" && i.expiresAt > Date.now())
+        ),
       countActiveShares(ctx.db, args.organizationId),
       countRotationEnabledVariables(ctx.db, args.organizationId),
+      countActiveAccounts(ctx.db, args.organizationId),
     ]);
 
     // Variable counts per project
@@ -357,8 +360,8 @@ export const getExtendedUsage = query({
         const variables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .filter((q) => q.eq(q.field("deletedAt"), undefined))
-          .collect();
+          .collect()
+          .then((rows) => rows.filter((v2) => !v2.deletedAt));
         return {
           projectId: project._id as string,
           projectName: project.name,
@@ -388,6 +391,7 @@ export const getExtendedUsage = query({
         variablesPerProject: variableResults,
         activeShares,
         rotationEnabledVars,
+        sharedAccounts,
       },
     };
   },
