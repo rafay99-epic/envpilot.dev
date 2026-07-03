@@ -9,7 +9,7 @@ import {
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { createSecret } from "@/lib/vault";
-import { resolveLegacyRoles } from "../_lib/legacy-roles";
+import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
 
 const createRequestSchema = z.object({
   key: z
@@ -199,12 +199,22 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    const message =
+    const rawMessage =
       error instanceof Error
         ? error.message
         : "Failed to create variable request";
-    if (message.includes("already exists")) {
+    // Convex wraps thrown errors as "[Request ID: …] Server Error\nUncaught
+    // Error: <real message>\n at …" — surface only the real message.
+    const message =
+      rawMessage.match(/Uncaught Error: ([^\n]+)/)?.[1] ?? rawMessage;
+    if (
+      message.includes("already exists") ||
+      message.includes("pending request")
+    ) {
       return NextResponse.json({ error: message }, { status: 409 });
+    }
+    if (isAuthorizationError(error)) {
+      return NextResponse.json({ error: message }, { status: 403 });
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

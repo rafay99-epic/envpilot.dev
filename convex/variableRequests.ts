@@ -414,8 +414,10 @@ export const create = mutation({
     );
 
     if (hasPendingDuplicate) {
+      // Keep the phrase "pending request" — the CLI/extension/web API routes
+      // match on it to map this rejection to HTTP 409.
       throw new Error(
-        "You already have a pending request for this variable key"
+        `You already have a pending request for "${args.key}". Wait for it to be reviewed, or cancel it from the dashboard before requesting again.`
       );
     }
 
