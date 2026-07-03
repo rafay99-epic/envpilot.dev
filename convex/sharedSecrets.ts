@@ -459,6 +459,19 @@ export const createShare = mutation({
       }
     }
 
+    // 0b. Reject self-sharing — the creator already has access to the resource,
+    // and mailing themselves an OTP link is never the intent. Checked against
+    // the creator's account email (case-insensitive), not just the current
+    // recipient list, so it holds regardless of what the client sends.
+    const creator = await ctx.db.get(args.userId);
+    const creatorEmail = creator?.email.toLowerCase().trim();
+    if (
+      creatorEmail &&
+      args.recipientEmails.some((e) => e.toLowerCase().trim() === creatorEmail)
+    ) {
+      throw new Error("You cannot share with your own email address.");
+    }
+
     // 1. Feature gate: secret_sharing boolean
     const boolGate = await checkBooleanFeature(
       ctx.db,

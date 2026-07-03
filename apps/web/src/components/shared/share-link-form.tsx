@@ -9,6 +9,7 @@ import {
   encryptForShare,
 } from "@/lib/share-crypto";
 import { useCreateShare } from "@/hooks/useShareSecret";
+import { useAuth } from "@/hooks/use-auth";
 
 type ShareMode = "one_time" | "time_limited";
 
@@ -38,6 +39,12 @@ export interface ShareLinkFormProps {
   oneTimeDestroyedMessage: string;
   /** Sentry source tag + resource-specific extras for unexpected failures. */
   sentry: { source: string; extra: Record<string, unknown> };
+  /**
+   * The signed-in user's email. Used to block self-sharing client-side (the
+   * backend rejects it too); omit if unavailable and the backend guard still
+   * applies.
+   */
+  currentUserEmail?: string;
   onClose: () => void;
 }
 
@@ -55,9 +62,14 @@ export function ShareLinkForm({
   extraShareArgs,
   oneTimeDestroyedMessage,
   sentry,
+  currentUserEmail,
   onClose,
 }: ShareLinkFormProps) {
   const createShare = useCreateShare();
+  const { user } = useAuth();
+  // Prop wins when provided (e.g. tests); otherwise fall back to the signed-in
+  // user's email so we can block self-sharing before the request is sent.
+  const selfEmail = (currentUserEmail ?? user?.email)?.trim().toLowerCase();
 
   const [mode, setMode] = useState<ShareMode>("one_time");
   const [ttlMs, setTtlMs] = useState(86_400_000);
@@ -75,6 +87,10 @@ export function ShareLinkForm({
     if (!trimmed) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setError("Invalid email format");
+      return;
+    }
+    if (selfEmail && trimmed === selfEmail) {
+      setError("You already have access — you can't share with yourself");
       return;
     }
     if (emails.includes(trimmed)) {
