@@ -1,0 +1,23 @@
+apps/web/src/app/api/extension/variable-requests/route.ts
+  s_e8fb00d5812ee1::t_693c64bed6fb49 12
+  s_e8fb00d5812ee1::t_62898321086eb7 202,206-213,216-217
+  s_e8fb00d5812ee1::t_2347f76cba70b9 218
+convex/variableRequests.ts
+  s_e8fb00d5812ee1::t_1a5bef5009474a 417-418,420
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "76b0fdf81501a4200a8f3bc93cba996c665667e0",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
