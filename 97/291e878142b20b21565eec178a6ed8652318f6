@@ -1,0 +1,114 @@
+apps/web/src/app/api/accounts/route.ts
+  s_a4b2d21b333179::t_f7958c278331da 3
+  s_a4b2d21b333179::t_ae42628caa9b28 118,122-125
+apps/web/src/app/api/organizations/[slug]/transfer/route.ts
+  s_a4b2d21b333179::t_34241489692b0c 8,12
+  s_a4b2d21b333179::t_437aa9344b5f7e 120-122
+  s_a4b2d21b333179::t_f2526e9849ea11 104-106
+  s_a4b2d21b333179::t_a852763d32bb76 13
+apps/web/src/app/api/projects/[id]/export/route.ts
+  s_a4b2d21b333179::t_f143568ad076f2 125-130
+  s_a4b2d21b333179::t_5d26f629967547 21-22
+  s_a4b2d21b333179::t_11a0c7f449a6d1 7
+apps/web/src/app/api/invitations/[token]/route.ts
+  s_a4b2d21b333179::t_178d774cfaa111 233-237,241-245
+  s_a4b2d21b333179::t_fe0bad62aff443 10,13
+  s_a4b2d21b333179::t_b546d64c83035e 14
+apps/web/src/app/api/shares/route.ts
+  s_a4b2d21b333179::t_f7361cc05d6e81 114-116,118,131,142
+apps/web/src/instrumentation-client.ts
+  s_a4b2d21b333179::t_2e43ad35f3f50a 3-7
+apps/web/src/app/api/vault/route.ts
+  s_a4b2d21b333179::t_fe2b67c4de2e75 73-77,79-83,97-104
+  s_a4b2d21b333179::t_2cf0a5d776eaf7 339-340,361,365,383-386
+  s_a4b2d21b333179::t_9c04a5dc586671 157,183,195
+  s_a4b2d21b333179::t_4a011d463b036b 4
+  s_a4b2d21b333179::t_33f60c6abcc0c9 209-210,232-233,236,257-260
+  s_a4b2d21b333179::t_f3749ab1388e95 275-276,297,301,322-325
+apps/web/sentry.edge.config.ts
+  s_a4b2d21b333179::t_c916e520bd8215 7-11
+convex/projectMembers.ts
+  s_a4b2d21b333179::t_c5ba4d58f89b06 112-117
+convex/subscriptions.ts
+  s_a4b2d21b333179::t_71b5ed2add1339 1002-1006
+  s_a4b2d21b333179::t_dc723ca76efd0f 745-748
+  s_a4b2d21b333179::t_09a72b2e9bc8b3 833-837
+  s_a4b2d21b333179::t_0248ba8dfca029 757-763
+  s_a4b2d21b333179::t_86c069bda94936 944-950
+  s_a4b2d21b333179::t_c72c20b91769c2 854-858
+  s_a4b2d21b333179::t_7043badeb58337 980-984
+  s_a4b2d21b333179::t_6da2eba3c79fda 1107-1111
+  s_a4b2d21b333179::t_e53cba2ffbe533 794-797
+apps/web/src/app/api/variables/route.ts
+  s_a4b2d21b333179::t_3061ca55fff769 241-245,249-253
+  s_a4b2d21b333179::t_30052d8b0da023 13,16
+  s_a4b2d21b333179::t_8a3f2ca721ad52 17
+convex/variableRequests.ts
+  s_a4b2d21b333179::t_c3737090c0e41e 75-80
+apps/web/src/app/api/variables/[id]/route.ts
+  s_a4b2d21b333179::t_764425a0a4cba2 357-361,365-369
+  s_a4b2d21b333179::t_f4a819acee315d 12,16
+  s_a4b2d21b333179::t_d3ee29b5a308b0 17
+apps/web/src/app/api/organizations/[slug]/members/route.ts
+  s_a4b2d21b333179::t_a97c7a5669a3c8 413-417,421-425
+  s_a4b2d21b333179::t_7e8043409dd2bc 10,14
+  s_a4b2d21b333179::t_2193b2444cb24b 15
+apps/web/src/components/shared/share-link-form.tsx
+  s_a4b2d21b333179::t_2651706971066c 84
+  s_a4b2d21b333179::t_d95e5bedfbc446 185-211,213-216
+  s_a4b2d21b333179::t_da7b36bb0fa5cf 212
+  s_a4b2d21b333179::t_2ed40e2924d095 143
+apps/web/src/hooks/useShareSecret.ts
+  s_a4b2d21b333179::t_20d61d1e562a6a 37-38
+convex/permissions.ts
+  s_a4b2d21b333179::t_1cb571df22d902 991-997
+  s_a4b2d21b333179::t_176f2db05fddc6 162-168
+  s_a4b2d21b333179::t_e08d3821fdef16 475-481
+convex/accountPermissions.ts
+  s_a4b2d21b333179::t_6eb4e23129a88c 299-305
+  s_a4b2d21b333179::t_f6ffc8901efb30 155-161
+apps/web/sentry.server.config.ts
+  s_a4b2d21b333179::t_c8cd49b504477c 7-11
+convex/sharedSecrets.ts
+  s_a4b2d21b333179::t_c3a468077836b9 864-870
+convex/variables.ts
+  s_a4b2d21b333179::t_156ef9aad86d20 407-413
+convex/emails.ts
+  s_a4b2d21b333179::t_2183566141b099 706-713
+apps/web/src/app/api/checkout/route.ts
+  s_a4b2d21b333179::t_12f0a568865eba 190-193
+  s_a4b2d21b333179::t_b43b0ca9cbcbf5 4
+  s_a4b2d21b333179::t_12f420f79be6bd 133-136,152-155
+apps/web/src/app/api/extension/variables/route.ts
+  s_a4b2d21b333179::t_022b9045b763f1 226-231
+  s_a4b2d21b333179::t_f2ca220dc4c6c4 10,15
+  s_a4b2d21b333179::t_d39cac5435ea5c 16
+convex/auditLogs.ts
+  s_a4b2d21b333179::t_d1860bdce202a6 961-965
+  s_a4b2d21b333179::t_ecf8f6d6d2e9bb 446-451
+  s_a4b2d21b333179::t_526142fe3c2553 585-590
+apps/web/src/app/api/projects/[id]/move/route.ts
+  s_a4b2d21b333179::t_adbdf42b8447c7 128-130,137-141
+  s_a4b2d21b333179::t_58dc0f674bc75f 8,11
+  s_a4b2d21b333179::t_09704320705ee5 12
+apps/web/src/app/api/webhooks/polar/route.ts
+  s_a4b2d21b333179::t_fcaa1a27221706 91-94,99
+  s_a4b2d21b333179::t_59df5e89adf080 95-98
+  s_a4b2d21b333179::t_5a2cc0d566c27a 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "97291e878142b20b21565eec178a6ed8652318f6",
+  "prompts": {},
+  "sessions": {
+    "s_a4b2d21b333179": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9525c4e-bb6e-4416-a0b5-14b910d032b2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
