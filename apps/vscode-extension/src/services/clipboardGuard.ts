@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
-import * as path from "path";
+import { normalizePath as sharedNormalizePath } from "../utils/paths";
+import * as output from "../utils/outputChannel";
 import type { ProtectionMode } from "./fileProtection";
 
 /**
@@ -9,8 +10,11 @@ import type { ProtectionMode } from "./fileProtection";
  * are blocked in .env files managed by Envpilot. This prevents exfiltration
  * of secret values via the clipboard.
  *
- * Implementation: Overrides the built-in copy/cut commands. For non-protected
- * files, performs the clipboard operation directly via the VS Code clipboard API.
+ * Implementation: Overrides the built-in copy/cut commands, but only runs the
+ * custom guard logic for protected files. For every other file, the override
+ * delegates straight back to VS Code's built-in `default:` command so normal
+ * editing keeps native copy/cut semantics (box selection, HTML clipboard
+ * payloads, notebook cells, diff editor, etc.).
  */
 export class ClipboardGuardService {
   private protectedFiles = new Map<string, ProtectionMode>();
@@ -39,6 +43,14 @@ export class ClipboardGuardService {
   }
 
   /**
+   * Delegate to VS Code's built-in copy/cut command for an unprotected file,
+   * so ordinary editing keeps native behavior instead of our reimplementation.
+   */
+  private async delegateToDefault(command: string): Promise<void> {
+    await vscode.commands.executeCommand(`default:${command}`);
+  }
+
+  /**
    * Mark a file as protected with a specific mode.
    */
   protectFile(filePath: string, mode: ProtectionMode): void {
@@ -62,74 +74,59 @@ export class ClipboardGuardService {
   }
 
   /**
-   * Get the selected text from an editor (or current line if no selection).
-   */
-  private getTextToCopy(editor: vscode.TextEditor): string {
-    const selections = editor.selections;
-
-    if (selections.length === 1 && selections[0].isEmpty) {
-      // No selection — VS Code copies the entire current line (including newline)
-      const line = editor.document.lineAt(selections[0].active.line);
-      const eol = editor.document.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
-      return line.text + eol;
-    }
-
-    // Copy all selected text (multi-cursor support)
-    return selections
-      .map((sel) => editor.document.getText(sel))
-      .join(editor.document.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n");
-  }
-
-  /**
-   * Handle copy command — block if file is protected, otherwise copy normally.
+   * Handle copy command — block if file is protected, otherwise delegate to
+   * the built-in copy command so unrelated files keep native behavior.
    */
   private async handleCopy(editor: vscode.TextEditor): Promise<void> {
-    if (this.isFileProtected(editor)) {
+    try {
+      if (!this.isFileProtected(editor)) {
+        await this.delegateToDefault("editor.action.clipboardCopyAction");
+        return;
+      }
+
       vscode.window.showWarningMessage(
         "Envpilot: Copying from protected .env files is not allowed. Secret values are managed securely."
       );
-      return;
+    } catch (err) {
+      // A clipboard/command API failure should degrade gracefully rather
+      // than surfacing a confusing error on an otherwise-normal file.
+      output.warn(
+        `Clipboard copy failed: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
-
-    // Perform copy directly via clipboard API
-    const text = this.getTextToCopy(editor);
-    await vscode.env.clipboard.writeText(text);
   }
 
   /**
-   * Handle cut command — block if file is protected, otherwise cut normally.
+   * Handle cut command — block if file is protected, otherwise delegate to
+   * the built-in cut command so unrelated files keep native behavior.
    */
   private async handleCut(
     editor: vscode.TextEditor,
-    edit: vscode.TextEditorEdit
+    // The built-in cut command is delegated to for unprotected files, so the
+    // edit builder VS Code supplies for this text-editor command is unused —
+    // kept to satisfy the `registerTextEditorCommand` callback signature.
+    _edit: vscode.TextEditorEdit
   ): Promise<void> {
-    if (this.isFileProtected(editor)) {
+    try {
+      if (!this.isFileProtected(editor)) {
+        await this.delegateToDefault("editor.action.clipboardCutAction");
+        return;
+      }
+
       vscode.window.showWarningMessage(
         "Envpilot: Cutting from protected .env files is not allowed. Secret values are managed securely."
       );
-      return;
-    }
-
-    // Perform cut: copy text then delete selection(s)
-    const text = this.getTextToCopy(editor);
-    await vscode.env.clipboard.writeText(text);
-
-    const selections = editor.selections;
-    if (selections.length === 1 && selections[0].isEmpty) {
-      // Cut entire line (VS Code default behavior)
-      const line = editor.document.lineAt(selections[0].active.line);
-      const range = line.rangeIncludingLineBreak;
-      edit.delete(range);
-    } else {
-      // Delete all selections
-      for (const sel of selections) {
-        edit.delete(sel);
-      }
+    } catch (err) {
+      // A clipboard/command API failure should degrade gracefully rather
+      // than surfacing a confusing error on an otherwise-normal file.
+      output.warn(
+        `Clipboard cut failed: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
   private normalizePath(filePath: string): string {
-    return path.resolve(filePath).toLowerCase();
+    return sharedNormalizePath(filePath);
   }
 
   dispose(): void {

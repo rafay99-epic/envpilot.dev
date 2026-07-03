@@ -44,6 +44,8 @@ export default authkitMiddleware({
       "/api/cli/projects",
       "/api/cli/variables",
       "/api/cli/variables/bulk",
+      "/api/cli/variables/fingerprint",
+      "/api/cli/variable-requests",
       "/api/cli/tier",
       "/api/cli/usage",
       // Extension API endpoints use bearer token auth, not browser session auth

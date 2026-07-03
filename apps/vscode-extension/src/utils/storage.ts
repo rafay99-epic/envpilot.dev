@@ -8,6 +8,12 @@ import type {
 import { normalizePath } from "./paths";
 
 const AUTH_SESSION_KEY = "envpilot.authSession";
+/**
+ * Multi-account auth blob. Holds every signed-in account keyed by user id plus
+ * a single active-account pointer, all inside one encrypted SecretStorage
+ * entry. Supersedes the single-session AUTH_SESSION_KEY (migrated lazily).
+ */
+const AUTH_ACCOUNTS_KEY = "envpilot.authAccounts";
 const LINKED_PROJECTS_KEY = "envpilot.linkedProjects";
 const LINKED_PROJECTS_V2_KEY = "envpilot.linkedProjectsV2";
 const ACCESS_TOKEN_PREFIX = "envpilot.token.";
@@ -45,6 +51,17 @@ interface LinkedProjectMetadataV2 {
 }
 
 /**
+ * Multi-account auth storage blob (persisted under AUTH_ACCOUNTS_KEY).
+ * `accounts` is keyed by user id; `activeAccountId` points at the account the
+ * legacy single-session API (getAuthSession/setAuthSession/clearAuthSession)
+ * operates on. Mirrors the CLI's `{ accounts, activeAccountId }` config shape.
+ */
+interface AuthAccountsBlob {
+  accounts: Record<string, AuthSession>;
+  activeAccountId?: string;
+}
+
+/**
  * Storage service for persisting extension state securely
  * Access tokens are stored in VS Code's secret storage for security
  */
@@ -52,11 +69,22 @@ export class StorageService {
   private context: vscode.ExtensionContext;
   private migrationComplete = false;
   /**
-   * In-memory copy of the auth session. Secret storage is an async IPC call
-   * and the API client reads the session on every request — cache it and
-   * invalidate on set/clear. `undefined` means "not loaded yet".
+   * In-memory copy of the multi-account auth blob. Secret storage is an async
+   * IPC call and the API client reads the active session on every request —
+   * cache the whole blob and invalidate on every mutation. `undefined` means
+   * "not loaded yet"; a loaded-but-empty state is `{ accounts: {} }`.
    */
-  private cachedSession: AuthSession | null | undefined = undefined;
+  private cachedAccounts: AuthAccountsBlob | undefined = undefined;
+  /**
+   * De-dupes concurrent first-reads (which trigger legacy migration) so the
+   * blob is only loaded/migrated once even under a burst of parallel reads.
+   */
+  private accountsLoadPromise: Promise<AuthAccountsBlob> | undefined;
+  /**
+   * Serializes account read-modify-write cycles (upsert/remove/switch) so two
+   * concurrent mutations can't clobber each other's copy of the blob.
+   */
+  private authWriteQueue: Promise<unknown> = Promise.resolve();
   /** Serializes metadata read-modify-write cycles from concurrent syncs. */
   private metadataWriteQueue: Promise<void> = Promise.resolve();
 
@@ -148,41 +176,242 @@ export class StorageService {
     await this.context.globalState.update(LINKED_PROJECTS_V2_KEY, newProjects);
   }
 
-  // Auth Session Management
-  async getAuthSession(): Promise<AuthSession | null> {
-    if (this.cachedSession === undefined) {
-      const session = await this.context.secrets.get(AUTH_SESSION_KEY);
-      if (!session) {
-        this.cachedSession = null;
-      } else {
-        try {
-          this.cachedSession = JSON.parse(session) as AuthSession;
-        } catch {
-          this.cachedSession = null;
-        }
+  // ============================================
+  // Multi-account auth session management
+  // ============================================
+  //
+  // Every signed-in account lives in one encrypted SecretStorage blob keyed by
+  // user id, with a single active-account pointer. The legacy single-session
+  // API (getAuthSession/setAuthSession/clearAuthSession) is preserved verbatim
+  // and now operates on the ACTIVE account, so existing callers are unaffected.
+
+  /**
+   * Load the accounts blob (cached). On the very first read, if no blob exists
+   * yet but a legacy single-session AUTH_SESSION_KEY does, it is migrated in
+   * place (see {@link migrateLegacyAuth}). Concurrent first-reads share one
+   * load via `accountsLoadPromise` so migration runs at most once.
+   */
+  private async loadAccounts(): Promise<AuthAccountsBlob> {
+    if (this.cachedAccounts !== undefined) {
+      return this.cachedAccounts;
+    }
+    if (!this.accountsLoadPromise) {
+      this.accountsLoadPromise = this.doLoadAccounts().finally(() => {
+        this.accountsLoadPromise = undefined;
+      });
+    }
+    return this.accountsLoadPromise;
+  }
+
+  private async doLoadAccounts(): Promise<AuthAccountsBlob> {
+    const raw = await this.context.secrets.get(AUTH_ACCOUNTS_KEY);
+    if (raw) {
+      try {
+        const blob = this.normalizeBlob(JSON.parse(raw) as AuthAccountsBlob);
+        this.cachedAccounts = blob;
+        return blob;
+      } catch {
+        // Corrupt blob — fall through to legacy migration / empty state.
       }
     }
 
-    // Check if session is expired
-    if (
-      this.cachedSession?.expiresAt &&
-      Date.now() > this.cachedSession.expiresAt
-    ) {
-      await this.clearAuthSession();
-      return null;
+    const blob = await this.migrateLegacyAuth();
+    this.cachedAccounts = blob;
+    return blob;
+  }
+
+  /**
+   * Repair an untrusted blob: guarantee an `accounts` object and an
+   * `activeAccountId` that actually points at a stored account (falling back to
+   * an arbitrary remaining account, or `undefined` when there are none).
+   */
+  private normalizeBlob(blob: AuthAccountsBlob | null): AuthAccountsBlob {
+    const accounts =
+      blob && typeof blob.accounts === "object" && blob.accounts !== null
+        ? blob.accounts
+        : {};
+    let activeAccountId = blob?.activeAccountId;
+    if (!activeAccountId || !accounts[activeAccountId]) {
+      activeAccountId = Object.keys(accounts)[0];
+    }
+    return { accounts, activeAccountId };
+  }
+
+  /**
+   * Lazy, idempotent migration from the legacy single-session AUTH_SESSION_KEY
+   * to the multi-account blob. If a valid legacy session exists it is wrapped
+   * into an accounts map keyed by its user id, made active, persisted, and the
+   * legacy key is deleted. Lossless: the same AuthSession object is preserved
+   * byte-for-byte, only re-homed under `accounts[user.id]`. Safe to call when
+   * no legacy session exists (returns an empty blob without writing).
+   */
+  private async migrateLegacyAuth(): Promise<AuthAccountsBlob> {
+    const legacy = await this.context.secrets.get(AUTH_SESSION_KEY);
+    if (!legacy) {
+      return { accounts: {}, activeAccountId: undefined };
     }
 
-    return this.cachedSession;
-  }
+    let session: AuthSession | null = null;
+    try {
+      session = JSON.parse(legacy) as AuthSession;
+    } catch {
+      session = null;
+    }
 
-  async setAuthSession(session: AuthSession): Promise<void> {
-    this.cachedSession = session;
-    await this.context.secrets.store(AUTH_SESSION_KEY, JSON.stringify(session));
-  }
+    if (!session?.user?.id) {
+      // Legacy value is unusable — drop it so we don't retry every read.
+      await this.context.secrets.delete(AUTH_SESSION_KEY);
+      return { accounts: {}, activeAccountId: undefined };
+    }
 
-  async clearAuthSession(): Promise<void> {
-    this.cachedSession = null;
+    const blob: AuthAccountsBlob = {
+      accounts: { [session.user.id]: session },
+      activeAccountId: session.user.id,
+    };
+    await this.persistAccounts(blob);
     await this.context.secrets.delete(AUTH_SESSION_KEY);
+    return blob;
+  }
+
+  /** Persist the blob and update the in-memory cache atomically. */
+  private async persistAccounts(blob: AuthAccountsBlob): Promise<void> {
+    this.cachedAccounts = blob;
+    await this.context.secrets.store(AUTH_ACCOUNTS_KEY, JSON.stringify(blob));
+  }
+
+  /** Serialize an account read-modify-write behind the auth write queue. */
+  private enqueueAuthWrite<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.authWriteQueue.then(task, task);
+    this.authWriteQueue = run.catch(() => {});
+    return run;
+  }
+
+  /**
+   * Get the ACTIVE account's session (runs migration on first read). Returns
+   * null when signed out. An expired active account is removed (which may
+   * promote another account to active) but NEVER wipes other valid accounts;
+   * expired accounts are skipped until a valid active session is found or none
+   * remain.
+   */
+  async getAuthSession(): Promise<AuthSession | null> {
+    let blob = await this.loadAccounts();
+
+    for (;;) {
+      const id = blob.activeAccountId;
+      if (!id) {
+        return null;
+      }
+
+      const session = blob.accounts[id];
+      if (!session) {
+        // Pointer/accounts drifted out of sync — normalize and retry.
+        await this.enqueueAuthWrite(async () => {
+          const current = await this.loadAccounts();
+          await this.persistAccounts(this.normalizeBlob(current));
+        });
+        blob = await this.loadAccounts();
+        continue;
+      }
+
+      if (session.expiresAt && Date.now() > session.expiresAt) {
+        await this.removeAccount(id);
+        blob = await this.loadAccounts();
+        continue;
+      }
+
+      return session;
+    }
+  }
+
+  /**
+   * UPSERT an account by `session.user.id` and make it the active account. This
+   * is what makes signIn ADD an account without clobbering the others.
+   */
+  async setAuthSession(session: AuthSession): Promise<void> {
+    await this.enqueueAuthWrite(async () => {
+      const blob = await this.loadAccounts();
+      await this.persistAccounts({
+        accounts: { ...blob.accounts, [session.user.id]: session },
+        activeAccountId: session.user.id,
+      });
+    });
+  }
+
+  /**
+   * Single-account logout: remove the ACTIVE account. If other accounts remain,
+   * the active pointer moves to one of them; otherwise the blob becomes empty.
+   */
+  async clearAuthSession(): Promise<void> {
+    const activeId = (await this.loadAccounts()).activeAccountId;
+    if (!activeId) {
+      return;
+    }
+    await this.removeAccount(activeId);
+  }
+
+  /** List every signed-in account. */
+  async listAccounts(): Promise<AuthSession[]> {
+    const blob = await this.loadAccounts();
+    return Object.values(blob.accounts);
+  }
+
+  /** Get the active account's user id (undefined when signed out). */
+  async getActiveAccountId(): Promise<string | undefined> {
+    return (await this.loadAccounts()).activeAccountId;
+  }
+
+  /**
+   * Switch the active account. Returns false (and changes nothing) when no
+   * account with the given id exists.
+   */
+  async setActiveAccount(userId: string): Promise<boolean> {
+    return this.enqueueAuthWrite(async () => {
+      const blob = await this.loadAccounts();
+      if (!blob.accounts[userId]) {
+        return false;
+      }
+      await this.persistAccounts({ ...blob, activeAccountId: userId });
+      return true;
+    });
+  }
+
+  /**
+   * Remove a specific account. If it was the active one, the active pointer
+   * moves to another remaining account (or is cleared when none remain).
+   */
+  async removeAccount(
+    userId: string
+  ): Promise<{ removedActive: boolean; newActiveId?: string }> {
+    return this.enqueueAuthWrite(async () => {
+      const blob = await this.loadAccounts();
+      if (!blob.accounts[userId]) {
+        return { removedActive: false };
+      }
+
+      const wasActive = blob.activeAccountId === userId;
+      const accounts = { ...blob.accounts };
+      delete accounts[userId];
+
+      let activeAccountId = blob.activeAccountId;
+      let newActiveId: string | undefined;
+      if (wasActive) {
+        newActiveId = Object.keys(accounts)[0];
+        activeAccountId = newActiveId;
+      }
+
+      await this.persistAccounts({ accounts, activeAccountId });
+      return { removedActive: wasActive, newActiveId };
+    });
+  }
+
+  /** Sign out of every account and clear the in-memory cache. */
+  async clearAllAccounts(): Promise<void> {
+    await this.enqueueAuthWrite(async () => {
+      this.cachedAccounts = { accounts: {}, activeAccountId: undefined };
+      await this.context.secrets.delete(AUTH_ACCOUNTS_KEY);
+      // Also drop any un-migrated legacy session so nothing lingers.
+      await this.context.secrets.delete(AUTH_SESSION_KEY);
+    });
   }
 
   // ============================================
@@ -702,7 +931,8 @@ export class StorageService {
 
   // Clear all stored data
   async clearAll(): Promise<void> {
-    await this.clearAuthSession();
+    // Sign out of every account (clearAuthSession only drops the active one).
+    await this.clearAllAccounts();
 
     // Delete all V1 access tokens
     const metadata = this.getLinkedProjectsMetadata();

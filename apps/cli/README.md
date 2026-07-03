@@ -64,6 +64,26 @@ The TUI returns after each command finishes, so you can run multiple commands in
 | `envpilot pull [options]` | Pull variables into a local `.env` file |
 | `envpilot push [options]` | Push local `.env` changes to Envpilot   |
 
+### Variable Requests
+
+Developers don't have direct write access — instead they submit a request,
+and an owner, project manager, or team lead reviews it on the dashboard
+(choosing the final environments on approval).
+
+| Command                       | Description                                                            |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `envpilot request [options]`  | Request a new variable (interactive: key, value, environments)         |
+| `envpilot requests [options]` | List variable requests for the linked project with their review status |
+
+```bash
+envpilot request                     # guided prompt: key → value → description → environments
+envpilot requests                    # all requests for the linked project
+envpilot requests --status pending   # filter: pending | approved | rejected | canceled
+```
+
+Environment choices are limited to the environments you have access to —
+a developer scoped to `development` cannot request a production variable.
+
 ### Browsing Resources
 
 | Command                       | Description                                        |
@@ -107,6 +127,8 @@ Run `envpilot man` for the full command reference, or `envpilot man <command>` f
 | `--dry-run`             | `pull`                                         | Preview changes without writing to disk                              |
 | `--json`                | `list projects`, `list organizations`, `usage` | Output as JSON                                                       |
 | `--force`               | `unlink`                                       | Skip confirmation prompt                                             |
+| `--project <id>`        | `request`, `requests`                          | Target a specific linked project                                     |
+| `--status <status>`     | `requests`                                     | Filter requests: pending, approved, rejected, canceled               |
 
 ## Pull Formats
 
@@ -124,17 +146,20 @@ envpilot pull --format docker-compose      # Docker Compose
 
 ## Role-Based Access
 
-Envpilot enforces two-tier role-based access control:
+Envpilot uses one unified organization role per user:
 
-**Organization roles** -- Admin, Team Lead, Member
+**Owner > Project Manager > Team Lead > Developer**
 
-**Project roles** -- Manager, Developer, Viewer
+What you can do in a project follows from this role plus whether you are
+assigned to the project. Developers can additionally be scoped to specific
+environments, and per-variable read/write grants control their access.
 
-| Role      | Pull                     | Push (direct) | Push (approval request) | Manage permissions |
-| --------- | ------------------------ | ------------- | ----------------------- | ------------------ |
-| Manager   | Yes                      | Yes           | --                      | Yes                |
-| Developer | Yes                      | No            | Yes                     | No                 |
-| Viewer    | Permitted variables only | No            | No                      | No                 |
+| Role            | Pull                                   | Push (direct) | Request new variable | Review requests | Manage permissions |
+| --------------- | -------------------------------------- | ------------- | -------------------- | --------------- | ------------------ |
+| Owner           | Yes                                    | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Project Manager | Yes (assigned projects)                | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Team Lead       | Yes (assigned projects)                | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Developer       | Granted variables, scoped environments | No            | Yes                  | No              | No                 |
 
 ## Security
 

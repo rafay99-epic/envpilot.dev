@@ -40,6 +40,8 @@ export function useResolveVariableRequest() {
       action: "approve" | "reject" | "cancel";
       reviewedBy: string;
       reviewReason?: string;
+      /** Reviewer's environment override — approve only. */
+      environments?: string[];
     }) => {
       if (data.action === "cancel") {
         const requestId = await cancel({
@@ -54,6 +56,7 @@ export function useResolveVariableRequest() {
         reviewedBy: data.reviewedBy as Id<"users">,
         action: data.action,
         reviewReason: data.reviewReason,
+        environments: data.action === "approve" ? data.environments : undefined,
       });
       return result;
     },

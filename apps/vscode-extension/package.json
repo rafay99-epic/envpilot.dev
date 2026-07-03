@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -113,7 +113,7 @@
         "command": "envpilot.requestVariable",
         "title": "Request Variable",
         "category": "Envpilot",
-        "icon": "$(git-pull-request-create)"
+        "icon": "$(add)"
       },
       {
         "command": "envpilot.installCommitGuard",
@@ -132,6 +132,18 @@
         "title": "Open Dashboard Panel",
         "category": "Envpilot",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "envpilot.switchAccount",
+        "title": "Switch Account",
+        "category": "Envpilot",
+        "icon": "$(account)"
+      },
+      {
+        "command": "envpilot.signOutAll",
+        "title": "Sign Out of All Accounts",
+        "category": "Envpilot",
+        "icon": "$(close-all)"
       }
     ],
     "viewsContainers": {
@@ -190,6 +202,16 @@
           "group": "navigation@3"
         },
         {
+          "command": "envpilot.switchAccount",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "navigation@4"
+        },
+        {
+          "command": "envpilot.requestVariable",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "navigation@5"
+        },
+        {
           "command": "envpilot.openDashboard",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "overflow@1"
@@ -197,7 +219,12 @@
         {
           "command": "envpilot.signOut",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
-          "group": "overflow@2"
+          "group": "overflow@3"
+        },
+        {
+          "command": "envpilot.signOutAll",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "overflow@4"
         },
         {
           "command": "envpilot.pullVariables",
@@ -211,7 +238,7 @@
         },
         {
           "command": "envpilot.requestVariable",
-          "when": "view == envpilot.variables && envpilot.isAuthenticated && envpilot.userRole == member",
+          "when": "view == envpilot.variables && envpilot.isAuthenticated && envpilot.isDeveloper",
           "group": "navigation@3"
         }
       ],

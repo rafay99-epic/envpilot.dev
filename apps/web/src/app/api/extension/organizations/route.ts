@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
-import { toLegacyOrgRole } from "@/lib/roles";
+import { normalizeOrgRole, toLegacyOrgRole } from "@/lib/roles";
 
 /**
  * GET /api/extension/organizations - List organizations for the authenticated user
@@ -47,6 +47,9 @@ export async function GET(request: Request) {
             tier: orgTiers[index]?.tierName ?? "free",
             // Old extension builds only understand the legacy role strings.
             role: toLegacyOrgRole(org!.role),
+            // Additive: unified-model org role for new extension builds. Old
+            // extension builds ignore it.
+            unifiedRole: normalizeOrgRole(org!.role),
             extensionAccess: features.extension_access?.value === true,
           };
         }),

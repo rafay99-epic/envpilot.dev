@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import {
-  checkOrganizationMembership,
-  getProjectOrganization,
-} from "@/lib/convex-helpers";
-import { authenticateExtensionRequest } from "@/lib/extension-auth";
+  authenticateCLIRequest,
+  unauthorizedResponse,
+  forbiddenResponse,
+} from "@/lib/cli-auth";
 import { createSecret } from "@/lib/vault";
 import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
 
@@ -30,51 +30,48 @@ const createRequestSchema = z.object({
 });
 
 /**
- * GET /api/extension/variable-requests?projectId=...&status=pending
- * List variable requests for the authenticated user's project
+ * GET /api/cli/variable-requests?projectId=...&status=pending
+ * List variable requests for the authenticated CLI user's project.
  */
-export async function GET(request: Request) {
-  try {
-    const auth = await authenticateExtensionRequest(request);
-    if (!auth) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateCLIRequest(request, convex);
 
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get("projectId");
-    const status = searchParams.get("status") || undefined;
+  if (!authResult.valid || !authResult.userId) {
+    return unauthorizedResponse(authResult.error);
+  }
 
-    if (!projectId) {
-      return NextResponse.json(
-        { error: "Project ID is required" },
-        { status: 400 }
-      );
-    }
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get("projectId");
+  const status = url.searchParams.get("status") || undefined;
 
-    const convexUser = auth.convexUser;
-
-    const { project, organizationId } = await getProjectOrganization(
-      convex,
-      projectId as Id<"projects">
+  if (!projectId) {
+    return NextResponse.json(
+      { error: "Missing projectId parameter" },
+      { status: 400 }
     );
+  }
 
-    if (!project || !organizationId) {
+  try {
+    const project = await convex.query(api.projects.getById, {
+      projectId: projectId as Id<"projects">,
+    });
+
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
-      organizationId
-    );
+    const membership = await convex.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+      userId: authResult.userId,
+    });
 
     if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbiddenResponse("You are not a member of this organization");
     }
 
     const requests = await convex.query(api.variableRequests.listForProject, {
       projectId: projectId as Id<"projects">,
-      userId: convexUser._id,
+      userId: authResult.userId,
       status: status as
         | "pending"
         | "approved"
@@ -84,9 +81,11 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
+      success: true,
       data: { requests },
     });
   } catch (error) {
+    console.error("CLI variable-requests list error:", error);
     const message =
       error instanceof Error
         ? error.message
@@ -96,89 +95,82 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/extension/variable-requests
- * Submit a variable request (members only)
+ * POST /api/cli/variable-requests
+ * Submit a variable request (developers only — owners/PMs/team leads should
+ * create variables directly).
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authResult = await authenticateCLIRequest(request, convex);
+
+  if (!authResult.valid || !authResult.userId) {
+    return unauthorizedResponse(authResult.error);
+  }
+
   try {
-    const auth = await authenticateExtensionRequest(request);
-    if (!auth) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
     const body = await request.json();
-    const validation = createRequestSchema.safeParse(body);
+    const parsed = createRequestSchema.safeParse(body);
 
-    if (!validation.success) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: validation.error.flatten() },
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
 
     const { key, value, description, environments, projectId, isSensitive } =
-      validation.data;
+      parsed.data;
 
-    const convexUser = auth.convexUser;
-    const { project, organizationId } = await getProjectOrganization(
-      convex,
-      projectId as Id<"projects">
-    );
+    const project = await convex.query(api.projects.getById, {
+      projectId: projectId as Id<"projects">,
+    });
 
-    if (!project || !organizationId) {
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
-      organizationId
-    );
+    const membership = await convex.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+      userId: authResult.userId,
+    });
 
     if (!membership) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return forbiddenResponse("You are not a member of this organization");
     }
 
     // Unified role model: only developers assigned to the project submit
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: convexUser._id,
+      userId: authResult.userId,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
 
     if (!legacy.assigned) {
       if (legacy.grantOnly) {
-        return NextResponse.json(
-          {
-            error:
-              "You have Viewer access to this project. Variable requests are not allowed.",
-          },
-          { status: 403 }
+        return forbiddenResponse(
+          "You have Viewer access to this project. Variable requests are not allowed."
         );
       }
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Owners, project managers, and team leads should create directly
-    if (legacy.role !== "developer") {
-      return NextResponse.json(
-        {
-          error:
-            "You have direct write access. Use direct variable creation instead of submitting a request.",
-        },
-        { status: 403 }
+      return forbiddenResponse(
+        "You are not assigned to this project. Variable requests are not allowed."
       );
     }
 
-    // Store the value in vault
+    // Owners, project managers, and team leads should create directly.
+    if (legacy.role !== "developer") {
+      return forbiddenResponse(
+        "You have direct write access. Use direct variable creation instead of submitting a request."
+      );
+    }
+
+    // Store the value in vault first — Convex mutations never talk to Vault
+    // directly, they only ever receive/store a vaultRef.
     const vaultResult = await createSecret(key, value, {
-      organizationId,
+      organizationId: project.organizationId,
       projectId,
     });
 
-    // Create the request in Convex
     const requestId = await convex.mutation(api.variableRequests.create, {
       key,
       vaultRef: vaultResult.id,
@@ -186,19 +178,20 @@ export async function POST(request: Request) {
       environments,
       projectId: projectId as Id<"projects">,
       isSensitive,
-      requestedBy: convexUser._id,
+      requestedBy: authResult.userId,
     });
 
     const createdRequest = await convex.query(api.variableRequests.getById, {
       requestId,
-      userId: convexUser._id,
+      userId: authResult.userId,
     });
 
     return NextResponse.json(
-      { data: { request: createdRequest } },
+      { success: true, data: { request: createdRequest } },
       { status: 201 }
     );
   } catch (error) {
+    console.error("CLI create variable request error:", error);
     const rawMessage =
       error instanceof Error
         ? error.message
@@ -213,8 +206,12 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
+    // The Convex mutation is the source of truth for authorization —
+    // translate its rejections into the standard FORBIDDEN response. Pass the
+    // real message through: scope errors ("Your access is limited to these
+    // environments: …") tell the developer exactly what to change.
     if (isAuthorizationError(error)) {
-      return NextResponse.json({ error: message }, { status: 403 });
+      return forbiddenResponse(message);
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

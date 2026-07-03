@@ -1,6 +1,13 @@
-import axios, { AxiosInstance, AxiosError } from "axios";
+import * as vscode from "vscode";
+import axios, {
+  AxiosInstance,
+  AxiosError,
+  InternalAxiosRequestConfig,
+} from "axios";
 import { getServerUrl } from "../utils/config";
 import { StorageService } from "../utils/storage";
+import { SingleFlight } from "../utils/singleFlight";
+import { getActiveAuthService } from "./auth";
 import type {
   Organization,
   Project,
@@ -24,6 +31,23 @@ export class ApiService {
   private roleCache: Map<string, MembershipRole> = new Map();
   private projectRoleCache: Map<string, ProjectRole> = new Map();
   /**
+   * Authoritative unified access facts returned alongside each getVariables
+   * response (additive server fields). Populated on the SAME request that
+   * fetches the variables, so it never goes stale relative to a sync — unlike
+   * projectRoleCache (populated only by getProjects). File protection reads
+   * this first; the legacy role/projectRole caches are the fallback.
+   */
+  private accessMetaCache: Map<
+    string,
+    {
+      unifiedRole?: string;
+      assigned?: boolean;
+      environmentScope?: string[] | null;
+      hasWriteAccess?: boolean;
+      scopeRestricted?: boolean;
+    }
+  > = new Map();
+  /**
    * Short-TTL response cache. One sync triggers refreshes of the variables
    * tree, dashboard panel, and status bar — without this, each refresh
    * re-fetches identical data (including vault-decrypted variables).
@@ -31,6 +55,16 @@ export class ApiService {
   private responseCache: Map<string, { at: number; value: unknown }> =
     new Map();
   private static readonly CACHE_TTL_MS = 30_000;
+  /**
+   * In-flight GET coalescing keyed by cache key. The 30s response cache only
+   * helps AFTER a response lands — when a sync fans out to many directories
+   * and subscriptions at once, several identical cold-cache fetches would
+   * otherwise stampede the server. This makes concurrent callers for the same
+   * key share one HTTP request (single-flight).
+   */
+  private inflight = new SingleFlight();
+  /** Guards against stacking multiple "session expired" prompts at once. */
+  private reauthPromptActive = false;
 
   constructor(storage: StorageService) {
     this.storage = storage;
@@ -51,11 +85,70 @@ export class ApiService {
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<{ error?: string }>) => {
+      async (error: AxiosError<{ error?: string }>) => {
+        const status = error.response?.status;
+        const config = error.config as
+          | (InternalAxiosRequestConfig & { _envpilotRetried?: boolean })
+          | undefined;
+
+        // On a 401, attempt a single token refresh + retry before giving up.
+        // The `_envpilotRetried` guard prevents an infinite retry loop if the
+        // refreshed token is itself rejected.
+        if (status === 401 && config && !config._envpilotRetried) {
+          config._envpilotRetried = true;
+          const refreshed = await this.tryRefreshSession();
+          if (refreshed) {
+            return this.client.request(config);
+          }
+          void this.promptReauth();
+        }
+
         const message = error.response?.data?.error || error.message;
-        throw new Error(message);
+        // Preserve the HTTP status so callers can distinguish auth failures
+        // (401) from transient/network errors instead of matching on message.
+        throw Object.assign(new Error(message), { status });
       }
     );
+  }
+
+  /**
+   * Attempt to refresh the current session's access token via
+   * `AuthService.refreshToken()`. Returns true only if a new token was
+   * persisted and the retried request can proceed.
+   */
+  private async tryRefreshSession(): Promise<boolean> {
+    const authService = getActiveAuthService();
+    if (!authService) {
+      return false;
+    }
+    try {
+      return await authService.refreshToken();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Surface a clear "session expired" prompt so the user knows to sign in
+   * again, instead of a generic error toast. Debounced so a burst of
+   * concurrent 401s (e.g. multiple in-flight requests) only shows one.
+   */
+  private async promptReauth(): Promise<void> {
+    if (this.reauthPromptActive) {
+      return;
+    }
+    this.reauthPromptActive = true;
+    try {
+      const action = await vscode.window.showWarningMessage(
+        "Envpilot: Session expired — sign in again to continue.",
+        "Sign In"
+      );
+      if (action === "Sign In") {
+        await vscode.commands.executeCommand("envpilot.signIn");
+      }
+    } finally {
+      this.reauthPromptActive = false;
+    }
   }
 
   private getCached<T>(key: string): T | undefined {
@@ -72,9 +165,21 @@ export class ApiService {
     this.responseCache.set(key, { at: Date.now(), value });
   }
 
+  /**
+   * Run `fetcher` under single-flight for `key`: if an identical request is
+   * already in flight, return its promise instead of issuing a second one.
+   */
+  private coalesce<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    return this.inflight.run(key, fetcher);
+  }
+
   /** Drop all cached responses (manual refresh, sign-out). */
   clearCache(): void {
     this.responseCache.clear();
+    // Stop new callers from joining a request that was issued under the
+    // previous session/token; the in-flight promises still settle for their
+    // original callers.
+    this.inflight.clear();
   }
 
   // Organizations
@@ -82,12 +187,14 @@ export class ApiService {
     const cached = this.getCached<Organization[]>("orgs");
     if (cached) return cached;
 
-    const response = await this.client.get<
-      ApiResponse<{ organizations: Organization[] }>
-    >("/api/extension/organizations");
-    const organizations = response.data.data?.organizations || [];
-    this.setCached("orgs", organizations);
-    return organizations;
+    return this.coalesce("orgs", async () => {
+      const response = await this.client.get<
+        ApiResponse<{ organizations: Organization[] }>
+      >("/api/extension/organizations");
+      const organizations = response.data.data?.organizations || [];
+      this.setCached("orgs", organizations);
+      return organizations;
+    });
   }
 
   // Projects
@@ -96,25 +203,27 @@ export class ApiService {
     const cached = this.getCached<Project[]>(cacheKey);
     if (cached) return cached;
 
-    const response = await this.client.get<
-      ApiResponse<{ projects: Project[] }>
-    >("/api/extension/projects", {
-      params: organizationId ? { organizationId } : undefined,
+    return this.coalesce(cacheKey, async () => {
+      const response = await this.client.get<
+        ApiResponse<{ projects: Project[] }>
+      >("/api/extension/projects", {
+        params: organizationId ? { organizationId } : undefined,
+      });
+      const projects = response.data.data?.projects || [];
+
+      // Cache both org-level and project-level roles from the response
+      for (const project of projects) {
+        if (project.userRole) {
+          this.roleCache.set(project._id, project.userRole);
+        }
+        if (project.projectRole) {
+          this.projectRoleCache.set(project._id, project.projectRole);
+        }
+      }
+
+      this.setCached(cacheKey, projects);
+      return projects;
     });
-    const projects = response.data.data?.projects || [];
-
-    // Cache both org-level and project-level roles from the response
-    for (const project of projects) {
-      if (project.userRole) {
-        this.roleCache.set(project._id, project.userRole);
-      }
-      if (project.projectRole) {
-        this.projectRoleCache.set(project._id, project.projectRole);
-      }
-    }
-
-    this.setCached(cacheKey, projects);
-    return projects;
   }
 
   async getProject(projectId: string): Promise<Project | null> {
@@ -142,31 +251,88 @@ export class ApiService {
       if (cached) return cached;
     }
 
-    const headers: Record<string, string> = {};
-    if (accessToken) {
-      headers["X-Access-Token"] = accessToken;
-    }
+    return this.coalesce(cacheKey, async () => {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers["X-Access-Token"] = accessToken;
+      }
 
-    const params: Record<string, string> = { projectId, environment };
-    if (organizationId) {
-      params.organizationId = organizationId;
-    }
+      const params: Record<string, string> = { projectId, environment };
+      if (organizationId) {
+        params.organizationId = organizationId;
+      }
 
-    const response = await this.client.get<
-      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
-    >("/api/extension/variables", {
-      params,
-      headers,
+      const response = await this.client.get<
+        ApiResponse<{
+          variables: EnvironmentVariable[];
+          role?: MembershipRole;
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }>
+      >("/api/extension/variables", {
+        params,
+        headers,
+      });
+
+      // Cache the user's role for this project
+      if (response.data.data?.role) {
+        this.roleCache.set(projectId, response.data.data.role);
+      }
+      this.cacheAccessMeta(projectId, response.data.data);
+
+      const variables = response.data.data?.variables || [];
+      this.setCached(cacheKey, variables);
+      return variables;
     });
+  }
 
-    // Cache the user's role for this project
-    if (response.data.data?.role) {
-      this.roleCache.set(projectId, response.data.data.role);
+  /** Store the additive unified access fields from a variables response. */
+  private cacheAccessMeta(
+    projectId: string,
+    data:
+      | {
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }
+      | undefined
+  ): void {
+    if (!data) return;
+    if (
+      data.unifiedRole !== undefined ||
+      data.assigned !== undefined ||
+      data.hasWriteAccess !== undefined ||
+      data.environmentScope !== undefined
+    ) {
+      this.accessMetaCache.set(projectId, {
+        unifiedRole: data.unifiedRole,
+        assigned: data.assigned,
+        environmentScope: data.environmentScope,
+        hasWriteAccess: data.hasWriteAccess,
+        scopeRestricted: data.scopeRestricted,
+      });
     }
+  }
 
-    const variables = response.data.data?.variables || [];
-    this.setCached(cacheKey, variables);
-    return variables;
+  /**
+   * Authoritative unified access facts for a project (populated by
+   * getVariables). Undefined against a legacy server that omits them.
+   */
+  getAccessMeta(projectId: string):
+    | {
+        unifiedRole?: string;
+        assigned?: boolean;
+        environmentScope?: string[] | null;
+        hasWriteAccess?: boolean;
+        scopeRestricted?: boolean;
+      }
+    | undefined {
+    return this.accessMetaCache.get(projectId);
   }
 
   /**
@@ -185,34 +351,45 @@ export class ApiService {
     const cached = this.getCached<EnvironmentVariable[]>(cacheKey);
     if (cached) return cached;
 
-    const headers: Record<string, string> = {};
-    if (accessToken) {
-      headers["X-Access-Token"] = accessToken;
-    }
+    return this.coalesce(cacheKey, async () => {
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers["X-Access-Token"] = accessToken;
+      }
 
-    const params: Record<string, string> = {
-      projectId,
-      environment,
-      metadataOnly: "true",
-    };
-    if (organizationId) {
-      params.organizationId = organizationId;
-    }
+      const params: Record<string, string> = {
+        projectId,
+        environment,
+        metadataOnly: "true",
+      };
+      if (organizationId) {
+        params.organizationId = organizationId;
+      }
 
-    const response = await this.client.get<
-      ApiResponse<{ variables: EnvironmentVariable[]; role?: MembershipRole }>
-    >("/api/extension/variables", {
-      params,
-      headers,
+      const response = await this.client.get<
+        ApiResponse<{
+          variables: EnvironmentVariable[];
+          role?: MembershipRole;
+          unifiedRole?: string;
+          assigned?: boolean;
+          environmentScope?: string[] | null;
+          hasWriteAccess?: boolean;
+          scopeRestricted?: boolean;
+        }>
+      >("/api/extension/variables", {
+        params,
+        headers,
+      });
+
+      if (response.data.data?.role) {
+        this.roleCache.set(projectId, response.data.data.role);
+      }
+      this.cacheAccessMeta(projectId, response.data.data);
+
+      const variables = response.data.data?.variables || [];
+      this.setCached(cacheKey, variables);
+      return variables;
     });
-
-    if (response.data.data?.role) {
-      this.roleCache.set(projectId, response.data.data.role);
-    }
-
-    const variables = response.data.data?.variables || [];
-    this.setCached(cacheKey, variables);
-    return variables;
   }
 
   /**

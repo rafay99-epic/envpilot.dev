@@ -15,6 +15,8 @@ import { accountsCommand } from "../commands/accounts.js";
 import { runCommand } from "../commands/run.js";
 import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
+import { requestCommand } from "../commands/request.js";
+import { requestsCommand } from "../commands/requests.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -197,6 +199,42 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["upload", "bulk", "merge", "replace"],
     topLevel: true,
     createCommand: () => pushCommand,
+  },
+  {
+    id: "request",
+    title: "Request a new variable",
+    category: "Sync",
+    description:
+      "Submit a request to create a new environment variable for review (developers only).",
+    argv: ["request"],
+    args: "[--project <name-or-id>]",
+    examples: [["request"], ["request", "--project", "api"]],
+    websiteSurface: "Maps to `/api/cli/variable-requests` (POST).",
+    notes: [
+      "Only assigned developers can submit requests — owners, project managers, and team leads create variables directly.",
+      "Environment choices are limited to the developer's assigned environment scope.",
+      "An owner, project manager, or team lead must approve the request before the variable is created.",
+    ],
+    keywords: ["request", "approval", "developer", "create"],
+    topLevel: true,
+    createCommand: () => requestCommand,
+  },
+  {
+    id: "requests",
+    title: "List variable requests",
+    category: "Browse",
+    description: "List pending and past variable requests for a project.",
+    argv: ["requests"],
+    args: "[--project <name-or-id>] [--status <status>]",
+    examples: [["requests"], ["requests", "--status", "pending"]],
+    websiteSurface: "Maps to `/api/cli/variable-requests` (GET).",
+    notes: [
+      "Reviewers (owner, assigned project manager/team lead) see every request for the project.",
+      "Developers see only their own requests.",
+    ],
+    keywords: ["requests", "approval", "review", "pending"],
+    topLevel: true,
+    createCommand: () => requestsCommand,
   },
   {
     id: "run",

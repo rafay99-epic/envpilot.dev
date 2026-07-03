@@ -29,6 +29,10 @@ import {
   isCommitGuardEnabled,
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
+import { envFileNamesFor } from "./utils/envFiles";
+import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
+import { groupProjectsForPicker } from "./utils/requestTarget";
+import type { Project } from "./types";
 import * as output from "./utils/outputChannel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -88,6 +92,14 @@ async function updateContextFlags(): Promise<void> {
       "setContext",
       "envpilot.projectRole",
       projectRole || ""
+    );
+    // Normalized flag for menu when-clauses: works whether the server sends
+    // legacy ("member") or unified ("developer") role names.
+    const meta = apiService.getAccessMeta(firstProject.projectId);
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.isDeveloper",
+      normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
     );
   }
 }
@@ -184,7 +196,11 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize UI providers
   projectsTreeProvider = new ProjectsTreeProvider(apiService, storageService);
   variablesTreeProvider = new VariablesTreeProvider(apiService, storageService);
-  statusBarProvider = new StatusBarProvider(authService, syncService);
+  statusBarProvider = new StatusBarProvider(
+    authService,
+    syncService,
+    storageService
+  );
   envCodeLensProvider = new EnvCodeLensProvider(storageService);
   dashboardPanelProvider = new DashboardPanelProvider(
     context.extensionUri,
@@ -221,6 +237,14 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.signOut",
       wrapCommand(handleSignOut)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.switchAccount",
+      wrapCommand(handleSwitchAccount)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.signOutAll",
+      wrapCommand(handleSignOutAll)
     ),
     vscode.commands.registerCommand(
       "envpilot.linkProject",
@@ -374,6 +398,17 @@ export async function activate(context: vscode.ExtensionContext) {
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
   if (success) {
+    // If sign-in added a new account alongside existing ones, point the user
+    // at the switcher — AuthService.signIn() already showed the plain
+    // "Signed in as <email>" toast for the single-account case.
+    const user = await authService.getCurrentUser();
+    const accounts = await storageService.listAccounts();
+    if (user && accounts.length > 1) {
+      vscode.window.showInformationMessage(
+        `Signed in as ${user.email}. You have ${accounts.length} accounts — use "Envpilot: Switch Account" to switch.`
+      );
+    }
+
     // Show progress while loading initial data
     await vscode.window.withProgress(
       {
@@ -402,6 +437,193 @@ async function handleSignOut(): Promise<void> {
   realTimeSyncService.stopRealTimeSync();
   projectsTreeProvider.refresh();
   variablesTreeProvider.refresh();
+
+  // authService.signOut() only ever removes the active account, so another
+  // account may now be active. Restore the "signed in" UI state for it
+  // instead of leaving things in the signed-out state the auth-state-changed
+  // handler just applied.
+  const remainingSession = await storageService.getAuthSession();
+  if (remainingSession) {
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.isAuthenticated",
+      true
+    );
+    projectsTreeProvider.setAuthenticated(true);
+    statusBarProvider.update();
+    dashboardPanelProvider.refresh();
+    await updateContextFlags();
+
+    if (shouldAutoSync()) {
+      await syncService.refreshSubscriptions();
+      await realTimeSyncService.refreshSubscriptions();
+      syncService.startPeriodicSync();
+      realTimeSyncService.startRealTimeSync();
+    }
+
+    vscode.window.showInformationMessage(
+      `Envpilot: Now signed in as ${remainingSession.user.email}.`
+    );
+  } else {
+    vscode.window.showInformationMessage("Signed out.");
+  }
+}
+
+/**
+ * Switch the active account among all accounts signed in to this machine.
+ * Mirrors the post-auth refresh handleSignIn performs (tree/status bar/
+ * dashboard refresh + subscription restart) since switching accounts changes
+ * which organization/project data and access tokens are in scope, just like
+ * a fresh sign-in does.
+ */
+async function handleSwitchAccount(): Promise<void> {
+  const accounts = await storageService.listAccounts();
+
+  // Nothing to switch between yet — go straight to sign-in.
+  if (accounts.length === 0) {
+    await handleSignIn();
+    return;
+  }
+
+  const activeAccountId = await storageService.getActiveAccountId();
+
+  const ADD_ACCOUNT = "$(add) Add Account";
+  type AccountPick = vscode.QuickPickItem & {
+    accountId?: string;
+    isAdd?: boolean;
+  };
+
+  const items: AccountPick[] = accounts.map((account) => ({
+    label:
+      account.user.id === activeAccountId
+        ? `$(check) ${account.user.email}`
+        : `$(account) ${account.user.email}`,
+    description:
+      account.user.id === activeAccountId
+        ? `${account.user.name || ""} (current)`.trim()
+        : account.user.name || "",
+    accountId: account.user.id,
+  }));
+
+  items.push(
+    { label: "", kind: vscode.QuickPickItemKind.Separator },
+    {
+      label: ADD_ACCOUNT,
+      description: "Sign in to another account",
+      isAdd: true,
+    }
+  );
+
+  const picked = await vscode.window.showQuickPick(items, {
+    title: "Envpilot Accounts",
+    placeHolder:
+      accounts.length > 1
+        ? "Switch account or add a new one"
+        : "Add another account",
+  });
+
+  if (!picked) {
+    return;
+  }
+
+  if (picked.isAdd) {
+    await handleSignIn();
+    return;
+  }
+
+  // Selecting the account already active is a no-op.
+  if (!picked.accountId || picked.accountId === activeAccountId) {
+    return;
+  }
+
+  await switchToAccount(picked.accountId);
+}
+
+/**
+ * Make `accountId` the active account and refresh every surface (tree, status
+ * bar, dashboard, subscriptions). Shared by the account picker and any other
+ * caller that needs to switch the active session.
+ */
+async function switchToAccount(accountId: string): Promise<void> {
+  const switched = await storageService.setActiveAccount(accountId);
+  if (!switched) {
+    vscode.window.showErrorMessage("Envpilot: Failed to switch account.");
+    return;
+  }
+
+  apiService.clearCache();
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Envpilot: Switching account...",
+    },
+    async (progress) => {
+      progress.report({ message: "Loading projects and variables..." });
+      projectsTreeProvider.refresh();
+      variablesTreeProvider.refresh();
+      statusBarProvider.update();
+      dashboardPanelProvider.refresh();
+      await updateContextFlags();
+
+      if (shouldAutoSync()) {
+        progress.report({ message: "Starting sync..." });
+        await syncService.refreshSubscriptions();
+        await realTimeSyncService.refreshSubscriptions();
+        syncService.startPeriodicSync();
+        realTimeSyncService.startRealTimeSync();
+      }
+    }
+  );
+
+  const active = await authService.getCurrentUser();
+  vscode.window.showInformationMessage(
+    `Switched to ${active?.email ?? "account"}.`
+  );
+}
+
+/** Sign out of every account stored on this machine. */
+async function handleSignOutAll(): Promise<void> {
+  const accounts = await storageService.listAccounts();
+
+  if (accounts.length === 0) {
+    vscode.window.showInformationMessage("Envpilot: Not signed in.");
+    return;
+  }
+
+  const confirm = await vscode.window.showWarningMessage(
+    accounts.length > 1
+      ? `Sign out of all ${accounts.length} Envpilot accounts on this machine?`
+      : "Sign out of Envpilot?",
+    { modal: true },
+    "Sign Out of All"
+  );
+
+  if (confirm !== "Sign Out of All") {
+    return;
+  }
+
+  await storageService.clearAllAccounts();
+
+  // Mirror handleSignOut's teardown plus the context/UI refresh that
+  // AuthService.onAuthStateChanged normally drives, since clearAllAccounts()
+  // bypasses authService.signOut() (which only removes the active account
+  // and shows a single-account message).
+  apiService.clearCache();
+  syncService.stopPeriodicSync();
+  realTimeSyncService.stopRealTimeSync();
+  vscode.commands.executeCommand(
+    "setContext",
+    "envpilot.isAuthenticated",
+    false
+  );
+  projectsTreeProvider.setAuthenticated(false);
+  variablesTreeProvider.refresh();
+  statusBarProvider.update();
+  dashboardPanelProvider.refresh();
+  await updateContextFlags();
+
+  vscode.window.showInformationMessage("Signed out of all Envpilot accounts.");
 }
 
 async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
@@ -540,6 +762,10 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
         projectsTreeProvider.refresh();
         variablesTreeProvider.refresh();
         statusBarProvider.update();
+
+        // Refresh WebSocket subscriptions so the new directory is reactive.
+        await syncService.refreshSubscriptions();
+        await realTimeSyncService.refreshSubscriptions();
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown error";
@@ -552,17 +778,21 @@ async function handleLinkProject(item?: ProjectTreeItem): Promise<void> {
   // Check if other projects are already linked — enforce role-based limit
   const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
   if (allLinkedProjects.length > 0) {
-    // Fetch variables for the new project's org to populate role cache,
-    // then check if user is admin or team_lead in ANY linked org.
-    // This avoids order-dependent bugs where role from the wrong org is used.
-    const canLinkMultiple = allLinkedProjects.some((p) => {
-      const role = apiService.getUserRole(p.projectId);
-      return role === "admin" || role === "team_lead";
-    });
+    // Warm the role cache before gating — getUserRole() reads a lazily
+    // populated map, so a cold cache would false-negative for legit
+    // admins/team-leads. getProjects() populates roles as a side effect.
+    await apiService.getProjects();
+
+    // Check whether the user is team-lead-or-above in ANY linked project.
+    // roleLevel/normalizeOrgRole handle legacy role strings transparently.
+    const canLinkMultiple = allLinkedProjects.some(
+      (p) =>
+        roleLevel(apiService.getUserRole(p.projectId)) >= ROLE_LEVEL.team_lead
+    );
 
     if (!canLinkMultiple) {
       vscode.window.showWarningMessage(
-        "Only admins and team leads can link multiple projects. Unlink your current project first."
+        "Only owners, project managers, and team leads can link multiple projects. Unlink your current project first."
       );
       return;
     }
@@ -687,6 +917,10 @@ async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
 
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
+
+    // Refresh WebSocket subscriptions so the new directory is reactive.
+    await syncService.refreshSubscriptions();
+    await realTimeSyncService.refreshSubscriptions();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     vscode.window.showErrorMessage(`Failed to add directory: ${message}`);
@@ -740,44 +974,97 @@ async function handleRequestVariable(): Promise<void> {
     return;
   }
 
-  // Get linked projects
-  const linkedProjects = await syncService.getAllLinkedProjectsV2();
-  if (linkedProjects.length === 0) {
-    vscode.window.showWarningMessage(
-      'No project linked. Use "Envpilot: Link Project" first.'
-    );
-    return;
-  }
+  // Fetch every accessible project (no org arg = all orgs) plus org names for
+  // grouping, the active account email for the title, and the workspace's
+  // linked project so it can lead as the default. All are cached + coalesced.
+  const [projects, orgs, currentUser, currentLinked] = await Promise.all([
+    apiService.getProjects(),
+    apiService.getOrganizations(),
+    authService.getCurrentUser(),
+    syncService.getLinkedProjectV2ForWorkspace(),
+  ]);
 
-  // Pick project if multiple are linked
-  let linkedProject = linkedProjects[0];
-  if (linkedProjects.length > 1) {
-    const pick = await vscode.window.showQuickPick(
-      linkedProjects.map((p) => ({
-        label: p.projectName,
-        description: p.organizationName,
-        project: p,
-      })),
-      { placeHolder: "Select a project to request a variable for" }
-    );
-    if (!pick) return;
-    linkedProject = pick.project;
-  }
-
-  // Check role — only members should use this
-  const role = apiService.getUserRole(linkedProject.projectId);
-  if (role && role !== "member") {
+  const rows = groupProjectsForPicker(projects, orgs, currentLinked?.projectId);
+  const hasEligible = rows.some((r) => r.kind === "project");
+  if (!hasEligible) {
+    // Owners/PMs/team leads have direct write access — requests aren't for them.
     vscode.window.showInformationMessage(
-      "As an admin or team lead, you can create variables directly on the dashboard."
+      "You have direct write access in your projects — create variables from the dashboard."
     );
     return;
   }
 
-  // Show the request dialog
+  // Map the pure rows onto QuickPickItems, carrying the Project on each pick.
+  type ProjectQuickPickItem = vscode.QuickPickItem & { project?: Project };
+  const items: ProjectQuickPickItem[] = rows.map((row) =>
+    row.kind === "separator"
+      ? { label: row.label, kind: vscode.QuickPickItemKind.Separator }
+      : {
+          label: row.label,
+          description: row.description,
+          project: row.project,
+        }
+  );
+
+  const email = currentUser?.email ?? "unknown";
+  const pick = await vscode.window.showQuickPick(items, {
+    title: `Request Variable — choose project (signed in as ${email})`,
+    placeHolder: "Select the project this variable request targets",
+  });
+  if (!pick?.project) {
+    return;
+  }
+  const project = pick.project;
+
+  // Defense-in-depth: re-derive the developer guard from the PICKED project.
+  // groupProjectsForPicker already filtered to eligible projects, so this only
+  // fires if that invariant is ever violated.
+  const role = normalizeOrgRole(project.unifiedRole ?? project.userRole);
+  if (role !== "developer") {
+    vscode.window.showInformationMessage(
+      "As an owner, project manager, or team lead you can create variables directly on the dashboard."
+    );
+    return;
+  }
+
+  // Scope-aware environments come from the picked project. An explicit empty
+  // scope means the developer has no environment access here — bail before the
+  // dialog offers an impossible pick.
+  const scope = project.environmentScope;
+  if (scope && scope.length === 0) {
+    vscode.window.showWarningMessage(
+      "You don't have access to any environments in this project."
+    );
+    return;
+  }
+  const allowedEnvironments = scope && scope.length > 0 ? scope : undefined;
+
   const input = await requestVariableDialog.showRequestDialog(
-    linkedProject.projectId
+    project,
+    allowedEnvironments
   );
   if (!input) {
+    return;
+  }
+
+  // Step 6/6: modal confirmation summarizing the request before submitting.
+  const orgName =
+    orgs.find((o) => o._id === project.organizationId)?.name ??
+    project.organizationId;
+  const confirm = await vscode.window.showInformationMessage(
+    "Submit this variable request?",
+    {
+      modal: true,
+      detail: [
+        `Key: ${input.key}`,
+        `Project: ${project.name} — ${orgName}`,
+        `Environments: ${input.environments.join(", ")}`,
+        `Sensitive: ${input.isSensitive ? "Yes" : "No"}`,
+      ].join("\n"),
+    },
+    "Submit Request"
+  );
+  if (confirm !== "Submit Request") {
     return;
   }
 
@@ -792,7 +1079,7 @@ async function handleRequestVariable(): Promise<void> {
       }
     );
     vscode.window.showInformationMessage(
-      `Variable request for "${input.key}" submitted for approval.`
+      `Variable request "${input.key}" submitted for ${project.name} (${orgName}) — pending review.`
     );
     variablesTreeProvider.refresh();
   } catch (error) {
@@ -848,6 +1135,11 @@ async function handleUnlinkProject(item?: ProjectTreeItem): Promise<void> {
       // Clean up all directories
       await syncService.cleanupAllDirectories(targetProject);
       await storageService.removeLinkedProjectV2(targetProject.projectId);
+
+      // Tear down the unlinked project's WebSocket subscriptions so no stale
+      // subscription lingers on the now-revoked access token.
+      await syncService.refreshSubscriptions();
+      await realTimeSyncService.refreshSubscriptions();
 
       vscode.window.showInformationMessage("Project unlinked");
       projectsTreeProvider.refresh();
@@ -993,6 +1285,7 @@ async function handleShowStatus(): Promise<void> {
   }
 
   const user = await authService.getCurrentUser();
+  const accounts = await storageService.listAccounts();
 
   // Get all linked projects (V2)
   const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
@@ -1000,10 +1293,19 @@ async function handleShowStatus(): Promise<void> {
   const items: vscode.QuickPickItem[] = [
     {
       label: "$(account) Signed in as",
-      description: user?.email || "Unknown",
+      description:
+        (user?.email || "Unknown") +
+        (accounts.length > 1 ? ` — ${accounts.length} accounts` : ""),
       alwaysShow: true,
     },
   ];
+
+  if (accounts.length > 1) {
+    items.push({
+      label: "$(arrow-swap) Switch Account",
+      description: "Switch to another signed-in account",
+    });
+  }
 
   if (allLinkedProjects.length > 0) {
     for (const linkedProjectV2 of allLinkedProjects) {
@@ -1027,9 +1329,10 @@ async function handleShowStatus(): Promise<void> {
       );
 
       for (const dir of linkedProjectV2.directories) {
+        const files = Array.from(envFileNamesFor(dir).values()).join(", ");
         items.push({
           label: `  $(folder-opened) ${dir.displayName || getDisplayPath(dir.directoryPath)}`,
-          description: `${dir.environments.join(", ")} -> ${dir.targetFile}`,
+          description: `${dir.environments.join(", ")} -> ${files}`,
         });
       }
     }
@@ -1110,7 +1413,9 @@ async function handleShowStatus(): Promise<void> {
     return;
   }
 
-  if (selected.label.includes("Pull Variables")) {
+  if (selected.label.includes("Switch Account")) {
+    await handleSwitchAccount();
+  } else if (selected.label.includes("Pull Variables")) {
     await handlePullVariables();
   } else if (selected.label.includes("Unlink Project")) {
     await handleUnlinkProject();
@@ -1138,25 +1443,12 @@ async function handleRemoveCommitGuard(): Promise<void> {
 }
 
 export async function deactivate() {
-  // Clean up synced .env files to prevent secrets from persisting on disk
-  try {
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const projects = storageService.getLinkedProjectsMetadataV2();
-    for (const project of projects) {
-      for (const dir of project.directories) {
-        const envFilePath = path.resolve(dir.directoryPath, dir.targetFile);
-        try {
-          await fs.chmod(envFilePath, 0o644);
-          await fs.unlink(envFilePath);
-        } catch {
-          // File may not exist or be inaccessible
-        }
-      }
-    }
-  } catch {
-    // Best-effort cleanup — don't block deactivation
-  }
-  // Remaining cleanup handled by dispose subscriptions
+  // Deactivate must only release resources — it must NEVER delete the user's
+  // synced .env files. deactivate() runs on every extension-host shutdown
+  // (window close, reload, VS Code/extension update), so deleting files here
+  // caused guaranteed data loss (writable files hand-edited by owners/PMs/TLs
+  // were destroyed with no backup). Genuine sign-out / explicit unlink delete
+  // files through their own gated paths (shouldPreventCopyOnRevoke in sync.ts).
+  // Remaining resource cleanup is handled by dispose subscriptions.
   await closeSentry();
 }

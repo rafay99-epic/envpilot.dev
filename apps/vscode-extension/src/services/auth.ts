@@ -15,6 +15,24 @@ function sessionPrefix(token: string): string {
 }
 
 /**
+ * The most recently constructed `AuthService` instance, if any.
+ *
+ * `ApiService` needs to trigger a token refresh / reauth prompt on a 401
+ * response, but it is only ever given a `StorageService` (see api.ts) and
+ * the extension wires services up purely via constructor injection in
+ * extension.ts. Rather than changing that wiring (which would ripple into
+ * extension.ts), `AuthService` publishes itself here so `api.ts` can reach
+ * it without a constructor change. There is only ever one live
+ * `AuthService` per extension host.
+ */
+let activeAuthService: AuthService | null = null;
+
+/** Get the currently active `AuthService`, if the extension has activated one. */
+export function getActiveAuthService(): AuthService | null {
+  return activeAuthService;
+}
+
+/**
  * Authentication service for the extension
  * Uses OAuth flow through the browser for secure authentication
  */
@@ -27,6 +45,10 @@ export class AuthService {
   constructor(context: vscode.ExtensionContext, storage: StorageService) {
     this.context = context;
     this.storage = storage;
+    // Intentional self-registration (see `getActiveAuthService` above), not
+    // an accidental `this` alias.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    activeAuthService = this;
   }
 
   /**
@@ -224,6 +246,58 @@ export class AuthService {
     return this.storage.getAuthSession();
   }
 
+  // ============================================
+  // Multi-account pass-throughs (for the UI layer)
+  // ============================================
+  //
+  // signIn() already ADDS an account via storage.setAuthSession (upsert +
+  // activate) and signOut() logs out only the ACTIVE account via
+  // clearAuthSession — both unchanged externally. These wrappers expose the
+  // rest of the account surface so the UI agent can drive it through
+  // AuthService (and get onAuthStateChanged notifications on active switches).
+
+  /** List every signed-in account. */
+  async listAccounts(): Promise<AuthSession[]> {
+    return this.storage.listAccounts();
+  }
+
+  /** Id of the currently active account (undefined when signed out). */
+  async getActiveAccountId(): Promise<string | undefined> {
+    return this.storage.getActiveAccountId();
+  }
+
+  /**
+   * Switch the active account and notify listeners. Returns false (no change)
+   * when the id is unknown.
+   */
+  async switchAccount(userId: string): Promise<boolean> {
+    const switched = await this.storage.setActiveAccount(userId);
+    if (switched) {
+      this._onAuthStateChanged.fire(await this.storage.getAuthSession());
+    }
+    return switched;
+  }
+
+  /**
+   * Remove a specific account. When it was the active one, the active pointer
+   * moves to a remaining account (or none) and listeners are notified.
+   */
+  async removeAccount(
+    userId: string
+  ): Promise<{ removedActive: boolean; newActiveId?: string }> {
+    const result = await this.storage.removeAccount(userId);
+    if (result.removedActive) {
+      this._onAuthStateChanged.fire(await this.storage.getAuthSession());
+    }
+    return result;
+  }
+
+  /** Sign out of every account at once. */
+  async signOutAll(): Promise<void> {
+    await this.storage.clearAllAccounts();
+    this._onAuthStateChanged.fire(null);
+  }
+
   /**
    * Check if the user is currently authenticated
    */
@@ -307,6 +381,9 @@ export class AuthService {
   }
 
   dispose(): void {
+    if (activeAuthService === this) {
+      activeAuthService = null;
+    }
     this._onAuthStateChanged.dispose();
   }
 }

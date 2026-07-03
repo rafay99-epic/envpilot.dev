@@ -18,6 +18,14 @@ export interface Organization {
   slug: string;
   tier: "free" | "pro";
   role?: MembershipRole;
+  /**
+   * Unified org role (owner/project_manager/team_lead/developer), additive
+   * alongside the legacy `role` field. Only present once the server-side
+   * `/api/extension/*` routes are updated to send it — normalize with
+   * `normalizeOrgRole`/`formatRoleLabel` from `../roles` rather than
+   * comparing raw strings.
+   */
+  unifiedRole?: string;
 }
 
 export interface UsageInfo {
@@ -71,6 +79,17 @@ export interface Project {
   color: string | null;
   userRole?: MembershipRole | null;
   projectRole?: ProjectRole | null;
+  /**
+   * Additive unified-role fields, mirroring `apps/cli`'s `ProjectAccess`
+   * shape. Sent by `/api/extension/projects`; still optional and safe to omit
+   * so legacy server deployments remain tolerated. When present, prefer these
+   * over `userRole`/`projectRole` via `normalizeOrgRole`/`formatRoleLabel`.
+   */
+  unifiedRole?: string;
+  /** Whether the user is actually assigned to this project (vs. grant-only). */
+  assigned?: boolean;
+  /** Environment scope for a scoped developer; null/undefined = unrestricted. */
+  environmentScope?: string[] | null;
 }
 
 export interface VariableTag {
@@ -89,6 +108,28 @@ export interface EnvironmentVariable {
   isSensitive: boolean;
   version: number;
   tags?: VariableTag[];
+  /**
+   * Additive per-variable grant, mirrors the CLI's `access` field. Only
+   * meaningful for grant-based (non-role-implied) write access; optional
+   * since legacy `/api/extension/variables` responses don't send it yet.
+   */
+  access?: "read" | "write";
+}
+
+/**
+ * Additive unified-role metadata that can accompany a variables response
+ * (mirrors `apps/cli`'s per-request `meta` block). All fields optional —
+ * legacy server deployments only return the bare `role` string today, so
+ * every consumer must tolerate this being partially or entirely absent.
+ */
+export interface VariablesResponseMeta {
+  role?: MembershipRole;
+  unifiedRole?: string;
+  assigned?: boolean;
+  grantOnly?: boolean;
+  environmentScope?: string[] | null;
+  hasWriteAccess?: boolean;
+  scopeRestricted?: boolean;
 }
 
 export interface ProjectAccess {

@@ -37,6 +37,8 @@ export class GitCommitGuardService {
   private disposables: vscode.Disposable[] = [];
   private gitApi: API | null = null;
   private installedHookPaths: Set<string> = new Set();
+  /** Per-repo `state.onDidChange` subscriptions, torn down when a repo closes. */
+  private repoWatchers: Map<Repository, vscode.Disposable> = new Map();
   private lastWarningTime = 0;
   private static readonly WARNING_DEBOUNCE_MS = 5000;
 
@@ -76,6 +78,14 @@ export class GitCommitGuardService {
         })
       );
 
+      // Tear down the per-repo listener when a repo closes (e.g. a folder
+      // is removed from a multi-root workspace) so it doesn't leak forever.
+      this.disposables.push(
+        this.gitApi.onDidCloseRepository((repo) => {
+          this.unwatchRepository(repo);
+        })
+      );
+
       output.log(
         `Git commit guard active. Watching ${this.gitApi.repositories.length} repository(ies).`
       );
@@ -87,10 +97,22 @@ export class GitCommitGuardService {
   }
 
   private watchRepository(repo: Repository): void {
+    // Avoid double-subscribing if a repo is reported as opened more than once.
+    if (this.repoWatchers.has(repo)) {
+      return;
+    }
     const disposable = repo.state.onDidChange(() => {
       this.checkAndUnstageEnvFiles(repo);
     });
-    this.disposables.push(disposable);
+    this.repoWatchers.set(repo, disposable);
+  }
+
+  private unwatchRepository(repo: Repository): void {
+    const disposable = this.repoWatchers.get(repo);
+    if (disposable) {
+      disposable.dispose();
+      this.repoWatchers.delete(repo);
+    }
   }
 
   private async checkAndUnstageEnvFiles(repo: Repository): Promise<void> {
@@ -266,6 +288,10 @@ export class GitCommitGuardService {
       d.dispose();
     }
     this.disposables = [];
+    for (const disposable of this.repoWatchers.values()) {
+      disposable.dispose();
+    }
+    this.repoWatchers.clear();
     // Hooks persist intentionally — they protect even without the extension
   }
 }

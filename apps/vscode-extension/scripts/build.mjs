@@ -4,7 +4,13 @@ const args = process.argv.slice(2);
 const isWatch = args.includes("--watch");
 const isMinify = args.includes("--minify");
 
-const serverUrl = process.env.ENVPILOT_SERVER_URL || "https://www.envpilot.dev";
+// ENVPILOT_SERVER_URL always wins. Otherwise a watch build (dev — `bun run
+// dev`) defaults to the local server, while a one-shot/minified build (prod
+// packaging) defaults to production. This keeps `bun run dev` pointed at
+// localhost without anyone having to remember to set the env var.
+const serverUrl =
+  process.env.ENVPILOT_SERVER_URL ||
+  (isWatch ? "http://localhost:3000" : "https://www.envpilot.dev");
 
 const define = {
   ...(serverUrl && {

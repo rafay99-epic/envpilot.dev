@@ -203,7 +203,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
   );
-
   // Share drawer state
   const [sharingVariable, setSharingVariable] = useState<Variable | null>(null);
 
@@ -893,6 +892,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                           >
                             {request.status}
                           </span>
+                          {request.environments?.map((env: string) => (
+                            <span
+                              key={env}
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                                env === "production"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                  : env === "staging"
+                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              }`}
+                            >
+                              {env}
+                            </span>
+                          ))}
                         </div>
                         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Requested by{" "}
@@ -915,30 +928,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {canReviewRequests && request.status === "pending" && (
-                          <>
-                            <button
-                              onClick={() =>
-                                updateRequestStatus(
-                                  request._id as Id<"environmentVariableRequests">,
-                                  "approve"
-                                )
-                              }
-                              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateRequestStatus(
-                                  request._id as Id<"environmentVariableRequests">,
-                                  "reject"
-                                )
-                              }
-                              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                            >
-                              Reject
-                            </button>
-                          </>
+                          <Link
+                            href="/dashboard/requests"
+                            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          >
+                            Review →
+                          </Link>
                         )}
                         {!canReviewRequests &&
                           convexUserId &&

@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { ApiService } from "../services/api";
 import { StorageService } from "../utils/storage";
+import { formatRoleLabel, normalizeOrgRole } from "../roles";
 import type { EnvironmentVariable, LinkedProjectV2 } from "../types";
+
+/** Coalesce rapid-fire refresh() calls into a single tree-data event. */
+const REFRESH_DEBOUNCE_MS = 150;
 
 export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<
@@ -11,14 +15,28 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
   private api: ApiService;
   private storage: StorageService;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(api: ApiService, storage: StorageService) {
     this.api = api;
     this.storage = storage;
   }
 
+  /**
+   * Requests a tree refresh. Multiple calls within REFRESH_DEBOUNCE_MS are
+   * coalesced into a single `onDidChangeTreeData` event — several call sites
+   * (auth changes, revocations, link/unlink, manual refresh) can fire in
+   * quick succession for what is effectively one user action, and each fire()
+   * makes VS Code re-invoke getChildren for the root and every expanded node.
+   */
   refresh(): void {
-    this._onDidChangeTreeData.fire();
+    if (this.refreshTimer) {
+      return;
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      this._onDidChangeTreeData.fire();
+    }, REFRESH_DEBOUNCE_MS);
   }
 
   getTreeItem(element: VariableTreeItem): vscode.TreeItem {
@@ -93,22 +111,21 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
 
       const items: VariableTreeItem[] = [];
 
-      // Environment & count header
+      // Environment & count header \u2014 always route the role through the
+      // unified normalizer/label formatter (never compare raw legacy
+      // strings) so the tree shows the same role vocabulary as web/CLI.
       const role = this.api.getUserRole(linkedProject.projectId);
       const projectRole = this.api.getProjectRole(linkedProject.projectId);
 
       let roleLabel = "";
-      if (role === "admin") {
-        roleLabel = " \u00b7 Admin";
-      } else if (projectRole) {
-        const projectRoleLabels: Record<string, string> = {
-          viewer: "Viewer",
-          developer: "Developer",
-          manager: "Manager",
-        };
-        roleLabel = ` \u00b7 ${projectRoleLabels[projectRole] || projectRole}`;
-      } else if (role) {
-        roleLabel = ` \u00b7 ${role === "team_lead" ? "Lead" : "Member"}`;
+      if (role || projectRole) {
+        roleLabel = ` \u00b7 ${formatRoleLabel(role)}`;
+        // Legacy "viewer" project role means grant-only / not assigned to
+        // the project \u2014 formatRoleLabel only knows org-level tiers, so it
+        // can't express that distinction on its own; annotate it here.
+        if (projectRole === "viewer") {
+          roleLabel += " (view-only)";
+        }
       }
 
       items.push(
@@ -155,8 +172,16 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
         }
       }
 
-      // Pending requests for members/viewers
-      if (role === "member" || projectRole === "viewer") {
+      // Pending requests for members/viewers — recognize the unified
+      // "developer" tier too (normalizeOrgRole maps legacy "member" onto
+      // it), so this keeps working if the server ever sends a unified role
+      // string in place of the legacy one. Guard on `role` being present so
+      // an unpopulated cache (normalizeOrgRole's "developer" default) doesn't
+      // spuriously trigger the extra pending-requests fetch below.
+      if (
+        (role && normalizeOrgRole(role) === "developer") ||
+        projectRole === "viewer"
+      ) {
         try {
           const pendingRequests = await this.api.getVariableRequests(
             linkedProject.projectId,
@@ -203,6 +228,10 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
   }
 
   dispose(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = undefined;
+    }
     this._onDidChangeTreeData.dispose();
   }
 }

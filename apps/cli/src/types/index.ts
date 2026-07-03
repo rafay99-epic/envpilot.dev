@@ -188,6 +188,41 @@ export const projectConfigV2Schema = z.object({
 });
 export type ProjectConfigV2 = z.infer<typeof projectConfigV2Schema>;
 
+// Variable request types (developer request-to-create flow)
+export const variableRequestStatusSchema = z.enum([
+  "pending",
+  "approved",
+  "rejected",
+  "canceled",
+]);
+export type VariableRequestStatus = z.infer<typeof variableRequestStatusSchema>;
+
+const variableRequestUserSchema = z
+  .object({
+    _id: z.string(),
+    email: z.string().optional(),
+    name: z.string().optional(),
+  })
+  .nullable()
+  .optional();
+
+export const variableRequestSchema = z.object({
+  _id: z.string(),
+  key: z.string(),
+  description: z.string().optional(),
+  environments: z.array(z.string()),
+  projectId: z.string(),
+  organizationId: z.string().optional(),
+  isSensitive: z.boolean().optional(),
+  status: variableRequestStatusSchema,
+  reviewReason: z.string().optional(),
+  createdAt: z.number(),
+  updatedAt: z.number().optional(),
+  requester: variableRequestUserSchema,
+  reviewer: variableRequestUserSchema,
+});
+export type VariableRequest = z.infer<typeof variableRequestSchema>;
+
 // Auth session types
 export interface AuthSession {
   code: string;

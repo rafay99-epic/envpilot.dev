@@ -40,6 +40,14 @@ export interface ResolvedLegacyRoles {
    * otherwise null.
    */
   legacyProjectRole: LegacyProjectRole | null;
+  /**
+   * Unified-model environment scope for the caller on this project. Only a
+   * scoped developer has a non-null value (the subset of environments their
+   * projectMembers row restricts them to). null means unrestricted, or that
+   * the caller's role is not developer / has no assignment. New extension
+   * builds use this to know production or other envs may have been withheld.
+   */
+  environmentScope: string[] | null;
 }
 
 /**
@@ -62,12 +70,18 @@ export async function resolveLegacyRoles(
 
   // Owners are implicitly assigned to every project.
   let assigned = role === "owner";
+  // A scoped developer's environment restriction (subset semantics). Only
+  // populated for an assigned developer whose projectMembers row sets it.
+  let environmentScope: string[] | null = null;
   if (!assigned) {
     const projectMembership = await convex.query(
       api.projectMembers.getProjectMembership,
       { projectId: args.projectId, userId: args.userId }
     );
     assigned = projectMembership !== null;
+    if (role === "developer") {
+      environmentScope = projectMembership?.environments ?? null;
+    }
   }
 
   let grantOnly = false;
@@ -95,6 +109,7 @@ export async function resolveLegacyRoles(
     assigned,
     grantOnly,
     legacyProjectRole,
+    environmentScope,
   };
 }
 
@@ -105,7 +120,7 @@ export async function resolveLegacyRoles(
  */
 export function isAuthorizationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /not authorized|insufficient permission|permission denied|forbidden|no write (access|permission)/i.test(
+  return /not authorized|insufficient permission|permission denied|forbidden|access is limited|no write (access|permission)/i.test(
     message
   );
 }
