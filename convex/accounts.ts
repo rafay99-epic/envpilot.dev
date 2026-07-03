@@ -461,7 +461,10 @@ export const remove = mutation({
     const now = Date.now();
 
     const account = await ctx.db.get(args.accountId);
-    if (!account) {
+    if (!account || account.deletedAt) {
+      // Guard against double-deletion: without the deletedAt check a second
+      // DELETE would overwrite the original soft-delete timestamp and emit a
+      // duplicate account.deleted audit entry (consistent with get/update).
       throw new Error("Account not found");
     }
 

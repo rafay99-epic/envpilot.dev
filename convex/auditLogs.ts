@@ -338,6 +338,9 @@ export const listSecurityEvents = query({
       "permission.updated",
       "permission.bulk_granted",
       "permission.bulk_revoked",
+      "account.permission_granted",
+      "account.permission_updated",
+      "account.permission_revoked",
       "access.token_created",
       "access.token_revoked",
       "access.token_used",
@@ -816,8 +819,10 @@ export const getComplianceReport = query({
         l.action === "variable.copied" ||
         l.action === "account.accessed"
     );
-    const permissionChangeLogs = logs.filter((l) =>
-      l.action.startsWith("permission.")
+    const permissionChangeLogs = logs.filter(
+      (l) =>
+        l.action.startsWith("permission.") ||
+        l.action.startsWith("account.permission_")
     );
     const securityEventLogs = logs.filter((l) =>
       l.action.startsWith("security.")

@@ -520,7 +520,7 @@ export const update = mutation({
     }
 
     const account = await ctx.db.get(existingPerm.accountId);
-    if (!account) {
+    if (!account || account.deletedAt) {
       throw new Error("Account not found");
     }
 

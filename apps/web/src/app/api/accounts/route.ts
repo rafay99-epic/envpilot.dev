@@ -15,7 +15,9 @@ import { createSecret, deleteSecret } from "@/lib/vault";
 import { serializeAccountVault, websiteUrlSchema } from "@/lib/account-payload";
 
 export const createAccountSchema = z.object({
-  organizationId: z.string().min(1, "Organization ID is required"),
+  // organizationId is intentionally NOT accepted here — the server resolves the
+  // owning org from projectId (see getProjectOrganization below) to prevent
+  // cross-tenant key confusion, so a client-supplied value would be ignored.
   projectId: z.string().min(1, "Project ID is required"),
   name: z
     .string()

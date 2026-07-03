@@ -68,7 +68,13 @@ export function AccountListItem({
       onReveal();
       setIsVisible(true);
     } else {
-      setIsVisible((prev) => !prev);
+      setIsVisible((prev) => {
+        // Re-mask the password whenever the block is hidden, so a prior unmask
+        // doesn't persist into the next reveal (credentials should default to
+        // masked every time they reappear).
+        if (prev) setShowPassword(false);
+        return !prev;
+      });
     }
   };
 

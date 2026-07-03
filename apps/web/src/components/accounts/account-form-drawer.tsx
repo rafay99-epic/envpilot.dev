@@ -120,6 +120,12 @@ export function AccountFormDrawer({
           setPrefillFailed(true);
         }
       })
+      .catch(() => {
+        // A rejected reveal (network/vault error) must surface the same
+        // "could not load" guidance as a null result — otherwise it fails
+        // silently and the form looks blank.
+        if (!cancelled) setPrefillFailed(true);
+      })
       .finally(() => {
         if (!cancelled) setIsPrefilling(false);
       });
