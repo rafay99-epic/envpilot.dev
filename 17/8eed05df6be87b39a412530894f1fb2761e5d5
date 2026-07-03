@@ -1,0 +1,32 @@
+convex/tierLimits.ts
+  s_a4b2d21b333179::t_4079f47818feaf 9,147-149,156-157,169-170,179-180,310,328,335-336,348-349,351,354,363-364,394
+  s_a4b2d21b333179::t_32f159568bcdd9 350
+apps/web/src/app/(dashboard)/dashboard/usage/page.tsx
+  s_a4b2d21b333179::t_5af5dedf7d8e83 143
+  s_a4b2d21b333179::t_2b61e8e151b63c 109-111
+apps/web/src/app/(dashboard)/dashboard/usage/layout-c.tsx
+  s_a4b2d21b333179::t_cfe3d1e5ee7662 390-398
+apps/web/src/app/(dashboard)/dashboard/usage/usage-data.ts
+  s_a4b2d21b333179::t_edf8baa4570fe3 241-253
+  s_a4b2d21b333179::t_3598556757cfb3 47,57
+  s_a4b2d21b333179::t_15485f8efd8e65 333-334
+  s_a4b2d21b333179::t_af171ee9b2d359 362-363
+apps/web/src/stores/tier-store.ts
+  s_a4b2d21b333179::t_0258c80ae02afc 21-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "178eed05df6be87b39a412530894f1fb2761e5d5",
+  "prompts": {},
+  "sessions": {
+    "s_a4b2d21b333179": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9525c4e-bb6e-4416-a0b5-14b910d032b2",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
