@@ -1,0 +1,25 @@
+apps/vscode-extension/package.json
+  s_e8fb00d5812ee1::t_e2fd91e3db0335 210-213
+  s_e8fb00d5812ee1::t_6adb701bc4fbca 116
+  s_e8fb00d5812ee1::t_33bd59c3b8963c 209
+apps/cli/README.md
+  s_e8fb00d5812ee1::t_3d78feffc6edeb 130-131
+  s_e8fb00d5812ee1::t_c020a02d50e2e6 149,151,153-155,157-162
+  s_e8fb00d5812ee1::t_f7cebbc37dff33 67-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "4ffe69ab2767c17ae213b86a243dfa3fe3dece6a",
+  "prompts": {},
+  "sessions": {
+    "s_e8fb00d5812ee1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bfe75a9-954c-4bf9-9d15-a920cb95fe1e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
