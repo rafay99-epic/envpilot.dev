@@ -1,6 +1,6 @@
 {
   "name": "envpilot-monorepo",
-  "version": "1.15.1",
+  "version": "1.16.0",
   "private": true,
   "description": "Envpilot — secure environment variable management for teams",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",

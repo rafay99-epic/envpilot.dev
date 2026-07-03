@@ -7,6 +7,34 @@ import {
   assertProjectAction,
   isEnvironmentScopeAllowed,
 } from "./authz";
+import { checkNumericLimit, countActiveVariables } from "./featureRegistry";
+
+const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;
+
+/**
+ * Validate a reviewer-supplied environment override on approve.
+ * Requires a non-empty array of known environments with no duplicates.
+ */
+function assertValidEnvironmentOverride(environments: string[]): void {
+  if (environments.length === 0) {
+    throw new Error(
+      "environments override must contain at least one environment"
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const environment of environments) {
+    if (!(VALID_ENVIRONMENTS as readonly string[]).includes(environment)) {
+      throw new Error(
+        `Invalid environment "${environment}". Allowed: ${VALID_ENVIRONMENTS.join(", ")}`
+      );
+    }
+    if (seen.has(environment)) {
+      throw new Error(`Duplicate environment "${environment}" in override`);
+    }
+    seen.add(environment);
+  }
+}
 
 async function getProjectAndOrgRole(
   ctx: MutationCtx | QueryCtx,
@@ -277,6 +305,8 @@ export const review = mutation({
     reviewedBy: v.id("users"),
     action: v.union(v.literal("approve"), v.literal("reject")),
     reviewReason: v.optional(v.string()),
+    // Reviewer may override the approved environments (approve only).
+    environments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -288,6 +318,13 @@ export const review = mutation({
 
     if (request.status !== "pending") {
       throw new Error(`Request has already been ${request.status}`);
+    }
+
+    // An environment override is only meaningful when approving.
+    if (args.environments !== undefined && args.action !== "approve") {
+      throw new Error(
+        "environments override is only allowed when approving a request"
+      );
     }
 
     const { project } = await getProjectAndOrgRole(
@@ -338,6 +375,27 @@ export const review = mutation({
       };
     }
 
+    // Resolve the final approved environment set. When the reviewer supplies
+    // an override, validate it and use it in place of the requested set.
+    let approvedEnvironments = request.environments;
+    if (args.environments !== undefined) {
+      assertValidEnvironmentOverride(args.environments);
+      approvedEnvironments = args.environments;
+    }
+
+    // Tier limit: approving must not push the org past its variable cap.
+    // Mirrors the check enforced by variables.create for direct creation.
+    const varCount = await countActiveVariables(ctx.db, request.projectId);
+    const varCheck = await checkNumericLimit(
+      ctx.db,
+      project.organizationId,
+      "max_variables_per_project",
+      varCount
+    );
+    if (!varCheck.allowed) {
+      throw new Error(varCheck.reason!);
+    }
+
     const existingVariable = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_and_key", (q) =>
@@ -353,7 +411,7 @@ export const review = mutation({
       key: request.key,
       vaultRef: request.vaultRef,
       description: request.description,
-      environments: request.environments,
+      environments: approvedEnvironments,
       projectId: request.projectId,
       isSensitive: request.isSensitive,
       createdBy: args.reviewedBy,
@@ -368,7 +426,7 @@ export const review = mutation({
       version: 1,
       vaultRef: request.vaultRef,
       description: request.description,
-      environments: request.environments,
+      environments: approvedEnvironments,
       changedBy: args.reviewedBy,
       changeReason: `Approved request ${args.requestId}`,
       createdAt: now,
@@ -391,6 +449,9 @@ export const review = mutation({
       reviewedBy: args.reviewedBy,
       reviewedAt: now,
       createdVariableId: variableId,
+      // Reflect the environments that were actually approved so the UI shows
+      // the final set (whether or not the reviewer overrode the request).
+      environments: approvedEnvironments,
       updatedAt: now,
     });
 
@@ -405,6 +466,8 @@ export const review = mutation({
         key: request.key,
         requesterId: request.requestedBy,
         reviewReason: args.reviewReason,
+        requestedEnvironments: request.environments,
+        approvedEnvironments,
       },
       resourceType: "variable",
       involvesSensitiveData: request.isSensitive,
@@ -418,7 +481,7 @@ export const review = mutation({
       action: "variable.created",
       details: {
         key: request.key,
-        environments: request.environments,
+        environments: approvedEnvironments,
         source: "request_approval",
         requestId: args.requestId,
       },

@@ -9,6 +9,11 @@ import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 const updateRequestSchema = z.object({
   action: z.enum(["approve", "reject", "cancel"]),
   reviewReason: z.string().max(500).optional(),
+  // Reviewer's environment override — only meaningful for action "approve".
+  environments: z
+    .array(z.enum(["development", "staging", "production"]))
+    .min(1)
+    .optional(),
 });
 
 interface RouteContext {
@@ -38,7 +43,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const { action, reviewReason } = validation.data;
+    const { action, reviewReason, environments } = validation.data;
     const convexUser = await getOrCreateConvexUser(convex, user);
     const requestId = id as Id<"environmentVariableRequests">;
 
@@ -65,6 +70,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         reviewedBy: convexUser._id,
         action,
         reviewReason,
+        environments: action === "approve" ? environments : undefined,
       });
     }
 

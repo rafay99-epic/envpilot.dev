@@ -14,7 +14,10 @@ import type {
   User,
   TierInfo,
   UsageInfo,
+  VariableRequest,
+  VariableRequestStatus,
 } from "../types/index.js";
+import type { CreateVariableRequestBody } from "./variable-requests.js";
 
 /**
  * Return the registrable domain (eTLD+1 approximation) for a hostname.
@@ -615,6 +618,38 @@ export class APIClient {
     organizationId?: string;
   }): Promise<{ created: number; updated: number; deleted: number }> {
     return this.post("/api/cli/variables/bulk", data);
+  }
+
+  /**
+   * Submit a variable request (developers only — owners/PMs/team leads
+   * create variables directly and get a 403 from the server here).
+   */
+  async createVariableRequest(
+    data: CreateVariableRequestBody
+  ): Promise<VariableRequest> {
+    const response = await this.post<ApiResponse<{ request: VariableRequest }>>(
+      "/api/cli/variable-requests",
+      data
+    );
+    if (!response.data) {
+      throw new APIError("No variable request returned by server", 500);
+    }
+    return response.data.request;
+  }
+
+  /**
+   * List variable requests for a project, optionally filtered by status.
+   */
+  async listVariableRequests(
+    projectId: string,
+    status?: VariableRequestStatus
+  ): Promise<VariableRequest[]> {
+    const params: Record<string, string> = { projectId };
+    if (status) params.status = status;
+    const response = await this.get<
+      ApiResponse<{ requests: VariableRequest[] }>
+    >("/api/cli/variable-requests", params);
+    return response.data?.requests ?? [];
   }
 
   // ============================================
