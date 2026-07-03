@@ -34,6 +34,8 @@ interface CreateShareParams {
 interface CreateShareResponse {
   token: string;
   shareId: string;
+  /** Recipients whose notification email failed to send (share still valid). */
+  emailsFailed?: string[];
 }
 
 interface VerifyEmailParams {

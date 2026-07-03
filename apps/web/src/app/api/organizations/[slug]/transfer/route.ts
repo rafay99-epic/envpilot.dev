@@ -5,8 +5,11 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { createLogger } from "@/lib/logger";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { handleApiError } from "@/lib/api-errors";
+
+const log = createLogger("api/organizations/transfer");
 
 const transferSchema = z.object({
   targetUserEmail: z.string().email("A valid email address is required"),
@@ -98,8 +101,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         orgSlug: slug,
       });
     } catch (emailErr) {
-      console.warn(
-        "[EMAIL] Failed to send transfer email to new owner:",
+      log.error(
+        "org_transfer_email_failed",
+        { organizationId, targetUserEmail },
         emailErr
       );
     }
@@ -113,8 +117,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         orgSlug: slug,
       });
     } catch (emailErr) {
-      console.warn(
-        "[EMAIL] Failed to send transfer confirmation to previous owner:",
+      log.error(
+        "org_transfer_confirmation_email_failed",
+        { organizationId, previousOwnerEmail: user.email },
         emailErr
       );
     }

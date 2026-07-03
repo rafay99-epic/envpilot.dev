@@ -861,7 +861,13 @@ export const revokeShare = mutation({
           share.organizationId,
           "team_lead"
         );
-      } catch {
+      } catch (err) {
+        console.error("sharedSecrets.revokeShare.denied", {
+          shareId: args.shareId,
+          userId: args.userId,
+          organizationId: share.organizationId,
+          error: String(err),
+        });
         throw new Error("Not authorized to revoke this share.");
       }
     }

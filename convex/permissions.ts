@@ -159,7 +159,13 @@ async function checkCanManagePermissions(
         userId,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("permissions.checkCanManagePermissions.denied", {
+      variableId,
+      userId,
+      projectId: variable.projectId,
+      error: String(err),
+    });
     return {
       canManage: false,
       reason:
@@ -466,7 +472,13 @@ export const getAssignableMembers = query({
         "project:manage_permissions"
       );
       requesterRole = auth.orgRole;
-    } catch {
+    } catch (err) {
+      console.error("permissions.getAssignableMembers.denied", {
+        variableId: args.variableId,
+        requestingUserId: args.requestingUserId,
+        projectId: variable.projectId,
+        error: String(err),
+      });
       return [];
     }
 
@@ -976,7 +988,13 @@ export const bulkGrant = mutation({
             targetMembership.role,
             "grant variable permissions"
           );
-        } catch {
+        } catch (err) {
+          console.error("permissions.bulkGrant.targetSkipped", {
+            variableId: args.variableId,
+            targetUserId: userId,
+            grantedBy: args.grantedBy,
+            error: String(err),
+          });
           skippedIds.push(userId);
           continue;
         }

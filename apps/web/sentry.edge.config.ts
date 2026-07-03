@@ -4,7 +4,11 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-const sentryEnabled = process.env.NODE_ENV !== "development";
+// Sentry is off in local dev by default. Set NEXT_PUBLIC_SENTRY_ENABLE_DEV=true
+// in .env.local to opt in locally (useful for verifying capture end to end).
+const sentryEnabled =
+  process.env.NODE_ENV !== "development" ||
+  process.env.NEXT_PUBLIC_SENTRY_ENABLE_DEV === "true";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,

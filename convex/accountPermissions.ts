@@ -152,7 +152,13 @@ async function checkCanManagePermissions(
         userId,
       },
     };
-  } catch {
+  } catch (err) {
+    console.error("accountPermissions.checkCanManagePermissions.denied", {
+      accountId,
+      userId,
+      projectId: account.projectId,
+      error: String(err),
+    });
     return {
       canManage: false,
       reason:
@@ -290,7 +296,13 @@ export const getAssignableMembers = query({
         "project:manage_account_permissions"
       );
       requesterRole = auth.orgRole;
-    } catch {
+    } catch (err) {
+      console.error("accountPermissions.getAssignableMembers.denied", {
+        accountId: args.accountId,
+        requestingUserId: args.requestingUserId,
+        projectId: account.projectId,
+        error: String(err),
+      });
       return [];
     }
 

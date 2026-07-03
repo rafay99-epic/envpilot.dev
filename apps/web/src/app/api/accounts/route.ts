@@ -1,5 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -114,13 +115,14 @@ export async function POST(request: Request) {
     } catch (mutationError) {
       // Best-effort cleanup: the Convex insert failed after the Vault write
       // succeeded, so remove the now-orphaned encrypted credentials.
+      // (Same pattern as shares/[token]/revoke's best-effort vault delete.)
       try {
         await deleteSecret(vaultRef);
       } catch (cleanupError) {
-        console.warn(
-          "[POST /api/accounts] Failed to clean up orphaned vault secret:",
-          cleanupError
-        );
+        Sentry.captureException(cleanupError, {
+          tags: { source: "account-vault", action: "create-rollback" },
+          extra: { vaultRef, organizationId, projectId },
+        });
       }
       throw mutationError;
     }

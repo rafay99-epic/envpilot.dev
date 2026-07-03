@@ -443,7 +443,12 @@ export const listSensitiveDataAccess = query({
         try {
           const details = log.details ? JSON.parse(log.details) : {};
           if (!details.isSensitive) return false;
-        } catch {
+        } catch (err) {
+          console.error("auditLogs.getSensitiveAccessLogs.parseDetailsFailed", {
+            auditLogId: log._id,
+            organizationId: args.organizationId,
+            error: String(err),
+          });
           return false;
         }
       }
@@ -577,8 +582,12 @@ export const listPermissionChanges = query({
                   }
                 : null;
             }
-          } catch {
-            // Ignore parse errors
+          } catch (err) {
+            console.error("auditLogs.listWithDetails.parseTargetUserFailed", {
+              auditLogId: log._id,
+              error: String(err),
+            });
+            // Ignore parse errors — targetUserInfo stays null
           }
         }
 
@@ -949,7 +958,11 @@ export const getForExport = query({
         return typeof parsed?.variableKey === "string"
           ? parsed.variableKey
           : null;
-      } catch {
+      } catch (err) {
+        console.error("auditLogs.exportLogs.parseVariableKeyFailed", {
+          field: "details.variableKey",
+          error: String(err),
+        });
         return null;
       }
     };

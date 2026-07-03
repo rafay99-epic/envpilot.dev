@@ -1,6 +1,7 @@
 import { Polar } from "@polar-sh/sdk";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
@@ -129,6 +130,10 @@ export async function GET(req: Request) {
       polarCustomerId = newCustomer.id;
     } catch (createErr) {
       console.error("Failed to create Polar customer:", createErr);
+      Sentry.captureException(createErr, {
+        tags: { source: "checkout", action: "create-customer" },
+        extra: { userId: convexUser._id, email: user.email },
+      });
       // If customer creation fails with conflict (email already exists),
       // try listing customers by email as a fallback
       try {
@@ -144,6 +149,10 @@ export async function GET(req: Request) {
         }
       } catch (listErr) {
         console.error("Failed to list Polar customers:", listErr);
+        Sentry.captureException(listErr, {
+          tags: { source: "checkout", action: "list-customer-fallback" },
+          extra: { userId: convexUser._id, email: user.email },
+        });
       }
     }
   }
@@ -178,6 +187,10 @@ export async function GET(req: Request) {
     return NextResponse.redirect(result.url);
   } catch (error) {
     console.error("Polar checkout error:", error);
+    Sentry.captureException(error, {
+      tags: { source: "checkout", action: "create-checkout" },
+      extra: { userId: convexUser._id, products },
+    });
 
     // User-friendly error page redirect instead of raw JSON error
     const errorMessage =

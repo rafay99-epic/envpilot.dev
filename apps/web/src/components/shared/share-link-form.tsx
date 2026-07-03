@@ -81,6 +81,7 @@ export function ShareLinkForm({
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailsFailed, setEmailsFailed] = useState<string[]>([]);
 
   const handleAddEmail = () => {
     const trimmed = emailInput.trim().toLowerCase();
@@ -139,6 +140,7 @@ export function ShareLinkForm({
       } as Parameters<typeof createShare.mutateAsync>[0]);
 
       const origin = window.location.origin;
+      setEmailsFailed(result.emailsFailed ?? []);
       setGeneratedUrl(
         `${origin}/s/${result.token}#${clientKeyToBase64Url(clientKey)}`
       );
@@ -180,13 +182,38 @@ export function ShareLinkForm({
   if (generatedUrl) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
-          <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-          <span className="text-sm font-medium text-green-700 dark:text-green-400">
-            Share link created and sent to {emails.length} recipient
-            {emails.length === 1 ? "" : "s"}
-          </span>
-        </div>
+        {(() => {
+          const sentCount = emails.length - emailsFailed.length;
+          return (
+            <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
+              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                {sentCount > 0
+                  ? `Share link created and sent to ${sentCount} recipient${
+                      sentCount === 1 ? "" : "s"
+                    }`
+                  : "Share link created"}
+              </span>
+            </div>
+          );
+        })()}
+
+        {emailsFailed.length > 0 && (
+          <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-900/20">
+            <Mail className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-xs text-amber-700 dark:text-amber-400">
+              <p className="font-medium">
+                Notification email could not be delivered to{" "}
+                {emailsFailed.length} recipient
+                {emailsFailed.length === 1 ? "" : "s"}.
+              </p>
+              <p className="mt-0.5 break-words">
+                {emailsFailed.join(", ")} — the share link above is still valid;
+                send it to them directly.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">

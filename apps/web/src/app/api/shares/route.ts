@@ -111,8 +111,11 @@ export async function POST(request: Request) {
     }
     const shareUrl = `${baseUrl}/s/${token}#${data.clientKeyBase64Url}`;
 
-    // Send notification emails to all recipients (best-effort, don't fail the request)
+    // Send notification emails to all recipients (best-effort, don't fail the
+    // request). Track which recipients we couldn't reach so the client can warn
+    // the creator — the share itself is already created and valid regardless.
     const senderName = convexUser.name || convexUser.email;
+    const emailsFailed: string[] = [];
     for (const email of data.recipientEmails) {
       try {
         await sendShareNotificationEmail({
@@ -125,6 +128,7 @@ export async function POST(request: Request) {
           resourceType: data.resourceType,
         });
       } catch (emailErr) {
+        emailsFailed.push(email);
         Sentry.captureException(emailErr, {
           tags: { source: "share-email", action: "notification" },
           extra: { recipientEmail: email, token },
@@ -135,6 +139,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       token,
       shareId: result.shareId,
+      emailsFailed,
     });
   } catch (error) {
     return handleApiError(error, "Failed to create share");

@@ -7,9 +7,12 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { createLogger } from "@/lib/logger";
 import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
 import { resolveLegacyRoles } from "../_lib/legacy-roles";
+
+const log = createLogger("api/extension/variables");
 
 /**
  * GET /api/extension/variables - List variables for a project (with decrypted values)
@@ -220,7 +223,12 @@ export async function GET(request: Request) {
               ? "write"
               : variable.permission) as "read" | "write",
           };
-        } catch {
+        } catch (decryptErr) {
+          log.error(
+            "variable_decrypt_failed",
+            { variableId: variable._id, key: variable.key, projectId },
+            decryptErr
+          );
           return {
             _id: variable._id,
             key: variable.key,
