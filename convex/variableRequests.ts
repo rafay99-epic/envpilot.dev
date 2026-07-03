@@ -197,6 +197,159 @@ export const getById = query({
   },
 });
 
+/**
+ * Org-wide "incoming variable requests" feed for reviewers/approvers.
+ *
+ * FREE-TIER READ COST (worst case, bounded and predictable):
+ *   1  membership check      — assertOrgMembership (indexed .first)
+ * + 1  memberships list      — projectMembers by_user .collect (owners skip this)
+ * + 1  indexed take(100)     — environmentVariableRequests by_organization_and_status
+ * + U  unique doc gets       — one ctx.db.get per DISTINCT requester + project
+ * Developers short-circuit to [] after the single membership read (they are
+ * never reviewers), and no request row is fetched more than once. We never
+ * call an assert/permission helper per request row (that would be N reads) —
+ * project scoping is done in memory against a Set built from ONE memberships
+ * query.
+ */
+export const listForReviewer = query({
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("canceled")
+      )
+    ),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("environmentVariableRequests"),
+      _creationTime: v.number(),
+      key: v.string(),
+      description: v.optional(v.string()),
+      environments: v.array(v.string()),
+      projectId: v.id("projects"),
+      organizationId: v.id("organizations"),
+      isSensitive: v.boolean(),
+      requestedBy: v.id("users"),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("canceled")
+      ),
+      reviewReason: v.optional(v.string()),
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      createdVariableId: v.optional(v.id("environmentVariables")),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      // Joined, deduped fields (vaultRef intentionally stripped).
+      requester: v.union(
+        v.object({
+          _id: v.id("users"),
+          email: v.string(),
+          name: v.optional(v.string()),
+        }),
+        v.null()
+      ),
+      projectName: v.string(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const status = args.status ?? "pending";
+
+    // 1 read: caller must be an org member. Returns the NORMALIZED role.
+    const { membership } = await assertOrgMembership(
+      ctx,
+      args.userId,
+      args.organizationId
+    );
+
+    // Developers are never reviewers — bail before touching the request table.
+    if (membership.role === "developer") {
+      return [];
+    }
+
+    // 1 read: newest-first, org + resolved status, hard-capped at 100 rows.
+    // Never .collect() here — an org could accumulate unbounded history.
+    const requests = await ctx.db
+      .query("environmentVariableRequests")
+      .withIndex("by_organization_and_status", (q) =>
+        q.eq("organizationId", args.organizationId).eq("status", status)
+      )
+      .order("desc")
+      .take(100);
+
+    // Reviewer scoping. Owners see every org request. project_manager /
+    // team_lead only see requests from projects they are ASSIGNED to. Fetch
+    // the caller's project memberships ONCE and build a Set of allowed
+    // projectIds, then filter in memory — NOT one assertProjectAction per row.
+    let scopedRequests = requests;
+    if (membership.role !== "owner") {
+      const memberships = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      const allowedProjectIds = new Set(memberships.map((m) => m.projectId));
+      scopedRequests = requests.filter((request) =>
+        allowedProjectIds.has(request.projectId)
+      );
+    }
+
+    // Joins without N+1 on duplicates: dedupe requester + project ids, then
+    // ctx.db.get each UNIQUE id exactly once.
+    const uniqueUserIds = [
+      ...new Set(scopedRequests.map((request) => request.requestedBy)),
+    ];
+    const uniqueProjectIds = [
+      ...new Set(scopedRequests.map((request) => request.projectId)),
+    ];
+
+    const [users, projects] = await Promise.all([
+      Promise.all(uniqueUserIds.map((id) => ctx.db.get(id))),
+      Promise.all(uniqueProjectIds.map((id) => ctx.db.get(id))),
+    ]);
+
+    const userById = new Map(
+      users
+        .filter((user): user is NonNullable<typeof user> => user !== null)
+        .map((user) => [user._id, user])
+    );
+    const projectById = new Map(
+      projects
+        .filter(
+          (project): project is NonNullable<typeof project> => project !== null
+        )
+        .map((project) => [project._id, project])
+    );
+
+    return scopedRequests.map((request) => {
+      const requester = userById.get(request.requestedBy) ?? null;
+      const project = projectById.get(request.projectId) ?? null;
+
+      // Strip vaultRef — the proposed secret ref is fetched only through a
+      // separate authorized route, never returned to the approvals list.
+      const { vaultRef: _vaultRef, ...rest } = request;
+
+      return {
+        ...rest,
+        requester: requester
+          ? {
+              _id: requester._id,
+              email: requester.email,
+              name: requester.name,
+            }
+          : null,
+        projectName: project?.name ?? "Unknown project",
+      };
+    });
+  },
+});
+
 export const create = mutation({
   args: {
     key: v.string(),

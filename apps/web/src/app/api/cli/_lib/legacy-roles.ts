@@ -120,7 +120,7 @@ export async function resolveLegacyRoles(
  */
 export function isAuthorizationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /not authorized|insufficient permission|permission denied|forbidden|no write (access|permission)/i.test(
+  return /not authorized|insufficient permission|permission denied|forbidden|access is limited|no write (access|permission)/i.test(
     message
   );
 }

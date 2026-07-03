@@ -37,9 +37,7 @@ import {
   ImportDialog,
   ShareSecretDrawer,
   TagFilter,
-  ApproveRequestDialog,
   type VariableFormData,
-  type ApproveRequestData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
@@ -75,13 +73,6 @@ interface Variable {
   expiresAt?: number;
   rotationStatus?: "active" | "expiring_soon" | "expired";
   tagIds?: string[];
-}
-
-interface PendingRequestSummary {
-  _id: Id<"environmentVariableRequests">;
-  key: string;
-  environments: string[];
-  requester?: { name?: string; email?: string } | null;
 }
 
 interface VersionRecord {
@@ -212,9 +203,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [deletingVariable, setDeletingVariable] = useState<Variable | null>(
     null
   );
-  const [approvingRequest, setApprovingRequest] =
-    useState<PendingRequestSummary | null>(null);
-
   // Share drawer state
   const [sharingVariable, setSharingVariable] = useState<Variable | null>(null);
 
@@ -466,43 +454,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       setError(
         err instanceof Error ? err.message : `Failed to ${action} request`
       );
-    }
-  };
-
-  // Separate from updateRequestStatus (reject/cancel) so a failure keeps the
-  // ApproveRequestDialog open — rethrowing lets ApproveRequestDialog's own
-  // try/catch (see ConfirmDialog convention) skip its auto-close on error.
-  const handleApproveRequest = async (data: ApproveRequestData) => {
-    if (!approvingRequest || !projectId || !convexUserId) return;
-    setNotice(null);
-    setError(null);
-    try {
-      await resolveRequest.mutateAsync({
-        requestId: approvingRequest._id,
-        action: "approve",
-        reviewedBy: convexUserId as string,
-        reviewReason: data.reviewReason,
-        environments: data.environments,
-      });
-
-      setNotice("Request approved and variable created.");
-      setApprovingRequest(null);
-    } catch (err) {
-      log.error(
-        "project_request_resolution_failed",
-        {
-          projectId,
-          requestId: approvingRequest._id,
-          action: "approve",
-          reviewedBy: convexUserId,
-          organizationId: organization?.id,
-        },
-        err
-      );
-      setError(
-        err instanceof Error ? err.message : "Failed to approve request"
-      );
-      throw err;
     }
   };
 
@@ -977,32 +928,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {canReviewRequests && request.status === "pending" && (
-                          <>
-                            <button
-                              onClick={() =>
-                                setApprovingRequest({
-                                  _id: request._id as Id<"environmentVariableRequests">,
-                                  key: request.key,
-                                  environments: request.environments ?? [],
-                                  requester: request.requester,
-                                })
-                              }
-                              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() =>
-                                updateRequestStatus(
-                                  request._id as Id<"environmentVariableRequests">,
-                                  "reject"
-                                )
-                              }
-                              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
-                            >
-                              Reject
-                            </button>
-                          </>
+                          <Link
+                            href="/dashboard/requests"
+                            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          >
+                            Review →
+                          </Link>
                         )}
                         {!canReviewRequests &&
                           convexUserId &&
@@ -1041,19 +972,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           )}
         </div>
       </div>
-
-      <ApproveRequestDialog
-        isOpen={!!approvingRequest}
-        onClose={() => setApprovingRequest(null)}
-        onConfirm={handleApproveRequest}
-        requestKey={approvingRequest?.key ?? ""}
-        requesterLabel={
-          approvingRequest?.requester?.name ??
-          approvingRequest?.requester?.email ??
-          "Unknown"
-        }
-        requestedEnvironments={approvingRequest?.environments ?? []}
-      />
 
       <VariableCreateDrawer
         isOpen={showCreateModal}

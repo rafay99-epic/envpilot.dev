@@ -192,10 +192,14 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("CLI create variable request error:", error);
-    const message =
+    const rawMessage =
       error instanceof Error
         ? error.message
         : "Failed to create variable request";
+    // Convex wraps thrown errors as "[Request ID: …] Server Error\nUncaught
+    // Error: <real message>\n at …" — surface only the real message.
+    const message =
+      rawMessage.match(/Uncaught Error: ([^\n]+)/)?.[1] ?? rawMessage;
     if (
       message.includes("already exists") ||
       message.includes("pending request")
@@ -203,11 +207,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
     // The Convex mutation is the source of truth for authorization —
-    // translate its rejections into the standard FORBIDDEN response.
+    // translate its rejections into the standard FORBIDDEN response. Pass the
+    // real message through: scope errors ("Your access is limited to these
+    // environments: …") tell the developer exactly what to change.
     if (isAuthorizationError(error)) {
-      return forbiddenResponse(
-        "You do not have permission to request variables in this project"
-      );
+      return forbiddenResponse(message);
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

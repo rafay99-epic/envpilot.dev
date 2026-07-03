@@ -11,6 +11,7 @@ import {
   Key,
   Share2,
   Users,
+  Inbox,
   ClipboardList,
   BarChart3,
   Gauge,
@@ -117,6 +118,16 @@ export function DashboardNav() {
       label: "Projects",
       icon: <FolderOpen className="h-4 w-4" />,
     },
+    // Variable request review is team_lead+ (reviewers: owner / PM / team lead)
+    ...(isTeamLeadPlus
+      ? [
+          {
+            href: "/dashboard/requests",
+            label: "Requests",
+            icon: <Inbox className="h-4 w-4" />,
+          },
+        ]
+      : []),
     // Team management is team_lead+ (developers cannot invite or manage anyone)
     ...(isTeamLeadPlus
       ? [
