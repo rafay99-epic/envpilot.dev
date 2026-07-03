@@ -17,9 +17,13 @@ export class RequestVariableDialog {
   /**
    * Show the variable request dialog and collect all inputs.
    * Returns undefined if the user cancels at any step.
+   *
+   * `allowedEnvironments` limits the environment picker for scoped
+   * developers (e.g. ["development"]); omitted = all environments.
    */
   async showRequestDialog(
-    projectId: string
+    projectId: string,
+    allowedEnvironments?: string[]
   ): Promise<VariableRequestInput | undefined> {
     // Step 1: Key name
     const key = await vscode.window.showInputBox({
@@ -70,16 +74,29 @@ export class RequestVariableDialog {
       return undefined; // User pressed Escape
     }
 
-    // Step 4: Environment selection
+    // Step 4: Environment selection — limited to the developer's permitted
+    // environments when they are scoped (server enforces this regardless).
+    const allEnvChoices = [
+      { label: "Development", value: "development" },
+      { label: "Staging", value: "staging" },
+      { label: "Production", value: "production" },
+    ];
+    const envChoices = allowedEnvironments
+      ? allEnvChoices.filter((c) => allowedEnvironments.includes(c.value))
+      : allEnvChoices;
+    if (envChoices.length === 0) {
+      vscode.window.showWarningMessage(
+        "You don't have access to any environments in this project."
+      );
+      return undefined;
+    }
     const envItems = await vscode.window.showQuickPick(
-      [
-        { label: "Development", value: "development", picked: true },
-        { label: "Staging", value: "staging" },
-        { label: "Production", value: "production" },
-      ],
+      envChoices.map((c, i) => ({ ...c, picked: i === 0 })),
       {
         title: "Request Variable (4/5) - Environments",
-        placeHolder: "Select environments for this variable",
+        placeHolder: allowedEnvironments
+          ? "Select environments (limited to your access)"
+          : "Select environments for this variable",
         canPickMany: true,
       }
     );

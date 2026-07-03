@@ -233,7 +233,7 @@
         },
         {
           "command": "envpilot.requestVariable",
-          "when": "view == envpilot.variables && envpilot.isAuthenticated && envpilot.userRole == member",
+          "when": "view == envpilot.variables && envpilot.isAuthenticated && envpilot.isDeveloper",
           "group": "navigation@3"
         }
       ],

@@ -29,7 +29,8 @@ import {
   isCommitGuardEnabled,
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
-import { roleLevel, ROLE_LEVEL } from "./roles";
+import { envFileNamesFor } from "./utils/envFiles";
+import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
 import * as output from "./utils/outputChannel";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -89,6 +90,14 @@ async function updateContextFlags(): Promise<void> {
       "setContext",
       "envpilot.projectRole",
       projectRole || ""
+    );
+    // Normalized flag for menu when-clauses: works whether the server sends
+    // legacy ("member") or unified ("developer") role names.
+    const meta = apiService.getAccessMeta(firstProject.projectId);
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.isDeveloper",
+      normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
     );
   }
 }
@@ -496,7 +505,11 @@ async function handleSwitchAccount(): Promise<void> {
 
   items.push(
     { label: "", kind: vscode.QuickPickItemKind.Separator },
-    { label: ADD_ACCOUNT, description: "Sign in to another account", isAdd: true }
+    {
+      label: ADD_ACCOUNT,
+      description: "Sign in to another account",
+      isAdd: true,
+    }
   );
 
   const picked = await vscode.window.showQuickPick(items, {
@@ -983,18 +996,31 @@ async function handleRequestVariable(): Promise<void> {
     linkedProject = pick.project;
   }
 
-  // Check role — only members should use this
-  const role = apiService.getUserRole(linkedProject.projectId);
-  if (role && role !== "member") {
+  // Check role — only developers request; everyone else creates directly.
+  // Prefer the authoritative unified meta from the last variables response;
+  // normalizeOrgRole maps legacy "member" → "developer" transparently.
+  const meta = apiService.getAccessMeta(linkedProject.projectId);
+  const role = normalizeOrgRole(
+    meta?.unifiedRole ?? apiService.getUserRole(linkedProject.projectId)
+  );
+  if (role !== "developer") {
     vscode.window.showInformationMessage(
-      "As an admin or team lead, you can create variables directly on the dashboard."
+      "As an owner, project manager, or team lead you can create variables directly on the dashboard."
     );
     return;
   }
 
+  // A scoped developer may only request environments inside their scope —
+  // the server enforces this too; filtering here just prevents a doomed pick.
+  const environmentScope =
+    meta?.environmentScope && meta.environmentScope.length > 0
+      ? meta.environmentScope
+      : undefined;
+
   // Show the request dialog
   const input = await requestVariableDialog.showRequestDialog(
-    linkedProject.projectId
+    linkedProject.projectId,
+    environmentScope
   );
   if (!input) {
     return;
@@ -1261,9 +1287,10 @@ async function handleShowStatus(): Promise<void> {
       );
 
       for (const dir of linkedProjectV2.directories) {
+        const files = Array.from(envFileNamesFor(dir).values()).join(", ");
         items.push({
           label: `  $(folder-opened) ${dir.displayName || getDisplayPath(dir.directoryPath)}`,
-          description: `${dir.environments.join(", ")} -> ${dir.targetFile}`,
+          description: `${dir.environments.join(", ")} -> ${files}`,
         });
       }
     }
