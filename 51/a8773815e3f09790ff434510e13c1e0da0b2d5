@@ -1,0 +1,36 @@
+.github/workflows/deploy-cli.yml
+  s_79051da7be3ab6::t_1d372944732b4c 1-108
+.github/workflows/ci.yml
+  s_79051da7be3ab6::t_50f64d2557ffd5 1-128,139-447
+  s_79051da7be3ab6::t_577ce5aa695502 129-138
+.github/workflows/deploy-extension.yml
+  s_79051da7be3ab6::t_c81c4473094e24 110
+  s_79051da7be3ab6::t_79e28d7b09b28c 42-45
+  s_79051da7be3ab6::t_f003c34cc998e6 1-41,46-109,111-129
+.github/workflows/version-tracker.yml
+  s_79051da7be3ab6::t_4597848eae2ba5 202-203
+  s_79051da7be3ab6::t_ec62d01dd57c01 11-14
+  s_79051da7be3ab6::t_bb831ae01a7d93 34-40
+  s_79051da7be3ab6::t_085e1d5df11f2a 45-51
+  s_79051da7be3ab6::t_e3a7c71c2b7f81 124-125
+.github/actions/setup/action.yml
+  s_79051da7be3ab6::t_1428aed8cd65d9 1-48
+.github/workflows/deploy-convex.yml
+  s_79051da7be3ab6::t_2e9ef05fab9b0b 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "51a8773815e3f09790ff434510e13c1e0da0b2d5",
+  "prompts": {},
+  "sessions": {
+    "s_79051da7be3ab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dd1c26e1-3f19-4228-82fc-00ee357ebee9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
