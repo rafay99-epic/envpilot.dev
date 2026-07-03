@@ -113,7 +113,7 @@
         "command": "envpilot.requestVariable",
         "title": "Request Variable",
         "category": "Envpilot",
-        "icon": "$(git-pull-request-create)"
+        "icon": "$(add)"
       },
       {
         "command": "envpilot.installCommitGuard",
@@ -205,6 +205,11 @@
           "command": "envpilot.switchAccount",
           "when": "view == envpilot.projects && envpilot.isAuthenticated",
           "group": "navigation@4"
+        },
+        {
+          "command": "envpilot.requestVariable",
+          "when": "view == envpilot.projects && envpilot.isAuthenticated",
+          "group": "navigation@5"
         },
         {
           "command": "envpilot.openDashboard",
