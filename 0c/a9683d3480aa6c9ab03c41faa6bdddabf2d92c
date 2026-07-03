@@ -1,0 +1,210 @@
+convex/crons.ts
+  s_a4b2d21b333179::t_8eddd805a53793 54-60
+apps/web/src/hooks/useAccounts.ts
+  s_a4b2d21b333179::t_f43ebfc57f4e87 183-186
+  s_a4b2d21b333179::t_4fa732c7ede492 1-3,5-47,49-61,63-182,187-195
+  s_a4b2d21b333179::t_4d02129ea5ccd5 4,48,62
+apps/web/src/lib/share-emails.ts
+  s_a4b2d21b333179::t_126e7811fcfd12 35,40-45,55,72,82
+apps/web/src/hooks/index.ts
+  s_a4b2d21b333179::t_5e17ca09dfcd9d 52-67
+apps/web/src/components/dashboard/shared-secrets-widget.tsx
+  s_a4b2d21b333179::t_b9ab0a36043825 93
+  s_a4b2d21b333179::t_aff05ec6411122 67
+  s_a4b2d21b333179::t_14ba4e7290f80d 90-92,94-97
+apps/web/src/components/accounts/account-share-drawer.tsx
+  s_a4b2d21b333179::t_388c8ef7e20209 1-2,4,6-8,10-14,16-29,32-68,70,75-187,189-199,201-376,394-396,405-406
+  s_a4b2d21b333179::t_7f14d21b097876 3
+  s_a4b2d21b333179::t_be045a006266b0 5,9,15,30-31
+  s_a4b2d21b333179::t_15ebcaf2cb4d0b 69,74
+  s_a4b2d21b333179::t_4d02129ea5ccd5 188,200
+  s_a4b2d21b333179::t_6ffab18e9cd5e9 71-73
+  s_a4b2d21b333179::t_e78d1a4557c542 377-393,397-404
+convex/auditLogs.ts
+  s_a4b2d21b333179::t_39cde5a043fd33 940-942,946-956,968
+  s_a4b2d21b333179::t_44a0c5bbf5f8e1 411
+  s_a4b2d21b333179::t_b58765d7269d6d 335
+  s_a4b2d21b333179::t_02b4bf551e27cc 807-808
+  s_a4b2d21b333179::t_570fa08e053dc6 943-945
+  s_a4b2d21b333179::t_0beec4a59387d8 522-524
+convex/admin.ts
+  s_a4b2d21b333179::t_8ec9c6579d8276 1695-1696
+  s_a4b2d21b333179::t_9f4f58505186fd 1667-1668
+  s_a4b2d21b333179::t_771c54198c3634 1533-1550
+apps/web/src/components/accounts/account-form-drawer.tsx
+  s_a4b2d21b333179::t_467c3e2743a32f 7-8
+  s_a4b2d21b333179::t_4e0951fba3670e 1-2,4-6,9-95,100,109-112,114-129,131-149,151-364,367-372
+  s_a4b2d21b333179::t_979b003b1c8849 96-99,101-108,113,130
+  s_a4b2d21b333179::t_d75967c551a817 150
+  s_a4b2d21b333179::t_4d02129ea5ccd5 365-366
+  s_a4b2d21b333179::t_eb06468d7a1ba7 3
+apps/web/tests/e2e/authenticated/accounts.spec.ts
+  s_a4b2d21b333179::t_327971543eb017 1,18-30,76,99-102,106,108,141-144,146,148,169-171,193-196,207,211,219-220
+  s_a4b2d21b333179::t_e96befd2c17e7c 2-17,31-75,77-98,103-105,107,109-140,145,147,149-160,163-166,168,172-175,185-192,205-206,208-210,212-218,222-242
+  s_a4b2d21b333179::t_648d893388529b 161-162,167,176-184
+  s_a4b2d21b333179::t_418122c95d51e6 197-204
+  s_a4b2d21b333179::t_1b13f81539d2b3 221
+package.json
+  s_a4b2d21b333179::t_ed10bd1bd4bece 3
+convex/sharedSecrets.ts
+  s_a4b2d21b333179::t_fa0dbe639b854d 624-625
+  s_a4b2d21b333179::t_f96a433fe4daf8 12,17-25
+  s_a4b2d21b333179::t_21d8d4c0a9feaf 874-875
+  s_a4b2d21b333179::t_67f26fb9798e2d 1049-1051,1054,1057,1061-1063,1072
+  s_a4b2d21b333179::t_d93d48708705c2 804-805
+  s_a4b2d21b333179::t_5670a57374fd24 778-779
+  s_a4b2d21b333179::t_1689ef9066ce76 496,498
+  s_a4b2d21b333179::t_c0dcdf64779254 532
+  s_a4b2d21b333179::t_7def683fa6c235 390-399,411,414-415,417-425,436-445,454-459
+  s_a4b2d21b333179::t_3dd26b6452586c 180-321
+  s_a4b2d21b333179::t_99f659f0b2180c 1170-1171
+  s_a4b2d21b333179::t_0ea4dd2dba7dac 426-435,446-453
+  s_a4b2d21b333179::t_3ed5e6cf86d2dc 730-731
+  s_a4b2d21b333179::t_9e85d48a812661 977-979,982,987-990,999
+  s_a4b2d21b333179::t_93faede77d5ead 533
+  s_a4b2d21b333179::t_008e853d48964e 179,322-366
+  s_a4b2d21b333179::t_e1d4a2f4eb690a 26
+  s_ca0e255411c63c::t_691ddcc73db562 821
+convex/auditHelpers.ts
+  s_a4b2d21b333179::t_8590c87504671c 179-186
+  s_a4b2d21b333179::t_e2cafffa5f2422 23-24
+  s_a4b2d21b333179::t_e64545b6449fce 79-86
+apps/web/src/app/api/accounts/route.ts
+  s_a4b2d21b333179::t_61d338f8f878ac 90
+  s_a4b2d21b333179::t_b9154416ab0289 16
+  s_a4b2d21b333179::t_c35e169aed50d5 14,23
+  s_a4b2d21b333179::t_68940c9d900d53 63-64,67-70
+  s_a4b2d21b333179::t_db73fde653fbc8 1-13,15,17-22,24-62,65-66,71-89,91-143
+apps/web/src/components/accounts/account-list-item.tsx
+  s_a4b2d21b333179::t_65703191922453 170
+  s_a4b2d21b333179::t_c272971ea96011 1-12,15-74,76-84,89-169,171-306
+  s_a4b2d21b333179::t_4d02129ea5ccd5 75
+  s_a4b2d21b333179::t_20880e1d0423c3 85-88
+  s_a4b2d21b333179::t_86565a472959df 13-14
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_a4b2d21b333179::t_570fa08e053dc6 22-25
+  s_a4b2d21b333179::t_58f3080fc5dc93 49
+  s_a4b2d21b333179::t_2924c9eb2c2522 249,252-253,255
+  s_a4b2d21b333179::t_6514b35aa4711d 250-251,254
+convex/accountPermissions.ts
+  s_a4b2d21b333179::t_69549b7f7be28d 456
+  s_a4b2d21b333179::t_0fe137c2956939 1-455,457-742
+convex/accounts.ts
+  s_a4b2d21b333179::t_2359f56204b154 205-208,217-222
+  s_a4b2d21b333179::t_2ca12740fd1d92 415-416,418-419,421-422
+  s_a4b2d21b333179::t_2099836f699516 1-204,209-216,223-414,417,420,423-567
+convex/featureRegistry.ts
+  s_a4b2d21b333179::t_b47d3a3e6f2a22 372-397
+  s_a4b2d21b333179::t_bc69d2f39ac032 1144-1145
+  s_a4b2d21b333179::t_2e5c885ee25a73 1116-1117
+  s_a4b2d21b333179::t_9add2e3a3d63b0 960-977
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/accounts/page.tsx
+  s_a4b2d21b333179::t_12a49b5d50fbcc 379-386
+  s_a4b2d21b333179::t_9f6c42691bc444 446
+  s_a4b2d21b333179::t_1aacb8b1e57156 76-78
+  s_a4b2d21b333179::t_fbeec88fd96403 1-14,17-22,24-75,79-152,158-172,177-378,387-421,423-445,447-453
+  s_a4b2d21b333179::t_4d02129ea5ccd5 153-157,422
+  s_a4b2d21b333179::t_1c220a01509fab 15-16,23
+  s_a4b2d21b333179::t_b3d12b3d00cd50 173-176
+apps/web/src/lib/__tests__/share-crypto-account.test.ts
+  s_a4b2d21b333179::t_76941733d86222 23-26
+  s_a4b2d21b333179::t_1634f73bc89f9e 1-22,27-127
+apps/web/src/app/api/shares/route.ts
+  s_a4b2d21b333179::t_5b4cc5b8c21f9f 33
+  s_a4b2d21b333179::t_ba2464d7a2b96d 86-94
+  s_a4b2d21b333179::t_4fa24166228173 13-32,34-36
+  s_a4b2d21b333179::t_1bbe0b04237113 125
+convex/authHelpers.ts
+  s_a4b2d21b333179::t_db42e7e934a667 6
+  s_a4b2d21b333179::t_a8982f3c5dbf41 72-132
+CLAUDE.md
+  s_a4b2d21b333179::t_f55a49f9fb1b54 12,15
+  h_1e0ba4a9f2a4b4 11,13-14,16
+convex/authz.ts
+  s_a4b2d21b333179::t_bbcd4f14c79f4c 126-139
+  s_a4b2d21b333179::t_0a6fc514a1eaea 546-650
+convex/schema.ts
+  s_a4b2d21b333179::t_17e15154bd6c1b 1220-1231
+  s_a4b2d21b333179::t_5dba80a181d418 1264
+  s_a4b2d21b333179::t_38f47cff9e7b8e 752-753
+  s_a4b2d21b333179::t_05d9c613c2d458 717-725
+  s_a4b2d21b333179::t_23d2ceedb3f996 355-421
+apps/web/src/app/s/[token]/page.tsx
+  s_a4b2d21b333179::t_4647dc6e31c953 470-597
+  s_a4b2d21b333179::t_6b0101a0a0001f 14
+  s_a4b2d21b333179::t_b810401e6e90e8 466-469
+  s_a4b2d21b333179::t_d46e6c1cc888f6 23
+  s_a4b2d21b333179::t_e60db6d661799a 254-267
+  s_a4b2d21b333179::t_f215c4f779e7ac 43-44
+apps/web/src/app/api/accounts/[id]/route.ts
+  s_a4b2d21b333179::t_49fd21eb1b3a78 87-98,105
+  s_a4b2d21b333179::t_a80863e72e7172 1-8,10-12,15-86,99-104,106-162
+  s_a4b2d21b333179::t_9806fa4c1885f0 9,13-14
+apps/web/src/lib/__tests__/account-payload.test.ts
+  s_a4b2d21b333179::t_76941733d86222 99-101,104-106,109-111,118-123
+  s_a4b2d21b333179::t_8b40ed69d9592a 1-98,102-103,107-108,112-117,124-206
+apps/web/src/components/shared/share-link-form.tsx
+  s_a4b2d21b333179::t_ac6f26dd612226 1-198,202-374,378-393
+  s_a4b2d21b333179::t_570fa08e053dc6 199-201,375-377
+apps/web/src/components/variables/share-secret-drawer.tsx
+  s_a4b2d21b333179::t_570fa08e053dc6 60-63
+  s_a4b2d21b333179::t_500c7386538016 5,30,34-42,45-59,64-65
+apps/web/src/app/api/shares/[token]/verify-otp/route.ts
+  s_a4b2d21b333179::t_137d314560bfc1 89
+apps/web/src/components/dashboard/dashboard-nav.tsx
+  s_a4b2d21b333179::t_227452b8d828ca 189-192
+  s_a4b2d21b333179::t_b56e9b208f99c0 12
+  s_a4b2d21b333179::t_74acd382e265bd 188
+apps/web/src/components/accounts/index.ts
+  s_a4b2d21b333179::t_8b8f7b9319e2d3 1-3
+apps/web/src/lib/account-payload.ts
+  s_a4b2d21b333179::t_18bc6df9ec26f6 1-18,39-146
+  s_a4b2d21b333179::t_285dd4098da4b7 19-38
+apps/web/src/app/api/accounts/__tests__/website-url-validation.test.ts
+  s_a4b2d21b333179::t_81f76ace9880f2 7-18,20-40
+  s_a4b2d21b333179::t_307fbb0e50a7f6 1-6,19,41-107
+apps/web/src/hooks/useShareSecret.ts
+  s_a4b2d21b333179::t_87109063a4127d 18-22
+  s_a4b2d21b333179::t_e5148d5c00fd19 54
+apps/web/package.json
+  s_a4b2d21b333179::t_ed10bd1bd4bece 3
+convex/_generated/api.d.ts
+  s_28fc808f19a484::t_0d55ca3cd73880 11-12,61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "0ca9683d3480aa6c9ab03c41faa6bdddabf2d92c",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_28fc808f19a484": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a22445fc51e3455ae",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_a4b2d21b333179": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9525c4e-bb6e-4416-a0b5-14b910d032b2",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_ca0e255411c63c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ace151334788e5070",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
