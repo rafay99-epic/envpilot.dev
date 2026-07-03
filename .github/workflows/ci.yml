@@ -1,0 +1,445 @@
+name: CI
+
+# Orchestrator pipeline:
+#   changes (path detection) → parallel scoped checks → checks-passed gate
+#   → artifact builds → deploys (main only, via reusable workflows) → release
+#
+# Web + Admin are deployed by Vercel's GitHub integration — CI only verifies
+# them. Build artifacts (CLI tarball, VSIX) are available in the run's
+# Artifacts panel; nothing is commented on PRs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Literal stubs (not secrets) so PR/fork builds compile without credentials.
+  CI: true
+  NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+  WORKOS_CLIENT_ID: ci-workos-client-id
+  WORKOS_API_KEY: ci-workos-api-key
+  WORKOS_COOKIE_PASSWORD: "01234567890123456789012345678901"
+  WORKOS_REDIRECT_URI: http://localhost:3000/callback
+  POLAR_ACCESS_TOKEN: pat_placeholder
+  POLAR_WEBHOOK_SECRET: whsec_placeholder
+  POLAR_SERVER: sandbox
+  RESEND_API_KEY: re_placeholder
+  ENVPILOT_SERVER_URL: https://www.envpilot.dev
+
+jobs:
+  # ------------------------------------------------------------------
+  # Stage 0: what changed?
+  # ------------------------------------------------------------------
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run_web: ${{ steps.flags.outputs.run_web }}
+      run_admin: ${{ steps.flags.outputs.run_admin }}
+      run_cli: ${{ steps.flags.outputs.run_cli }}
+      run_extension: ${{ steps.flags.outputs.run_extension }}
+      run_convex: ${{ steps.flags.outputs.run_convex }}
+      deploy_convex: ${{ steps.flags.outputs.deploy_convex }}
+      any: ${{ steps.flags.outputs.any }}
+      root_version: ${{ steps.versions.outputs.root }}
+      web_version: ${{ steps.versions.outputs.web }}
+      admin_version: ${{ steps.versions.outputs.admin }}
+      cli_version: ${{ steps.versions.outputs.cli }}
+      ext_version: ${{ steps.versions.outputs.extension }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+            admin:
+              - 'apps/admin/**'
+            cli:
+              - 'apps/cli/**'
+            extension:
+              - 'apps/vscode-extension/**'
+            convex:
+              - 'convex/**'
+            shared:
+              - 'package.json'
+              - 'bun.lock'
+              - 'turbo.json'
+              - 'packages/**'
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - '.prettierignore'
+
+      - name: Compute run flags
+        id: flags
+        env:
+          WEB: ${{ steps.filter.outputs.web }}
+          ADMIN: ${{ steps.filter.outputs.admin }}
+          CLI: ${{ steps.filter.outputs.cli }}
+          EXTENSION: ${{ steps.filter.outputs.extension }}
+          CONVEX: ${{ steps.filter.outputs.convex }}
+          SHARED: ${{ steps.filter.outputs.shared }}
+        run: |
+          bool() { if [ "$1" = "true" ] || [ "$2" = "true" ]; then echo true; else echo false; fi; }
+
+          run_web=$(bool "$WEB" "$SHARED")
+          run_admin=$(bool "$ADMIN" "$SHARED")
+          run_cli=$(bool "$CLI" "$SHARED")
+          run_extension=$(bool "$EXTENSION" "$SHARED")
+          # Shared changes (lockfile, configs) can break convex typecheck,
+          # so they re-run the convex CHECK — but only convex/** changes
+          # trigger a convex DEPLOY.
+          run_convex=$(bool "$CONVEX" "$SHARED")
+          deploy_convex="$CONVEX"
+
+          any=false
+          for f in "$run_web" "$run_admin" "$run_cli" "$run_extension" "$run_convex"; do
+            [ "$f" = "true" ] && any=true
+          done
+
+          {
+            echo "run_web=$run_web"
+            echo "run_admin=$run_admin"
+            echo "run_cli=$run_cli"
+            echo "run_extension=$run_extension"
+            echo "run_convex=$run_convex"
+            echo "deploy_convex=$deploy_convex"
+            echo "any=$any"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Change detection"
+            echo "| Surface | Check | Deploy |"
+            echo "|---------|-------|--------|"
+            echo "| Web | $run_web | Vercel |"
+            echo "| Admin | $run_admin | Vercel |"
+            echo "| CLI | $run_cli | $run_cli |"
+            echo "| Extension | $run_extension | $run_extension |"
+            echo "| Convex | $run_convex | $deploy_convex |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Read package versions
+        id: versions
+        run: |
+          {
+            echo "root=$(jq -r '.version' package.json)"
+            echo "web=$(jq -r '.version' apps/web/package.json)"
+            echo "admin=$(jq -r '.version' apps/admin/package.json)"
+            echo "cli=$(jq -r '.version' apps/cli/package.json)"
+            echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+          } >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------
+  # Stage 1: quality checks — parallel, scoped to what changed
+  # ------------------------------------------------------------------
+  format:
+    name: Format check
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Prettier check
+        run: bunx prettier --check .
+
+  check-web:
+    name: Check web
+    needs: changes
+    if: needs.changes.outputs.run_web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck web
+        run: bunx turbo build lint typecheck --filter=@envpilot/web
+
+  check-admin:
+    name: Check admin
+    needs: changes
+    if: needs.changes.outputs.run_admin == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck admin
+        run: bunx turbo build lint typecheck --filter=@envpilot/admin
+
+  check-cli:
+    name: Check CLI
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck, test CLI
+        run: bunx turbo build lint typecheck test --filter=@envpilot/cli
+
+  check-extension:
+    name: Check extension
+    needs: changes
+    if: needs.changes.outputs.run_extension == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck, test extension
+        run: bunx turbo build lint typecheck test --filter=envpilot
+
+  check-convex:
+    name: Check Convex
+    needs: changes
+    if: needs.changes.outputs.run_convex == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Typecheck Convex functions
+        # CI config adds Node type roots so process.env usage resolves without
+        # a Convex deployment. See convex/tsconfig.ci.json.
+        run: bunx tsc --noEmit -p convex/tsconfig.ci.json
+
+  react-doctor:
+    name: React Doctor (advisory)
+    needs: changes
+    if: needs.changes.outputs.run_web == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run react-doctor
+        run: bunx -y react-doctor@latest apps/web --yes --offline --fail-on none --score
+
+  # ------------------------------------------------------------------
+  # Stage 2: the gate — the single required status check
+  # ------------------------------------------------------------------
+  checks-passed:
+    name: All checks passed
+    needs:
+      - changes
+      - format
+      - check-web
+      - check-admin
+      - check-cli
+      - check-extension
+      - check-convex
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no check failed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq .
+          if echo "$RESULTS" | jq -e '[.[] | select(.result == "failure" or .result == "cancelled")] | length > 0' > /dev/null; then
+            echo "::error::One or more checks failed."
+            exit 1
+          fi
+          echo "All required checks passed (skipped = not applicable)."
+
+  # ------------------------------------------------------------------
+  # Stage 3: artifact builds — only after every check is green
+  # ------------------------------------------------------------------
+  build-cli:
+    name: Build CLI tarball
+    needs: [changes, checks-passed]
+    if: needs.changes.outputs.run_cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build CLI
+        run: bunx turbo build --filter=@envpilot/cli
+      - name: Pack CLI tarball
+        working-directory: apps/cli
+        run: npm pack
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: envpilot-cli-${{ github.sha }}
+          path: apps/cli/*.tgz
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+  build-extension:
+    name: Build VSIX
+    needs: [changes, checks-passed]
+    if: needs.changes.outputs.run_extension == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build extension
+        run: bunx turbo build --filter=envpilot
+      - name: Package VSIX
+        working-directory: apps/vscode-extension
+        run: bunx @vscode/vsce package --no-dependencies
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: envpilot-vsix-${{ github.sha }}
+          path: apps/vscode-extension/*.vsix
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+  # ------------------------------------------------------------------
+  # Stage 4: deploys — main only, fully verified, via reusable workflows
+  # ------------------------------------------------------------------
+  deploy-convex:
+    name: Deploy Convex
+    needs: [changes, checks-passed]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.deploy_convex == 'true'
+    uses: ./.github/workflows/deploy-convex.yml
+    secrets: inherit
+
+  deploy-cli:
+    name: Deploy CLI
+    needs: [changes, build-cli]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_cli == 'true'
+    uses: ./.github/workflows/deploy-cli.yml
+    with:
+      force: false
+    secrets: inherit
+    permissions:
+      contents: write
+
+  deploy-extension:
+    name: Deploy extension
+    needs: [changes, build-extension]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_extension == 'true'
+    uses: ./.github/workflows/deploy-extension.yml
+    with:
+      force: false
+    secrets: inherit
+    permissions:
+      contents: write
+
+  # ------------------------------------------------------------------
+  # Stage 5: release — aggregate tag + GitHub Release
+  # ------------------------------------------------------------------
+  release:
+    name: GitHub Release
+    needs:
+      - changes
+      - build-cli
+      - build-extension
+      - deploy-convex
+      - deploy-cli
+      - deploy-extension
+    # Skipped deploys (surface unchanged) must not block the release,
+    # so check for failure/cancelled explicitly instead of success().
+    if: |
+      always() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.any == 'true' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          TAG="v${{ needs.changes.outputs.root_version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TAG="${TAG}+$(git rev-parse --short HEAD)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_LINE=""
+          PR_NUMBER=$(git log -1 --pretty=%s | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
+          if [ -n "$PR_NUMBER" ]; then
+            PR_TITLE=$(gh pr view "$PR_NUMBER" --json title -q .title 2>/dev/null || true)
+            [ -n "$PR_TITLE" ] && PR_LINE="Merged PR: #${PR_NUMBER} — ${PR_TITLE}"
+          fi
+
+          status() {
+            case "$1" in
+              success) echo "✅ deployed" ;;
+              skipped) echo "⏭️ no changes" ;;
+              *) echo "❔ $1" ;;
+            esac
+          }
+
+          {
+            echo "## Envpilot ${{ steps.tag.outputs.tag }}"
+            echo ""
+            [ -n "$PR_LINE" ] && echo "$PR_LINE" && echo ""
+            echo "| Surface | Version | Status |"
+            echo "|---------|---------|--------|"
+            echo "| Web | ${{ needs.changes.outputs.web_version }} | 🌐 Vercel |"
+            echo "| Admin | ${{ needs.changes.outputs.admin_version }} | 🌐 Vercel |"
+            echo "| Convex | — | $(status '${{ needs.deploy-convex.result }}') |"
+            echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
+            echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
+            echo ""
+            echo "**Install:** \`npm i -g @envpilot/cli\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+          } > /tmp/release-body.md
+          cat /tmp/release-body.md
+
+      - name: Download CLI artifact
+        if: needs.changes.outputs.run_cli == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: envpilot-cli-${{ github.sha }}
+          path: release-artifacts
+
+      - name: Download VSIX artifact
+        if: needs.changes.outputs.run_extension == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: envpilot-vsix-${{ github.sha }}
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Envpilot ${{ steps.tag.outputs.tag }}
+          body_path: /tmp/release-body.md
+          generate_release_notes: true
+          files: |
+            release-artifacts/*.vsix
+            release-artifacts/*.tgz

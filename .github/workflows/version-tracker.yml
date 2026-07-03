@@ -8,6 +8,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: version-tracker-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   track-versions:
     name: Track Package Versions
@@ -27,20 +31,24 @@ jobs:
       - name: Read current versions
         id: current
         run: |
-          echo "root=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
-          echo "web=$(jq -r '.version' apps/web/package.json)" >> "$GITHUB_OUTPUT"
-          echo "cli=$(jq -r '.version' apps/cli/package.json)" >> "$GITHUB_OUTPUT"
-          echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
-          echo "admin=$(jq -r '.version' apps/admin/package.json)" >> "$GITHUB_OUTPUT"
+          {
+            echo "root=$(jq -r '.version' package.json)"
+            echo "web=$(jq -r '.version' apps/web/package.json)"
+            echo "cli=$(jq -r '.version' apps/cli/package.json)"
+            echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
+            echo "admin=$(jq -r '.version' apps/admin/package.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Read base versions
         id: base
         run: |
-          echo "root=$(jq -r '.version' base/package.json)" >> "$GITHUB_OUTPUT"
-          echo "web=$(jq -r '.version' base/apps/web/package.json)" >> "$GITHUB_OUTPUT"
-          echo "cli=$(jq -r '.version' base/apps/cli/package.json)" >> "$GITHUB_OUTPUT"
-          echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)" >> "$GITHUB_OUTPUT"
-          echo "admin=$(jq -r '.version // "0.0.0"' base/apps/admin/package.json 2>/dev/null || echo '0.0.0')" >> "$GITHUB_OUTPUT"
+          {
+            echo "root=$(jq -r '.version' base/package.json)"
+            echo "web=$(jq -r '.version' base/apps/web/package.json)"
+            echo "cli=$(jq -r '.version' base/apps/cli/package.json)"
+            echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)"
+            echo "admin=$(jq -r '.version // "0.0.0"' base/apps/admin/package.json 2>/dev/null || echo '0.0.0')"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Detect version changes and bump types
         id: changes
@@ -113,7 +121,8 @@ jobs:
           printf "%b" "$summary" > /tmp/version-summary.txt
 
       - name: Post PR comment
-        if: github.event_name == 'pull_request'
+        # Fork PRs get a read-only token — commenting would fail.
+        if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork
         uses: actions/github-script@v7
         with:
           script: |
@@ -190,7 +199,8 @@ jobs:
           fi
 
       - name: Add labels to PR
-        if: github.event_name == 'pull_request'
+        # Fork PRs get a read-only token — labeling would fail.
+        if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork
         uses: actions/github-script@v7
         with:
           script: |

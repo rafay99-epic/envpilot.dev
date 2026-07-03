@@ -1,0 +1,29 @@
+name: Deploy Convex
+
+# Called by ci.yml when convex/** changed (strict — shared config changes
+# re-run convex checks but never redeploy). workflow_dispatch is the manual
+# escape hatch and force-deploys unconditionally.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-convex-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Convex
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Deploy Convex functions
+        run: bunx convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
