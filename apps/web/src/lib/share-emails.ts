@@ -32,9 +32,16 @@ export async function sendShareNotificationEmail(params: {
   mode: "one_time" | "time_limited";
   expiresAt: number;
   shareUrl: string;
+  resourceType?: "variable" | "account";
 }): Promise<void> {
   const resend = getResendClient();
   const from = getFromEmail();
+
+  const isAccount = params.resourceType === "account";
+  const resourceNounCapitalized = isAccount ? "Account login" : "Secret";
+  const subject = isAccount
+    ? "An account login has been shared with you on Envpilot"
+    : "A secret has been shared with you on Envpilot";
 
   const expiresIn = getRelativeTimeString(params.expiresAt);
   const modeLabel =
@@ -45,7 +52,7 @@ export async function sendShareNotificationEmail(params: {
   const { error: sendError } = await resend.emails.send({
     from: `Envpilot <${from}>`,
     to: params.recipientEmail,
-    subject: "A secret has been shared with you on Envpilot",
+    subject,
     html: `
 <!DOCTYPE html>
 <html>
@@ -62,7 +69,7 @@ export async function sendShareNotificationEmail(params: {
 
     <!-- Card -->
     <div style="background-color: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 32px;">
-      <p style="color: #a1a1aa; font-size: 14px; margin: 0 0 8px 0;">Secret shared by</p>
+      <p style="color: #a1a1aa; font-size: 14px; margin: 0 0 8px 0;">${resourceNounCapitalized} shared by</p>
       <p style="color: #fafafa; font-size: 16px; font-weight: 600; margin: 0 0 24px 0;">${escapeHtml(params.senderName)}</p>
 
       <div style="background-color: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
@@ -72,7 +79,7 @@ export async function sendShareNotificationEmail(params: {
       <p style="color: #71717a; font-size: 13px; margin: 0 0 24px 0;">${modeLabel}</p>
 
       <a href="${escapeHtml(params.shareUrl)}" style="display: block; text-align: center; background-color: #22c55e; color: #0a0a0a; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-        View Secret
+        View ${resourceNounCapitalized}
       </a>
     </div>
 

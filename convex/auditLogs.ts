@@ -332,6 +332,7 @@ export const listSecurityEvents = query({
       "variable.accessed",
       "variable.exported",
       "variable.copied",
+      "account.accessed",
       "permission.granted",
       "permission.revoked",
       "permission.updated",
@@ -407,6 +408,7 @@ export const listSensitiveDataAccess = query({
       "variable.accessed",
       "variable.exported",
       "variable.copied",
+      "account.accessed",
     ];
 
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
@@ -517,6 +519,9 @@ export const listPermissionChanges = query({
       "permission.expired",
       "permission.bulk_granted",
       "permission.bulk_revoked",
+      "account.permission_granted",
+      "account.permission_updated",
+      "account.permission_revoked",
     ];
 
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
@@ -799,7 +804,8 @@ export const getComplianceReport = query({
       (l) =>
         l.action === "variable.accessed" ||
         l.action === "variable.exported" ||
-        l.action === "variable.copied"
+        l.action === "variable.copied" ||
+        l.action === "account.accessed"
     );
     const permissionChangeLogs = logs.filter((l) =>
       l.action.startsWith("permission.")
@@ -931,6 +937,23 @@ export const getForExport = query({
       vars.filter(Boolean).map((v) => [v!._id.toString(), v!])
     );
 
+    // Account-share events (and other resource types) carry no variableId, so
+    // fall back to the variableKey stored in the details JSON to keep the
+    // export's resource column populated.
+    const variableKeyFromDetails = (
+      details: string | undefined
+    ): string | null => {
+      if (!details) return null;
+      try {
+        const parsed = JSON.parse(details);
+        return typeof parsed?.variableKey === "string"
+          ? parsed.variableKey
+          : null;
+      } catch {
+        return null;
+      }
+    };
+
     const exportData = logs.map((log) => {
       const u = userMap.get(log.userId.toString());
       const baseRecord = {
@@ -942,7 +965,7 @@ export const getForExport = query({
           : null,
         variableKey: log.variableId
           ? (varMap.get(log.variableId.toString())?.key ?? null)
-          : null,
+          : variableKeyFromDetails(log.details),
         severity: log.severity ?? "info",
         resourceType: log.resourceType ?? null,
         ipAddress: log.ipAddress ?? null,

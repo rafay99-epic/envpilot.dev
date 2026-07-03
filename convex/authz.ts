@@ -123,6 +123,20 @@ export const PROJECT_ACTIONS = {
   "project:manage_permissions": ["project_manager", "team_lead"] as OrgRole[],
   // Team leads may only add/remove developers (hierarchy enforced separately).
   "project:manage_members": ["project_manager", "team_lead"] as OrgRole[],
+  // Shared accounts — parity with the variable actions above. Any assigned
+  // role (incl. developer) may create; developers update via per-account write
+  // grants, enforced in getAccountAccess — not via this action.
+  "project:create_account": [
+    "project_manager",
+    "team_lead",
+    "developer",
+  ] as OrgRole[],
+  "project:update_account": ["project_manager", "team_lead"] as OrgRole[],
+  "project:delete_account": ["project_manager", "team_lead"] as OrgRole[],
+  "project:manage_account_permissions": [
+    "project_manager",
+    "team_lead",
+  ] as OrgRole[],
 } as const;
 
 export type OrgAction = keyof typeof ORG_ACTIONS;
@@ -527,6 +541,111 @@ export async function getVariableAccess(
   if (!projectMembership) return "read";
 
   return grant.permission === "read" ? "read" : "write"; // legacy "admin" → write
+}
+
+// ─── Account-level access ─────────────────────────────────────────────────────
+//
+// Shared accounts (projectAccounts) inherit the exact access model of
+// environment variables: role-based blanket access for owners / assigned
+// managers, per-account grants for developers, environment scoping for
+// scoped developers, and capped-read viewer sharing for unassigned members.
+
+/**
+ * Look up a user's active, unexpired grant on an account (if any).
+ * Mirrors getActiveVariableGrant — multiple rows can exist per (account,
+ * user) as revoked history accumulates, so scan for the active one.
+ */
+export async function getActiveAccountGrant(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  accountId: Id<"projectAccounts">
+): Promise<Doc<"accountPermissions"> | null> {
+  const grants = await ctx.db
+    .query("accountPermissions")
+    .withIndex("by_account_and_user", (q) =>
+      q.eq("accountId", accountId).eq("userId", userId)
+    )
+    .collect();
+
+  return (
+    grants.find(
+      (g) => g.isActive && (!g.expiresAt || g.expiresAt > Date.now())
+    ) ?? null
+  );
+}
+
+/**
+ * Compute a user's effective access to a single shared account.
+ *
+ *   "write" — can view and modify the credentials
+ *   "read"  — can view the credentials only
+ *   null    — no access
+ *
+ * EXACT mirror of getVariableAccess:
+ * - owner: write on everything
+ * - project_manager / team_lead assigned to the account's project: write
+ * - developer assigned to the project: environment-scope check first
+ *   (out-of-scope → null even with a grant), then the per-account grant
+ *   decides (write grant → write, read grant → read, none → null)
+ * - anyone else in the org with an active grant: read only
+ *   (per-account "viewer" sharing — grants work without an assignment)
+ */
+export async function getAccountAccess(
+  ctx: MutationCtx | QueryCtx,
+  userId: Id<"users">,
+  account: Doc<"projectAccounts">
+): Promise<"write" | "read" | null> {
+  const project = await ctx.db.get(account.projectId);
+  if (!project || project.deletedAt) return null;
+
+  const membership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", project.organizationId).eq("userId", userId)
+    )
+    .first();
+
+  if (!membership) return null;
+
+  const role = normalizeOrgRole(membership.role);
+  if (role === "owner") return "write";
+
+  const projectMembership = await ctx.db
+    .query("projectMembers")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", account.projectId).eq("userId", userId)
+    )
+    .first();
+
+  if (
+    projectMembership &&
+    (role === "project_manager" || role === "team_lead")
+  ) {
+    return "write";
+  }
+
+  // Environment scope: an assigned developer restricted to e.g.
+  // ["development", "staging"] never gets access to an account that lives in
+  // production — grants included.
+  if (
+    projectMembership &&
+    role === "developer" &&
+    !isEnvironmentScopeAllowed(
+      projectMembership.environments,
+      account.environments
+    )
+  ) {
+    return null;
+  }
+
+  // Developers (and any grant-only viewers) fall through to explicit grants
+  const grant = await getActiveAccountGrant(ctx, userId, account._id);
+  if (!grant) return null;
+
+  // Users without a project assignment are capped at read (viewer sharing)
+  if (!projectMembership) return "read";
+
+  return grant.permission === "read" ? "read" : "write";
 }
 
 // ─── Query: getMyPermissions ──────────────────────────────────────────────────

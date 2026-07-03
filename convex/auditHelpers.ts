@@ -20,7 +20,8 @@ export type AuditResourceType =
   | "access_token"
   | "invitation"
   | "billing"
-  | "security";
+  | "security"
+  | "account";
 
 // Severity mapping for different action types
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
@@ -75,6 +76,14 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "template.created": "info",
   "template.updated": "info",
   "template.deleted": "info",
+  // Shared account actions
+  "account.created": "info",
+  "account.updated": "info",
+  "account.deleted": "critical",
+  "account.accessed": "info",
+  "account.permission_granted": "info",
+  "account.permission_revoked": "warning",
+  "account.permission_updated": "info",
 };
 
 // Resource type mapping for different action types
@@ -167,6 +176,14 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "template.created": "organization",
   "template.updated": "organization",
   "template.deleted": "organization",
+  // Shared accounts
+  "account.created": "account",
+  "account.updated": "account",
+  "account.deleted": "account",
+  "account.accessed": "account",
+  "account.permission_granted": "account",
+  "account.permission_revoked": "account",
+  "account.permission_updated": "account",
 };
 
 export interface AuditLogInput {

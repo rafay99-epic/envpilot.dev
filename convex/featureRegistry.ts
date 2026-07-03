@@ -369,6 +369,32 @@ export async function countRotationEnabledVariables(
   return count;
 }
 
+/**
+ * Count active (non-deleted) shared accounts across an organization.
+ * Iterates the org's live projects and their by_project account rows,
+ * excluding soft-deleted accounts — used by the shared_accounts_limit gate.
+ */
+export async function countActiveAccounts(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<number> {
+  const allProjects = await db
+    .query("projects")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+  const projects = allProjects.filter((p) => p.deletedAt === undefined);
+
+  let count = 0;
+  for (const project of projects) {
+    const accounts = await db
+      .query("projectAccounts")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+    count += accounts.filter((a) => a.deletedAt === undefined).length;
+  }
+  return count;
+}
+
 // ==========================================
 // QUERIES (exposed to client)
 // ==========================================
@@ -931,6 +957,24 @@ const SEED_FEATURES = [
     resettable: false,
     sortOrder: 6,
   },
+  {
+    key: "shared_accounts",
+    displayName: "Shared Accounts",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 7,
+  },
+  {
+    key: "shared_accounts_limit",
+    displayName: "Max Shared Accounts",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 8,
+  },
 
   // Customization
   {
@@ -1069,6 +1113,8 @@ export const seedDefaultTierFeatures = internalMutation({
         secret_rotation_limit: "7",
         secret_sharing: "false",
         max_active_shares: "0",
+        shared_accounts: "true",
+        shared_accounts_limit: "5",
         keyboard_shortcuts_custom: "true",
         custom_branding: "false",
         analytics_retention_days: "7",
@@ -1095,6 +1141,8 @@ export const seedDefaultTierFeatures = internalMutation({
         secret_rotation_limit: "null",
         secret_sharing: "true",
         max_active_shares: "null",
+        shared_accounts: "true",
+        shared_accounts_limit: "null",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",

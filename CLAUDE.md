@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 There are some important skills defined in the .claude file or .agent folders . Use them to enhance your work and make sure that the code you write is up to quality standard.
 
+### Branching
+
+You will do all of your work. All of the workflow that is happening. in branches so you will always switch to main pull the changes and then whatever new work you're about to do and then you're going to make a branch of that from main and then make a PR set as review then code reviewer will come like code have code rabbit kube and then they will review your work and once they're done with the review you will you will verify the work you will do your own code or review and analysis and analysis make sure that the code is ready and production ready.
+
+No slob pad generation code should be allowed. And you're following the development process of making always making a PR because I will review and verify that is it really working or not.
+
 ### Development Server
 
 - **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
