@@ -154,12 +154,12 @@ What you can do in a project follows from this role plus whether you are
 assigned to the project. Developers can additionally be scoped to specific
 environments, and per-variable read/write grants control their access.
 
-| Role            | Pull                     | Push (direct) | Request new variable | Review requests | Manage permissions |
-| --------------- | ------------------------ | ------------- | -------------------- | --------------- | ------------------ |
-| Owner           | Yes                      | Yes           | -- (creates direct)  | Yes             | Yes                |
-| Project Manager | Yes (assigned projects)  | Yes           | -- (creates direct)  | Yes             | Yes                |
-| Team Lead       | Yes (assigned projects)  | Yes           | -- (creates direct)  | Yes             | Yes                |
-| Developer       | Granted variables, scoped environments | No | Yes             | No              | No                 |
+| Role            | Pull                                   | Push (direct) | Request new variable | Review requests | Manage permissions |
+| --------------- | -------------------------------------- | ------------- | -------------------- | --------------- | ------------------ |
+| Owner           | Yes                                    | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Project Manager | Yes (assigned projects)                | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Team Lead       | Yes (assigned projects)                | Yes           | -- (creates direct)  | Yes             | Yes                |
+| Developer       | Granted variables, scoped environments | No            | Yes                  | No              | No                 |
 
 ## Security
 
