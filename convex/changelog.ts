@@ -1135,6 +1135,31 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
 - 2 under-review features: GraphQL API, multi-region vault replication
 - Idempotent seeding — safe to run multiple times without duplicates`,
   },
+
+  // ============================================================
+  // v1.27.0 — Trustworthy Rollback & Error Notifications (2026-07-04)
+  // ============================================================
+  {
+    title: "Trustworthy Version Rollback & Error Notifications",
+    version: "v1.27.0",
+    type: "fix",
+    publishedAt: ts("2026-07-04"),
+    content: `Variable rollback now restores the actual secret value, not just settings — and the app is honest about the one case where it still can't.
+
+### Trustworthy Rollback
+- Every value edit now creates an immutable version snapshot of the real secret value, not just metadata
+- Rolling back to a version restores that historical value into the vault, not just settings like environment scoping
+- Rollback confirmations now state exactly what was restored (value and settings, or settings only)
+
+### Honest Legacy Disclosure
+- Versions created before this release did not retain their historical value, so there is nothing to restore for them
+- Rolling back to one of those legacy versions now explicitly restores settings only, and says so, instead of implying a full restore
+- This is a one-time limitation from the previous storage model — every version created from this release forward is fully restorable
+
+### Error Notifications
+- Actions that fail (permission errors, tier limits, unexpected failures) now surface a toast notification instead of failing silently
+- Covers rollback, variable edits, and other mutation flows across the dashboard`,
+  },
 ];
 
 // ==========================================
