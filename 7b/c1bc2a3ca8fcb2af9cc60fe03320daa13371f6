@@ -1,0 +1,276 @@
+apps/web/src/app/api/organizations/[slug]/members/[userId]/sessions/route.ts
+  s_53bfe4b41edb34::t_6ea3d5567161b8 9
+  s_53bfe4b41edb34::t_d86d54cab86975 171-174
+  s_53bfe4b41edb34::t_2e8b3cb9e2322f 54-57
+  s_53bfe4b41edb34::t_4ae5782b7e2101 181-184
+apps/web/src/app/api/extension/organizations/route.ts
+  s_53bfe4b41edb34::t_952f7be1ec5395 60
+  s_53bfe4b41edb34::t_a7b7a07c3cd30c 6
+apps/web/sentry.server.config.ts
+  s_53bfe4b41edb34::t_5489b77f608d96 21-24
+apps/vscode-extension/src/services/api.ts
+  s_53bfe4b41edb34::t_29f0ffa0b8ce2f 237-238
+  s_53bfe4b41edb34::t_f7749cf920a1ad 501-502
+  s_53bfe4b41edb34::t_4535f5fb95e6df 11
+  s_53bfe4b41edb34::t_6975a98615d304 127-128
+apps/vscode-extension/src/services/sync.ts
+  s_53bfe4b41edb34::t_d85825be7a40f7 246
+  s_53bfe4b41edb34::t_58e73b221bc7ba 729
+  s_53bfe4b41edb34::t_80bf5e5358b032 17
+.github/workflows/deploy-cli.yml
+  s_53bfe4b41edb34::t_e0fdc26b25fd4c 89-93
+apps/web/src/app/api/users/me/preferences/route.ts
+  s_53bfe4b41edb34::t_211962016d6e3f 81
+  s_53bfe4b41edb34::t_ba40bf8bea9cf0 7
+  s_53bfe4b41edb34::t_02f3d06d21e31f 27
+apps/vscode-extension/src/utils/sentryRuntime.ts
+  s_53bfe4b41edb34::t_422dd98b41dfd3 7,16-20,35-37
+  s_53bfe4b41edb34::t_289e5d00500d8e 92-95
+  s_53bfe4b41edb34::t_b43108bd9fc8f1 38
+apps/web/src/app/api/projects/[id]/export/route.ts
+  s_53bfe4b41edb34::t_e29fb5f94785f3 154
+  s_53bfe4b41edb34::t_83a12d3b695bd1 8
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_53bfe4b41edb34::t_a097289942fceb 173-174
+  s_53bfe4b41edb34::t_9a7d1cc3a97fb4 150
+  s_53bfe4b41edb34::t_d11471e9953f28 388
+  s_53bfe4b41edb34::t_567548b0b7b450 6
+  s_53bfe4b41edb34::t_e18c6850832af1 316
+apps/web/src/app/api/cli/organizations/route.ts
+  s_53bfe4b41edb34::t_2619816393e341 52
+  s_53bfe4b41edb34::t_629eb1743ca673 10
+apps/web/src/app/api/users/sync/route.ts
+  s_53bfe4b41edb34::t_6dd4b127e58332 5
+  s_53bfe4b41edb34::t_9746c07d76eb6a 31
+apps/web/src/app/api/cli/variables/route.ts
+  s_53bfe4b41edb34::t_62d3df4142d242 332
+  s_53bfe4b41edb34::t_47b6d595defe1e 13
+  s_53bfe4b41edb34::t_8cb63ce64dfa15 213
+apps/web/src/app/api/vault/keys/route.ts
+  s_53bfe4b41edb34::t_ded68d9125ff4c 110
+  s_53bfe4b41edb34::t_ac43337990130d 10
+  s_53bfe4b41edb34::t_d1102bc61f9e63 153
+apps/web/src/app/api/users/search/route.ts
+  s_53bfe4b41edb34::t_ebb656a79632c7 8
+  s_53bfe4b41edb34::t_b71983f4c2011e 99
+apps/web/src/app/(dashboard)/error.tsx
+  s_53bfe4b41edb34::t_843232056297c8 36-38,45
+apps/web/src/lib/api-errors.ts
+  s_53bfe4b41edb34::t_3514f1b5e842e3 57-79,87-88,110-113
+  s_53bfe4b41edb34::t_9200caec210649 56
+apps/web/src/app/api/projects/route.ts
+  s_53bfe4b41edb34::t_b970b06549c45f 6-10
+  s_53bfe4b41edb34::t_9af88c2508dce8 82
+apps/web/src/app/api/extension/unlink/route.ts
+  s_53bfe4b41edb34::t_9a37d46d2d09ae 7
+  s_53bfe4b41edb34::t_0fe9a8074b71d0 50
+apps/web/src/app/api/users/me/sessions/route.ts
+  s_53bfe4b41edb34::t_37f2170980e283 6
+  s_53bfe4b41edb34::t_fff6fdce71b3ce 26
+  s_53bfe4b41edb34::t_7133220b179d13 54
+apps/web/src/app/api/organizations/[slug]/route.ts
+  s_53bfe4b41edb34::t_9fd2d6acb074c0 8
+  s_53bfe4b41edb34::t_e1c4d26fdba495 74
+apps/cli/src/index.tsx
+  s_53bfe4b41edb34::t_5b30cd821243f1 3
+  s_53bfe4b41edb34::t_2e52d9ae679472 24,26-29
+apps/web/src/app/error.tsx
+  s_53bfe4b41edb34::t_f7d836e444d0c9 35-38,45
+apps/web/src/components/ConvexClientProvider.tsx
+  s_53bfe4b41edb34::t_b4732b0f7aefd4 15-50,64-68,72-83
+  s_53bfe4b41edb34::t_34aa3b14500c56 51-63,69-71
+apps/vscode-extension/src/services/auth.ts
+  s_53bfe4b41edb34::t_b2ae685fe6a154 346
+  s_53bfe4b41edb34::t_7a0458ff6e549c 7
+apps/web/src/app/api/users/me/route.ts
+  s_53bfe4b41edb34::t_009630feffd4cb 32
+  s_53bfe4b41edb34::t_93dde62baef71a 7
+  s_53bfe4b41edb34::t_a9a20e633e4c38 80
+apps/web/src/app/api/variable-requests/route.ts
+  s_53bfe4b41edb34::t_b9b8376087bd21 92
+  s_53bfe4b41edb34::t_6627a22bde0d3a 185
+  s_53bfe4b41edb34::t_509bf82a877836 14
+apps/web/src/app/api/cli/tier/route.ts
+  s_53bfe4b41edb34::t_bc320738bbbdca 115
+  s_53bfe4b41edb34::t_2033a5088b32ae 13
+apps/web/src/app/api/billing/checkout/route.ts
+  s_53bfe4b41edb34::t_20dd5cf4a128db 172
+  s_53bfe4b41edb34::t_6d3e7cccbdb058 8
+apps/web/src/app/api/billing/portal/route.ts
+  s_53bfe4b41edb34::t_9a66b0b68d0e99 120
+  s_53bfe4b41edb34::t_9b5a04e74576b4 9
+apps/cli/src/lib/sentry.ts
+  s_53bfe4b41edb34::t_96878d56f841eb 18-21
+apps/web/src/app/api/variable-requests/[id]/route.ts
+  s_53bfe4b41edb34::t_8f2cf8b8f9c662 8
+  s_53bfe4b41edb34::t_fb486ae109dc1a 105
+apps/web/src/app/api/projects/[id]/import/route.ts
+  s_53bfe4b41edb34::t_0dd6bbc16e7290 179-183
+  s_53bfe4b41edb34::t_81c4c364c5b83d 7
+apps/vscode-extension/src/extension.ts
+  s_53bfe4b41edb34::t_ef8837e1a1a58e 478
+  s_53bfe4b41edb34::t_8f1240dd8a98bb 130-131
+  s_53bfe4b41edb34::t_89154546cce095 432-434
+  s_53bfe4b41edb34::t_b880ef20e78063 23-29
+  s_53bfe4b41edb34::t_06b4a561693d47 155-168
+  s_53bfe4b41edb34::t_f652913c0bbf81 352-357
+  s_53bfe4b41edb34::t_48a2405a34e436 612-614
+  s_53bfe4b41edb34::t_ae49ed5b2cca97 465
+  s_53bfe4b41edb34::t_f616a2882be394 642
+apps/vscode-extension/src/services/gitCommitGuard.ts
+  s_53bfe4b41edb34::t_619472b557198d 8
+  s_53bfe4b41edb34::t_f7114604526dd2 94
+  s_53bfe4b41edb34::t_b0e89571b6275b 251
+apps/web/src/app/api/templates/route.ts
+  s_53bfe4b41edb34::t_b4be7548a1b19b 87
+  s_53bfe4b41edb34::t_5f9a0d0b0f5723 12
+  s_53bfe4b41edb34::t_0125c9bc0e2e26 157
+apps/web/src/app/api/cli/variable-requests/route.ts
+  s_53bfe4b41edb34::t_cecf917aecc79f 218
+  s_53bfe4b41edb34::t_013b4e6f1f3f76 13
+  s_53bfe4b41edb34::t_d42dc1038f260c 94
+apps/web/src/app/api/extension/check-access/[organizationId]/route.ts
+  s_53bfe4b41edb34::t_af66d582c6a82f 57
+  s_53bfe4b41edb34::t_cbb759281f971f 7
+apps/web/src/app/api/templates/seed/route.ts
+  s_53bfe4b41edb34::t_67369a6799c61a 6
+  s_53bfe4b41edb34::t_966e0fbe7fdb04 46
+  s_53bfe4b41edb34::t_7e345a399ebf18 87
+apps/web/src/app/api/variables/[id]/history/route.ts
+  s_53bfe4b41edb34::t_87cd24b48ecf51 97-98
+  s_53bfe4b41edb34::t_8c7f4e866dcde6 12
+apps/web/src/app/api/cli/variables/fingerprint/route.ts
+  s_53bfe4b41edb34::t_cb016914f7109e 103
+  s_53bfe4b41edb34::t_93bcb974b86779 11
+apps/web/src/app/api/variable-requests/[id]/value/route.ts
+  s_53bfe4b41edb34::t_2af1aacd58c946 60
+  s_53bfe4b41edb34::t_2c5d83d974682a 8
+apps/web/src/app/api/organizations/[slug]/members/route.ts
+  s_53bfe4b41edb34::t_96ced47539cbc3 380
+  s_53bfe4b41edb34::t_5cfc3dd78e0d86 94
+  s_53bfe4b41edb34::t_5d7cc0a5c4095c 302
+  s_53bfe4b41edb34::t_8751a96a1fa891 6-10
+apps/web/src/app/api/cli/usage/route.ts
+  s_53bfe4b41edb34::t_cf8c65e4f30493 106
+  s_53bfe4b41edb34::t_a4b94501c51350 12
+apps/web/src/app/api/variables/[id]/rollback/route.ts
+  s_53bfe4b41edb34::t_39e1458c68c005 107
+  s_53bfe4b41edb34::t_2f89e428bb6949 13
+apps/web/src/app/api/projects/[id]/move/route.ts
+  s_53bfe4b41edb34::t_d3203c6b980edc 9
+  s_53bfe4b41edb34::t_02fdf49185fa5c 153
+apps/web/src/app/api/variables/[id]/route.ts
+  s_53bfe4b41edb34::t_4cce71c55bb203 118-119
+  s_53bfe4b41edb34::t_a35ad99d827286 239
+  s_53bfe4b41edb34::t_958900dac7c661 13
+  s_53bfe4b41edb34::t_a2c06057aa4d0e 321-322
+apps/web/src/app/api/cli/projects/route.ts
+  s_53bfe4b41edb34::t_ba995c0666675a 128
+  s_53bfe4b41edb34::t_d59cdcba3e35ca 15
+apps/web/src/app/api/auth/me/route.ts
+  s_53bfe4b41edb34::t_a9388f3ae90c83 16
+  s_53bfe4b41edb34::t_a9c84ae4861c42 128
+.github/workflows/deploy-extension.yml
+  s_53bfe4b41edb34::t_79440b70ebbf2e 98-101
+apps/web/src/app/api/extension/projects/[id]/route.ts
+  s_53bfe4b41edb34::t_4b00cd2df98a5d 7
+  s_53bfe4b41edb34::t_1dbe7b4baa1769 63
+apps/web/src/app/api/extension/variable-requests/route.ts
+  s_53bfe4b41edb34::t_2b085cece20f28 13
+  s_53bfe4b41edb34::t_ff773a80389851 95
+  s_53bfe4b41edb34::t_63309036c41128 221
+apps/web/src/app/api/billing/sync/route.ts
+  s_53bfe4b41edb34::t_247cd97fec6adf 7
+  s_53bfe4b41edb34::t_258ba754690d2a 88
+.mcp.json
+  s_53bfe4b41edb34::t_4074569b88bb7a 1-7
+apps/web/src/app/api/organizations/[slug]/settings/route.ts
+  s_53bfe4b41edb34::t_0b968898497a7a 8
+  s_53bfe4b41edb34::t_aeb0220f114949 63
+apps/web/src/app/api/extension/usage/route.ts
+  s_53bfe4b41edb34::t_bff7112352160e 113
+  s_53bfe4b41edb34::t_aa32077a1ea42d 8
+apps/cli/package.json
+  s_53bfe4b41edb34::t_212b5f6131838d 3
+apps/web/src/app/api/billing/cancel/route.ts
+  s_53bfe4b41edb34::t_8b5666e91b5b53 134
+  s_53bfe4b41edb34::t_4a842b7bcfd7b9 9
+apps/web/src/app/api/vault/encrypt/route.ts
+  s_53bfe4b41edb34::t_c8f5f0df23b78a 10
+  s_53bfe4b41edb34::t_176461d9fbeedf 117
+  s_53bfe4b41edb34::t_242a2078984550 162
+apps/web/src/app/api/extension/acknowledge-revocation/route.ts
+  s_53bfe4b41edb34::t_0793efe1c03e8f 95
+  s_53bfe4b41edb34::t_e1d6a1934b5a3c 6
+apps/web/src/instrumentation-client.ts
+  s_53bfe4b41edb34::t_105f01b580409b 37-40
+apps/web/src/app/api/accounts/[id]/route.ts
+  s_53bfe4b41edb34::t_f0ecca1e1a3926 210-214
+  s_53bfe4b41edb34::t_012221722af507 176-180
+  s_53bfe4b41edb34::t_4ea695c9c2e27d 31-35,55-56
+  s_53bfe4b41edb34::t_8380ac3dca321d 9
+  s_31c0954e2a7380::t_e60c70b11579c1 57-58
+apps/web/src/app/api/extension/link/route.ts
+  s_53bfe4b41edb34::t_65eec02c73cf85 11
+  s_53bfe4b41edb34::t_caead9110a2ef2 84
+apps/web/src/app/api/billing/subscription/route.ts
+  s_53bfe4b41edb34::t_ba708305818da9 8
+  s_53bfe4b41edb34::t_b1485231dc5950 135
+apps/web/src/app/api/organizations/route.ts
+  s_53bfe4b41edb34::t_86d3f183fc4a96 14
+  s_53bfe4b41edb34::t_042892f35ec733 70
+apps/vscode-extension/package.json
+  s_53bfe4b41edb34::t_212b5f6131838d 5
+package.json
+  s_53bfe4b41edb34::t_212b5f6131838d 3
+apps/web/src/app/api/invitations/[token]/route.ts
+  s_53bfe4b41edb34::t_11a822dd600dec 65
+  s_53bfe4b41edb34::t_4ecd4b5f61ac0a 167
+  s_53bfe4b41edb34::t_5e0c2b5e94082f 197
+  s_53bfe4b41edb34::t_90a788e7375010 12
+apps/web/src/app/api/variables/bulk-delete/route.ts
+  s_53bfe4b41edb34::t_aaeecfa2e81d64 81
+  s_53bfe4b41edb34::t_e56a7fe25feb03 13
+apps/web/src/app/api/projects/[id]/members/route.ts
+  s_53bfe4b41edb34::t_3518b06b990cd0 11
+  s_53bfe4b41edb34::t_f92fc7529860eb 112
+apps/web/src/app/api/projects/[id]/route.ts
+  s_53bfe4b41edb34::t_fe163c0d750997 11
+  s_53bfe4b41edb34::t_27a58c6c3520de 89
+apps/web/src/app/api/extension/update-last-used/route.ts
+  s_53bfe4b41edb34::t_f76e6b95a25edc 36
+  s_53bfe4b41edb34::t_db688b74a13da9 5
+apps/web/src/app/api/templates/[id]/route.ts
+  s_53bfe4b41edb34::t_c1a2b1151252ee 147
+  s_53bfe4b41edb34::t_96f15aac876b70 12
+  s_53bfe4b41edb34::t_ae26dd433017cc 221
+  s_53bfe4b41edb34::t_3f78dd4a1fe90e 57
+apps/web/sentry.edge.config.ts
+  s_53bfe4b41edb34::t_018e8ab85efa23 20-23
+apps/web/package.json
+  s_53bfe4b41edb34::t_212b5f6131838d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7bc1bc2a3ca8fcb2af9cc60fe03320daa13371f6",
+  "prompts": {},
+  "sessions": {
+    "s_31c0954e2a7380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e09b434b-6265-4567-8982-86df0539232f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
