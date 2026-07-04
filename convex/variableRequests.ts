@@ -7,7 +7,7 @@ import {
   assertProjectAction,
   isEnvironmentScopeAllowed,
 } from "./authz";
-import { checkNumericLimit, countActiveVariables } from "./featureRegistry";
+import { checkCountedLimit, countActiveVariables } from "./featureRegistry";
 
 const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;
 
@@ -545,12 +545,13 @@ export const review = mutation({
 
     // Tier limit: approving must not push the org past its variable cap.
     // Mirrors the check enforced by variables.create for direct creation.
-    const varCount = await countActiveVariables(ctx.db, request.projectId);
-    const varCheck = await checkNumericLimit(
+    // Limit-first: only counts existing variables when the tier's limit is
+    // finite, bounded at that limit rather than scanning every variable.
+    const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
       "max_variables_per_project",
-      varCount
+      (limit) => countActiveVariables(ctx.db, request.projectId, limit)
     );
     if (!varCheck.allowed) {
       throw new Error(varCheck.reason!);

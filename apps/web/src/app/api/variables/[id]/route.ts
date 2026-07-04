@@ -11,7 +11,7 @@ import {
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
-import { updateSecret } from "@/lib/vault";
+import { createSecret } from "@/lib/vault";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const log = createLogger("api/variables/[id]");
@@ -192,10 +192,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       tagIds,
     } = validation.data;
 
-    // If value is being updated, update the existing encrypted value in Vault.
+    // If value is being updated, mint a NEW vault object instead of
+    // overwriting in place (same pattern as the CLI bulk-push route). The
+    // previous vaultRef stays referenced by earlier variableVersions rows,
+    // which is what makes rollback actually restore the old value —
+    // in-place updates left every version row pointing at the same object.
     let vaultRef: string | undefined;
     if (value !== undefined) {
-      const vaultResult = await updateSecret(variable.vaultRef, value);
+      const vaultResult = await createSecret(variable.key, value, {
+        organizationId,
+        projectId: variable.projectId,
+      });
       vaultRef = vaultResult.id;
     }
 

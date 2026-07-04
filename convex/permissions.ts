@@ -526,23 +526,26 @@ export const getAssignableMembers = query({
       return true;
     });
 
-    const assignableMembers = await Promise.all(
-      eligibleMembers.map(async (member) => {
-        const user = await ctx.db.get(member.userId);
-        return user
-          ? {
-              _id: user._id,
-              email: user.email,
-              name: user.name,
-              avatarUrl: user.avatarUrl,
-              role: normalizeOrgRole(member.role),
-              isAssignedToProject: assignedUserIds.has(
-                member.userId.toString()
-              ),
-            }
-          : null;
-      })
+    // Batch fetch every eligible user in one pass instead of one ctx.db.get
+    // per member (getAssignableMembers N+1).
+    const userMap = await batchGetUsers(
+      ctx,
+      eligibleMembers.map((member) => member.userId)
     );
+
+    const assignableMembers = eligibleMembers.map((member) => {
+      const user = userMap.get(member.userId.toString());
+      return user
+        ? {
+            _id: user._id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+            role: normalizeOrgRole(member.role),
+            isAssignedToProject: assignedUserIds.has(member.userId.toString()),
+          }
+        : null;
+    });
 
     return assignableMembers.filter((member) => member !== null);
   },

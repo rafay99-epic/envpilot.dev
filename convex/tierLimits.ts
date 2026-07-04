@@ -3,6 +3,7 @@ import { query } from "./_generated/server";
 import type { DatabaseReader } from "./_generated/server";
 import {
   checkNumericLimit,
+  checkCountedLimit,
   checkBooleanFeature,
   countActiveProjects,
   countActiveVariables,
@@ -269,12 +270,15 @@ export const checkTierLimit = query({
         if (!args.projectId) {
           return { allowed: false, reason: "Project ID required" };
         }
-        const count = await countActiveVariables(ctx.db, args.projectId);
-        return await checkNumericLimit(
+        // Limit-first: only counts existing variables when the tier's limit
+        // is finite, bounded at that limit rather than scanning every
+        // variable in the project.
+        const projectId = args.projectId;
+        return await checkCountedLimit(
           ctx.db,
           args.organizationId,
           featureKey,
-          count
+          (limit) => countActiveVariables(ctx.db, projectId, limit)
         );
       }
 

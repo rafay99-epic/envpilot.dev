@@ -85,7 +85,10 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    await convex.mutation(api.variables.rollback, {
+    // valueRestored is false when the target is a legacy version written
+    // before value updates minted distinct vault objects — those rollbacks
+    // only restore metadata, not the secret value.
+    const { valueRestored } = await convex.mutation(api.variables.rollback, {
       variableId: id as Id<"environmentVariables">,
       targetVersion,
       rolledBackBy: convexUser._id,
@@ -95,7 +98,7 @@ export async function POST(request: Request, context: RouteContext) {
       variableId: id as Id<"environmentVariables">,
     });
 
-    return NextResponse.json({ variable: updatedVariable });
+    return NextResponse.json({ variable: updatedVariable, valueRestored });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to rollback variable";

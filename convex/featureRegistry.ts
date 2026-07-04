@@ -4,6 +4,23 @@ import type { DatabaseReader } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { isEnforcementEnabledFromDb, getDefaultTierName } from "./tierLimits";
 
+// ==========================================
+// PAGINATION SHAPE (structural — matches Convex's query builder return type)
+// ==========================================
+
+/**
+ * Minimal shape shared by Convex's `OrderedQuery` builder — just enough to
+ * paginate a single index range without pulling in the full query-builder
+ * generic type at every call site.
+ */
+type Pageable<Doc> = {
+  paginate: (opts: {
+    cursor: string | null;
+    numItems: number;
+  }) => Promise<{ page: Doc[]; isDone: boolean; continueCursor: string }>;
+  collect: () => Promise<Doc[]>;
+};
+
 /**
  * Dynamic Feature Registry
  *
@@ -289,9 +306,106 @@ export async function checkNumericLimit(
   };
 }
 
+/**
+ * Limit-first numeric check for an organization.
+ *
+ * Resolves the feature's numeric limit BEFORE counting anything. When the
+ * limit is unlimited (`null` — either because the tier grants it or because
+ * tier enforcement is off), `countFn` is never invoked, so a gated create
+ * path pays zero extra read cost on the common "unlimited" path. When a
+ * finite limit exists, `countFn` receives it and can use it to bound its own
+ * read (e.g. `countActiveVariables(db, projectId, limit)`), so a per-project
+ * or per-org fan-out count only reads as many rows as needed to prove the
+ * limit is exceeded rather than every row in the table.
+ *
+ * Prefer this over `checkNumericLimit` for any call site whose count is
+ * itself expensive (org-wide fan-out across projects, etc). `checkNumericLimit`
+ * stays available for callers with an already-cheap or already-computed count.
+ */
+export async function checkCountedLimit(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  featureKey: string,
+  countFn: (limit: number) => Promise<number>
+): Promise<{
+  allowed: boolean;
+  current: number;
+  limit: number | null;
+  reason?: string;
+  tierName: string;
+}> {
+  const resolved = await resolveFeatureValue(db, organizationId, featureKey);
+  const limit = resolved.value as number | null;
+
+  if (limit === null) {
+    // Unlimited (or enforcement disabled) — never count.
+    return {
+      allowed: true,
+      current: 0,
+      limit: null,
+      tierName: resolved.tierName,
+    };
+  }
+
+  const currentCount = await countFn(limit);
+  const allowed = currentCount < limit;
+  return {
+    allowed,
+    current: currentCount,
+    limit,
+    tierName: resolved.tierName,
+    reason: allowed
+      ? undefined
+      : `Limit reached (${currentCount}/${limit}). Upgrade your tier for more.`,
+  };
+}
+
 // ==========================================
 // COUNT HELPERS (reusable across mutations)
 // ==========================================
+
+/**
+ * Count documents from `query` matching `isCounted`, optionally bounded by
+ * `limit`.
+ *
+ * - `limit === undefined`: collects the full range and filters in memory —
+ *   identical to the original unbounded behavior. Used by display/usage
+ *   paths (e.g. the usage dashboard) that need an exact total regardless of
+ *   size.
+ * - `limit` given: pages through the range and stops as soon as the running
+ *   count exceeds `limit` (the `< limit` decision downstream is already
+ *   determined at that point, so reading further can't change the outcome)
+ *   or the range is exhausted. This is NOT a flat `.take(limit + 1)` on raw
+ *   rows — `deletedAt` (and, for rotation, `rotationFrequencyDays`) aren't
+ *   part of the index, so a naive raw-row cap could under-count real matches
+ *   sitting behind a run of non-matching rows. Paginating and filtering each
+ *   page keeps the bound correct while still avoiding a full table scan in
+ *   the common case (limit reached within the first page or two).
+ */
+async function countMatchingUpTo<Doc>(
+  query: Pageable<Doc>,
+  isCounted: (doc: Doc) => boolean,
+  limit: number | undefined
+): Promise<number> {
+  if (limit === undefined) {
+    const rows = await query.collect();
+    return rows.filter(isCounted).length;
+  }
+
+  const pageSize = Math.max(limit + 1, 25);
+  let cursor: string | null = null;
+  let count = 0;
+  for (;;) {
+    const result = await query.paginate({ cursor, numItems: pageSize });
+    for (const doc of result.page) {
+      if (isCounted(doc)) count++;
+    }
+    if (count > limit || result.isDone) {
+      return count;
+    }
+    cursor = result.continueCursor;
+  }
+}
 
 export async function countActiveProjects(
   db: DatabaseReader,
@@ -304,15 +418,22 @@ export async function countActiveProjects(
   return projects.filter((p) => p.deletedAt === undefined).length;
 }
 
+/**
+ * Count active (non-deleted) variables in a project.
+ *
+ * Pass `limit` (the resolved tier limit) to bound the read — the count stops
+ * as soon as it's proven to exceed the limit instead of collecting every
+ * variable in the project. Omit `limit` for an exact total (e.g. dashboards).
+ */
 export async function countActiveVariables(
   db: DatabaseReader,
-  projectId: Id<"projects">
+  projectId: Id<"projects">,
+  limit?: number
 ): Promise<number> {
-  const vars = await db
+  const query = db
     .query("environmentVariables")
-    .withIndex("by_project", (q) => q.eq("projectId", projectId))
-    .collect();
-  return vars.filter((v) => v.deletedAt === undefined).length;
+    .withIndex("by_project", (q) => q.eq("projectId", projectId));
+  return countMatchingUpTo(query, (v) => v.deletedAt === undefined, limit);
 }
 
 export async function countMembersAndPendingInvites(
@@ -340,10 +461,20 @@ export async function countMembersAndPendingInvites(
   return members.length + pendingInvites.length;
 }
 
+/**
+ * Count rotation-enabled (non-deleted) variables across every live project
+ * of an organization.
+ *
+ * Pass `limit` (the resolved `secret_rotation_limit`) to bound the fan-out —
+ * the project loop short-circuits as soon as the running total is proven to
+ * exceed the limit, instead of collecting every variable of every project.
+ * Omit `limit` for an exact total (e.g. the usage dashboard).
+ */
 export async function countRotationEnabledVariables(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
-  excludeVariableId?: Id<"environmentVariables">
+  excludeVariableId?: Id<"environmentVariables">,
+  limit?: number
 ): Promise<number> {
   const allProjects = await db
     .query("projects")
@@ -351,20 +482,25 @@ export async function countRotationEnabledVariables(
     .collect();
   const projects = allProjects.filter((p) => p.deletedAt === undefined);
 
+  const isRotationEnabled = (v: {
+    deletedAt?: number;
+    rotationFrequencyDays?: number;
+    _id: Id<"environmentVariables">;
+  }) =>
+    v.deletedAt === undefined &&
+    v.rotationFrequencyDays !== undefined &&
+    v.rotationFrequencyDays > 0 &&
+    !(excludeVariableId !== undefined && v._id === excludeVariableId);
+
   let count = 0;
   for (const project of projects) {
-    const vars = await db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id))
-      .collect();
+    if (limit !== undefined && count > limit) break; // already over — no need to scan remaining projects
 
-    for (const v of vars) {
-      if (v.deletedAt !== undefined) continue;
-      if (v.rotationFrequencyDays === undefined || v.rotationFrequencyDays <= 0)
-        continue;
-      if (excludeVariableId && v._id === excludeVariableId) continue;
-      count++;
-    }
+    const remaining = limit === undefined ? undefined : limit - count;
+    const query = db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id));
+    count += await countMatchingUpTo(query, isRotationEnabled, remaining);
   }
   return count;
 }
@@ -376,7 +512,8 @@ export async function countRotationEnabledVariables(
  */
 export async function countActiveAccounts(
   db: DatabaseReader,
-  organizationId: Id<"organizations">
+  organizationId: Id<"organizations">,
+  limit?: number
 ): Promise<number> {
   const allProjects = await db
     .query("projects")
@@ -386,11 +523,17 @@ export async function countActiveAccounts(
 
   let count = 0;
   for (const project of projects) {
-    const accounts = await db
+    if (limit !== undefined && count > limit) break; // already over — no need to scan remaining projects
+
+    const remaining = limit === undefined ? undefined : limit - count;
+    const query = db
       .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id))
-      .collect();
-    count += accounts.filter((a) => a.deletedAt === undefined).length;
+      .withIndex("by_project", (q) => q.eq("projectId", project._id));
+    count += await countMatchingUpTo(
+      query,
+      (a) => a.deletedAt === undefined,
+      remaining
+    );
   }
   return count;
 }
