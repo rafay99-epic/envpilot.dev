@@ -1,0 +1,19 @@
+CLAUDE.md
+  s_53bfe4b41edb34::t_55f6a368af9a46 22-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c2c4ae8ac1b88e47f4fb26768ab4aa85847ce4fc",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
