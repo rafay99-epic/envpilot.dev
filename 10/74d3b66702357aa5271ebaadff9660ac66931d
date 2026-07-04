@@ -1,0 +1,74 @@
+convex/variables.ts
+  s_53bfe4b41edb34::t_8011428fc9504c 20
+  s_53bfe4b41edb34::t_7a2372040189f8 1941-1949
+  s_53bfe4b41edb34::t_271ab75ea24978 1986-2039
+convex/accounts.ts
+  s_53bfe4b41edb34::t_8565d8f10f84b9 11
+  s_53bfe4b41edb34::t_3522b1ae26696e 656-657
+  s_53bfe4b41edb34::t_2d9ba623345f4a 528-564,574-613
+  s_53bfe4b41edb34::t_bb0e05ae2e1d4b 614-655,658-666
+  s_53bfe4b41edb34::t_a8f4f2b75a80f5 565-573
+convex/schema.ts
+  s_53bfe4b41edb34::t_13a4fd21368ca3 393-396
+  s_53bfe4b41edb34::t_0d2ea9d81bfb1e 229-234
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/accounts/page.tsx
+  s_53bfe4b41edb34::t_76465e75e69794 432
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_53bfe4b41edb34::t_742f1515e867c4 1068
+  s_53bfe4b41edb34::t_c6c16f5a3130d9 872-875
+  s_53bfe4b41edb34::t_64ddcf427b4213 1036
+  s_53bfe4b41edb34::t_e56ea6ac2bedda 41
+convex/crons.ts
+  s_53bfe4b41edb34::t_fbd77ee9caf6ce 103-112
+apps/web/src/app/(dashboard)/organizations/[slug]/settings/page.tsx
+  s_53bfe4b41edb34::t_0517a00ce0449f 667-670
+convex/projects.ts
+  s_53bfe4b41edb34::t_5a7a98268e58a7 379-384
+  s_53bfe4b41edb34::t_a64ae5fa4be2ba 404-435
+  s_53bfe4b41edb34::t_630ab610dfa0a1 494-495
+apps/web/src/components/variables/recently-deleted.tsx
+  s_53bfe4b41edb34::t_366eb6e5599e2d 1-202
+apps/web/package.json
+  s_53bfe4b41edb34::t_0517a00ce0449f 3
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_53bfe4b41edb34::t_5f0cb760548f8f 511
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/settings/page.tsx
+  s_53bfe4b41edb34::t_c3ab829632b0f2 736-738
+package.json
+  s_53bfe4b41edb34::t_0517a00ce0449f 3
+convex/vaultGc.ts
+  s_53bfe4b41edb34::t_0517a00ce0449f 345-350
+  s_53bfe4b41edb34::t_a1b0e0abeb5d80 1-344,351-376
+convex/organizations.ts
+  s_53bfe4b41edb34::t_a2ef1818d121e8 368-373,390-407
+  s_53bfe4b41edb34::t_147f066d290b2e 408-410
+  s_378f64f3dde5a7::t_8e3e6bece573c8 411-415
+apps/web/src/components/variables/index.ts
+  s_53bfe4b41edb34::t_4e77596b8a0edc 17
+convex/_generated/api.d.ts
+  s_378f64f3dde5a7::t_47397f9111a3e6 52,103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1074d3b66702357aa5271ebaadff9660ac66931d",
+  "prompts": {},
+  "sessions": {
+    "s_378f64f3dde5a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aca26630c64daa765",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
