@@ -226,7 +226,16 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_project_and_key", ["projectId", "key"])
     .index("by_project_and_environments", ["projectId", "environments"])
-    .index("by_expires_at", ["expiresAt"]),
+    .index("by_expires_at", ["expiresAt"])
+    // Bounds the daily vault-GC sweep to soft-deleted rows past the retention
+    // window. deletedAt is optional; undefined sorts BELOW all numbers in
+    // Convex's index ordering, so the GC query pairs a `gt(0)` floor with a
+    // `lt(cutoff)` ceiling to exclude never-deleted (undefined) rows.
+    .index("by_deleted_at", ["deletedAt"])
+    // Serves the per-project trash listing (getDeleted): reads exactly the
+    // project's soft-deleted rows in the restore window, instead of paging
+    // through active rows and filtering in memory.
+    .index("by_project_deleted", ["projectId", "deletedAt"]),
 
   // ==========================================
   // VARIABLE TAGS (organization-scoped)
@@ -385,7 +394,13 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
-    .index("by_project_and_name", ["projectId", "name"]),
+    .index("by_project_and_name", ["projectId", "name"])
+    // Bounds the daily vault-GC sweep to soft-deleted rows past the retention
+    // window (see environmentVariables.by_deleted_at for the ordering caveat).
+    .index("by_deleted_at", ["deletedAt"])
+    // Serves the per-project trash listing (getDeleted) — see the twin index
+    // on environmentVariables.
+    .index("by_project_deleted", ["projectId", "deletedAt"]),
 
   // ==========================================
   // ACCOUNT ACCESS PERMISSIONS (per-account grants)

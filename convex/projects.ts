@@ -376,18 +376,12 @@ export const remove = mutation({
       });
     }
 
-    // Delete variable versions for each variable
-    let deletedVersions = 0;
-    for (const variable of variables) {
-      const versions = await ctx.db
-        .query("variableVersions")
-        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-        .collect();
-      for (const version of versions) {
-        await ctx.db.delete(version._id);
-        deletedVersions++;
-      }
-    }
+    // NOTE: variableVersions rows are intentionally NOT hard-deleted here.
+    // The soft-deleted variables above now flow through the daily vault-GC
+    // sweep (convex/vaultGc.ts), which purges each variable's version history,
+    // permission grants, Vault objects, and row together once the 7-day
+    // retention window elapses. Keeping version rows means a project restored
+    // within the window keeps its full variable history.
 
     // Deactivate variable permissions for each variable
     let deactivatedPermissions = 0;
@@ -404,6 +398,38 @@ export const remove = mutation({
           revokedBy: args.deletedBy,
         });
         deactivatedPermissions++;
+      }
+    }
+
+    // Soft-delete shared accounts + deactivate their grants (mirrors the
+    // variable cascade above). Previously the project delete never touched
+    // projectAccounts at all, leaking them. The soft-deleted accounts now flow
+    // through the daily vault-GC sweep (convex/vaultGc.ts) alongside variables.
+    const accounts = await ctx.db
+      .query("projectAccounts")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+
+    let deactivatedAccountPermissions = 0;
+    for (const account of accounts) {
+      await ctx.db.patch(account._id, {
+        deletedAt: now,
+        updatedAt: now,
+      });
+
+      const accountPermissions = await ctx.db
+        .query("accountPermissions")
+        .withIndex("by_account", (q) => q.eq("accountId", account._id))
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.isActive === true));
+      for (const perm of accountPermissions) {
+        await ctx.db.patch(perm._id, {
+          isActive: false,
+          revokedAt: now,
+          revokedBy: args.deletedBy,
+        });
+        deactivatedAccountPermissions++;
       }
     }
 
@@ -464,8 +490,9 @@ export const remove = mutation({
       action: "project.deleted",
       details: JSON.stringify({
         variablesDeleted: variables.length,
-        versionsDeleted: deletedVersions,
         permissionsDeactivated: deactivatedPermissions,
+        accountsDeleted: accounts.length,
+        accountPermissionsDeactivated: deactivatedAccountPermissions,
         membersRemoved: projectMembers.length,
         tokensRevoked: revokedTokens,
         requestsCanceled: canceledRequests,

@@ -365,14 +365,12 @@ export const remove = mutation({
       for (const variable of variables) {
         await ctx.db.patch(variable._id, { deletedAt: now, updatedAt: now });
 
-        // Delete variable versions
-        const versions = await ctx.db
-          .query("variableVersions")
-          .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
-          .collect();
-        for (const version of versions) {
-          await ctx.db.delete(version._id);
-        }
+        // NOTE: variableVersions rows are intentionally NOT hard-deleted here.
+        // The soft-deleted variables flow through the daily vault-GC sweep
+        // (convex/vaultGc.ts), which purges each variable's version history,
+        // permission grants, Vault objects, and row together once the 7-day
+        // retention window elapses — so their Vault objects are reclaimed
+        // instead of being leaked forever.
 
         // Deactivate variable permissions
         const permissions = await ctx.db
@@ -381,6 +379,32 @@ export const remove = mutation({
           .collect()
           .then((rows) => rows.filter((doc) => doc.isActive === true));
         for (const perm of permissions) {
+          await ctx.db.patch(perm._id, {
+            isActive: false,
+            revokedAt: now,
+            revokedBy: args.deletedBy,
+          });
+        }
+      }
+
+      // Soft-delete shared accounts + deactivate their grants (mirrors the
+      // variable cascade above). Previously the org delete never touched
+      // projectAccounts, leaking them; they now flow through the vault-GC sweep.
+      const accounts = await ctx.db
+        .query("projectAccounts")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .collect()
+        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+
+      for (const account of accounts) {
+        await ctx.db.patch(account._id, { deletedAt: now, updatedAt: now });
+
+        const accountPermissions = await ctx.db
+          .query("accountPermissions")
+          .withIndex("by_account", (q) => q.eq("accountId", account._id))
+          .collect()
+          .then((rows) => rows.filter((doc) => doc.isActive === true));
+        for (const perm of accountPermissions) {
           await ctx.db.patch(perm._id, {
             isActive: false,
             revokedAt: now,

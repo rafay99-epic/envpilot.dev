@@ -8,6 +8,7 @@ import {
 } from "./featureRegistry";
 import { createAuditLog } from "./auditHelpers";
 import { authorizeAccountAccess, requireAccountAccess } from "./authHelpers";
+import { PURGE_RETENTION_DAYS } from "./vaultGc";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
@@ -521,6 +522,144 @@ export const remove = mutation({
     });
 
     return args.accountId;
+  },
+});
+
+/**
+ * Restore a soft-deleted account within the 7-day retention window.
+ *
+ * Mirror of variables.restore (convex/variables.ts): same authorization
+ * (owner / assigned PM / team lead via "project:delete_account"), clears
+ * deletedAt, and writes an audit entry. Like variables.restore it does NOT
+ * reactivate per-account permission grants — those were deactivated on delete
+ * and are re-granted explicitly if needed (exact behavior parity).
+ *
+ * Once the daily vault-GC sweep (convex/vaultGc.ts) purges the account after
+ * the retention window, its row is gone and restore fails with a not-found
+ * error that names the expired window (see the null-account branch below).
+ *
+ * NOTE: the auditLogs action union has no "account.restored" literal and this
+ * change is constrained to index-only schema edits, so the restore is recorded
+ * as "account.updated" with a `restored: true` detail. See vault-gc.md for the
+ * follow-up recommendation to add a dedicated audit action.
+ */
+export const restore = mutation({
+  args: {
+    accountId: v.id("projectAccounts"),
+    restoredBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    const account = await ctx.db.get(args.accountId);
+    if (!account) {
+      throw new Error(
+        "Account not found — it may have been permanently deleted after the 7-day retention period."
+      );
+    }
+
+    if (!account.deletedAt) {
+      throw new Error("Account is not deleted");
+    }
+
+    // Past the retention window the account is purge-eligible: its vault
+    // object may be destroyed at any moment, so restoring would race the
+    // GC and could resurrect an account whose credentials no longer exist.
+    if (account.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
+      throw new Error(
+        `Account can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
+      );
+    }
+
+    const project = await ctx.db.get(account.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Authorization: owner, or assigned PM / team lead (parity with
+    // accounts.remove — role-only, developers can never restore).
+    await authorizeAccountAccess(ctx, {
+      userId: args.restoredBy,
+      projectId: account.projectId,
+      action: "project:delete_account",
+      preloadedProject: project,
+    });
+
+    await ctx.db.patch(args.accountId, {
+      deletedAt: undefined,
+      updatedAt: now,
+    });
+
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: account.projectId,
+      userId: args.restoredBy,
+      action: "account.updated",
+      details: {
+        accountId: args.accountId,
+        accountName: account.name,
+        restored: true,
+        deletedAt: account.deletedAt,
+        restoredAt: now,
+      },
+      involvesSensitiveData: true,
+      resourceType: "account",
+    });
+
+    return args.accountId;
+  },
+});
+
+/**
+ * List a project's soft-deleted accounts that are still within the
+ * PURGE_RETENTION_DAYS restore window — twin of variables.getDeleted.
+ * vaultGc purges anything older, so those are excluded here rather than
+ * surfaced as "restorable".
+ *
+ * Authorization mirrors restore: only owners / assigned PM / team lead
+ * ("project:delete_account") may see the trash list. Like the other
+ * list-style queries in this file (listWithAccess) this returns [] rather
+ * than throwing when the project is gone or the caller lacks access, so the
+ * UI can render nothing instead of erroring.
+ */
+export const getDeleted = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      return [];
+    }
+
+    try {
+      await authorizeAccountAccess(ctx, {
+        userId: args.userId,
+        projectId: args.projectId,
+        action: "project:delete_account",
+        preloadedProject: project,
+      });
+    } catch {
+      return [];
+    }
+
+    const cutoff = Date.now() - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+    // by_project_deleted reads exactly this project's soft-deleted rows in
+    // the restore window — see variables.getDeleted for the ordering note.
+    const deletedAccounts = await ctx.db
+      .query("projectAccounts")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gte("deletedAt", cutoff)
+      )
+      .take(100);
+
+    return deletedAccounts.map((account) => ({
+      _id: account._id,
+      name: account.name,
+      deletedAt: account.deletedAt as number,
+    }));
   },
 });
 

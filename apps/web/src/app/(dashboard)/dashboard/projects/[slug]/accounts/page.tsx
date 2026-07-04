@@ -429,7 +429,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
           onClose={() => setDeletingAccount(null)}
           onConfirm={handleDelete}
           title="Delete Account"
-          message={`Are you sure you want to delete "${deletingAccount?.name}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete "${deletingAccount?.name}"? You can restore it for 7 days. After that it is permanently deleted, including the stored credentials.`}
           confirmText="Delete"
           variant="danger"
         />

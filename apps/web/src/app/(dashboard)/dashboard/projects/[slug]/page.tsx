@@ -38,6 +38,7 @@ import {
   ImportDialog,
   ShareSecretDrawer,
   TagFilter,
+  RecentlyDeleted,
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
@@ -868,6 +869,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
       </div>
 
+      {canDeleteVariable && projectId && (
+        <RecentlyDeleted projectId={projectId} userId={convexUserId} />
+      )}
+
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
@@ -1028,7 +1033,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onClose={() => setDeletingVariable(null)}
         onConfirm={handleDeleteVariable}
         title="Delete Variable"
-        message={`Are you sure you want to delete "${deletingVariable?.key}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deletingVariable?.key}"? You can restore it for 7 days. After that it is permanently deleted, including the stored secret value.`}
         confirmText="Delete"
         variant="danger"
       />
@@ -1060,7 +1065,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         onClose={() => setShowBulkDeleteConfirm(false)}
         onConfirm={handleBulkDelete}
         title="Bulk Delete Variables"
-        message={`Are you sure you want to delete ${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}? This action cannot be undone.`}
+        message={`Are you sure you want to delete ${selectedIds.size} variable${selectedIds.size !== 1 ? "s" : ""}? You can restore them for 7 days. After that they are permanently deleted, including the stored secret values.`}
         confirmText={isBulkDeleting ? "Deleting..." : "Delete All"}
         variant="danger"
       />

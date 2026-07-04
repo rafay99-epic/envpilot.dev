@@ -100,4 +100,14 @@ crons.interval(
   internal.subscriptions.cleanupProcessedWebhooks
 );
 
+// Permanently purge trashed variables/accounts past the 7-day retention window
+// — destroys their WorkOS Vault objects AND Convex rows. Runs after the 3:xx
+// permission cleanups so it operates on freshly-settled state.
+crons.daily(
+  "purge expired trashed secrets",
+  { hourUTC: 4, minuteUTC: 0 },
+  internal.vaultGc.purgeExpiredBatch,
+  {}
+);
+
 export default crons;

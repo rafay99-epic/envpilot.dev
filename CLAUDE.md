@@ -19,6 +19,12 @@ No slob pad generation code should be allowed. And you're following the developm
 - **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
 - **Verify work using built-in checks only**: `bun run typecheck`, `bun run lint`, `bun run format:check`, or `bun run check:all` (runs all three).
 
+### Testing Policy (every feature PR)
+
+1. **Playwright end-to-end tests are mandatory for every feature.** Cover the happy path and the reachable edge cases by driving the REAL UI (existing components, existing flows — never test-only shortcuts). New specs go in `apps/web/tests/e2e/authenticated/` and must follow the suite's existing conventions (`support.ts` helpers, unique test-data naming, cleanup so reruns stay green, self-skip when preconditions are unavailable). Playwright reuses the already-running dev server on :3000.
+2. **Smoke test before opening/finishing the PR:** run the FULL e2e suite (`cd apps/web && bunx playwright test`), not just the new spec — the point is catching regressions in existing flows. All tests must pass (self-skips are acceptable); a failing existing test is a blocker, and bending a test to pass instead of fixing the product is never acceptable.
+3. **Final testing is done by the developer** (the human) on the PR before merge — automated green is necessary but not sufficient; do not merge on the AI's say-so.
+
 ### Feature Registry & Tier Gating (CRITICAL)
 
 Every gatable feature in the platform is managed through the **dynamic feature registry** (`convex/featureRegistry.ts`). When implementing any new feature that should be tier-gated:
