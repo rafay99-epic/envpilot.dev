@@ -1,0 +1,24 @@
+convex/accounts.ts
+  s_53bfe4b41edb34::t_1281eed2403b0b 649-651,653-654,656-662
+convex/variables.ts
+  s_53bfe4b41edb34::t_b9922dab939e3a 2021-2026,2028-2029,2031-2038
+convex/schema.ts
+  s_53bfe4b41edb34::t_0d9ee748f9da33 234-238
+  s_53bfe4b41edb34::t_b724dccac208c9 400-403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d42ee3228c3bb898bed23b7fa25cdc8cd47a9526",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
