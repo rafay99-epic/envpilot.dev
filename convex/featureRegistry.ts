@@ -474,12 +474,16 @@ export async function checkCountedLimit(
  *   the common case (limit reached within the first page or two).
  */
 async function countMatchingUpTo<Doc>(
-  query: Pageable<Doc>,
+  // A FACTORY, not a query: Convex query builders are single-use ("A query
+  // can only be chained once"), so each .paginate() loop iteration must
+  // rebuild the query from scratch — reusing one builder threw at runtime
+  // as soon as a range spanned more than one page.
+  makeQuery: () => Pageable<Doc>,
   isCounted: (doc: Doc) => boolean,
   limit: number | undefined
 ): Promise<number> {
   if (limit === undefined) {
-    const rows = await query.collect();
+    const rows = await makeQuery().collect();
     return rows.filter(isCounted).length;
   }
 
@@ -487,7 +491,7 @@ async function countMatchingUpTo<Doc>(
   let cursor: string | null = null;
   let count = 0;
   for (;;) {
-    const result = await query.paginate({ cursor, numItems: pageSize });
+    const result = await makeQuery().paginate({ cursor, numItems: pageSize });
     for (const doc of result.page) {
       if (isCounted(doc)) count++;
     }
@@ -524,10 +528,14 @@ export async function countActiveVariables(
   projectId: Id<"projects">,
   limit?: number
 ): Promise<number> {
-  const query = db
-    .query("environmentVariables")
-    .withIndex("by_project", (q) => q.eq("projectId", projectId));
-  return countMatchingUpTo(query, (v) => v.deletedAt === undefined, limit);
+  return countMatchingUpTo(
+    () =>
+      db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId)),
+    (v) => v.deletedAt === undefined,
+    limit
+  );
 }
 
 export async function countMembersAndPendingInvites(
@@ -591,10 +599,14 @@ export async function countRotationEnabledVariables(
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
-    const query = db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id));
-    count += await countMatchingUpTo(query, isRotationEnabled, remaining);
+    count += await countMatchingUpTo(
+      () =>
+        db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
+      isRotationEnabled,
+      remaining
+    );
   }
   return count;
 }
@@ -620,11 +632,11 @@ export async function countActiveAccounts(
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
-    const query = db
-      .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id));
     count += await countMatchingUpTo(
-      query,
+      () =>
+        db
+          .query("projectAccounts")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
       (a) => a.deletedAt === undefined,
       remaining
     );
