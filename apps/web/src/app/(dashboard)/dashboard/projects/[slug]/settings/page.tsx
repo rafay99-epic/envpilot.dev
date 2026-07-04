@@ -733,8 +733,9 @@ function DangerZoneProjectSettings({
       <TerminalCard className="border-red-500/30">
         <h2 className="text-base font-semibold text-red-400">Delete Project</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Once you delete a project, all its environment variables will be
-          deleted. This action cannot be undone.
+          Once you delete a project, it cannot be restored. Its variables and
+          shared accounts follow the same 7-day retention before permanent
+          deletion, including the stored secret values.
         </p>
 
         {showDeleteConfirm && project ? (

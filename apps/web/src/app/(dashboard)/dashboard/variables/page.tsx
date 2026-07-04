@@ -508,7 +508,7 @@ export default function VariablesPage() {
         onClose={() => setDeletingVariable(null)}
         onConfirm={handleDeleteVariable}
         title="Delete Variable"
-        message={`Are you sure you want to delete "${deletingVariable?.key}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deletingVariable?.key}"? You can restore it for 7 days. After that it is permanently deleted, including the stored secret value.`}
         confirmText="Delete"
         variant="danger"
       />

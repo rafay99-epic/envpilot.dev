@@ -17,6 +17,7 @@ import {
 } from "./auditHelpers";
 import { rateLimiter } from "./rateLimits";
 import { authorizeVariableAccess, requireVariableAccess } from "./authHelpers";
+import { PURGE_RETENTION_DAYS } from "./vaultGc";
 import {
   assertOrgAction,
   getVariableAccess,
@@ -1937,6 +1938,15 @@ export const restore = mutation({
       throw new Error("Variable is not deleted");
     }
 
+    // Past the retention window the variable is purge-eligible: its vault
+    // objects may be destroyed at any moment, so restoring would race the
+    // GC and could resurrect a variable whose values no longer exist.
+    if (variable.deletedAt < now - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000) {
+      throw new Error(
+        `Variable can no longer be restored — the ${PURGE_RETENTION_DAYS}-day retention window has passed and it is scheduled for permanent deletion.`
+      );
+    }
+
     const project = await ctx.db.get(variable.projectId);
     if (!project) {
       throw new Error("Project not found");
@@ -1970,6 +1980,60 @@ export const restore = mutation({
     });
 
     return args.variableId;
+  },
+});
+
+/**
+ * List a project's soft-deleted variables that are still within the
+ * PURGE_RETENTION_DAYS restore window (vaultGc purges anything older, so
+ * those are excluded here rather than surfaced as "restorable").
+ *
+ * Authorization mirrors restore: only owners / assigned PM / team lead
+ * ("project:delete_variable") may see the trash list. Like the other
+ * list-style queries in this file (listWithAccess, listMetadataByProject)
+ * this returns [] rather than throwing when the project is gone or the
+ * caller lacks access, so the UI can render nothing instead of erroring.
+ */
+export const getDeleted = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      return [];
+    }
+
+    try {
+      await authorizeVariableAccess(ctx, {
+        userId: args.userId,
+        projectId: args.projectId,
+        action: "project:delete_variable",
+        preloadedProject: project,
+      });
+    } catch {
+      return [];
+    }
+
+    const cutoff = Date.now() - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+    const allVariables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .take(500);
+
+    return allVariables
+      .filter(
+        (variable) =>
+          variable.deletedAt !== undefined && variable.deletedAt >= cutoff
+      )
+      .map((variable) => ({
+        _id: variable._id,
+        key: variable.key,
+        deletedAt: variable.deletedAt as number,
+        environments: variable.environments,
+      }));
   },
 });
 

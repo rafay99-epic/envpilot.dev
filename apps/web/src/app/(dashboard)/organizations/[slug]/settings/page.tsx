@@ -664,8 +664,10 @@ function DangerZoneSettings({
       <TerminalCard className="border-red-500/30">
         <h2 className="text-base font-semibold text-red-400">Danger Zone</h2>
         <p className="mt-2 text-sm text-zinc-500">
-          Once you delete an organization, there is no going back. All projects,
-          environment variables, and team data will be permanently removed.
+          Once you delete an organization, there is no going back. All projects
+          and team data will be permanently removed; its environment variables
+          and shared accounts follow the same 7-day retention before permanent
+          deletion, including the stored secret values.
         </p>
 
         {showDeleteConfirm ? (
