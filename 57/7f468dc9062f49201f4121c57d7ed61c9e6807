@@ -1,0 +1,23 @@
+convex/featureRegistry.ts
+  s_53bfe4b41edb34::t_1d0e58d0558361 403-406
+  s_53bfe4b41edb34::t_94a756fbe48244 500,529
+apps/web/src/app/api/variables/[id]/route.ts
+  s_53bfe4b41edb34::t_880db3abe782b3 14
+  s_53bfe4b41edb34::t_674f93af00022c 209-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "577f468dc9062f49201f4121c57d7ed61c9e6807",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
