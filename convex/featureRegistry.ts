@@ -400,7 +400,10 @@ async function countMatchingUpTo<Doc>(
     for (const doc of result.page) {
       if (isCounted(doc)) count++;
     }
-    if (count > limit || result.isDone) {
+    // Stop at equality: the downstream decision is `count < limit`, which
+    // is already false once count reaches limit — reading further can't
+    // change the outcome.
+    if (count >= limit || result.isDone) {
       return count;
     }
     cursor = result.continueCursor;
@@ -494,7 +497,7 @@ export async function countRotationEnabledVariables(
 
   let count = 0;
   for (const project of projects) {
-    if (limit !== undefined && count > limit) break; // already over — no need to scan remaining projects
+    if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
     const query = db
@@ -523,7 +526,7 @@ export async function countActiveAccounts(
 
   let count = 0;
   for (const project of projects) {
-    if (limit !== undefined && count > limit) break; // already over — no need to scan remaining projects
+    if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
     const query = db

@@ -11,7 +11,7 @@ import {
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
-import { createSecret } from "@/lib/vault";
+import { createSecret, deleteSecret } from "@/lib/vault";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const log = createLogger("api/variables/[id]");
@@ -206,17 +206,34 @@ export async function PATCH(request: Request, context: RouteContext) {
       vaultRef = vaultResult.id;
     }
 
-    await convex.mutation(api.variables.update, {
-      variableId: id as Id<"environmentVariables">,
-      vaultRef,
-      description,
-      environments,
-      isSensitive,
-      updatedBy: convexUser._id,
-      changeReason,
-      rotationFrequencyDays,
-      tagIds: tagIds as Id<"variableTags">[] | undefined,
-    });
+    try {
+      await convex.mutation(api.variables.update, {
+        variableId: id as Id<"environmentVariables">,
+        vaultRef,
+        description,
+        environments,
+        isSensitive,
+        updatedBy: convexUser._id,
+        changeReason,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
+      });
+    } catch (mutationError) {
+      // The mutation performs write authorization and validation — if it
+      // rejects, the freshly minted vault object is referenced by nothing
+      // and would leak forever (no GC exists). Best-effort cleanup, same
+      // pattern as the accounts create route.
+      if (vaultRef) {
+        try {
+          await deleteSecret(vaultRef);
+        } catch (cleanupError) {
+          reportApiError(cleanupError, "PATCH /api/variables/[id]", {
+            phase: "vault-orphan-cleanup",
+          });
+        }
+      }
+      throw mutationError;
+    }
 
     const updatedVariable = await convex.query(api.variables.getById, {
       variableId: id as Id<"environmentVariables">,
