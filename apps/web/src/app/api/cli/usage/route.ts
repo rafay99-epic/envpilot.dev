@@ -9,6 +9,7 @@ import {
   checkCLIAccess,
   tierLimitResponse,
 } from "@/lib/cli-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/cli/usage
@@ -102,6 +103,7 @@ export async function GET(request: NextRequest) {
       resolvedFeatures: resolvedFeatures?.features ?? {},
     });
   } catch (error) {
+    reportApiError(error, "GET /api/cli/usage");
     console.error("CLI usage error:", error);
     return NextResponse.json(
       { error: "Failed to get usage information" },

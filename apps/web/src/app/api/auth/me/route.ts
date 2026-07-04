@@ -13,6 +13,7 @@ import {
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 // GET /api/auth/me - Get current authenticated user
 export async function GET(request: Request) {
@@ -124,6 +125,7 @@ export async function GET(request: Request) {
       { headers: cacheHeaders.privateShort }
     );
   } catch (error) {
+    reportApiError(error, "GET /api/auth/me");
     console.error("Error fetching user:", error);
     return NextResponse.json(
       { error: "Failed to fetch user" },

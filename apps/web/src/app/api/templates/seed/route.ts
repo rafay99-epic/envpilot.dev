@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { BUILT_IN_TEMPLATES } from "@/constants/templates";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * POST /api/templates/seed - Seed built-in templates
@@ -42,6 +43,7 @@ export async function POST() {
       { status: 403 }
     );
   } catch (error) {
+    reportApiError(error, "POST /api/templates/seed");
     const message =
       error instanceof Error ? error.message : "Failed to process request";
     console.error("Failed to process seed request:", error);
@@ -82,6 +84,7 @@ export async function GET() {
       info: "Built-in templates from constants are used directly by the client. Database templates are optional for custom modifications.",
     });
   } catch (error) {
+    reportApiError(error, "GET /api/templates/seed");
     console.error("Failed to check seed status:", error);
     return NextResponse.json(
       { error: "Failed to check seed status" },

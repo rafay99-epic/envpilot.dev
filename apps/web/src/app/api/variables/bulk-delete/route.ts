@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const bulkDeleteSchema = z.object({
   variableIds: z.array(z.string()).min(1).max(50),
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
       deletedCount: result.deletedCount,
     });
   } catch (err) {
+    reportApiError(err, "POST /api/variables/bulk-delete");
     const message =
       err instanceof Error ? err.message : "Failed to bulk delete variables";
     return NextResponse.json({ error: message }, { status: 500 });

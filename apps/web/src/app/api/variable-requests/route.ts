@@ -11,6 +11,7 @@ import {
 } from "@/lib/convex-helpers";
 import { createSecret } from "@/lib/vault";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const listSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -88,6 +89,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ requests });
   } catch (error) {
+    reportApiError(error, "GET /api/variable-requests");
     const message =
       error instanceof Error
         ? error.message
@@ -180,6 +182,7 @@ export async function POST(request: Request) {
     if (message.includes("already exists")) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
+    reportApiError(error, "POST /api/variable-requests");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

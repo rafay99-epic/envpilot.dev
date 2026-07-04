@@ -34,6 +34,10 @@ Sentry.init({
 
   enableLogs: true,
 
+  // All EnvPilot surfaces report to one Sentry project; the surface tag
+  // is how dashboards tell web / cli / extension events apart.
+  initialScope: { tags: { surface: "web" } },
+
   tracesSampleRate: 0,
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,

@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
+import {
+  sanitizeConvexError,
+  handleApiError,
+  reportApiError,
+} from "@/lib/api-errors";
 import { z } from "zod";
 import {
   getOrCreateConvexUser,
@@ -75,6 +79,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ projects });
     }
   } catch (error) {
+    reportApiError(error, "GET /api/projects");
     console.error("Error fetching projects:", error);
     return NextResponse.json(
       { error: "Failed to fetch projects" },

@@ -4,6 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/users/me - Get current user's Convex ID and details
@@ -28,6 +29,7 @@ export async function GET() {
       createdAt: user.createdAt,
     });
   } catch (error) {
+    reportApiError(error, "GET /api/users/me");
     console.error("Error fetching user:", error);
     return NextResponse.json(
       { error: "Failed to fetch user" },
@@ -75,6 +77,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, name });
   } catch (error) {
+    reportApiError(error, "PATCH /api/users/me");
     console.error("Error updating profile:", error);
     return NextResponse.json(
       { error: "Failed to update profile" },

@@ -20,7 +20,13 @@ import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import { VersionCheckService } from "./services/versionCheck";
 import { openUrlReliably } from "./utils/browser";
-import { initSentry, captureError, closeSentry } from "./utils/sentry";
+import {
+  initSentry,
+  captureError,
+  closeSentry,
+  setSentryUser,
+  clearSentryUser,
+} from "./utils/sentry";
 import { getDeviceInfo } from "./utils/device";
 import {
   getServerUrl,
@@ -121,7 +127,8 @@ async function initializeConvexService(): Promise<void> {
           { timeout: 5000 }
         );
         convexUrl = response.data?.convexUrl || "";
-      } catch {
+      } catch (err) {
+        captureError(err, { phase: "convex-url-autodetect" });
         output.warn("Failed to auto-detect Convex URL from server");
       }
     }
@@ -144,6 +151,29 @@ async function initializeConvexService(): Promise<void> {
 
 export async function activate(context: vscode.ExtensionContext) {
   initSentry();
+
+  // Sentry must be torn down/brought back up if the user flips VS Code's
+  // global telemetry setting mid-session — initSentry() already checks
+  // vscode.env.isTelemetryEnabled, but that check only runs when init is
+  // called, so a live toggle needs its own listener.
+  context.subscriptions.push(
+    vscode.env.onDidChangeTelemetryEnabled((enabled) => {
+      if (enabled) {
+        initSentry();
+        // setSentryUser() was a no-op while telemetry was off, so a
+        // sign-in that happened in the meantime never tagged the user —
+        // reapply the current identity on opt-in.
+        void authService
+          ?.getCurrentUser()
+          .then((user) => {
+            if (user) setSentryUser(user.id, user.email);
+          })
+          .catch(() => {});
+      } else {
+        void closeSentry();
+      }
+    })
+  );
 
   // Initialize storage
   storageService = new StorageService(context);
@@ -328,6 +358,12 @@ export async function activate(context: vscode.ExtensionContext) {
     isAuthenticated
   );
   projectsTreeProvider.setAuthenticated(isAuthenticated);
+  if (isAuthenticated) {
+    const currentUser = await authService.getCurrentUser();
+    if (currentUser) {
+      setSentryUser(currentUser.id, currentUser.email);
+    }
+  }
 
   // Start reactive sync if authenticated and auto-sync enabled
   if (isAuthenticated && shouldAutoSync()) {
@@ -402,6 +438,9 @@ async function handleSignIn(): Promise<void> {
     // at the switcher — AuthService.signIn() already showed the plain
     // "Signed in as <email>" toast for the single-account case.
     const user = await authService.getCurrentUser();
+    if (user) {
+      setSentryUser(user.id, user.email);
+    }
     const accounts = await storageService.listAccounts();
     if (user && accounts.length > 1) {
       vscode.window.showInformationMessage(
@@ -432,6 +471,7 @@ async function handleSignIn(): Promise<void> {
 
 async function handleSignOut(): Promise<void> {
   await authService.signOut();
+  clearSentryUser();
   apiService.clearCache();
   syncService.stopPeriodicSync();
   realTimeSyncService.stopRealTimeSync();
@@ -444,6 +484,7 @@ async function handleSignOut(): Promise<void> {
   // handler just applied.
   const remainingSession = await storageService.getAuthSession();
   if (remainingSession) {
+    setSentryUser(remainingSession.user.id, remainingSession.user.email);
     vscode.commands.executeCommand(
       "setContext",
       "envpilot.isAuthenticated",
@@ -577,6 +618,9 @@ async function switchToAccount(accountId: string): Promise<void> {
   );
 
   const active = await authService.getCurrentUser();
+  if (active) {
+    setSentryUser(active.id, active.email);
+  }
   vscode.window.showInformationMessage(
     `Switched to ${active?.email ?? "account"}.`
   );
@@ -604,6 +648,7 @@ async function handleSignOutAll(): Promise<void> {
   }
 
   await storageService.clearAllAccounts();
+  clearSentryUser();
 
   // Mirror handleSignOut's teardown plus the context/UI refresh that
   // AuthService.onAuthStateChanged normally drives, since clearAllAccounts()

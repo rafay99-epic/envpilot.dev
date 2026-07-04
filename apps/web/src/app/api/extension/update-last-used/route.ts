@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
+import { reportApiError } from "@/lib/api-errors";
 
 const updateLastUsedSchema = z.object({
   accessToken: z.string().min(1, "Access token is required"),
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       data: { success },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/extension/update-last-used");
     const message =
       error instanceof Error ? error.message : "Failed to update last used";
     return NextResponse.json({ error: message }, { status: 500 });

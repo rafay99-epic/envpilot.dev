@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
+import { reportApiError } from "@/lib/api-errors";
 import { readSecret } from "@/lib/vault";
 import {
   serialize,
@@ -150,6 +151,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/projects/[id]/export");
     console.error("Error exporting variables:", error);
     return NextResponse.json(
       { error: "Failed to export variables" },

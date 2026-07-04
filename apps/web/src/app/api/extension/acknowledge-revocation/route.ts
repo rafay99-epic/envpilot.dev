@@ -3,6 +3,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { Id } from "@convex/_generated/dataModel";
+import { reportApiError } from "@/lib/api-errors";
 
 const acknowledgeSchema = z.object({
   // Require an access token for authentication
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/extension/acknowledge-revocation");
     const message =
       error instanceof Error
         ? error.message

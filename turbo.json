@@ -29,6 +29,9 @@
         "SENTRY_AUTH_TOKEN",
         "SENTRY_ORG",
         "SENTRY_PROJECT",
+        "SENTRY_CLI_DSN",
+        "SENTRY_EXTENSION_DSN",
+        "ENVPILOT_SERVER_URL",
         "VITE_CONVEX_URL"
       ],
       "outputs": [".next/**", "dist/**"]

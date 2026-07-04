@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const createTemplateSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -83,6 +84,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ templates });
   } catch (error) {
+    reportApiError(error, "GET /api/templates");
     console.error("Failed to fetch templates:", error);
     return NextResponse.json(
       { error: "Failed to fetch templates" },
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ template }, { status: 201 });
   } catch (error) {
+    reportApiError(error, "POST /api/templates");
     const message =
       error instanceof Error ? error.message : "Failed to create template";
     console.error("Failed to create template:", error);

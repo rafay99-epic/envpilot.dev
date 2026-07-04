@@ -6,6 +6,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import * as Sentry from "@sentry/nextjs";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { reportApiError } from "@/lib/api-errors";
 import { readSecret, updateSecret } from "@/lib/vault";
 import { serializeAccountVault, websiteUrlSchema } from "@/lib/account-payload";
 
@@ -27,7 +28,11 @@ interface RouteContext {
  * Map a thrown Convex/route error to the appropriate HTTP status + shape.
  * Mirrors the classification used by PATCH /api/variables/[id].
  */
-function errorResponseFor(error: unknown, fallbackMessage: string) {
+function errorResponseFor(
+  error: unknown,
+  fallbackMessage: string,
+  route?: string
+) {
   const message = error instanceof Error ? error.message : String(error);
 
   if (message.includes("not found") || message.includes("Not found")) {
@@ -45,6 +50,10 @@ function errorResponseFor(error: unknown, fallbackMessage: string) {
 
   if (message.includes("limit reached")) {
     return NextResponse.json({ error: message }, { status: 403 });
+  }
+
+  if (route) {
+    reportApiError(error, route);
   }
 
   return NextResponse.json(
@@ -164,7 +173,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ account: updatedAccount });
   } catch (error) {
     console.error("[PATCH /api/accounts/[id]]", error);
-    return errorResponseFor(error, "Failed to update account");
+    return errorResponseFor(
+      error,
+      "Failed to update account",
+      "PATCH /api/accounts/[id]"
+    );
   }
 }
 
@@ -194,6 +207,10 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[DELETE /api/accounts/[id]]", error);
-    return errorResponseFor(error, "Failed to delete account");
+    return errorResponseFor(
+      error,
+      "Failed to delete account",
+      "DELETE /api/accounts/[id]"
+    );
   }
 }

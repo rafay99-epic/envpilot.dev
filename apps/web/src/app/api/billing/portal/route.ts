@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const portalSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       portalUrl: session.customerPortalUrl,
     });
   } catch (error) {
+    reportApiError(error, "POST /api/billing/portal");
     console.error("Error creating billing portal session:", error);
     const message =
       error instanceof Error

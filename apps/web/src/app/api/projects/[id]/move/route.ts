@@ -6,6 +6,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
+import { reportApiError } from "@/lib/api-errors";
 import { normalizeOrgRole } from "@/lib/roles";
 
 const log = createLogger("api/projects/move");
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (message.includes("slug already exists")) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
+    reportApiError(error, "POST /api/projects/[id]/move");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

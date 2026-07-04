@@ -7,6 +7,7 @@ import {
   VaultError,
   isVaultConfigured,
 } from "@/lib/vault";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * Data Key Management API Routes
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/vault/keys");
     logError("createDataKey", error);
 
     if (error instanceof VaultError) {
@@ -148,6 +150,7 @@ export async function PUT(request: NextRequest) {
       data: { dataKey },
     });
   } catch (error) {
+    reportApiError(error, "PUT /api/vault/keys");
     logError("decryptDataKey", error);
 
     if (error instanceof VaultError) {

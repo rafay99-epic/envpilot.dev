@@ -6,6 +6,7 @@ import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { reportApiError } from "@/lib/api-errors";
 
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
@@ -50,6 +51,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json(sessions);
   } catch (error) {
+    reportApiError(
+      error,
+      "GET /api/organizations/[slug]/members/[userId]/sessions"
+    );
     console.error("[SESSIONS] Error fetching sessions:", error);
     return NextResponse.json(
       {
@@ -163,12 +168,20 @@ export async function DELETE(request: Request, { params }: RouteParams) {
           });
         }
       } catch (emailErr) {
+        reportApiError(
+          emailErr,
+          "DELETE /api/organizations/[slug]/members/[userId]/sessions"
+        );
         console.error("[SESSIONS] Failed to send revocation email:", emailErr);
       }
     }
 
     return NextResponse.json({ success: true, revokedCount });
   } catch (error) {
+    reportApiError(
+      error,
+      "DELETE /api/organizations/[slug]/members/[userId]/sessions"
+    );
     console.error("[SESSIONS] Error revoking sessions:", error);
     return NextResponse.json(
       {

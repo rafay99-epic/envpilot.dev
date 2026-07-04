@@ -9,6 +9,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -93,7 +94,8 @@ export async function GET(request: Request, context: RouteContext) {
     });
 
     return NextResponse.json({ history });
-  } catch {
+  } catch (error) {
+    reportApiError(error, "GET /api/variables/[id]/history");
     return NextResponse.json(
       { error: "Failed to fetch variable history" },
       { status: 500 }

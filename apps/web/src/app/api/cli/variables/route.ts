@@ -10,6 +10,7 @@ import {
 import { createSecret, readSecret } from "@/lib/vault";
 import { z } from "zod";
 import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const createVariableSchema = z.object({
   projectId: z.string().min(1),
@@ -209,6 +210,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/cli/variables");
     console.error("CLI variables error:", error);
     return NextResponse.json(
       { error: "Failed to list variables" },
@@ -327,6 +329,7 @@ export async function POST(request: NextRequest) {
         "You do not have permission to create variables in this project"
       );
     }
+    reportApiError(error, "POST /api/cli/variables");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

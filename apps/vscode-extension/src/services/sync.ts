@@ -14,6 +14,7 @@ import {
 } from "../utils/config";
 import { normalizePath, toPlatformPath, getDisplayPath } from "../utils/paths";
 import { envFileNamesFor } from "../utils/envFiles";
+import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
   fileProtectionMode,
@@ -242,6 +243,7 @@ export class SyncService {
       try {
         await this.checkProjectPermissions(project);
       } catch (error) {
+        captureError(error, { phase: "check-linked-projects-v1" });
         console.error(
           `Failed to check permissions for ${project.projectName}:`,
           error
@@ -724,6 +726,7 @@ export class SyncService {
       try {
         await this.checkProjectPermissionsV2(project);
       } catch (error) {
+        captureError(error, { phase: "check-linked-projects-v2" });
         console.error(
           `Failed to check permissions for ${project.projectName}:`,
           error

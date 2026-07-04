@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const rollbackSchema = z.object({
   targetVersion: z.number().int().positive(),
@@ -103,6 +104,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: message }, { status: 404 });
     }
 
+    reportApiError(error, "POST /api/variables/[id]/rollback");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -33,12 +33,16 @@ export default function DashboardError({
 
     // All retries exhausted — schedule showing the error UI via a microtask
     // to avoid synchronous setState within an effect body.
+    // Convex useQuery failures throw into this boundary; label them so
+    // they're distinguishable from generic render errors in Sentry.
+    const isConvexError = /\[Request ID:|\[CONVEX/.test(error.message);
     log.error(
       "dashboard_error_exhausted",
       {
         digest: error.digest,
         attempts: retryCount.current,
         message: error.message,
+        source: isConvexError ? "convex-query" : "render",
       },
       error
     );

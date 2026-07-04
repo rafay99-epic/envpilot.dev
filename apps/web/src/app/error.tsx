@@ -32,13 +32,17 @@ export default function Error({
       return () => clearTimeout(timer);
     }
 
-    // All retries exhausted — report to Sentry and show error UI
+    // All retries exhausted — report to Sentry and show error UI.
+    // Convex useQuery failures throw into this boundary; label them so
+    // they're distinguishable from generic render errors in Sentry.
+    const isConvexError = /\[Request ID:|\[CONVEX/.test(error.message);
     log.error(
       "application_error_exhausted",
       {
         digest: error.digest,
         attempts: retryCount.current,
         message: error.message,
+        source: isConvexError ? "convex-query" : "render",
       },
       error
     );

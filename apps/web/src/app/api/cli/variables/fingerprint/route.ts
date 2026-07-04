@@ -8,6 +8,7 @@ import {
   unauthorizedResponse,
   forbiddenResponse,
 } from "@/lib/cli-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/cli/variables/fingerprint
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ fingerprint });
   } catch (error) {
+    reportApiError(error, "GET /api/cli/variables/fingerprint");
     console.error("CLI variables fingerprint error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

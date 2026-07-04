@@ -4,6 +4,7 @@ import axios from "axios";
 import { getServerUrl } from "../utils/config";
 import { openUrlReliably } from "../utils/browser";
 import * as output from "../utils/outputChannel";
+import { captureError } from "../utils/sentry";
 import { StorageService } from "../utils/storage";
 import type { AuthSession, User, ApiResponse } from "../types";
 
@@ -342,6 +343,7 @@ export class AuthService {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response
         ?.status;
+      captureError(err, { phase: "auth-refresh-token" });
       // Only sign out when the server definitively rejects the refresh
       // token (4xx). Transient network errors or server outages must not
       // destroy an otherwise valid session.

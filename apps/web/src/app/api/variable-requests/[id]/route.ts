@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { reportApiError } from "@/lib/api-errors";
 
 const updateRequestSchema = z.object({
   action: z.enum(["approve", "reject", "cancel"]),
@@ -101,6 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
 
+    reportApiError(error, "PATCH /api/variable-requests/[id]");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
