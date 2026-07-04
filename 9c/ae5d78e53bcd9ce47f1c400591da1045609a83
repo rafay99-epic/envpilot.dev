@@ -1,0 +1,85 @@
+convex/accountPermissions.ts
+  s_53bfe4b41edb34::t_a9894d1abf2bf2 353-357,360-372
+  s_e17bfc164ca791::t_e008417eadd339 373
+convex/tierLimits.ts
+  s_53bfe4b41edb34::t_b289b4bb3c12b6 6
+  s_53bfe4b41edb34::t_aec10a1bdf58e6 273-277,281
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_53bfe4b41edb34::t_fa889bbba67a74 328-330
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_53bfe4b41edb34::t_eee32a520b8139 205-207
+apps/web/src/app/api/variables/[id]/route.ts
+  s_53bfe4b41edb34::t_c65c5a3ada63cb 14
+  s_53bfe4b41edb34::t_35f017f9d60c8a 195-199,202-205
+convex/featureRegistry.ts
+  s_53bfe4b41edb34::t_2daea29c908edb 515-516,526-529,531-536
+  s_53bfe4b41edb34::t_8544df88096927 367-409
+  s_53bfe4b41edb34::t_9aa1909aeff3fb 309-362
+  s_53bfe4b41edb34::t_848ec102a4c81d 464-472,476-477,485-494,497-500,502-503
+  s_53bfe4b41edb34::t_aa805a4936a4d5 7-23
+  s_53bfe4b41edb34::t_ccb282043bbed4 421-427,430-431,433,435-436
+apps/web/src/app/api/variables/[id]/rollback/route.ts
+  s_53bfe4b41edb34::t_5d92fe4715642f 88-91,101
+apps/web/package.json
+  s_53bfe4b41edb34::t_c79fdb95a3ad59 3
+convex/accounts.ts
+  s_53bfe4b41edb34::t_bcc2529dfde71f 6
+  s_53bfe4b41edb34::t_f65e2a06a9b109 255
+  s_53bfe4b41edb34::t_9f3b229ccbfabf 279-282,286
+  s_53bfe4b41edb34::t_5b2fecf8e67daf 369
+  s_53bfe4b41edb34::t_09afc5ce47c132 463,478,481-487
+package.json
+  s_53bfe4b41edb34::t_c79fdb95a3ad59 3
+convex/authz.ts
+  s_53bfe4b41edb34::t_b6247acf75a34b 283-287,289-292
+  s_53bfe4b41edb34::t_16cbdcb04cb0c6 609-612,614-617
+  s_53bfe4b41edb34::t_94777787c00318 498-501,503-506
+convex/permissions.ts
+  s_53bfe4b41edb34::t_bc81f5af17b565 529-533,536-548
+  s_53bfe4b41edb34::t_c7e4d85c924f48 549
+convex/authHelpers.ts
+  s_53bfe4b41edb34::t_0249ceca3bd002 61-64
+  s_53bfe4b41edb34::t_4ec09695d8c78a 134-137,145
+  s_53bfe4b41edb34::t_cab41362163835 100-102,115-116
+  s_53bfe4b41edb34::t_117239aedc8623 27-29,42-43
+  s_53bfe4b41edb34::t_c79fdb95a3ad59 72-77
+convex/variableRequests.ts
+  s_53bfe4b41edb34::t_7f639abe403292 548-550,554
+  s_53bfe4b41edb34::t_fae5efcd666b55 10
+convex/variables.ts
+  s_53bfe4b41edb34::t_bb50700f6d7a33 1334-1337,1341
+  s_53bfe4b41edb34::t_961aa4409c4be3 1593,1597-1603
+  s_53bfe4b41edb34::t_7c5aaa8372ea90 1643-1645,1647-1648
+  s_53bfe4b41edb34::t_dce6904633445e 2174-2178,2180,2184-2191
+  s_53bfe4b41edb34::t_fd0c14e1ded164 1321
+  s_53bfe4b41edb34::t_07b2061c195355 1367-1369,1373-1379
+  s_53bfe4b41edb34::t_cb0efd8ece3a72 1536
+  s_53bfe4b41edb34::t_3946a409a3d60f 8
+  s_53bfe4b41edb34::t_ccacf732fbcf03 1773,1776-1782
+  s_53bfe4b41edb34::t_b9a2afe1b2bef9 2054,2060
+  s_53bfe4b41edb34::t_be13772ef871fc 2016-2022
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9cae5d78e53bcd9ce47f1c400591da1045609a83",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_e17bfc164ca791": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "685940b6-307a-4715-b170-03cfb6cf055d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
