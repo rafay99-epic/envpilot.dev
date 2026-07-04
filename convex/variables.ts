@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { MAX_BULK_IMPORT_SIZE, isCronPaused } from "./tierLimits";
 import {
-  checkNumericLimit,
+  checkCountedLimit,
   checkBooleanFeature,
   countActiveVariables,
   countRotationEnabledVariables,
@@ -1318,6 +1318,7 @@ export const create = mutation({
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_variable",
+      preloadedProject: project,
     });
 
     // Environment scope: scoped developers may only create variables whose
@@ -1330,13 +1331,14 @@ export const create = mutation({
       throws: true,
     });
 
-    // Check tier limits for variable creation
-    const varCount = await countActiveVariables(ctx.db, args.projectId);
-    const varCheck = await checkNumericLimit(
+    // Check tier limits for variable creation. Limit-first: only counts
+    // existing variables when the tier's limit is finite, and bounds that
+    // count at the limit instead of scanning every variable in the project.
+    const varCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
       "max_variables_per_project",
-      varCount
+      (limit) => countActiveVariables(ctx.db, args.projectId, limit)
     );
     if (!varCheck.allowed) {
       throw new Error(varCheck.reason!);
@@ -1362,16 +1364,19 @@ export const create = mutation({
         );
       }
 
-      // Check rotation-enabled variable limit
-      const currentRotationCount = await countRotationEnabledVariables(
-        ctx.db,
-        project.organizationId
-      );
-      const limitCheck = await checkNumericLimit(
+      // Check rotation-enabled variable limit. Limit-first: skips the
+      // org-wide fan-out entirely when rotation is unlimited for this tier.
+      const limitCheck = await checkCountedLimit(
         ctx.db,
         project.organizationId,
         "secret_rotation_limit",
-        currentRotationCount
+        (limit) =>
+          countRotationEnabledVariables(
+            ctx.db,
+            project.organizationId,
+            undefined,
+            limit
+          )
       );
       if (!limitCheck.allowed) {
         throw new Error(
@@ -1528,7 +1533,7 @@ export const update = mutation({
 
     // Authorization: effective write access — owner, assigned PM/team lead,
     // or a developer holding a write grant on this variable
-    await requireVariableAccess(ctx, updatedBy, variable, "write");
+    await requireVariableAccess(ctx, updatedBy, variable, "write", project);
 
     // Environment scope: getVariableAccess already blocks scoped developers
     // from touching out-of-scope variables, but the NEW environments must
@@ -1585,15 +1590,17 @@ export const update = mutation({
         variable.rotationFrequencyDays !== undefined &&
         variable.rotationFrequencyDays > 0;
       if (!alreadyHasRotation) {
-        const currentRotationCount = await countRotationEnabledVariables(
-          ctx.db,
-          project.organizationId
-        );
-        const limitCheck = await checkNumericLimit(
+        const limitCheck = await checkCountedLimit(
           ctx.db,
           project.organizationId,
           "secret_rotation_limit",
-          currentRotationCount
+          (limit) =>
+            countRotationEnabledVariables(
+              ctx.db,
+              project.organizationId,
+              undefined,
+              limit
+            )
         );
         if (!limitCheck.allowed) {
           throw new Error(
@@ -1633,8 +1640,12 @@ export const update = mutation({
     };
 
     if (updates.vaultRef !== undefined) updateData.vaultRef = updates.vaultRef;
+    // An empty string clears the optional field. Convex patch treats an
+    // explicit `undefined` as field removal, so map "" → undefined (mirrors
+    // accounts.update).
     if (updates.description !== undefined)
-      updateData.description = updates.description;
+      updateData.description =
+        updates.description === "" ? undefined : updates.description;
     if (updates.environments !== undefined)
       updateData.environments = updates.environments;
     if (updates.isSensitive !== undefined)
@@ -1759,7 +1770,15 @@ export const remove = mutation({
       userId: args.deletedBy,
       projectId: variable.projectId,
       action: "project:delete_variable",
+      preloadedProject: project,
     });
+
+    // Idempotent no-op: a variable that's already soft-deleted must not be
+    // re-patched (which would clobber the original deletedAt) or emit a
+    // second "variable.deleted" audit row on a retried/duplicate call.
+    if (variable.deletedAt !== undefined) {
+      return args.variableId;
+    }
 
     await ctx.db.patch(args.variableId, {
       deletedAt: now,
@@ -1794,7 +1813,6 @@ export const remove = mutation({
       },
       involvesSensitiveData: variable.isSensitive,
       resourceType: "variable",
-      severity: "warning",
     });
 
     return args.variableId;
@@ -1896,7 +1914,6 @@ export const bulkDelete = mutation({
         projectName: project.name,
       },
       resourceType: "variable",
-      severity: "warning",
     });
 
     return { deletedCount };
@@ -1996,6 +2013,13 @@ export const rollback = mutation({
 
     const newVersion = variable.version + 1;
 
+    // Versions created since value updates started minting a fresh vault
+    // object per change carry distinct vaultRefs, so this patch genuinely
+    // restores the secret value. Legacy versions (written while updates
+    // overwrote the vault object in place) share the variable's current
+    // vaultRef — for those, only metadata is restored.
+    const valueRestored = targetVersionRecord.vaultRef !== variable.vaultRef;
+
     await ctx.db.patch(args.variableId, {
       vaultRef: targetVersionRecord.vaultRef,
       description: targetVersionRecord.description,
@@ -2027,12 +2051,13 @@ export const rollback = mutation({
         rollbackToVersion: args.targetVersion,
         previousVersion: variable.version,
         newVersion,
+        valueRestored,
       },
       involvesSensitiveData: variable.isSensitive,
       resourceType: "variable",
     });
 
-    return args.variableId;
+    return { variableId: args.variableId, valueRestored };
   },
 });
 
@@ -2146,17 +2171,24 @@ export const bulkCreate = mutation({
       );
     }
 
-    // Check variable count limits (if applicable)
-    const existingVarCount = await countActiveVariables(ctx.db, args.projectId);
-    // checkNumericLimit uses `currentCount < limit` (pre-action semantics).
-    // For bulk import, pass totalAfterImport - 1 so that exactly filling
+    // Check variable count limits (if applicable). Limit-first: only counts
+    // existing variables when the tier's limit is finite, bounded at that
+    // limit rather than scanning every variable in the project.
+    // checkCountedLimit uses `currentCount < limit` (pre-action semantics).
+    // For bulk import, return totalAfterImport - 1 so that exactly filling
     // the quota is allowed (e.g., 10 existing + 5 import vs limit 15 → ok).
-    const totalAfterImport = existingVarCount + args.variables.length;
-    const varLimitCheck = await checkNumericLimit(
+    const varLimitCheck = await checkCountedLimit(
       ctx.db,
       project.organizationId,
       "max_variables_per_project",
-      totalAfterImport - 1
+      async (limit) => {
+        const existingVarCount = await countActiveVariables(
+          ctx.db,
+          args.projectId,
+          limit
+        );
+        return existingVarCount + args.variables.length - 1;
+      }
     );
     if (!varLimitCheck.allowed) {
       throw new Error(

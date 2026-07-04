@@ -325,7 +325,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         variableId,
         projectId,
         value: data.value || undefined,
-        description: data.description || undefined,
+        // Send "" through (not undefined) so a cleared description is
+        // actually removed server-side — see convex/variables.ts update.
+        description: data.description,
         environments: data.environments,
         isSensitive: data.isSensitive,
         changeReason: "Updated via dashboard",

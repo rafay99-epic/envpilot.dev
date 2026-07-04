@@ -24,6 +24,9 @@ export async function authorizeVariableAccess(
     userId: Id<"users">;
     projectId: Id<"projects">;
     action: ProjectAction;
+    // Pass the project doc when the caller already fetched it, so
+    // assertProjectAction doesn't read the same row again.
+    preloadedProject?: Doc<"projects"> | null;
   }
 ) {
   // Verify user exists
@@ -36,7 +39,8 @@ export async function authorizeVariableAccess(
     ctx,
     args.userId,
     args.projectId,
-    args.action
+    args.action,
+    args.preloadedProject
   );
 }
 
@@ -54,7 +58,10 @@ export async function requireVariableAccess(
   ctx: MutationCtx | QueryCtx,
   userId: Id<"users">,
   variable: Doc<"environmentVariables">,
-  minimum: "read" | "write"
+  minimum: "read" | "write",
+  // Pass the project doc when the caller already fetched it, so
+  // getVariableAccess doesn't read the same row again.
+  preloadedProject?: Doc<"projects"> | null
 ): Promise<"read" | "write"> {
   // Verify user exists
   const user = await ctx.db.get(userId);
@@ -62,7 +69,12 @@ export async function requireVariableAccess(
     throw new Error("Not authorized");
   }
 
-  const access = await getVariableAccess(ctx, userId, variable);
+  const access = await getVariableAccess(
+    ctx,
+    userId,
+    variable,
+    preloadedProject
+  );
   if (!access || (minimum === "write" && access !== "write")) {
     throw new Error("Insufficient permissions");
   }
@@ -85,6 +97,9 @@ export async function authorizeAccountAccess(
     userId: Id<"users">;
     projectId: Id<"projects">;
     action: ProjectAction;
+    // Pass the project doc when the caller already fetched it, so
+    // assertProjectAction doesn't read the same row again.
+    preloadedProject?: Doc<"projects"> | null;
   }
 ) {
   // Verify user exists
@@ -97,7 +112,8 @@ export async function authorizeAccountAccess(
     ctx,
     args.userId,
     args.projectId,
-    args.action
+    args.action,
+    args.preloadedProject
   );
 }
 
@@ -115,7 +131,10 @@ export async function requireAccountAccess(
   ctx: MutationCtx | QueryCtx,
   userId: Id<"users">,
   account: Doc<"projectAccounts">,
-  minimum: "read" | "write"
+  minimum: "read" | "write",
+  // Pass the project doc when the caller already fetched it, so
+  // getAccountAccess doesn't read the same row again.
+  preloadedProject?: Doc<"projects"> | null
 ): Promise<"read" | "write"> {
   // Verify user exists
   const user = await ctx.db.get(userId);
@@ -123,7 +142,7 @@ export async function requireAccountAccess(
     throw new Error("Not authorized");
   }
 
-  const access = await getAccountAccess(ctx, userId, account);
+  const access = await getAccountAccess(ctx, userId, account, preloadedProject);
   if (!access || (minimum === "write" && access !== "write")) {
     throw new Error("Insufficient permissions");
   }

@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import {
   checkBooleanFeature,
-  checkNumericLimit,
+  checkCountedLimit,
   countActiveAccounts,
 } from "./featureRegistry";
 import { createAuditLog } from "./auditHelpers";
@@ -252,6 +252,7 @@ export const create = mutation({
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_account",
+      preloadedProject: project,
     });
 
     // Environment scope: scoped developers may only create accounts whose
@@ -275,16 +276,14 @@ export const create = mutation({
       );
     }
 
-    // Feature gate: shared_accounts_limit numeric
-    const accountCount = await countActiveAccounts(
-      ctx.db,
-      project.organizationId
-    );
-    const numGate = await checkNumericLimit(
+    // Feature gate: shared_accounts_limit numeric. Limit-first: only fans out
+    // across the org's projects to count accounts when the tier's limit is
+    // finite, bounded at that limit rather than reading every account.
+    const numGate = await checkCountedLimit(
       ctx.db,
       project.organizationId,
       "shared_accounts_limit",
-      accountCount
+      (limit) => countActiveAccounts(ctx.db, project.organizationId, limit)
     );
     if (!numGate.allowed) {
       throw new Error(
@@ -367,7 +366,7 @@ export const update = mutation({
 
     // Authorization: effective write access — owner, assigned PM/team lead,
     // or a developer holding a write grant on this account
-    await requireAccountAccess(ctx, userId, account, "write");
+    await requireAccountAccess(ctx, userId, account, "write", project);
 
     // Environment scope: getAccountAccess already blocks scoped developers
     // from touching out-of-scope accounts, but the NEW environments must also
@@ -461,10 +460,7 @@ export const remove = mutation({
     const now = Date.now();
 
     const account = await ctx.db.get(args.accountId);
-    if (!account || account.deletedAt) {
-      // Guard against double-deletion: without the deletedAt check a second
-      // DELETE would overwrite the original soft-delete timestamp and emit a
-      // duplicate account.deleted audit entry (consistent with get/update).
+    if (!account) {
       throw new Error("Account not found");
     }
 
@@ -479,7 +475,15 @@ export const remove = mutation({
       userId: args.deletedBy,
       projectId: account.projectId,
       action: "project:delete_account",
+      preloadedProject: project,
     });
+
+    // Idempotent no-op: an account that's already soft-deleted must not be
+    // re-patched (which would clobber the original deletedAt) or emit a
+    // second "account.deleted" audit row on a retried/duplicate call.
+    if (account.deletedAt !== undefined) {
+      return args.accountId;
+    }
 
     await ctx.db.patch(args.accountId, {
       deletedAt: now,
@@ -514,7 +518,6 @@ export const remove = mutation({
       },
       involvesSensitiveData: true,
       resourceType: "account",
-      severity: "warning",
     });
 
     return args.accountId;

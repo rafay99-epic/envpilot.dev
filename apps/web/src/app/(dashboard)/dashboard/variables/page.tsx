@@ -202,7 +202,9 @@ export default function VariablesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           value: data.value || undefined,
-          description: data.description || undefined,
+          // Send "" through (not undefined) so a cleared description is
+          // actually removed server-side — see convex/variables.ts update.
+          description: data.description,
           environments: data.environments,
           isSensitive: data.isSensitive,
           rotationFrequencyDays: data.rotationFrequencyDays,

@@ -11,7 +11,7 @@ import {
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
-import { updateSecret } from "@/lib/vault";
+import { createSecret, deleteSecret } from "@/lib/vault";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const log = createLogger("api/variables/[id]");
@@ -192,24 +192,48 @@ export async function PATCH(request: Request, context: RouteContext) {
       tagIds,
     } = validation.data;
 
-    // If value is being updated, update the existing encrypted value in Vault.
+    // If value is being updated, mint a NEW vault object instead of
+    // overwriting in place (same pattern as the CLI bulk-push route). The
+    // previous vaultRef stays referenced by earlier variableVersions rows,
+    // which is what makes rollback actually restore the old value —
+    // in-place updates left every version row pointing at the same object.
     let vaultRef: string | undefined;
     if (value !== undefined) {
-      const vaultResult = await updateSecret(variable.vaultRef, value);
+      const vaultResult = await createSecret(variable.key, value, {
+        organizationId,
+        projectId: variable.projectId,
+      });
       vaultRef = vaultResult.id;
     }
 
-    await convex.mutation(api.variables.update, {
-      variableId: id as Id<"environmentVariables">,
-      vaultRef,
-      description,
-      environments,
-      isSensitive,
-      updatedBy: convexUser._id,
-      changeReason,
-      rotationFrequencyDays,
-      tagIds: tagIds as Id<"variableTags">[] | undefined,
-    });
+    try {
+      await convex.mutation(api.variables.update, {
+        variableId: id as Id<"environmentVariables">,
+        vaultRef,
+        description,
+        environments,
+        isSensitive,
+        updatedBy: convexUser._id,
+        changeReason,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
+      });
+    } catch (mutationError) {
+      // The mutation performs write authorization and validation — if it
+      // rejects, the freshly minted vault object is referenced by nothing
+      // and would leak forever (no GC exists). Best-effort cleanup, same
+      // pattern as the accounts create route.
+      if (vaultRef) {
+        try {
+          await deleteSecret(vaultRef);
+        } catch (cleanupError) {
+          reportApiError(cleanupError, "PATCH /api/variables/[id]", {
+            phase: "vault-orphan-cleanup",
+          });
+        }
+      }
+      throw mutationError;
+    }
 
     const updatedVariable = await convex.query(api.variables.getById, {
       variableId: id as Id<"environmentVariables">,

@@ -280,9 +280,16 @@ export async function assertProjectAction(
   ctx: MutationCtx | QueryCtx,
   userId: Id<"users">,
   projectId: Id<"projects">,
-  action: ProjectAction
+  action: ProjectAction,
+  // Caller-supplied project doc when it was already fetched, so this doesn't
+  // re-read the same row a second time in the same request. Falls back to
+  // fetching when omitted — behavior is identical either way.
+  preloadedProject?: Doc<"projects"> | null
 ): Promise<ProjectAuthResult> {
-  const project = await ctx.db.get(projectId);
+  const project =
+    preloadedProject !== undefined
+      ? preloadedProject
+      : await ctx.db.get(projectId);
   if (!project || project.deletedAt) {
     throw new Error("Project not found");
   }
@@ -488,9 +495,15 @@ export async function getActiveVariableGrant(
 export async function getVariableAccess(
   ctx: MutationCtx | QueryCtx,
   userId: Id<"users">,
-  variable: Doc<"environmentVariables">
+  variable: Doc<"environmentVariables">,
+  // Caller-supplied project doc when it was already fetched, avoiding a
+  // duplicate read of the same row. Falls back to fetching when omitted.
+  preloadedProject?: Doc<"projects"> | null
 ): Promise<"write" | "read" | null> {
-  const project = await ctx.db.get(variable.projectId);
+  const project =
+    preloadedProject !== undefined
+      ? preloadedProject
+      : await ctx.db.get(variable.projectId);
   if (!project || project.deletedAt) return null;
 
   const membership = await ctx.db
@@ -593,9 +606,15 @@ export async function getActiveAccountGrant(
 export async function getAccountAccess(
   ctx: MutationCtx | QueryCtx,
   userId: Id<"users">,
-  account: Doc<"projectAccounts">
+  account: Doc<"projectAccounts">,
+  // Caller-supplied project doc when it was already fetched, avoiding a
+  // duplicate read of the same row. Falls back to fetching when omitted.
+  preloadedProject?: Doc<"projects"> | null
 ): Promise<"write" | "read" | null> {
-  const project = await ctx.db.get(account.projectId);
+  const project =
+    preloadedProject !== undefined
+      ? preloadedProject
+      : await ctx.db.get(account.projectId);
   if (!project || project.deletedAt) return null;
 
   const membership = await ctx.db
