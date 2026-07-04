@@ -1,0 +1,59 @@
+apps/web/src/app/(dashboard)/dashboard/audit/page.tsx
+  s_53bfe4b41edb34::t_20e0cd866af90b 478-482,485-488
+apps/web/tests/e2e/authenticated/history-rollback.spec.ts
+  s_53bfe4b41edb34::t_0fa719b9fa362d 1-73,75-111,115-131,133-142,144-155,160,163-215,219-282
+  s_53bfe4b41edb34::t_0935b880fa1bf9 112-114,216-218
+  s_53bfe4b41edb34::t_c82b806fc11b66 74
+  s_53bfe4b41edb34::t_625ce73a66e201 132
+  s_53bfe4b41edb34::t_6e36e35a44f7f8 156-159,161-162
+  s_53bfe4b41edb34::t_caa2bc44fa8fe8 143
+apps/web/tests/e2e/authenticated/sharing-tags-export.spec.ts
+  s_53bfe4b41edb34::t_7b63807ae7dbe0 6-10,52-55,72-77,88-91,141-143,179-181,272-274,302-304,334-338,340-342,396-398,419-421,426-429,462-464,475-477
+  s_53bfe4b41edb34::t_a71f62b8967b02 1-5,11-51,56-65,69,84-87,92-140,144-178,202,204,206-271,275-301,305-333,339,343-395,399-418,422-425,430-461,465-467,481,483-484
+  s_53bfe4b41edb34::t_478455605adc14 66-68,70-71,78-83
+  s_53bfe4b41edb34::t_afc2e10b92f2eb 468-474,478-480,482
+  s_53bfe4b41edb34::t_4db8baf6a5ff16 182-201,203,205
+convex/featureRegistry.ts
+  s_53bfe4b41edb34::t_bc3045cef9d09c 477-481,486,494
+  s_53bfe4b41edb34::t_226d3ebf5f94a5 531-538
+  s_53bfe4b41edb34::t_05328bbbcf9fd1 602-609
+  s_53bfe4b41edb34::t_3d15f8242f6cd5 636-639
+apps/web/tests/e2e/authenticated/variables-lifecycle.spec.ts
+  s_53bfe4b41edb34::t_5c56f34711133d 88-89
+  s_53bfe4b41edb34::t_ca7b99ddf01dca 159-162,164,169
+  s_53bfe4b41edb34::t_8a138091203f51 128-131,146-157,163,165-166,168
+  s_53bfe4b41edb34::t_418bf0959e574f 1-87,90-127,132-145,158,167,170-239
+  s_53bfe4b41edb34::t_4bfe87dbb32a32 240-252
+apps/web/tests/e2e/authenticated/search-projects-org.spec.ts
+  s_53bfe4b41edb34::t_b72445a8e65f24 53
+  s_53bfe4b41edb34::t_2e461558da6ab2 203-205,207
+  s_53bfe4b41edb34::t_eb4d24f9d8cf52 208-211
+  s_53bfe4b41edb34::t_a7a208242788b0 247-254
+  s_53bfe4b41edb34::t_f43b9188f2f0e3 73
+  s_53bfe4b41edb34::t_deabc5bc87296d 86-89,91-104,110-114
+  s_53bfe4b41edb34::t_8415b1d1253b2c 1-4,6-34,49-52,54-72,74-85,90,115-188,190-202,206,212-221,229-246,255-300,312,330-389,391-431,433-443,445-448,455
+  s_53bfe4b41edb34::t_4bcae52aa2b247 35-48
+  s_53bfe4b41edb34::t_17d3dee891eb77 5
+  s_53bfe4b41edb34::t_a27552c94880f9 449-454,456-457
+  s_53bfe4b41edb34::t_fadf406d611e39 444
+  s_53bfe4b41edb34::t_3d5fa9bda0b0cc 189,390,432
+  s_53bfe4b41edb34::t_553e93b8b667a6 105-109
+  s_53bfe4b41edb34::t_a4bdec933767bb 301-311,313-329
+  s_53bfe4b41edb34::t_2789b19bb41eb4 222-228
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c9e481a17271e06957180fec8d613ab9838395eb",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
