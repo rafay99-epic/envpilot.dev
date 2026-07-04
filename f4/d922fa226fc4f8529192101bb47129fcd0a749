@@ -1,0 +1,23 @@
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_53bfe4b41edb34::t_b239a85e1a5eb8 54,279-282
+  s_53bfe4b41edb34::t_ab00da82d9eeb1 75-84
+  s_53bfe4b41edb34::t_ba29beae9f85a9 1-32,46-53,55-74,85-179,184-185,187-278,283-326,331-332,334-391
+  s_53bfe4b41edb34::t_092ccbf05ae925 33-45
+  s_53bfe4b41edb34::t_7b4bd4f771b35b 180-183,186,327-330,333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f4d922fa226fc4f8529192101bb47129fcd0a749",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
