@@ -174,7 +174,7 @@ export function useRollbackVariable() {
       projectId: string;
       targetVersion: number;
     }) =>
-      api.post<{ variable: Variable }>(
+      api.post<{ variable: Variable; valueRestored: boolean }>(
         `/api/variables/${variableId}/rollback`,
         { targetVersion }
       ),

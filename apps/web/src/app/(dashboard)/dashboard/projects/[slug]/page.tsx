@@ -6,6 +6,7 @@ import { usePaginatedQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
+import { toast } from "sonner";
 import type { Hotkey, HotkeySequence } from "@tanstack/react-hotkeys";
 import { useVariableSelectionStore } from "@/stores/variable-selection-store";
 import { useKeyboardStore } from "@/stores/keyboard-store";
@@ -394,7 +395,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     if (!historyVariableId || !projectId) return;
 
     try {
-      await rollbackVariable.mutateAsync({
+      const { valueRestored } = await rollbackVariable.mutateAsync({
         variableId: historyVariableId,
         projectId,
         targetVersion,
@@ -403,6 +404,20 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       setNotice(
         `Rolled back ${historyVariableKey} to version ${targetVersion}.`
       );
+
+      if (valueRestored) {
+        toast.success(`Rolled back to version ${targetVersion}`, {
+          description: "Value and settings restored.",
+        });
+      } else {
+        toast.warning(
+          `Rolled back to version ${targetVersion} — settings only`,
+          {
+            description:
+              "This version predates value history, so the secret value could not be restored and is unchanged.",
+          }
+        );
+      }
     } catch (err) {
       log.error(
         "project_variable_rollback_failed",
@@ -414,9 +429,10 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         },
         err
       );
-      setError(
-        err instanceof Error ? err.message : "Failed to rollback variable"
-      );
+      const message =
+        err instanceof Error ? err.message : "Failed to rollback variable";
+      setError(message);
+      toast.error(message);
     }
   };
 

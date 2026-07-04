@@ -10,7 +10,13 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ReactNode } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { Toaster, toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
+import {
+  sanitizeConvexError,
+  isTierLimitError,
+  isAuthorizationError,
+} from "@/lib/error-messages";
 
 function convexLogArgsToMessage(args: unknown[]): string {
   return args
@@ -54,10 +60,21 @@ const convexLogger = {
   error(...args: unknown[]) {
     console.error(...args);
     const message = convexLogArgsToMessage(args);
+    // Only mutation/action failures get a toast — the request manager tags
+    // them "[CONVEX M(...)]" / "[CONVEX A(...)]". Other logger noise
+    // (connection chatter etc.) is reported but not shown to the user.
+    const isFunctionFailure = /\[CONVEX [MA]\(/.test(message);
+    const friendly = sanitizeConvexError(message);
+
     // Tier-limit and authorization failures are expected conditions
-    // (mirrors the server-side triage in @/lib/api-errors) — breadcrumb
-    // only, so they add context without becoming alertable issues.
-    if (EXPECTED_CONVEX_ERROR.test(message)) {
+    // (mirrors the server-side triage in @/lib/api-errors) — tell the USER
+    // what happened, but breadcrumb-only for Sentry so they don't alert.
+    if (isTierLimitError(friendly) || isAuthorizationError(friendly)) {
+      if (isFunctionFailure) {
+        // Dedupe by message: a re-clicked failing action updates the
+        // existing toast instead of stacking.
+        toast.warning(friendly, { id: friendly });
+      }
       Sentry.addBreadcrumb({
         category: "convex",
         message,
@@ -65,15 +82,18 @@ const convexLogger = {
       });
       return;
     }
+    if (isFunctionFailure) {
+      toast.error("Something went wrong", {
+        id: friendly,
+        description: friendly,
+      });
+    }
     Sentry.captureMessage(message, {
       level: "error",
       tags: { source: "convex-client" },
     });
   },
 };
-
-const EXPECTED_CONVEX_ERROR =
-  /limit reached|Upgrade to Pro|Insufficient permissions|Not a member of this organization|No access to this project|Insufficient project permissions/;
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!, {
   logger: convexLogger,
@@ -101,7 +121,20 @@ function handleGlobalQueryError(
   error: Error,
   context: { type: "query" | "mutation"; key: readonly unknown[] }
 ) {
+  // ApiErrors are expected server responses whose call sites own the UX
+  // (forms show them inline) — no global toast, no client-side Sentry.
   if (error instanceof ApiError) return;
+
+  // A non-ApiError here is a bug (queryFn/mutationFn threw). Nothing else
+  // will tell the user for mutations — queries retry/rerender, so only
+  // mutation bugs get the toast.
+  if (context.type === "mutation") {
+    const friendly = sanitizeConvexError(error);
+    toast.error("Something went wrong", {
+      id: friendly,
+      description: friendly,
+    });
+  }
 
   Sentry.captureException(error, {
     tags: { source: "tanstack-query", type: context.type },
@@ -150,6 +183,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ConvexBoundaryProvider>{children}</ConvexBoundaryProvider>
+      <Toaster theme="dark" position="bottom-right" richColors closeButton />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
