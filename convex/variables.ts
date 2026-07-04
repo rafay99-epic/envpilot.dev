@@ -9,6 +9,7 @@ import {
   checkBooleanFeature,
   countActiveVariables,
   countRotationEnabledVariables,
+  resolveOrgGateContext,
 } from "./featureRegistry";
 import {
   createAuditLog,
@@ -99,58 +100,23 @@ export const listByProject = query({
   },
 });
 
-export const listByOrganization = query({
-  args: {
-    organizationId: v.id("organizations"),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const perProjectLimit = args.limit ?? 500;
-    const allProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-    const projects = allProjects.filter(
-      (project) => project.deletedAt === undefined
-    );
-
-    const variablesNested = await Promise.all(
-      projects.map(async (project) => {
-        const allVariables = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .take(perProjectLimit);
-        const variables = allVariables.filter(
-          (variable) => variable.deletedAt === undefined
-        );
-
-        return variables.map((variable) => ({
-          ...variable,
-          projectName: project.name,
-          projectSlug: project.slug,
-        }));
-      })
-    );
-
-    return variablesNested.flat();
-  },
-});
-
 /**
  * Access-aware org-wide variable listing for the global Variables page.
  *
- * Unlike listByOrganization (which returns every org vaultRef unfiltered),
- * this enumerates only the projects the caller can see (owner → all;
- * everyone else → assigned projects), applies environment scope for
- * developers, and returns vaultRef ONLY for variables the caller can
- * actually access. Variables the caller has no access to are omitted
- * entirely — the page shows keys/metadata only for what they may touch.
+ * Enumerates only the projects the caller can see (owner → all; everyone
+ * else → assigned projects), applies environment scope for developers, and
+ * returns vaultRef ONLY for variables the caller can actually access.
+ * Variables the caller has no access to are omitted entirely — the page
+ * shows keys/metadata only for what they may touch.
  *
- * Shape mirrors listByOrganization's rows (variable fields + projectName/
- * projectSlug) plus a `hasAccess`/`permission` pair, so the page's
- * filtering/search keeps working. vaultRef is present only when hasAccess.
+ * Row shape is the variable's fields plus projectName/projectSlug and a
+ * `hasAccess`/`permission` pair, so the page's filtering/search keeps
+ * working. vaultRef is present only when hasAccess.
+ *
+ * (This used to have an org-wide, access-unfiltered sibling —
+ * `listByOrganization` — that duplicated this query without the access
+ * filtering or vaultRef trimming. It had no live callers and was removed as
+ * dead code; this query has always been the correct one to use.)
  */
 export const listOrgVariablesWithAccess = query({
   args: {
@@ -501,24 +467,6 @@ export const getById = query({
   },
 });
 
-export const getByKey = query({
-  args: {
-    projectId: v.id("projects"),
-    key: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const variable = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key)
-      )
-      .first();
-
-    if (variable?.deletedAt) return null;
-    return variable;
-  },
-});
-
 export const getVersionHistory = query({
   args: {
     variableId: v.id("environmentVariables"),
@@ -567,32 +515,6 @@ export const getVersionHistory = query({
     );
 
     return versionsWithUsers;
-  },
-});
-
-export const getVersion = query({
-  args: {
-    variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
-    version: v.number(),
-  },
-  handler: async (ctx, args) => {
-    // A single version row still carries a vaultRef — gate on effective
-    // access to the parent variable before returning it.
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable) return null;
-
-    const access = await getVariableAccess(ctx, args.userId, variable);
-    if (access === null) {
-      throw new Error("No access to this variable");
-    }
-
-    return await ctx.db
-      .query("variableVersions")
-      .withIndex("by_variable_and_version", (q) =>
-        q.eq("variableId", args.variableId).eq("version", args.version)
-      )
-      .first();
   },
 });
 
@@ -979,23 +901,31 @@ export const globalSearchWithAccess = query({
     const user = await ctx.db.get(args.userId);
     if (!user) return [];
 
+    // Overall result budget AND per-project read cap (mirrors the `search`
+    // query's resultLimit pattern just above): bounds both how much this
+    // query ever returns and — critically — how many rows it ever reads out
+    // of a single project, so a large org with an active-editor project can
+    // never turn "type two characters" into an unbounded scan of every
+    // non-deleted variable in every accessible project.
+    const RESULT_LIMIT = 50;
+
     const searchLower = args.searchTerm.toLowerCase();
+    // Light shape only — trimmed to exactly the fields the command palette
+    // (apps/web/src/components/command-palette/command-palette.tsx, the sole
+    // consumer via useGlobalSearch) renders. vaultRef was never included here
+    // even before this fix; description/tagIds(raw)/projectId/projectIcon/
+    // organizationId/organizationSlug are computed internally but not part of
+    // the public shape since nothing reads them.
     const results: Array<{
       _id: string;
       key: string;
-      description?: string;
       environments?: string[];
       isSensitive?: boolean;
-      tagIds?: string[];
       tags?: Array<{ _id: string; name: string; color: string }>;
-      projectId: string;
       projectName: string;
       projectSlug: string;
-      projectIcon?: string;
       projectColor?: string;
-      organizationId: string;
       organizationName: string;
-      organizationSlug: string;
     }> = [];
 
     // Pre-fetch tag cache for resolving tag names during search
@@ -1173,10 +1103,15 @@ export const globalSearchWithAccess = query({
       for (const project of accessibleProjects) {
         coveredProjectIds.add(project._id as string);
 
+        // Capped read (was an unbounded .collect()) — a project's variable
+        // set no longer has to be read in full just to find a handful of
+        // search matches. Same accepted tradeoff as the `search` query above:
+        // if a project has more than RESULT_LIMIT non-deleted variables, only
+        // the first RESULT_LIMIT (index/creation order) are searched.
         const allVariables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect();
+          .take(RESULT_LIMIT);
         const variables = allVariables.filter(
           (variable) => variable.deletedAt === undefined
         );
@@ -1206,31 +1141,25 @@ export const globalSearchWithAccess = query({
           results.push({
             _id: variable._id as string,
             key: variable.key,
-            description: variable.description,
             environments: variable.environments,
             isSensitive: variable.isSensitive,
-            tagIds: variable.tagIds as string[] | undefined,
             tags: resolvedTags.length > 0 ? resolvedTags : undefined,
-            projectId: project._id as string,
             projectName: project.name,
             projectSlug: project.slug,
-            projectIcon: project.icon,
             projectColor: project.color,
-            organizationId: org._id as string,
             organizationName: org.name,
-            organizationSlug: org.slug,
           });
 
-          if (results.length >= 50) break;
+          if (results.length >= RESULT_LIMIT) break;
         }
-        if (results.length >= 50) break;
+        if (results.length >= RESULT_LIMIT) break;
       }
-      if (results.length >= 50) break;
+      if (results.length >= RESULT_LIMIT) break;
     }
 
     // Per-variable viewer sharing: grant holders may list metadata for
     // variables explicitly shared with them, even without an assignment.
-    if (results.length < 50) {
+    if (results.length < RESULT_LIMIT) {
       const grants = await ctx.db
         .query("variablePermissions")
         .withIndex("by_user_active", (q) =>
@@ -1245,7 +1174,7 @@ export const globalSearchWithAccess = query({
       const seenVariableIds = new Set(results.map((r) => r._id));
 
       for (const grant of grants) {
-        if (results.length >= 50) break;
+        if (results.length >= RESULT_LIMIT) break;
         if (grant.expiresAt && grant.expiresAt <= now) continue;
         if (seenVariableIds.has(grant.variableId as string)) continue;
 
@@ -1268,19 +1197,13 @@ export const globalSearchWithAccess = query({
         results.push({
           _id: variable._id as string,
           key: variable.key,
-          description: variable.description,
           environments: variable.environments,
           isSensitive: variable.isSensitive,
-          tagIds: variable.tagIds as string[] | undefined,
           tags: resolvedTags.length > 0 ? resolvedTags : undefined,
-          projectId: project._id as string,
           projectName: project.name,
           projectSlug: project.slug,
-          projectIcon: project.icon,
           projectColor: project.color,
-          organizationId: org._id as string,
           organizationName: org.name,
-          organizationSlug: org.slug,
         });
         seenVariableIds.add(variable._id as string);
       }
@@ -1332,6 +1255,11 @@ export const create = mutation({
       throws: true,
     });
 
+    // Resolve the shared org/tier/grace-period context once and reuse it for
+    // every feature check against this org in this handler (avoids re-fetching
+    // the same rows per check). Zero behavior change.
+    const gate = await resolveOrgGateContext(ctx.db, project.organizationId);
+
     // Check tier limits for variable creation. Limit-first: only counts
     // existing variables when the tier's limit is finite, and bounds that
     // count at the limit instead of scanning every variable in the project.
@@ -1339,7 +1267,8 @@ export const create = mutation({
       ctx.db,
       project.organizationId,
       "max_variables_per_project",
-      (limit) => countActiveVariables(ctx.db, args.projectId, limit)
+      (limit) => countActiveVariables(ctx.db, args.projectId, limit),
+      gate
     );
     if (!varCheck.allowed) {
       throw new Error(varCheck.reason!);
@@ -1357,7 +1286,8 @@ export const create = mutation({
       const rotationCheck = await checkBooleanFeature(
         ctx.db,
         project.organizationId,
-        "secret_rotation"
+        "secret_rotation",
+        gate
       );
       if (!rotationCheck.allowed) {
         throw new Error(
@@ -1377,7 +1307,8 @@ export const create = mutation({
             project.organizationId,
             undefined,
             limit
-          )
+          ),
+        gate
       );
       if (!limitCheck.allowed) {
         throw new Error(
@@ -1575,10 +1506,14 @@ export const update = mutation({
 
     // If rotation is being set/changed, check boolean gate + numeric limit
     if (rotationFrequencyDays !== undefined && rotationFrequencyDays > 0) {
+      // Resolve the shared org/tier/grace context once for both gate checks.
+      const gate = await resolveOrgGateContext(ctx.db, project.organizationId);
+
       const rotationCheck = await checkBooleanFeature(
         ctx.db,
         project.organizationId,
-        "secret_rotation"
+        "secret_rotation",
+        gate
       );
       if (!rotationCheck.allowed) {
         throw new Error(
@@ -1601,7 +1536,8 @@ export const update = mutation({
               project.organizationId,
               undefined,
               limit
-            )
+            ),
+          gate
         );
         if (!limitCheck.allowed) {
           throw new Error(
@@ -2174,168 +2110,6 @@ export const logAccess = mutation({
   },
 });
 
-export const bulkCreate = mutation({
-  args: {
-    projectId: v.id("projects"),
-    variables: v.array(
-      v.object({
-        key: v.string(),
-        vaultRef: v.string(),
-        description: v.optional(v.string()),
-        environments: v.array(v.string()),
-        isSensitive: v.optional(v.boolean()),
-      })
-    ),
-    createdBy: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    // Enforce maximum bulk import size to prevent DoS
-    if (args.variables.length > MAX_BULK_IMPORT_SIZE) {
-      throw new Error(
-        `Bulk import is limited to ${MAX_BULK_IMPORT_SIZE} variables at a time. Please split your import into smaller batches.`
-      );
-    }
-
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
-
-    // Authorization: owner, or assigned PM / team lead / developer
-    const { orgRole, environmentScope } = await authorizeVariableAccess(ctx, {
-      userId: args.createdBy,
-      projectId: args.projectId,
-      action: "project:create_variable",
-    });
-
-    // Environment scope: scoped developers may only import variables whose
-    // environments all fall inside their assignment scope — validate the
-    // whole batch up front so nothing is partially imported
-    if (environmentScope) {
-      for (const varData of args.variables) {
-        assertWithinEnvironmentScope(environmentScope, varData.environments);
-      }
-    }
-
-    // Rate limit: bulk import is expensive
-    await rateLimiter.limit(ctx, "bulkImport", {
-      key: project.organizationId,
-      throws: true,
-    });
-
-    // Check tier limits for bulk import feature
-    const bulkCheck = await checkBooleanFeature(
-      ctx.db,
-      project.organizationId,
-      "bulk_import"
-    );
-    if (!bulkCheck.allowed) {
-      throw new Error(
-        "Bulk import requires a higher tier. Upgrade to import variables in bulk."
-      );
-    }
-
-    // Check variable count limits (if applicable). Limit-first: only counts
-    // existing variables when the tier's limit is finite, bounded at that
-    // limit rather than scanning every variable in the project.
-    // checkCountedLimit uses `currentCount < limit` (pre-action semantics).
-    // For bulk import, return totalAfterImport - 1 so that exactly filling
-    // the quota is allowed (e.g., 10 existing + 5 import vs limit 15 → ok).
-    const varLimitCheck = await checkCountedLimit(
-      ctx.db,
-      project.organizationId,
-      "max_variables_per_project",
-      async (limit) => {
-        const existingVarCount = await countActiveVariables(
-          ctx.db,
-          args.projectId,
-          limit
-        );
-        return existingVarCount + args.variables.length - 1;
-      }
-    );
-    if (!varLimitCheck.allowed) {
-      throw new Error(
-        `Cannot import ${args.variables.length} variables. ${varLimitCheck.reason}`
-      );
-    }
-
-    const createdIds = [];
-
-    for (const varData of args.variables) {
-      const existing = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project_and_key", (q) =>
-          q.eq("projectId", args.projectId).eq("key", varData.key)
-        )
-        .first();
-
-      if (existing && !existing.deletedAt) {
-        continue;
-      }
-
-      const variableId = await ctx.db.insert("environmentVariables", {
-        key: varData.key,
-        vaultRef: varData.vaultRef,
-        description: varData.description,
-        environments: varData.environments,
-        projectId: args.projectId,
-        isSensitive: varData.isSensitive ?? false,
-        createdBy: args.createdBy,
-        lastModifiedBy: args.createdBy,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      await ctx.db.insert("variableVersions", {
-        variableId,
-        version: 1,
-        vaultRef: varData.vaultRef,
-        description: varData.description,
-        environments: varData.environments,
-        changedBy: args.createdBy,
-        changeReason: "Bulk import",
-        createdAt: now,
-      });
-
-      // Developers have no blanket write access — an automatic grant keeps
-      // write access to the variables they create.
-      if (orgRole === "developer") {
-        await ctx.db.insert("variablePermissions", {
-          variableId,
-          userId: args.createdBy,
-          permission: "write",
-          grantedBy: args.createdBy,
-          grantedAt: now,
-          isActive: true,
-        });
-      }
-
-      createdIds.push(variableId);
-    }
-
-    // Log bulk import operation with detailed tracking
-    await logBulkOperation(ctx, {
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-      userId: args.createdBy,
-      action: "variable.bulk_imported",
-      details: {
-        totalCount: args.variables.length,
-        successCount: createdIds.length,
-        skippedCount: args.variables.length - createdIds.length,
-        affectedItems: args.variables.map((v) => v.key),
-        sensitiveCount: args.variables.filter((v) => v.isSensitive).length,
-      },
-    });
-
-    return createdIds;
-  },
-});
-
 // ==========================================
 // SECRET ROTATION & EXPIRY
 // ==========================================
@@ -2455,51 +2229,6 @@ export const listExpiringVariables = query({
     return results
       .sort((a, b) => a.expiresAt - b.expiresAt)
       .slice(0, resultLimit);
-  },
-});
-
-/**
- * Get rotation history for a variable from audit logs.
- */
-export const getRotationHistory = query({
-  args: {
-    variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    // Verify caller has access to the variable's organization
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) return [];
-
-    const project = await ctx.db.get(variable.projectId);
-    if (!project) return [];
-
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
-      )
-      .first();
-    if (!membership) return [];
-
-    // The response is capped at 50 rotation events, so we only need the most
-    // recent audit logs — bound the read instead of collecting a variable's
-    // entire audit history. 200 leaves generous headroom for interleaved
-    // non-rotation actions while keeping the read cost fixed.
-    const logs = await ctx.db
-      .query("auditLogs")
-      .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-      .order("desc")
-      .take(200);
-
-    return logs
-      .filter(
-        (log) =>
-          log.action === "variable.rotated" ||
-          log.action === "variable.expired" ||
-          log.action === "variable.rotation_reminder_sent"
-      )
-      .slice(0, 50);
   },
 });
 

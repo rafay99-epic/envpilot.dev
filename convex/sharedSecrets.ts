@@ -1113,26 +1113,6 @@ export const listByProject = query({
   },
 });
 
-/**
- * Count active shares for an organization (for numeric limit check).
- */
-export const countActiveByOrg = query({
-  args: {
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    const shares = (
-      await ctx.db
-        .query("sharedSecrets")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
-        )
-        .collect()
-    ).filter((share) => share.status === "active");
-    return shares.length;
-  },
-});
-
 // ==========================================
 // INTERNAL HELPERS
 // ==========================================

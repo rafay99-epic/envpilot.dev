@@ -8,7 +8,6 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { DatabaseReader } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
 import { getDefaultTierName, isCronPaused } from "./tierLimits";
 import { getUserTier } from "./featureRegistry";
 import { normalizeOrgRole } from "./authz";
@@ -96,21 +95,6 @@ export const getByUser = query({
 });
 
 /**
- * Get subscription by Polar subscription ID
- */
-export const getByPolarSubscriptionId = query({
-  args: { polarSubscriptionId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("subscriptions")
-      .withIndex("by_polar_subscription", (q) =>
-        q.eq("polarSubscriptionId", args.polarSubscriptionId)
-      )
-      .first();
-  },
-});
-
-/**
  * Get Polar customer for an organization (LEGACY — backward compat)
  */
 export const getPolarCustomer = query({
@@ -135,65 +119,6 @@ export const getPolarCustomerByUser = query({
       .query("polarCustomers")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
-  },
-});
-
-/**
- * Get Polar customer by Polar customer ID
- */
-export const getPolarCustomerById = query({
-  args: { polarCustomerId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("polarCustomers")
-      .withIndex("by_polar_customer", (q) =>
-        q.eq("polarCustomerId", args.polarCustomerId)
-      )
-      .first();
-  },
-});
-
-/**
- * Check if organization has active subscription (LEGACY — backward compat)
- */
-export const hasActiveSubscription = query({
-  args: { organizationId: v.id("organizations") },
-  handler: async (ctx, args) => {
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .first();
-
-    if (!subscription) {
-      return false;
-    }
-
-    return (
-      subscription.status === "active" || subscription.status === "trialing"
-    );
-  },
-});
-
-/**
- * Check if user has active subscription (NEW)
- */
-export const hasActiveUserSubscription = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-
-    if (!subscription) {
-      return false;
-    }
-
-    return (
-      subscription.status === "active" || subscription.status === "trialing"
-    );
   },
 });
 
@@ -411,45 +336,6 @@ export const updateSubscription = internalMutation({
 });
 
 /**
- * Delete a subscription (when customer is deleted in Polar)
- */
-export const deleteSubscription = internalMutation({
-  args: {
-    polarSubscriptionId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_polar_subscription", (q) =>
-        q.eq("polarSubscriptionId", args.polarSubscriptionId)
-      )
-      .first();
-
-    if (subscription) {
-      await ctx.db.delete(subscription._id);
-
-      // Audit: subscription removed (customer deleted in Polar)
-      const actorUserId =
-        subscription.userId ??
-        (await ctx.db.get(subscription.organizationId))?.createdBy;
-
-      if (actorUserId) {
-        await ctx.db.insert("auditLogs", {
-          organizationId: subscription.organizationId,
-          userId: actorUserId,
-          action: "billing.subscription_canceled",
-          details: JSON.stringify({
-            polarSubscriptionId: args.polarSubscriptionId,
-            deleted: true,
-          }),
-          createdAt: Date.now(),
-        });
-      }
-    }
-  },
-});
-
-/**
  * Sync user's tier (NEW — primary tier assignment).
  * Writes to userTiers table. This is the source of truth for billing.
  */
@@ -486,7 +372,13 @@ export const _syncUserTier = internalMutation({
 
 /**
  * Reset consumption counters on billing cycle.
- * Only resets counters for resettable features.
+ *
+ * DEAD DATA: the `usageCounters` table this operated on is never inserted into
+ * anywhere in the codebase (consumption tracking was never wired up), so this
+ * was always a no-op. Body removed to drop the last code reference to
+ * `usageCounters` (so the table declaration can be dropped in a later PR after
+ * the `cleanup-dead-data` migration clears any rows). Kept as a no-op stub so
+ * the four billing-webhook call sites remain unchanged. Zero behavior change.
  */
 export const _resetUsageCounters = internalMutation({
   args: {
@@ -494,29 +386,8 @@ export const _resetUsageCounters = internalMutation({
     periodStart: v.number(),
     periodEnd: v.number(),
   },
-  handler: async (ctx, args) => {
-    // Only reset counters for features marked as resettable in the registry
-    const resettableFeatures = await ctx.db
-      .query("featureRegistry")
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.resettable === true));
-    const resettableKeys = new Set(resettableFeatures.map((f) => f.key));
-
-    const counters = await ctx.db
-      .query("usageCounters")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    for (const counter of counters) {
-      if (resettableKeys.has(counter.featureKey)) {
-        await ctx.db.patch(counter._id, {
-          count: 0,
-          periodStart: args.periodStart,
-          periodEnd: args.periodEnd,
-          resetAt: Date.now(),
-        });
-      }
-    }
+  handler: async () => {
+    // No-op: usageCounters is never populated. See doc comment above.
   },
 });
 
@@ -597,10 +468,6 @@ export const expireGracePeriods = internalMutation({
     const now = Date.now();
     const defaultTier = await getDefaultTierName(ctx.db);
 
-    // Lazily loaded org list for audit-log context
-    // (organizations has no index on createdBy)
-    let allOrgs: Doc<"organizations">[] | null = null;
-
     for (const g of active) {
       if (g.gracePeriodEnd <= now) {
         // Grace period expired → downgrade to default tier
@@ -627,11 +494,12 @@ export const expireGracePeriods = internalMutation({
           });
         }
 
-        // Audit: tier downgraded after grace period expiry
-        if (allOrgs === null) {
-          allOrgs = await ctx.db.query("organizations").collect();
-        }
-        const ownedOrg = allOrgs.find((o) => o.createdBy === g.userId);
+        // Audit: tier downgraded after grace period expiry — indexed point
+        // lookup (organizations.by_created_by), not a full-table scan.
+        const ownedOrg = await ctx.db
+          .query("organizations")
+          .withIndex("by_created_by", (q) => q.eq("createdBy", g.userId))
+          .first();
         if (ownedOrg) {
           await ctx.db.insert("auditLogs", {
             organizationId: ownedOrg._id,
@@ -1355,8 +1223,8 @@ export const _getUserOwnedOrgs = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("organizations")
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.createdBy === args.userId));
+      .withIndex("by_created_by", (q) => q.eq("createdBy", args.userId))
+      .collect();
   },
 });
 

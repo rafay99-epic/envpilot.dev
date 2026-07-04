@@ -35,12 +35,9 @@ interface Organization {
   description?: string;
   logoUrl?: string;
   role: string;
-  settings?: {
-    teamLeadsCanCreateProjects: boolean;
-  };
 }
 
-type OrgSettingsTab = "general" | "access" | "tags" | "danger";
+type OrgSettingsTab = "general" | "tags" | "danger";
 
 export default function OrganizationSettingsPage(props: {
   params: Promise<{ slug: string }>;
@@ -70,9 +67,6 @@ function OrganizationSettingsPageContent({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [teamLeadsCanCreateProjects, setTeamLeadsCanCreateProjects] =
-    useState(true);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // Transfer state
   const [transferEmail, setTransferEmail] = useState("");
@@ -102,7 +96,6 @@ function OrganizationSettingsPageContent({
 
   const tabs: { id: OrgSettingsTab; label: string }[] = [
     { id: "general", label: "General" },
-    { id: "access", label: "Access Control" },
     ...(showTags ? [{ id: "tags" as const, label: "Tags" }] : []),
     { id: "danger", label: "Danger Zone" },
   ];
@@ -121,9 +114,6 @@ function OrganizationSettingsPageContent({
         setOrganization(data.organization);
         setName(data.organization.name);
         setDescription(data.organization.description || "");
-        setTeamLeadsCanCreateProjects(
-          data.organization.settings?.teamLeadsCanCreateProjects ?? true
-        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -211,34 +201,6 @@ function OrganizationSettingsPageContent({
     }
   }
 
-  async function handleToggleAccess() {
-    const newValue = !teamLeadsCanCreateProjects;
-    setTeamLeadsCanCreateProjects(newValue);
-    setIsSavingSettings(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/organizations/${slug}/settings`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          settings: {
-            teamLeadsCanCreateProjects: newValue,
-          },
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to update settings");
-      }
-      setSuccessMessage("Access control settings updated");
-    } catch (err) {
-      setTeamLeadsCanCreateProjects(!newValue);
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setIsSavingSettings(false);
-    }
-  }
-
   if (isLoading) {
     return <TerminalLoading fullPage />;
   }
@@ -323,13 +285,6 @@ function OrganizationSettingsPageContent({
             handleSave={handleSave}
             error={error}
             successMessage={successMessage}
-          />
-        )}
-        {activeTab === "access" && (
-          <AccessControlSettings
-            teamLeadsCanCreateProjects={teamLeadsCanCreateProjects}
-            isSavingSettings={isSavingSettings}
-            onToggle={handleToggleAccess}
           />
         )}
         {activeTab === "tags" && showTags && organization && (
@@ -475,63 +430,6 @@ function GeneralOrgSettings({
           >
             View Usage
           </TerminalButtonLink>
-        </div>
-      </TerminalCard>
-    </div>
-  );
-}
-
-// ============================================================
-// Access Control Tab
-// ============================================================
-
-function AccessControlSettings({
-  teamLeadsCanCreateProjects,
-  isSavingSettings,
-  onToggle,
-}: {
-  teamLeadsCanCreateProjects: boolean;
-  isSavingSettings: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <TerminalCard>
-        <h2 className="text-base font-semibold text-zinc-100">
-          Access Control
-        </h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Control what team leads can do in your organization.
-        </p>
-
-        <div className="mt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-zinc-100">
-                Allow team leads to create projects
-              </p>
-              <p className="text-xs text-zinc-500">
-                When disabled, only owners and project managers can create new
-                projects.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={teamLeadsCanCreateProjects}
-              onClick={onToggle}
-              disabled={isSavingSettings}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                teamLeadsCanCreateProjects ? "bg-green-500" : "bg-zinc-600"
-              } ${isSavingSettings ? "opacity-50" : ""}`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                  teamLeadsCanCreateProjects ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
         </div>
       </TerminalCard>
     </div>

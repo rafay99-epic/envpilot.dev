@@ -5,6 +5,7 @@ import {
   checkBooleanFeature,
   checkCountedLimit,
   countActiveAccounts,
+  resolveOrgGateContext,
 } from "./featureRegistry";
 import { createAuditLog } from "./auditHelpers";
 import { authorizeAccountAccess, requireAccountAccess } from "./authHelpers";
@@ -265,11 +266,16 @@ export const create = mutation({
       throw new Error("An account must have at least one environment");
     }
 
+    // Resolve the shared org/tier/grace context once and reuse it for both
+    // gate checks against this org (avoids re-fetching the same rows twice).
+    const gate = await resolveOrgGateContext(ctx.db, project.organizationId);
+
     // Feature gate: shared_accounts boolean
     const boolGate = await checkBooleanFeature(
       ctx.db,
       project.organizationId,
-      "shared_accounts"
+      "shared_accounts",
+      gate
     );
     if (!boolGate.allowed) {
       throw new Error(
@@ -284,7 +290,8 @@ export const create = mutation({
       ctx.db,
       project.organizationId,
       "shared_accounts_limit",
-      (limit) => countActiveAccounts(ctx.db, project.organizationId, limit)
+      (limit) => countActiveAccounts(ctx.db, project.organizationId, limit),
+      gate
     );
     if (!numGate.allowed) {
       throw new Error(

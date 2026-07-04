@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "./_generated/server";
-import { Id, Doc } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 import { batchGetUsers, userDisplay } from "./helpers";
 import { resolveFeatureValue } from "./featureRegistry";
 
@@ -213,91 +213,6 @@ export const listByVariable = query({
     const cutoff = project
       ? await getRetentionCutoff(ctx.db, project.organizationId)
       : null;
-    const retainedLogs = cutoff
-      ? logs.filter((l) => l.createdAt >= cutoff)
-      : logs;
-
-    const userMap = await batchGetUsers(
-      ctx,
-      retainedLogs.map((l) => l.userId)
-    );
-    return retainedLogs.map((log) => {
-      const u = userMap.get(log.userId.toString());
-      return {
-        ...log,
-        ...userDisplay(u),
-        parsedDetails: log.details ? JSON.parse(log.details) : null,
-      };
-    });
-  },
-});
-
-export const listByUser = query({
-  args: {
-    userId: v.id("users"),
-    organizationId: v.optional(v.id("organizations")),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-    const orgId = args.organizationId;
-
-    // There is no composite user+org index, so when scoping to an org we fetch
-    // a bounded window by user (via the by_user_and_created index) and filter
-    // it in memory — never a db `.filter` scan of the whole table.
-    const fetchCount = orgId ? Math.max(limit, 500) : limit;
-    let logs = await ctx.db
-      .query("auditLogs")
-      .withIndex("by_user_and_created", (q) => q.eq("userId", args.userId))
-      .order("desc")
-      .take(fetchCount);
-
-    if (orgId) {
-      logs = logs.filter((l) => l.organizationId === orgId);
-      const cutoff = await getRetentionCutoff(ctx.db, orgId);
-      if (cutoff) logs = logs.filter((l) => l.createdAt >= cutoff);
-    }
-
-    const limitedLogs = logs.slice(0, limit);
-
-    const logsWithDetails = await Promise.all(
-      limitedLogs.map(async (log) => {
-        const org = await ctx.db.get(log.organizationId);
-        const project = log.projectId ? await ctx.db.get(log.projectId) : null;
-        return {
-          ...log,
-          organizationName: org?.name ?? "Unknown",
-          projectName: project?.name,
-          parsedDetails: log.details ? JSON.parse(log.details) : null,
-        };
-      })
-    );
-
-    return logsWithDetails;
-  },
-});
-
-export const listByAction = query({
-  args: {
-    organizationId: v.id("organizations"),
-    action: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    // Use the by_org_and_action index so only rows for this org+action are
-    // read (bounded by take), instead of scanning all org rows with a db
-    // `.filter`. The index appends _creationTime (not our createdAt field),
-    // so the retention cutoff is applied in memory on the bounded result set.
-    const action = args.action as Doc<"auditLogs">["action"];
-    const logs = await ctx.db
-      .query("auditLogs")
-      .withIndex("by_org_and_action", (q) =>
-        q.eq("organizationId", args.organizationId).eq("action", action)
-      )
-      .order("desc")
-      .take(args.limit ?? 50);
-
-    const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const retainedLogs = cutoff
       ? logs.filter((l) => l.createdAt >= cutoff)
       : logs;

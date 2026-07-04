@@ -651,69 +651,11 @@ export const revoke = mutation({
   },
 });
 
-export const revokeAllForAccount = mutation({
-  args: {
-    accountId: v.id("projectAccounts"),
-    revokedBy: v.id("users"),
-  },
-  returns: v.object({ revokedCount: v.number() }),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const account = await ctx.db.get(args.accountId);
-    if (!account || account.deletedAt) {
-      throw new Error("Account not found");
-    }
-
-    // Unified authorization, then tightened: this is a destructive operation,
-    // so only owners and project managers may revoke everything at once
-    // (team leads are blocked — parity with permissions.revokeAllForVariable).
-    const { orgRole, organizationId } = await authorizeAccountGrantManager(
-      ctx,
-      args.revokedBy,
-      account.projectId
-    );
-
-    if (orgRole === "team_lead") {
-      throw new Error(
-        "Only owners and project managers can revoke all permissions for an account"
-      );
-    }
-
-    const permissions = (
-      await ctx.db
-        .query("accountPermissions")
-        .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
-        .collect()
-    ).filter((p) => p.isActive);
-
-    for (const perm of permissions) {
-      await ctx.db.patch(perm._id, {
-        isActive: false,
-        revokedAt: now,
-        revokedBy: args.revokedBy,
-      });
-    }
-
-    await createAuditLog(ctx, {
-      organizationId,
-      projectId: account.projectId,
-      userId: args.revokedBy,
-      action: "account.permission_revoked",
-      details: {
-        accountId: args.accountId,
-        accountName: account.name,
-        bulkRevoke: true,
-        allPermissions: true,
-        count: permissions.length,
-      },
-      involvesSensitiveData: true,
-      resourceType: "account",
-    });
-
-    return { revokedCount: permissions.length };
-  },
-});
+/**
+ * Runs are capped per invocation — see permissions.CLEANUP_BATCH_SIZE for the
+ * rationale (cheap per-row work here, unlike vaultGc's external calls).
+ */
+const CLEANUP_BATCH_SIZE = 1000;
 
 /**
  * Internal mutation to cleanup expired account permissions.
@@ -733,18 +675,21 @@ export const cleanupExpired = internalMutation({
 
     const now = Date.now();
 
-    // Full scan (mirrors permissions.cleanupExpired): permanent grants (no
-    // expiry) are the common case and cost a single cheap `continue`; an
-    // expiresAt index would still scan them (undefined sorts before numbers).
-    const allPermissions = await ctx.db.query("accountPermissions").collect();
+    // Bounded by the by_active_and_expires index (mirrors
+    // permissions.cleanupExpired's variablePermissions fix — see that file
+    // for the full ordering rationale): permanent grants (no expiry) are
+    // never read at all, since expiresAt's undefined sorts below the gt(0)
+    // floor. Capped at CLEANUP_BATCH_SIZE per run.
+    const expiredPermissions = await ctx.db
+      .query("accountPermissions")
+      .withIndex("by_active_and_expires", (q) =>
+        q.eq("isActive", true).gt("expiresAt", 0).lte("expiresAt", now)
+      )
+      .take(CLEANUP_BATCH_SIZE);
 
     let cleanedUp = 0;
 
-    for (const perm of allPermissions) {
-      if (!perm.expiresAt) continue;
-      if (!perm.isActive) continue;
-      if (perm.expiresAt >= now) continue;
-
+    for (const perm of expiredPermissions) {
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,

@@ -394,61 +394,6 @@ export const revokeToken = mutation({
 });
 
 /**
- * List active CLI tokens for a user
- */
-export const listUserTokens = query({
-  args: {
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const tokens = await ctx.db
-      .query("cliTokens")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
-      )
-      .collect();
-
-    return tokens.map((token) => ({
-      id: token._id,
-      deviceName: token.deviceName,
-      createdAt: token.createdAt,
-      lastUsedAt: token.lastUsedAt,
-      expiresAt: token.expiresAt,
-      // Mask the token for display
-      tokenPreview: token.accessToken.slice(0, 12) + "...",
-    }));
-  },
-});
-
-/**
- * Revoke all CLI tokens for a user
- */
-export const revokeAllUserTokens = mutation({
-  args: {
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const tokens = await ctx.db
-      .query("cliTokens")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
-      )
-      .collect();
-
-    const now = Date.now();
-
-    for (const token of tokens) {
-      await ctx.db.patch(token._id, {
-        isActive: false,
-        revokedAt: now,
-      });
-    }
-
-    return { revokedCount: tokens.length };
-  },
-});
-
-/**
  * Store a token for the VS Code extension (reuses cliTokens table).
  *
  * TRUST BOUNDARY: this inserts an ACTIVE token bound to `userId`. It is called

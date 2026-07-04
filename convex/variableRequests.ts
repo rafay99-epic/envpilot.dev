@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { batchGetUsers } from "./helpers";
 import { createAuditLog } from "./auditHelpers";
 import {
   assertOrgMembership,
@@ -102,17 +103,24 @@ export const listForProject = query({
       args.userId
     );
 
+    // Never .collect() — cap at the most recent 100 requests per project
+    // (mirrors listForReviewer's take(100) org-wide cap), newest first via
+    // order("desc") on the index. Nothing purges old approved/rejected/
+    // canceled requests, so an uncapped read here grows without bound as
+    // request history accumulates.
     const requests = args.status
       ? await ctx.db
           .query("environmentVariableRequests")
           .withIndex("by_project_and_status", (q) =>
             q.eq("projectId", project._id).eq("status", args.status!)
           )
-          .collect()
+          .order("desc")
+          .take(100)
       : await ctx.db
           .query("environmentVariableRequests")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect();
+          .order("desc")
+          .take(100);
 
     // Reviewers (owner, assigned PM/team lead) see every request;
     // everyone else only sees their own.
@@ -121,38 +129,50 @@ export const listForProject = query({
       ? requests
       : requests.filter((request) => request.requestedBy === args.userId);
 
-    const sortedRequests = [...visibleRequests].sort(
-      (a, b) => b.createdAt - a.createdAt
-    );
+    // Already newest-first from the index's order("desc") (createdAt is set
+    // at insert time and tracks _creationTime, same ordering assumption
+    // listForReviewer already relies on) — no separate JS sort needed.
+    const sortedRequests = visibleRequests;
 
-    const requestsWithUsers = await Promise.all(
-      sortedRequests.map(async (request) => {
-        const requester = await ctx.db.get(request.requestedBy);
-        const reviewer = request.reviewedBy
-          ? await ctx.db.get(request.reviewedBy)
-          : null;
+    // Dedupe requester/reviewer ids and batch-fetch each unique user exactly
+    // once (mirrors listForReviewer's join pattern), instead of two
+    // ctx.db.get calls per row — a prolific requester/reviewer no longer
+    // costs one read per request they appear on.
+    const uniqueUserIds = [
+      ...new Set(
+        sortedRequests.flatMap((request) =>
+          request.reviewedBy
+            ? [request.requestedBy, request.reviewedBy]
+            : [request.requestedBy]
+        )
+      ),
+    ];
+    const userMap = await batchGetUsers(ctx, uniqueUserIds);
 
-        return {
-          ...request,
-          requester: requester
-            ? {
-                _id: requester._id,
-                email: requester.email,
-                name: requester.name,
-              }
-            : null,
-          reviewer: reviewer
-            ? {
-                _id: reviewer._id,
-                email: reviewer.email,
-                name: reviewer.name,
-              }
-            : null,
-        };
-      })
-    );
+    return sortedRequests.map((request) => {
+      const requester = userMap.get(request.requestedBy.toString()) ?? null;
+      const reviewer = request.reviewedBy
+        ? (userMap.get(request.reviewedBy.toString()) ?? null)
+        : null;
 
-    return requestsWithUsers;
+      return {
+        ...request,
+        requester: requester
+          ? {
+              _id: requester._id,
+              email: requester.email,
+              name: requester.name,
+            }
+          : null,
+        reviewer: reviewer
+          ? {
+              _id: reviewer._id,
+              email: reviewer.email,
+              name: reviewer.name,
+            }
+          : null,
+      };
+    });
   },
 });
 

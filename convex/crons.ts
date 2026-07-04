@@ -86,10 +86,14 @@ crons.interval(
   internal.sharedSecrets.cleanupExpiredOtps
 );
 
-// Auto-publish scheduled changelog entries every 5 minutes
+// Auto-publish scheduled changelog entries hourly. A marketing changelog
+// entry going live up to ~55 minutes after its scheduledFor timestamp has
+// no user-facing consequence — publishedAt is still set to the original
+// scheduledFor value (see changelog.ts), so displayed ordering/dates are
+// unaffected by the coarser cadence.
 crons.interval(
   "publish scheduled changelog entries",
-  { minutes: 5 },
+  { hours: 1 },
   internal.changelog.publishScheduledEntries
 );
 

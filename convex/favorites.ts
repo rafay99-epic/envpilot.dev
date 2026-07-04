@@ -29,24 +29,6 @@ export const listByUser = query({
   },
 });
 
-export const isFavorite = query({
-  args: {
-    userId: v.id("users"),
-    projectId: v.id("projects"),
-  },
-  returns: v.boolean(),
-  handler: async (ctx, args) => {
-    const favorite = await ctx.db
-      .query("favoriteProjects")
-      .withIndex("by_user_and_project", (q) =>
-        q.eq("userId", args.userId).eq("projectId", args.projectId)
-      )
-      .first();
-
-    return !!favorite;
-  },
-});
-
 export const toggle = mutation({
   args: {
     userId: v.id("users"),

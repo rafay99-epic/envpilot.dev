@@ -9,10 +9,8 @@ import {
 import { Doc, Id } from "./_generated/dataModel";
 import { batchGetUsers, userInfo } from "./helpers";
 import { isCronPaused } from "./tierLimits";
-import { checkBooleanFeature } from "./featureRegistry";
 import {
   assertProjectAction,
-  assertCanManageUser,
   normalizeOrgRole,
   roleLevel,
   type OrgRole,
@@ -40,69 +38,11 @@ type PermissionCheckResult = {
 /** Grantable permission levels. "admin" is legacy — treated as write, never granted. */
 const GRANTABLE_PERMISSIONS = ["read", "write"] as const;
 
-function assertGrantablePermission(permission: string): void {
-  if (permission === "admin") {
-    throw new Error(
-      'The "admin" permission level can no longer be granted. Grant "read" or "write" instead.'
-    );
-  }
-}
-
 /**
- * Authorize an actor to manage permissions on a variable's project and
- * resolve the owning organization. Throws on failure.
+ * Cap for getUsersWithProjectAccess's per-project variable read — mirrors the
+ * 500-per-project convention used throughout variables.ts (e.g. listWithAccess).
  */
-async function authorizePermissionManager(
-  ctx: MutationCtx | QueryCtx,
-  actorId: Id<"users">,
-  projectId: Id<"projects">
-): Promise<{ orgRole: OrgRole; organizationId: Id<"organizations"> }> {
-  const project = await ctx.db.get(projectId);
-  if (!project || project.deletedAt) {
-    throw new Error("Project not found");
-  }
-
-  const { orgRole } = await assertProjectAction(
-    ctx,
-    actorId,
-    projectId,
-    "project:manage_permissions"
-  );
-
-  return { orgRole, organizationId: project.organizationId };
-}
-
-/**
- * Target rule — identical in every mutation:
- * the target must be a member of the same organization, and their normalized
- * role level must be strictly below the actor's. Owners can target anyone.
- *
- * Note: targets do NOT need a project assignment — per-variable grants to
- * unassigned org members are the read-only "viewer sharing" feature
- * (getVariableAccess caps unassigned users at read).
- */
-async function assertGrantTarget(
-  ctx: MutationCtx | QueryCtx,
-  organizationId: Id<"organizations">,
-  actorRole: OrgRole,
-  targetUserId: Id<"users">,
-  action: string
-): Promise<void> {
-  const targetMembership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", organizationId).eq("userId", targetUserId)
-    )
-    .first();
-
-  if (!targetMembership) {
-    throw new Error("Target user is not a member of the organization");
-  }
-
-  if (actorRole !== "owner") {
-    assertCanManageUser(actorRole, targetMembership.role, action);
-  }
-}
+const GET_USERS_VARIABLES_CAP = 500;
 
 /**
  * Find the target's active grant on a variable (isActive only — expiry is
@@ -598,17 +538,26 @@ export const getUsersWithProjectAccess = query({
     })
   ),
   handler: async (ctx, args) => {
+    // Capped (mirrors the perProjectLimit convention in variables.ts) instead
+    // of an unbounded collect — variablePermissions has no project-scoped
+    // index (see below), so this bounds the fan-out width too. Projects past
+    // this cap will only show access for their first GET_USERS_VARIABLES_CAP
+    // variables; that mirrors the same tradeoff variables.ts's other
+    // per-project list queries already accept.
     const variables = (
       await ctx.db
         .query("environmentVariables")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect()
+        .take(GET_USERS_VARIABLES_CAP)
     ).filter((variable) => !variable.deletedAt);
 
-    // variablePermissions has no project-scoped index, so one indexed read per
-    // variable is the minimum. Run them concurrently (instead of awaiting in a
-    // sequential loop) and fold into the user map in a single pass. Promise.all
-    // preserves order, so the resulting user ordering matches the old loop.
+    // variablePermissions has no project-scoped index (it would require
+    // denormalizing projectId onto every grant row plus a backfill migration
+    // — out of scope for this pass; see convex/permissions.ts module notes),
+    // so one indexed read per variable is the minimum. Run them concurrently
+    // (instead of awaiting in a sequential loop) and fold into the user map in
+    // a single pass. Promise.all preserves order, so the resulting user
+    // ordering matches the old loop.
     const permsPerVariable = await Promise.all(
       variables.map(async (variable) => ({
         variable,
@@ -665,525 +614,14 @@ export const getUsersWithProjectAccess = query({
 // MUTATIONS
 // ==========================================
 
-export const grant = mutation({
-  args: {
-    variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
-    permission: v.union(
-      v.literal("read"),
-      v.literal("write"),
-      v.literal("admin")
-    ),
-    grantedBy: v.id("users"),
-    expiresAt: v.optional(v.number()),
-  },
-  returns: v.id("variablePermissions"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
-    }
-
-    // Unified authorization: owner (bypass), or project manager / team lead
-    // assigned to the variable's project
-    const { orgRole, organizationId } = await authorizePermissionManager(
-      ctx,
-      args.grantedBy,
-      variable.projectId
-    );
-
-    // Only read/write are grantable going forward
-    assertGrantablePermission(args.permission);
-
-    // Check granular_permissions feature gate
-    const permCheck = await checkBooleanFeature(
-      ctx.db,
-      organizationId,
-      "granular_permissions"
-    );
-    if (!permCheck.allowed) {
-      throw new Error(
-        "Granular permissions are not available on your current tier."
-      );
-    }
-
-    // Target rule: org member, strictly below the actor (owners exempt)
-    await assertGrantTarget(
-      ctx,
-      organizationId,
-      orgRole,
-      args.userId,
-      "grant variable permissions"
-    );
-
-    const existingPermission = await findActiveGrant(
-      ctx,
-      args.variableId,
-      args.userId
-    );
-
-    if (existingPermission) {
-      throw new Error(
-        "User already has an active permission for this variable"
-      );
-    }
-
-    const permissionId = await ctx.db.insert("variablePermissions", {
-      variableId: args.variableId,
-      userId: args.userId,
-      permission: args.permission,
-      grantedBy: args.grantedBy,
-      grantedAt: now,
-      expiresAt: args.expiresAt,
-      isActive: true,
-    });
-
-    // Get target user details for audit log
-    const targetUser = await ctx.db.get(args.userId);
-
-    await ctx.db.insert("auditLogs", {
-      organizationId,
-      projectId: variable.projectId,
-      variableId: args.variableId,
-      userId: args.grantedBy,
-      action: "permission.granted",
-      details: JSON.stringify({
-        grantedTo: args.userId,
-        grantedToEmail: targetUser?.email,
-        permission: args.permission,
-        expiresAt: args.expiresAt,
-        variableKey: variable.key,
-      }),
-      createdAt: now,
-    });
-
-    return permissionId;
-  },
-});
-
-export const update = mutation({
-  args: {
-    permissionId: v.id("variablePermissions"),
-    permission: v.optional(
-      v.union(v.literal("read"), v.literal("write"), v.literal("admin"))
-    ),
-    expiresAt: v.optional(v.number()),
-    updatedBy: v.id("users"),
-  },
-  returns: v.id("variablePermissions"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const existingPerm = await ctx.db.get(args.permissionId);
-    if (!existingPerm) {
-      throw new Error("Permission not found");
-    }
-
-    if (!existingPerm.isActive) {
-      throw new Error("Cannot update an inactive permission");
-    }
-
-    const variable = await ctx.db.get(existingPerm.variableId);
-    if (!variable) {
-      throw new Error("Variable not found");
-    }
-
-    // Unified authorization: owner (bypass), or project manager / team lead
-    // assigned to the variable's project
-    const { orgRole, organizationId } = await authorizePermissionManager(
-      ctx,
-      args.updatedBy,
-      variable.projectId
-    );
-
-    // Only read/write are grantable going forward
-    if (args.permission !== undefined) {
-      assertGrantablePermission(args.permission);
-    }
-
-    // Check granular_permissions feature gate
-    const updatePermCheck = await checkBooleanFeature(
-      ctx.db,
-      organizationId,
-      "granular_permissions"
-    );
-    if (!updatePermCheck.allowed) {
-      throw new Error(
-        "Granular permissions are not available on your current tier."
-      );
-    }
-
-    // Target rule: org member, strictly below the actor (owners exempt)
-    await assertGrantTarget(
-      ctx,
-      organizationId,
-      orgRole,
-      existingPerm.userId,
-      "update variable permissions"
-    );
-
-    const updateData: Record<string, unknown> = {};
-    if (args.permission !== undefined) updateData.permission = args.permission;
-    if (args.expiresAt !== undefined) updateData.expiresAt = args.expiresAt;
-
-    await ctx.db.patch(args.permissionId, updateData);
-
-    // Get target user details for audit log
-    const targetUser = await ctx.db.get(existingPerm.userId);
-
-    await ctx.db.insert("auditLogs", {
-      organizationId,
-      projectId: variable.projectId,
-      variableId: existingPerm.variableId,
-      userId: args.updatedBy,
-      action: "permission.updated",
-      details: JSON.stringify({
-        targetUser: existingPerm.userId,
-        targetUserEmail: targetUser?.email,
-        oldPermission: existingPerm.permission,
-        newPermission: args.permission ?? existingPerm.permission,
-        variableKey: variable.key,
-      }),
-      createdAt: now,
-    });
-
-    return args.permissionId;
-  },
-});
-
-export const revoke = mutation({
-  args: {
-    variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
-    revokedBy: v.id("users"),
-  },
-  returns: v.id("variablePermissions"),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
-    }
-
-    // Unified authorization: owner (bypass), or project manager / team lead
-    // assigned to the variable's project
-    const { orgRole, organizationId } = await authorizePermissionManager(
-      ctx,
-      args.revokedBy,
-      variable.projectId
-    );
-
-    const permission = await findActiveGrant(ctx, args.variableId, args.userId);
-
-    if (!permission) {
-      throw new Error("No active permission found");
-    }
-
-    // Target rule: org member, strictly below the actor (owners exempt)
-    await assertGrantTarget(
-      ctx,
-      organizationId,
-      orgRole,
-      args.userId,
-      "revoke variable permissions"
-    );
-
-    await ctx.db.patch(permission._id, {
-      isActive: false,
-      revokedAt: now,
-      revokedBy: args.revokedBy,
-    });
-
-    // Get target user details for audit log
-    const targetUser = await ctx.db.get(args.userId);
-
-    await ctx.db.insert("auditLogs", {
-      organizationId,
-      projectId: variable.projectId,
-      variableId: args.variableId,
-      userId: args.revokedBy,
-      action: "permission.revoked",
-      details: JSON.stringify({
-        revokedFrom: args.userId,
-        revokedFromEmail: targetUser?.email,
-        permission: permission.permission,
-        variableKey: variable.key,
-      }),
-      createdAt: now,
-    });
-
-    return permission._id;
-  },
-});
-
-export const bulkGrant = mutation({
-  args: {
-    variableId: v.id("environmentVariables"),
-    userIds: v.array(v.id("users")),
-    permission: v.union(
-      v.literal("read"),
-      v.literal("write"),
-      v.literal("admin")
-    ),
-    grantedBy: v.id("users"),
-    expiresAt: v.optional(v.number()),
-  },
-  returns: v.object({
-    granted: v.array(v.id("variablePermissions")),
-    skipped: v.array(v.id("users")),
-  }),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
-    }
-
-    // Unified authorization: owner (bypass), or project manager / team lead
-    // assigned to the variable's project
-    const { orgRole, organizationId } = await authorizePermissionManager(
-      ctx,
-      args.grantedBy,
-      variable.projectId
-    );
-
-    // Only read/write are grantable going forward
-    assertGrantablePermission(args.permission);
-
-    // Check granular_permissions feature gate
-    const bulkPermCheck = await checkBooleanFeature(
-      ctx.db,
-      organizationId,
-      "granular_permissions"
-    );
-    if (!bulkPermCheck.allowed) {
-      throw new Error(
-        "Granular permissions are not available on your current tier."
-      );
-    }
-
-    const grantedIds: Id<"variablePermissions">[] = [];
-    const skippedIds: Id<"users">[] = [];
-
-    for (const userId of args.userIds) {
-      // Target rule — same as single grant; ineligible targets are skipped
-      // instead of failing the whole batch
-      const targetMembership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q.eq("organizationId", organizationId).eq("userId", userId)
-        )
-        .first();
-
-      if (!targetMembership) {
-        skippedIds.push(userId);
-        continue;
-      }
-
-      if (orgRole !== "owner") {
-        try {
-          assertCanManageUser(
-            orgRole,
-            targetMembership.role,
-            "grant variable permissions"
-          );
-        } catch (err) {
-          console.error("permissions.bulkGrant.targetSkipped", {
-            variableId: args.variableId,
-            targetUserId: userId,
-            grantedBy: args.grantedBy,
-            error: String(err),
-          });
-          skippedIds.push(userId);
-          continue;
-        }
-      }
-
-      const existing = await findActiveGrant(ctx, args.variableId, userId);
-
-      if (existing) {
-        skippedIds.push(userId);
-        continue;
-      }
-
-      const permissionId = await ctx.db.insert("variablePermissions", {
-        variableId: args.variableId,
-        userId,
-        permission: args.permission,
-        grantedBy: args.grantedBy,
-        grantedAt: now,
-        expiresAt: args.expiresAt,
-        isActive: true,
-      });
-
-      grantedIds.push(permissionId);
-    }
-
-    await ctx.db.insert("auditLogs", {
-      organizationId,
-      projectId: variable.projectId,
-      variableId: args.variableId,
-      userId: args.grantedBy,
-      action: "permission.granted",
-      details: JSON.stringify({
-        bulkGrant: true,
-        permission: args.permission,
-        grantedCount: grantedIds.length,
-        skippedCount: skippedIds.length,
-      }),
-      createdAt: now,
-    });
-
-    return { granted: grantedIds, skipped: skippedIds };
-  },
-});
-
-export const bulkRevokeForUser = mutation({
-  args: {
-    projectId: v.id("projects"),
-    userId: v.id("users"),
-    revokedBy: v.id("users"),
-  },
-  returns: v.object({ revokedCount: v.number() }),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.deletedAt) {
-      throw new Error("Project not found");
-    }
-
-    // Unified authorization: owner (bypass), or project manager / team lead
-    // assigned to the project
-    const { orgRole } = await assertProjectAction(
-      ctx,
-      args.revokedBy,
-      args.projectId,
-      "project:manage_permissions"
-    );
-
-    // Target rule: org member, strictly below the actor (owners exempt)
-    await assertGrantTarget(
-      ctx,
-      project.organizationId,
-      orgRole,
-      args.userId,
-      "revoke variable permissions"
-    );
-
-    const variables = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-
-    let revokedCount = 0;
-
-    for (const variable of variables) {
-      const permissions = (
-        await ctx.db
-          .query("variablePermissions")
-          .withIndex("by_variable_and_user", (q) =>
-            q.eq("variableId", variable._id).eq("userId", args.userId)
-          )
-          .collect()
-      ).filter((p) => p.isActive);
-
-      for (const perm of permissions) {
-        await ctx.db.patch(perm._id, {
-          isActive: false,
-          revokedAt: now,
-          revokedBy: args.revokedBy,
-        });
-        revokedCount++;
-      }
-    }
-
-    // Get target user details for audit log
-    const targetUser = await ctx.db.get(args.userId);
-
-    await ctx.db.insert("auditLogs", {
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-      userId: args.revokedBy,
-      action: "permission.revoked",
-      details: JSON.stringify({
-        bulkRevoke: true,
-        revokedFrom: args.userId,
-        revokedFromEmail: targetUser?.email,
-        count: revokedCount,
-      }),
-      createdAt: now,
-    });
-
-    return { revokedCount };
-  },
-});
-
-export const revokeAllForVariable = mutation({
-  args: {
-    variableId: v.id("environmentVariables"),
-    revokedBy: v.id("users"),
-  },
-  returns: v.object({ revokedCount: v.number() }),
-  handler: async (ctx, args) => {
-    const now = Date.now();
-
-    const variable = await ctx.db.get(args.variableId);
-    if (!variable || variable.deletedAt) {
-      throw new Error("Variable not found");
-    }
-
-    // Unified authorization, then tightened: this is a destructive operation,
-    // so only owners and project managers may revoke everything at once
-    const { orgRole, organizationId } = await authorizePermissionManager(
-      ctx,
-      args.revokedBy,
-      variable.projectId
-    );
-
-    if (orgRole === "team_lead") {
-      throw new Error(
-        "Only owners and project managers can revoke all permissions for a variable"
-      );
-    }
-
-    const permissions = (
-      await ctx.db
-        .query("variablePermissions")
-        .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
-        .collect()
-    ).filter((p) => p.isActive);
-
-    for (const perm of permissions) {
-      await ctx.db.patch(perm._id, {
-        isActive: false,
-        revokedAt: now,
-        revokedBy: args.revokedBy,
-      });
-    }
-
-    await ctx.db.insert("auditLogs", {
-      organizationId,
-      projectId: variable.projectId,
-      variableId: args.variableId,
-      userId: args.revokedBy,
-      action: "permission.revoked",
-      details: JSON.stringify({
-        bulkRevoke: true,
-        allPermissions: true,
-        count: permissions.length,
-        variableKey: variable.key,
-      }),
-      createdAt: now,
-    });
-
-    return { revokedCount: permissions.length };
-  },
-});
+/**
+ * Runs are capped per invocation (mirrors vaultGc.PURGE_BATCH_SIZE): the work
+ * per row here is a cheap patch + optional audit insert (not an external vault
+ * call), so a larger batch is safe. Any remainder past this cap is picked up
+ * by tomorrow's run — nothing is lost, just deferred by a day in a
+ * pathological pile-up.
+ */
+const CLEANUP_BATCH_SIZE = 1000;
 
 /**
  * Internal mutation to cleanup expired permissions
@@ -1199,27 +637,32 @@ export const cleanupExpired = internalMutation({
 
     const now = Date.now();
 
-    // Runs at most once per day (crons.daily "cleanup expired permissions").
-    // A full scan is unavoidable here: the app now creates many PERMANENT
-    // grants (no expiresAt), and an expiresAt index would still scan them
-    // (undefined sorts before numbers), so an index buys nothing. Instead we
-    // stream the collected rows and bail out early on anything that isn't an
-    // active, actually-expired grant — permanent grants (the common case) cost
-    // one cheap `continue` and zero further work.
-    const allPermissions = await ctx.db.query("variablePermissions").collect();
+    // Bounded by the by_active_and_expires index instead of a full
+    // cross-tenant table scan. expiresAt is optional and undefined sorts
+    // BELOW all numbers in Convex's index ordering (same trick already used
+    // by vaultGc.by_deleted_at), so eq("isActive", true) + gt("expiresAt", 0)
+    // + lte("expiresAt", now) reads ONLY grants that are active, DO carry an
+    // expiry, AND have actually expired — permanent grants (the common case,
+    // and the growing majority of this table) are never read at all. (A
+    // previous comment here claimed an expiresAt index "would still scan"
+    // permanent grants — that was true only for a naive `lte(now)` range with
+    // no floor; the `gt(0)` floor is what excludes them, and this codebase
+    // already relies on the identical trick for vault-GC.) Capped at
+    // CLEANUP_BATCH_SIZE per run so a pathological expiry pile-up can't blow
+    // the per-call read/write budget.
+    const expiredPermissions = await ctx.db
+      .query("variablePermissions")
+      .withIndex("by_active_and_expires", (q) =>
+        q.eq("isActive", true).gt("expiresAt", 0).lte("expiresAt", now)
+      )
+      .take(CLEANUP_BATCH_SIZE);
 
     // Cache project lookups so repeated variables don't re-fetch
     const projectCache = new Map<string, Doc<"projects"> | null>();
 
     let cleanedUp = 0;
 
-    for (const perm of allPermissions) {
-      // Skip permanent grants (no expiry) first — minimal work for the bulk of
-      // rows — then inactive and not-yet-expired grants.
-      if (!perm.expiresAt) continue;
-      if (!perm.isActive) continue;
-      if (perm.expiresAt >= now) continue;
-
+    for (const perm of expiredPermissions) {
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,

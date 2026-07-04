@@ -567,57 +567,6 @@ export const sendMemberUpdateEmail = action({
   },
 });
 
-export const sendAccessRequestEmail = action({
-  args: {
-    userId: v.id("users"),
-    to: v.string(),
-    requesterName: v.string(),
-    variableName: v.string(),
-    projectName: v.string(),
-    organizationName: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const prefs = await ctx.runQuery(
-      internal.userPreferences.getByUserIdInternal,
-      {
-        userId: args.userId,
-      }
-    );
-    if (prefs?.emailNotifications?.accessRequests === false) {
-      return { success: true, skipped: true };
-    }
-
-    const safeRequester = escapeHtml(args.requesterName);
-    const safeVar = escapeHtml(args.variableName);
-    const safeProject = escapeHtml(args.projectName);
-    const safeOrg = escapeHtml(args.organizationName);
-    const orgInitial = args.organizationName.charAt(0).toUpperCase();
-
-    const html = emailWrapper(
-      `Access Request - ${safeOrg}`,
-      [
-        iconRow(orgInitial, "#f59e0b"),
-        headingRow("Access Request"),
-        paragraphRow(
-          `<strong>${safeRequester}</strong> is requesting access to the variable <code style="${CODE_STYLE}">${safeVar}</code> in project <strong>${safeProject}</strong>.`
-        ),
-        footerRow(
-          'You received this because you have access request notifications enabled. <a href="#" style="color: #71717a;">Manage preferences</a>'
-        ),
-      ].join("")
-    );
-
-    const text = `Access Request - ${args.organizationName}\n\n${args.requesterName} is requesting access to the variable ${args.variableName} in project ${args.projectName}.`;
-
-    return sendEmail(
-      args.to,
-      `Access request for ${args.variableName} in ${args.projectName}`,
-      html,
-      text
-    );
-  },
-});
-
 // ============================================================
 // Rotation Reminder Emails
 // ============================================================

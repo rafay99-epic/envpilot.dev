@@ -69,43 +69,6 @@ export const listPendingByOrganization = query({
   },
 });
 
-export const getForEmail = query({
-  args: { email: v.string() },
-  handler: async (ctx, args) => {
-    const invitations = await ctx.db
-      .query("invitations")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.status === "pending"));
-
-    const now = Date.now();
-    const validInvitations = invitations.filter((inv) => inv.expiresAt > now);
-
-    const invitationsWithOrg = await Promise.all(
-      validInvitations.map(async (inv) => {
-        const org = await ctx.db.get(inv.organizationId);
-        const inviter = await ctx.db.get(inv.invitedBy);
-        // Strip the invitation token: this "you have a pending invite" lookup
-        // only needs display fields. The token grants acceptance and must only
-        // reach the invitee via the emailed accept link (getByToken), never a
-        // by-email listing.
-        const { token: _token, ...safe } = inv;
-        return {
-          ...safe,
-          organization: org
-            ? { name: org.name, slug: org.slug, logoUrl: org.logoUrl }
-            : null,
-          invitedByUser: inviter
-            ? { name: inviter.name, email: inviter.email }
-            : null,
-        };
-      })
-    );
-
-    return invitationsWithOrg;
-  },
-});
-
 export const getByToken = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {

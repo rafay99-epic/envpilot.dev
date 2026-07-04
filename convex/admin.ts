@@ -67,14 +67,26 @@ export const verifySecret = query({
 // DASHBOARD
 // ==========================================
 
+// Admin dashboard reads are reactive (re-run on every write to any of these
+// tables platform-wide). This cap bounds worst-case read cost per render and
+// keeps every table scan in this file below Convex's per-function read
+// limit; it mirrors the existing users/organizations/projects cap below.
+// True fix (denormalized counters / @convex-dev/aggregate) is a larger
+// follow-up — see .frugal-fable/usage-audit/fixes-crons.md.
+const ADMIN_DASHBOARD_SCAN_CAP = 10000;
+
 export const getStats = query({
   args: { secret: v.string() },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
 
-    const users = await ctx.db.query("users").take(10000);
-    const organizations = await ctx.db.query("organizations").take(10000);
-    const projects = await ctx.db.query("projects").take(10000);
+    const users = await ctx.db.query("users").take(ADMIN_DASHBOARD_SCAN_CAP);
+    const organizations = await ctx.db
+      .query("organizations")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
+    const projects = await ctx.db
+      .query("projects")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
 
     const unreadMessages = await ctx.db
       .query("contactMessages")
@@ -86,14 +98,18 @@ export const getStats = query({
       .withIndex("by_status", (q) => q.eq("status", "open"))
       .collect();
 
-    const featureRequests = await ctx.db.query("featureRequests").collect();
+    const featureRequests = await ctx.db
+      .query("featureRequests")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
     const featureRequestsByStatus: Record<string, number> = {};
     for (const fr of featureRequests) {
       featureRequestsByStatus[fr.status] =
         (featureRequestsByStatus[fr.status] || 0) + 1;
     }
 
-    const userTiers = await ctx.db.query("userTiers").collect();
+    const userTiers = await ctx.db
+      .query("userTiers")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
     const tierDistribution: Record<string, number> = {};
     for (const ut of userTiers) {
       tierDistribution[ut.tier] = (tierDistribution[ut.tier] || 0) + 1;
@@ -321,65 +337,6 @@ export const listOrganizations = query({
     }
 
     return results;
-  },
-});
-
-export const getOrganizationDetail = query({
-  args: {
-    secret: v.string(),
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
-
-    const org = await ctx.db.get(args.organizationId);
-    if (!org) {
-      throw new Error("Organization not found");
-    }
-
-    const memberships = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-
-    const members = [];
-    for (const membership of memberships) {
-      const user = await ctx.db.get(membership.userId);
-      members.push({
-        ...membership,
-        user: user
-          ? {
-              _id: user._id,
-              email: user.email,
-              name: user.name,
-              avatarUrl: user.avatarUrl,
-              isBanned: user.isBanned,
-            }
-          : null,
-      });
-    }
-
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-
-    // Resolve tier from org owner's userTiers record
-    const ownerTier = await ctx.db
-      .query("userTiers")
-      .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
-      .first();
-
-    return {
-      ...org,
-      members,
-      projects,
-      tier: ownerTier?.tier ?? "free",
-    };
   },
 });
 
@@ -2146,6 +2103,47 @@ export const runMigration = mutation({
       return { success: true, ...results };
     }
 
+    // Drains legacy/dead data so the corresponding schema declarations can be
+    // dropped in a later PR:
+    //   a. `organizations.settings` — the write path (teamLeadsCanCreateProjects)
+    //      was removed; the field was never consulted by any auth check. Unset it.
+    //   b. `usageCounters` rows — the table is never inserted into anywhere
+    //      (consumption tracking was never wired up); defensively delete any rows.
+    // Idempotent and bounded: writes are capped per run (org patches limited to
+    // BATCH, counters deleted in batches of BATCH). Re-run until both
+    // `orgSettingsRemaining` is 0 and `usageCountersMayHaveMore` is false.
+    if (args.name === "cleanup-dead-data") {
+      const BATCH = 500;
+
+      // a. Unset legacy `settings` on organizations.
+      const orgs = await ctx.db.query("organizations").collect();
+      let orgSettingsUnset = 0;
+      let orgSettingsRemaining = 0;
+      for (const org of orgs) {
+        if (org.settings === undefined) continue;
+        if (orgSettingsUnset >= BATCH) {
+          orgSettingsRemaining++;
+          continue;
+        }
+        await ctx.db.patch(org._id, { settings: undefined });
+        orgSettingsUnset++;
+      }
+
+      // b. Delete dead usageCounters rows (expected to be none).
+      const counters = await ctx.db.query("usageCounters").take(BATCH);
+      for (const counter of counters) {
+        await ctx.db.delete(counter._id);
+      }
+
+      return {
+        success: true,
+        orgSettingsUnset,
+        orgSettingsRemaining,
+        usageCountersDeleted: counters.length,
+        usageCountersMayHaveMore: counters.length === BATCH,
+      };
+    }
+
     throw new Error(`Unknown migration: ${args.name}`);
   },
 });
@@ -2153,30 +2151,6 @@ export const runMigration = mutation({
 // ==========================================
 // DATA BROWSER
 // ==========================================
-
-export const browseTable = query({
-  args: {
-    secret: v.string(),
-    tableName: v.string(),
-  },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
-
-    if (
-      !BROWSABLE_TABLES.includes(
-        args.tableName as (typeof BROWSABLE_TABLES)[number]
-      )
-    ) {
-      throw new Error(`Table "${args.tableName}" is not browsable`);
-    }
-
-    const rows = await (ctx.db.query(args.tableName as any) as any)
-      .order("desc")
-      .take(100);
-
-    return rows;
-  },
-});
 
 export const updateTableRow = mutation({
   args: {
@@ -2369,16 +2343,26 @@ export const getAnalytics = query({
     verifyAdmin(args.secret);
 
     // Get all users with creation times for growth chart
-    const users = await ctx.db.query("users").take(10000);
-    const organizations = await ctx.db.query("organizations").take(10000);
-    const projects = await ctx.db.query("projects").take(10000);
+    const users = await ctx.db.query("users").take(ADMIN_DASHBOARD_SCAN_CAP);
+    const organizations = await ctx.db
+      .query("organizations")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
+    const projects = await ctx.db
+      .query("projects")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
 
     // Messages and tickets
-    const contactMessages = await ctx.db.query("contactMessages").collect();
-    const supportTickets = await ctx.db.query("supportTickets").collect();
+    const contactMessages = await ctx.db
+      .query("contactMessages")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
+    const supportTickets = await ctx.db
+      .query("supportTickets")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
 
     // Feature requests
-    const featureRequests = await ctx.db.query("featureRequests").collect();
+    const featureRequests = await ctx.db
+      .query("featureRequests")
+      .take(ADMIN_DASHBOARD_SCAN_CAP);
 
     // Build monthly growth data for last 12 months
     const now = Date.now();
@@ -2745,112 +2729,6 @@ export const updateUserTier = mutation({
         reason: args.reason ?? "admin.manual_assignment",
       });
     }
-  },
-});
-
-// ==========================================
-// PHASE 6 MIGRATION
-// ==========================================
-
-/**
- * Migration: Clean up legacy data from the Phase 6 schema transition.
- *
- * 1. Strips `limits` and `features` from all tierDefinitions documents.
- * 2. Migrates organizationTiers → userTiers (if not already migrated).
- * 3. Deletes all organizationTiers records.
- * 4. Backfills userId on subscriptions/polarCustomers from org owner.
- *
- * Run this ONCE after deploying the Phase 6 schema.
- * After running, redeploy with organizationTiers table + limits/features
- * fields fully removed from schema.ts.
- */
-export const migratePhase6 = mutation({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
-    const now = Date.now();
-    const results = {
-      tierDefsCleanedLimits: 0,
-      tierDefsCleanedFeatures: 0,
-      orgTiersMigrated: 0,
-      orgTiersDeleted: 0,
-      subscriptionsBackfilled: 0,
-      polarCustomersBackfilled: 0,
-    };
-
-    // 1. Strip limits/features from tierDefinitions
-    const tierDefs = await ctx.db.query("tierDefinitions").collect();
-    for (const td of tierDefs) {
-      const updates: Record<string, undefined> = {};
-      if ((td as Record<string, unknown>).limits !== undefined) {
-        updates.limits = undefined;
-        results.tierDefsCleanedLimits++;
-      }
-      if ((td as Record<string, unknown>).features !== undefined) {
-        updates.features = undefined;
-        results.tierDefsCleanedFeatures++;
-      }
-      if ((td as Record<string, unknown>).dynamicFeatures !== undefined) {
-        updates.dynamicFeatures = undefined;
-        results.tierDefsCleanedLimits++;
-      }
-      if (Object.keys(updates).length > 0) {
-        await ctx.db.patch(td._id, updates);
-      }
-    }
-
-    // 2. Migrate organizationTiers → userTiers
-    const orgTiers = await ctx.db.query("organizationTiers").collect();
-    for (const ot of orgTiers) {
-      const org = await ctx.db.get(ot.organizationId);
-      if (org) {
-        const existing = await ctx.db
-          .query("userTiers")
-          .withIndex("by_user", (q) => q.eq("userId", org.createdBy))
-          .first();
-        if (!existing) {
-          await ctx.db.insert("userTiers", {
-            userId: org.createdBy,
-            tier: ot.tier,
-            updatedAt: now,
-            reason: "migration.phase6",
-          });
-          results.orgTiersMigrated++;
-        }
-      }
-    }
-
-    // 3. Delete all organizationTiers records
-    for (const ot of orgTiers) {
-      await ctx.db.delete(ot._id);
-      results.orgTiersDeleted++;
-    }
-
-    // 4. Backfill userId on subscriptions
-    const subs = await ctx.db.query("subscriptions").collect();
-    for (const sub of subs) {
-      if (!sub.userId) {
-        const org = await ctx.db.get(sub.organizationId);
-        if (org) {
-          await ctx.db.patch(sub._id, { userId: org.createdBy });
-          results.subscriptionsBackfilled++;
-        }
-      }
-    }
-
-    // 5. Backfill userId on polarCustomers
-    const customers = await ctx.db.query("polarCustomers").collect();
-    for (const sc of customers) {
-      if (!sc.userId) {
-        const org = await ctx.db.get(sc.organizationId);
-        if (org) {
-          await ctx.db.patch(sc._id, { userId: org.createdBy });
-          results.polarCustomersBackfilled++;
-        }
-      }
-    }
-
-    return results;
   },
 });
 
