@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/billing/subscription?organizationId=xxx
@@ -131,6 +132,7 @@ export async function GET(request: Request) {
       canManageBilling: normalizeOrgRole(membership.role) === "owner",
     });
   } catch (error) {
+    reportApiError(error, "GET /api/billing/subscription");
     console.error("Error getting subscription:", error);
     const message =
       error instanceof Error ? error.message : "Failed to get subscription";

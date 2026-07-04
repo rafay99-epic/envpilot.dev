@@ -4,6 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/users/me/preferences - Get current user's preferences
@@ -23,6 +24,7 @@ export async function GET() {
 
     return NextResponse.json(preferences);
   } catch (error) {
+    reportApiError(error, "GET /api/users/me/preferences");
     console.error("Error fetching preferences:", error);
     return NextResponse.json(
       { error: "Failed to fetch preferences" },
@@ -76,6 +78,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    reportApiError(error, "PATCH /api/users/me/preferences");
     console.error("Error updating preferences:", error);
     return NextResponse.json(
       { error: "Failed to update preferences" },

@@ -4,7 +4,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { handleApiError } from "@/lib/api-errors";
+import { handleApiError, reportApiError } from "@/lib/api-errors";
 import { createSecret, readSecret } from "@/lib/vault";
 import { parse, ALL_FORMATS, type FormatType } from "@/lib/format-converter";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
@@ -176,7 +176,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             requestedBy: convexUser._id,
           });
           requested++;
-        } catch {
+        } catch (requestError) {
+          reportApiError(requestError, "POST /api/projects/[id]/import", {
+            phase: "developer-request",
+            key,
+          });
           skipped++;
         }
       }

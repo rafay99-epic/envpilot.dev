@@ -12,6 +12,7 @@ import {
   toLegacyOrgRole,
   toLegacyProjectRole,
 } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/cli/projects
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
       }),
     });
   } catch (error) {
+    reportApiError(error, "GET /api/cli/projects");
     console.error("CLI projects error:", error);
     return NextResponse.json(
       { error: "Failed to list projects" },

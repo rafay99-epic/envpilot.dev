@@ -3,6 +3,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { normalizeOrgRole, toLegacyOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/extension/organizations - List organizations for the authenticated user
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/extension/organizations");
     const message =
       error instanceof Error ? error.message : "Failed to fetch organizations";
     return NextResponse.json({ error: message }, { status: 500 });

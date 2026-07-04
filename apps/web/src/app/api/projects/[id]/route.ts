@@ -8,7 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
-import { handleApiError } from "@/lib/api-errors";
+import { handleApiError, reportApiError } from "@/lib/api-errors";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const updateProjectSchema = z.object({
@@ -86,6 +86,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ project });
   } catch (error) {
+    reportApiError(error, "GET /api/projects/[id]");
     console.error("Error fetching project:", error);
     return NextResponse.json(
       { error: "Failed to fetch project" },

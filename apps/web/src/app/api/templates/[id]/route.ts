@@ -9,6 +9,7 @@ import {
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const updateTemplateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -53,6 +54,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ template });
   } catch (error) {
+    reportApiError(error, "GET /api/templates/[id]");
     console.error("Failed to fetch template:", error);
     return NextResponse.json(
       { error: "Failed to fetch template" },
@@ -142,6 +144,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ template: updatedTemplate });
   } catch (error) {
+    reportApiError(error, "PATCH /api/templates/[id]");
     const message =
       error instanceof Error ? error.message : "Failed to update template";
     console.error("Failed to update template:", error);
@@ -215,6 +218,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    reportApiError(error, "DELETE /api/templates/[id]");
     const message =
       error instanceof Error ? error.message : "Failed to delete template";
     console.error("Failed to delete template:", error);

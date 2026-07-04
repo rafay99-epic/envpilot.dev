@@ -10,6 +10,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
+import { reportApiError } from "@/lib/api-errors";
 import { updateSecret } from "@/lib/vault";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
@@ -114,7 +115,8 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     return NextResponse.json({ variable, history });
-  } catch {
+  } catch (error) {
+    reportApiError(error, "GET /api/variables/[id]");
     return NextResponse.json(
       { error: "Failed to fetch variable" },
       { status: 500 }
@@ -234,6 +236,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     ) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
+    reportApiError(error, "PATCH /api/variables/[id]");
     return NextResponse.json(
       {
         error: "Failed to update variable",
@@ -315,7 +318,8 @@ export async function DELETE(request: Request, context: RouteContext) {
     );
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
+    reportApiError(error, "DELETE /api/variables/[id]");
     return NextResponse.json(
       { error: "Failed to delete variable" },
       { status: 500 }

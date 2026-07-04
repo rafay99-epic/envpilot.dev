@@ -4,6 +4,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { checkOrganizationMembership } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 interface RouteParams {
   params: Promise<{
@@ -53,6 +54,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/extension/check-access/[organizationId]");
     const message =
       error instanceof Error ? error.message : "Failed to check access";
     return NextResponse.json({ error: message }, { status: 500 });

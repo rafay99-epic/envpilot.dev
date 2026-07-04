@@ -11,6 +11,7 @@ import {
   sanitizeConvexError,
   isTierLimitError,
   handleApiError,
+  reportApiError,
 } from "@/lib/api-errors";
 
 const createOrgSchema = z.object({
@@ -66,6 +67,7 @@ export async function GET() {
 
     return NextResponse.json({ organizations });
   } catch (error) {
+    reportApiError(error, "GET /api/organizations");
     console.error("Error fetching organizations:", error);
     return NextResponse.json(
       { error: "Failed to fetch organizations" },

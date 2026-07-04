@@ -7,6 +7,7 @@ import {
   VaultError,
   isVaultConfigured,
 } from "@/lib/vault";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * Client-side encryption API Routes
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
       data: { encryptedData },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/vault/encrypt");
     logError("encrypt", error);
 
     if (error instanceof VaultError) {
@@ -157,6 +159,7 @@ export async function PUT(request: NextRequest) {
       data: { data: decryptedData },
     });
   } catch (error) {
+    reportApiError(error, "PUT /api/vault/encrypt");
     logError("decrypt", error);
 
     if (error instanceof VaultError) {

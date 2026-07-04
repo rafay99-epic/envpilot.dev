@@ -4,6 +4,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 const unlinkExtensionSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       data: { success: true },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/extension/unlink");
     const message =
       error instanceof Error ? error.message : "Failed to unlink extension";
     return NextResponse.json({ error: message }, { status: 500 });

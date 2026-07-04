@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * POST /api/billing/sync?checkout_id=<id>
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ synced: true });
   } catch (error) {
+    reportApiError(error, "POST /api/billing/sync");
     console.error("Billing sync error:", error);
     // Don't return 500 — the webhook will handle it. Just log and move on.
     return NextResponse.json({

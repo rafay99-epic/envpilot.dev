@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const cancelSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    reportApiError(error, "POST /api/billing/cancel");
     console.error("Error canceling subscription:", error);
     const message =
       error instanceof Error ? error.message : "Failed to cancel subscription";

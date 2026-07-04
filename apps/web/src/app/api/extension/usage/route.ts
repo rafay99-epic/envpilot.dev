@@ -5,6 +5,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { checkOrganizationMembership } from "@/lib/convex-helpers";
 import { checkExtensionAccess } from "@/lib/cli-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/extension/usage
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/extension/usage");
     const message =
       error instanceof Error
         ? error.message

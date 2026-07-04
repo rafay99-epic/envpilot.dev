@@ -86,6 +86,11 @@ jobs:
       - name: Build CLI
         if: steps.guard.outputs.should_publish == 'true'
         run: bunx turbo build --filter=@envpilot/cli
+        env:
+          # DSNs are publishable identifiers, not secrets. Baked into the
+          # bundle at build time (tsup define) — without this the published
+          # CLI ships with Sentry disabled.
+          SENTRY_CLI_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
 
       - name: Publish to npm
         if: steps.guard.outputs.should_publish == 'true'

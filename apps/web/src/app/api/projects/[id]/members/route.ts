@@ -8,7 +8,7 @@ import {
   getOrCreateConvexUser,
   checkOrganizationMembership,
 } from "@/lib/convex-helpers";
-import { handleApiError } from "@/lib/api-errors";
+import { handleApiError, reportApiError } from "@/lib/api-errors";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
@@ -109,6 +109,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ members: allMembers, assignableMembers });
   } catch (error) {
+    reportApiError(error, "GET /api/projects/[id]/members");
     console.error("Error fetching project members:", error);
     return NextResponse.json(
       { error: "Failed to fetch project members" },

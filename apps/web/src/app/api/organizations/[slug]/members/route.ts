@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
-import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
+import {
+  sanitizeConvexError,
+  handleApiError,
+  reportApiError,
+} from "@/lib/api-errors";
 import { z } from "zod";
 
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -87,6 +91,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ members, invitations });
   } catch (error) {
+    reportApiError(error, "GET /api/organizations/[slug]/members");
     console.error("Error fetching members:", error);
     return NextResponse.json(
       { error: "Failed to fetch members" },
@@ -294,6 +299,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ updated: true });
   } catch (error) {
+    reportApiError(error, "PATCH /api/organizations/[slug]/members");
     console.error("Error updating member role:", error);
     return NextResponse.json(
       { error: "Failed to update member role" },
@@ -371,6 +377,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ removed: true });
   } catch (error) {
+    reportApiError(error, "DELETE /api/organizations/[slug]/members");
     console.error("Error removing member:", error);
     return NextResponse.json(
       { error: "Failed to remove member" },

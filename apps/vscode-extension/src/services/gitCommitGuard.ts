@@ -5,6 +5,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import type { GitExtension, API, Repository } from "../types/git";
 import * as output from "../utils/outputChannel";
+import { captureError } from "../utils/sentry";
 
 const execAsync = promisify(exec);
 
@@ -90,6 +91,7 @@ export class GitCommitGuardService {
         `Git commit guard active. Watching ${this.gitApi.repositories.length} repository(ies).`
       );
     } catch (err) {
+      captureError(err, { phase: "commit-guard-init" });
       output.error(
         `Failed to initialize Git API: ${err instanceof Error ? err.message : String(err)}`
       );
@@ -246,6 +248,7 @@ export class GitCommitGuardService {
       await fs.chmod(hookPath, 0o755);
       this.installedHookPaths.add(hookPath);
     } catch (err) {
+      captureError(err, { phase: "commit-guard-hook-install" });
       output.error(
         `Failed to install pre-commit hook at ${repoRoot}: ${err instanceof Error ? err.message : String(err)}`
       );

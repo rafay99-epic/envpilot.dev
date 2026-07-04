@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { reportApiError } from "@/lib/api-errors";
 
 const updateSettingsSchema = z.object({
   settings: z.object({
@@ -59,6 +60,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ updated: true });
   } catch (error) {
+    reportApiError(error, "PATCH /api/organizations/[slug]/settings");
     console.error("Error updating organization settings:", error);
     const message =
       error instanceof Error ? error.message : "Failed to update settings";

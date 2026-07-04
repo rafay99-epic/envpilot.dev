@@ -8,6 +8,7 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { reportApiError } from "@/lib/api-errors";
 
 const linkExtensionSchema = z.object({
   projectId: z.string().min(1, "Project ID is required"),
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    reportApiError(error, "POST /api/extension/link");
     const message =
       error instanceof Error ? error.message : "Failed to link extension";
     return NextResponse.json({ error: message }, { status: 500 });

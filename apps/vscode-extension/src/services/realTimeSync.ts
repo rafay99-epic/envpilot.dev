@@ -3,6 +3,7 @@ import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
 import { ConvexService } from "./convex";
 import { getConvexUrl, getServerUrl } from "../utils/config";
+import { captureError } from "../utils/sentry";
 import type { LinkedProjectV2 } from "../types";
 
 /**
@@ -146,6 +147,7 @@ export class RealTimeSyncService {
       await this.startRealTimeSync();
       this.syncService.startPeriodicSync();
     } catch (error) {
+      captureError(error, { phase: "realtime-reconnect" });
       console.error("[RealTimeSync] Reconnect attempt failed:", error);
       this.syncService.setConnectionState("disconnected");
     } finally {
@@ -168,7 +170,8 @@ export class RealTimeSyncService {
         { timeout: 5000 }
       );
       return response.data?.convexUrl || null;
-    } catch {
+    } catch (err) {
+      captureError(err, { phase: "convex-url-resolve" });
       return null;
     }
   }
@@ -310,6 +313,7 @@ export class RealTimeSyncService {
             )
           ),
         ]).catch((err) => {
+          captureError(err, { phase: "revocation-cleanup-race" });
           console.error("[RealTimeSync] Cleanup error:", err);
         });
       }
@@ -381,6 +385,7 @@ export class RealTimeSyncService {
           )
         ),
       ]).catch((err) => {
+        captureError(err, { phase: "revocation-cleanup-race" });
         console.error("[RealTimeSync] Cleanup error:", err);
       });
 

@@ -2,6 +2,7 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * POST /api/users/sync - Sync current WorkOS user to Convex database
@@ -27,6 +28,7 @@ export async function POST() {
 
     return NextResponse.json({ userId, synced: true });
   } catch (error) {
+    reportApiError(error, "POST /api/users/sync");
     console.error("Error syncing user:", error);
     return NextResponse.json({ error: "Failed to sync user" }, { status: 500 });
   }

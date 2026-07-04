@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
 import type { Id } from "@convex/_generated/dataModel";
+import { reportApiError } from "@/lib/api-errors";
 
 const checkoutSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
@@ -168,6 +169,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
+    reportApiError(error, "POST /api/billing/checkout");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

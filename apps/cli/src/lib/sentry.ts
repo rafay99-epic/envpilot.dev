@@ -15,6 +15,10 @@ export function initSentry(): void {
     environment: "cli",
     release: typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "0.0.0",
 
+    // All EnvPilot surfaces report to one Sentry project; the surface tag
+    // is how dashboards tell web / cli / extension events apart.
+    initialScope: { tags: { surface: "cli" } },
+
     // Free tier: disable performance monitoring
     tracesSampleRate: 0,
 

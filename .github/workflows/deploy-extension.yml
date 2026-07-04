@@ -95,6 +95,10 @@ jobs:
         run: bunx turbo build --filter=envpilot
         env:
           ENVPILOT_SERVER_URL: https://www.envpilot.dev
+          # DSNs are publishable identifiers, not secrets. Baked into the
+          # bundle at build time (esbuild define) — without this the published
+          # extension ships with Sentry disabled.
+          SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
 
       - name: Package VSIX
         if: steps.guard.outputs.should_publish == 'true'

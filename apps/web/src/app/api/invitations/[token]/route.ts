@@ -9,6 +9,7 @@ import {
 } from "@/lib/organization-context";
 import { createLogger } from "@/lib/logger";
 import { normalizeOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const log = createLogger("api/invitations");
 
@@ -61,6 +62,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/invitations/[token]");
     console.error("Error fetching invitation:", error);
     return NextResponse.json(
       { error: "Failed to fetch invitation" },
@@ -162,6 +164,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
+    reportApiError(error, "POST /api/invitations/[token]");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -191,6 +194,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     return NextResponse.json({ declined: true });
   } catch (error) {
+    reportApiError(error, "DELETE /api/invitations/[token]");
     console.error("Error declining invitation:", error);
     const message =
       error instanceof Error ? error.message : "Failed to decline invitation";

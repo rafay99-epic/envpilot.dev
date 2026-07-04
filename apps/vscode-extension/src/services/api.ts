@@ -8,6 +8,7 @@ import { getServerUrl } from "../utils/config";
 import { StorageService } from "../utils/storage";
 import { SingleFlight } from "../utils/singleFlight";
 import { getActiveAuthService } from "./auth";
+import { captureError } from "../utils/sentry";
 import type {
   Organization,
   Project,
@@ -123,7 +124,8 @@ export class ApiService {
     }
     try {
       return await authService.refreshToken();
-    } catch {
+    } catch (err) {
+      captureError(err, { phase: "token-refresh" });
       return false;
     }
   }
@@ -232,7 +234,8 @@ export class ApiService {
         `/api/extension/projects/${projectId}`
       );
       return response.data.data?.project || null;
-    } catch {
+    } catch (err) {
+      captureError(err, { phase: "get-project" });
       return null;
     }
   }
@@ -495,7 +498,8 @@ export class ApiService {
         this.setCached(cacheKey, usage);
       }
       return usage;
-    } catch {
+    } catch (err) {
+      captureError(err, { phase: "get-usage" });
       return null;
     }
   }

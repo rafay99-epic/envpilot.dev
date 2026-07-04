@@ -4,6 +4,7 @@
  * bundle) never blocks activation. Do not import this module directly —
  * go through ./sentry.ts.
  */
+import * as vscode from "vscode";
 import * as Sentry from "@sentry/node";
 
 declare const __EXTENSION_SENTRY_DSN__: string;
@@ -12,6 +13,11 @@ declare const __EXTENSION_VERSION__: string;
 let initialized = false;
 
 export function initSentry(): void {
+  // Respect VS Code's global telemetry opt-out — this is a hard requirement
+  // for marketplace listings. When the user has telemetry disabled we must
+  // never initialize Sentry (or send anything to it).
+  if (!vscode.env.isTelemetryEnabled) return;
+
   const dsn =
     typeof __EXTENSION_SENTRY_DSN__ !== "undefined"
       ? __EXTENSION_SENTRY_DSN__
@@ -25,6 +31,10 @@ export function initSentry(): void {
       typeof __EXTENSION_VERSION__ !== "undefined"
         ? __EXTENSION_VERSION__
         : "0.0.0",
+
+    // All EnvPilot surfaces (web, CLI, extension) share one Sentry project —
+    // this tag is how events are told apart.
+    initialScope: { tags: { surface: "extension" } },
 
     // Free tier: disable performance monitoring
     tracesSampleRate: 0,
@@ -79,5 +89,9 @@ export function clearSentryUser(): void {
 
 export async function closeSentry(): Promise<void> {
   if (!initialized) return;
+  // Reset the guard so a later initSentry() call (e.g. the user re-enables
+  // telemetry mid-session) actually re-initializes the client instead of
+  // silently no-oping forever.
+  initialized = false;
   await Sentry.close(2000);
 }

@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { readSecret } from "@/lib/vault";
+import { reportApiError } from "@/lib/api-errors";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -56,6 +57,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
 
+    reportApiError(error, "GET /api/variable-requests/[id]/value");
     // Generic message to the client — never surface vault internals.
     return NextResponse.json(
       { error: "Failed to read request value" },

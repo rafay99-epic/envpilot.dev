@@ -12,7 +12,75 @@ import { ReactNode } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { ApiError } from "@/lib/api-client";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function convexLogArgsToMessage(args: unknown[]): string {
+  return args
+    .map((a) =>
+      typeof a === "string"
+        ? a
+        : a instanceof Error
+          ? a.message
+          : JSON.stringify(a)
+    )
+    .join(" ")
+    .slice(0, 1000);
+}
+
+/**
+ * Custom Convex client logger. The Convex request manager routes EVERY
+ * mutation/action failure through logger.error() regardless of whether the
+ * call site .catch()es the returned promise — this is the only blanket hook
+ * for the raw convex/react useMutation call sites that have no local catch.
+ * Query failures do NOT pass through here; they throw into React render and
+ * are reported by the error.tsx boundaries.
+ */
+const convexLogger = {
+  logVerbose() {},
+  log(...args: unknown[]) {
+    console.log(...args);
+  },
+  warn(...args: unknown[]) {
+    console.warn(...args);
+    Sentry.addBreadcrumb({
+      category: "convex",
+      message: convexLogArgsToMessage(args),
+      level: "warning",
+    });
+  },
+  error(...args: unknown[]) {
+    console.error(...args);
+    const message = convexLogArgsToMessage(args);
+    // Tier-limit and authorization failures are expected conditions
+    // (mirrors the server-side triage in @/lib/api-errors) — breadcrumb
+    // only, so they add context without becoming alertable issues.
+    if (EXPECTED_CONVEX_ERROR.test(message)) {
+      Sentry.addBreadcrumb({
+        category: "convex",
+        message,
+        level: "error",
+      });
+      return;
+    }
+    Sentry.captureMessage(message, {
+      level: "error",
+      tags: { source: "convex-client" },
+    });
+  },
+};
+
+const EXPECTED_CONVEX_ERROR =
+  /limit reached|Upgrade to Pro|Insufficient permissions|Not a member of this organization|No access to this project|Insufficient project permissions/;
+
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!, {
+  logger: convexLogger,
+  // Experimental Convex hook for abnormal WebSocket closes. Message shape is
+  // unstable, so treat as a warning-level signal, not an alertable issue.
+  onServerDisconnectError: (message) => {
+    Sentry.captureMessage(message, {
+      level: "warning",
+      tags: { source: "convex-ws" },
+    });
+  },
+});
 
 /**
  * Global TanStack Query error handler.

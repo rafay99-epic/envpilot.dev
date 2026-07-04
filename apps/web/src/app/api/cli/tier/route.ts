@@ -10,6 +10,7 @@ import {
   tierLimitResponse,
 } from "@/lib/cli-auth";
 import { cacheHeaders } from "@/lib/cache-headers";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/cli/tier
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
       { headers: cacheHeaders.privateMedium }
     );
   } catch (error) {
+    reportApiError(error, "GET /api/cli/tier");
     console.error("CLI tier error:", error);
     return NextResponse.json(
       { error: "Failed to get tier information" },

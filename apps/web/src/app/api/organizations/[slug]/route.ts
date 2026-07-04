@@ -5,7 +5,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { handleApiError } from "@/lib/api-errors";
+import { handleApiError, reportApiError } from "@/lib/api-errors";
 import { normalizeOrgRole } from "@/lib/roles";
 
 const updateOrgSchema = z.object({
@@ -71,6 +71,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       },
     });
   } catch (error) {
+    reportApiError(error, "GET /api/organizations/[slug]");
     console.error("Error fetching organization:", error);
     return NextResponse.json(
       { error: "Failed to fetch organization" },

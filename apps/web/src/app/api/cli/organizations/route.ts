@@ -7,6 +7,7 @@ import {
   getUserOrganizations,
 } from "@/lib/cli-auth";
 import { normalizeOrgRole, toLegacyOrgRole } from "@/lib/roles";
+import { reportApiError } from "@/lib/api-errors";
 
 /**
  * GET /api/cli/organizations
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
+    reportApiError(error, "GET /api/cli/organizations");
     console.error("CLI organizations error:", error);
     return NextResponse.json(
       { error: "Failed to list organizations" },

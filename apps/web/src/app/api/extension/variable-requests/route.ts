@@ -10,6 +10,7 @@ import {
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { createSecret } from "@/lib/vault";
 import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
+import { reportApiError } from "@/lib/api-errors";
 
 const createRequestSchema = z.object({
   key: z
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
       error instanceof Error
         ? error.message
         : "Failed to fetch variable requests";
+    reportApiError(error, "GET /api/extension/variable-requests");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -216,6 +218,7 @@ export async function POST(request: Request) {
     if (isAuthorizationError(error)) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
+    reportApiError(error, "POST /api/extension/variable-requests");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
+import { reportApiError } from "@/lib/api-errors";
 
 // Convex ID pattern - alphanumeric characters only
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
@@ -95,6 +96,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ users: enrichedUsers });
   } catch (error) {
+    reportApiError(error, "GET /api/users/search");
     console.error("Error searching users:", error);
     return NextResponse.json(
       { error: "Failed to search users" },
