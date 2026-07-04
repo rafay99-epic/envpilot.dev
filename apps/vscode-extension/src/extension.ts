@@ -160,6 +160,15 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.env.onDidChangeTelemetryEnabled((enabled) => {
       if (enabled) {
         initSentry();
+        // setSentryUser() was a no-op while telemetry was off, so a
+        // sign-in that happened in the meantime never tagged the user —
+        // reapply the current identity on opt-in.
+        void authService
+          ?.getCurrentUser()
+          .then((user) => {
+            if (user) setSentryUser(user.id, user.email);
+          })
+          .catch(() => {});
       } else {
         void closeSentry();
       }

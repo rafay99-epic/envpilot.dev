@@ -14,13 +14,18 @@ import { ApiError } from "@/lib/api-client";
 
 function convexLogArgsToMessage(args: unknown[]): string {
   return args
-    .map((a) =>
-      typeof a === "string"
-        ? a
-        : a instanceof Error
-          ? a.message
-          : JSON.stringify(a)
-    )
+    .map((a) => {
+      if (typeof a === "string") return a;
+      if (a instanceof Error) return a.message;
+      try {
+        // JSON.stringify throws on circular refs/BigInt and returns
+        // undefined for undefined/functions — never let the reporting
+        // path itself throw.
+        return JSON.stringify(a) ?? String(a);
+      } catch {
+        return String(a);
+      }
+    })
     .join(" ")
     .slice(0, 1000);
 }
