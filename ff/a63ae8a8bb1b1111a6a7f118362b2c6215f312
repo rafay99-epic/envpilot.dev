@@ -1,0 +1,21 @@
+apps/vscode-extension/src/extension.ts
+  s_53bfe4b41edb34::t_7125c0342ff0d9 163-171
+apps/web/src/components/ConvexClientProvider.tsx
+  s_53bfe4b41edb34::t_04d0b3039a0503 17-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ffa63ae8a8bb1b1111a6a7f118362b2c6215f312",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
