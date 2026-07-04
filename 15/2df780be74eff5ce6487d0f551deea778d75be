@@ -1,0 +1,42 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_53bfe4b41edb34::t_c6710cea477179 9
+  s_53bfe4b41edb34::t_9637a7c8982873 398,407-420,432-435
+apps/web/src/hooks/queries/useVariablesQuery.ts
+  s_53bfe4b41edb34::t_07cd5e2490532e 177
+package.json
+  s_53bfe4b41edb34::t_d559e9ca828335 3
+apps/web/src/lib/error-messages.ts
+  s_53bfe4b41edb34::t_0fcb790969f239 1-64
+apps/web/src/components/ConvexClientProvider.tsx
+  s_53bfe4b41edb34::t_a6ac30b4688eee 124-125,128-132,137
+  s_53bfe4b41edb34::t_d559e9ca828335 133-136
+  s_53bfe4b41edb34::t_39c1481d50840a 186
+  s_53bfe4b41edb34::t_884f3a0e2923ad 63-68,70-77,85-89
+  s_53bfe4b41edb34::t_60ae658b213241 13,15-19
+  s_53bfe4b41edb34::t_55aad11e3c9de5 90,138
+apps/web/src/lib/api-errors.ts
+  s_53bfe4b41edb34::t_2ad2f3c709423d 3-7,9-11
+apps/web/package.json
+  s_53bfe4b41edb34::t_67d61aa8ae2a9d 46
+  s_53bfe4b41edb34::t_d559e9ca828335 3
+convex/changelog.ts
+  s_53bfe4b41edb34::t_84b85dd20c0f4f 1138-1162
+bun.lock
+  s_53bfe4b41edb34::t_e012e9934d85d8 58,91,113,140,2387-2388
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "152df780be74eff5ce6487d0f551deea778d75be",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
