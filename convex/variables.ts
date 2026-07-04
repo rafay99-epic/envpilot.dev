@@ -2018,22 +2018,24 @@ export const getDeleted = query({
 
     const cutoff = Date.now() - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    const allVariables = await ctx.db
+    // by_project_deleted reads exactly this project's soft-deleted rows in
+    // the restore window — never-deleted rows (deletedAt undefined, which
+    // sorts below all numbers) fall outside the gte range, and active rows
+    // never inflate the read like a by_project scan would (a project with
+    // >500 active variables previously hid its trash entirely).
+    const deletedVariables = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(500);
-
-    return allVariables
-      .filter(
-        (variable) =>
-          variable.deletedAt !== undefined && variable.deletedAt >= cutoff
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gte("deletedAt", cutoff)
       )
-      .map((variable) => ({
-        _id: variable._id,
-        key: variable.key,
-        deletedAt: variable.deletedAt as number,
-        environments: variable.environments,
-      }));
+      .take(100);
+
+    return deletedVariables.map((variable) => ({
+      _id: variable._id,
+      key: variable.key,
+      deletedAt: variable.deletedAt as number,
+      environments: variable.environments,
+    }));
   },
 });
 

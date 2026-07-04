@@ -646,21 +646,20 @@ export const getDeleted = query({
 
     const cutoff = Date.now() - PURGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    const allAccounts = await ctx.db
+    // by_project_deleted reads exactly this project's soft-deleted rows in
+    // the restore window — see variables.getDeleted for the ordering note.
+    const deletedAccounts = await ctx.db
       .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(500);
-
-    return allAccounts
-      .filter(
-        (account) =>
-          account.deletedAt !== undefined && account.deletedAt >= cutoff
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gte("deletedAt", cutoff)
       )
-      .map((account) => ({
-        _id: account._id,
-        name: account.name,
-        deletedAt: account.deletedAt as number,
-      }));
+      .take(100);
+
+    return deletedAccounts.map((account) => ({
+      _id: account._id,
+      name: account.name,
+      deletedAt: account.deletedAt as number,
+    }));
   },
 });
 
