@@ -122,9 +122,15 @@ export async function POST(request: NextRequest) {
       isSensitive,
     });
 
+    // Return the full created request under `data.request` — the CLI
+    // (api.ts submitVariableRequest) reads `response.data.request`.
+    const createdRequest = await authed.query(api.variableRequests.getById, {
+      requestId,
+    });
+
     return NextResponse.json({
       success: true,
-      data: { requestId },
+      data: { request: createdRequest, requestId },
     });
   } catch (error) {
     const message =

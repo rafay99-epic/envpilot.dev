@@ -90,14 +90,18 @@ export const revoke = mutation({
     const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
+    // Bounded to ACTIVE rows via the compound index so cost doesn't grow with
+    // the user's history of revoked/expired sessions.
     const rows = await ctx.db
       .query("cliTokens")
-      .withIndex("by_user", (q) => q.eq("userId", actor._id))
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", actor._id).eq("isActive", true)
+      )
       .collect();
 
     let count = 0;
     for (const row of rows) {
-      if (row.sessionId === args.sessionId && row.isActive) {
+      if (row.sessionId === args.sessionId) {
         await ctx.db.patch(row._id, { isActive: false, revokedAt: now });
         count++;
       }

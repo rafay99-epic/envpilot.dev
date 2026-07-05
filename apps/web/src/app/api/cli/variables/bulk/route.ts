@@ -3,11 +3,7 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { handleApiError } from "@/lib/api-errors";
-import {
-  verifyWorkosBearer,
-  unauthorizedResponse,
-  forbiddenResponse,
-} from "@/lib/cli-auth";
+import { requireWorkosUser, forbiddenResponse } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import {
   isAuthorizationError,
@@ -26,13 +22,11 @@ interface BulkVariable {
  * Bulk create/update variables (for push command)
  */
 export async function POST(request: NextRequest) {
-  // Authenticate via WorkOS JWT bearer, then act as the caller through a
-  // setAuth'd Convex client that resolves identity server-side.
-  const verified = await verifyWorkosBearer(request);
-  if (!verified) {
-    return unauthorizedResponse("Missing or invalid authorization token");
-  }
-  const authed = createAuthedConvexClient(verified.token);
+  // Authenticate via WorkOS JWT bearer + confirm a provisioned Convex user
+  // (unprovisioned → clean 401, not a 500).
+  const auth = await requireWorkosUser(request, convex);
+  if (!auth.ok) return auth.response;
+  const authed = createAuthedConvexClient(auth.token);
 
   try {
     const body = await request.json();

@@ -3,7 +3,7 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getProjectOrganization } from "@/lib/convex-helpers";
-import { verifyWorkosBearer } from "@/lib/cli-auth";
+import { requireWorkosUser } from "@/lib/cli-auth";
 import { createLogger } from "@/lib/logger";
 import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
@@ -24,11 +24,12 @@ const log = createLogger("api/extension/variables");
  */
 export async function GET(request: Request) {
   try {
-    const verified = await verifyWorkosBearer(request);
-    if (!verified) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-    const authed = createAuthedConvexClient(verified.token);
+    // Verify the JWT bearer AND confirm a provisioned Convex user, so an
+    // unprovisioned-but-valid token returns 401 instead of a 500 from the
+    // first identity-resolving Convex query.
+    const auth = await requireWorkosUser(request, convex);
+    if (!auth.ok) return auth.response;
+    const authed = createAuthedConvexClient(auth.token);
 
     const ipAddress =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||

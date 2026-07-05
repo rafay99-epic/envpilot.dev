@@ -88,6 +88,52 @@ export async function verifyWorkosBearer(
 }
 
 /**
+ * Verify the WorkOS JWT bearer AND confirm the caller has a provisioned Convex
+ * `users` row, in one step. Returns the token + resolved ids on success, or a
+ * ready-to-return 401 response otherwise.
+ *
+ * Use this at the top of the surviving vault routes: without the user-existence
+ * check, a valid-but-unprovisioned JWT would reach `authed.query(...)`, throw
+ * from `requireAuthedUser` identity resolution, and surface as a generic 500
+ * instead of a clean auth failure.
+ */
+export type WorkosBearerAuth =
+  | { ok: true; token: string; workosUserId: string; userId: Id<"users"> }
+  | { ok: false; response: Response };
+
+export async function requireWorkosUser(
+  request: NextRequest | Request,
+  convex: ConvexHttpClient
+): Promise<WorkosBearerAuth> {
+  const verified = await verifyWorkosBearer(request);
+  if (!verified) {
+    return {
+      ok: false,
+      response: unauthorizedResponse("Missing or invalid authorization token"),
+    };
+  }
+
+  const user = await convex.query(api.users.getByWorkosId, {
+    workosId: verified.workosUserId,
+  });
+  if (!user) {
+    return {
+      ok: false,
+      response: unauthorizedResponse(
+        "Your account is not provisioned yet. Sign in on the web app once, then retry."
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    token: verified.token,
+    workosUserId: verified.workosUserId,
+    userId: user._id,
+  };
+}
+
+/**
  * Authenticate a CLI request: verify the WorkOS JWT bearer, then resolve the
  * Convex user by WorkOS id. The returned `user`/`userId` identify the caller;
  * routes that need to call identity-verified Convex functions should ALSO build

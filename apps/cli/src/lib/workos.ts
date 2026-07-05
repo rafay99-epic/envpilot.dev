@@ -217,11 +217,17 @@ export async function refreshAccessToken(
   if (result.status >= 400) {
     const message =
       extractOauthError(result.body) ?? extractErrorMessage(result.body);
-    // A rejected refresh means the session is dead (revoked/expired) — surface
-    // as access_denied so callers clear local creds and prompt re-login.
+    // Distinguish a genuinely dead session from a transient hiccup:
+    //   - 5xx / 429           → server unavailable or rate-limited; the refresh
+    //                           token is probably still valid. Surface as
+    //                           `network` so the caller KEEPS the creds and the
+    //                           user can retry (no wrongful forced re-login).
+    //   - other 4xx (400/401) → the refresh grant was rejected (revoked/expired
+    //                           token) → access_denied so the caller clears creds.
+    const transient = result.status >= 500 || result.status === 429;
     throw new WorkosAuthError(
       `Session refresh failed${message ? `: ${message}` : ""}.`,
-      "access_denied"
+      transient ? "network" : "access_denied"
     );
   }
 
