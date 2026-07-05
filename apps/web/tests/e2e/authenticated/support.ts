@@ -164,7 +164,13 @@ export async function createVariable(
   await expect(async () => {
     // Already created on a prior attempt (the mutation landed but a remount
     // tore the drawer down before we observed it) — done.
-    if (await row.first().isVisible().catch(() => false)) return;
+    if (
+      await row
+        .first()
+        .isVisible()
+        .catch(() => false)
+    )
+      return;
 
     const drawer = page.getByRole("dialog");
     if (!(await drawer.isVisible().catch(() => false))) {
@@ -219,7 +225,10 @@ export async function createVariable(
  * Delete a variable through the row's Delete control + ConfirmDialog.
  * No-op if the row/control isn't present, so it's safe in finally blocks.
  */
-export async function deleteVariableByKey(page: Page, key: string): Promise<void> {
+export async function deleteVariableByKey(
+  page: Page,
+  key: string
+): Promise<void> {
   const row = variableRow(page, key).first();
   const deleteButton = row.getByTitle("Delete variable");
   if (!(await deleteButton.isVisible().catch(() => false))) return;
