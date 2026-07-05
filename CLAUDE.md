@@ -19,6 +19,19 @@ No slob pad generation code should be allowed. And you're following the developm
 - **Never start the dev server** — Convex and Next.js are always running during development. Do not run `bun run dev`, `bun run dev:web`, or `bun run dev:convex`.
 - **Verify work using built-in checks only**: `bun run typecheck`, `bun run lint`, `bun run format:check`, or `bun run check:all` (runs all three).
 
+### CLI local testing — MUST be isolated from the production CLI (CRITICAL)
+
+The developer has the **production `@envpilot/cli` installed globally** and uses it for real projects. The CLI stores accounts/tokens in a global config `conf` locates via `$HOME` (`~/Library/Preferences/envpilot-nodejs/config.json` on macOS).
+
+- **NEVER `bun link` / `npm link` the CLI** — it shadows the production `envpilot` on `$PATH` everywhere.
+- **NEVER run a dev/branch build against the real global config.** A dev build that hits the production login will try to WorkOS-refresh the old `env_` token, fail, and **wipe the stored account** (this happened once — restore from `~/Library/Preferences/envpilot-nodejs/config.json.pre-multiaccount.bak`).
+- **NEVER change the global `apiUrl`** (production is `https://www.envpilot.dev`).
+- **ALWAYS test via the isolated runner** `apps/cli/scripts/cli-dev.sh`, which sets a throwaway `$HOME` (`/tmp/envpilot-dev-home`, override `ENVPILOT_DEV_HOME`) and a scratch workdir so the dev build cannot see or touch the production config. It talks to the DEV Convex deployment (baked at build time) and the local dev server for vault routes (`apiUrl=http://localhost:3000`, set inside the sandbox).
+  - Build: `cd apps/cli && WORKOS_CLIENT_ID=<dev client id> NEXT_PUBLIC_CONVEX_URL=<dev convex url> bun run build`
+  - Run: `apps/cli/scripts/cli-dev.sh <command>` (e.g. `login`, `whoami`, `list orgs`).
+  - Reset the sandbox: `rm -rf /tmp/envpilot-dev-home`.
+- The device-flow `login` requires a **human browser approval** (WorkOS-hosted device page) — it cannot be fully automated. Use a throwaway/dev WorkOS account, never the production login.
+
 ### Testing Policy (every feature PR)
 
 1. **Playwright end-to-end tests are mandatory for every feature.** Cover the happy path and the reachable edge cases by driving the REAL UI (existing components, existing flows — never test-only shortcuts). New specs go in `apps/web/tests/e2e/authenticated/` and must follow the suite's existing conventions (`support.ts` helpers, unique test-data naming, cleanup so reruns stay green, self-skip when preconditions are unavailable). Playwright reuses the already-running dev server on :3000.
