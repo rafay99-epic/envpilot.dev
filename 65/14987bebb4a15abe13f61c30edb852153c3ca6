@@ -1,0 +1,24 @@
+apps/web/tests/e2e/authenticated/support.ts
+  s_53bfe4b41edb34::t_f71a0c8988306a 126-128,136-137,139-170,172-174,186-188,195-198,202-204,208-211,213-232
+  s_53bfe4b41edb34::t_d311466c219a4d 171,175-185,194,199-201,205-207,212
+  s_53bfe4b41edb34::t_7c70514570a77a 189-193
+  s_53bfe4b41edb34::t_cb8565c88f8dc0 129-135,138
+convex/featureRegistry.ts
+  s_53bfe4b41edb34::t_8be43892d0bfbc 481-493
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6514987bebb4a15abe13f61c30edb852153c3ca6",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
