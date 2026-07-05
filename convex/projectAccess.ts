@@ -3,18 +3,22 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { assertOrgAction } from "./authz";
-import { requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 
 /**
  * Project Access Queries and Mutations (for extension linking)
+ *
+ * Since the Stage 2 device-flow cutover a projectAccess row is a SCOPING record
+ * only — it records which project a linked extension device is focused on, and
+ * its `accessToken` is an internal handle used to key real-time revocation
+ * events. Identity is the WorkOS JWT (requireAuthedUser); the token is never an
+ * auth credential a client presents to prove who it is.
  */
 const REVOCATION_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Generate a project-access token using a CSPRNG. Since the auth cutover these
- * tokens are an identity credential (requireBearerUser resolves the acting
- * user from them), so they MUST be unguessable — crypto.getRandomValues(),
- * never Math.random(). Mirrors cliSessions.generateToken.
+ * Generate a project-access token using a CSPRNG. It keys revocation events and
+ * must be unguessable — crypto.getRandomValues(), never Math.random().
  */
 function generateAccessToken(): string {
   const chars =
@@ -88,50 +92,41 @@ export const validateToken = query({
 });
 
 /**
- * Resolve an access token to userId + projectId.
- * Used by the VS Code extension to get IDs for WebSocket subscriptions.
- * Returns null if token is invalid, inactive, or expired.
+ * List the caller's own active project-access (extension-link) scoping records.
+ * Identity-scoped replacement for the old getByAccessToken token lookup: the
+ * VS Code extension attaches its WorkOS JWT (requireAuthedUser) and gets the
+ * projects it is linked to for its WebSocket subscriptions — no token string
+ * is presented as a credential.
  */
-export const getByAccessToken = query({
-  args: { accessToken: v.string() },
-  handler: async (ctx, args) => {
-    const access = await ctx.db
+export const listForCaller = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("projectAccess"),
+      projectId: v.id("projects"),
+      deviceId: v.optional(v.string()),
+      deviceName: v.optional(v.string()),
+      expiresAt: v.number(),
+    })
+  ),
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+    const now = Date.now();
+
+    const rows = await ctx.db
       .query("projectAccess")
-      .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken)
-      )
-      .first();
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
+      .collect();
 
-    if (!access || !access.isActive) return null;
-    if (access.expiresAt < Date.now()) return null;
-
-    return {
-      projectId: access.projectId,
-      userId: access.userId,
-      expiresAt: access.expiresAt,
-    };
-  },
-});
-
-/**
- * Resolve the owning user of an access token regardless of active/expired
- * state. Used by the extension acknowledge-revocation route to supply the
- * acknowledging user id — the token being acknowledged has usually just been
- * revoked, so getByAccessToken (which requires isActive) would return null.
- */
-export const getOwnerByAccessToken = query({
-  args: { accessToken: v.string() },
-  handler: async (ctx, args) => {
-    const access = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken)
-      )
-      .first();
-
-    if (!access) return null;
-
-    return { userId: access.userId };
+    return rows
+      .filter((row) => row.isActive && row.expiresAt >= now)
+      .map((row) => ({
+        _id: row._id,
+        projectId: row.projectId,
+        deviceId: row.deviceId,
+        deviceName: row.deviceName,
+        expiresAt: row.expiresAt,
+      }));
   },
 });
 
@@ -293,21 +288,20 @@ export const refresh = mutation({
 });
 
 /**
- * ForToken-only variant: the extension link/unlink routes authenticate with a
- * bearer session token (cliTokens) that they already hold. The acting user is
- * resolved server-side from that token via requireBearerUser — the client can
- * no longer supply an arbitrary userId. No JWT twin exists (extension-only).
+ * Link a VS Code extension device to a project. Identity is the WorkOS JWT
+ * (requireAuthedUser) — the caller can no longer supply an arbitrary userId or
+ * present a bearer token as a credential. Mints a projectAccess scoping record
+ * whose accessToken keys real-time revocation events.
  */
-export const linkExtensionForToken = mutation({
+export const linkExtension = mutation({
   args: {
-    accessToken: v.string(),
     projectId: v.id("projects"),
     deviceId: v.string(),
     deviceName: v.string(),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
+    const actor = await requireAuthedUser(ctx);
 
     // Rate limit: prevent excessive extension linking
     await rateLimiter.limit(ctx, "extensionLink", {
@@ -327,7 +321,7 @@ export const linkExtensionForToken = mutation({
     // Authorize BEFORE minting a token: the acting user must be permitted to
     // link an extension in this project's org. Without this, any authenticated
     // bearer holder could mint a project-access token (itself an identity
-    // credential) for an arbitrary project. Mirrors unlinkExtensionForToken.
+    // credential) for an arbitrary project. Mirrors unlinkExtension.
     await assertOrgAction(
       ctx,
       actor._id,
@@ -406,20 +400,18 @@ export const linkExtensionForToken = mutation({
 });
 
 /**
- * ForToken-only variant (extension-only; no JWT twin). Self-service unlink —
- * the acting user is resolved from the bearer token via requireBearerUser, and
- * the token lookup is scoped to (projectId, actor._id), so a caller can only
- * ever unlink a token that belongs to THEM. The caller must still be an org
- * member permitted to link/unlink their own extension in the project's org.
+ * Self-service unlink — identity is the WorkOS JWT (requireAuthedUser) and the
+ * token lookup is scoped to (projectId, actor._id), so a caller can only ever
+ * unlink a link that belongs to THEM. The caller must still be an org member
+ * permitted to link/unlink their own extension in the project's org.
  */
-export const unlinkExtensionForToken = mutation({
+export const unlinkExtension = mutation({
   args: {
-    accessToken: v.string(),
     projectId: v.id("projects"),
     deviceId: v.string(),
   },
   handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);

@@ -37,7 +37,6 @@ const BROWSABLE_TABLES = [
   "auditLogs",
   "subscriptions",
   "polarCustomers",
-  "cliSessions",
   "cliTokens",
   "environmentTemplates",
   "templateVariables",
@@ -2757,12 +2756,6 @@ export const listCronJobs = query({
 
     // Static cron registry — mirrors convex/crons.ts
     const cronRegistry = [
-      {
-        name: "cleanup expired CLI sessions",
-        function: "cliSessions.cleanupExpiredSessions",
-        interval: "Every 1 hour",
-        settingKey: "cron_pause_cleanup_cli_sessions",
-      },
       {
         name: "cleanup expired project access",
         function: "projectAccess.cleanupExpired",

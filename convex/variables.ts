@@ -9,7 +9,7 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import { MAX_BULK_IMPORT_SIZE, isCronPaused } from "./tierLimits";
 import {
   checkCountedLimit,
@@ -661,19 +661,6 @@ export const listWithAccess = query({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     return listWithAccessCore(ctx, { ...args, userId: actor._id });
-  },
-});
-
-export const listWithAccessForToken = query({
-  args: {
-    accessToken: v.string(),
-    projectId: v.id("projects"),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const { accessToken, ...rest } = args;
-    const actor = await requireBearerUser(ctx, accessToken);
-    return listWithAccessCore(ctx, { ...rest, userId: actor._id });
   },
 });
 
@@ -1477,15 +1464,6 @@ export const create = mutation({
   },
 });
 
-export const createForToken = mutation({
-  args: { accessToken: v.string(), ...createArgs },
-  handler: async (ctx, args) => {
-    const { accessToken, ...rest } = args;
-    const actor = await requireBearerUser(ctx, accessToken);
-    return createCore(ctx, { ...rest, createdBy: actor._id });
-  },
-});
-
 async function updateCore(
   ctx: MutationCtx,
   args: {
@@ -1758,15 +1736,6 @@ export const update = mutation({
   },
 });
 
-export const updateForToken = mutation({
-  args: { accessToken: v.string(), ...updateArgs },
-  handler: async (ctx, args) => {
-    const { accessToken, ...rest } = args;
-    const actor = await requireBearerUser(ctx, accessToken);
-    return updateCore(ctx, { ...rest, updatedBy: actor._id });
-  },
-});
-
 async function removeCore(
   ctx: MutationCtx,
   args: { variableId: Id<"environmentVariables">; deletedBy: Id<"users"> }
@@ -1845,15 +1814,6 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     return removeCore(ctx, { ...args, deletedBy: actor._id });
-  },
-});
-
-export const removeForToken = mutation({
-  args: { accessToken: v.string(), ...removeArgs },
-  handler: async (ctx, args) => {
-    const { accessToken, ...rest } = args;
-    const actor = await requireBearerUser(ctx, accessToken);
-    return removeCore(ctx, { ...rest, deletedBy: actor._id });
   },
 });
 
@@ -2164,9 +2124,14 @@ export const rollback = mutation({
   },
 });
 
-export const logAccessForToken = mutation({
+/**
+ * Log an access event for a variable (view / copy / export). Identity is the
+ * verified WorkOS JWT — the CLI/extension call this via a setAuth'd Convex
+ * client after decrypting a value through the vault route. Replaces the old
+ * bearer `logAccessForToken`; this is its JWT twin.
+ */
+export const logAccess = mutation({
   args: {
-    accessToken: v.string(),
     variableId: v.id("environmentVariables"),
     accessType: v.union(
       v.literal("view"),
@@ -2179,7 +2144,7 @@ export const logAccessForToken = mutation({
     sessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
+    const actor = await requireAuthedUser(ctx);
     const variable = await ctx.db.get(args.variableId);
     if (!variable) {
       throw new Error("Variable not found");

@@ -27,8 +27,17 @@ export type User = z.infer<typeof userSchema>;
 export const accountSchema = z.object({
   id: z.string(),
   user: userSchema,
+  // WorkOS AuthKit tokens. accessToken is a short-lived (5 min) JWT refreshed
+  // on demand via the WorkOS refresh token. The JWT itself is never stored
+  // server-side — identity is proven per-request.
   accessToken: z.string(),
   refreshToken: z.string().optional(),
+  // WorkOS session id (`sid` claim), decoded from the access token at login.
+  // Recorded server-side (deviceSessions.record) so the session appears in the
+  // active-sessions UI and can be remotely revoked.
+  sessionId: z.string().optional(),
+  // Human-friendly device label shown in the sessions UI (e.g. "CLI - host").
+  deviceName: z.string().optional(),
   // Stored role string (legacy or unified); normalized on read.
   role: z.string().optional(),
   // Per-account active org/project selection.

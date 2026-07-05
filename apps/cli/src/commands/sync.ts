@@ -205,17 +205,13 @@ export const syncCommand = new Command("sync")
         `Fetching ${chalk.bold(environment)} variables...`,
         async () => {
           const api = createAPIClient();
-          const response = await api.get<{
-            success: boolean;
-            data: Variable[];
-            meta?: CliVariablesMeta;
-          }>("/api/cli/variables", {
+          const response = await api.listVariables(
             projectId,
             environment,
-            ...(organizationId && { organizationId }),
-          });
+            organizationId
+          );
           meta = response.meta;
-          return response.data || [];
+          return response.variables;
         }
       );
 

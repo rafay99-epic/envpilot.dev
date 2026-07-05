@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import {
   assertOrgAction,
   assertProjectAction,
@@ -151,20 +151,6 @@ export const listWithStats = query({
   },
 });
 
-export const listWithStatsForToken = query({
-  args: {
-    accessToken: v.string(),
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
-    return listWithStatsCore(ctx, {
-      organizationId: args.organizationId,
-      userId: actor._id,
-    });
-  },
-});
-
 async function listForUserCore(ctx: QueryCtx, userId: Id<"users">) {
   const memberships = await ctx.db
     .query("organizationMembers")
@@ -230,14 +216,6 @@ export const listForUser = query({
   args: {},
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
-    return listForUserCore(ctx, actor._id);
-  },
-});
-
-export const listForUserForToken = query({
-  args: { accessToken: v.string() },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return listForUserCore(ctx, actor._id);
   },
 });

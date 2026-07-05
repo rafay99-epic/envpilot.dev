@@ -35,7 +35,7 @@ import {
   fileNotFound,
   handleError,
 } from "../lib/errors.js";
-import type { Variable, VariablesMeta } from "../types/index.js";
+import type { VariablesMeta } from "../types/index.js";
 
 export const pushCommand = new Command("push")
   .description("Upload local .env file to cloud")
@@ -176,20 +176,13 @@ export const pushCommand = new Command("push")
       const remoteVariables = await withSpinner(
         "Fetching current variables...",
         async () => {
-          const params: Record<string, string> = {
+          const response = await api.listVariables(
             projectId,
             environment,
-          };
-          if (organizationId) {
-            params.organizationId = organizationId;
-          }
-          const response = await api.get<{
-            success: boolean;
-            data: Variable[];
-            meta?: VariablesMeta;
-          }>("/api/cli/variables", params);
+            organizationId
+          );
           meta = response.meta;
-          return response.data || [];
+          return response.variables;
         }
       );
 
@@ -289,17 +282,7 @@ export const pushCommand = new Command("push")
       const result = await withSpinner(
         `Pushing variables to ${chalk.bold(environment)}...`,
         async () => {
-          const response = await api.post<{
-            success: boolean;
-            data: {
-              created: number;
-              updated: number;
-              deleted: number;
-              total: number;
-              skipped?: number;
-              deniedKeys?: string[];
-            };
-          }>("/api/cli/variables/bulk", {
+          return api.bulkUpsertVariables({
             projectId,
             environment,
             variables: Object.entries(valid).map(([key, value]) => ({
@@ -309,7 +292,6 @@ export const pushCommand = new Command("push")
             mode,
             ...(organizationId && { organizationId }),
           });
-          return response.data;
         }
       );
 

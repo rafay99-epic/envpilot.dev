@@ -326,27 +326,6 @@ export function getAccessToken(): string | undefined {
 }
 
 /**
- * Set the active account's access token (used by the refresh flow).
- */
-export function setAccessToken(token: string): void {
-  updateActiveAccount({ accessToken: token });
-}
-
-/**
- * Get the active account's refresh token.
- */
-export function getRefreshToken(): string | undefined {
-  return getActiveAccount()?.refreshToken;
-}
-
-/**
- * Set the active account's refresh token (used by the refresh flow).
- */
-export function setRefreshToken(token: string): void {
-  updateActiveAccount({ refreshToken: token });
-}
-
-/**
  * Get the active account's active project ID.
  */
 export function getActiveProjectId(): string | undefined {

@@ -7,7 +7,7 @@ import {
   QueryCtx,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import { batchGetUsers, userInfo } from "./helpers";
 import { isCronPaused } from "./tierLimits";
 import {
@@ -284,15 +284,6 @@ export const getForUser = query({
   returns: getForUserReturns,
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
-    return getForUserCore(ctx, actor._id);
-  },
-});
-
-export const getForUserForToken = query({
-  args: { accessToken: v.string() },
-  returns: getForUserReturns,
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return getForUserCore(ctx, actor._id);
   },
 });

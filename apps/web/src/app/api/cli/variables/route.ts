@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import {
-  authenticateCLIRequest,
+  verifyWorkosBearer,
   unauthorizedResponse,
   forbiddenResponse,
-  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import { z } from "zod";
@@ -34,12 +33,13 @@ const createVariableSchema = z.object({
  * List variables in a project (with decrypted values)
  */
 export async function GET(request: NextRequest) {
-  // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex);
-
-  if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error);
+  // Authenticate via WorkOS JWT bearer, then act as the caller through a
+  // setAuth'd Convex client that resolves identity server-side.
+  const verified = await verifyWorkosBearer(request);
+  if (!verified) {
+    return unauthorizedResponse("Missing or invalid authorization token");
   }
+  const authed = createAuthedConvexClient(verified.token);
 
   const ipAddress =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -68,25 +68,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const token = extractBearerToken(request)!;
-
-    // Check membership
-    const membership = await convex.query(
-      api.organizations.getMembershipForToken,
-      {
-        accessToken: token,
-        organizationId: project.organizationId,
-      }
-    );
+    // Check membership (identity resolved server-side from the JWT)
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
     // Get variables with access info. Identity is resolved server-side from
-    // the bearer token via the ForToken variant.
-    const variables = await convex.query(api.variables.listWithAccessForToken, {
-      accessToken: token,
+    // the verified JWT.
+    const variables = await authed.query(api.variables.listWithAccess, {
       projectId: projectId as Id<"projects">,
     });
 
@@ -157,8 +150,7 @@ export async function GET(request: NextRequest) {
     // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues.map((v) =>
-        convex.mutation(api.variables.logAccessForToken, {
-          accessToken: token,
+        authed.mutation(api.variables.logAccess, {
           variableId: v._id as Id<"environmentVariables">,
           accessType: "export" as const,
           ipAddress,
@@ -174,8 +166,7 @@ export async function GET(request: NextRequest) {
     // builds derive .env file protection from. Owners get projectRole null
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
-    const legacy = await resolveLegacyRoles(convex, {
-      accessToken: token,
+    const legacy = await resolveLegacyRoles(authed, {
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -231,12 +222,12 @@ export async function GET(request: NextRequest) {
  * Create a new variable
  */
 export async function POST(request: NextRequest) {
-  // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex);
-
-  if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error);
+  // Authenticate via WorkOS JWT bearer.
+  const verified = await verifyWorkosBearer(request);
+  if (!verified) {
+    return unauthorizedResponse("Missing or invalid authorization token");
   }
+  const authed = createAuthedConvexClient(verified.token);
 
   try {
     const body = await request.json();
@@ -261,16 +252,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const token = extractBearerToken(request)!;
-
-    // Check membership and role
-    const membership = await convex.query(
-      api.organizations.getMembershipForToken,
-      {
-        accessToken: token,
-        organizationId: project.organizationId,
-      }
-    );
+    // Check membership and role (identity from the verified JWT)
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -281,8 +266,7 @@ export async function POST(request: NextRequest) {
     // developers write on variables they create). Users without a project
     // assignment are blocked; grant-only users (per-variable viewer sharing)
     // get the strict read-only treatment old clients expect.
-    const legacy = await resolveLegacyRoles(convex, {
-      accessToken: token,
+    const legacy = await resolveLegacyRoles(authed, {
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -310,8 +294,7 @@ export async function POST(request: NextRequest) {
     const vaultRef = vaultResult.id;
 
     // Create variable
-    const variableId = await convex.mutation(api.variables.createForToken, {
-      accessToken: token,
+    const variableId = await authed.mutation(api.variables.create, {
       key,
       vaultRef,
       description,

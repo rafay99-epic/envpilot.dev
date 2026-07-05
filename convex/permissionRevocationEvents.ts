@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { isCronPaused } from "./tierLimits";
+import { requireAuthedUser } from "./identity";
 
 /**
  * Permission Revocation Events
@@ -11,91 +12,68 @@ import { isCronPaused } from "./tierLimits";
 const EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Check for any pending revocation events for multiple tokens
- * More efficient for checking multiple projects at once
+ * List the caller's own pending (unacknowledged) revocation events.
+ *
+ * Identity-scoped replacement for the old token-keyed `checkForTokens`: the VS
+ * Code extension attaches its WorkOS JWT (requireAuthedUser) and polls for
+ * revocations targeting its user, instead of passing the raw project-access
+ * tokens it holds. Events for other users are structurally unreachable.
  */
-export const checkForTokens = query({
-  args: { accessTokens: v.array(v.string()) },
-  handler: async (ctx, args) => {
-    const events: Array<{
-      accessToken: string;
-      eventId: string;
-      projectId: string;
-      userId: string;
-      reason: string;
-      revokedAt: number;
-    }> = [];
+export const listMine = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      accessToken: v.string(),
+      eventId: v.id("permissionRevocationEvents"),
+      projectId: v.id("projects"),
+      userId: v.id("users"),
+      reason: v.string(),
+      revokedAt: v.number(),
+    })
+  ),
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
 
-    for (const accessToken of args.accessTokens) {
-      const event = await ctx.db
-        .query("permissionRevocationEvents")
-        .withIndex("by_access_token", (q) => q.eq("accessToken", accessToken))
-        .collect()
-        .then((rows) => rows.find((doc) => doc.acknowledged === false) ?? null);
+    const rows = await ctx.db
+      .query("permissionRevocationEvents")
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
+      .collect();
 
-      if (event) {
-        events.push({
-          accessToken,
-          eventId: event._id,
-          projectId: event.projectId,
-          userId: event.userId,
-          reason: event.reason,
-          revokedAt: event.revokedAt,
-        });
-      }
-    }
-
-    return events;
+    return rows
+      .filter((doc) => doc.acknowledged === false)
+      .map((event) => ({
+        accessToken: event.accessToken,
+        eventId: event._id,
+        projectId: event.projectId,
+        userId: event.userId,
+        reason: event.reason,
+        revokedAt: event.revokedAt,
+      }));
   },
 });
 
 /**
- * Acknowledge multiple revocation events at once (extension bearer surface).
+ * Acknowledge the caller's own revocation events.
  *
- * The acting user is resolved INSIDE Convex from the presented token —
- * deliberately WITHOUT active/expiry checks, because acknowledging a
- * "your access was revoked" event legitimately happens with an
- * already-revoked or expired token. Possession of the token string proves
- * the caller was that device; a made-up userId can no longer be passed.
- *
- * Authorization: the caller may only acknowledge events that belong to the
- * token's owner. Events owned by another user are skipped rather than
- * throwing, so a partially-mismatched batch still clears what it may.
+ * Identity-scoped replacement for `acknowledgeMultipleForToken`: identity is
+ * the WorkOS JWT (requireAuthedUser). The caller may only acknowledge events
+ * whose `userId` is their own — events owned by another user are skipped rather
+ * than throwing, so a partially-mismatched batch still clears what it may.
  */
-export const acknowledgeMultipleForToken = mutation({
+export const acknowledgeMine = mutation({
   args: {
-    accessToken: v.string(),
     eventIds: v.array(v.id("permissionRevocationEvents")),
   },
   returns: v.object({ acknowledgedCount: v.number() }),
   handler: async (ctx, args) => {
-    // Lenient owner resolution: projectAccess first (extension project
-    // tokens), then cliTokens (session tokens). Existence only — see docstring.
-    const projectToken = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_access_token", (q) =>
-        q.eq("accessToken", args.accessToken)
-      )
-      .first();
-    const cliToken = projectToken
-      ? null
-      : await ctx.db
-          .query("cliTokens")
-          .withIndex("by_access_token", (q) =>
-            q.eq("accessToken", args.accessToken)
-          )
-          .first();
-    const ownerId = projectToken?.userId ?? cliToken?.userId;
-    if (!ownerId) {
-      throw new Error("Unauthenticated: unknown access token");
-    }
+    const actor = await requireAuthedUser(ctx);
 
     const now = Date.now();
     let count = 0;
 
     for (const eventId of args.eventIds) {
       const event = await ctx.db.get(eventId);
-      if (event && !event.acknowledged && event.userId === ownerId) {
+      if (event && !event.acknowledged && event.userId === actor._id) {
         await ctx.db.patch(eventId, {
           acknowledged: true,
           acknowledgedAt: now,

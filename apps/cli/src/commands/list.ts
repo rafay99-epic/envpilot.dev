@@ -17,12 +17,7 @@ import {
 } from "../lib/project-config.js";
 import { getEnvPathForEnvironment } from "../lib/env-file.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
-import type {
-  Organization,
-  Project,
-  Variable,
-  VariablesMeta,
-} from "../types/index.js";
+import type { VariablesMeta } from "../types/index.js";
 
 export const listCommand = new Command("list")
   .description("List resources")
@@ -123,11 +118,7 @@ async function listOrganizations(
   const organizations = await withSpinner(
     "Fetching organizations...",
     async () => {
-      const response = await api.get<{
-        success: boolean;
-        data: Organization[];
-      }>("/api/cli/organizations");
-      return response.data || [];
+      return api.listOrganizations();
     }
   );
 
@@ -171,11 +162,7 @@ async function listProjects(
     const organizations = await withSpinner(
       "Fetching organizations...",
       async () => {
-        const response = await api.get<{
-          success: boolean;
-          data: Organization[];
-        }>("/api/cli/organizations");
-        return response.data || [];
+        return api.listOrganizations();
       }
     );
 
@@ -197,11 +184,7 @@ async function listProjects(
   }
 
   const projects = await withSpinner("Fetching projects...", async () => {
-    const response = await api.get<{ success: boolean; data: Project[] }>(
-      "/api/cli/projects",
-      { organizationId: organizationId! }
-    );
-    return response.data || [];
+    return api.listProjects(organizationId!);
   });
 
   if (projects.length === 0) {
@@ -264,18 +247,9 @@ async function listVariables(
   let meta: VariablesMeta | undefined;
 
   const variables = await withSpinner("Fetching variables...", async () => {
-    const params: Record<string, string> = { projectId };
-    if (environment) {
-      params.environment = environment;
-    }
-
-    const response = await api.get<{
-      success: boolean;
-      data: Variable[];
-      meta?: VariablesMeta;
-    }>("/api/cli/variables", params);
+    const response = await api.listVariables(projectId, environment);
     meta = response.meta;
-    return response.data || [];
+    return response.variables;
   });
 
   // Filter by tag name if specified

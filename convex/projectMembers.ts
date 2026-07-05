@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import {
   assertProjectAction,
   assertCanManageUser,
@@ -90,17 +90,6 @@ export const getProjectMembership = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    return getProjectMembershipCore(ctx, args.projectId, actor._id);
-  },
-});
-
-export const getProjectMembershipForToken = query({
-  args: {
-    accessToken: v.string(),
-    projectId: v.id("projects"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return getProjectMembershipCore(ctx, args.projectId, actor._id);
   },
 });

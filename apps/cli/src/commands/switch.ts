@@ -30,7 +30,7 @@ import {
   setActiveProjectInConfig,
 } from "../lib/project-config.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
-import type { Organization, Project, Environment } from "../types/index.js";
+import type { Organization, Environment } from "../types/index.js";
 
 /** Resolve an organization's unified role from its additive/legacy fields. */
 function orgUnifiedRole(org: Organization): OrgRole {
@@ -119,11 +119,7 @@ export const switchCommand = new Command("switch")
         const organizations = await withSpinner(
           "Fetching organizations...",
           async () => {
-            const response = await api.get<{
-              success: boolean;
-              data: Organization[];
-            }>("/api/cli/organizations");
-            return response.data || [];
+            return api.listOrganizations();
           }
         );
 
@@ -187,11 +183,7 @@ export const switchCommand = new Command("switch")
           const organizations = await withSpinner(
             "Fetching organizations...",
             async () => {
-              const response = await api.get<{
-                success: boolean;
-                data: Organization[];
-              }>("/api/cli/organizations");
-              return response.data || [];
+              return api.listOrganizations();
             }
           );
 
@@ -224,11 +216,7 @@ export const switchCommand = new Command("switch")
         }
 
         const projects = await withSpinner("Fetching projects...", async () => {
-          const response = await api.get<{
-            success: boolean;
-            data: Project[];
-          }>("/api/cli/projects", { organizationId: organizationId! });
-          return response.data || [];
+          return api.listProjects(organizationId!);
         });
 
         const project = projects.find(
@@ -360,11 +348,7 @@ export const switchCommand = new Command("switch")
           const organizations = await withSpinner(
             "Fetching organizations...",
             async () => {
-              const response = await api.get<{
-                success: boolean;
-                data: Organization[];
-              }>("/api/cli/organizations");
-              return response.data || [];
+              return api.listOrganizations();
             }
           );
 
@@ -406,11 +390,7 @@ export const switchCommand = new Command("switch")
           const projects = await withSpinner(
             "Fetching projects...",
             async () => {
-              const response = await api.get<{
-                success: boolean;
-                data: Project[];
-              }>("/api/cli/projects", { organizationId: orgId });
-              return response.data || [];
+              return api.listProjects(orgId);
             }
           );
 

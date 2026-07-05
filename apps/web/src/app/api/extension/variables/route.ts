@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import {
-  checkOrganizationMembershipForToken,
-  getProjectOrganization,
-} from "@/lib/convex-helpers";
-import { authenticateExtensionRequest } from "@/lib/extension-auth";
+import { getProjectOrganization } from "@/lib/convex-helpers";
+import { verifyWorkosBearer } from "@/lib/cli-auth";
 import { createLogger } from "@/lib/logger";
 import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
@@ -15,14 +12,24 @@ import { resolveLegacyRoles } from "../_lib/legacy-roles";
 const log = createLogger("api/extension/variables");
 
 /**
- * GET /api/extension/variables - List variables for a project (with decrypted values)
+ * GET /api/extension/variables - List variables for a project (with decrypted
+ * values).
  *
- * Requires either:
- * - A valid access token (X-Access-Token header)
- * - Or authenticated session with project access
+ * Since the Stage 2 device-flow cutover this route has ONE auth plane: a
+ * WorkOS AuthKit JWT in the Authorization header (the extension's device-flow
+ * token). Identity is verified against WorkOS's JWKS and re-derived inside
+ * every Convex call via the setAuth'd client — the old projectAccess
+ * X-Access-Token and cliTokens bearer planes are gone. This route survives
+ * only because vault decryption is server-side until Stage 3.
  */
 export async function GET(request: Request) {
   try {
+    const verified = await verifyWorkosBearer(request);
+    if (!verified) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const authed = createAuthedConvexClient(verified.token);
+
     const ipAddress =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
@@ -33,7 +40,6 @@ export async function GET(request: Request) {
     const projectId = searchParams.get("projectId");
     const environment = searchParams.get("environment") || "development";
     const metadataOnly = searchParams.get("metadataOnly") === "true";
-    const accessToken = request.headers.get("X-Access-Token");
 
     if (!projectId) {
       return NextResponse.json(
@@ -42,114 +48,30 @@ export async function GET(request: Request) {
       );
     }
 
-    let authorizedUserId: Id<"users">;
-    let userRole: string = "member";
-    // The token that authenticated this request — a projectAccess token on the
-    // X-Access-Token path, or a cliTokens bearer on the session/bearer path.
-    // requireBearerUser (inside the *ForToken Convex variants) resolves the
-    // acting user from EITHER plane, so both branches drive the same ForToken
-    // calls and legacy-role resolution.
-    let authToken: string;
+    const { project, organizationId } = await getProjectOrganization(
+      convex,
+      projectId as Id<"projects">
+    );
 
-    // Validate access token if provided
-    if (accessToken) {
-      const validation = await convex.query(api.projectAccess.validateToken, {
-        accessToken,
-      });
-
-      if (!validation.valid) {
-        return NextResponse.json(
-          { error: validation.reason || "Invalid access token" },
-          { status: 401 }
-        );
-      }
-
-      if (validation.projectId !== projectId) {
-        return NextResponse.json(
-          { error: "Access token does not match project" },
-          { status: 403 }
-        );
-      }
-
-      authorizedUserId = validation.userId as Id<"users">;
-      // requireBearerUser resolves this projectAccess token to the linking user.
-      authToken = accessToken;
-
-      // Resolve user role from project's organization
-      const { organizationId: projOrgId } = await getProjectOrganization(
-        convex,
-        projectId as Id<"projects">
-      );
-      if (projOrgId) {
-        // projectAccess-token path: authorizedUserId was resolved server-side
-        // from the validated token, so read the role from the unchanged
-        // (identity-free) member list rather than an identity-bound query.
-        const members = await convex.query(api.organizations.getMembers, {
-          organizationId: projOrgId,
-        });
-        const tokenMembership = members.find(
-          (m) => m !== null && m.userId === authorizedUserId
-        );
-        if (tokenMembership) {
-          userRole = tokenMembership.role || "member";
-        }
-      }
-
-      // Update last used
-      await convex.mutation(api.projectAccess.updateLastUsed, { accessToken });
-    } else {
-      // Fall back to Bearer token or session authentication
-      const auth = await authenticateExtensionRequest(request);
-
-      if (!auth) {
-        return NextResponse.json(
-          { error: "Not authenticated" },
-          { status: 401 }
-        );
-      }
-
-      const convexUser = auth.convexUser;
-
-      // Verify project access
-      const { project, organizationId } = await getProjectOrganization(
-        convex,
-        projectId as Id<"projects">
-      );
-
-      if (!project || !organizationId) {
-        return NextResponse.json(
-          { error: "Project not found" },
-          { status: 404 }
-        );
-      }
-
-      const membership = await checkOrganizationMembershipForToken(
-        convex,
-        auth.accessToken!,
-        organizationId
-      );
-
-      if (!membership) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-
-      userRole = membership.role || "member";
-      authorizedUserId = convexUser._id;
-      // Bearer-only data route: a non-null auth here always carries a cliTokens
-      // bearer (session fallback yields no token and is unreachable without
-      // AuthKit middleware on this path).
-      authToken = auth.accessToken!;
+    if (!project || !organizationId) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get only variables this user can access. Identity is resolved server-side
-    // from the authenticating token via the ForToken variant (which accepts
-    // both the cliTokens and projectAccess planes).
-    const variablesWithAccess = await convex.query(
-      api.variables.listWithAccessForToken,
-      {
-        accessToken: authToken,
-        projectId: projectId as Id<"projects">,
-      }
+    // Membership check runs as the caller (identity from the verified JWT).
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId,
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const userRole = membership.role || "member";
+
+    // Get only variables this user can access — identity re-derived inside.
+    const variablesWithAccess = await authed.query(
+      api.variables.listWithAccess,
+      { projectId: projectId as Id<"projects"> }
     );
 
     const variables = variablesWithAccess
@@ -160,8 +82,7 @@ export async function GET(request: Request) {
     // builds derive .env file protection from. Owners get projectRole null
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
-    const legacy = await resolveLegacyRoles(convex, {
-      accessToken: authToken,
+    const legacy = await resolveLegacyRoles(authed, {
       projectId: projectId as Id<"projects">,
       orgRole: userRole,
     });
@@ -264,13 +185,13 @@ export async function GET(request: Request) {
       })
     );
 
-    // Fire-and-forget: log access for the audit trail (non-blocking)
+    // Fire-and-forget: log access for the audit trail (non-blocking).
+    // Identity is re-derived from the JWT inside the mutation.
     Promise.allSettled(
       variablesWithValues
         .filter((v) => v.value !== "[DECRYPTION_FAILED]")
         .map((v) =>
-          convex.mutation(api.variables.logAccessForToken, {
-            accessToken: authToken,
+          authed.mutation(api.variables.logAccess, {
             variableId: v._id as Id<"environmentVariables">,
             accessType: "export" as const,
             ipAddress,

@@ -60,7 +60,7 @@ export const whoamiCommand = new Command("whoami")
       }
 
       blank();
-      console.log(chalk.dim("Token verified against the CLI auth endpoint."));
+      console.log(chalk.dim("Session verified against Convex."));
     } catch (err) {
       await handleError(err);
     }

@@ -1,12 +1,13 @@
 import { Command } from "commander";
 import { success, info } from "../lib/ui.js";
-import { APIClient, createAPIClient } from "../lib/api.js";
+import { revokeDeviceSession } from "../lib/api.js";
 import {
   clearAuth,
   isAuthenticated,
   getActiveAccount,
   listAccounts,
   removeAccount,
+  setActiveAccount,
 } from "../lib/config.js";
 import { handleError } from "../lib/errors.js";
 
@@ -24,18 +25,17 @@ export const logoutCommand = new Command("logout")
         const accounts = listAccounts();
 
         for (const account of accounts) {
-          try {
-            const api = new APIClient({ accessToken: account.accessToken });
-            await api.post("/api/cli/auth?action=revoke", {});
-          } catch {
-            // Ignore errors during revocation - we'll clear local config anyway
+          // Best-effort remote revoke. Each account is a distinct WorkOS
+          // identity, so authenticate as it (setActive) before revoking.
+          if (account.sessionId) {
+            setActiveAccount(account.id);
+            await revokeDeviceSession(account.sessionId);
           }
           removeAccount(account.id);
         }
 
         // clearAuth() also purges the run cache; there's no active account
-        // left at this point, but calling it is a cheap, safe way to reuse
-        // the same cache-purge path as a single-account logout.
+        // left, but calling it reuses the same cache-purge path.
         clearAuth();
 
         success(`Logged out of all ${accounts.length} accounts.`);
@@ -43,16 +43,13 @@ export const logoutCommand = new Command("logout")
       }
 
       const activeAccount = getActiveAccount();
-      const api = createAPIClient();
 
-      // Revoke token on server
-      try {
-        await api.post("/api/cli/auth?action=revoke", {});
-      } catch {
-        // Ignore errors during revocation - we'll clear local config anyway
+      // Best-effort remote sign-out: revoke the WorkOS session + device record.
+      if (activeAccount?.sessionId) {
+        await revokeDeviceSession(activeAccount.sessionId);
       }
 
-      // Clear local config (removes the active account, purges run cache)
+      // Clear local config (removes the active account, purges run cache).
       const { newActiveId } = clearAuth();
 
       success(
