@@ -61,7 +61,7 @@ export interface ResolvedLegacyRoles {
 export async function resolveLegacyRoles(
   convex: ConvexHttpClient,
   args: {
-    userId: Id<"users">;
+    accessToken: string;
     projectId: Id<"projects">;
     orgRole: string | null | undefined;
   }
@@ -75,8 +75,8 @@ export async function resolveLegacyRoles(
   let environmentScope: string[] | null = null;
   if (!assigned) {
     const projectMembership = await convex.query(
-      api.projectMembers.getProjectMembership,
-      { projectId: args.projectId, userId: args.userId }
+      api.projectMembers.getProjectMembershipForToken,
+      { accessToken: args.accessToken, projectId: args.projectId }
     );
     assigned = projectMembership !== null;
     if (role === "developer") {
@@ -88,8 +88,8 @@ export async function resolveLegacyRoles(
   let legacyProjectRole = toLegacyProjectRole(args.orgRole, assigned);
 
   if (!assigned) {
-    const grants = await convex.query(api.permissions.getForUser, {
-      userId: args.userId,
+    const grants = await convex.query(api.permissions.getForUserForToken, {
+      accessToken: args.accessToken,
     });
     const now = Date.now();
     grantOnly = grants.some(

@@ -28,7 +28,7 @@ export function useProjectMembership(
 ) {
   const membership = useQuery(
     api.projectMembers.getProjectMembership,
-    projectId && userId ? { projectId, userId } : "skip"
+    projectId && userId ? { projectId } : "skip"
   );
 
   return {
@@ -46,7 +46,7 @@ export function useAssignableProjectMembers(
 ) {
   const members = useQuery(
     api.projectMembers.getAssignableOrgMembers,
-    projectId && requestingUserId ? { projectId, requestingUserId } : "skip"
+    projectId && requestingUserId ? { projectId } : "skip"
   );
 
   return {

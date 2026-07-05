@@ -16,12 +16,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const convexUser = auth.convexUser;
-
-    // Get organizations where the user is a member
-    const organizations = await convex.query(api.organizations.listForUser, {
-      userId: convexUser._id,
-    });
+    // Get organizations where the user is a member. Identity is re-derived
+    // server-side from the bearer token the request authenticated with.
+    const organizations = await convex.query(
+      api.organizations.listForUserForToken,
+      { accessToken: auth.accessToken! }
+    );
 
     // Filter out null organizations
     const validOrgs = organizations.filter(

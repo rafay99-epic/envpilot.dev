@@ -42,17 +42,35 @@ export async function getOrCreateConvexUser(
 }
 
 /**
- * Check if a user is a member of an organization
- * Returns the membership if found, null otherwise
+ * Check if the JWT-authenticated caller is a member of an organization
+ * (web/session routes). The caller identity is derived server-side inside
+ * Convex from the attached WorkOS token, so pass an already-authed client
+ * (see createAuthedConvexClient). Returns the membership if found, null
+ * otherwise.
  */
 export async function checkOrganizationMembership(
-  convex: ConvexHttpClient,
-  userId: Id<"users">,
+  authedConvex: ConvexHttpClient,
   organizationId: Id<"organizations">
 ): Promise<Doc<"organizationMembers"> | null> {
-  return await convex.query(api.organizations.getMembership, {
+  return await authedConvex.query(api.organizations.getMembership, {
     organizationId,
-    userId,
+  });
+}
+
+/**
+ * Bearer-path variant for CLI/extension routes: the caller identity is
+ * resolved inside Convex from the validated bearer token (cliTokens), so the
+ * route passes the raw token it already holds. Returns the membership if
+ * found, null otherwise.
+ */
+export async function checkOrganizationMembershipForToken(
+  convex: ConvexHttpClient,
+  accessToken: string,
+  organizationId: Id<"organizations">
+): Promise<Doc<"organizationMembers"> | null> {
+  return await convex.query(api.organizations.getMembershipForToken, {
+    accessToken,
+    organizationId,
   });
 }
 

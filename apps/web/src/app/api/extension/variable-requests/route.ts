@@ -4,7 +4,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import {
-  checkOrganizationMembership,
+  checkOrganizationMembershipForToken,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
@@ -63,9 +63,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken!,
       organizationId
     );
 
@@ -131,9 +131,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken!,
       organizationId
     );
 
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: convexUser._id,
+      accessToken: auth.accessToken!,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });

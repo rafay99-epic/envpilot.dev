@@ -35,9 +35,10 @@ export async function GET(request: Request) {
       profilePictureUrl: user.profilePictureUrl ?? null,
     });
 
-    const organizations = (await convex.query(api.organizations.listForUser, {
-      userId: convexUser._id,
-    })) as OrganizationWithMembershipRole[];
+    const organizations = (await createAuthedConvexClient(accessToken!).query(
+      api.organizations.listForUser,
+      {}
+    )) as OrganizationWithMembershipRole[];
 
     const url = new URL(request.url);
     const organizationIdFromQuery = url.searchParams.get("organizationId");

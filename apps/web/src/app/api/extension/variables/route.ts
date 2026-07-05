@@ -3,16 +3,89 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
-  checkOrganizationMembership,
+  checkOrganizationMembershipForToken,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { createLogger } from "@/lib/logger";
-import { toLegacyOrgRole } from "@/lib/roles";
+import {
+  normalizeOrgRole,
+  toLegacyOrgRole,
+  toLegacyProjectRole,
+} from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
-import { resolveLegacyRoles } from "../_lib/legacy-roles";
+import {
+  resolveLegacyRoles,
+  type ResolvedLegacyRoles,
+} from "../_lib/legacy-roles";
 
 const log = createLogger("api/extension/variables");
+
+/**
+ * DEVIATION (auth cutover): the X-Access-Token branch below authenticates with
+ * a `projectAccess` token (not a WorkOS JWT and not a `cliTokens` bearer), so
+ * the server-verified identity helpers (requireAuthedUser / requireBearerUser)
+ * cannot resolve it, and the *ForToken Convex variants do not accept it. That
+ * projectAccess-token surface was NOT modelled by the cutover inventory. To
+ * keep this route's linked-extension flow working without inventing a new
+ * Convex identity resolver, this helper reconstructs the same legacy-role
+ * answer `resolveLegacyRoles` produces, but for an already server-resolved
+ * `userId`, using ONLY unchanged (non-actor) public queries. Once a proper
+ * projectAccess-token identity resolver exists, delete this and route the
+ * X-Access-Token path through it.
+ *
+ * NOTE: `getUsersWithProjectAccess` filters grants by isActive only (not
+ * expiry), so an active-but-expired grant is treated as grant-only here —
+ * that errs toward the read-only "viewer" .env protection, i.e. the safe
+ * direction.
+ */
+async function resolveLegacyRolesByProjectToken(
+  convexClient: typeof convex,
+  args: {
+    userId: Id<"users">;
+    projectId: Id<"projects">;
+    orgRole: string | null | undefined;
+  }
+): Promise<ResolvedLegacyRoles> {
+  const role = normalizeOrgRole(args.orgRole);
+
+  let assigned = role === "owner";
+  let environmentScope: string[] | null = null;
+  if (!assigned) {
+    const members = await convexClient.query(api.projectMembers.listByProject, {
+      projectId: args.projectId,
+    });
+    const membership = members.find((m) => m.userId === args.userId) ?? null;
+    assigned = membership !== null;
+    if (role === "developer") {
+      environmentScope = membership?.environments ?? null;
+    }
+  }
+
+  let grantOnly = false;
+  let legacyProjectRole = toLegacyProjectRole(args.orgRole, assigned);
+  if (!assigned) {
+    const usersWithAccess = await convexClient.query(
+      api.permissions.getUsersWithProjectAccess,
+      { projectId: args.projectId }
+    );
+    grantOnly = usersWithAccess.some(
+      (u) => u.user?._id === args.userId && u.totalVariables > 0
+    );
+    if (grantOnly) {
+      legacyProjectRole = "viewer";
+    }
+  }
+
+  return {
+    role,
+    legacyRole: toLegacyOrgRole(args.orgRole),
+    assigned,
+    grantOnly,
+    legacyProjectRole,
+    environmentScope,
+  };
+}
 
 /**
  * GET /api/extension/variables - List variables for a project (with decrypted values)
@@ -44,6 +117,9 @@ export async function GET(request: Request) {
 
     let authorizedUserId: Id<"users">;
     let userRole: string = "member";
+    // Non-null only on the cliTokens bearer path — drives whether legacy-role
+    // resolution uses the ForToken variant or the projectAccess reconstruction.
+    let bearerToken: string | null = null;
 
     // Validate access token if provided
     if (accessToken) {
@@ -73,10 +149,14 @@ export async function GET(request: Request) {
         projectId as Id<"projects">
       );
       if (projOrgId) {
-        const tokenMembership = await checkOrganizationMembership(
-          convex,
-          authorizedUserId,
-          projOrgId
+        // projectAccess-token path: authorizedUserId was resolved server-side
+        // from the validated token, so read the role from the unchanged
+        // (identity-free) member list rather than an identity-bound query.
+        const members = await convex.query(api.organizations.getMembers, {
+          organizationId: projOrgId,
+        });
+        const tokenMembership = members.find(
+          (m) => m !== null && m.userId === authorizedUserId
         );
         if (tokenMembership) {
           userRole = tokenMembership.role || "member";
@@ -111,9 +191,9 @@ export async function GET(request: Request) {
         );
       }
 
-      const membership = await checkOrganizationMembership(
+      const membership = await checkOrganizationMembershipForToken(
         convex,
-        convexUser._id,
+        auth.accessToken!,
         organizationId
       );
 
@@ -123,6 +203,7 @@ export async function GET(request: Request) {
 
       userRole = membership.role || "member";
       authorizedUserId = convexUser._id;
+      bearerToken = auth.accessToken;
     }
 
     // Get only variables this user can access.
@@ -142,11 +223,17 @@ export async function GET(request: Request) {
     // builds derive .env file protection from. Owners get projectRole null
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
-    const legacy = await resolveLegacyRoles(convex, {
-      userId: authorizedUserId,
-      projectId: projectId as Id<"projects">,
-      orgRole: userRole,
-    });
+    const legacy = bearerToken
+      ? await resolveLegacyRoles(convex, {
+          accessToken: bearerToken,
+          projectId: projectId as Id<"projects">,
+          orgRole: userRole,
+        })
+      : await resolveLegacyRolesByProjectToken(convex, {
+          userId: authorizedUserId,
+          projectId: projectId as Id<"projects">,
+          orgRole: userRole,
+        });
 
     // Additive unified-model meta for new extension builds. Old extension
     // builds read only `role` and ignore these keys.

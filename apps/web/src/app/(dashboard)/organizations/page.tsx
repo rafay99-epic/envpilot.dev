@@ -44,7 +44,7 @@ export default function OrganizationsPage() {
   // Use Convex real-time query directly instead of fetch("/api/organizations")
   const rawOrgs = useQuery(
     api.organizations.listForUser,
-    convexUserId ? { userId: convexUserId } : "skip"
+    convexUserId ? {} : "skip"
   );
   const isLoading = rawOrgs === undefined;
   const organizations: Organization[] = (rawOrgs ?? []) as Organization[];

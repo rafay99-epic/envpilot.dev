@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -25,7 +25,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -92,10 +92,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Check org membership and role
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: convexUser._id,
-    });
+    const membership = await createAuthedConvexClient(accessToken!).query(
+      api.organizations.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return NextResponse.json(

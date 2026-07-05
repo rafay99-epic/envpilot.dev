@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -33,7 +33,7 @@ interface RouteContext {
  * Returns { tag, membership, convexUser } or a NextResponse error.
  */
 async function resolveTagWithAuth(tagId: string) {
-  const { user } = await withAuth();
+  const { user, accessToken } = await withAuth();
 
   if (!user) {
     return {
@@ -54,8 +54,7 @@ async function resolveTagWithAuth(tagId: string) {
   }
 
   const membership = await checkOrganizationMembership(
-    convex,
-    convexUser._id,
+    createAuthedConvexClient(accessToken!),
     tag.organizationId
   );
 

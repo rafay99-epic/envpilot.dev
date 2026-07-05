@@ -6,6 +6,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import {
   normalizeOrgRole,
@@ -37,11 +38,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Bearer token the request already authenticated with — ForToken Convex
+    // variants resolve identity from it server-side.
+    const token = extractBearerToken(request)!;
+
     // Check membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: organizationId as Id<"organizations">,
-      userId: authResult.userId,
-    });
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -83,10 +91,10 @@ export async function GET(request: NextRequest) {
           return;
         }
         const projectMembership = await convex.query(
-          api.projectMembers.getProjectMembership,
+          api.projectMembers.getProjectMembershipForToken,
           {
+            accessToken: token,
             projectId: project._id as Id<"projects">,
-            userId: authResult.userId!,
           }
         );
         unifiedByProject.set(project._id, {

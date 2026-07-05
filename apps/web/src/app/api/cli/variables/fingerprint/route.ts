@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -65,10 +66,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify organization membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");

@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret } from "@/lib/vault";
 import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
@@ -61,10 +62,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -130,10 +135,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -143,7 +152,7 @@ export async function POST(request: NextRequest) {
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });

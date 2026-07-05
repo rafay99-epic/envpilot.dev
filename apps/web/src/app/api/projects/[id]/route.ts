@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -36,7 +36,7 @@ interface RouteParams {
  */
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -57,8 +57,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       project.organizationId
     );
 
@@ -68,13 +67,11 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     // Owners bypass assignment; everyone else needs a project assignment
     if (normalizeOrgRole(membership.role) !== "owner") {
-      const projectMembership = await convex.query(
-        api.projectMembers.getProjectMembership,
-        {
-          projectId: id as Id<"projects">,
-          userId: convexUser._id,
-        }
-      );
+      const projectMembership = await createAuthedConvexClient(
+        accessToken!
+      ).query(api.projectMembers.getProjectMembership, {
+        projectId: id as Id<"projects">,
+      });
 
       if (!projectMembership) {
         return NextResponse.json(
@@ -100,7 +97,7 @@ export async function GET(request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -131,8 +128,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       existingProject.organizationId
     );
 
@@ -176,7 +172,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -197,8 +193,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       existingProject.organizationId
     );
 

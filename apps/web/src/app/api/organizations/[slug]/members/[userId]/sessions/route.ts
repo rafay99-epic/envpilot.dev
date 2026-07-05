@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -18,7 +18,7 @@ type RouteParams = { params: Promise<{ slug: string; userId: string }> };
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -43,11 +43,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { organizationId } = resolved;
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const sessions = await convex.query(api.organizations.getMemberSessions, {
-      organizationId,
-      targetUserId: userId as Id<"users">,
-      callerUserId: convexUser._id,
-    });
+    const sessions = await createAuthedConvexClient(accessToken!).query(
+      api.organizations.getMemberSessions,
+      {
+        organizationId,
+        targetUserId: userId as Id<"users">,
+      }
+    );
 
     return NextResponse.json(sessions);
   } catch (error) {
@@ -77,7 +79,7 @@ const revokeSchema = z.object({
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -115,26 +117,29 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     let revokedCount = 0;
 
     if (type === "cli" && sessionId) {
-      await convex.mutation(api.organizations.revokeMemberCliToken, {
-        organizationId,
-        tokenId: sessionId as Id<"cliTokens">,
-        revokedBy: convexUser._id,
-      });
+      await createAuthedConvexClient(accessToken!).mutation(
+        api.organizations.revokeMemberCliToken,
+        {
+          organizationId,
+          tokenId: sessionId as Id<"cliTokens">,
+        }
+      );
       revokedCount = 1;
     } else if (type === "extension" && sessionId) {
-      await convex.mutation(api.organizations.revokeMemberExtensionSession, {
-        organizationId,
-        projectAccessId: sessionId as Id<"projectAccess">,
-        revokedBy: convexUser._id,
-      });
+      await createAuthedConvexClient(accessToken!).mutation(
+        api.organizations.revokeMemberExtensionSession,
+        {
+          organizationId,
+          projectAccessId: sessionId as Id<"projectAccess">,
+        }
+      );
       revokedCount = 1;
     } else if (type === "all") {
-      const result = await convex.mutation(
+      const result = await createAuthedConvexClient(accessToken!).mutation(
         api.organizations.revokeAllMemberSessions,
         {
           organizationId,
           targetUserId: userId as Id<"users">,
-          revokedBy: convexUser._id,
         }
       );
       revokedCount = result.revokedCliTokens + result.revokedExtensionSessions;

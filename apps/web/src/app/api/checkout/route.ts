@@ -2,7 +2,7 @@ import { Polar } from "@polar-sh/sdk";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   }
 
   // --- Authentication required ---
-  const { user } = await withAuth();
+  const { user, accessToken: workosAccessToken } = await withAuth();
 
   if (!user) {
     // Redirect unauthenticated users to sign-in, then back to checkout
@@ -95,9 +95,10 @@ export async function GET(req: Request) {
   }
 
   // Get user's first owned organization for billing association
-  const organizations = await convex.query(api.organizations.listForUser, {
-    userId: convexUser._id,
-  });
+  const organizations = await createAuthedConvexClient(workosAccessToken!).query(
+    api.organizations.listForUser,
+    {}
+  );
   const primaryOrg = organizations[0];
 
   // --- Ensure Polar customer exists BEFORE checkout ---

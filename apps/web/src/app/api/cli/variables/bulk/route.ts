@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import {
@@ -53,11 +54,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const token = extractBearerToken(request)!;
+
     // Check membership and role
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
     // blocked; grant-only users (per-variable viewer sharing) get the
     // strict read-only treatment old clients expect.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });

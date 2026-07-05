@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { checkOrganizationMembershipForToken } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { clientIp, createLogger, isRateLimitError, since } from "@/lib/logger";
 import {
@@ -37,7 +37,7 @@ function legacyRolesForProject(orgRole: string | null | undefined): {
  * viewers with no project assignment.
  */
 async function resolveUnifiedProjectFields(
-  userId: Id<"users">,
+  accessToken: string,
   projectId: Id<"projects">,
   orgRole: string | null | undefined
 ): Promise<{
@@ -50,8 +50,8 @@ async function resolveUnifiedProjectFields(
     return { unifiedRole, assigned: true, environmentScope: null };
   }
   const projectMembership = await convex.query(
-    api.projectMembers.getProjectMembership,
-    { projectId, userId }
+    api.projectMembers.getProjectMembershipForToken,
+    { accessToken, projectId }
   );
   return {
     unifiedRole,
@@ -97,9 +97,9 @@ export async function GET(request: Request) {
     });
 
     if (organizationId) {
-      const membership = await checkOrganizationMembership(
+      const membership = await checkOrganizationMembershipForToken(
         convex,
-        convexUser._id,
+        auth.accessToken!,
         organizationId as Id<"organizations">
       );
 
@@ -128,7 +128,7 @@ export async function GET(request: Request) {
               [
                 project._id,
                 await resolveUnifiedProjectFields(
-                  convexUser._id,
+                  auth.accessToken!,
                   project._id as Id<"projects">,
                   membership.role
                 ),
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
             [
               project._id,
               await resolveUnifiedProjectFields(
-                convexUser._id,
+                auth.accessToken!,
                 project._id as Id<"projects">,
                 project.userRole
               ),

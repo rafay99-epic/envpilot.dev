@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import {
@@ -44,7 +44,7 @@ type RouteParams = { params: Promise<{ slug: string }> };
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -64,10 +64,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Check membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
+    const membership = await createAuthedConvexClient(accessToken!).query(
+      api.organizations.getMembership,
+      {
+        organizationId,
+      }
+    );
 
     if (!membership) {
       return NextResponse.json(
@@ -242,7 +244,7 @@ export async function POST(request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -280,12 +282,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       userId: targetUserId as Id<"users">,
     });
 
-    await convex.mutation(api.organizations.updateMemberRole, {
-      organizationId,
-      userId: targetUserId as Id<"users">,
-      newRole: role,
-      updatedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.organizations.updateMemberRole,
+      {
+        organizationId,
+        userId: targetUserId as Id<"users">,
+        newRole: role,
+      }
+    );
 
     // Notify org members about the role change (non-blocking)
     const roleDisplay = ORG_ROLE_LABELS[role];
@@ -313,7 +317,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -361,11 +365,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       userId: targetUserId,
     });
 
-    await convex.mutation(api.organizations.removeMember, {
-      organizationId,
-      userId: targetUserId,
-      removedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.organizations.removeMember,
+      {
+        organizationId,
+        userId: targetUserId,
+      }
+    );
 
     // Notify org members about the removal (non-blocking)
     notifyMemberUpdate(

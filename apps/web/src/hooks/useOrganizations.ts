@@ -8,7 +8,9 @@ import { Id } from "@convex/_generated/dataModel";
  * Hook for listing organizations for the current user
  */
 export function useUserOrganizations(userId: Id<"users"> | undefined) {
-  return useQuery(api.organizations.listForUser, userId ? { userId } : "skip");
+  // Identity is derived server-side from the attached JWT; `userId` gates the
+  // query until the current user is known (auth ready).
+  return useQuery(api.organizations.listForUser, userId ? {} : "skip");
 }
 
 /**

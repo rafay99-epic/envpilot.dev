@@ -1,7 +1,7 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -22,7 +22,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   // Server-side auth check
-  const { user } = await withAuth();
+  const { user, accessToken } = await withAuth();
 
   if (!user) {
     redirect("/sign-in");
@@ -89,9 +89,10 @@ export default async function DashboardLayout({
     // navigation. If the cookie matches the actual active org (the common case),
     // we avoid a waterfall.
     const [orgList, tierByGuess] = await Promise.all([
-      convex.query(api.organizations.listForUser, {
-        userId: convexUser._id,
-      }) as Promise<OrganizationWithMembershipRole[]>,
+      createAuthedConvexClient(accessToken!).query(
+        api.organizations.listForUser,
+        {}
+      ) as Promise<OrganizationWithMembershipRole[]>,
       preferredOrgId
         ? convex
             .query(api.featureRegistry.getResolvedFeatures, {
