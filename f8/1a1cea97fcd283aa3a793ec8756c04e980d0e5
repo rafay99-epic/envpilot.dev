@@ -1,0 +1,37 @@
+apps/cli/src/lib/workos.ts
+  s_8ac05b3f82c26d::t_5da98ca07686a1 220-227,230
+apps/web/src/lib/cli-auth.ts
+  s_8ac05b3f82c26d::t_9280cbc24141a7 91-135
+  s_8ac05b3f82c26d::t_fcc51e9bf107b7 90
+apps/web/src/app/api/extension/variables/route.ts
+  s_8ac05b3f82c26d::t_606e1183ae3fe8 6
+  s_8ac05b3f82c26d::t_9a1ccd97b91ed1 27-32
+convex/deviceSessions.ts
+  s_8ac05b3f82c26d::t_4562ca933299d0 93-94,97-99,104
+apps/web/src/app/api/cli/variables/route.ts
+  s_8ac05b3f82c26d::t_f97430205d11e1 220-223
+  s_8ac05b3f82c26d::t_a648f85f41d5c5 5
+  s_8ac05b3f82c26d::t_76d691a98417c2 32-37
+apps/web/src/app/api/cli/variable-requests/route.ts
+  s_8ac05b3f82c26d::t_f3ca45aa76986a 125-126,128-130
+  s_8ac05b3f82c26d::t_f07376ce7ec751 127,133
+apps/web/src/app/api/cli/variables/bulk/route.ts
+  s_8ac05b3f82c26d::t_39b46757037bbd 25-29
+  s_8ac05b3f82c26d::t_893613c9444745 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f81a1cea97fcd283aa3a793ec8756c04e980d0e5",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
