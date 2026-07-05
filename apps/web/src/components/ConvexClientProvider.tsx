@@ -1,6 +1,8 @@
 "use client";
 
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components";
+import { useConvexAuthFromWorkOS } from "@/hooks/use-convex-workos-auth";
 import {
   QueryClient,
   QueryClientProvider,
@@ -189,6 +191,18 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * AuthKitProvider owns the WorkOS session/token state (server-action backed);
+ * ConvexProviderWithAuth attaches the AuthKit JWT to the Convex WebSocket so
+ * every query/mutation runs with a server-verified identity
+ * (convex/auth.config.ts + ctx.auth.getUserIdentity()).
+ */
 export function ConvexBoundaryProvider({ children }: { children: ReactNode }) {
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  return (
+    <AuthKitProvider>
+      <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromWorkOS}>
+        {children}
+      </ConvexProviderWithAuth>
+    </AuthKitProvider>
+  );
 }
