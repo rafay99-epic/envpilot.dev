@@ -48,9 +48,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
-    // Verify membership
+    // Verify membership — identity is derived server-side from the JWT, so no
+    // user sync is needed before the check.
     const membership = await checkOrganizationMembership(
       createAuthedConvexClient(accessToken!),
       organizationId as Id<"organizations">

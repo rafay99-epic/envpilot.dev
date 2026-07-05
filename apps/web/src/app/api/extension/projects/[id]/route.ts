@@ -23,6 +23,16 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // This route authorizes via the bearer token (ForToken membership check).
+    // The session-cookie fallback carries no bearer token, so reject it with a
+    // clean 401 rather than passing null into a v.string() arg (→ 500).
+    if (!auth.accessToken) {
+      return NextResponse.json(
+        { error: "Bearer token required" },
+        { status: 401 }
+      );
+    }
+
     const { id: projectId } = await params;
 
     const project = await convex.query(api.projects.getById, {
@@ -36,7 +46,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Check membership — identity re-derived server-side from the bearer token.
     const membership = await checkOrganizationMembershipForToken(
       convex,
-      auth.accessToken!,
+      auth.accessToken,
       project.organizationId
     );
 

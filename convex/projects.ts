@@ -79,34 +79,37 @@ async function listWithStatsCore(
   let userRole: string | null = null;
   const assignedProjectIds = new Set<string>();
 
-  if (args.userId) {
-    const userId = args.userId;
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", userId)
-      )
-      .first();
+  const userId = args.userId;
+  const membership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", args.organizationId).eq("userId", userId)
+    )
+    .first();
 
-    if (membership) {
-      userRole = normalizeOrgRole(membership.role);
+  // Fail closed: a non-member of this org sees nothing. Previously the
+  // visibility filter was skipped when membership was absent, which returned
+  // the ENTIRE org project list to any authenticated non-member.
+  if (!membership) {
+    return [];
+  }
+
+  userRole = normalizeOrgRole(membership.role);
+
+  if (normalizeOrgRole(membership.role) !== "owner") {
+    // Get user's project assignments
+    const projectMemberships = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const pm of projectMemberships) {
+      assignedProjectIds.add(pm.projectId.toString());
     }
 
-    if (membership && normalizeOrgRole(membership.role) !== "owner") {
-      // Get user's project assignments
-      const projectMemberships = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-
-      for (const pm of projectMemberships) {
-        assignedProjectIds.add(pm.projectId.toString());
-      }
-
-      projects = projects.filter((p) =>
-        assignedProjectIds.has(p._id.toString())
-      );
-    }
+    projects = projects.filter((p) =>
+      assignedProjectIds.has(p._id.toString())
+    );
   }
 
   const projectsWithStats = await Promise.all(

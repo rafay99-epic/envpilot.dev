@@ -4,7 +4,6 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
-import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -41,7 +40,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const { organizationId } = resolved;
-    const convexUser = await getOrCreateConvexUser(convex, user);
 
     const sessions = await createAuthedConvexClient(accessToken!).query(
       api.organizations.getMemberSessions,
@@ -102,7 +100,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     }
 
     const { organizationId } = resolved;
-    const convexUser = await getOrCreateConvexUser(convex, user);
 
     const body = await request.json();
     const parsed = revokeSchema.safeParse(body);

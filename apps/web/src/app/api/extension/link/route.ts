@@ -28,6 +28,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Linking authorizes and mints via the bearer token (ForToken path). The
+    // session-cookie fallback carries no bearer token, so reject it with a
+    // clean 401 rather than passing null into a v.string() arg (→ 500).
+    if (!auth.accessToken) {
+      return NextResponse.json(
+        { error: "Bearer token required" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const validation = linkExtensionSchema.safeParse(body);
 
@@ -52,7 +62,7 @@ export async function POST(request: Request) {
 
     const membership = await checkOrganizationMembershipForToken(
       convex,
-      auth.accessToken!,
+      auth.accessToken,
       organizationId
     );
 
@@ -65,7 +75,7 @@ export async function POST(request: Request) {
     const access = await convex.mutation(
       api.projectAccess.linkExtensionForToken,
       {
-        accessToken: auth.accessToken!,
+        accessToken: auth.accessToken,
         projectId: projectId as Id<"projects">,
         deviceId,
         deviceName,

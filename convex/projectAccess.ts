@@ -10,12 +10,20 @@ import { requireBearerUser } from "./identity";
  */
 const REVOCATION_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Generate a project-access token using a CSPRNG. Since the auth cutover these
+ * tokens are an identity credential (requireBearerUser resolves the acting
+ * user from them), so they MUST be unguessable — crypto.getRandomValues(),
+ * never Math.random(). Mirrors cliSessions.generateToken.
+ */
 function generateAccessToken(): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
   let token = "env_";
   for (let i = 0; i < 48; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+    token += chars.charAt(bytes[i] % chars.length);
   }
   return token;
 }
@@ -315,6 +323,17 @@ export const linkExtensionForToken = mutation({
     if (!project || project.deletedAt) {
       throw new Error("Project not found");
     }
+
+    // Authorize BEFORE minting a token: the acting user must be permitted to
+    // link an extension in this project's org. Without this, any authenticated
+    // bearer holder could mint a project-access token (itself an identity
+    // credential) for an arbitrary project. Mirrors unlinkExtensionForToken.
+    await assertOrgAction(
+      ctx,
+      actor._id,
+      project.organizationId,
+      "org:link_extension"
+    );
 
     const existingAccess = await ctx.db
       .query("projectAccess")
