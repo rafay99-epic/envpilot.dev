@@ -1103,15 +1103,19 @@ export const globalSearchWithAccess = query({
       for (const project of accessibleProjects) {
         coveredProjectIds.add(project._id as string);
 
-        // Capped read (was an unbounded .collect()) — a project's variable
-        // set no longer has to be read in full just to find a handful of
-        // search matches. Same accepted tradeoff as the `search` query above:
-        // if a project has more than RESULT_LIMIT non-deleted variables, only
-        // the first RESULT_LIMIT (index/creation order) are searched.
+        // Read the project's full (non-deleted) variable set. A per-project
+        // .take() cap was tried for cost, but it broke search correctness:
+        // .take(n) returns rows in creation order, so a project's NEWEST
+        // variables silently fall out of search once it exceeds the cap —
+        // a user couldn't find a variable they just created. Search must see
+        // every candidate; the overall RESULT_LIMIT still bounds what's
+        // RETURNED. (If per-keystroke search cost becomes a problem on very
+        // large orgs, the right fix is a Convex search index on `key`, not a
+        // correctness-breaking read cap.)
         const allVariables = await ctx.db
           .query("environmentVariables")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .take(RESULT_LIMIT);
+          .collect();
         const variables = allVariables.filter(
           (variable) => variable.deletedAt === undefined
         );

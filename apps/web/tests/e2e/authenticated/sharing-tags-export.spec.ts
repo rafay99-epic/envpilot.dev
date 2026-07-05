@@ -4,6 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
+  createVariable,
   getFirstProjectSlug,
   getOwnedOrgSlug,
   trackClientErrors,
@@ -133,18 +134,14 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     let created = false;
 
     try {
-      await addButton.first().click();
-      const createDrawer = page.getByRole("dialog");
-      await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-      await createDrawer.locator("#key").fill(key);
-      await createDrawer.locator("#value").fill(`share-value-${Date.now()}`);
-      await createDrawer
-        .getByRole("button", { name: "Create Variable" })
-        .click();
-      await expect(
-        createDrawer,
-        "create drawer should close on success"
-      ).toBeHidden({ timeout: 15_000 });
+      // Resilient to dev-mode React remounts tearing down the create drawer
+      // mid-interaction — retries the whole open→fill→submit sequence as a
+      // unit instead of failing on a detached element (this is the step that
+      // flaked in the full-suite marathon run).
+      await createVariable(page, {
+        key,
+        value: `share-value-${Date.now()}`,
+      });
       created = true;
       auditMarkers.push(key);
 
@@ -388,15 +385,9 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     let created = false;
 
     try {
-      await addButton.first().click();
-      const createDrawer = page.getByRole("dialog");
-      await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-      await createDrawer.locator("#key").fill(key);
-      await createDrawer.locator("#value").fill(value);
-      await createDrawer
-        .getByRole("button", { name: "Create Variable" })
-        .click();
-      await expect(createDrawer).toBeHidden({ timeout: 15_000 });
+      // Same dev-mode-remount hardening as test A — retries the whole
+      // open→fill→submit sequence as a unit.
+      await createVariable(page, { key, value });
       created = true;
       auditMarkers.push(key);
 

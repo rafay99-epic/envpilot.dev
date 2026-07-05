@@ -80,74 +80,117 @@ test.describe("shared accounts", () => {
 
     try {
       // ── Create an account via the drawer ──
-      await addButton.click();
-      const createDrawer = page.getByRole("dialog");
-      await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-      await expect(createDrawer).toContainText("Add Account");
+      // Retried as a unit — the same principle as support.ts's
+      // createVariable(): a dev-mode React remount can detach the drawer
+      // mid-fill, so the whole open→fill→submit sequence is replayed
+      // (reopening + refilling) rather than failing on a stale element. The
+      // top-of-loop guard makes a retry a no-op once the row has actually
+      // landed, even if the drawer-hidden observation itself got interrupted.
+      const row = accountRow(page, accountName);
+      await expect(async () => {
+        if (
+          await row
+            .first()
+            .isVisible()
+            .catch(() => false)
+        )
+          return;
 
-      await createDrawer.locator("#account-name").fill(accountName);
-      await createDrawer
-        .locator("#account-url")
-        .fill("https://dashboard.example.com");
-      await createDrawer.locator("#account-username").fill(username);
-      await createDrawer.locator("#account-password").fill(password);
-      // Environments default to ["development"] pre-selected — leave as is.
+        const createDrawer = page.getByRole("dialog");
+        if (!(await createDrawer.isVisible().catch(() => false))) {
+          await addButton.click();
+          await expect(createDrawer).toBeVisible({ timeout: 10_000 });
+        }
+        await expect(createDrawer).toContainText("Add Account");
 
-      await createDrawer
-        .getByRole("button", { name: "Create Account" })
-        .click();
-      await expect(
-        createDrawer,
-        "create drawer should close on success"
-      ).toBeHidden({ timeout: 15_000 });
+        await createDrawer.locator("#account-name").fill(accountName);
+        await createDrawer
+          .locator("#account-url")
+          .fill("https://dashboard.example.com");
+        await createDrawer.locator("#account-username").fill(username);
+        await createDrawer.locator("#account-password").fill(password);
+        // Environments default to ["development"] pre-selected — leave as is.
+
+        await createDrawer
+          .getByRole("button", { name: "Create Account" })
+          .click();
+        await expect(
+          createDrawer,
+          "create drawer should close on success"
+        ).toBeHidden({ timeout: 15_000 });
+        await expect(
+          row.first(),
+          "created account row should appear in the list"
+        ).toBeVisible({ timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       created = true;
 
       // ── Row appears with env pills ──
-      const row = accountRow(page, accountName);
-      await expect(
-        row,
-        "created account row should appear in the list"
-      ).toBeVisible({ timeout: 20_000 });
       await expect(row.getByText(/^development$/)).toBeVisible({
         timeout: 10_000,
       });
 
       // ── Reveal shows username + password ──
-      const revealButton = row.getByTitle("Reveal credentials");
-      await expect(revealButton).toBeVisible();
-      await revealButton.click();
-      await expect(row.getByText("Username")).toBeVisible({ timeout: 15_000 });
-      await expect(row.getByText("Password")).toBeVisible();
-      // Username is shown in the clear; password starts masked, so assert
-      // the plaintext username round-tripped through create -> vault -> reveal.
-      await expect(row.locator("code", { hasText: username })).toBeVisible({
-        timeout: 10_000,
-      });
+      // Retried as a unit too: reveal is a plain click (no dialog), but a
+      // remount resets the row's local `isValueVisible` state, so a retry
+      // just re-clicks rather than hanging on a detached button.
+      await expect(async () => {
+        if (
+          !(await row
+            .getByText("Username")
+            .isVisible()
+            .catch(() => false))
+        ) {
+          const revealButton = row.getByTitle("Reveal credentials");
+          await expect(revealButton).toBeVisible();
+          await revealButton.click();
+        }
+        await expect(row.getByText("Username")).toBeVisible({
+          timeout: 15_000,
+        });
+        await expect(row.getByText("Password")).toBeVisible();
+        // Username is shown in the clear; password starts masked, so assert
+        // the plaintext username round-tripped through create -> vault ->
+        // reveal.
+        await expect(row.locator("code", { hasText: username })).toBeVisible({
+          timeout: 10_000,
+        });
+      }).toPass({ timeout: 30_000 });
 
       // ── Edit the name ──
-      const editButton = row.getByTitle("Edit account");
-      await expect(editButton).toBeVisible();
-      await editButton.click();
-
-      const editDrawer = page.getByRole("dialog");
-      await expect(editDrawer).toBeVisible({ timeout: 10_000 });
-      await expect(editDrawer).toContainText("Edit Account");
-
-      const nameInput = editDrawer.locator("#account-name");
-      await expect(nameInput).toHaveValue(accountName);
-      await nameInput.fill(editedName);
-
-      await editDrawer.getByRole("button", { name: "Save Changes" }).click();
-      await expect(
-        editDrawer,
-        "edit drawer should close on success"
-      ).toBeHidden({ timeout: 15_000 });
-
       const updatedRow = accountRow(page, editedName);
-      await expect(
-        updatedRow,
-        "row should reflect the updated name"
-      ).toBeVisible({ timeout: 20_000 });
+      await expect(async () => {
+        if (
+          await updatedRow
+            .first()
+            .isVisible()
+            .catch(() => false)
+        )
+          return;
+
+        const editDrawer = page.getByRole("dialog");
+        if (!(await editDrawer.isVisible().catch(() => false))) {
+          const editButton = row.getByTitle("Edit account");
+          await expect(editButton).toBeVisible();
+          await editButton.click();
+          await expect(editDrawer).toBeVisible({ timeout: 10_000 });
+        }
+        await expect(editDrawer).toContainText("Edit Account");
+
+        const nameInput = editDrawer.locator("#account-name");
+        await expect(nameInput).toHaveValue(accountName);
+        await nameInput.fill(editedName);
+
+        await editDrawer.getByRole("button", { name: "Save Changes" }).click();
+        await expect(
+          editDrawer,
+          "edit drawer should close on success"
+        ).toBeHidden({ timeout: 15_000 });
+        await expect(
+          updatedRow.first(),
+          "row should reflect the updated name"
+        ).toBeVisible({ timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
 
       // ── Open the share drawer and assert both modes render ──
       const shareButton = updatedRow.getByTitle("Share account");
@@ -186,31 +229,40 @@ test.describe("shared accounts", () => {
       await expect(shareDrawer).toBeHidden({ timeout: 10_000 });
 
       // ── Delete via ConfirmDialog ──
-      const deleteButton = updatedRow.getByTitle("Delete account");
-      await expect(deleteButton).toBeVisible();
-      await deleteButton.click();
+      // Retried as a unit — a remount between opening the ConfirmDialog and
+      // clicking its Delete button would otherwise surface as a detached-
+      // element actionability timeout. The top-of-loop guard makes a retry a
+      // no-op once the row is actually gone, so the destructive click never
+      // fires twice.
+      await expect(async () => {
+        if ((await updatedRow.count()) === 0) return;
 
-      const confirmDialogHeading = page.getByRole("heading", {
-        name: "Delete Account",
-      });
-      await expect(confirmDialogHeading).toBeVisible({ timeout: 10_000 });
-      // Assert against the full confirmation sentence (not just the bare
-      // account name) — `editedName` alone also matches the account row's
-      // name span still visible behind the modal (ConfirmDialog's `Modal`
-      // has no `role="dialog"` to scope against), which is a Playwright
-      // strict-mode violation (2 matching elements).
-      await expect(
-        page.getByText(`delete "${editedName}"`, { exact: false })
-      ).toBeVisible();
+        const confirmDialogHeading = page.getByRole("heading", {
+          name: "Delete Account",
+        });
+        if (!(await confirmDialogHeading.isVisible().catch(() => false))) {
+          const deleteButton = updatedRow.getByTitle("Delete account");
+          await expect(deleteButton).toBeVisible();
+          await deleteButton.click();
+          await expect(confirmDialogHeading).toBeVisible({ timeout: 10_000 });
+        }
+        // Assert against the full confirmation sentence (not just the bare
+        // account name) — `editedName` alone also matches the account row's
+        // name span still visible behind the modal (ConfirmDialog's `Modal`
+        // has no `role="dialog"` to scope against), which is a Playwright
+        // strict-mode violation (2 matching elements).
+        await expect(
+          page.getByText(`delete "${editedName}"`, { exact: false })
+        ).toBeVisible();
 
-      await page.getByRole("button", { name: "Delete", exact: true }).click();
-      await expect(confirmDialogHeading).toBeHidden({ timeout: 15_000 });
+        await page.getByRole("button", { name: "Delete", exact: true }).click();
+        await expect(confirmDialogHeading).toBeHidden({ timeout: 15_000 });
+        await expect(
+          updatedRow,
+          "deleted account row should no longer be present"
+        ).toHaveCount(0, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       created = false;
-
-      await expect(
-        accountRow(page, editedName),
-        "deleted account row should no longer be present"
-      ).toHaveCount(0, { timeout: 20_000 });
     } finally {
       // Best-effort cleanup: if any assertion above threw before the delete
       // step completed, make sure the account doesn't linger in the shared

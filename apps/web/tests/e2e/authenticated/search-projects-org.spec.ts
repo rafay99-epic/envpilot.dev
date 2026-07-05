@@ -1,11 +1,14 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   ACCESS_DENIED_TEXT,
+  createVariable,
+  deleteVariableByKey,
   getFirstProjectSlug,
   getOwnedOrgSlug,
   trackClientErrors,
+  variableRow,
 } from "./support";
 
 // Authenticated e2e — proves the perf/convex-cleanup backend rewrite didn't
@@ -22,15 +25,6 @@ import {
 //      to real numbers instead of getting stuck loading or erroring.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
-
-/**
- * Variable rows render as `<div className="px-6 py-4">...`
- * (apps/web/src/components/variables/variable-list-item.tsx), same class
- * pair convention as accountRow in accounts.spec.ts / trash-restore.spec.ts.
- */
-function variableRow(page: Page, key: string): Locator {
-  return page.locator("div.px-6.py-4").filter({ hasText: key });
-}
 
 /**
  * Drops dev-server lifecycle noise from the collected client errors: when
@@ -79,41 +73,15 @@ test.describe("global search (command palette)", () => {
 
     try {
       // ── Create a uniquely-keyed variable to search for ──
-      // Retried as a unit: a dev-mode remount can detach the drawer mid-fill
-      // ("element is not stable" / detached-from-DOM). The row-visible guard
-      // at the top makes a retry after a successful-but-slow submit a no-op
-      // instead of a duplicate create.
-      const createDrawer = page.getByRole("dialog");
-      await expect(async () => {
-        if (
-          await variableRow(page, uniqueKey)
-            .isVisible()
-            .catch(() => false)
-        ) {
-          return; // a previous attempt already created it
-        }
-        if (!(await createDrawer.isVisible().catch(() => false))) {
-          await addButton.click();
-          await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-        }
-        await createDrawer.locator("#key").fill(uniqueKey);
-        await createDrawer.locator("#value").fill("e2e-search-value");
-        // Submit via Enter (implicit form submission) instead of clicking
-        // "Create Variable": the drawer's framer-motion spring keeps the
-        // button "not stable" for Playwright's click actionability check
-        // when the dev server is compiling and starving the rAF loop.
-        await createDrawer.locator("#value").press("Enter");
-        await expect(
-          createDrawer,
-          "create drawer should close on success"
-        ).toBeHidden({ timeout: 15_000 });
-      }).toPass({ timeout: 60_000 });
+      // Delegates to the shared remount-resilient helper (support.ts): the
+      // whole open→fill→submit sequence is retried as a unit via toPass, so
+      // a dev-mode remount mid-fill just restarts the sequence instead of
+      // failing outright.
+      await createVariable(page, {
+        key: uniqueKey,
+        value: "e2e-search-value",
+      });
       created = true;
-
-      await expect(
-        variableRow(page, uniqueKey),
-        "created variable should appear in the project's list"
-      ).toBeVisible({ timeout: 20_000 });
 
       // ── Open the command palette via its sidebar trigger ──
       const searchTrigger = page.getByRole("button", { name: /^Search/ });
@@ -145,14 +113,7 @@ test.describe("global search (command palette)", () => {
       await expect(searchInput).toBeHidden({ timeout: 10_000 });
 
       // ── Cleanup: delete the fixture variable ──
-      const row = variableRow(page, uniqueKey);
-      await row.getByTitle("Delete variable").click();
-      const confirmHeading = page.getByRole("heading", {
-        name: "Delete Variable",
-      });
-      await expect(confirmHeading).toBeVisible({ timeout: 10_000 });
-      await page.getByRole("button", { name: "Delete", exact: true }).click();
-      await expect(confirmHeading).toBeHidden({ timeout: 15_000 });
+      await deleteVariableByKey(page, uniqueKey);
       created = false;
 
       await expect(
@@ -160,21 +121,11 @@ test.describe("global search (command palette)", () => {
         "deleted variable should no longer be present"
       ).toHaveCount(0, { timeout: 20_000 });
     } finally {
+      // Best-effort cleanup if an assertion above threw before the in-flow
+      // delete step ran — deleteVariableByKey no-ops when the row/control
+      // isn't present, so this is safe to call unconditionally.
       if (created) {
-        // Best-effort cleanup if an assertion above threw before the
-        // in-flow delete step ran.
-        const cleanupRow = variableRow(page, uniqueKey);
-        const cleanupDeleteButton = cleanupRow.getByTitle("Delete variable");
-        if (await cleanupDeleteButton.isVisible().catch(() => false)) {
-          await cleanupDeleteButton.click();
-          const confirmDeleteButton = page.getByRole("button", {
-            name: "Delete",
-            exact: true,
-          });
-          if (await confirmDeleteButton.isVisible().catch(() => false)) {
-            await confirmDeleteButton.click();
-          }
-        }
+        await deleteVariableByKey(page, uniqueKey).catch(() => undefined);
       }
     }
 
@@ -260,23 +211,43 @@ test.describe("project lifecycle", () => {
       await expect(projectCard.getByText(projectName)).toBeVisible();
 
       // ── Favorite / unfavorite via the card's star control ──
+      // Each toggle is retried as a unit (click + assert) so a dev-mode
+      // remount landing between the click and the title assertion just
+      // restarts the check instead of misreporting the toggle as failed —
+      // the idempotency guard (checking the current title first) keeps a
+      // retry after a slow-but-successful click from double-toggling.
       const favoriteButton = projectCard.getByTitle(/favorites/i);
       await expect(favoriteButton).toBeVisible();
       await expect(favoriteButton).toHaveAttribute("title", "Add to favorites");
 
-      await favoriteButton.click();
-      await expect(favoriteButton).toHaveAttribute(
-        "title",
-        "Remove from favorites",
-        { timeout: 10_000 }
-      );
+      await expect(async () => {
+        if (
+          (await favoriteButton.getAttribute("title")) ===
+          "Remove from favorites"
+        ) {
+          return;
+        }
+        await favoriteButton.click();
+        await expect(favoriteButton).toHaveAttribute(
+          "title",
+          "Remove from favorites",
+          { timeout: 5_000 }
+        );
+      }).toPass({ timeout: 20_000 });
 
-      await favoriteButton.click();
-      await expect(favoriteButton).toHaveAttribute(
-        "title",
-        "Add to favorites",
-        { timeout: 10_000 }
-      );
+      await expect(async () => {
+        if (
+          (await favoriteButton.getAttribute("title")) === "Add to favorites"
+        ) {
+          return;
+        }
+        await favoriteButton.click();
+        await expect(favoriteButton).toHaveAttribute(
+          "title",
+          "Add to favorites",
+          { timeout: 5_000 }
+        );
+      }).toPass({ timeout: 20_000 });
 
       // ── Edit name/description via project settings ──
       await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
@@ -325,19 +296,35 @@ test.describe("project lifecycle", () => {
         page.getByText(/7-day retention before permanent deletion/i)
       ).toBeVisible({ timeout: 10_000 });
 
-      await page
-        .getByRole("button", { name: "Delete Project", exact: true })
-        .click();
-      await page
-        .locator('input[placeholder="' + projectName + '"]')
-        .fill(projectName);
-      await page
-        .getByRole("button", { name: "Delete Project", exact: true })
-        .click();
-
-      await expect(page).toHaveURL(/\/dashboard\/projects$/, {
-        timeout: 20_000,
+      // Retried as a unit: the confirm-text input only exists once the
+      // "Delete Project" button has been clicked once (it swaps the whole
+      // danger-zone block via a ternary, not just adds a sibling), so a
+      // remount partway through would otherwise strand the flow with a
+      // stale locator reference. The idempotency guards — bailing out once
+      // already redirected, and skipping the "open the confirm form" click
+      // if it's already open — keep a retry safe after a slow-but-successful
+      // step.
+      const deleteProjectButton = page.getByRole("button", {
+        name: "Delete Project",
+        exact: true,
       });
+      const deleteConfirmInput = page.locator(
+        'input[placeholder="' + projectName + '"]'
+      );
+      await expect(async () => {
+        if (/\/dashboard\/projects$/.test(new URL(page.url()).pathname)) {
+          return; // a previous attempt already deleted it and navigated away
+        }
+        if (!(await deleteConfirmInput.isVisible().catch(() => false))) {
+          await deleteProjectButton.click();
+          await expect(deleteConfirmInput).toBeVisible({ timeout: 5_000 });
+        }
+        await deleteConfirmInput.fill(projectName);
+        await deleteProjectButton.click();
+        await expect(page).toHaveURL(/\/dashboard\/projects$/, {
+          timeout: 10_000,
+        });
+      }).toPass({ timeout: 30_000 });
       await expect(
         page.locator(`a[href="/dashboard/projects/${projectSlug}"]`),
         "deleted project should no longer be present in the list"

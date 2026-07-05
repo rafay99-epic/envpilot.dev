@@ -1,7 +1,13 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
-import { getFirstProjectSlug, trackClientErrors } from "./support";
+import {
+  createVariable,
+  deleteVariableByKey,
+  getFirstProjectSlug,
+  trackClientErrors,
+  variableRow,
+} from "./support";
 
 // Authenticated e2e — core Variable lifecycle against a real project:
 // create (multi-env + sensitive), reveal, edit value + description, clear a
@@ -17,10 +23,6 @@ import { getFirstProjectSlug, trackClientErrors } from "./support";
 // self-skip when the Add Variable control isn't available for this role/tier.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
-
-function variableRow(page: Page, key: string): Locator {
-  return page.locator("div.px-6.py-4").filter({ hasText: key });
-}
 
 test.describe.serial("variable lifecycle", () => {
   test("create (multi-env, sensitive), reveal, edit value + description, clear description, duplicate-key rejection, delete", async ({
@@ -55,46 +57,14 @@ test.describe.serial("variable lifecycle", () => {
     const description = `E2E description ${Date.now()}`;
     let created = false;
 
-    async function deleteVariableByKey(k: string): Promise<void> {
-      const row = variableRow(page, k);
-      const deleteButton = row.getByTitle("Delete variable");
-      if (!(await deleteButton.isVisible().catch(() => false))) return;
-      await deleteButton.click();
-      const confirmHeading = page.getByRole("heading", {
-        name: "Delete Variable",
-      });
-      if (await confirmHeading.isVisible().catch(() => false)) {
-        await page.getByRole("button", { name: "Delete", exact: true }).click();
-        await expect(confirmHeading).toBeHidden({ timeout: 15_000 });
-      }
-    }
-
     try {
       // ── A. CREATE: unique key, value, multiple environments, sensitive ──
-      await addButton.click();
-      const createDrawer = page.getByRole("dialog");
-      await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-
-      await createDrawer.locator("#key").fill(key);
-      await createDrawer.locator("#value").fill(initialValue);
-
-      // "development" is pre-selected by default; add "staging" so this
-      // variable spans multiple environments.
-      await createDrawer
-        .getByRole("button", { name: "staging", exact: true })
-        .click();
-
-      await createDrawer
-        .getByRole("checkbox", { name: /mark as sensitive/i })
-        .check();
-
-      await createDrawer
-        .getByRole("button", { name: "Create Variable" })
-        .click();
-      await expect(
-        createDrawer,
-        "create drawer should close on success"
-      ).toBeHidden({ timeout: 15_000 });
+      await createVariable(page, {
+        key,
+        value: initialValue,
+        environments: ["staging"],
+        sensitive: true,
+      });
       created = true;
 
       const row = variableRow(page, key);
@@ -192,9 +162,16 @@ test.describe.serial("variable lifecycle", () => {
       await expect(editDrawer).toBeHidden({ timeout: 10_000 });
 
       // ── D. DUPLICATE-KEY CONFLICT ──
-      await addButton.click();
+      // This flow deliberately expects the submission to FAIL, so it can't
+      // use the resilient createVariable() helper (which waits for
+      // success). Only the drawer-open step is hardened against a dev-mode
+      // remount tearing it down right after the click.
       const dupeDrawer = page.getByRole("dialog");
-      await expect(dupeDrawer).toBeVisible({ timeout: 10_000 });
+      await expect(async () => {
+        if (await dupeDrawer.isVisible().catch(() => false)) return;
+        await addButton.click();
+        await expect(dupeDrawer).toBeVisible({ timeout: 10_000 });
+      }).toPass({ timeout: 30_000 });
 
       await dupeDrawer.locator("#key").fill(key);
       await dupeDrawer.locator("#value").fill(`dupe-${Date.now()}`);
@@ -218,14 +195,14 @@ test.describe.serial("variable lifecycle", () => {
       await expect(dupeDrawer).toBeHidden({ timeout: 10_000 });
 
       // ── E. CLEANUP ──
-      await deleteVariableByKey(key);
+      await deleteVariableByKey(page, key);
       created = false;
       await expect(variableRow(page, key)).toHaveCount(0, {
         timeout: 20_000,
       });
     } finally {
       if (created) {
-        await deleteVariableByKey(key).catch(() => undefined);
+        await deleteVariableByKey(page, key).catch(() => undefined);
       }
     }
 
