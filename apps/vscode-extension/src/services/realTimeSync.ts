@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
-import { ConvexService } from "./convex";
+import { ConvexService, type RevocationEvent, type TokenFetcher } from "./convex";
 import { getConvexUrl, getServerUrl } from "../utils/config";
 import { captureError } from "../utils/sentry";
 import type { LinkedProjectV2 } from "../types";
@@ -17,8 +17,9 @@ export class RealTimeSyncService {
   private convexService: ConvexService | null = null;
   private syncService: SyncService;
   private storage: StorageService;
+  private getFreshToken: TokenFetcher;
   private revocationSubId: string | null = null;
-  private tokenSubIds: string[] = [];
+  private accessSubId: string | null = null;
   private isRunning = false;
   private isProcessingRevocation = false;
   /** Serializes refreshSubscriptions() calls (mirrors sync.ts /
@@ -47,9 +48,14 @@ export class RealTimeSyncService {
 
   readonly onRevocationDetected = this._onRevocationDetected.event;
 
-  constructor(syncService: SyncService, storage: StorageService) {
+  constructor(
+    syncService: SyncService,
+    storage: StorageService,
+    getFreshToken: TokenFetcher
+  ) {
     this.syncService = syncService;
     this.storage = storage;
+    this.getFreshToken = getFreshToken;
   }
 
   /**
@@ -136,7 +142,7 @@ export class RealTimeSyncService {
           this.syncService.setConnectionState("disconnected");
           return;
         }
-        const convexService = new ConvexService(convexUrl);
+        const convexService = new ConvexService(convexUrl, this.getFreshToken);
         this.setConvexService(convexService);
         this.syncService.setConvexService(convexService);
       }
@@ -185,27 +191,17 @@ export class RealTimeSyncService {
     const linkedProjects = await this.storage.getLinkedProjectsV2();
     if (linkedProjects.length === 0) return;
 
-    // Subscribe to revocation events for all access tokens
-    const accessTokens = linkedProjects.map((p) => p.accessToken);
-
-    this.revocationSubId = this.convexService.subscribeToRevocations(
-      accessTokens,
-      (events) => this.handleRevocationEvents(events, linkedProjects)
+    // Identity-scoped revocation events (no access tokens passed). Match each
+    // event to a linked project by projectId.
+    this.revocationSubId = this.convexService.subscribeToRevocations((events) =>
+      this.handleRevocationEvents(events, linkedProjects)
     );
 
-    // Subscribe to token validation for each project
-    for (const project of linkedProjects) {
-      const subId = this.convexService.subscribeToTokenValidation(
-        project.accessToken,
-        (result) => {
-          if (result === null) {
-            // Token is invalid/expired — trigger revocation
-            this.handleTokenInvalid(project);
-          }
-        }
-      );
-      this.tokenSubIds.push(subId);
-    }
+    // Identity-scoped set of the caller's still-active project accesses. When a
+    // linked project drops out of this set, its access has ended.
+    this.accessSubId = this.convexService.subscribeToProjectAccess((records) =>
+      this.handleProjectAccessUpdate(records)
+    );
   }
 
   /**
@@ -219,10 +215,10 @@ export class RealTimeSyncService {
       this.revocationSubId = null;
     }
 
-    for (const subId of this.tokenSubIds) {
-      this.convexService.unsubscribe(subId);
+    if (this.accessSubId) {
+      this.convexService.unsubscribe(this.accessSubId);
+      this.accessSubId = null;
     }
-    this.tokenSubIds = [];
   }
 
   /**
@@ -249,14 +245,7 @@ export class RealTimeSyncService {
    * Deduplicates by access token and processes with a timeout guard.
    */
   private async handleRevocationEvents(
-    events: Array<{
-      accessToken: string;
-      eventId: string;
-      projectId: string;
-      userId: string;
-      reason: string;
-      revokedAt: number;
-    }>,
+    events: RevocationEvent[],
     linkedProjects: LinkedProjectV2[]
   ): Promise<void> {
     if (this.isProcessingRevocation) {
@@ -269,35 +258,26 @@ export class RealTimeSyncService {
         `[RealTimeSync] Detected ${events.length} revocation event(s)`
       );
 
-      const eventIds: string[] = [];
-      // Every revocation event delivered to this extension belongs to the
-      // signed-in user, so any event's userId identifies the acknowledging
-      // user for the backend ownership check.
-      const revocationUserId = events[0]?.userId;
+      // Acknowledge EVERY delivered event id (identity-scoped server-side), so
+      // an event for a project we no longer track locally doesn't loop forever.
+      const eventIds = events.map((e) => e.eventId);
 
-      // Deduplicate events by access token — process each token only once
+      // Deduplicate by projectId — clean up each affected project only once.
       const seen = new Set<string>();
       const deduped = events.filter((e) => {
-        if (seen.has(e.accessToken)) return false;
-        seen.add(e.accessToken);
+        if (seen.has(e.projectId)) return false;
+        seen.add(e.projectId);
         return true;
       });
 
       for (const event of deduped) {
         const project = linkedProjects.find(
-          (p) => p.accessToken === event.accessToken
+          (p) => p.projectId === event.projectId
         );
 
         if (!project) {
           console.warn("[RealTimeSync] Revocation event for unknown project");
           continue;
-        }
-
-        // Collect all event IDs for this token (including duplicates)
-        for (const e of events) {
-          if (e.accessToken === event.accessToken) {
-            eventIds.push(e.eventId);
-          }
         }
 
         // Emit event for UI updates
@@ -319,11 +299,64 @@ export class RealTimeSyncService {
       }
 
       // Acknowledge events with retry (up to 3 attempts)
-      if (eventIds.length > 0 && this.convexService && revocationUserId) {
-        await this.acknowledgeWithRetry(eventIds, revocationUserId, 3);
+      if (eventIds.length > 0 && this.convexService) {
+        await this.acknowledgeWithRetry(eventIds, 3);
       }
 
       // Refresh subscriptions since projects were removed
+      await this.refreshSubscriptions();
+    } finally {
+      this.isProcessingRevocation = false;
+    }
+  }
+
+  /**
+   * React to the caller's live set of active project accesses. Any locally
+   * linked project that is NOT in the active set has had its access end
+   * (expired/revoked out-of-band) — clean it up as if revoked.
+   */
+  private async handleProjectAccessUpdate(
+    records: Array<{ projectId: string }>
+  ): Promise<void> {
+    if (this.isProcessingRevocation) {
+      return;
+    }
+
+    const linkedProjects = await this.storage.getLinkedProjectsV2();
+    if (linkedProjects.length === 0) return;
+
+    const activeProjectIds = new Set(records.map((r) => r.projectId));
+    const orphaned = linkedProjects.filter(
+      (p) => !activeProjectIds.has(p.projectId)
+    );
+    if (orphaned.length === 0) return;
+
+    this.isProcessingRevocation = true;
+    try {
+      for (const project of orphaned) {
+        console.log(
+          `[RealTimeSync] Access ended for project: ${project.projectName}`
+        );
+        this._onRevocationDetected.fire({
+          project,
+          reason: "Access expired or revoked",
+        });
+        await Promise.race([
+          this.triggerRevocationCleanup(
+            project,
+            "Access expired or revoked"
+          ),
+          new Promise<void>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Revocation cleanup timed out")),
+              30000
+            )
+          ),
+        ]).catch((err) => {
+          captureError(err, { phase: "revocation-cleanup-race" });
+          console.error("[RealTimeSync] Cleanup error:", err);
+        });
+      }
       await this.refreshSubscriptions();
     } finally {
       this.isProcessingRevocation = false;
@@ -335,12 +368,11 @@ export class RealTimeSyncService {
    */
   private async acknowledgeWithRetry(
     eventIds: string[],
-    userId: string,
     maxAttempts: number
   ): Promise<void> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.convexService!.acknowledgeRevocations(eventIds, userId);
+        await this.convexService!.acknowledgeRevocations(eventIds);
         return;
       } catch (error) {
         console.debug(
@@ -351,47 +383,6 @@ export class RealTimeSyncService {
           await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
-    }
-  }
-
-  /**
-   * Handle token becoming invalid (detected via WebSocket subscription).
-   */
-  private async handleTokenInvalid(project: LinkedProjectV2): Promise<void> {
-    if (this.isProcessingRevocation) {
-      return;
-    }
-    this.isProcessingRevocation = true;
-
-    try {
-      console.log(
-        `[RealTimeSync] Token invalid for project: ${project.projectName}`
-      );
-
-      this._onRevocationDetected.fire({
-        project,
-        reason: "Access token expired or revoked",
-      });
-
-      await Promise.race([
-        this.triggerRevocationCleanup(
-          project,
-          "Access token expired or revoked"
-        ),
-        new Promise<void>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Revocation cleanup timed out")),
-            30000
-          )
-        ),
-      ]).catch((err) => {
-        captureError(err, { phase: "revocation-cleanup-race" });
-        console.error("[RealTimeSync] Cleanup error:", err);
-      });
-
-      await this.refreshSubscriptions();
-    } finally {
-      this.isProcessingRevocation = false;
     }
   }
 

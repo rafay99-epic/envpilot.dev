@@ -26,7 +26,6 @@ import type {
   LinkedDirectory,
   SyncResult,
   EnvironmentVariable,
-  TokenValidation,
   ConflictCheckResult,
   ConflictStrategy,
   LinkDirectoryOptions,
@@ -67,11 +66,6 @@ export class SyncService {
   /** Serializes refreshSubscriptions() so concurrent callers can't race on
    * subscription-id teardown/setup (mirrors StorageService.metadataWriteQueue). */
   private refreshSubscriptionsQueue: Promise<void> = Promise.resolve();
-  /** Last time updateLastUsed() was called per access token — throttles the
-   * bookkeeping write so it doesn't self-trigger the token-validation
-   * subscription on every sync. */
-  private lastUsedAtByToken = new Map<string, number>();
-  private static readonly UPDATE_LAST_USED_MIN_INTERVAL_MS = 15 * 60 * 1000;
   private connectionState: SyncConnectionState = "disconnected";
   private _onSyncComplete = new vscode.EventEmitter<SyncResult>();
   private _onPermissionRevoked = new vscode.EventEmitter<
@@ -232,55 +226,6 @@ export class SyncService {
   // ============================================
 
   /**
-   * Check all linked projects for permission changes
-   * Returns true if all checks succeeded, false if any failed
-   */
-  async checkAllLinkedProjects(): Promise<boolean> {
-    const linkedProjects = await this.storage.getLinkedProjects();
-    let allSuccessful = true;
-
-    for (const project of linkedProjects) {
-      try {
-        await this.checkProjectPermissions(project);
-      } catch (error) {
-        captureError(error, { phase: "check-linked-projects-v1" });
-        console.error(
-          `Failed to check permissions for ${project.projectName}:`,
-          error
-        );
-        allSuccessful = false;
-      }
-    }
-
-    return allSuccessful;
-  }
-
-  /**
-   * Check if permissions are still valid for a linked project
-   */
-  async checkProjectPermissions(
-    project: LinkedProject
-  ): Promise<TokenValidation> {
-    // Check local expiry first to avoid unnecessary network calls
-    if (project.expiresAt && Date.now() > project.expiresAt) {
-      await this.handlePermissionRevoked(project, "Access token expired");
-      return { valid: false, reason: "Access token expired" };
-    }
-
-    const validation = await this.api.validateAccessToken(project.accessToken);
-
-    if (!validation.valid) {
-      // Permissions have been revoked
-      await this.handlePermissionRevoked(
-        project,
-        validation.reason || "Unknown"
-      );
-    }
-
-    return validation;
-  }
-
-  /**
    * Handle when permissions are revoked
    */
   private async handlePermissionRevoked(
@@ -322,29 +267,12 @@ export class SyncService {
         };
       }
 
-      // Validate token with server
-      const validation = await this.api.validateAccessToken(
-        project.accessToken
-      );
-
-      if (!validation.valid) {
-        await this.handlePermissionRevoked(
-          project,
-          validation.reason || "Unknown"
-        );
-        return {
-          success: false,
-          variablesCount: 0,
-          targetFile: project.targetFile,
-          error: validation.reason,
-        };
-      }
-
-      // Fetch variables
+      // Fetch variables. The server authenticates via the WorkOS JWT and
+      // rejects the request if the caller no longer has access, so a separate
+      // token-validation round trip is unnecessary.
       const variables = await this.api.getVariables(
         project.projectId,
-        project.environment,
-        project.accessToken
+        project.environment
       );
 
       // Write to .env file
@@ -358,9 +286,6 @@ export class SyncService {
           lastSyncedAt: Date.now(),
         }
       );
-
-      // Update last used on server
-      await this.api.updateLastUsed(project.accessToken);
 
       const result: SyncResult = {
         success: true,
@@ -546,25 +471,6 @@ export class SyncService {
   }
 
   /**
-   * Throttle the `updateLastUsed` bookkeeping call — it patches the same
-   * projectAccess document a live token-validation subscription watches, so
-   * calling it on every sync self-triggers a needless Convex read/re-fire.
-   */
-  private maybeUpdateLastUsed(accessToken: string): void {
-    const now = Date.now();
-    const last = this.lastUsedAtByToken.get(accessToken) ?? 0;
-    if (now - last < SyncService.UPDATE_LAST_USED_MIN_INTERVAL_MS) {
-      return;
-    }
-    this.lastUsedAtByToken.set(accessToken, now);
-    void this.api.updateLastUsed(accessToken).catch(() => {
-      // Don't suppress the next attempt for a full throttle window just
-      // because this one failed transiently.
-      this.lastUsedAtByToken.delete(accessToken);
-    });
-  }
-
-  /**
    * Track WebSocket connectivity (set by RealTimeSyncService) so the status
    * bar can surface a silent sync failure instead of going quiet forever.
    */
@@ -714,76 +620,6 @@ export class SyncService {
   // ============================================
   // V2 Methods (multi-directory support)
   // ============================================
-
-  /**
-   * Check all linked projects V2 for permission changes
-   */
-  async checkAllLinkedProjectsV2(): Promise<boolean> {
-    const linkedProjects = await this.storage.getLinkedProjectsV2();
-    let allSuccessful = true;
-
-    for (const project of linkedProjects) {
-      try {
-        await this.checkProjectPermissionsV2(project);
-      } catch (error) {
-        captureError(error, { phase: "check-linked-projects-v2" });
-        console.error(
-          `Failed to check permissions for ${project.projectName}:`,
-          error
-        );
-        allSuccessful = false;
-      }
-    }
-
-    return allSuccessful;
-  }
-
-  /**
-   * Check permissions for a V2 linked project
-   */
-  async checkProjectPermissionsV2(
-    project: LinkedProjectV2
-  ): Promise<TokenValidation> {
-    // Check local expiry first
-    if (project.expiresAt && Date.now() > project.expiresAt) {
-      await this.handlePermissionRevokedV2(project, "Access token expired");
-      return { valid: false, reason: "Access token expired" };
-    }
-
-    const validation = await this.api.validateAccessToken(project.accessToken);
-
-    if (!validation.valid) {
-      await this.handlePermissionRevokedV2(
-        project,
-        validation.reason || "Unknown"
-      );
-    }
-
-    return validation;
-  }
-
-  /**
-   * Handle permission revocation for V2 project
-   */
-  private async handlePermissionRevokedV2(
-    project: LinkedProjectV2,
-    reason: string
-  ): Promise<void> {
-    this._onPermissionRevoked.fire(project);
-
-    // Delete all synced .env files if configured
-    if (shouldPreventCopyOnRevoke()) {
-      await this.cleanupAllDirectories(project);
-    }
-
-    // Remove the linked project
-    await this.storage.removeLinkedProjectV2(project.projectId);
-
-    vscode.window.showWarningMessage(
-      `Access revoked for "${project.projectName}": ${reason}. All synced .env files have been removed.`,
-      "OK"
-    );
-  }
 
   /**
    * Check for existing .env file conflicts across every file this directory
@@ -966,14 +802,13 @@ export class SyncService {
   private async mergeDirectory(
     projectId: string,
     projectName: string,
-    accessToken: string,
     directory: LinkedDirectory
   ): Promise<void> {
     const envToFile = envFileNamesFor(directory);
     const envs = Array.from(envToFile.keys());
 
     const varsByEnv = await Promise.all(
-      envs.map((env) => this.api.getVariables(projectId, env, accessToken))
+      envs.map((env) => this.api.getVariables(projectId, env))
     );
 
     await Promise.all(
@@ -1009,13 +844,9 @@ export class SyncService {
       // round trip is redundant — a revoked token surfaces as an error here.
       const varsByEnv = await Promise.all(
         envs.map((env) =>
-          this.api.getVariables(
-            project.projectId,
-            env,
-            project.accessToken,
-            undefined,
-            { fresh: true }
-          )
+          this.api.getVariables(project.projectId, env, undefined, {
+            fresh: true,
+          })
         )
       );
 
@@ -1063,10 +894,6 @@ export class SyncService {
         project.projectId,
         directory.directoryPath
       );
-
-      // Update last used on server — throttled (see maybeUpdateLastUsed) so
-      // routine syncs don't self-trigger the token-validation subscription.
-      this.maybeUpdateLastUsed(project.accessToken);
 
       return {
         success: true,
@@ -1392,7 +1219,7 @@ export class SyncService {
 
     // Sync the directory
     if (options.conflictStrategy === "merge") {
-      await this.mergeDirectory(projectId, projectName, accessToken, directory);
+      await this.mergeDirectory(projectId, projectName, directory);
       await this.storage.updateDirectorySyncTime(
         projectId,
         directory.directoryPath
@@ -1452,7 +1279,6 @@ export class SyncService {
       await this.mergeDirectory(
         project.projectId,
         project.projectName,
-        project.accessToken,
         directory
       );
       await this.storage.updateDirectorySyncTime(

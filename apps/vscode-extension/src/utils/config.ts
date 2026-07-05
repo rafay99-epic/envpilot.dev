@@ -13,6 +13,26 @@ const DEFAULT_SERVER_URL =
     ? __DEFAULT_SERVER_URL__
     : "http://localhost:3000";
 
+/**
+ * Public WorkOS AuthKit client id and the Convex deployment URL, baked in at
+ * build time via esbuild --define (see scripts/build.mjs). Sourced from the
+ * same env vars the web app uses. The `typeof` guard makes referencing them
+ * safe when the extension is run un-bundled (e.g. tests) — they fall back to
+ * `process.env` / empty.
+ */
+declare const __WORKOS_CLIENT_ID__: string;
+declare const __CONVEX_URL__: string;
+
+const BUILD_WORKOS_CLIENT_ID: string =
+  typeof __WORKOS_CLIENT_ID__ !== "undefined" && __WORKOS_CLIENT_ID__
+    ? __WORKOS_CLIENT_ID__
+    : (process.env.WORKOS_CLIENT_ID ?? "");
+
+const BUILD_CONVEX_URL: string =
+  typeof __CONVEX_URL__ !== "undefined" && __CONVEX_URL__
+    ? __CONVEX_URL__
+    : (process.env.NEXT_PUBLIC_CONVEX_URL ?? "");
+
 export function getConfig(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
 
@@ -58,11 +78,21 @@ export function shouldPreventCopyOnRevoke(): boolean {
 
 /**
  * Get the Convex deployment URL.
- * Checks setting first, then falls back to auto-detection from server.
+ * Prefers the VS Code setting, then the build-time baked URL. Callers still
+ * fall back to `/api/extension/config` auto-detection when this is empty.
  */
 export function getConvexUrl(): string {
   const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-  return config.get<string>("convexUrl", "");
+  return config.get<string>("convexUrl", "") || BUILD_CONVEX_URL;
+}
+
+/**
+ * Public WorkOS AuthKit client id used for the device authorization flow and
+ * token refresh. Baked in at build time; safe to embed (same value the browser
+ * app exposes).
+ */
+export function getWorkosClientId(): string {
+  return BUILD_WORKOS_CLIENT_ID;
 }
 
 export function isCommitGuardEnabled(): boolean {

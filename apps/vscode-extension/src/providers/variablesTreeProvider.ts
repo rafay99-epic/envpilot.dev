@@ -90,8 +90,7 @@ export class VariablesTreeProvider implements vscode.TreeDataProvider<VariableTr
       // server decrypt every variable from the vault just to render names.
       const variables = await this.api.getVariablesMetadata(
         linkedProject.projectId,
-        env,
-        linkedProject.accessToken
+        env
       );
 
       if (variables.length === 0) {
