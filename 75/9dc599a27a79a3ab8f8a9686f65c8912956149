@@ -1,0 +1,141 @@
+apps/web/src/app/api/variables/[id]/route.ts
+  s_8ac05b3f82c26d::t_835682f0b5b10a 107-113
+  s_8ac05b3f82c26d::t_af87379155e305 328-333
+  s_8ac05b3f82c26d::t_7f3c69d4948a39 208-220
+  s_8ac05b3f82c26d::t_13e511b67d3823 83-87
+apps/web/src/app/api/variables/bulk-delete/route.ts
+  s_8ac05b3f82c26d::t_5b7909e56b619a 70-75
+apps/web/src/components/dashboard/shared-secrets-widget.tsx
+  s_8ac05b3f82c26d::t_a72b347d61d426 28-30
+apps/web/src/app/api/extension/variables/route.ts
+  s_8ac05b3f82c26d::t_71ce51da377827 11,13
+  s_8ac05b3f82c26d::t_b1cca97c9d5b54 138-141
+  s_8ac05b3f82c26d::t_7ecc274d4dd88e 47-52
+  s_8ac05b3f82c26d::t_4eea0d7ddd761c 144-146,148,150
+  s_8ac05b3f82c26d::t_95436e8531eb36 163-167
+  s_8ac05b3f82c26d::t_d96ddd2ab099f3 272-273
+  s_8ac05b3f82c26d::t_92756b51608fe5 75-76
+apps/web/src/hooks/useGlobalSearch.ts
+  s_8ac05b3f82c26d::t_2128c0d2ef987c 25-26
+  s_8ac05b3f82c26d::t_6ec021ba0e935d 27
+apps/web/src/app/api/variables/route.ts
+  s_8ac05b3f82c26d::t_b13ff76c0a80c5 81-85
+  s_8ac05b3f82c26d::t_fe3efc8e1ae23b 166-178
+apps/web/src/app/api/variables/[id]/history/route.ts
+  s_8ac05b3f82c26d::t_358b080aac76ed 69-73
+  s_8ac05b3f82c26d::t_12da02ca9bc0cc 87-93
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_8ac05b3f82c26d::t_a2634f386c5b6a 84-85,87
+apps/web/src/app/api/projects/[id]/import/route.ts
+  s_8ac05b3f82c26d::t_039947b68fe2e5 238
+  s_8ac05b3f82c26d::t_d3aed8c857bc37 253
+  s_8ac05b3f82c26d::t_7c6248077fffff 209-212
+  s_8ac05b3f82c26d::t_f4c46198557019 267
+convex/sharedSecrets.ts
+  s_8ac05b3f82c26d::t_2756e896ba4435 1073
+  s_8ac05b3f82c26d::t_67b1cd39ace12c 467
+  s_8ac05b3f82c26d::t_944ab35cec2448 410,417
+  s_8ac05b3f82c26d::t_955fdb6102fdba 976,982
+  s_8ac05b3f82c26d::t_79ddb6d38bb5bb 1047,1055
+  s_8ac05b3f82c26d::t_d23bcfe0fe3ade 849,856,861,868
+  s_8ac05b3f82c26d::t_b6288bac095c89 437
+  s_8ac05b3f82c26d::t_4f82587c651591 1001
+  s_8ac05b3f82c26d::t_343bbbb015a2a6 6
+  s_8ac05b3f82c26d::t_a2fb37ef8f57fc 457
+  s_8ac05b3f82c26d::t_8e5a3bb794fde5 516
+  s_8ac05b3f82c26d::t_f56c22160359bb 883,891
+  s_8ac05b3f82c26d::t_ad08d6b0db7fc3 924,930
+  s_8ac05b3f82c26d::t_a1e5cdae4d266b 543
+apps/web/src/app/api/shares/route.ts
+  s_8ac05b3f82c26d::t_1b99f87253cab1 179-184
+  s_8ac05b3f82c26d::t_73a852963c9b6c 3
+  s_8ac05b3f82c26d::t_27dcd6247c93d9 156
+  s_8ac05b3f82c26d::t_ea77454ccdd093 43
+  s_8ac05b3f82c26d::t_6e13536590dac3 83-105
+convex/variables.ts
+  s_8ac05b3f82c26d::t_f15648c3681f73 483,494
+  s_8ac05b3f82c26d::t_9c4c3570058920 162
+  s_8ac05b3f82c26d::t_7f3d623760eee9 1966
+  s_8ac05b3f82c26d::t_dcab119d47f25a 705,719
+  s_8ac05b3f82c26d::t_d3bb7df073b4bd 539-542
+  s_8ac05b3f82c26d::t_185ac847ad16fe 543-546
+  s_8ac05b3f82c26d::t_804f12ee8667c7 278,285
+  s_8ac05b3f82c26d::t_56136c9dc7969a 926
+  s_8ac05b3f82c26d::t_c1ea35a0745f0d 2131,2141,2150
+  s_8ac05b3f82c26d::t_3dbbf2d2244d90 2255
+  s_8ac05b3f82c26d::t_8f063a5dfa59b5 742,764
+  s_8ac05b3f82c26d::t_394a184bf53bf1 1019,1026
+  s_8ac05b3f82c26d::t_cfb19f08d46399 1837,1839-1841,1843-1856,1865
+  s_8ac05b3f82c26d::t_afbb0791571dd6 2039,2047
+  s_8ac05b3f82c26d::t_f741044afb881b 2085
+  s_8ac05b3f82c26d::t_5560459a43adde 2112
+  s_8ac05b3f82c26d::t_5e24b8cf114d46 1946
+  s_8ac05b3f82c26d::t_04a26e817c7878 2167,2169,2182,2195,2201
+  s_8ac05b3f82c26d::t_6e36e51e8b2e2b 1740,1742-1751,1753-1757,1761-1762,1764-1768,1770-1774,1776-1779,1781-1784,1786-1788
+  s_8ac05b3f82c26d::t_b28723f97c6266 134,139
+  s_8ac05b3f82c26d::t_3c31c44f210cce 654,656-665,667-676
+  s_8ac05b3f82c26d::t_720777c477aaf4 1994,2008
+  s_8ac05b3f82c26d::t_efeae54e733aba 385
+  s_8ac05b3f82c26d::t_304ee2cfe34bac 308
+  s_8ac05b3f82c26d::t_9dbd397dfd2731 1194
+  s_8ac05b3f82c26d::t_5989ad83a0c35c 1934
+  s_8ac05b3f82c26d::t_c84935a0ef480f 1890
+  s_8ac05b3f82c26d::t_6c4cd23c707c99 3-9,12
+  s_8ac05b3f82c26d::t_6f2c0255cfb5cd 344
+  s_8ac05b3f82c26d::t_84afd631dd0054 1248-1249,1251-1262,1264-1267
+  s_8ac05b3f82c26d::t_649a3f2d403878 1459,1461-1470,1472-1478,1480-1485,1489-1490,1492-1511
+  s_8ac05b3f82c26d::t_3abfc3050fb1f6 185
+  s_8ac05b3f82c26d::t_e8e4d9d1092d67 2228,2233
+  s_8ac05b3f82c26d::t_18273bef72aae7 548-554,556-558,560-561,563-577,579,581-612,614-616,618-625,627-628,630-632,634-645,647-651,653,1269-1304,1306-1311,1313-1315,1318,1321-1324,1327-1345,1347,1349-1353,1355-1357,1360-1363,1365-1366,1369,1371-1376,1378-1380,1382-1396,1398-1440,1442-1448,1452-1456,1458,1513-1516,1518-1521,1523-1525,1527-1546,1550-1553,1555,1557-1560,1562,1564-1579,1581-1586,1589-1596,1599,1601,1605,1607-1608,1610-1612,1615-1621,1624,1626-1661,1663-1684,1686-1694,1697,1699-1727,1729-1739,1789-1799,1801-1816,1818,1820-1834,1836
+  s_8ac05b3f82c26d::t_00a1b1a17f5e7c 1512
+apps/web/src/hooks/useExpiringVariables.ts
+  s_8ac05b3f82c26d::t_442d02958ba921 11-13
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_8ac05b3f82c26d::t_bdc2e50cff23ef 178-180
+apps/web/src/hooks/useVariables.ts
+  s_8ac05b3f82c26d::t_33e13817634aed 53-55
+  s_8ac05b3f82c26d::t_5c0aab5a276608 68-70
+  s_8ac05b3f82c26d::t_ef9ebe28d0ff0e 22-24
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_8ac05b3f82c26d::t_e982149d91729a 364-366
+apps/web/src/app/api/shares/[token]/revoke/route.ts
+  s_8ac05b3f82c26d::t_8b208151c7d4e3 3
+  s_8ac05b3f82c26d::t_b975f8a6fdd30a 18,33-40
+apps/web/src/app/api/variables/[id]/rollback/route.ts
+  s_8ac05b3f82c26d::t_812d5679317706 90-92
+apps/web/src/hooks/useDashboard.ts
+  s_8ac05b3f82c26d::t_6cc21e3c87d486 37-39
+apps/web/src/app/api/cli/variables/fingerprint/route.ts
+  s_8ac05b3f82c26d::t_d72107605391c8 83-84
+  s_8ac05b3f82c26d::t_18273bef72aae7 85-86
+apps/web/src/app/api/projects/[id]/export/route.ts
+  s_8ac05b3f82c26d::t_0150865d33b80d 109-114
+apps/web/src/app/api/cli/variables/bulk/route.ts
+  s_8ac05b3f82c26d::t_bea128d4f13344 142-143
+  s_8ac05b3f82c26d::t_90adb3e50e190f 161-162
+  s_8ac05b3f82c26d::t_774119487638a2 194-195
+apps/web/src/components/variables/recently-deleted.tsx
+  s_8ac05b3f82c26d::t_13fc53283efd17 57-59
+  s_8ac05b3f82c26d::t_a708545d6a41e3 86-87
+apps/web/src/app/api/cli/variables/route.ts
+  s_8ac05b3f82c26d::t_5e39b772364ffc 86-87
+  s_8ac05b3f82c26d::t_18273bef72aae7 88-89
+  s_8ac05b3f82c26d::t_b15d89670e29c8 160-161
+  s_8ac05b3f82c26d::t_92fee7c38da879 313-314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "759dc599a27a79a3ab8f8a9686f65c8912956149",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
