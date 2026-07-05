@@ -1,0 +1,19 @@
+apps/web/tests/e2e/authenticated/support.ts
+  s_53bfe4b41edb34::t_c043b60019d1b3 167-173,228-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "751c5f11019a6f645a745568ccabe4282ee5c0a3",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
