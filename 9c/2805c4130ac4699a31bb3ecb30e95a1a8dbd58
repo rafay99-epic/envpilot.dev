@@ -1,0 +1,30 @@
+apps/web/src/app/api/tags/route.ts
+  s_8ac05b3f82c26d::t_64c6234d3238b0 51-52
+apps/web/src/app/api/extension/link/route.ts
+  s_8ac05b3f82c26d::t_b2b28ba26800d4 31-40
+  s_8ac05b3f82c26d::t_e093fbea0788f0 65
+  s_8ac05b3f82c26d::t_d86dccceebeabf 78
+apps/web/src/app/api/extension/projects/[id]/route.ts
+  s_8ac05b3f82c26d::t_7c92ba0884d3a4 26-35,49
+convex/projectAccess.ts
+  s_8ac05b3f82c26d::t_a4d854831348db 327-337
+  s_8ac05b3f82c26d::t_0f6424edefdc86 13-18,22-23,26
+convex/projects.ts
+  s_8ac05b3f82c26d::t_a79fd8b10e4237 82-88,90-95,97,99-104,106-107,109-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9c2805c4130ac4699a31bb3ecb30e95a1a8dbd58",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
