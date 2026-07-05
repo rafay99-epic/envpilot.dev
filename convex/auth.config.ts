@@ -1,33 +1,41 @@
 /**
- * Convex auth provider configuration — WorkOS AuthKit.
+ * Convex auth provider configuration — WorkOS AuthKit (ACTIVE).
  *
- * ⚠️ INERT PLACEHOLDER. This file intentionally registers NO auth providers
- * right now, so it does not force any function to require auth and every
- * existing function keeps accepting a client-supplied `userId` arg exactly as
- * before. `ctx.auth.getUserIdentity()` returns `null` for all current callers.
+ * Convex verifies WorkOS-issued JWTs against these providers and surfaces the
+ * verified identity to functions via `ctx.auth.getUserIdentity()`, whose
+ * `subject` is the WorkOS user id (`user_...`) — the join key for
+ * `users.workosId` used by convex/identity.ts.
  *
- * It must stay free of `process.env` references: the Convex CLI statically
- * scans this file at push time and REJECTS the deployment if any env var it
- * references is unset — which would block every `convex dev`/`convex deploy`
- * push until the WorkOS JWT vars exist. Keeping it env-free keeps pushes green.
+ * Two providers because WorkOS issues tokens under two issuers (per the
+ * official Convex + AuthKit guide, docs.convex.dev/auth/authkit):
+ *  - `https://api.workos.com/` — carries an `aud` claim, so `applicationID`
+ *    pins it to this app's client id.
+ *  - `https://api.workos.com/user_management/<client id>` — AuthKit session
+ *    access tokens. No `aud` claim, but the issuer itself embeds the client
+ *    id, so tokens are already application-scoped.
  *
- * ── Activating auth (the cutover, step 1) ──────────────────────────────────
- * When you are ready to bind functions to server-verified identity:
- *   1. Create the WorkOS JWT template (see docs/CONVEX_AUTH_MIGRATION.md).
- *   2. Set WORKOS_JWT_ISSUER and WORKOS_CONVEX_APPLICATION_ID in the Convex
- *      deployment: `npx convex env set WORKOS_JWT_ISSUER <issuer-url>` etc.
- *   3. Replace the empty `providers` below with:
- *        providers: [
- *          {
- *            domain: process.env.WORKOS_JWT_ISSUER,
- *            applicationID: process.env.WORKOS_CONVEX_APPLICATION_ID,
- *          },
- *        ]
- *      `domain` is the issuer/JWKS URL Convex uses to fetch signing keys;
- *      `applicationID` is the expected `aud` claim.
- *
- * The full ordered cutover plan lives in docs/CONVEX_AUTH_MIGRATION.md.
+ * ⚠️ WORKOS_CLIENT_ID must be set in the Convex deployment BEFORE this file
+ * is pushed (`npx convex env set WORKOS_CLIENT_ID client_...`) — the Convex
+ * CLI statically scans this file at push time and rejects the deployment if a
+ * referenced env var is unset. Set it on prod before the first prod deploy of
+ * this config.
  */
+const clientId = process.env.WORKOS_CLIENT_ID;
+
 export default {
-  providers: [],
+  providers: [
+    {
+      type: "customJwt",
+      issuer: "https://api.workos.com/",
+      algorithm: "RS256",
+      jwks: `https://api.workos.com/sso/jwks/${clientId}`,
+      applicationID: clientId,
+    },
+    {
+      type: "customJwt",
+      issuer: `https://api.workos.com/user_management/${clientId}`,
+      algorithm: "RS256",
+      jwks: `https://api.workos.com/sso/jwks/${clientId}`,
+    },
+  ],
 };

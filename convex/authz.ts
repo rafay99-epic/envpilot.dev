@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { requireAuthedUser } from "./identity";
 
 // ─── Unified role model ───────────────────────────────────────────────────────
 //
@@ -676,7 +677,6 @@ export async function getAccountAccess(
 
 export const getMyPermissions = query({
   args: {
-    userId: v.id("users"),
     organizationId: v.id("organizations"),
     projectId: v.optional(v.id("projects")),
   },
@@ -692,11 +692,15 @@ export const getMyPermissions = query({
     actions: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
+    // Actor comes from the verified AuthKit JWT, never from an arg — a caller
+    // can no longer ask for someone else's permission set.
+    const actor = await requireAuthedUser(ctx);
+
     // 1. Resolve org membership
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
       )
       .first();
 
@@ -733,7 +737,7 @@ export const getMyPermissions = query({
         const pm = await ctx.db
           .query("projectMembers")
           .withIndex("by_project_and_user", (q) =>
-            q.eq("projectId", args.projectId!).eq("userId", args.userId)
+            q.eq("projectId", args.projectId!).eq("userId", actor._id)
           )
           .first();
 

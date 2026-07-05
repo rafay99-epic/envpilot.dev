@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -41,7 +41,7 @@ interface RouteParams {
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -59,8 +59,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       project.organizationId
     );
 
@@ -98,11 +97,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // team_lead — Convex enforces project-assignment scoping for non-owners).
     let assignableMembers = null;
     if (roleLevel(membership.role) >= ROLE_LEVEL.team_lead) {
-      assignableMembers = await convex.query(
+      assignableMembers = await createAuthedConvexClient(accessToken!).query(
         api.projectMembers.getAssignableOrgMembers,
         {
           projectId: id as Id<"projects">,
-          requestingUserId: convexUser._id,
         }
       );
     }
@@ -123,7 +121,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -142,15 +140,17 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const membershipId = await convex.mutation(api.projectMembers.addMember, {
-      projectId: id as Id<"projects">,
-      userId: validation.data.userId as Id<"users">,
-      // Developer environment scope — omitted means unrestricted.
-      ...(validation.data.environments
-        ? { environments: validation.data.environments }
-        : {}),
-      addedBy: convexUser._id,
-    });
+    const membershipId = await createAuthedConvexClient(accessToken!).mutation(
+      api.projectMembers.addMember,
+      {
+        projectId: id as Id<"projects">,
+        userId: validation.data.userId as Id<"users">,
+        // Developer environment scope — omitted means unrestricted.
+        ...(validation.data.environments
+          ? { environments: validation.data.environments }
+          : {}),
+      }
+    );
 
     return NextResponse.json({ membershipId }, { status: 201 });
   } catch (error) {
@@ -169,7 +169,7 @@ export async function POST(request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -190,14 +190,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     // Authorization (actor can manage target, target must be a developer)
     // is enforced in the Convex mutation.
-    await convex.mutation(api.projectMembers.setMemberEnvironments, {
-      projectId: id as Id<"projects">,
-      userId: validation.data.userId as Id<"users">,
-      requestingUserId: convexUser._id,
-      ...(validation.data.environments
-        ? { environments: validation.data.environments }
-        : {}),
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.projectMembers.setMemberEnvironments,
+      {
+        projectId: id as Id<"projects">,
+        userId: validation.data.userId as Id<"users">,
+        ...(validation.data.environments
+          ? { environments: validation.data.environments }
+          : {}),
+      }
+    );
 
     return NextResponse.json({ updated: true });
   } catch (error) {
@@ -211,7 +213,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
  */
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -230,11 +232,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    await convex.mutation(api.projectMembers.removeMember, {
-      projectId: id as Id<"projects">,
-      userId: targetUserIdParam as Id<"users">,
-      removedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.projectMembers.removeMember,
+      {
+        projectId: id as Id<"projects">,
+        userId: targetUserIdParam as Id<"users">,
+      }
+    );
 
     return NextResponse.json({ removed: true });
   } catch (error) {

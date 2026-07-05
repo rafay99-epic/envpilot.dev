@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -28,7 +28,7 @@ interface RouteContext {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -45,12 +45,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { action, reviewReason, environments } = validation.data;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
     const requestId = id as Id<"environmentVariableRequests">;
 
-    const existingRequest = await convex.query(api.variableRequests.getById, {
+    const existingRequest = await authed.query(api.variableRequests.getById, {
       requestId,
-      userId: convexUser._id,
     });
 
     if (!existingRequest) {
@@ -61,23 +62,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (action === "cancel") {
-      await convex.mutation(api.variableRequests.cancel, {
+      await authed.mutation(api.variableRequests.cancel, {
         requestId,
-        canceledBy: convexUser._id,
       });
     } else {
-      await convex.mutation(api.variableRequests.review, {
+      await authed.mutation(api.variableRequests.review, {
         requestId,
-        reviewedBy: convexUser._id,
         action,
         reviewReason,
         environments: action === "approve" ? environments : undefined,
       });
     }
 
-    const updatedRequest = await convex.query(api.variableRequests.getById, {
+    const updatedRequest = await authed.query(api.variableRequests.getById, {
       requestId,
-      userId: convexUser._id,
     });
 
     return NextResponse.json({ request: updatedRequest });

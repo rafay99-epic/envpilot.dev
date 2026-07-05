@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -32,7 +32,7 @@ const createTagSchema = z.object({
  */
 export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -48,12 +48,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
-    // Verify membership
+    // Verify membership — identity is derived server-side from the JWT, so no
+    // user sync is needed before the check.
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId as Id<"organizations">
     );
 
@@ -76,7 +74,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -106,8 +104,7 @@ export async function POST(request: Request) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId as Id<"organizations">
     );
 

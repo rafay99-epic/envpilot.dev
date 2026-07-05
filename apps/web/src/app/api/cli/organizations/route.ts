@@ -5,6 +5,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   getUserOrganizations,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { normalizeOrgRole, toLegacyOrgRole } from "@/lib/roles";
 import { reportApiError } from "@/lib/api-errors";
@@ -22,7 +23,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const organizations = await getUserOrganizations(convex, authResult.userId);
+    // Bearer token the request already authenticated with — the ForToken
+    // Convex variant resolves identity from it server-side.
+    const token = extractBearerToken(request)!;
+    const organizations = await getUserOrganizations(convex, token);
 
     // Get tiers for all organizations from organizationTiers table
     const orgTiers = await Promise.all(

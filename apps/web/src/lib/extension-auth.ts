@@ -9,6 +9,13 @@ const log = createLogger("lib/extension-auth");
 
 interface ExtensionAuthResult {
   convexUser: Doc<"users">;
+  /**
+   * The raw bearer token the request authenticated with, when present. Passed
+   * to `*ForToken` Convex variants so identity is re-derived server-side. Null
+   * only on the session-cookie fallback path (which does not apply to the
+   * bearer-only extension data routes).
+   */
+  accessToken: string | null;
 }
 
 /**
@@ -63,7 +70,7 @@ async function authenticateByToken(
       return null;
     }
 
-    return { convexUser: user };
+    return { convexUser: user, accessToken: token };
   } catch (error) {
     log.error("token_auth_failed", { token: tokenPrefix(token) }, error);
     return null;
@@ -77,5 +84,5 @@ async function authenticateBySession(): Promise<ExtensionAuthResult | null> {
   }
 
   const convexUser = await getOrCreateConvexUser(convex, user);
-  return { convexUser };
+  return { convexUser, accessToken: null };
 }

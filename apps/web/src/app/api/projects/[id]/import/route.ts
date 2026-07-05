@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -25,7 +25,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -88,13 +88,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get or create Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Check org membership and role
-    const membership = await convex.query(api.organizations.getMembership, {
+    const membership = await authed.query(api.organizations.getMembership, {
       organizationId: project.organizationId,
-      userId: convexUser._id,
     });
 
     if (!membership) {
@@ -167,13 +167,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             projectId: id,
           });
 
-          await convex.mutation(api.variableRequests.create, {
+          await authed.mutation(api.variableRequests.create, {
             key,
             vaultRef: vaultResult.id,
             environments: [environment],
             projectId: id as Id<"projects">,
             isSensitive: false,
-            requestedBy: convexUser._id,
           });
           requested++;
         } catch (requestError) {
@@ -229,10 +228,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             projectId: id,
           });
 
-          await convex.mutation(api.variables.update, {
+          await authed.mutation(api.variables.update, {
             variableId: existing._id,
             vaultRef: vaultResult.id,
-            updatedBy: convexUser._id,
             changeReason: `Updated via ${format} import`,
           });
           updated++;
@@ -245,13 +243,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           projectId: id,
         });
 
-        await convex.mutation(api.variables.create, {
+        await authed.mutation(api.variables.create, {
           key,
           vaultRef: vaultResult.id,
           environments: [environment],
           projectId: id as Id<"projects">,
           isSensitive: false,
-          createdBy: convexUser._id,
         });
         created++;
       }
@@ -260,9 +257,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // In replace mode, delete remaining existing variables
     if (mode === "replace") {
       for (const [, variable] of existingByKey) {
-        await convex.mutation(api.variables.remove, {
+        await authed.mutation(api.variables.remove, {
           variableId: variable._id,
-          deletedBy: convexUser._id,
         });
         deleted++;
       }

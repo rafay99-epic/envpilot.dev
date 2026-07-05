@@ -1,7 +1,7 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { AuthUser, Organization } from "@/lib/auth";
@@ -35,9 +35,10 @@ export async function GET(request: Request) {
       profilePictureUrl: user.profilePictureUrl ?? null,
     });
 
-    const organizations = (await convex.query(api.organizations.listForUser, {
-      userId: convexUser._id,
-    })) as OrganizationWithMembershipRole[];
+    const organizations = (await createAuthedConvexClient(accessToken!).query(
+      api.organizations.listForUser,
+      {}
+    )) as OrganizationWithMembershipRole[];
 
     const url = new URL(request.url);
     const organizationIdFromQuery = url.searchParams.get("organizationId");
@@ -79,11 +80,11 @@ export async function GET(request: Request) {
             ),
           })
         : Promise.resolve([]),
-      activeOrganization
-        ? convex.query(api.authz.getMyPermissions, {
-            userId: convexUser._id,
-            organizationId: activeOrganization._id as Id<"organizations">,
-          })
+      activeOrganization && accessToken
+        ? createAuthedConvexClient(accessToken).query(
+            api.authz.getMyPermissions,
+            { organizationId: activeOrganization._id as Id<"organizations"> }
+          )
         : Promise.resolve({ actions: [] }),
     ]);
 

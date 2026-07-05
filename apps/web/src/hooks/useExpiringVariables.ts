@@ -8,7 +8,9 @@ export function useExpiringVariables(
 ) {
   const data = useQuery(
     api.variables.listExpiringVariables,
-    organizationId && userId ? { organizationId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    organizationId && userId ? { organizationId } : "skip"
   );
   return { variables: data ?? [], isLoading: data === undefined };
 }

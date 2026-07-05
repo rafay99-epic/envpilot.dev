@@ -53,12 +53,14 @@ export function useFeatureCategories() {
  */
 export function useHasVoted(
   featureRequestId: Id<"featureRequests"> | undefined,
-  userId?: Id<"users">,
+  _userId?: Id<"users">,
   voterEmail?: string
 ) {
+  // Identity (for signed-in voters) is derived server-side from the attached
+  // JWT; only the anonymous `voterEmail` fallback is still passed.
   return useQuery(
     api.featureRequests.hasVoted,
-    featureRequestId ? { featureRequestId, userId, voterEmail } : "skip"
+    featureRequestId ? { featureRequestId, voterEmail } : "skip"
   );
 }
 

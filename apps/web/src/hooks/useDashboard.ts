@@ -14,7 +14,9 @@ export function useProjects(
 ) {
   const projects = useQuery(
     api.projects.listWithStats,
-    organizationId ? { organizationId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    organizationId && userId ? { organizationId } : "skip"
   );
 
   return {
@@ -34,7 +36,9 @@ export function useVariables(
 ) {
   const variables = useQuery(
     api.variables.listOrgVariablesWithAccess,
-    organizationId && userId ? { organizationId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    organizationId && userId ? { organizationId } : "skip"
   );
 
   return {
@@ -71,7 +75,9 @@ export function useRecentActivity(
 ) {
   const activity = useQuery(
     api.dashboard.getRecentActivity,
-    organizationId && userId ? { organizationId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    organizationId && userId ? { organizationId } : "skip"
   );
 
   return {

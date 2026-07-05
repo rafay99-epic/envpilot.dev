@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import {
@@ -29,7 +29,7 @@ const createOrgSchema = z.object({
  */
 export async function GET() {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -61,9 +61,10 @@ export async function GET() {
       );
     }
 
-    const organizations = await convex.query(api.organizations.listForUser, {
-      userId: convexUser._id,
-    });
+    const organizations = await createAuthedConvexClient(accessToken!).query(
+      api.organizations.listForUser,
+      {}
+    );
 
     return NextResponse.json({ organizations });
   } catch (error) {
@@ -81,7 +82,7 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -124,11 +125,12 @@ export async function POST(request: Request) {
 
     const { name, slug, description } = validation.data;
 
-    const organizationId = await convex.mutation(api.organizations.create, {
+    const organizationId = await createAuthedConvexClient(
+      accessToken!
+    ).mutation(api.organizations.create, {
       name,
       slug,
       description,
-      createdBy: convexUser._id,
     });
 
     const organization = await convex.query(api.organizations.getById, {

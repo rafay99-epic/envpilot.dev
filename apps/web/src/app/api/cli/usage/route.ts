@@ -8,6 +8,7 @@ import {
   forbiddenResponse,
   checkCLIAccess,
   tierLimitResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -33,10 +34,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: organizationId as Id<"organizations">,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");

@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getPolarClient, isPaymentsEnabled } from "@/lib/polar";
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -111,12 +111,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify checkout is allowed (user is admin, no active subscription)
-    const checkoutData = await convex.mutation(
+    // Verify checkout is allowed (user is owner, no active subscription).
+    // Identity is derived server-side from the attached JWT.
+    const checkoutData = await createAuthedConvexClient(accessToken!).mutation(
       api.subscriptions.prepareCheckout,
       {
         organizationId: organizationId as Id<"organizations">,
-        userId: convexUser._id,
       }
     );
 

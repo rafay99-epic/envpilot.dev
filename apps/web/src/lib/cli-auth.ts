@@ -219,14 +219,17 @@ export async function checkExtensionAccess(
 }
 
 /**
- * Get user's organizations for CLI
+ * Get the bearer-authenticated user's organizations for CLI. Identity is
+ * resolved inside Convex from the validated bearer token, so the route passes
+ * the raw token it already holds.
  */
 export async function getUserOrganizations(
   convex: ConvexHttpClient,
-  userId: Id<"users">
+  accessToken: string
 ): Promise<Array<Doc<"organizations"> & { role: string }>> {
-  const memberships = await convex.query(api.organizations.listForUser, {
-    userId,
-  });
+  const memberships = await convex.query(
+    api.organizations.listForUserForToken,
+    { accessToken }
+  );
   return memberships as Array<Doc<"organizations"> & { role: string }>;
 }

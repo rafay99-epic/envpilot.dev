@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { batchGetUsers } from "./helpers";
 import { resolveFeatureValue } from "./featureRegistry";
 import { normalizeOrgRole } from "./authz";
+import { requireAuthedUser } from "./identity";
 
 /**
  * Dashboard Statistics Queries
@@ -132,14 +133,15 @@ export const getStats = query({
 export const getRecentActivity = query({
   args: {
     organizationId: v.id("organizations"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Require org membership before surfacing any activity.
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
       )
       .first();
     if (!membership) return [];
@@ -152,7 +154,7 @@ export const getRecentActivity = query({
     if (orgRole === "developer") {
       const assignments = await ctx.db
         .query("projectMembers")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .withIndex("by_user", (q) => q.eq("userId", actor._id))
         .collect();
       assignedProjectIds = new Set(
         assignments.map((pm) => pm.projectId as string)

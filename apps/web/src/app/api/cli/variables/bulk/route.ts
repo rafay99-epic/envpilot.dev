@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import {
@@ -53,11 +54,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const token = extractBearerToken(request)!;
+
     // Check membership and role
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
     // blocked; grant-only users (per-variable viewer sharing) get the
     // strict read-only treatment old clients expect.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -133,12 +139,12 @@ export async function POST(request: NextRequest) {
             );
             const vaultRef = vaultResult.id;
 
-            await convex.mutation(api.variables.update, {
+            await convex.mutation(api.variables.updateForToken, {
+              accessToken: token,
               variableId: existing._id,
               vaultRef,
               description: variable.description,
               isSensitive: variable.isSensitive,
-              updatedBy: authResult.userId,
               changeReason: "Updated via CLI push",
             });
 
@@ -152,14 +158,14 @@ export async function POST(request: NextRequest) {
           });
           const vaultRef = vaultResult.id;
 
-          await convex.mutation(api.variables.create, {
+          await convex.mutation(api.variables.createForToken, {
+            accessToken: token,
             key: variable.key,
             vaultRef,
             description: variable.description,
             environments: [environment],
             projectId: projectId as Id<"projects">,
             isSensitive: variable.isSensitive ?? false,
-            createdBy: authResult.userId,
           });
 
           created++;
@@ -185,9 +191,9 @@ export async function POST(request: NextRequest) {
     if (mode === "replace") {
       for (const [key, variable] of existingByKey) {
         try {
-          await convex.mutation(api.variables.remove, {
+          await convex.mutation(api.variables.removeForToken, {
+            accessToken: token,
             variableId: variable._id,
-            deletedBy: authResult.userId,
           });
           deleted++;
         } catch (error) {

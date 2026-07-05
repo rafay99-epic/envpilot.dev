@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -38,7 +38,7 @@ interface RouteContext {
  */
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -70,8 +70,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -81,13 +80,11 @@ export async function GET(request: Request, context: RouteContext) {
 
     // Developers can only view variables they hold a grant on.
     if (normalizeOrgRole(membership.role) === "developer") {
-      const accessibleVariables = await convex.query(
-        api.variables.listWithAccess,
-        {
-          projectId: variable.projectId,
-          userId: convexUser._id,
-        }
-      );
+      const accessibleVariables = await createAuthedConvexClient(
+        accessToken!
+      ).query(api.variables.listWithAccess, {
+        projectId: variable.projectId,
+      });
 
       const canAccessVariable = accessibleVariables.some(
         (entry) => entry._id === variable._id && entry.hasAccess
@@ -107,11 +104,13 @@ export async function GET(request: Request, context: RouteContext) {
 
     let history = null;
     if (includeHistory) {
-      history = await convex.query(api.variables.getVersionHistory, {
-        variableId: id as Id<"environmentVariables">,
-        userId: convexUser._id,
-        limit: 50,
-      });
+      history = await createAuthedConvexClient(accessToken!).query(
+        api.variables.getVersionHistory,
+        {
+          variableId: id as Id<"environmentVariables">,
+          limit: 50,
+        }
+      );
     }
 
     return NextResponse.json({ variable, history });
@@ -129,7 +128,7 @@ export async function GET(request: Request, context: RouteContext) {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -170,8 +169,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -207,17 +205,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     try {
-      await convex.mutation(api.variables.update, {
-        variableId: id as Id<"environmentVariables">,
-        vaultRef,
-        description,
-        environments,
-        isSensitive,
-        updatedBy: convexUser._id,
-        changeReason,
-        rotationFrequencyDays,
-        tagIds: tagIds as Id<"variableTags">[] | undefined,
-      });
+      await createAuthedConvexClient(accessToken!).mutation(
+        api.variables.update,
+        {
+          variableId: id as Id<"environmentVariables">,
+          vaultRef,
+          description,
+          environments,
+          isSensitive,
+          changeReason,
+          rotationFrequencyDays,
+          tagIds: tagIds as Id<"variableTags">[] | undefined,
+        }
+      );
     } catch (mutationError) {
       // The mutation performs write authorization and validation — if it
       // rejects, the freshly minted vault object is referenced by nothing
@@ -276,7 +276,7 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -308,8 +308,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -326,10 +325,12 @@ export async function DELETE(request: Request, context: RouteContext) {
       );
     }
 
-    await convex.mutation(api.variables.remove, {
-      variableId: id as Id<"environmentVariables">,
-      deletedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.variables.remove,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     // Notify project members about variable deletion (non-blocking)
     notifyVariableChange(

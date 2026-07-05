@@ -3,18 +3,27 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { rateLimiter } from "./rateLimits";
 import { isCronPaused } from "./tierLimits";
 import { assertOrgAction } from "./authz";
+import { requireBearerUser } from "./identity";
 
 /**
  * Project Access Queries and Mutations (for extension linking)
  */
 const REVOCATION_EVENT_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Generate a project-access token using a CSPRNG. Since the auth cutover these
+ * tokens are an identity credential (requireBearerUser resolves the acting
+ * user from them), so they MUST be unguessable — crypto.getRandomValues(),
+ * never Math.random(). Mirrors cliSessions.generateToken.
+ */
 function generateAccessToken(): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
   let token = "env_";
   for (let i = 0; i < 48; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
+    token += chars.charAt(bytes[i] % chars.length);
   }
   return token;
 }
@@ -283,18 +292,26 @@ export const refresh = mutation({
   },
 });
 
-export const linkExtension = mutation({
+/**
+ * ForToken-only variant: the extension link/unlink routes authenticate with a
+ * bearer session token (cliTokens) that they already hold. The acting user is
+ * resolved server-side from that token via requireBearerUser — the client can
+ * no longer supply an arbitrary userId. No JWT twin exists (extension-only).
+ */
+export const linkExtensionForToken = mutation({
   args: {
+    accessToken: v.string(),
     projectId: v.id("projects"),
-    userId: v.id("users"),
     deviceId: v.string(),
     deviceName: v.string(),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireBearerUser(ctx, args.accessToken);
+
     // Rate limit: prevent excessive extension linking
     await rateLimiter.limit(ctx, "extensionLink", {
-      key: args.userId,
+      key: actor._id,
       throws: true,
     });
 
@@ -307,10 +324,21 @@ export const linkExtension = mutation({
       throw new Error("Project not found");
     }
 
+    // Authorize BEFORE minting a token: the acting user must be permitted to
+    // link an extension in this project's org. Without this, any authenticated
+    // bearer holder could mint a project-access token (itself an identity
+    // credential) for an arbitrary project. Mirrors unlinkExtensionForToken.
+    await assertOrgAction(
+      ctx,
+      actor._id,
+      project.organizationId,
+      "org:link_extension"
+    );
+
     const existingAccess = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId)
+        q.eq("projectId", args.projectId).eq("userId", actor._id)
       )
       .collect()
       .then(
@@ -330,7 +358,7 @@ export const linkExtension = mutation({
       await ctx.db.insert("auditLogs", {
         organizationId: project.organizationId,
         projectId: args.projectId,
-        userId: args.userId,
+        userId: actor._id,
         action: "access.token_refreshed",
         details: JSON.stringify({
           relink: true,
@@ -351,7 +379,7 @@ export const linkExtension = mutation({
 
     const accessId = await ctx.db.insert("projectAccess", {
       projectId: args.projectId,
-      userId: args.userId,
+      userId: actor._id,
       accessToken,
       expiresAt,
       deviceId: args.deviceId,
@@ -364,7 +392,7 @@ export const linkExtension = mutation({
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.userId,
+      userId: actor._id,
       action: "access.extension_linked",
       details: JSON.stringify({
         deviceId: args.deviceId,
@@ -377,26 +405,29 @@ export const linkExtension = mutation({
   },
 });
 
-export const unlinkExtension = mutation({
+/**
+ * ForToken-only variant (extension-only; no JWT twin). Self-service unlink —
+ * the acting user is resolved from the bearer token via requireBearerUser, and
+ * the token lookup is scoped to (projectId, actor._id), so a caller can only
+ * ever unlink a token that belongs to THEM. The caller must still be an org
+ * member permitted to link/unlink their own extension in the project's org.
+ */
+export const unlinkExtensionForToken = mutation({
   args: {
+    accessToken: v.string(),
     projectId: v.id("projects"),
-    userId: v.id("users"),
     deviceId: v.string(),
   },
   handler: async (ctx, args) => {
+    const actor = await requireBearerUser(ctx, args.accessToken);
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);
 
-    // Authorization: this is a self-service unlink — `userId` is the acting
-    // caller. The lookup is scoped to (projectId, userId), so a caller can only
-    // ever unlink a token that belongs to THEM; a token owned by another user
-    // is simply not found. The caller must still be an org member permitted to
-    // link/unlink their own extension in the project's org.
     if (project && !project.deletedAt) {
       await assertOrgAction(
         ctx,
-        args.userId,
+        actor._id,
         project.organizationId,
         "org:link_extension"
       );
@@ -405,7 +436,7 @@ export const unlinkExtension = mutation({
     const access = await ctx.db
       .query("projectAccess")
       .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId)
+        q.eq("projectId", args.projectId).eq("userId", actor._id)
       )
       .collect()
       .then(
@@ -427,9 +458,9 @@ export const unlinkExtension = mutation({
     await ctx.db.insert("permissionRevocationEvents", {
       accessToken: access.accessToken,
       projectId: args.projectId,
-      userId: args.userId,
+      userId: actor._id,
       reason: "Extension unlinked",
-      revokedBy: args.userId,
+      revokedBy: actor._id,
       revokedAt: now,
       acknowledged: false,
       expiresAt: now + 24 * 60 * 60 * 1000, // 24 hours TTL
@@ -439,7 +470,7 @@ export const unlinkExtension = mutation({
       await ctx.db.insert("auditLogs", {
         organizationId: project.organizationId,
         projectId: args.projectId,
-        userId: args.userId,
+        userId: actor._id,
         action: "access.extension_unlinked",
         details: JSON.stringify({
           deviceId: args.deviceId,

@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -21,7 +21,7 @@ type RouteParams = { params: Promise<{ slug: string }> };
  */
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -41,10 +41,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Check membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId,
-      userId: convexUser._id,
-    });
+    const membership = await createAuthedConvexClient(accessToken!).query(
+      api.organizations.getMembership,
+      {
+        organizationId,
+      }
+    );
 
     if (!membership) {
       return NextResponse.json(
@@ -85,7 +87,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -118,13 +120,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     // Authorization is enforced in the Convex mutation (assertOrgAction)
     const { name, description, logoUrl } = validation.data;
 
-    await convex.mutation(api.organizations.update, {
-      organizationId,
-      name,
-      description,
-      logoUrl,
-      updatedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.organizations.update,
+      {
+        organizationId,
+        name,
+        description,
+        logoUrl,
+      }
+    );
 
     const organization = await convex.query(api.organizations.getById, {
       organizationId,
@@ -142,7 +146,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
  */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -162,10 +166,12 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Authorization is enforced in the Convex mutation (assertOrgAction)
-    await convex.mutation(api.organizations.remove, {
-      organizationId,
-      deletedBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.organizations.remove,
+      {
+        organizationId,
+      }
+    );
 
     return NextResponse.json({ deleted: true });
   } catch (error) {

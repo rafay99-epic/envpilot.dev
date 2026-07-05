@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { reportApiError } from "@/lib/api-errors";
@@ -10,16 +10,18 @@ import { reportApiError } from "@/lib/api-errors";
  */
 export async function GET() {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-    const sessions = await convex.query(api.users.getOwnSessions, {
-      userId: convexUser._id,
-    });
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const sessions = await createAuthedConvexClient(accessToken!).query(
+      api.users.getOwnSessions,
+      {}
+    );
 
     return NextResponse.json(sessions);
   } catch (error) {
@@ -37,17 +39,18 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-    const result = await convex.mutation(api.users.revokeOwnSessions, {
-      userId: convexUser._id,
-      callerUserId: convexUser._id,
-    });
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const result = await createAuthedConvexClient(accessToken!).mutation(
+      api.users.revokeOwnSessions,
+      {}
+    );
 
     return NextResponse.json({ success: true, revoked: result.revoked });
   } catch (error) {

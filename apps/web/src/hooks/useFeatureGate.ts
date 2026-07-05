@@ -61,12 +61,15 @@ export function useFeatureGate(
 }
 
 /**
- * Hook to get the current user's tier, grace period status, and tier definition.
+ * Hook to get the current user's tier, grace period status, and tier
+ * definition. The user is derived server-side from the verified JWT; the
+ * `userId` param remains only as a readiness gate (skip until the Convex
+ * user is known).
  */
 export function useUserTier(userId: Id<"users"> | undefined) {
   const data = useQuery(
-    api.featureRegistry.getUserTierInfo,
-    userId ? { userId } : "skip"
+    api.featureRegistry.getMyTierInfo,
+    userId ? {} : "skip"
   );
 
   return {

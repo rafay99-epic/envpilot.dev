@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { normalizeOrgRole } from "./authz";
+import { getAuthedUser, requireAuthedUser } from "./identity";
 
 /**
  * Feature Requests (Wishlist) Queries and Mutations
@@ -112,17 +113,20 @@ export const listPlanned = query({
 export const hasVoted = query({
   args: {
     featureRequestId: v.id("featureRequests"),
-    userId: v.optional(v.id("users")),
     voterEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.userId) {
+    // Anonymous-capable: derive the actor from the verified identity when
+    // signed in; otherwise fall back to the anonymous email path.
+    const actor = await getAuthedUser(ctx);
+
+    if (actor) {
       const vote = await ctx.db
         .query("featureVotes")
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!)
+            .eq("userId", actor._id)
         )
         .first();
       return !!vote;
@@ -176,10 +180,12 @@ export const submit = mutation({
     description: v.string(),
     submitterEmail: v.optional(v.string()),
     submitterName: v.optional(v.string()),
-    userId: v.optional(v.id("users")),
     category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Anonymous-capable: attribute to the signed-in user when present,
+    // otherwise fall back to the anonymous submitter email path.
+    const actor = await getAuthedUser(ctx);
     const now = Date.now();
     const title = args.title.trim();
     const description = args.description.trim();
@@ -224,7 +230,7 @@ export const submit = mutation({
       description,
       submitterEmail: email,
       submitterName: name,
-      userId: args.userId,
+      userId: actor?._id,
       status: "submitted",
       category,
       voteCount: 1, // Auto-vote for submitter
@@ -233,10 +239,10 @@ export const submit = mutation({
     });
 
     // Create initial vote from submitter
-    if (args.userId || email) {
+    if (actor || email) {
       await ctx.db.insert("featureVotes", {
         featureRequestId,
-        userId: args.userId,
+        userId: actor?._id,
         voterEmail: email,
         createdAt: now,
       });
@@ -252,16 +258,18 @@ export const submit = mutation({
 export const vote = mutation({
   args: {
     featureRequestId: v.id("featureRequests"),
-    userId: v.optional(v.id("users")),
     voterEmail: v.optional(v.string()),
     ipHash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Anonymous-capable: signed-in users vote by identity; anonymous voters
+    // by email.
+    const actor = await getAuthedUser(ctx);
     const now = Date.now();
     const email = args.voterEmail?.trim();
 
     // Validate that we have some form of voter identification
-    if (!args.userId && !email) {
+    if (!actor && !email) {
       throw new Error("User ID or email required to vote");
     }
 
@@ -277,13 +285,13 @@ export const vote = mutation({
     }
 
     // If user is logged in, check by userId only (prevent double-identity voting)
-    if (args.userId) {
+    if (actor) {
       const existingVote = await ctx.db
         .query("featureVotes")
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!)
+            .eq("userId", actor._id)
         )
         .first();
 
@@ -294,7 +302,7 @@ export const vote = mutation({
       // Create vote with userId only (don't store email for logged-in users)
       await ctx.db.insert("featureVotes", {
         featureRequestId: args.featureRequestId,
-        userId: args.userId,
+        userId: actor._id,
         ipHash: args.ipHash,
         createdAt: now,
       });
@@ -338,10 +346,12 @@ export const vote = mutation({
 export const unvote = mutation({
   args: {
     featureRequestId: v.id("featureRequests"),
-    userId: v.optional(v.id("users")),
     voterEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Anonymous-capable: signed-in users unvote by identity; anonymous voters
+    // by email.
+    const actor = await getAuthedUser(ctx);
     const now = Date.now();
 
     // Check if feature request exists
@@ -353,13 +363,13 @@ export const unvote = mutation({
     let vote = null;
 
     // Find vote by user ID
-    if (args.userId) {
+    if (actor) {
       vote = await ctx.db
         .query("featureVotes")
         .withIndex("by_feature_and_user", (q) =>
           q
             .eq("featureRequestId", args.featureRequestId)
-            .eq("userId", args.userId!)
+            .eq("userId", actor._id)
         )
         .first();
     }
@@ -410,22 +420,16 @@ export const updateStatus = mutation({
       v.literal("declined")
     ),
     adminNotes: v.optional(v.string()),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
-    // Verify user exists
-    const user = await ctx.db.get(args.userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Check if user is an org owner (any organization). After the unified-role
+    // Check if actor is an org owner (any organization). After the unified-role
     // migration there are no "admin" rows — owners hold that authority.
     const memberships = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
     const ownerMembership = memberships.find(
       (m) => normalizeOrgRole(m.role) === "owner"
@@ -461,23 +465,17 @@ export const update = mutation({
     description: v.optional(v.string()),
     category: v.optional(v.string()),
     adminNotes: v.optional(v.string()),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
-    const { featureRequestId, userId, ...updates } = args;
+    const { featureRequestId, ...updates } = args;
 
-    // Verify user exists
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Check if user is an org owner (any organization). After the unified-role
+    // Check if actor is an org owner (any organization). After the unified-role
     // migration there are no "admin" rows — owners hold that authority.
     const memberships = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
     const ownerMembership = memberships.find(
       (m) => normalizeOrgRole(m.role) === "owner"
@@ -542,20 +540,15 @@ export const update = mutation({
 export const remove = mutation({
   args: {
     featureRequestId: v.id("featureRequests"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    // Verify user exists
-    const user = await ctx.db.get(args.userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const actor = await requireAuthedUser(ctx);
 
-    // Check if user is an org owner (any organization). After the unified-role
+    // Check if actor is an org owner (any organization). After the unified-role
     // migration there are no "admin" rows — owners hold that authority.
     const memberships = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
     const ownerMembership = memberships.find(
       (m) => normalizeOrgRole(m.role) === "owner"

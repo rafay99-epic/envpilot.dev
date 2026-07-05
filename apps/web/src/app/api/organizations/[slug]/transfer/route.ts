@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -22,7 +22,7 @@ type RouteParams = { params: Promise<{ slug: string }> };
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -80,11 +80,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     // Execute the transfer
-    await convex.mutation(api.organizations.transferOwnership, {
-      organizationId,
-      targetUserId: targetUser._id,
-      transferredBy: convexUser._id,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.organizations.transferOwnership,
+      {
+        organizationId,
+        targetUserId: targetUser._id,
+      }
+    );
 
     const orgName = org?.name || "the organization";
     const previousOwnerName =

@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -25,7 +25,7 @@ interface RouteContext {
  */
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -68,8 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -88,10 +87,11 @@ export async function POST(request: Request, context: RouteContext) {
     // valueRestored is false when the target is a legacy version written
     // before value updates minted distinct vault objects — those rollbacks
     // only restore metadata, not the secret value.
-    const { valueRestored } = await convex.mutation(api.variables.rollback, {
+    const { valueRestored } = await createAuthedConvexClient(
+      accessToken!
+    ).mutation(api.variables.rollback, {
       variableId: id as Id<"environmentVariables">,
       targetVersion,
-      rolledBackBy: convexUser._id,
     });
 
     const updatedVariable = await convex.query(api.variables.getById, {

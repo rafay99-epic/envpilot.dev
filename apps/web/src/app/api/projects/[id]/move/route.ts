@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -24,7 +24,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const { id } = await params;
 
     if (!user) {
@@ -52,14 +52,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Check admin in source org
-    const sourceMembership = await convex.query(
+    const sourceMembership = await authed.query(
       api.organizations.getMembership,
       {
         organizationId: project.organizationId,
-        userId: convexUser._id,
       }
     );
 
@@ -74,11 +75,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check membership in target org
-    const targetMembership = await convex.query(
+    const targetMembership = await authed.query(
       api.organizations.getMembership,
       {
         organizationId: targetOrganizationId as Id<"organizations">,
-        userId: convexUser._id,
       }
     );
 
@@ -93,10 +93,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Execute the move (tier enforcement is handled server-side in the mutation)
-    await convex.mutation(api.projects.move, {
+    await authed.mutation(api.projects.move, {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
-      movedBy: convexUser._id,
     });
 
     // Send notification email to target org admins (non-blocking)

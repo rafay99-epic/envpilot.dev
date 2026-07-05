@@ -7,6 +7,7 @@ import {
   QueryCtx,
 } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { requireAuthedUser, requireBearerUser } from "./identity";
 import { batchGetUsers, userInfo } from "./helpers";
 import { isCronPaused } from "./tierLimits";
 import {
@@ -206,86 +207,99 @@ export const getForVariable = query({
   },
 });
 
-export const getForUser = query({
-  args: { userId: v.id("users") },
-  returns: v.array(
-    v.object({
-      ...permissionDocFields,
-      variable: v.object({
-        _id: v.id("environmentVariables"),
-        key: v.string(),
-        description: v.optional(v.string()),
+const getForUserReturns = v.array(
+  v.object({
+    ...permissionDocFields,
+    variable: v.object({
+      _id: v.id("environmentVariables"),
+      key: v.string(),
+      description: v.optional(v.string()),
+    }),
+    project: v.union(
+      v.object({
+        _id: v.id("projects"),
+        name: v.string(),
+        slug: v.string(),
       }),
-      project: v.union(
-        v.object({
-          _id: v.id("projects"),
-          name: v.string(),
-          slug: v.string(),
-        }),
-        v.null()
-      ),
+      v.null()
+    ),
+  })
+);
+
+async function getForUserCore(ctx: QueryCtx, userId: Id<"users">) {
+  const permissions = await ctx.db
+    .query("variablePermissions")
+    .withIndex("by_user_active", (q) =>
+      q.eq("userId", userId).eq("isActive", true)
+    )
+    .collect();
+
+  // Batch fetch variables
+  const varIds = [...new Set(permissions.map((p) => p.variableId.toString()))];
+  const variables = await Promise.all(
+    varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
+  );
+  const varMap = new Map(
+    variables.filter(Boolean).map((v) => [v!._id.toString(), v!])
+  );
+
+  // Batch fetch projects from variables
+  const projIds = [
+    ...new Set(
+      variables
+        .filter((v) => v && !v.deletedAt)
+        .map((v) => v!.projectId.toString())
+    ),
+  ];
+  const projects = await Promise.all(
+    projIds.map((id) => ctx.db.get(id as Id<"projects">))
+  );
+  const projMap = new Map(
+    projects.filter(Boolean).map((p) => [p!._id.toString(), p!])
+  );
+
+  return permissions
+    .map((perm) => {
+      const variable = varMap.get(perm.variableId.toString());
+      if (!variable || variable.deletedAt) return null;
+
+      const project = projMap.get(variable.projectId.toString());
+      return {
+        ...perm,
+        variable: {
+          _id: variable._id,
+          key: variable.key,
+          description: variable.description,
+        },
+        project: project
+          ? { _id: project._id, name: project.name, slug: project.slug }
+          : null,
+      };
     })
-  ),
+    .filter((entry) => entry !== null);
+}
+
+export const getForUser = query({
+  args: {},
+  returns: getForUserReturns,
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+    return getForUserCore(ctx, actor._id);
+  },
+});
+
+export const getForUserForToken = query({
+  args: { accessToken: v.string() },
+  returns: getForUserReturns,
   handler: async (ctx, args) => {
-    const permissions = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
-      )
-      .collect();
-
-    // Batch fetch variables
-    const varIds = [
-      ...new Set(permissions.map((p) => p.variableId.toString())),
-    ];
-    const variables = await Promise.all(
-      varIds.map((id) => ctx.db.get(id as Id<"environmentVariables">))
-    );
-    const varMap = new Map(
-      variables.filter(Boolean).map((v) => [v!._id.toString(), v!])
-    );
-
-    // Batch fetch projects from variables
-    const projIds = [
-      ...new Set(
-        variables
-          .filter((v) => v && !v.deletedAt)
-          .map((v) => v!.projectId.toString())
-      ),
-    ];
-    const projects = await Promise.all(
-      projIds.map((id) => ctx.db.get(id as Id<"projects">))
-    );
-    const projMap = new Map(
-      projects.filter(Boolean).map((p) => [p!._id.toString(), p!])
-    );
-
-    return permissions
-      .map((perm) => {
-        const variable = varMap.get(perm.variableId.toString());
-        if (!variable || variable.deletedAt) return null;
-
-        const project = projMap.get(variable.projectId.toString());
-        return {
-          ...perm,
-          variable: {
-            _id: variable._id,
-            key: variable.key,
-            description: variable.description,
-          },
-          project: project
-            ? { _id: project._id, name: project.name, slug: project.slug }
-            : null,
-        };
-      })
-      .filter((entry) => entry !== null);
+    const actor = await requireBearerUser(ctx, args.accessToken);
+    return getForUserCore(ctx, actor._id);
   },
 });
 
 export const checkPermission = query({
   args: {
     variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
     requiredPermission: v.union(
       v.literal("read"),
       v.literal("write"),
@@ -301,9 +315,10 @@ export const checkPermission = query({
     expiresAt: v.optional(v.number()),
   }),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
-    const permission = await findActiveGrant(ctx, args.variableId, args.userId);
+    const permission = await findActiveGrant(ctx, args.variableId, actor._id);
 
     if (!permission) {
       return { hasPermission: false, reason: "No permission granted" };
@@ -379,7 +394,6 @@ export const getHistory = query({
 export const getAssignableMembers = query({
   args: {
     variableId: v.id("environmentVariables"),
-    requestingUserId: v.id("users"),
   },
   returns: v.array(
     v.object({
@@ -392,6 +406,8 @@ export const getAssignableMembers = query({
     })
   ),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const variable = await ctx.db.get(args.variableId);
     if (!variable || variable.deletedAt) {
       return [];
@@ -407,7 +423,7 @@ export const getAssignableMembers = query({
     try {
       const auth = await assertProjectAction(
         ctx,
-        args.requestingUserId,
+        actor._id,
         variable.projectId,
         "project:manage_permissions"
       );
@@ -415,7 +431,7 @@ export const getAssignableMembers = query({
     } catch (err) {
       console.error("permissions.getAssignableMembers.denied", {
         variableId: args.variableId,
-        requestingUserId: args.requestingUserId,
+        requestingUserId: actor._id,
         projectId: variable.projectId,
         error: String(err),
       });
@@ -454,7 +470,7 @@ export const getAssignableMembers = query({
     );
 
     const eligibleMembers = orgMembers.filter((member) => {
-      if (member.userId === args.requestingUserId) return false;
+      if (member.userId === actor._id) return false;
       if (usersWithPermissions.has(member.userId.toString())) return false;
       // Owners can grant to anyone; everyone else only strictly below their level
       if (
@@ -498,7 +514,6 @@ export const getAssignableMembers = query({
 export const canManageVariablePermissions = query({
   args: {
     variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
   },
   returns: v.object({
     canManage: v.boolean(),
@@ -509,10 +524,12 @@ export const canManageVariablePermissions = query({
     ),
   }),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const check = await checkCanManagePermissions(
       ctx,
       args.variableId,
-      args.userId
+      actor._id
     );
 
     if (!check.canManage || !check.membership) {

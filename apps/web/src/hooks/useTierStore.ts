@@ -27,10 +27,11 @@ export function useTierStoreSync() {
 
   const enforcementEnabled = useQuery(api.tierLimits.isEnforcementEnabled);
 
-  // Hydrate user-level tier info
+  // Hydrate user-level tier info (self, derived from the verified JWT;
+  // convexUserId only gates readiness)
   const userTierInfo = useQuery(
-    api.featureRegistry.getUserTierInfo,
-    convexUserId ? { userId: convexUserId } : "skip"
+    api.featureRegistry.getMyTierInfo,
+    convexUserId ? {} : "skip"
   );
 
   // Hydrate resolved features for the current org

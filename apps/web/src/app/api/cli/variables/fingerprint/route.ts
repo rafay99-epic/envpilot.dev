@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -65,20 +66,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify organization membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
     // Fetch variable metadata — same access rules as the full endpoint,
-    // but we never call readSecret() so vault is untouched.
-    const variables = await convex.query(api.variables.listWithAccess, {
+    // but we never call readSecret() so vault is untouched. Identity is
+    // resolved server-side from the bearer token via the ForToken variant.
+    const variables = await convex.query(api.variables.listWithAccessForToken, {
+      accessToken: token,
       projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
     });
 
     const accessible = variables

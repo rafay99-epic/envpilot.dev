@@ -7,6 +7,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret } from "@/lib/vault";
 import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
@@ -61,25 +62,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    const requests = await convex.query(api.variableRequests.listForProject, {
-      projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
-      status: status as
-        | "pending"
-        | "approved"
-        | "rejected"
-        | "canceled"
-        | undefined,
-    });
+    const requests = await convex.query(
+      api.variableRequests.listForProjectForToken,
+      {
+        accessToken: token,
+        projectId: projectId as Id<"projects">,
+        status: status as
+          | "pending"
+          | "approved"
+          | "rejected"
+          | "canceled"
+          | undefined,
+      }
+    );
 
     return NextResponse.json({
       success: true,
@@ -130,10 +138,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const token = extractBearerToken(request)!;
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -143,7 +155,7 @@ export async function POST(request: NextRequest) {
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -173,20 +185,26 @@ export async function POST(request: NextRequest) {
       projectId,
     });
 
-    const requestId = await convex.mutation(api.variableRequests.create, {
-      key,
-      vaultRef: vaultResult.id,
-      description,
-      environments,
-      projectId: projectId as Id<"projects">,
-      isSensitive,
-      requestedBy: authResult.userId,
-    });
+    const requestId = await convex.mutation(
+      api.variableRequests.createForToken,
+      {
+        accessToken: token,
+        key,
+        vaultRef: vaultResult.id,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive,
+      }
+    );
 
-    const createdRequest = await convex.query(api.variableRequests.getById, {
-      requestId,
-      userId: authResult.userId,
-    });
+    const createdRequest = await convex.query(
+      api.variableRequests.getByIdForToken,
+      {
+        accessToken: token,
+        requestId,
+      }
+    );
 
     return NextResponse.json(
       { success: true, data: { request: createdRequest } },

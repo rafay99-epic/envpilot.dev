@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sanitizeConvexError, handleApiError } from "@/lib/api-errors";
@@ -40,7 +40,7 @@ const createVariableSchema = z.object({
  */
 export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -70,8 +70,7 @@ export async function GET(request: Request) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -79,13 +78,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const variablesWithAccess = await convex.query(
-      api.variables.listWithAccess,
-      {
-        projectId: projectId as Id<"projects">,
-        userId: convexUser._id,
-      }
-    );
+    const variablesWithAccess = await createAuthedConvexClient(
+      accessToken!
+    ).query(api.variables.listWithAccess, {
+      projectId: projectId as Id<"projects">,
+    });
 
     const variables = variablesWithAccess
       .filter((variable) => variable.hasAccess)
@@ -108,7 +105,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -148,8 +145,7 @@ export async function POST(request: Request) {
     }
 
     const membership = await checkOrganizationMembership(
-      convex,
-      convexUser._id,
+      createAuthedConvexClient(accessToken!),
       organizationId
     );
 
@@ -167,17 +163,19 @@ export async function POST(request: Request) {
     // Unified RBAC: assigned developers create variables directly (they get a
     // write grant on variables they create). Authorization — including project
     // assignment scoping — is enforced by the Convex mutation.
-    const variableId = await convex.mutation(api.variables.create, {
-      key,
-      vaultRef,
-      description,
-      environments,
-      projectId: projectId as Id<"projects">,
-      isSensitive,
-      createdBy: convexUser._id,
-      rotationFrequencyDays,
-      tagIds: tagIds as Id<"variableTags">[] | undefined,
-    });
+    const variableId = await createAuthedConvexClient(accessToken!).mutation(
+      api.variables.create,
+      {
+        key,
+        vaultRef,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
+      }
+    );
 
     const variable = await convex.query(api.variables.getById, { variableId });
 

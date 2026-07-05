@@ -3,7 +3,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
-  checkOrganizationMembership,
+  checkOrganizationMembershipForToken,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
@@ -44,6 +44,12 @@ export async function GET(request: Request) {
 
     let authorizedUserId: Id<"users">;
     let userRole: string = "member";
+    // The token that authenticated this request — a projectAccess token on the
+    // X-Access-Token path, or a cliTokens bearer on the session/bearer path.
+    // requireBearerUser (inside the *ForToken Convex variants) resolves the
+    // acting user from EITHER plane, so both branches drive the same ForToken
+    // calls and legacy-role resolution.
+    let authToken: string;
 
     // Validate access token if provided
     if (accessToken) {
@@ -66,6 +72,8 @@ export async function GET(request: Request) {
       }
 
       authorizedUserId = validation.userId as Id<"users">;
+      // requireBearerUser resolves this projectAccess token to the linking user.
+      authToken = accessToken;
 
       // Resolve user role from project's organization
       const { organizationId: projOrgId } = await getProjectOrganization(
@@ -73,10 +81,14 @@ export async function GET(request: Request) {
         projectId as Id<"projects">
       );
       if (projOrgId) {
-        const tokenMembership = await checkOrganizationMembership(
-          convex,
-          authorizedUserId,
-          projOrgId
+        // projectAccess-token path: authorizedUserId was resolved server-side
+        // from the validated token, so read the role from the unchanged
+        // (identity-free) member list rather than an identity-bound query.
+        const members = await convex.query(api.organizations.getMembers, {
+          organizationId: projOrgId,
+        });
+        const tokenMembership = members.find(
+          (m) => m !== null && m.userId === authorizedUserId
         );
         if (tokenMembership) {
           userRole = tokenMembership.role || "member";
@@ -111,9 +123,9 @@ export async function GET(request: Request) {
         );
       }
 
-      const membership = await checkOrganizationMembership(
+      const membership = await checkOrganizationMembershipForToken(
         convex,
-        convexUser._id,
+        auth.accessToken!,
         organizationId
       );
 
@@ -123,14 +135,20 @@ export async function GET(request: Request) {
 
       userRole = membership.role || "member";
       authorizedUserId = convexUser._id;
+      // Bearer-only data route: a non-null auth here always carries a cliTokens
+      // bearer (session fallback yields no token and is unreachable without
+      // AuthKit middleware on this path).
+      authToken = auth.accessToken!;
     }
 
-    // Get only variables this user can access.
+    // Get only variables this user can access. Identity is resolved server-side
+    // from the authenticating token via the ForToken variant (which accepts
+    // both the cliTokens and projectAccess planes).
     const variablesWithAccess = await convex.query(
-      api.variables.listWithAccess,
+      api.variables.listWithAccessForToken,
       {
+        accessToken: authToken,
         projectId: projectId as Id<"projects">,
-        userId: authorizedUserId,
       }
     );
 
@@ -143,7 +161,7 @@ export async function GET(request: Request) {
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authorizedUserId,
+      accessToken: authToken,
       projectId: projectId as Id<"projects">,
       orgRole: userRole,
     });
@@ -251,9 +269,9 @@ export async function GET(request: Request) {
       variablesWithValues
         .filter((v) => v.value !== "[DECRYPTION_FAILED]")
         .map((v) =>
-          convex.mutation(api.variables.logAccess, {
+          convex.mutation(api.variables.logAccessForToken, {
+            accessToken: authToken,
             variableId: v._id as Id<"environmentVariables">,
-            accessedBy: authorizedUserId,
             accessType: "export" as const,
             ipAddress,
             userAgent,

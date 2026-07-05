@@ -13,10 +13,11 @@ export function useVariableRequests(
 ) {
   const requests = useQuery(
     api.variableRequests.listForProject,
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
     projectId && userId
       ? {
           projectId: projectId as Id<"projects">,
-          userId: userId as Id<"users">,
         }
       : "skip"
   );
@@ -46,14 +47,12 @@ export function useResolveVariableRequest() {
       if (data.action === "cancel") {
         const requestId = await cancel({
           requestId: data.requestId as Id<"environmentVariableRequests">,
-          canceledBy: data.reviewedBy as Id<"users">,
         });
         return { requestId, status: "cancelled" };
       }
 
       const result = await review({
         requestId: data.requestId as Id<"environmentVariableRequests">,
-        reviewedBy: data.reviewedBy as Id<"users">,
         action: data.action,
         reviewReason: data.reviewReason,
         environments: data.action === "approve" ? data.environments : undefined,

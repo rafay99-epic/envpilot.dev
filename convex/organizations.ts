@@ -1,5 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query, internalQuery } from "./_generated/server";
+import {
+  mutation,
+  query,
+  internalQuery,
+  type QueryCtx,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { requireAuthedUser, requireBearerUser } from "./identity";
 import { checkBooleanFeature, resolveFeatureForUser } from "./featureRegistry";
 import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
@@ -22,22 +29,35 @@ import {
 /**
  * Get all organizations for a user
  */
+async function listForUserCore(ctx: QueryCtx, userId: Id<"users">) {
+  const memberships = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+
+  const organizations = await Promise.all(
+    memberships.map(async (membership) => {
+      const org = await ctx.db.get(membership.organizationId);
+      return org ? { ...org, role: membership.role } : null;
+    })
+  );
+
+  return organizations.filter(Boolean);
+}
+
 export const listForUser = query({
-  args: { userId: v.id("users") },
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+    return listForUserCore(ctx, actor._id);
+  },
+});
+
+export const listForUserForToken = query({
+  args: { accessToken: v.string() },
   handler: async (ctx, args) => {
-    const memberships = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    const organizations = await Promise.all(
-      memberships.map(async (membership) => {
-        const org = await ctx.db.get(membership.organizationId);
-        return org ? { ...org, role: membership.role } : null;
-      })
-    );
-
-    return organizations.filter(Boolean);
+    const actor = await requireBearerUser(ctx, args.accessToken);
+    return listForUserCore(ctx, actor._id);
   },
 });
 
@@ -135,18 +155,37 @@ export const getMembersInternal = internalQuery({
 /**
  * Check if a user is a member of an organization
  */
+async function getMembershipCore(
+  ctx: QueryCtx,
+  organizationId: Id<"organizations">,
+  userId: Id<"users">
+) {
+  return await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", organizationId).eq("userId", userId)
+    )
+    .first();
+}
+
 export const getMembership = query({
   args: {
     organizationId: v.id("organizations"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
-      )
-      .first();
+    const actor = await requireAuthedUser(ctx);
+    return getMembershipCore(ctx, args.organizationId, actor._id);
+  },
+});
+
+export const getMembershipForToken = query({
+  args: {
+    accessToken: v.string(),
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireBearerUser(ctx, args.accessToken);
+    return getMembershipCore(ctx, args.organizationId, actor._id);
   },
 });
 
@@ -163,13 +202,14 @@ export const create = mutation({
     slug: v.string(),
     description: v.optional(v.string()),
     logoUrl: v.optional(v.string()),
-    createdBy: v.id("users"),
     workosOrgId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Rate limit: prevent excessive org creation
     await rateLimiter.limit(ctx, "orgCreate", {
-      key: args.createdBy,
+      key: actor._id,
       throws: true,
     });
 
@@ -178,7 +218,7 @@ export const create = mutation({
     // Check organization creation limits based on user's tier
     const userMemberships = await ctx.db
       .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", args.createdBy))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect()
       .then((rows) =>
         rows.filter((doc) => normalizeOrgRole(doc.role) === "owner")
@@ -186,7 +226,7 @@ export const create = mutation({
 
     const orgResolved = await resolveFeatureForUser(
       ctx.db,
-      args.createdBy,
+      actor._id,
       "max_organizations"
     );
     const orgLimit = orgResolved.value as number | null;
@@ -212,7 +252,7 @@ export const create = mutation({
       description: args.description,
       logoUrl: args.logoUrl,
       workosOrgId: args.workosOrgId,
-      createdBy: args.createdBy,
+      createdBy: actor._id,
       createdAt: now,
       updatedAt: now,
     });
@@ -221,11 +261,11 @@ export const create = mutation({
     const defaultTier = await getDefaultTierName(ctx.db);
     const existingUserTier = await ctx.db
       .query("userTiers")
-      .withIndex("by_user", (q) => q.eq("userId", args.createdBy))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
     if (!existingUserTier) {
       await ctx.db.insert("userTiers", {
-        userId: args.createdBy,
+        userId: actor._id,
         tier: defaultTier,
         updatedAt: now,
         reason: "org_created",
@@ -234,14 +274,14 @@ export const create = mutation({
 
     await ctx.db.insert("organizationMembers", {
       organizationId,
-      userId: args.createdBy,
+      userId: actor._id,
       role: "owner",
       joinedAt: now,
     });
 
     await ctx.db.insert("auditLogs", {
       organizationId,
-      userId: args.createdBy,
+      userId: actor._id,
       action: "org.created",
       details: JSON.stringify({ name: args.name, slug: args.slug }),
       createdAt: now,
@@ -260,19 +300,15 @@ export const update = mutation({
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     logoUrl: v.optional(v.string()),
-    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: only admins can update org details
-    await assertOrgAction(
-      ctx,
-      args.updatedBy,
-      args.organizationId,
-      "org:update"
-    );
+    await assertOrgAction(ctx, actor._id, args.organizationId, "org:update");
 
     const now = Date.now();
-    const { organizationId, updatedBy, ...updates } = args;
+    const { organizationId, ...updates } = args;
 
     const org = await ctx.db.get(organizationId);
     if (!org) {
@@ -303,7 +339,7 @@ export const update = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId,
-      userId: updatedBy,
+      userId: actor._id,
       action: "org.updated",
       details: JSON.stringify(updates),
       createdAt: now,
@@ -319,16 +355,12 @@ export const update = mutation({
 export const remove = mutation({
   args: {
     organizationId: v.id("organizations"),
-    deletedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: only admins can delete an organization
-    await assertOrgAction(
-      ctx,
-      args.deletedBy,
-      args.organizationId,
-      "org:delete"
-    );
+    await assertOrgAction(ctx, actor._id, args.organizationId, "org:delete");
 
     const now = Date.now();
     const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
@@ -336,7 +368,7 @@ export const remove = mutation({
     // Audit log first (before deleting)
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.deletedBy,
+      userId: actor._id,
       action: "org.deleted",
       createdAt: now,
     });
@@ -377,7 +409,7 @@ export const remove = mutation({
           await ctx.db.patch(perm._id, {
             isActive: false,
             revokedAt: now,
-            revokedBy: args.deletedBy,
+            revokedBy: actor._id,
           });
         }
       }
@@ -403,7 +435,7 @@ export const remove = mutation({
           await ctx.db.patch(perm._id, {
             isActive: false,
             revokedAt: now,
-            revokedBy: args.deletedBy,
+            revokedBy: actor._id,
           });
         }
       }
@@ -430,7 +462,7 @@ export const remove = mutation({
           projectId: project._id,
           userId: token.userId,
           reason: "Organization deleted",
-          revokedBy: args.deletedBy,
+          revokedBy: actor._id,
           revokedAt: now,
           acknowledged: false,
           expiresAt: revocationExpiresAt,
@@ -448,7 +480,7 @@ export const remove = mutation({
         await ctx.db.patch(req._id, {
           status: "canceled",
           reviewReason: "Organization deleted",
-          reviewedBy: args.deletedBy,
+          reviewedBy: actor._id,
           reviewedAt: now,
           updatedAt: now,
         });
@@ -519,10 +551,10 @@ export const removeMember = mutation({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
-    removedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const isSelfRemoval = args.removedBy === args.userId;
+    const actor = await requireAuthedUser(ctx);
+    const isSelfRemoval = actor._id === args.userId;
 
     // Capture the caller's membership from assertOrgAction to avoid a second DB query
     let callerMembership: { role: string } | null = null;
@@ -531,7 +563,7 @@ export const removeMember = mutation({
       // Authorization: only admins can remove OTHER members
       const result = await assertOrgAction(
         ctx,
-        args.removedBy,
+        actor._id,
         args.organizationId,
         "org:remove_member"
       );
@@ -607,7 +639,7 @@ export const removeMember = mutation({
           projectId: project._id,
           userId: args.userId,
           reason: "Organization membership removed",
-          revokedBy: args.removedBy,
+          revokedBy: actor._id,
           revokedAt: now,
           acknowledged: false,
           expiresAt: revocationExpiresAt,
@@ -664,7 +696,7 @@ export const removeMember = mutation({
         await ctx.db.patch(perm._id, {
           isActive: false,
           revokedAt: now,
-          revokedBy: args.removedBy,
+          revokedBy: actor._id,
         });
         revokedPermissionCount++;
       }
@@ -674,7 +706,7 @@ export const removeMember = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.removedBy,
+      userId: actor._id,
       action: "org.member_removed",
       details: JSON.stringify({
         removedUserId: args.userId,
@@ -701,13 +733,14 @@ export const updateMemberRole = mutation({
       v.literal("team_lead"),
       v.literal("developer")
     ),
-    updatedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: only owners can change roles
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.updatedBy,
+      actor._id,
       args.organizationId,
       "org:change_role"
     );
@@ -777,7 +810,7 @@ export const updateMemberRole = mutation({
           await ctx.db.insert("projectMembers", {
             projectId: project._id,
             userId: args.userId,
-            addedBy: args.updatedBy,
+            addedBy: actor._id,
             addedAt: now,
           });
         }
@@ -788,7 +821,7 @@ export const updateMemberRole = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.updatedBy,
+      userId: actor._id,
       action: "org.member_role_changed",
       details: JSON.stringify({
         targetUserId: args.userId,
@@ -814,13 +847,14 @@ export const getMemberSessions = query({
   args: {
     organizationId: v.id("organizations"),
     targetUserId: v.id("users"),
-    callerUserId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: only roles allowed to view sessions (owner, project_manager)
     await assertOrgAction(
       ctx,
-      args.callerUserId,
+      actor._id,
       args.organizationId,
       "org:view_sessions"
     );
@@ -900,13 +934,14 @@ export const revokeMemberCliToken = mutation({
   args: {
     organizationId: v.id("organizations"),
     tokenId: v.id("cliTokens"),
-    revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners and project managers can revoke sessions
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.revokedBy,
+      actor._id,
       args.organizationId,
       "org:revoke_session"
     );
@@ -952,7 +987,7 @@ export const revokeMemberCliToken = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.revokedBy,
+      userId: actor._id,
       action: "access.token_revoked",
       details: JSON.stringify({
         tokenId: args.tokenId,
@@ -974,13 +1009,14 @@ export const revokeMemberExtensionSession = mutation({
   args: {
     organizationId: v.id("organizations"),
     projectAccessId: v.id("projectAccess"),
-    revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners and project managers can revoke sessions
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.revokedBy,
+      actor._id,
       args.organizationId,
       "org:revoke_session"
     );
@@ -1028,7 +1064,7 @@ export const revokeMemberExtensionSession = mutation({
       projectId: access.projectId,
       userId: access.userId,
       reason: "Session revoked by administrator",
-      revokedBy: args.revokedBy,
+      revokedBy: actor._id,
       revokedAt: now,
       acknowledged: false,
       expiresAt: revocationExpiresAt,
@@ -1036,7 +1072,7 @@ export const revokeMemberExtensionSession = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.revokedBy,
+      userId: actor._id,
       action: "access.extension_unlinked",
       details: JSON.stringify({
         projectAccessId: args.projectAccessId,
@@ -1060,13 +1096,14 @@ export const revokeAllMemberSessions = mutation({
   args: {
     organizationId: v.id("organizations"),
     targetUserId: v.id("users"),
-    revokedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners and project managers can revoke sessions
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.revokedBy,
+      actor._id,
       args.organizationId,
       "org:revoke_session"
     );
@@ -1150,7 +1187,7 @@ export const revokeAllMemberSessions = mutation({
           projectId: project._id,
           userId: args.targetUserId,
           reason: "All sessions revoked by administrator",
-          revokedBy: args.revokedBy,
+          revokedBy: actor._id,
           revokedAt: now,
           acknowledged: false,
           expiresAt: revocationExpiresAt,
@@ -1161,7 +1198,7 @@ export const revokeAllMemberSessions = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.revokedBy,
+      userId: actor._id,
       action: "access.token_revoked",
       details: JSON.stringify({
         targetUserId: args.targetUserId,
@@ -1189,13 +1226,14 @@ export const transferOwnership = mutation({
   args: {
     organizationId: v.id("organizations"),
     targetUserId: v.id("users"),
-    transferredBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: only admins can transfer ownership
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.transferredBy,
+      actor._id,
       args.organizationId,
       "org:transfer_ownership"
     );
@@ -1214,7 +1252,7 @@ export const transferOwnership = mutation({
     }
 
     // Cannot transfer to yourself
-    if (args.targetUserId === args.transferredBy) {
+    if (args.targetUserId === actor._id) {
       throw new Error("Cannot transfer ownership to yourself");
     }
 
@@ -1239,7 +1277,7 @@ export const transferOwnership = mutation({
         userId: args.targetUserId,
         role: "owner",
         joinedAt: now,
-        invitedBy: args.transferredBy,
+        invitedBy: actor._id,
       });
     }
 
@@ -1254,10 +1292,10 @@ export const transferOwnership = mutation({
     // Audit log
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.transferredBy,
+      userId: actor._id,
       action: "org.transferred",
       details: JSON.stringify({
-        transferredFrom: args.transferredBy,
+        transferredFrom: actor._id,
         transferredTo: args.targetUserId,
       }),
       createdAt: now,

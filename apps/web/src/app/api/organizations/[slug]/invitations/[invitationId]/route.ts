@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -14,7 +14,7 @@ type RouteParams = { params: Promise<{ slug: string; invitationId: string }> };
  */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -33,16 +33,17 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     const { organizationId } = resolved;
     const invitationId = resolvedParams.invitationId as Id<"invitations">;
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
-    // Authorization is enforced in the Convex mutation (assertOrgAction)
+    // Ensure the `users` row exists so the session JWT identity resolves in the
+    // authenticated Convex calls below (authorization + actor derivation happen
+    // server-side via requireAuthedUser / assertOrgAction).
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Verify invitation belongs to this organization before cancelling
-    const invitations = await convex.query(
+    const invitations = await authed.query(
       api.invitations.listPendingByOrganization,
       {
         organizationId,
-        requestingUserId: convexUser._id,
       }
     );
 
@@ -55,9 +56,8 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       );
     }
 
-    await convex.mutation(api.invitations.cancel, {
+    await authed.mutation(api.invitations.cancel, {
       invitationId,
-      cancelledBy: convexUser._id,
     });
 
     return NextResponse.json({ cancelled: true });
@@ -72,7 +72,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
  */
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -91,9 +91,11 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const { organizationId } = resolved;
     const invitationId = resolvedParams.invitationId as Id<"invitations">;
 
+    // getOrCreateConvexUser both guarantees the `users` row exists (so the
+    // session JWT resolves in the authenticated calls below) and supplies the
+    // inviter name for the resend email.
     const convexUser = await getOrCreateConvexUser(convex, user);
-
-    // Authorization is enforced in the Convex mutation (assertOrgAction)
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Get organization details for the email
     const organization = await convex.query(api.organizations.getById, {
@@ -108,11 +110,10 @@ export async function POST(_request: Request, { params }: RouteParams) {
     }
 
     // Get invitation details before resending
-    const invitations = await convex.query(
+    const invitations = await authed.query(
       api.invitations.listPendingByOrganization,
       {
         organizationId,
-        requestingUserId: convexUser._id,
       }
     );
 
@@ -125,9 +126,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const result = await convex.mutation(api.invitations.resend, {
+    const result = await authed.mutation(api.invitations.resend, {
       invitationId,
-      resentBy: convexUser._id,
     });
 
     // Send the new invitation email

@@ -3,7 +3,7 @@ import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
-import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { checkOrganizationMembershipForToken } from "@/lib/convex-helpers";
 import { checkExtensionAccess } from "@/lib/cli-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -29,9 +29,9 @@ export async function GET(request: Request) {
       );
     }
 
-    const membership = await checkOrganizationMembership(
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      auth.convexUser._id,
+      auth.accessToken!,
       organizationId as Id<"organizations">
     );
 

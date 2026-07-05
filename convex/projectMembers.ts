@@ -1,5 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { requireAuthedUser, requireBearerUser } from "./identity";
 import {
   assertProjectAction,
   assertCanManageUser,
@@ -69,18 +71,37 @@ export const listByProject = query({
 /**
  * Check if a user is a member of a specific project
  */
+async function getProjectMembershipCore(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  userId: Id<"users">
+) {
+  return await ctx.db
+    .query("projectMembers")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", projectId).eq("userId", userId)
+    )
+    .first();
+}
+
 export const getProjectMembership = query({
   args: {
     projectId: v.id("projects"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("projectMembers")
-      .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", args.projectId).eq("userId", args.userId)
-      )
-      .first();
+    const actor = await requireAuthedUser(ctx);
+    return getProjectMembershipCore(ctx, args.projectId, actor._id);
+  },
+});
+
+export const getProjectMembershipForToken = query({
+  args: {
+    accessToken: v.string(),
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireBearerUser(ctx, args.accessToken);
+    return getProjectMembershipCore(ctx, args.projectId, actor._id);
   },
 });
 
@@ -91,9 +112,10 @@ export const getProjectMembership = query({
 export const getAssignableOrgMembers = query({
   args: {
     projectId: v.id("projects"),
-    requestingUserId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) return [];
 
@@ -103,7 +125,7 @@ export const getAssignableOrgMembers = query({
     try {
       const auth = await assertProjectAction(
         ctx,
-        args.requestingUserId,
+        actor._id,
         args.projectId,
         "project:manage_members"
       );
@@ -111,7 +133,7 @@ export const getAssignableOrgMembers = query({
     } catch (err) {
       console.error("projectMembers.getAssignableOrgMembers.denied", {
         projectId: args.projectId,
-        requestingUserId: args.requestingUserId,
+        requestingUserId: actor._id,
         error: String(err),
       });
       return [];
@@ -143,7 +165,7 @@ export const getAssignableOrgMembers = query({
         .filter((member) => {
           if (normalizeOrgRole(member.role) === "owner") return false;
           if (assignedUserIds.has(member.userId.toString())) return false;
-          if (member.userId === args.requestingUserId) return false;
+          if (member.userId === actor._id) return false;
           if (roleLevel(member.role) >= roleLevel(requesterRole)) return false;
           return true;
         })
@@ -186,13 +208,14 @@ export const addMember = mutation({
     // (owners/PMs/team leads are always unrestricted). Omit for all
     // environments.
     environments: v.optional(v.array(v.string())),
-    addedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners, project managers, and team leads (assigned)
     const { orgRole: actorRole } = await assertProjectAction(
       ctx,
-      args.addedBy,
+      actor._id,
       args.projectId,
       "project:manage_members"
     );
@@ -258,7 +281,7 @@ export const addMember = mutation({
       projectId: args.projectId,
       userId: args.userId,
       ...(environmentScope ? { environments: environmentScope } : {}),
-      addedBy: args.addedBy,
+      addedBy: actor._id,
       addedAt: now,
     });
 
@@ -267,7 +290,7 @@ export const addMember = mutation({
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.addedBy,
+      userId: actor._id,
       action: "project.member_added",
       details: JSON.stringify({
         addedUserId: args.userId,
@@ -293,13 +316,14 @@ export const removeMember = mutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
-    removedBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners, project managers, and team leads (assigned)
     const { orgRole: actorRole } = await assertProjectAction(
       ctx,
-      args.removedBy,
+      actor._id,
       args.projectId,
       "project:manage_members"
     );
@@ -361,7 +385,7 @@ export const removeMember = mutation({
         await ctx.db.patch(perm._id, {
           isActive: false,
           revokedAt: now,
-          revokedBy: args.removedBy,
+          revokedBy: actor._id,
         });
         revokedPermissions++;
       }
@@ -383,7 +407,7 @@ export const removeMember = mutation({
         projectId: args.projectId,
         userId: args.userId,
         reason: "Removed from project",
-        revokedBy: args.removedBy,
+        revokedBy: actor._id,
         revokedAt: now,
         acknowledged: false,
         expiresAt: revocationExpiresAt,
@@ -398,7 +422,7 @@ export const removeMember = mutation({
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.removedBy,
+      userId: actor._id,
       action: "project.member_removed",
       details: JSON.stringify({
         removedUserId: args.userId,
@@ -430,15 +454,16 @@ export const setMemberEnvironments = mutation({
   args: {
     projectId: v.id("projects"),
     userId: v.id("users"),
-    requestingUserId: v.id("users"),
     // Omit to clear the scope (all environments); must not be empty
     environments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners, project managers, and team leads (assigned)
     const { orgRole: actorRole } = await assertProjectAction(
       ctx,
-      args.requestingUserId,
+      actor._id,
       args.projectId,
       "project:manage_members"
     );
@@ -503,7 +528,7 @@ export const setMemberEnvironments = mutation({
     await ctx.db.insert("auditLogs", {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.requestingUserId,
+      userId: actor._id,
       action: "project.member_environments_changed",
       details: JSON.stringify({
         targetUserId: args.userId,

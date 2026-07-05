@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { checkOrganizationMembershipForToken } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -25,12 +25,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { organizationId } = await params;
 
-    const convexUser = auth.convexUser;
-
-    // Check membership
-    const membership = await checkOrganizationMembership(
+    // Check membership — identity re-derived server-side from the bearer token.
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken!,
       organizationId as Id<"organizations">
     );
 

@@ -20,7 +20,9 @@ export function useVariablePermissions(
  * Hook for getting all active permissions for a user
  */
 export function useUserPermissions(userId: Id<"users"> | undefined) {
-  return useQuery(api.permissions.getForUser, userId ? { userId } : "skip");
+  // Identity is derived server-side from the attached JWT; `userId` gates the
+  // query until the current user is known (auth ready).
+  return useQuery(api.permissions.getForUser, userId ? {} : "skip");
 }
 
 /**
@@ -33,7 +35,7 @@ export function useCheckPermission(
 ) {
   return useQuery(
     api.permissions.checkPermission,
-    variableId && userId ? { variableId, userId, requiredPermission } : "skip"
+    variableId && userId ? { variableId, requiredPermission } : "skip"
   );
 }
 
@@ -71,7 +73,7 @@ export function useCanManageVariablePermissions(
 ) {
   return useQuery(
     api.permissions.canManageVariablePermissions,
-    variableId && userId ? { variableId, userId } : "skip"
+    variableId && userId ? { variableId } : "skip"
   );
 }
 
@@ -84,6 +86,6 @@ export function useAssignableMembers(
 ) {
   return useQuery(
     api.permissions.getAssignableMembers,
-    variableId && requestingUserId ? { variableId, requestingUserId } : "skip"
+    variableId && requestingUserId ? { variableId } : "skip"
   );
 }

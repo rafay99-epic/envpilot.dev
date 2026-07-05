@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireAuthedUser } from "./identity";
 
 /**
  * User Queries and Mutations
@@ -114,46 +115,39 @@ export const upsert = mutation({
 
 export const updateProfile = mutation({
   args: {
-    userId: v.id("users"),
-    callerUserId: v.id("users"),
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.callerUserId !== args.userId) {
-      throw new Error("You can only update your own profile");
-    }
-    const { userId, callerUserId: _caller, ...updates } = args;
-
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
+    // Self-service only: the acting user is derived from the verified identity,
+    // so a caller can only ever update their own profile.
+    const actor = await requireAuthedUser(ctx);
 
     const updateData: Record<string, unknown> = {};
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.avatarUrl !== undefined)
-      updateData.avatarUrl = updates.avatarUrl;
+    if (args.name !== undefined) updateData.name = args.name;
+    if (args.avatarUrl !== undefined) updateData.avatarUrl = args.avatarUrl;
 
-    await ctx.db.patch(userId, updateData);
+    await ctx.db.patch(actor._id, updateData);
 
-    return userId;
+    return actor._id;
   },
 });
 
 export const getOwnSessions = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+
     const cliTokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
+        q.eq("userId", actor._id).eq("isActive", true)
       )
       .collect();
 
     const extensionSessions = await ctx.db
       .query("projectAccess")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect()
       .then((rows) => rows.filter((doc) => doc.isActive === true));
 
@@ -179,18 +173,17 @@ export const getOwnSessions = query({
 });
 
 export const revokeOwnSessions = mutation({
-  args: { userId: v.id("users"), callerUserId: v.id("users") },
-  handler: async (ctx, args) => {
-    if (args.callerUserId !== args.userId) {
-      throw new Error("You can only revoke your own sessions");
-    }
+  args: {},
+  handler: async (ctx) => {
+    // Self-service only: revokes the acting user's own sessions.
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
     let count = 0;
 
     const cliTokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
+        q.eq("userId", actor._id).eq("isActive", true)
       )
       .collect();
 
@@ -201,7 +194,7 @@ export const revokeOwnSessions = mutation({
 
     const extensionSessions = await ctx.db
       .query("projectAccess")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect()
       .then((rows) => rows.filter((doc) => doc.isActive === true));
 

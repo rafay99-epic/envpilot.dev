@@ -6,6 +6,7 @@ import {
   authenticateCLIRequest,
   unauthorizedResponse,
   forbiddenResponse,
+  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import { z } from "zod";
@@ -67,20 +68,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const token = extractBearerToken(request)!;
+
     // Check membership
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Get variables with access info
-    const variables = await convex.query(api.variables.listWithAccess, {
+    // Get variables with access info. Identity is resolved server-side from
+    // the bearer token via the ForToken variant.
+    const variables = await convex.query(api.variables.listWithAccessForToken, {
+      accessToken: token,
       projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
     });
 
     // Decrypt values for accessible variables.
@@ -150,9 +157,9 @@ export async function GET(request: NextRequest) {
     // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues.map((v) =>
-        convex.mutation(api.variables.logAccess, {
+        convex.mutation(api.variables.logAccessForToken, {
+          accessToken: token,
           variableId: v._id as Id<"environmentVariables">,
-          accessedBy: authResult.userId!,
           accessType: "export" as const,
           ipAddress,
           userAgent,
@@ -168,7 +175,7 @@ export async function GET(request: NextRequest) {
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -254,11 +261,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    const token = extractBearerToken(request)!;
+
     // Check membership and role
-    const membership = await convex.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-      userId: authResult.userId,
-    });
+    const membership = await convex.query(
+      api.organizations.getMembershipForToken,
+      {
+        accessToken: token,
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -270,7 +282,7 @@ export async function POST(request: NextRequest) {
     // assignment are blocked; grant-only users (per-variable viewer sharing)
     // get the strict read-only treatment old clients expect.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: authResult.userId,
+      accessToken: token,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -298,14 +310,14 @@ export async function POST(request: NextRequest) {
     const vaultRef = vaultResult.id;
 
     // Create variable
-    const variableId = await convex.mutation(api.variables.create, {
+    const variableId = await convex.mutation(api.variables.createForToken, {
+      accessToken: token,
       key,
       vaultRef,
       description,
       environments,
       projectId: projectId as Id<"projects">,
       isSensitive: isSensitive ?? false,
-      createdBy: authResult.userId,
     });
 
     return NextResponse.json({

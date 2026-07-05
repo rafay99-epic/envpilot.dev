@@ -4,7 +4,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import {
-  checkOrganizationMembership,
+  checkOrganizationMembershipForToken,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
@@ -52,8 +52,6 @@ export async function GET(request: Request) {
       );
     }
 
-    const convexUser = auth.convexUser;
-
     const { project, organizationId } = await getProjectOrganization(
       convex,
       projectId as Id<"projects">
@@ -63,9 +61,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken!,
       organizationId
     );
 
@@ -73,16 +71,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const requests = await convex.query(api.variableRequests.listForProject, {
-      projectId: projectId as Id<"projects">,
-      userId: convexUser._id,
-      status: status as
-        | "pending"
-        | "approved"
-        | "rejected"
-        | "canceled"
-        | undefined,
-    });
+    const requests = await convex.query(
+      api.variableRequests.listForProjectForToken,
+      {
+        accessToken: auth.accessToken!,
+        projectId: projectId as Id<"projects">,
+        status: status as
+          | "pending"
+          | "approved"
+          | "rejected"
+          | "canceled"
+          | undefined,
+      }
+    );
 
     return NextResponse.json({
       data: { requests },
@@ -121,7 +122,6 @@ export async function POST(request: Request) {
     const { key, value, description, environments, projectId, isSensitive } =
       validation.data;
 
-    const convexUser = auth.convexUser;
     const { project, organizationId } = await getProjectOrganization(
       convex,
       projectId as Id<"projects">
@@ -131,9 +131,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const membership = await checkOrganizationMembership(
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken!,
       organizationId
     );
 
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
     const legacy = await resolveLegacyRoles(convex, {
-      userId: convexUser._id,
+      accessToken: auth.accessToken!,
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -181,20 +181,26 @@ export async function POST(request: Request) {
     });
 
     // Create the request in Convex
-    const requestId = await convex.mutation(api.variableRequests.create, {
-      key,
-      vaultRef: vaultResult.id,
-      description,
-      environments,
-      projectId: projectId as Id<"projects">,
-      isSensitive,
-      requestedBy: convexUser._id,
-    });
+    const requestId = await convex.mutation(
+      api.variableRequests.createForToken,
+      {
+        accessToken: auth.accessToken!,
+        key,
+        vaultRef: vaultResult.id,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive,
+      }
+    );
 
-    const createdRequest = await convex.query(api.variableRequests.getById, {
-      requestId,
-      userId: convexUser._id,
-    });
+    const createdRequest = await convex.query(
+      api.variableRequests.getByIdForToken,
+      {
+        accessToken: auth.accessToken!,
+        requestId,
+      }
+    );
 
     return NextResponse.json(
       { data: { request: createdRequest } },

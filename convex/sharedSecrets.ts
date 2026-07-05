@@ -3,6 +3,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import type { DatabaseReader, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { Id } from "./_generated/dataModel";
+import { requireAuthedUser } from "./identity";
 import { createAuditLog } from "./auditHelpers";
 import { checkBooleanFeature, checkNumericLimit } from "./featureRegistry";
 import { rateLimiter } from "./rateLimits";
@@ -400,20 +401,20 @@ export const createShare = mutation({
     variableKey: v.string(),
     organizationId: v.id("organizations"),
     projectId: v.id("projects"),
-    userId: v.id("users"),
     mode: v.union(v.literal("one_time"), v.literal("time_limited")),
     expiresAt: v.number(),
     hasPassphrase: v.boolean(),
     recipientEmails: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
     const resourceType = normalizeResourceType(args);
 
     // 0. Authorization: the caller must be a member of the org AND have at
     // least read access to the resource being shared. Without this a member
     // could mint a share link for a resource they cannot see.
-    await assertOrgMembership(ctx, args.userId, args.organizationId);
+    await assertOrgMembership(ctx, actor._id, args.organizationId);
 
     if (resourceType === "account") {
       if (!args.accountId) {
@@ -433,7 +434,7 @@ export const createShare = mutation({
       ) {
         throw new Error("Account not found");
       }
-      const access = await getAccountAccess(ctx, args.userId, account);
+      const access = await getAccountAccess(ctx, actor._id, account);
       if (!access) {
         throw new Error("You do not have access to this account");
       }
@@ -453,7 +454,7 @@ export const createShare = mutation({
       ) {
         throw new Error("Variable not found");
       }
-      const access = await getVariableAccess(ctx, args.userId, variable);
+      const access = await getVariableAccess(ctx, actor._id, variable);
       if (!access) {
         throw new Error("You do not have access to this variable");
       }
@@ -463,7 +464,7 @@ export const createShare = mutation({
     // and mailing themselves an OTP link is never the intent. Checked against
     // the creator's account email (case-insensitive), not just the current
     // recipient list, so it holds regardless of what the client sends.
-    const creator = await ctx.db.get(args.userId);
+    const creator = actor;
     const creatorEmail = creator?.email.toLowerCase().trim();
     if (
       creatorEmail &&
@@ -512,7 +513,7 @@ export const createShare = mutation({
       variableKey: args.variableKey,
       organizationId: args.organizationId,
       projectId: args.projectId,
-      createdBy: args.userId,
+      createdBy: actor._id,
       mode: args.mode,
       expiresAt: args.expiresAt,
       hasPassphrase: args.hasPassphrase,
@@ -539,7 +540,7 @@ export const createShare = mutation({
       organizationId: args.organizationId,
       projectId: args.projectId,
       variableId: args.variableId,
-      userId: args.userId,
+      userId: actor._id,
       action: "share.created",
       details: {
         resourceType,
@@ -843,28 +844,28 @@ export const verifyOtp = mutation({
 export const revokeShare = mutation({
   args: {
     shareId: v.id("sharedSecrets"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const share = await ctx.db.get(args.shareId);
     if (!share) {
       throw new Error("Share not found.");
     }
 
     // Check if user is creator OR at least a team lead in the org
-    const isCreator = share.createdBy === args.userId;
+    const isCreator = share.createdBy === actor._id;
     if (!isCreator) {
       try {
         await assertOrgMembership(
           ctx,
-          args.userId,
+          actor._id,
           share.organizationId,
           "team_lead"
         );
       } catch (err) {
         console.error("sharedSecrets.revokeShare.denied", {
           shareId: args.shareId,
-          userId: args.userId,
+          userId: actor._id,
           organizationId: share.organizationId,
           error: String(err),
         });
@@ -879,7 +880,7 @@ export const revokeShare = mutation({
     await ctx.db.patch(share._id, {
       status: "revoked",
       revokedAt: Date.now(),
-      revokedBy: args.userId,
+      revokedBy: actor._id,
     });
 
     // Audit log
@@ -887,7 +888,7 @@ export const revokeShare = mutation({
       organizationId: share.organizationId,
       projectId: share.projectId,
       variableId: share.variableId,
-      userId: args.userId,
+      userId: actor._id,
       action: "share.revoked",
       details: {
         resourceType: normalizeResourceType(share),
@@ -918,15 +919,15 @@ export const revokeShare = mutation({
 export const listByVariable = query({
   args: {
     variableId: v.id("environmentVariables"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     // Authorization: require variable access (read or write).
     const variable = await ctx.db.get(args.variableId);
     if (!variable || variable.deletedAt) {
       throw new Error("Variable not found");
     }
-    const access = await getVariableAccess(ctx, args.userId, variable);
+    const access = await getVariableAccess(ctx, actor._id, variable);
     if (!access) {
       throw new Error("You do not have access to this variable");
     }
@@ -970,15 +971,15 @@ export const listByVariable = query({
 export const listActiveByOrg = query({
   args: {
     organizationId: v.id("organizations"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     // Require org membership; each share also exposes a variableKey, so it is
     // only surfaced when the caller has access to the underlying variable.
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
       )
       .first();
     if (!membership) return [];
@@ -997,7 +998,7 @@ export const listActiveByOrg = query({
     // pass per type instead of a full getX-Access fan-out per share.
     const { variableAccess, accountAccess } = await buildShareAccessMaps(
       ctx,
-      args.userId,
+      actor._id,
       shares
     );
 
@@ -1041,9 +1042,9 @@ export const listActiveByOrg = query({
 export const listByProject = query({
   args: {
     projectId: v.id("projects"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) return [];
 
@@ -1051,7 +1052,7 @@ export const listByProject = query({
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", project.organizationId).eq("userId", actor._id)
       )
       .first();
     if (!membership) return [];
@@ -1069,7 +1070,7 @@ export const listByProject = query({
     // pass per type instead of a full getX-Access fan-out per share.
     const { variableAccess, accountAccess } = await buildShareAccessMaps(
       ctx,
-      args.userId,
+      actor._id,
       shares
     );
 

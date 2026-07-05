@@ -7,10 +7,12 @@ import {
   action,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { DatabaseReader } from "./_generated/server";
+import type { DatabaseReader, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { getDefaultTierName, isCronPaused } from "./tierLimits";
 import { getUserTier } from "./featureRegistry";
 import { normalizeOrgRole } from "./authz";
+import { requireAuthedUser } from "./identity";
 
 /**
  * Subscription Management for Polar.sh Integration
@@ -67,11 +69,40 @@ async function mapProductIdToTier(
 // ==========================================
 
 /**
- * Get subscription for an organization (LEGACY — backward compat)
+ * Assert the JWT-verified actor is a member of the organization and return
+ * the organization. Billing state is org-scoped-sensitive: members may read
+ * their org's tier/subscription, outsiders may not.
+ */
+async function requireOrgMemberAndOrg(
+  ctx: QueryCtx,
+  actorId: Id<"users">,
+  organizationId: Id<"organizations">
+) {
+  const membership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", organizationId).eq("userId", actorId)
+    )
+    .first();
+  if (!membership) {
+    throw new Error("Not a member of this organization");
+  }
+  const organization = await ctx.db.get(organizationId);
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+  return organization;
+}
+
+/**
+ * Get subscription for an organization (LEGACY — backward compat).
+ * Membership-gated.
  */
 export const getByOrganization = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    await requireOrgMemberAndOrg(ctx, actor._id, args.organizationId);
     return await ctx.db
       .query("subscriptions")
       .withIndex("by_organization", (q) =>
@@ -82,24 +113,49 @@ export const getByOrganization = query({
 });
 
 /**
- * Get subscription for a user (NEW — user-level billing)
+ * The caller's own subscription (self-service billing: cancel, portal).
  */
-export const getByUser = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
+export const getOwn = query({
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
     return await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
   },
 });
 
 /**
- * Get Polar customer for an organization (LEGACY — backward compat)
+ * The org owner's subscription, readable by any member of that org — the
+ * billing tab shows the org's effective plan to all members. The owner is
+ * resolved server-side from organization.createdBy, never from the client.
+ */
+export const getForOrgOwner = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const organization = await requireOrgMemberAndOrg(
+      ctx,
+      actor._id,
+      args.organizationId
+    );
+    return await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", organization.createdBy))
+      .first();
+  },
+});
+
+/**
+ * Get Polar customer for an organization (LEGACY — backward compat).
+ * Membership-gated.
  */
 export const getPolarCustomer = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    await requireOrgMemberAndOrg(ctx, actor._id, args.organizationId);
     return await ctx.db
       .query("polarCustomers")
       .withIndex("by_organization", (q) =>
@@ -110,14 +166,35 @@ export const getPolarCustomer = query({
 });
 
 /**
- * Get Polar customer for a user (NEW)
+ * The caller's own Polar customer record (self-service billing portal).
  */
-export const getPolarCustomerByUser = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
+export const getOwnPolarCustomer = query({
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
     return await ctx.db
       .query("polarCustomers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
+      .first();
+  },
+});
+
+/**
+ * The org owner's Polar customer record, membership-gated (see
+ * getForOrgOwner).
+ */
+export const getPolarCustomerForOrgOwner = query({
+  args: { organizationId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const organization = await requireOrgMemberAndOrg(
+      ctx,
+      actor._id,
+      args.organizationId
+    );
+    return await ctx.db
+      .query("polarCustomers")
+      .withIndex("by_user", (q) => q.eq("userId", organization.createdBy))
       .first();
   },
 });
@@ -1332,14 +1409,15 @@ export const getProductIdForTier = query({
 export const prepareCheckout = mutation({
   args: {
     organizationId: v.id("organizations"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Verify user is the organization owner
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
+        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
       )
       .first();
 
@@ -1350,7 +1428,7 @@ export const prepareCheckout = mutation({
     // Check if user already has active subscription
     const userSubscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
 
     if (
@@ -1380,7 +1458,7 @@ export const prepareCheckout = mutation({
     // Get Polar customer — prefer user-level, fallback to org-level
     const userCustomer = await ctx.db
       .query("polarCustomers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
 
     const orgCustomer = userCustomer

@@ -22,9 +22,9 @@ export function useGlobalSearch(userId: Id<"users"> | undefined) {
 
   const results = useQuery(
     api.variables.globalSearchWithAccess,
-    userId && debouncedTerm.length >= 2
-      ? { userId, searchTerm: debouncedTerm }
-      : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    userId && debouncedTerm.length >= 2 ? { searchTerm: debouncedTerm } : "skip"
   );
 
   return {

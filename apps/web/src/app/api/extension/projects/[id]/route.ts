@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { checkOrganizationMembership } from "@/lib/convex-helpers";
+import { checkOrganizationMembershipForToken } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -23,9 +23,17 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { id: projectId } = await params;
+    // This route authorizes via the bearer token (ForToken membership check).
+    // The session-cookie fallback carries no bearer token, so reject it with a
+    // clean 401 rather than passing null into a v.string() arg (→ 500).
+    if (!auth.accessToken) {
+      return NextResponse.json(
+        { error: "Bearer token required" },
+        { status: 401 }
+      );
+    }
 
-    const convexUser = auth.convexUser;
+    const { id: projectId } = await params;
 
     const project = await convex.query(api.projects.getById, {
       projectId: projectId as Id<"projects">,
@@ -35,10 +43,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Check membership
-    const membership = await checkOrganizationMembership(
+    // Check membership — identity re-derived server-side from the bearer token.
+    const membership = await checkOrganizationMembershipForToken(
       convex,
-      convexUser._id,
+      auth.accessToken,
       project.organizationId
     );
 

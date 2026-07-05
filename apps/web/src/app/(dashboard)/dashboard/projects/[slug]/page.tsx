@@ -175,7 +175,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     loadMore: loadMoreVariables,
   } = usePaginatedQuery(
     api.variables.listWithAccessPaginated,
-    projectId && convexUserId ? { projectId, userId: convexUserId } : "skip",
+    // Identity is derived server-side from the attached JWT; `convexUserId`
+    // gates the query until the current user is known (auth ready).
+    projectId && convexUserId ? { projectId } : "skip",
     { initialNumItems: 50 }
   );
   const isLoadingVariables = variablesStatus === "LoadingFirstPage";
