@@ -110,8 +110,10 @@ export default function RequestsPage() {
 
   const requestsResult = useQuery(
     api.variableRequests.listForReviewer,
+    // Identity is derived server-side from the attached JWT; `convexUserId`
+    // gates the query until the current user is known (auth ready).
     activeOrganizationId && convexUserId
-      ? { organizationId: activeOrganizationId, userId: convexUserId, status }
+      ? { organizationId: activeOrganizationId, status }
       : "skip"
   );
   const requests = (requestsResult ?? []) as ReviewerRequest[];

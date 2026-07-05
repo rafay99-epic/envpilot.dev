@@ -91,14 +91,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get Polar customer — try user-level first, fallback to org-level
-    let polarCustomer = await convex.query(
-      api.subscriptions.getPolarCustomerByUser,
-      { userId: convexUser._id }
+    // Get Polar customer — the caller's own first, fallback to org-level.
+    // Both derive/gate identity inside Convex from the attached JWT.
+    const authed = createAuthedConvexClient(accessToken!);
+    let polarCustomer = await authed.query(
+      api.subscriptions.getOwnPolarCustomer,
+      {}
     );
 
     if (!polarCustomer) {
-      polarCustomer = await convex.query(api.subscriptions.getPolarCustomer, {
+      polarCustomer = await authed.query(api.subscriptions.getPolarCustomer, {
         organizationId: organizationId as Id<"organizations">,
       });
     }

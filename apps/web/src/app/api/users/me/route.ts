@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
@@ -48,7 +48,7 @@ const profileSchema = z.object({
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -65,15 +65,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { firstName, lastName } = validation.data;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
 
     const name = `${firstName} ${lastName}`.trim();
 
-    await convex.mutation(api.users.updateProfile, {
-      userId: convexUser._id,
-      callerUserId: convexUser._id,
-      name,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.users.updateProfile,
+      { name }
+    );
 
     return NextResponse.json({ success: true, name });
   } catch (error) {

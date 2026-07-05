@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -23,21 +23,24 @@ interface RouteContext {
  */
 export async function GET(_request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { id } = await context.params;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
     const requestId = id as Id<"environmentVariableRequests">;
 
     // getById enforces authorization (requester or reviewer) and returns the
     // request document including its vaultRef.
-    const variableRequest = await convex.query(api.variableRequests.getById, {
-      requestId,
-      userId: convexUser._id,
-    });
+    const variableRequest = await createAuthedConvexClient(accessToken!).query(
+      api.variableRequests.getById,
+      {
+        requestId,
+      }
+    );
 
     if (!variableRequest) {
       return NextResponse.json(

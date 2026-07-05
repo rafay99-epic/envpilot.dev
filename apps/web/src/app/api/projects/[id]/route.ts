@@ -123,12 +123,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get or create the Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       existingProject.organizationId
     );
 
@@ -147,13 +148,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const { name, description, icon, color } = validation.data;
 
-    await convex.mutation(api.projects.update, {
+    await authed.mutation(api.projects.update, {
       projectId: id as Id<"projects">,
       name,
       description,
       icon,
       color,
-      updatedBy: convexUser._id,
     });
 
     const project = await convex.query(api.projects.getById, {
@@ -188,12 +188,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get or create the Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       existingProject.organizationId
     );
 
@@ -209,9 +210,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       );
     }
 
-    await convex.mutation(api.projects.remove, {
+    await authed.mutation(api.projects.remove, {
       projectId: id as Id<"projects">,
-      deletedBy: convexUser._id,
     });
 
     return NextResponse.json({ success: true });

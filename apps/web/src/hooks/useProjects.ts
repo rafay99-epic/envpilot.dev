@@ -39,7 +39,9 @@ export function useProject(projectId: Id<"projects"> | undefined) {
  * Hook for listing all projects accessible to a user
  */
 export function useUserProjects(userId: Id<"users"> | undefined) {
-  return useQuery(api.projects.listForUser, userId ? { userId } : "skip");
+  // Identity is derived server-side from the attached JWT; `userId` only gates
+  // the query until the current user is known (auth ready).
+  return useQuery(api.projects.listForUser, userId ? {} : "skip");
 }
 
 /**

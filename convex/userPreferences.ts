@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
 import { resolveFeatureForUser } from "./featureRegistry";
+import { requireAuthedUser } from "./identity";
 
 const DEFAULT_NOTIFICATIONS = {
   variableChanges: true,
@@ -11,11 +12,12 @@ const DEFAULT_NOTIFICATIONS = {
 };
 
 export const getByUserId = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
     const prefs = await ctx.db
       .query("userPreferences")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
 
     if (!prefs) {
@@ -56,8 +58,6 @@ export const getByUserIdInternal = internalQuery({
 
 export const upsert = mutation({
   args: {
-    userId: v.id("users"),
-    callerUserId: v.id("users"),
     emailNotifications: v.optional(
       v.object({
         variableChanges: v.boolean(),
@@ -70,15 +70,14 @@ export const upsert = mutation({
     keyboardShortcuts: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
-    if (args.callerUserId !== args.userId) {
-      throw new Error("You can only update your own preferences");
-    }
+    // Self-service only: the acting user is derived from the verified identity.
+    const actor = await requireAuthedUser(ctx);
 
     // If keyboard shortcuts are being updated, check feature gate
     if (args.keyboardShortcuts !== undefined) {
       const shortcutCheck = await resolveFeatureForUser(
         ctx.db,
-        args.userId,
+        actor._id,
         "keyboard_shortcuts_custom"
       );
       if (shortcutCheck.value !== true) {
@@ -91,7 +90,7 @@ export const upsert = mutation({
     const now = Date.now();
     const existing = await ctx.db
       .query("userPreferences")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .first();
 
     if (existing) {
@@ -107,7 +106,7 @@ export const upsert = mutation({
     }
 
     return await ctx.db.insert("userPreferences", {
-      userId: args.userId,
+      userId: actor._id,
       emailNotifications: args.emailNotifications,
       keyboardShortcuts: args.keyboardShortcuts,
       updatedAt: now,

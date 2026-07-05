@@ -103,13 +103,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the subscription — try user-level first, fallback to org-level
-    let subscription = await convex.query(api.subscriptions.getByUser, {
-      userId: convexUser._id,
-    });
+    // Get the subscription — the caller's own first, fallback to org-level.
+    // Both derive/gate identity inside Convex from the attached JWT.
+    const authed = createAuthedConvexClient(accessToken!);
+    let subscription = await authed.query(api.subscriptions.getOwn, {});
 
     if (!subscription) {
-      subscription = await convex.query(api.subscriptions.getByOrganization, {
+      subscription = await authed.query(api.subscriptions.getByOrganization, {
         organizationId: organizationId as Id<"organizations">,
       });
     }

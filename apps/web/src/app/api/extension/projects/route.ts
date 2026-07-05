@@ -109,9 +109,9 @@ export async function GET(request: Request) {
       }
 
       const queryStart = Date.now();
-      const projects = await convex.query(api.projects.listWithStats, {
+      const projects = await convex.query(api.projects.listWithStatsForToken, {
+        accessToken: auth.accessToken!,
         organizationId: organizationId as Id<"organizations">,
-        userId: convexUser._id,
       });
       childLog.info("org_projects_returned", {
         count: projects.length,
@@ -163,8 +163,8 @@ export async function GET(request: Request) {
     }
 
     const queryStart = Date.now();
-    const userProjects = await convex.query(api.projects.listForUser, {
-      userId: convexUser._id,
+    const userProjects = await convex.query(api.projects.listForUserForToken, {
+      accessToken: auth.accessToken!,
     });
     childLog.info("user_projects_returned", {
       count: userProjects.length,

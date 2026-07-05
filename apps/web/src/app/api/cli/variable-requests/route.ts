@@ -75,16 +75,19 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    const requests = await convex.query(api.variableRequests.listForProject, {
-      projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
-      status: status as
-        | "pending"
-        | "approved"
-        | "rejected"
-        | "canceled"
-        | undefined,
-    });
+    const requests = await convex.query(
+      api.variableRequests.listForProjectForToken,
+      {
+        accessToken: token,
+        projectId: projectId as Id<"projects">,
+        status: status as
+          | "pending"
+          | "approved"
+          | "rejected"
+          | "canceled"
+          | undefined,
+      }
+    );
 
     return NextResponse.json({
       success: true,
@@ -182,20 +185,26 @@ export async function POST(request: NextRequest) {
       projectId,
     });
 
-    const requestId = await convex.mutation(api.variableRequests.create, {
-      key,
-      vaultRef: vaultResult.id,
-      description,
-      environments,
-      projectId: projectId as Id<"projects">,
-      isSensitive,
-      requestedBy: authResult.userId,
-    });
+    const requestId = await convex.mutation(
+      api.variableRequests.createForToken,
+      {
+        accessToken: token,
+        key,
+        vaultRef: vaultResult.id,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive,
+      }
+    );
 
-    const createdRequest = await convex.query(api.variableRequests.getById, {
-      requestId,
-      userId: authResult.userId,
-    });
+    const createdRequest = await convex.query(
+      api.variableRequests.getByIdForToken,
+      {
+        accessToken: token,
+        requestId,
+      }
+    );
 
     return NextResponse.json(
       { success: true, data: { request: createdRequest } },

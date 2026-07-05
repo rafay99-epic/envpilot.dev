@@ -52,10 +52,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Check admin in source org
-    const sourceMembership = await createAuthedConvexClient(accessToken!).query(
+    const sourceMembership = await authed.query(
       api.organizations.getMembership,
       {
         organizationId: project.organizationId,
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check membership in target org
-    const targetMembership = await createAuthedConvexClient(accessToken!).query(
+    const targetMembership = await authed.query(
       api.organizations.getMembership,
       {
         organizationId: targetOrganizationId as Id<"organizations">,
@@ -91,10 +93,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Execute the move (tier enforcement is handled server-side in the mutation)
-    await convex.mutation(api.projects.move, {
+    await authed.mutation(api.projects.move, {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
-      movedBy: convexUser._id,
     });
 
     // Send notification email to target org admins (non-blocking)

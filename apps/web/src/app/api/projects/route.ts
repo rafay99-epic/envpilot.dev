@@ -50,13 +50,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const organizationId = searchParams.get("organizationId");
 
-    // Get or create the Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     if (organizationId) {
       // Verify user is a member of the requested organization
       const membership = await checkOrganizationMembership(
-        createAuthedConvexClient(accessToken!),
+        authed,
         organizationId as Id<"organizations">
       );
 
@@ -65,16 +66,13 @@ export async function GET(request: Request) {
       }
 
       // List projects for a specific organization (filtered by membership for non-admins)
-      const projects = await convex.query(api.projects.listWithStats, {
+      const projects = await authed.query(api.projects.listWithStats, {
         organizationId: organizationId as Id<"organizations">,
-        userId: convexUser._id,
       });
       return NextResponse.json({ projects });
     } else {
       // List all projects for the user (across all their organizations)
-      const projects = await convex.query(api.projects.listForUser, {
-        userId: convexUser._id,
-      });
+      const projects = await authed.query(api.projects.listForUser, {});
       return NextResponse.json({ projects });
     }
   } catch (error) {
@@ -92,7 +90,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -108,22 +106,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get or create the Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
 
     const { name, slug, description, organizationId, icon, color } =
       validation.data;
 
     // Authorization is enforced in the Convex mutation (assertOrgAction + team_lead setting check)
-    const projectId = await convex.mutation(api.projects.create, {
-      name,
-      slug,
-      description,
-      organizationId: organizationId as Id<"organizations">,
-      icon,
-      color,
-      createdBy: convexUser._id,
-    });
+    const projectId = await createAuthedConvexClient(accessToken!).mutation(
+      api.projects.create,
+      {
+        name,
+        slug,
+        description,
+        organizationId: organizationId as Id<"organizations">,
+        icon,
+        color,
+      }
+    );
 
     const project = await convex.query(api.projects.getById, {
       projectId,

@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get projects (filtered to the user's assigned projects for non-owners)
-    const projects = await convex.query(api.projects.listWithStats, {
+    const projects = await convex.query(api.projects.listWithStatsForToken, {
+      accessToken: token,
       organizationId: organizationId as Id<"organizations">,
-      userId: authResult.userId,
     });
 
     // Old CLI builds only understand the legacy role strings. Non-owners only

@@ -60,7 +60,9 @@ export async function GET(request: Request) {
     }
 
     const { projectId, status } = validation.data;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     const { project, organizationId } = await getProjectOrganization(
       convex,
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
     }
 
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       organizationId
     );
 
@@ -80,9 +82,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const requests = await convex.query(api.variableRequests.listForProject, {
+    const requests = await authed.query(api.variableRequests.listForProject, {
       projectId: projectId as Id<"projects">,
-      userId: convexUser._id,
       status,
     });
 
@@ -120,7 +121,9 @@ export async function POST(request: Request) {
     const { key, value, description, environments, projectId, isSensitive } =
       validation.data;
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
     const { project, organizationId } = await getProjectOrganization(
       convex,
       projectId as Id<"projects">
@@ -131,7 +134,7 @@ export async function POST(request: Request) {
     }
 
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       organizationId
     );
 
@@ -156,19 +159,17 @@ export async function POST(request: Request) {
       projectId,
     });
 
-    const requestId = await convex.mutation(api.variableRequests.create, {
+    const requestId = await authed.mutation(api.variableRequests.create, {
       key,
       vaultRef: vaultResult.id,
       description,
       environments,
       projectId: projectId as Id<"projects">,
       isSensitive,
-      requestedBy: convexUser._id,
     });
 
-    const createdRequest = await convex.query(api.variableRequests.getById, {
+    const createdRequest = await authed.query(api.variableRequests.getById, {
       requestId,
-      userId: convexUser._id,
     });
 
     return NextResponse.json({ request: createdRequest }, { status: 201 });

@@ -87,31 +87,34 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get user-level tier info (primary source of truth)
-    const userTierInfo = await convex.query(
-      api.featureRegistry.getUserTierInfo,
-      { userId: organization.createdBy }
+    // Org-owner billing state, membership-gated inside Convex — the owner is
+    // resolved server-side from organization.createdBy, never client-supplied.
+    const authed = createAuthedConvexClient(accessToken!);
+
+    const userTierInfo = await authed.query(
+      api.featureRegistry.getOrgOwnerTierInfo,
+      { organizationId: organizationId as Id<"organizations"> }
     );
 
     // Get subscription — try user-level first, fallback to org-level
-    let subscription = await convex.query(api.subscriptions.getByUser, {
-      userId: organization.createdBy,
+    let subscription = await authed.query(api.subscriptions.getForOrgOwner, {
+      organizationId: organizationId as Id<"organizations">,
     });
 
     if (!subscription) {
-      subscription = await convex.query(api.subscriptions.getByOrganization, {
+      subscription = await authed.query(api.subscriptions.getByOrganization, {
         organizationId: organizationId as Id<"organizations">,
       });
     }
 
     // Get Polar customer — try user-level first, fallback to org-level
-    let polarCustomer = await convex.query(
-      api.subscriptions.getPolarCustomerByUser,
-      { userId: organization.createdBy }
+    let polarCustomer = await authed.query(
+      api.subscriptions.getPolarCustomerForOrgOwner,
+      { organizationId: organizationId as Id<"organizations"> }
     );
 
     if (!polarCustomer) {
-      polarCustomer = await convex.query(api.subscriptions.getPolarCustomer, {
+      polarCustomer = await authed.query(api.subscriptions.getPolarCustomer, {
         organizationId: organizationId as Id<"organizations">,
       });
     }

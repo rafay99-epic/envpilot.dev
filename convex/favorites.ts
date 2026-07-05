@@ -1,15 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { createAuditLog } from "./auditHelpers";
+import { requireAuthedUser } from "./identity";
 
 /**
  * Favorite Projects — user-specific project bookmarking
  */
 
 export const listByUser = query({
-  args: {
-    userId: v.id("users"),
-  },
+  args: {},
   returns: v.array(
     v.object({
       _id: v.id("favoriteProjects"),
@@ -19,10 +18,12 @@ export const listByUser = query({
       createdAt: v.number(),
     })
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+
     const favorites = await ctx.db
       .query("favoriteProjects")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
 
     return favorites;
@@ -31,15 +32,16 @@ export const listByUser = query({
 
 export const toggle = mutation({
   args: {
-    userId: v.id("users"),
     projectId: v.id("projects"),
   },
   returns: v.object({ favorited: v.boolean() }),
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const existing = await ctx.db
       .query("favoriteProjects")
       .withIndex("by_user_and_project", (q) =>
-        q.eq("userId", args.userId).eq("projectId", args.projectId)
+        q.eq("userId", actor._id).eq("projectId", args.projectId)
       )
       .first();
 
@@ -52,7 +54,7 @@ export const toggle = mutation({
         await createAuditLog(ctx, {
           organizationId: project.organizationId,
           projectId: args.projectId,
-          userId: args.userId,
+          userId: actor._id,
           action: "project.unfavorited",
           details: { projectName: project.name },
         });
@@ -62,7 +64,7 @@ export const toggle = mutation({
     }
 
     await ctx.db.insert("favoriteProjects", {
-      userId: args.userId,
+      userId: actor._id,
       projectId: args.projectId,
       createdAt: Date.now(),
     });
@@ -71,7 +73,7 @@ export const toggle = mutation({
       await createAuditLog(ctx, {
         organizationId: project.organizationId,
         projectId: args.projectId,
-        userId: args.userId,
+        userId: actor._id,
         action: "project.favorited",
         details: { projectName: project.name },
       });

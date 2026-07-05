@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { z } from "zod";
@@ -11,16 +11,18 @@ import { reportApiError } from "@/lib/api-errors";
  */
 export async function GET() {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-    const preferences = await convex.query(api.userPreferences.getByUserId, {
-      userId: convexUser._id,
-    });
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
+    const preferences = await createAuthedConvexClient(accessToken!).query(
+      api.userPreferences.getByUserId,
+      {}
+    );
 
     return NextResponse.json(preferences);
   } catch (error) {
@@ -51,7 +53,7 @@ const preferencesSchema = z.object({
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -67,14 +69,16 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves server-side.
+    await getOrCreateConvexUser(convex, user);
 
-    await convex.mutation(api.userPreferences.upsert, {
-      userId: convexUser._id,
-      callerUserId: convexUser._id,
-      emailNotifications: validation.data.emailNotifications,
-      keyboardShortcuts: validation.data.keyboardShortcuts,
-    });
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.userPreferences.upsert,
+      {
+        emailNotifications: validation.data.emailNotifications,
+        keyboardShortcuts: validation.data.keyboardShortcuts,
+      }
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

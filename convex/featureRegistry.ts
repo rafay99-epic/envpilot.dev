@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
-import type { DatabaseReader } from "./_generated/server";
+import type { DatabaseReader, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { isEnforcementEnabledFromDb, getDefaultTierName } from "./tierLimits";
+import { requireAuthedUser } from "./identity";
 
 // ==========================================
 // PAGINATION SHAPE (structural — matches Convex's query builder return type)
@@ -900,44 +901,75 @@ export const getResolvedFeaturesBatch = query({
 });
 
 /**
- * Get a user's tier info including grace period status.
+ * Shared tier-info shape for a resolved user id. Callers must have already
+ * established that the requester may see this user's tier.
  */
-export const getUserTierInfo = query({
-  args: { userId: v.id("users") },
+async function tierInfoForUser(ctx: QueryCtx, userId: Id<"users">) {
+  const tier = await getUserTier(ctx.db, userId);
+  const tierDef = await ctx.db
+    .query("tierDefinitions")
+    .withIndex("by_name", (q) => q.eq("name", tier))
+    .first();
+
+  const grace = await ctx.db
+    .query("subscriptionGracePeriods")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+
+  const graceActive =
+    grace?.isActive === true && grace.gracePeriodEnd > Date.now();
+
+  return {
+    tier,
+    tierDefinition: tierDef
+      ? {
+          name: tierDef.name,
+          displayName: tierDef.displayName,
+          description: tierDef.description,
+          color: tierDef.color,
+          sortOrder: tierDef.sortOrder,
+        }
+      : null,
+    graceActive,
+    gracePeriodEnd: graceActive ? grace!.gracePeriodEnd : undefined,
+  };
+}
+
+/**
+ * The caller's own tier info including grace period status (browser hooks:
+ * tier badge, grace-period banner).
+ */
+export const getMyTierInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+    return tierInfoForUser(ctx, actor._id);
+  },
+});
+
+/**
+ * The org owner's tier info — what the billing tab shows every member as
+ * the org's effective plan. Membership-gated; the owner is resolved
+ * server-side from organization.createdBy, never from the client.
+ */
+export const getOrgOwnerTierInfo = query({
+  args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    if (!user) {
-      throw new Error("User not found");
+    const actor = await requireAuthedUser(ctx);
+    const membership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
+      )
+      .first();
+    if (!membership) {
+      throw new Error("Not a member of this organization");
     }
-
-    const tier = await getUserTier(ctx.db, args.userId);
-    const tierDef = await ctx.db
-      .query("tierDefinitions")
-      .withIndex("by_name", (q) => q.eq("name", tier))
-      .first();
-
-    const grace = await ctx.db
-      .query("subscriptionGracePeriods")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .first();
-
-    const graceActive =
-      grace?.isActive === true && grace.gracePeriodEnd > Date.now();
-
-    return {
-      tier,
-      tierDefinition: tierDef
-        ? {
-            name: tierDef.name,
-            displayName: tierDef.displayName,
-            description: tierDef.description,
-            color: tierDef.color,
-            sortOrder: tierDef.sortOrder,
-          }
-        : null,
-      graceActive,
-      gracePeriodEnd: graceActive ? grace!.gracePeriodEnd : undefined,
-    };
+    const organization = await ctx.db.get(args.organizationId);
+    if (!organization) {
+      throw new Error("Organization not found");
+    }
+    return tierInfoForUser(ctx, organization.createdBy);
   },
 });
 
