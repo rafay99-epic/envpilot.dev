@@ -1,0 +1,158 @@
+apps/web/src/app/api/billing/portal/route.ts
+  s_8ac05b3f82c26d::t_94d6c6d3fe986d 94-99,103
+convex/variableRequests.ts
+  s_8ac05b3f82c26d::t_62fcfa3aac174f 575
+  s_8ac05b3f82c26d::t_630cc570007219 784,789-790,806
+  s_8ac05b3f82c26d::t_a7bf1940920b88 544-552,554-562
+  s_8ac05b3f82c26d::t_3f07ef4cc080ea 171-233
+  s_8ac05b3f82c26d::t_b598b653b11548 6
+  s_8ac05b3f82c26d::t_e88147974e6cc1 87-88,90-94
+  s_8ac05b3f82c26d::t_ade4259c05b8b1 433-443,445-454
+  s_8ac05b3f82c26d::t_8a70de7fa3ab3d 597,603,616,624,682-683,695,706,714,727,745
+  s_8ac05b3f82c26d::t_16710ed3202208 257-276
+  s_8ac05b3f82c26d::t_ee8727f03690b3 770
+  s_8ac05b3f82c26d::t_0182b23c8f33cc 342,348
+  s_8ac05b3f82c26d::t_82221e335b3d88 95-99
+  s_8ac05b3f82c26d::t_773ac02cabfcca 375
+  s_8ac05b3f82c26d::t_c9d0643954dd64 101-110,112-145,147-148,150,170,235-256,456-459,461-471,473,475-481,483-488,490-492,494-499,501-504,506-510,512,514-534,538-541,543,798
+  s_8ac05b3f82c26d::t_83761f48dffe2f 234
+apps/web/src/app/api/users/me/sessions/route.ts
+  s_8ac05b3f82c26d::t_3299599b342dad 3
+  s_8ac05b3f82c26d::t_fb4d2cdef20c96 13,19-24
+  s_8ac05b3f82c26d::t_4046c9bd4a4708 42,48-53
+convex/dashboard.ts
+  s_8ac05b3f82c26d::t_82d00206e1b476 138-139,144,157
+  s_8ac05b3f82c26d::t_99c52428681ecd 7
+apps/web/src/app/api/billing/checkout/route.ts
+  s_8ac05b3f82c26d::t_ea4f9218edf827 114-116
+  s_8ac05b3f82c26d::t_a0633a25157e52 3
+  s_8ac05b3f82c26d::t_20f0ba0b666a06 55
+apps/web/src/app/api/users/me/route.ts
+  s_8ac05b3f82c26d::t_64fb1c909ca922 51,68-69,73-76
+  s_8ac05b3f82c26d::t_ee5581e2dfe230 3
+apps/web/src/app/api/variable-requests/route.ts
+  s_8ac05b3f82c26d::t_24698ddbc88a07 77,137
+  s_8ac05b3f82c26d::t_b4c906b367745d 124-126,162,171
+  s_8ac05b3f82c26d::t_8b14c18d958a9a 63-65,85
+apps/web/src/app/api/projects/[id]/route.ts
+  s_8ac05b3f82c26d::t_789d1d081c508d 191-193,197,213
+  s_8ac05b3f82c26d::t_cca7b78a35c449 126-128,132,151
+apps/web/src/app/api/cli/projects/route.ts
+  s_8ac05b3f82c26d::t_5b4a92ffcbb9dc 59-60
+apps/web/src/app/api/extension/projects/route.ts
+  s_8ac05b3f82c26d::t_24698ddbc88a07 166-167
+  s_8ac05b3f82c26d::t_9038080066331b 112-113
+convex/featureRequests.ts
+  s_8ac05b3f82c26d::t_9e096b73fcbbf5 119-123
+  s_8ac05b3f82c26d::t_eea99af3e90593 233,242,245
+  s_8ac05b3f82c26d::t_3f82301e57102d 352-354,366
+  s_8ac05b3f82c26d::t_16bb6258cd1f47 4
+  s_8ac05b3f82c26d::t_a92c50f1d744fa 186-188
+  s_8ac05b3f82c26d::t_91c505f8b12dec 425,428,432
+  s_8ac05b3f82c26d::t_f87a4c2194e758 470,472,474,478
+  s_8ac05b3f82c26d::t_fb12ab6c6591e3 265-267,272,288,305
+  s_8ac05b3f82c26d::t_511460ea909e6a 545,547,551
+  s_8ac05b3f82c26d::t_c9d0643954dd64 129,294,372
+convex/users.ts
+  s_8ac05b3f82c26d::t_32f99c1baaf335 176-179,186,197
+  s_8ac05b3f82c26d::t_d8c3c0cef82081 122-124,127-128,130,132,137-140,144,150
+  s_8ac05b3f82c26d::t_b0e537cf85a23c 3
+apps/web/src/hooks/useProjects.ts
+  s_8ac05b3f82c26d::t_533ee147dcb37f 42-44
+apps/web/src/hooks/useDashboard.ts
+  s_8ac05b3f82c26d::t_40dc18beaa49e7 17-19
+  s_8ac05b3f82c26d::t_aadbb67337fd03 78-80
+apps/web/src/app/api/variable-requests/[id]/route.ts
+  s_8ac05b3f82c26d::t_44f4bac101c5fc 3
+  s_8ac05b3f82c26d::t_bcd1e01dae6860 31,48-50,53,65,69,77
+apps/web/src/app/api/projects/route.ts
+  s_8ac05b3f82c26d::t_2e35b043b0dafd 53-55,60,69,75
+  s_8ac05b3f82c26d::t_d4ae111575d44a 93,109-110,116-126
+apps/web/src/hooks/useVariableRequests.ts
+  s_8ac05b3f82c26d::t_a7bd60dd8f2c5a 16-17
+convex/featureRegistry.ts
+  s_8ac05b3f82c26d::t_50c63ddf243448 904-905,907-912,914-917,919-920,922-936,938-972
+  s_8ac05b3f82c26d::t_a2f3897f70a49d 3,6
+convex/favorites.ts
+  s_8ac05b3f82c26d::t_efc8e29e493598 4
+  s_8ac05b3f82c26d::t_70a219cd496d30 11,21-23,26,39-40,44,57,67,76
+apps/web/src/hooks/useFeatureRequests.ts
+  s_8ac05b3f82c26d::t_1f57c6a9a88648 56,59-60,63
+apps/web/src/app/api/billing/subscription/route.ts
+  s_8ac05b3f82c26d::t_8277fa46c43a57 90-96,100-101,105,111-113,117
+convex/subscriptions.ts
+  s_8ac05b3f82c26d::t_cb86fd79ac792c 1461
+  s_8ac05b3f82c26d::t_e1211116ab447c 72-99,104-105,116,118-135,137-142,145,151-152,157-158,169,171-187,189-194,197
+  s_8ac05b3f82c26d::t_d77e8320da5c29 15
+  s_8ac05b3f82c26d::t_d0cfce62b87937 10-11
+  s_8ac05b3f82c26d::t_ce03069fe5239a 1414-1415,1420,1431
+apps/web/src/app/(dashboard)/dashboard/requests/page.tsx
+  s_8ac05b3f82c26d::t_900019d022e214 113-114,116
+apps/web/src/hooks/useFavorites.ts
+  s_8ac05b3f82c26d::t_365c6fa792cb41 8-10,22-25
+apps/web/src/hooks/useTierStore.ts
+  s_8ac05b3f82c26d::t_8c9fc450e4f369 30-31,33-34
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_8ac05b3f82c26d::t_0c0cc902095bf9 356-358
+apps/web/src/app/api/projects/[id]/move/route.ts
+  s_8ac05b3f82c26d::t_d3f3828364574d 96
+  s_8ac05b3f82c26d::t_2b254bbed073dc 55-57,60
+  s_8ac05b3f82c26d::t_8bd0f1ce2108f7 78
+apps/web/src/app/api/users/me/preferences/route.ts
+  s_8ac05b3f82c26d::t_4efe5f9608e78b 14,20-25
+  s_8ac05b3f82c26d::t_aa4ad03bb8d7fa 56,72-73,75-81
+  s_8ac05b3f82c26d::t_99f65c0315d851 3
+convex/projects.ts
+  s_8ac05b3f82c26d::t_c485c8dbcb8188 438,470,499,519,529,583,589,660,686,704,715,732
+  s_8ac05b3f82c26d::t_59b22d5eea2543 341-342,347
+  s_8ac05b3f82c26d::t_3d496d270e4212 61-62,64-67
+  s_8ac05b3f82c26d::t_aeda66bd20d18e 224-238
+  s_8ac05b3f82c26d::t_d03fdc9591e40a 381-382,391
+  s_8ac05b3f82c26d::t_9f9209c658fca7 556
+  s_8ac05b3f82c26d::t_65f77f2f0dcd52 136,138-147,151-155,157-169
+  s_8ac05b3f82c26d::t_407073f3eb7385 256-257,261
+  s_8ac05b3f82c26d::t_ce6635fef03908 366
+  s_8ac05b3f82c26d::t_d144efd579488a 68
+  s_8ac05b3f82c26d::t_c9d0643954dd64 69-87,89,91-93,95-100,102-103,105-108,110,112-118,120-135,171-190,192-208,211-221,223,344
+  s_8ac05b3f82c26d::t_2d776b3f5576d6 2-3,5
+  s_8ac05b3f82c26d::t_de91d931e287af 303,313-314,322
+  s_8ac05b3f82c26d::t_760a2c6f61f01c 170
+apps/web/src/app/api/cli/variable-requests/route.ts
+  s_8ac05b3f82c26d::t_272ff3065b67af 188-199,201-207
+  s_8ac05b3f82c26d::t_b9b80aec9908cf 78-90
+apps/web/src/app/api/extension/variable-requests/route.ts
+  s_8ac05b3f82c26d::t_c286b3c0f1ed7c 74-86
+  s_8ac05b3f82c26d::t_b18a01b3f50864 184-195,197-203
+apps/web/src/app/api/billing/cancel/route.ts
+  s_8ac05b3f82c26d::t_4d9f33a8b15342 106-109,112
+apps/web/src/app/api/projects/[id]/import/route.ts
+  s_8ac05b3f82c26d::t_03f01b17d75758 91-93,96-98
+  s_8ac05b3f82c26d::t_6a972a985f1ae2 170
+  s_8ac05b3f82c26d::t_774b0da59ecd25 231,246,260
+apps/web/src/hooks/useFeatureGate.ts
+  s_8ac05b3f82c26d::t_bcbc41d75ffd7f 64-67,71-72
+convex/userPreferences.ts
+  s_8ac05b3f82c26d::t_e9bb2b3410e2e1 109
+  s_8ac05b3f82c26d::t_867c39d8c82f17 73-74,80,93
+  s_8ac05b3f82c26d::t_00059791606faf 4
+  s_8ac05b3f82c26d::t_acf1b5cbdd316d 15-17,20
+apps/web/src/app/api/variable-requests/[id]/value/route.ts
+  s_8ac05b3f82c26d::t_73315ea4f318a1 26,32-33,38-43
+  s_8ac05b3f82c26d::t_4c20a777380c4d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "22f35ac855890379bc6edcd0a397e25cae1a2d04",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
