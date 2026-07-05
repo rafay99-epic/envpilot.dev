@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { handleApiError } from "@/lib/api-errors";
-import {
-  authenticateCLIRequest,
-  unauthorizedResponse,
-  forbiddenResponse,
-  extractBearerToken,
-} from "@/lib/cli-auth";
+import { requireWorkosUser, forbiddenResponse } from "@/lib/cli-auth";
 import { createSecret, readSecret } from "@/lib/vault";
 import {
   isAuthorizationError,
@@ -27,12 +22,11 @@ interface BulkVariable {
  * Bulk create/update variables (for push command)
  */
 export async function POST(request: NextRequest) {
-  // Authenticate
-  const authResult = await authenticateCLIRequest(request, convex);
-
-  if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error);
-  }
+  // Authenticate via WorkOS JWT bearer + confirm a provisioned Convex user
+  // (unprovisioned → clean 401, not a 500).
+  const auth = await requireWorkosUser(request, convex);
+  if (!auth.ok) return auth.response;
+  const authed = createAuthedConvexClient(auth.token);
 
   try {
     const body = await request.json();
@@ -54,16 +48,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const token = extractBearerToken(request)!;
-
     // Check membership and role
-    const membership = await convex.query(
-      api.organizations.getMembershipForToken,
-      {
-        accessToken: token,
-        organizationId: project.organizationId,
-      }
-    );
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -76,8 +64,7 @@ export async function POST(request: NextRequest) {
     // failing the whole push. Users without a project assignment are
     // blocked; grant-only users (per-variable viewer sharing) get the
     // strict read-only treatment old clients expect.
-    const legacy = await resolveLegacyRoles(convex, {
-      accessToken: token,
+    const legacy = await resolveLegacyRoles(authed, {
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -139,8 +126,7 @@ export async function POST(request: NextRequest) {
             );
             const vaultRef = vaultResult.id;
 
-            await convex.mutation(api.variables.updateForToken, {
-              accessToken: token,
+            await authed.mutation(api.variables.update, {
               variableId: existing._id,
               vaultRef,
               description: variable.description,
@@ -158,8 +144,7 @@ export async function POST(request: NextRequest) {
           });
           const vaultRef = vaultResult.id;
 
-          await convex.mutation(api.variables.createForToken, {
-            accessToken: token,
+          await authed.mutation(api.variables.create, {
             key: variable.key,
             vaultRef,
             description: variable.description,
@@ -191,8 +176,7 @@ export async function POST(request: NextRequest) {
     if (mode === "replace") {
       for (const [key, variable] of existingByKey) {
         try {
-          await convex.mutation(api.variables.removeForToken, {
-            accessToken: token,
+          await authed.mutation(api.variables.remove, {
             variableId: variable._id,
           });
           deleted++;

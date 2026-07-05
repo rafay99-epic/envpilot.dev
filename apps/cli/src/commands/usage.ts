@@ -13,7 +13,6 @@ import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated, getActiveOrganizationId } from "../lib/config.js";
 import { readProjectConfig } from "../lib/project-config.js";
 import { notAuthenticated, handleError } from "../lib/errors.js";
-import type { Organization } from "../types/index.js";
 
 /**
  * Format a usage ratio with color coding
@@ -59,11 +58,7 @@ export const usageCommand = new Command("usage")
         const orgs = await withSpinner(
           "Fetching organizations...",
           async () => {
-            const response = await api.get<{
-              success: boolean;
-              data: Organization[];
-            }>("/api/cli/organizations");
-            return response.data || [];
+            return api.listOrganizations();
           }
         );
 

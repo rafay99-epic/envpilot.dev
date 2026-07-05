@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { checkNumericLimit, countActiveProjects } from "./featureRegistry";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import {
   assertOrgAction,
   assertProjectAction,
@@ -107,9 +107,7 @@ async function listWithStatsCore(
       assignedProjectIds.add(pm.projectId.toString());
     }
 
-    projects = projects.filter((p) =>
-      assignedProjectIds.has(p._id.toString())
-    );
+    projects = projects.filter((p) => assignedProjectIds.has(p._id.toString()));
   }
 
   const projectsWithStats = await Promise.all(
@@ -144,20 +142,6 @@ export const listWithStats = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    return listWithStatsCore(ctx, {
-      organizationId: args.organizationId,
-      userId: actor._id,
-    });
-  },
-});
-
-export const listWithStatsForToken = query({
-  args: {
-    accessToken: v.string(),
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return listWithStatsCore(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
@@ -230,14 +214,6 @@ export const listForUser = query({
   args: {},
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
-    return listForUserCore(ctx, actor._id);
-  },
-});
-
-export const listForUserForToken = query({
-  args: { accessToken: v.string() },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return listForUserCore(ctx, actor._id);
   },
 });

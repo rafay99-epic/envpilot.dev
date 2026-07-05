@@ -288,19 +288,13 @@ async function pullProject(
   const variables = await withSpinner(
     `Fetching ${chalk.bold(project.environment)} variables...`,
     async () => {
-      const response = await api.get<{
-        success: boolean;
-        data: Variable[];
-        meta?: CliVariablesMeta;
-      }>("/api/cli/variables", {
-        projectId: project.projectId,
-        environment: project.environment,
-        ...(project.organizationId && {
-          organizationId: project.organizationId,
-        }),
-      });
+      const response = await api.listVariables(
+        project.projectId,
+        project.environment,
+        project.organizationId
+      );
       meta = response.meta;
-      return response.data || [];
+      return response.variables;
     }
   );
 

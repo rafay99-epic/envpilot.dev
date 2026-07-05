@@ -22,5 +22,11 @@ export default defineConfig({
   define: {
     __CLI_SENTRY_DSN__: JSON.stringify(process.env.SENTRY_CLI_DSN || ""),
     __CLI_VERSION__: JSON.stringify(version),
+    // WorkOS AuthKit device-flow client id (public) and the Convex deployment
+    // URL, baked in at build time. Sourced from the same env vars the web app
+    // uses so a single build environment configures every surface. See
+    // src/lib/env.ts for the runtime fallback to process.env in local dev.
+    __WORKOS_CLIENT_ID__: JSON.stringify(process.env.WORKOS_CLIENT_ID || ""),
+    __CONVEX_URL__: JSON.stringify(process.env.NEXT_PUBLIC_CONVEX_URL || ""),
   },
 });

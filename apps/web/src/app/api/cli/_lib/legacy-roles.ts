@@ -54,14 +54,17 @@ export interface ResolvedLegacyRoles {
  * Resolve a user's unified role + project assignment and translate them into
  * the legacy role strings old clients understand.
  *
+ * Since the device-flow cutover the caller is identified by the WorkOS JWT, so
+ * this takes an already-authed Convex client (setAuth'd with the caller's
+ * bearer) and calls the identity-verified functions — no accessToken arg.
+ *
  * Special case: a user with no project assignment but an active
  * variablePermissions grant is reported as projectRole "viewer" so old
  * clients apply strict read-only protection to the .env file.
  */
 export async function resolveLegacyRoles(
-  convex: ConvexHttpClient,
+  authedConvex: ConvexHttpClient,
   args: {
-    accessToken: string;
     projectId: Id<"projects">;
     orgRole: string | null | undefined;
   }
@@ -74,9 +77,9 @@ export async function resolveLegacyRoles(
   // populated for an assigned developer whose projectMembers row sets it.
   let environmentScope: string[] | null = null;
   if (!assigned) {
-    const projectMembership = await convex.query(
-      api.projectMembers.getProjectMembershipForToken,
-      { accessToken: args.accessToken, projectId: args.projectId }
+    const projectMembership = await authedConvex.query(
+      api.projectMembers.getProjectMembership,
+      { projectId: args.projectId }
     );
     assigned = projectMembership !== null;
     if (role === "developer") {
@@ -88,9 +91,7 @@ export async function resolveLegacyRoles(
   let legacyProjectRole = toLegacyProjectRole(args.orgRole, assigned);
 
   if (!assigned) {
-    const grants = await convex.query(api.permissions.getForUserForToken, {
-      accessToken: args.accessToken,
-    });
+    const grants = await authedConvex.query(api.permissions.getForUser, {});
     const now = Date.now();
     grantOnly = grants.some(
       (grant) =>

@@ -24,7 +24,7 @@ import {
   validateRequestValue,
   type RequestTarget,
 } from "../lib/variable-requests.js";
-import type { ProjectEntry, Variable, VariablesMeta } from "../types/index.js";
+import type { ProjectEntry, VariablesMeta } from "../types/index.js";
 
 /**
  * The /api/cli/variables meta block, including the legacy role/projectRole
@@ -321,14 +321,11 @@ async function fetchProjectMeta(
   api: APIClient,
   entry: ProjectEntry
 ): Promise<CliVariablesMeta | undefined> {
-  const response = await api.get<{
-    success: boolean;
-    data: Variable[];
-    meta?: CliVariablesMeta;
-  }>("/api/cli/variables", {
-    projectId: entry.projectId,
-    ...(entry.organizationId && { organizationId: entry.organizationId }),
-  });
+  const response = await api.listVariables(
+    entry.projectId,
+    undefined,
+    entry.organizationId
+  );
   return response.meta;
 }
 

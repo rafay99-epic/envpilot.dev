@@ -1,88 +1,42 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { convex } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
 import type { Doc } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "./convex-helpers";
-import { createLogger, tokenPrefix } from "./logger";
+import { createLogger } from "./logger";
 
 const log = createLogger("lib/extension-auth");
 
 interface ExtensionAuthResult {
   convexUser: Doc<"users">;
-  /**
-   * The raw bearer token the request authenticated with, when present. Passed
-   * to `*ForToken` Convex variants so identity is re-derived server-side. Null
-   * only on the session-cookie fallback path (which does not apply to the
-   * bearer-only extension data routes).
-   */
-  accessToken: string | null;
 }
 
 /**
- * Authenticate an extension API request.
+ * Authenticate a browser-originated extension API request via the WorkOS
+ * session cookie.
  *
- * Tries two methods in order:
- * 1. Bearer token from Authorization header → validated against cliTokens table
- * 2. WorkOS session cookie via withAuth() → for browser-based calls (requires middleware)
+ * Since the Stage 2 device-flow cutover the old homegrown bearer branch
+ * (cliTokens/cliSessions) is gone: the extension attaches a real WorkOS JWT and
+ * either calls Convex directly (setAuth) or, for the surviving vault route, is
+ * verified with `verifyWorkosBearer` from lib/cli-auth. This helper only covers
+ * the session-cookie path used by browser-based calls.
  *
  * Returns the authenticated Convex user, or null if not authenticated.
  */
-export async function authenticateExtensionRequest(
-  request: Request
-): Promise<ExtensionAuthResult | null> {
-  // Method 1: Bearer token (sent by the extension/CLI)
-  const authHeader = request.headers.get("Authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    return authenticateByToken(token);
-  }
-
-  // Method 2: Session cookie (browser-based calls)
+export async function authenticateExtensionRequest(): Promise<ExtensionAuthResult | null> {
   // Wrapped in try-catch because withAuth() throws if AuthKit middleware
-  // is not active on this route (e.g. extension API routes)
+  // is not active on this route.
   try {
-    return await authenticateBySession();
+    const { user } = await withAuth();
+    if (!user) {
+      return null;
+    }
+
+    const convexUser = await getOrCreateConvexUser(convex, user);
+    return { convexUser };
   } catch (error) {
     log.warn("session_auth_unavailable", {
       reason: error instanceof Error ? error.message : "unknown",
     });
     return null;
   }
-}
-
-async function authenticateByToken(
-  token: string
-): Promise<ExtensionAuthResult | null> {
-  try {
-    const validation = await convex.query(api.cliSessions.validateToken, {
-      accessToken: token,
-    });
-
-    if (!validation.valid || !validation.userId) {
-      return null;
-    }
-
-    const user = await convex.query(api.users.getById, {
-      userId: validation.userId,
-    });
-
-    if (!user) {
-      return null;
-    }
-
-    return { convexUser: user, accessToken: token };
-  } catch (error) {
-    log.error("token_auth_failed", { token: tokenPrefix(token) }, error);
-    return null;
-  }
-}
-
-async function authenticateBySession(): Promise<ExtensionAuthResult | null> {
-  const { user } = await withAuth();
-  if (!user) {
-    return null;
-  }
-
-  const convexUser = await getOrCreateConvexUser(convex, user);
-  return { convexUser, accessToken: null };
 }

@@ -9,20 +9,6 @@ import { internal } from "./_generated/api";
  */
 const crons = cronJobs();
 
-// Clean up expired CLI auth sessions every hour
-crons.interval(
-  "cleanup expired CLI sessions",
-  { hours: 1 },
-  internal.cliSessions.cleanupExpiredSessions
-);
-
-// Clean up expired pending extension auth handshake records every 15 minutes
-crons.interval(
-  "cleanup expired pending extension auth sessions",
-  { minutes: 15 },
-  internal.pendingExtensionAuthSessions.cleanupExpired
-);
-
 // Clean up expired project access tokens every hour
 crons.interval(
   "cleanup expired project access",

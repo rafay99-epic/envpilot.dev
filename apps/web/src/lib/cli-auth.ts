@@ -1,13 +1,27 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
-import type { Id, Doc } from "@convex/_generated/dataModel";
+import type { Id } from "@convex/_generated/dataModel";
 import { NextRequest } from "next/server";
-import { createLogger, tokenPrefix } from "@/lib/logger";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createLogger } from "@/lib/logger";
 
 const log = createLogger("lib/cli-auth");
 
+// WorkOS AuthKit device-flow JWTs are verified against the client's JWKS. The
+// client id is public (baked into the CLI/extension at build time) and shared
+// server-side via process.env — mirror the browser-side NEXT_PUBLIC value.
+const WORKOS_CLIENT_ID =
+  process.env.NEXT_PUBLIC_WORKOS_CLIENT_ID ??
+  process.env.WORKOS_CLIENT_ID ??
+  "";
+const WORKOS_ISSUER = `https://api.workos.com/user_management/${WORKOS_CLIENT_ID}`;
+// createRemoteJWKSet caches keys in-process, so this is created once per server.
+const workosJwks = createRemoteJWKSet(
+  new URL(`https://api.workos.com/sso/jwks/${WORKOS_CLIENT_ID}`)
+);
+
 /**
- * Result of CLI token validation
+ * Result of CLI request authentication
  */
 export interface CLIAuthResult {
   valid: boolean;
@@ -23,7 +37,9 @@ export interface CLIAuthResult {
 /**
  * Extract the Bearer token from the Authorization header
  */
-export function extractBearerToken(request: NextRequest): string | null {
+export function extractBearerToken(
+  request: NextRequest | Request
+): string | null {
   const authHeader = request.headers.get("Authorization");
 
   if (!authHeader) {
@@ -38,67 +54,117 @@ export function extractBearerToken(request: NextRequest): string | null {
 }
 
 /**
- * Validate a CLI access token
+ * Verify a WorkOS AuthKit device-flow JWT from the `Authorization: Bearer`
+ * header. `withAuth()` only reads cookies, so the CLI/extension surfaces that
+ * still hit a Next.js route (the vault crypto path) verify their JWT here.
+ *
+ * Returns the WorkOS user id (`sub`) plus the raw token (so the route can build
+ * a setAuth'd Convex client to call the identity-verified functions), or null
+ * if there is no valid token.
  */
-export async function validateCLIToken(
-  convex: ConvexHttpClient,
-  token: string
-): Promise<CLIAuthResult> {
+export async function verifyWorkosBearer(
+  request: NextRequest | Request
+): Promise<{ workosUserId: string; token: string } | null> {
+  const token = extractBearerToken(request);
+  if (!token) return null;
+
+  if (!WORKOS_CLIENT_ID) {
+    log.error("workos_client_id_missing", {});
+    return null;
+  }
+
   try {
-    const result = await convex.query(api.cliSessions.validateToken, {
-      accessToken: token,
+    const { payload } = await jwtVerify(token, workosJwks, {
+      issuer: WORKOS_ISSUER,
     });
-
-    if (!result.valid) {
-      return {
-        valid: false,
-        error: result.reason || "Invalid token",
-      };
-    }
-
-    // Update last used timestamp (fire and forget)
-    convex
-      .mutation(api.cliSessions.updateLastUsed, {
-        accessToken: token,
-      })
-      .catch((error) => {
-        log.warn("token_last_used_update_failed", {
-          token: tokenPrefix(token),
-          reason: error instanceof Error ? error.message : "unknown",
-        });
-      });
-
-    return {
-      valid: true,
-      userId: result.userId,
-      user: result.user,
-    };
+    if (!payload.sub) return null;
+    return { workosUserId: payload.sub, token };
   } catch (error) {
-    log.error("token_validation_failed", { token: tokenPrefix(token) }, error);
-    return {
-      valid: false,
-      error: "Failed to validate token",
-    };
+    log.warn("bearer_verification_failed", {
+      reason: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
   }
 }
 
 /**
- * Middleware helper to authenticate CLI requests
+ * Verify the WorkOS JWT bearer AND confirm the caller has a provisioned Convex
+ * `users` row, in one step. Returns the token + resolved ids on success, or a
+ * ready-to-return 401 response otherwise.
+ *
+ * Use this at the top of the surviving vault routes: without the user-existence
+ * check, a valid-but-unprovisioned JWT would reach `authed.query(...)`, throw
+ * from `requireAuthedUser` identity resolution, and surface as a generic 500
+ * instead of a clean auth failure.
+ */
+export type WorkosBearerAuth =
+  | { ok: true; token: string; workosUserId: string; userId: Id<"users"> }
+  | { ok: false; response: Response };
+
+export async function requireWorkosUser(
+  request: NextRequest | Request,
+  convex: ConvexHttpClient
+): Promise<WorkosBearerAuth> {
+  const verified = await verifyWorkosBearer(request);
+  if (!verified) {
+    return {
+      ok: false,
+      response: unauthorizedResponse("Missing or invalid authorization token"),
+    };
+  }
+
+  const user = await convex.query(api.users.getByWorkosId, {
+    workosId: verified.workosUserId,
+  });
+  if (!user) {
+    return {
+      ok: false,
+      response: unauthorizedResponse(
+        "Your account is not provisioned yet. Sign in on the web app once, then retry."
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    token: verified.token,
+    workosUserId: verified.workosUserId,
+    userId: user._id,
+  };
+}
+
+/**
+ * Authenticate a CLI request: verify the WorkOS JWT bearer, then resolve the
+ * Convex user by WorkOS id. The returned `user`/`userId` identify the caller;
+ * routes that need to call identity-verified Convex functions should ALSO build
+ * a setAuth'd client from `verifyWorkosBearer(...).token`.
  */
 export async function authenticateCLIRequest(
   request: NextRequest,
   convex: ConvexHttpClient
 ): Promise<CLIAuthResult> {
-  const token = extractBearerToken(request);
+  const verified = await verifyWorkosBearer(request);
 
-  if (!token) {
+  if (!verified) {
     return {
       valid: false,
-      error: "Missing authorization header",
+      error: "Missing or invalid authorization token",
     };
   }
 
-  return validateCLIToken(convex, token);
+  const user = await convex.query(api.users.getByWorkosId, {
+    workosId: verified.workosUserId,
+  });
+
+  if (!user) {
+    return { valid: false, error: "User not found" };
+  }
+
+  return {
+    valid: true,
+    userId: user._id,
+    user: { id: user._id, email: user.email, name: user.name },
+  };
 }
 
 /**
@@ -216,20 +282,4 @@ export async function checkExtensionAccess(
   }
 
   return { allowed: true, tier };
-}
-
-/**
- * Get the bearer-authenticated user's organizations for CLI. Identity is
- * resolved inside Convex from the validated bearer token, so the route passes
- * the raw token it already holds.
- */
-export async function getUserOrganizations(
-  convex: ConvexHttpClient,
-  accessToken: string
-): Promise<Array<Doc<"organizations"> & { role: string }>> {
-  const memberships = await convex.query(
-    api.organizations.listForUserForToken,
-    { accessToken }
-  );
-  return memberships as Array<Doc<"organizations"> & { role: string }>;
 }

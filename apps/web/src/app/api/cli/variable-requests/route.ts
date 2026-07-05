@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import {
-  authenticateCLIRequest,
+  verifyWorkosBearer,
   unauthorizedResponse,
   forbiddenResponse,
-  extractBearerToken,
 } from "@/lib/cli-auth";
 import { createSecret } from "@/lib/vault";
-import { isAuthorizationError, resolveLegacyRoles } from "../_lib/legacy-roles";
+import { resolveLegacyRoles } from "../_lib/legacy-roles";
 import { reportApiError } from "@/lib/api-errors";
 
+/**
+ * POST-only since the Stage 2 device-flow cutover: request LISTING moved to a
+ * direct Convex query from the CLI (variableRequests.listForProject with the
+ * caller's JWT). Only CREATE still needs this route, because the submitted
+ * value must be encrypted into WorkOS Vault server-side (WORKOS_API_KEY) —
+ * that moves into Convex in Stage 3.
+ */
 const createRequestSchema = z.object({
   key: z
     .string()
@@ -32,89 +38,16 @@ const createRequestSchema = z.object({
 });
 
 /**
- * GET /api/cli/variable-requests?projectId=...&status=pending
- * List variable requests for the authenticated CLI user's project.
- */
-export async function GET(request: NextRequest) {
-  const authResult = await authenticateCLIRequest(request, convex);
-
-  if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error);
-  }
-
-  const url = new URL(request.url);
-  const projectId = url.searchParams.get("projectId");
-  const status = url.searchParams.get("status") || undefined;
-
-  if (!projectId) {
-    return NextResponse.json(
-      { error: "Missing projectId parameter" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const project = await convex.query(api.projects.getById, {
-      projectId: projectId as Id<"projects">,
-    });
-
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
-    }
-
-    const token = extractBearerToken(request)!;
-    const membership = await convex.query(
-      api.organizations.getMembershipForToken,
-      {
-        accessToken: token,
-        organizationId: project.organizationId,
-      }
-    );
-
-    if (!membership) {
-      return forbiddenResponse("You are not a member of this organization");
-    }
-
-    const requests = await convex.query(
-      api.variableRequests.listForProjectForToken,
-      {
-        accessToken: token,
-        projectId: projectId as Id<"projects">,
-        status: status as
-          | "pending"
-          | "approved"
-          | "rejected"
-          | "canceled"
-          | undefined,
-      }
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: { requests },
-    });
-  } catch (error) {
-    console.error("CLI variable-requests list error:", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to fetch variable requests";
-    reportApiError(error, "GET /api/cli/variable-requests");
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
-/**
  * POST /api/cli/variable-requests
  * Submit a variable request (developers only — owners/PMs/team leads should
- * create variables directly).
+ * create variables directly). Authenticated by a WorkOS device-flow JWT.
  */
 export async function POST(request: NextRequest) {
-  const authResult = await authenticateCLIRequest(request, convex);
-
-  if (!authResult.valid || !authResult.userId) {
-    return unauthorizedResponse(authResult.error);
+  const verified = await verifyWorkosBearer(request);
+  if (!verified) {
+    return unauthorizedResponse("Missing or invalid authorization token");
   }
+  const authed = createAuthedConvexClient(verified.token);
 
   try {
     const body = await request.json();
@@ -138,14 +71,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const token = extractBearerToken(request)!;
-    const membership = await convex.query(
-      api.organizations.getMembershipForToken,
-      {
-        accessToken: token,
-        organizationId: project.organizationId,
-      }
-    );
+    // Membership + role checks run as the caller (identity from the JWT).
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
 
     if (!membership) {
       return forbiddenResponse("You are not a member of this organization");
@@ -154,8 +83,7 @@ export async function POST(request: NextRequest) {
     // Unified role model: only developers assigned to the project submit
     // variable requests. Owners/project managers/team leads create directly;
     // unassigned users (including per-variable viewer grants) are blocked.
-    const legacy = await resolveLegacyRoles(convex, {
-      accessToken: token,
+    const legacy = await resolveLegacyRoles(authed, {
       projectId: projectId as Id<"projects">,
       orgRole: membership.role,
     });
@@ -185,54 +113,30 @@ export async function POST(request: NextRequest) {
       projectId,
     });
 
-    const requestId = await convex.mutation(
-      api.variableRequests.createForToken,
-      {
-        accessToken: token,
-        key,
-        vaultRef: vaultResult.id,
-        description,
-        environments,
-        projectId: projectId as Id<"projects">,
-        isSensitive,
-      }
-    );
+    const requestId = await authed.mutation(api.variableRequests.create, {
+      key,
+      vaultRef: vaultResult.id,
+      description,
+      environments,
+      projectId: projectId as Id<"projects">,
+      isSensitive,
+    });
 
-    const createdRequest = await convex.query(
-      api.variableRequests.getByIdForToken,
-      {
-        accessToken: token,
-        requestId,
-      }
-    );
+    // Return the full created request under `data.request` — the CLI
+    // (api.ts submitVariableRequest) reads `response.data.request`.
+    const createdRequest = await authed.query(api.variableRequests.getById, {
+      requestId,
+    });
 
-    return NextResponse.json(
-      { success: true, data: { request: createdRequest } },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      success: true,
+      data: { request: createdRequest, requestId },
+    });
   } catch (error) {
-    console.error("CLI create variable request error:", error);
-    const rawMessage =
+    const message =
       error instanceof Error
         ? error.message
-        : "Failed to create variable request";
-    // Convex wraps thrown errors as "[Request ID: …] Server Error\nUncaught
-    // Error: <real message>\n at …" — surface only the real message.
-    const message =
-      rawMessage.match(/Uncaught Error: ([^\n]+)/)?.[1] ?? rawMessage;
-    if (
-      message.includes("already exists") ||
-      message.includes("pending request")
-    ) {
-      return NextResponse.json({ error: message }, { status: 409 });
-    }
-    // The Convex mutation is the source of truth for authorization —
-    // translate its rejections into the standard FORBIDDEN response. Pass the
-    // real message through: scope errors ("Your access is limited to these
-    // environments: …") tell the developer exactly what to change.
-    if (isAuthorizationError(error)) {
-      return forbiddenResponse(message);
-    }
+        : "Failed to submit variable request";
     reportApiError(error, "POST /api/cli/variable-requests");
     return NextResponse.json({ error: message }, { status: 500 });
   }

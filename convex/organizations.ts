@@ -6,7 +6,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import { checkBooleanFeature, resolveFeatureForUser } from "./featureRegistry";
 import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
@@ -49,14 +49,6 @@ export const listForUser = query({
   args: {},
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
-    return listForUserCore(ctx, actor._id);
-  },
-});
-
-export const listForUserForToken = query({
-  args: { accessToken: v.string() },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return listForUserCore(ctx, actor._id);
   },
 });
@@ -174,17 +166,6 @@ export const getMembership = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    return getMembershipCore(ctx, args.organizationId, actor._id);
-  },
-});
-
-export const getMembershipForToken = query({
-  args: {
-    accessToken: v.string(),
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return getMembershipCore(ctx, args.organizationId, actor._id);
   },
 });
@@ -873,13 +854,16 @@ export const getMemberSessions = query({
       throw new Error("User is not a member of this organization");
     }
 
-    // Get active CLI tokens
+    // Get active CLI device-sessions. cliTokens now backs both surfaces; the
+    // extension is shown via projectAccess below, so exclude clientType
+    // "extension" here (legacy rows with no clientType are treated as CLI).
     const cliTokens = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
         q.eq("userId", args.targetUserId).eq("isActive", true)
       )
-      .collect();
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.clientType !== "extension"));
 
     const maskedCliTokens = cliTokens.map((token) => ({
       _id: token._id,
@@ -887,7 +871,10 @@ export const getMemberSessions = query({
       lastUsedAt: token.lastUsedAt,
       createdAt: token.createdAt,
       expiresAt: token.expiresAt,
-      tokenPreview: token.accessToken.slice(0, 8) + "...",
+      // Device-flow rows store no token server-side; fall back to a generic tag.
+      tokenPreview: token.accessToken
+        ? token.accessToken.slice(0, 8) + "..."
+        : "device",
     }));
 
     // Get active extension sessions across all org projects
@@ -998,7 +985,9 @@ export const revokeMemberCliToken = mutation({
       createdAt: now,
     });
 
-    return { success: true };
+    // The caller (Next.js route with the WorkOS SDK) revokes this WorkOS
+    // session server-side so remote sign-out is real.
+    return { success: true, sessionId: token.sessionId };
   },
 });
 
@@ -1135,8 +1124,10 @@ export const revokeAllMemberSessions = mutation({
 
     let revokedCliCount = 0;
     let revokedExtensionCount = 0;
+    // WorkOS session ids to revoke server-side in the calling Next.js route.
+    const sessionIds: string[] = [];
 
-    // Revoke active CLI tokens.
+    // Revoke active CLI/extension device-sessions (cliTokens backs both).
     // cliTokens now carry an OPTIONAL organizationId. When a token records this
     // org we scope the revocation to it. Legacy tokens with no organizationId
     // remain un-scoped and are still revoked here (we cannot attribute them to
@@ -1159,6 +1150,7 @@ export const revokeAllMemberSessions = mutation({
         continue;
       }
       await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
+      if (token.sessionId) sessionIds.push(token.sessionId);
       revokedCliCount++;
     }
 
@@ -1213,6 +1205,7 @@ export const revokeAllMemberSessions = mutation({
       success: true,
       revokedCliTokens: revokedCliCount,
       revokedExtensionSessions: revokedExtensionCount,
+      sessionIds,
     };
   },
 });

@@ -1,40 +1,59 @@
+// Convex-first API client.
+//
+// Stage 2 cutover: the CLI now authenticates with real WorkOS AuthKit JWTs and
+// talks DIRECTLY to Convex for all non-vault data (organizations, projects,
+// variable metadata, variable requests, tier/usage). The ONLY calls that still
+// go over HTTP to the Next.js app are the WorkOS-Vault crypto paths — reading
+// decrypted secret VALUES and writing (encrypting) them — because those need
+// the server-side WORKOS_API_KEY. Those requests now carry a
+// `Authorization: Bearer <WorkOS JWT>` header instead of the old cliTokens
+// bearer.
+//
+// Auth freshness: WorkOS access tokens live 5 minutes. Every Convex call and
+// every vault request first runs ensureFreshAccessToken(), which decodes the
+// stored token's `exp` and refreshes (rotating the refresh token) when it is
+// expired or within 60s of expiring, persisting the result to the active
+// account.
+
+import { ConvexHttpClient } from "convex/browser";
+import {
+  makeFunctionReference,
+  type FunctionReference,
+  type FunctionReturnType,
+  type OptionalRestArgs,
+} from "convex/server";
+import { CONVEX_URL } from "./env.js";
 import {
   getApiUrl,
-  getAccessToken,
-  getRefreshToken,
-  setAccessToken,
-  setRefreshToken,
+  getActiveAccount,
+  updateActiveAccount,
   clearAuth,
 } from "./config.js";
+import { isTokenExpiring } from "./jwt.js";
+import { refreshAccessToken, WorkosAuthError } from "./workos.js";
+import { computeFingerprint } from "./variables-cache.js";
+import { normalizeOrgRole } from "./roles.js";
 import type {
   ApiResponse,
   Organization,
   Project,
   Variable,
+  VariablesMeta,
   User,
-  TierInfo,
   UsageInfo,
   VariableRequest,
   VariableRequestStatus,
 } from "../types/index.js";
 import type { CreateVariableRequestBody } from "./variable-requests.js";
 
-/**
- * Return the registrable domain (eTLD+1 approximation) for a hostname.
- * For hostnames like `envpilot.dev` or `www.envpilot.dev` this returns
- * `envpilot.dev`. This is a heuristic — we only use it to decide whether
- * a redirect is "same site" and thus safe to re-issue with Authorization.
- */
-function registrableDomain(hostname: string): string {
-  const parts = hostname.toLowerCase().split(".").filter(Boolean);
-  if (parts.length <= 2) return parts.join(".");
-  return parts.slice(-2).join(".");
-}
-
-const MAX_MANUAL_REDIRECTS = 5;
+// ============================================================================
+// Errors
+// ============================================================================
 
 /**
- * Custom error class for API errors
+ * Custom error class for API errors. `statusCode` is preserved so callers can
+ * branch on it (e.g. `request.ts` treats a 403 from createVariableRequest as
+ * "not allowed to create — submit a request instead").
  */
 export class APIError extends Error {
   constructor(
@@ -47,65 +66,308 @@ export class APIError extends Error {
   }
 }
 
+// ============================================================================
+// Auth: fresh WorkOS access token
+// ============================================================================
+
+// Re-entrancy guard so concurrent calls share a single in-flight refresh
+// instead of each hitting WorkOS (and racing to persist rotated tokens).
+let refreshInFlight: Promise<string> | null = null;
+
 /**
- * API client for communicating with Envpilot server
+ * Return a valid WorkOS access token for the active account, refreshing it
+ * first when it is expired or about to expire (<60s left). Persists the new
+ * access token AND any rotated refresh token onto the active account.
+ *
+ * Throws APIError(401) when there is no session, or when the refresh token is
+ * rejected (in which case local credentials are cleared so the user re-logs in).
  */
-export class APIClient {
-  private baseUrl: string;
-  private accessToken: string | undefined;
-  // Re-entrancy guard: true while a token refresh is in flight so a 401 from
-  // the refresh endpoint itself can never trigger another refresh (no loops).
-  private refreshing = false;
-
-  constructor(options?: { baseUrl?: string; accessToken?: string }) {
-    this.baseUrl = options?.baseUrl ?? getApiUrl();
-    this.accessToken = options?.accessToken ?? getAccessToken();
-  }
-
-  /**
-   * Get headers for API requests
-   */
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (this.accessToken) {
-      headers["Authorization"] = `Bearer ${this.accessToken}`;
-    }
-
-    return headers;
-  }
-
-  /**
-   * Detect auth middleware redirects that returned HTML instead of CLI JSON.
-   */
-  private isAuthRedirect(response: Response, bodyText?: string): boolean {
-    const location = response.headers.get("location") || "";
-    const finalUrl = response.url || "";
-    const contentType = response.headers.get("content-type") || "";
-    const preview = (bodyText || "").slice(0, 512).toLowerCase();
-
-    return (
-      location.includes("authkit") ||
-      finalUrl.includes("authkit") ||
-      (contentType.includes("text/html") &&
-        (preview.includes("authorization_session_id") ||
-          preview.includes("client_id=") ||
-          preview.includes("<!doctype html")))
+export async function ensureFreshAccessToken(): Promise<string> {
+  const account = getActiveAccount();
+  if (!account?.accessToken) {
+    throw new APIError(
+      "You are not logged in. Run `envpilot login`.",
+      401,
+      "NOT_AUTHENTICATED"
     );
   }
 
+  if (!isTokenExpiring(account.accessToken)) {
+    return account.accessToken;
+  }
+
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = account.refreshToken;
+  if (!refreshToken) {
+    throw new APIError(
+      "Your session has expired. Run `envpilot login`.",
+      401,
+      "SESSION_EXPIRED"
+    );
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const result = await refreshAccessToken(refreshToken);
+      updateActiveAccount({
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+      });
+      return result.access_token;
+    } catch (err) {
+      if (err instanceof WorkosAuthError && err.code === "access_denied") {
+        // Refresh token revoked/expired — the session is genuinely dead.
+        clearAuth();
+        throw new APIError(
+          "Your session has expired. Run `envpilot login`.",
+          401,
+          "SESSION_EXPIRED"
+        );
+      }
+      throw err;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+// ============================================================================
+// Convex client + function references
+// ============================================================================
+
+/**
+ * Build a ConvexHttpClient authed with a freshly-minted WorkOS JWT.
+ *
+ * NOTE: ConvexHttpClient.setAuth takes a token STRING (unlike the reactive
+ * client's fetcher), so we resolve the fresh token up front and set it. Every
+ * call therefore carries a non-expired JWT.
+ */
+export async function getConvexClient(): Promise<ConvexHttpClient> {
+  if (!CONVEX_URL) {
+    throw new APIError(
+      "This CLI build has no Convex URL embedded. Rebuild with NEXT_PUBLIC_CONVEX_URL set.",
+      0,
+      "NOT_CONFIGURED"
+    );
+  }
+  const token = await ensureFreshAccessToken();
+  const client = new ConvexHttpClient(CONVEX_URL);
+  client.setAuth(token);
+  return client;
+}
+
+// String-based function references decouple the shipped CLI from
+// convex/_generated (which references the whole backend and may not be
+// generated at CLI build time). Args/returns are typed here against the
+// confirmed contract.
+
+type OrgRow = {
+  _id: string;
+  name: string;
+  slug: string;
+  role?: string;
+  description?: string;
+  logoUrl?: string;
+};
+type ProjectRow = {
+  _id: string;
+  name: string;
+  slug: string;
+  organizationId: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+};
+type MembershipRow = { role: string } | null;
+type ProjectMembershipRow = { environments?: string[] } | null;
+type VariableAccessRow = {
+  _id: string;
+  key: string;
+  environments: string[];
+  version?: number;
+  updatedAt?: number;
+  hasAccess: boolean;
+};
+type ResolvedFeatures = {
+  tierName: string;
+  features: Record<
+    string,
+    { value: boolean | number | null; valueType: string }
+  >;
+} | null;
+type OrganizationUsage = {
+  tier: "free" | "pro";
+  usage: UsageInfo["usage"];
+} | null;
+
+const fnRef = makeFunctionReference;
+
+const refs = {
+  listOrganizations: fnRef<"query", Record<string, never>, OrgRow[]>(
+    "organizations:listForUser"
+  ),
+  getMembership: fnRef<"query", { organizationId: string }, MembershipRow>(
+    "organizations:getMembership"
+  ),
+  listProjectsWithStats: fnRef<
+    "query",
+    { organizationId: string },
+    ProjectRow[]
+  >("projects:listWithStats"),
+  getProject: fnRef<"query", { projectId: string }, ProjectRow | null>(
+    "projects:getById"
+  ),
+  getProjectMembership: fnRef<
+    "query",
+    { projectId: string },
+    ProjectMembershipRow
+  >("projectMembers:getProjectMembership"),
+  listVariablesWithAccess: fnRef<
+    "query",
+    { projectId: string; limit?: number },
+    VariableAccessRow[]
+  >("variables:listWithAccess"),
+  listVariableRequests: fnRef<
+    "query",
+    { projectId: string; status?: VariableRequestStatus },
+    VariableRequest[]
+  >("variableRequests:listForProject"),
+  getResolvedFeatures: fnRef<
+    "query",
+    { organizationId: string },
+    ResolvedFeatures
+  >("featureRegistry:getResolvedFeatures"),
+  getResolvedFeaturesBatch: fnRef<
+    "query",
+    { organizationIds: string[] },
+    ResolvedFeatures[]
+  >("featureRegistry:getResolvedFeaturesBatch"),
+  getOrganizationUsage: fnRef<
+    "query",
+    { organizationId: string },
+    OrganizationUsage
+  >("tierLimits:getOrganizationUsage"),
+  isEnforcementEnabled: fnRef<"query", Record<string, never>, boolean>(
+    "tierLimits:isEnforcementEnabled"
+  ),
+  deviceSessionRecord: fnRef<
+    "mutation",
+    { deviceName: string; clientType: "cli" | "extension"; sessionId: string },
+    unknown
+  >("deviceSessions:record"),
+  deviceSessionRevoke: fnRef<"mutation", { sessionId: string }, unknown>(
+    "deviceSessions:revoke"
+  ),
+};
+
+async function convexQuery<Ref extends FunctionReference<"query">>(
+  ref: Ref,
+  ...args: OptionalRestArgs<Ref>
+): Promise<FunctionReturnType<Ref>> {
+  const client = await getConvexClient();
+  return client.query(ref, ...args);
+}
+
+async function convexMutation<Ref extends FunctionReference<"mutation">>(
+  ref: Ref,
+  ...args: OptionalRestArgs<Ref>
+): Promise<FunctionReturnType<Ref>> {
+  const client = await getConvexClient();
+  return client.mutation(ref, ...args);
+}
+
+// ============================================================================
+// Device-session record / revoke (display + remote sign-out only)
+// ============================================================================
+
+/**
+ * Record this CLI device as an active session so it shows up in the web
+ * active-sessions UI and can be remotely revoked. Best-effort: a failure here
+ * must never block a successful login.
+ */
+export async function recordDeviceSession(
+  deviceName: string,
+  sessionId: string
+): Promise<void> {
+  try {
+    await convexMutation(refs.deviceSessionRecord, {
+      deviceName,
+      clientType: "cli",
+      sessionId,
+    });
+  } catch {
+    // Non-fatal — the session record is a convenience, not load-bearing.
+  }
+}
+
+/**
+ * Best-effort remote revoke of a device session by its WorkOS session id.
+ * Used on logout so the session disappears from the active-sessions UI and the
+ * WorkOS session is invalidated server-side.
+ */
+export async function revokeDeviceSession(sessionId: string): Promise<void> {
+  try {
+    await convexMutation(refs.deviceSessionRevoke, { sessionId });
+  } catch {
+    // Non-fatal — local credentials are cleared regardless.
+  }
+}
+
+// ============================================================================
+// Feature helpers
+// ============================================================================
+
+function numericFeature(
+  resolved: ResolvedFeatures,
+  key: string,
+  fallback: number | null = null
+): number | null {
+  const value = resolved?.features?.[key]?.value;
+  return typeof value === "number" ? value : fallback;
+}
+
+function booleanFeature(
+  resolved: ResolvedFeatures,
+  key: string,
+  fallback = false
+): boolean {
+  const value = resolved?.features?.[key]?.value;
+  return typeof value === "boolean" ? value : fallback;
+}
+
+// ============================================================================
+// API client
+// ============================================================================
+
+/**
+ * Return the registrable domain (eTLD+1 approximation) for a hostname, used to
+ * decide whether a redirect is "same site" and safe to re-issue with the
+ * Authorization header.
+ */
+function registrableDomain(hostname: string): string {
+  const parts = hostname.toLowerCase().split(".").filter(Boolean);
+  if (parts.length <= 2) return parts.join(".");
+  return parts.slice(-2).join(".");
+}
+
+const MAX_MANUAL_REDIRECTS = 5;
+
+export class APIClient {
+  private baseUrl: string;
+
+  constructor(options?: { baseUrl?: string }) {
+    this.baseUrl = options?.baseUrl ?? getApiUrl();
+  }
+
+  // ── Vault HTTP path (decrypted secret values) ──────────────────────────
+
   /**
-   * Perform a fetch that follows 3xx redirects manually, re-attaching the
-   * Authorization header when the redirect stays inside the same registrable
-   * domain (eTLD+1). This defends against the apex→www redirect case where
-   * Node's default redirect follower drops the Authorization header on any
-   * hostname change and the resulting request comes back as a bogus 401 —
-   * which used to wipe the user's credentials.
-   *
-   * Cross-site redirects (different registrable domain) are followed without
-   * the Authorization header, matching browser/fetch security semantics.
+   * Follow 3xx redirects manually, re-attaching Authorization only within the
+   * same registrable domain (defends against the apex→www redirect that would
+   * otherwise drop the header and yield a bogus 401).
    */
   private async fetchWithSafeRedirects(
     initialUrl: string,
@@ -117,7 +379,6 @@ export class APIClient {
     for (let hop = 0; hop < MAX_MANUAL_REDIRECTS; hop++) {
       const response = await fetch(currentUrl, currentInit);
 
-      // Not a redirect — return as-is
       if (response.status < 300 || response.status >= 400) {
         return response;
       }
@@ -131,13 +392,8 @@ export class APIClient {
         registrableDomain(nextUrl.hostname) === registrableDomain(prevHost);
 
       const headers = new Headers(currentInit.headers);
-      if (!sameSite) {
-        // Cross-site redirect — strip credentials (matches fetch spec)
-        headers.delete("Authorization");
-      }
+      if (!sameSite) headers.delete("Authorization");
 
-      // 303 and (per spec) most 302/301 redirects coerce POST/PUT/PATCH to
-      // GET and drop the body. 307 and 308 preserve method and body.
       let nextMethod = (currentInit.method || "GET").toUpperCase();
       let nextBody = currentInit.body;
       if (
@@ -169,191 +425,57 @@ export class APIClient {
     );
   }
 
-  /**
-   * Attempt a one-shot access-token refresh using the stored refresh token.
-   * Persists the rotated tokens and updates this client's in-memory token on
-   * success. Returns false (without throwing) when there is no refresh token,
-   * a refresh is already in flight, or the refresh call fails — the caller
-   * then treats the session as dead.
-   */
-  private async tryRefreshToken(): Promise<boolean> {
-    if (this.refreshing) return false;
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
-
-    this.refreshing = true;
-    try {
-      const result = await this.refreshToken(refreshToken);
-      setAccessToken(result.accessToken);
-      setRefreshToken(result.refreshToken);
-      this.accessToken = result.accessToken;
-      return true;
-    } catch {
-      return false;
-    } finally {
-      this.refreshing = false;
-    }
-  }
-
-  /**
-   * Run a request thunk with automatic one-shot token refresh on a genuine 401.
-   *
-   * - An AUTH_REDIRECT (HTML sign-in page) is NOT a rejected token — rethrow
-   *   without clearing creds or refreshing.
-   * - A genuine 401 triggers a single refresh attempt. On success the request
-   *   is retried once with the rotated token; on failure (or a second 401) the
-   *   local credentials are cleared so the user is prompted to log in again.
-   *
-   * The thunk rebuilds its headers on each call, so the retry automatically
-   * picks up the refreshed access token.
-   */
-  private async withAuthRetry<T>(exec: () => Promise<T>): Promise<T> {
-    try {
-      return await exec();
-    } catch (err) {
-      if (
-        !(err instanceof APIError) ||
-        err.statusCode !== 401 ||
-        err.code === "AUTH_REDIRECT" ||
-        this.refreshing
-      ) {
-        throw err;
-      }
-
-      const refreshed = await this.tryRefreshToken();
-      if (!refreshed) {
-        clearAuth();
-        throw err;
-      }
-
-      try {
-        return await exec();
-      } catch (retryErr) {
-        // Refresh succeeded but the retried request still failed auth — the
-        // session is genuinely dead.
-        if (
-          retryErr instanceof APIError &&
-          retryErr.statusCode === 401 &&
-          retryErr.code !== "AUTH_REDIRECT"
-        ) {
-          clearAuth();
-        }
-        throw retryErr;
+  /** Perform an authed vault request carrying a fresh WorkOS JWT bearer. */
+  private async vaultRequest<T>(
+    method: string,
+    path: string,
+    options?: { params?: Record<string, string>; body?: unknown }
+  ): Promise<T> {
+    const token = await ensureFreshAccessToken();
+    const url = new URL(path, this.baseUrl);
+    if (options?.params) {
+      for (const [key, value] of Object.entries(options.params)) {
+        url.searchParams.set(key, value);
       }
     }
-  }
 
-  /**
-   * Make a GET request
-   */
-  async get<T>(path: string, params?: Record<string, string>): Promise<T> {
-    return this.withAuthRetry(async () => {
-      const url = new URL(path, this.baseUrl);
-
-      if (params) {
-        for (const [key, value] of Object.entries(params)) {
-          url.searchParams.set(key, value);
-        }
-      }
-
-      const response = await this.fetchWithSafeRedirects(url.toString(), {
-        method: "GET",
-        headers: this.getHeaders(),
-      });
-
-      return this.handleResponse<T>(response);
+    const response = await this.fetchWithSafeRedirects(url.toString(), {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: options?.body ? JSON.stringify(options.body) : undefined,
     });
+
+    return this.handleResponse<T>(response);
   }
 
-  /**
-   * Make a POST request
-   */
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.withAuthRetry(async () => {
-      const url = new URL(path, this.baseUrl);
-
-      const response = await this.fetchWithSafeRedirects(url.toString(), {
-        method: "POST",
-        headers: this.getHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      return this.handleResponse<T>(response);
-    });
+  private isAuthRedirect(response: Response, bodyText?: string): boolean {
+    const location = response.headers.get("location") || "";
+    const finalUrl = response.url || "";
+    const contentType = response.headers.get("content-type") || "";
+    const preview = (bodyText || "").slice(0, 512).toLowerCase();
+    return (
+      location.includes("authkit") ||
+      finalUrl.includes("authkit") ||
+      (contentType.includes("text/html") &&
+        (preview.includes("authorization_session_id") ||
+          preview.includes("client_id=") ||
+          preview.includes("<!doctype html")))
+    );
   }
 
-  /**
-   * Make a PUT request
-   */
-  async put<T>(path: string, body?: unknown): Promise<T> {
-    return this.withAuthRetry(async () => {
-      const url = new URL(path, this.baseUrl);
-
-      const response = await this.fetchWithSafeRedirects(url.toString(), {
-        method: "PUT",
-        headers: this.getHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      return this.handleResponse<T>(response);
-    });
-  }
-
-  /**
-   * Make a PATCH request
-   */
-  async patch<T>(path: string, body?: unknown): Promise<T> {
-    return this.withAuthRetry(async () => {
-      const url = new URL(path, this.baseUrl);
-
-      const response = await this.fetchWithSafeRedirects(url.toString(), {
-        method: "PATCH",
-        headers: this.getHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      return this.handleResponse<T>(response);
-    });
-  }
-
-  /**
-   * Make a DELETE request
-   */
-  async delete(path: string): Promise<void> {
-    return this.withAuthRetry(async () => {
-      const url = new URL(path, this.baseUrl);
-
-      const response = await this.fetchWithSafeRedirects(url.toString(), {
-        method: "DELETE",
-        headers: this.getHeaders(),
-      });
-
-      if (!response.ok) {
-        await this.handleError(response);
-      }
-    });
-  }
-
-  /**
-   * Handle API response
-   */
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       await this.handleError(response);
     }
 
     const contentType = response.headers.get("content-type") || "";
+    const body = await response.text();
 
     if (!contentType.includes("application/json")) {
-      const body = await response.text();
       if (this.isAuthRedirect(response, body)) {
-        // We intentionally do NOT call clearAuth() here. The server decided
-        // to send us to the browser sign-in flow, but that doesn't mean the
-        // stored token is garbage — it may be a CDN/edge quirk, a same-site
-        // redirect, or a transient auth-middleware misroute. Wiping creds on
-        // the first surprise response locks the user out of their own
-        // session. Surface the error; let them re-run `envpilot login` if
-        // the token really is bad.
         throw new APIError(
           "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
           401,
@@ -367,11 +489,8 @@ export class APIClient {
       );
     }
 
-    const body = await response.text();
-
     try {
-      const data = JSON.parse(body);
-      return data as T;
+      return JSON.parse(body) as T;
     } catch {
       const preview = body.replace(/\s+/g, " ").slice(0, 160);
       throw new APIError(
@@ -381,31 +500,20 @@ export class APIClient {
     }
   }
 
-  /**
-   * Handle API errors
-   */
   private async handleError(response: Response): Promise<never> {
-    // Read the body ONCE as text so we can both parse JSON errors and run the
-    // HTML sign-in-page detection below without consuming the stream twice.
     const bodyText = await response.text();
 
     let message = `Request failed with status ${response.status}`;
     let code: string | undefined;
-
     try {
       const data = JSON.parse(bodyText) as Record<string, string>;
       message = data.error || data.message || message;
       code = data.code;
     } catch {
-      // Ignore JSON parsing errors — non-JSON error bodies fall through.
+      // Non-JSON error body — fall through with the default message.
     }
 
-    // Handle authentication errors.
     if (response.status === 401) {
-      // Same detection as the ok-path (handleResponse): if the "401" body is
-      // actually an HTML sign-in page, the auth middleware redirected us — the
-      // stored token may be perfectly valid. Surface AUTH_REDIRECT WITHOUT
-      // clearing creds so a CDN/edge misroute can't log the user out.
       if (this.isAuthRedirect(response, bodyText)) {
         throw new APIError(
           "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
@@ -413,10 +521,6 @@ export class APIClient {
           "AUTH_REDIRECT"
         );
       }
-
-      // Genuine 401 — the token was rejected. Do NOT clearAuth() here; the
-      // withAuthRetry wrapper first tries a one-shot token refresh and only
-      // clears credentials if that fails.
       throw new APIError(
         message || "Authentication failed. Please run `envpilot login`.",
         401,
@@ -424,7 +528,6 @@ export class APIClient {
       );
     }
 
-    // Handle tier limit errors (403 with TIER_LIMIT_REACHED code)
     if (response.status === 403 && code === "TIER_LIMIT_REACHED") {
       throw new APIError(
         message ||
@@ -434,12 +537,10 @@ export class APIClient {
       );
     }
 
-    // Handle authorization errors
     if (response.status === 403) {
       throw new APIError(message || "Access denied.", 403, code || "FORBIDDEN");
     }
 
-    // Handle tier limit errors
     if (response.status === 402) {
       throw new APIError(
         message ||
@@ -453,158 +554,240 @@ export class APIClient {
   }
 
   // ============================================
-  // High-level API methods
+  // High-level methods — DIRECT to Convex
   // ============================================
 
   /**
-   * Get current user info
+   * Current authenticated user. Verifies the session is live server-side (an
+   * authed Convex query) and returns the identity captured at login.
    */
   async getCurrentUser(): Promise<User> {
-    return this.get<User>("/api/cli/auth", { action: "me" });
+    const account = getActiveAccount();
+    if (!account) {
+      throw new APIError(
+        "You are not logged in. Run `envpilot login`.",
+        401,
+        "NOT_AUTHENTICATED"
+      );
+    }
+    // Round-trips to Convex with a fresh JWT; throws if the session is dead.
+    await convexQuery(refs.listOrganizations, {});
+    return account.user;
   }
 
-  /**
-   * Get tier info for the active organization
-   */
-  async getTierInfo(organizationId: string): Promise<TierInfo> {
-    return this.get<TierInfo>("/api/cli/tier", { organizationId });
-  }
-
-  /**
-   * Get usage info for the active organization
-   */
-  async getUsage(organizationId: string): Promise<UsageInfo> {
-    return this.get<UsageInfo>("/api/cli/usage", { organizationId });
-  }
-
-  /**
-   * List organizations the user has access to
-   */
+  /** List organizations the user belongs to (with tier + role). */
   async listOrganizations(): Promise<Organization[]> {
-    const response = await this.get<ApiResponse<Organization[]>>(
-      "/api/cli/organizations"
-    );
-    return response.data || [];
+    const orgs = await convexQuery(refs.listOrganizations, {});
+    const orgIds = orgs.map((o) => o._id);
+
+    let tiers: ResolvedFeatures[] = [];
+    if (orgIds.length > 0) {
+      try {
+        tiers = await convexQuery(refs.getResolvedFeaturesBatch, {
+          organizationIds: orgIds,
+        });
+      } catch {
+        tiers = [];
+      }
+    }
+
+    return orgs.map((org, index) => ({
+      _id: org._id,
+      name: org.name,
+      slug: org.slug,
+      tier: (tiers[index]?.tierName ?? "free") as Organization["tier"],
+      role: org.role,
+      unifiedRole: normalizeOrgRole(org.role),
+      description: org.description,
+      logoUrl: org.logoUrl,
+    }));
   }
 
-  /**
-   * List projects in an organization
-   */
+  /** List projects in an organization, with unified-role + assignment info. */
   async listProjects(organizationId: string): Promise<Project[]> {
-    const response = await this.get<ApiResponse<Project[]>>(
-      "/api/cli/projects",
-      { organizationId }
+    const [projects, membership] = await Promise.all([
+      convexQuery(refs.listProjectsWithStats, { organizationId }),
+      convexQuery(refs.getMembership, { organizationId }),
+    ]);
+
+    const unifiedRole = normalizeOrgRole(membership?.role);
+    const isOwner = unifiedRole === "owner";
+    const isDeveloper = unifiedRole === "developer";
+    const legacyProjectRole = isOwner
+      ? null
+      : isDeveloper
+        ? "developer"
+        : "manager";
+
+    return Promise.all(
+      projects.map(async (project) => {
+        let assigned = isOwner;
+        let environmentScope: string[] | null = null;
+        if (!isOwner) {
+          const projectMembership = await convexQuery(
+            refs.getProjectMembership,
+            { projectId: project._id }
+          );
+          assigned = projectMembership !== null;
+          environmentScope = isDeveloper
+            ? (projectMembership?.environments ?? null)
+            : null;
+        }
+        return {
+          _id: project._id,
+          name: project.name,
+          slug: project.slug,
+          description: project.description,
+          icon: project.icon,
+          color: project.color,
+          organizationId: project.organizationId,
+          userRole: unifiedRole,
+          projectRole: legacyProjectRole,
+          unifiedRole,
+          assigned,
+          environmentScope,
+        };
+      })
     );
-    return response.data || [];
   }
 
-  /**
-   * Get a project by ID
-   */
+  /** Get a single project (metadata) by id. */
   async getProject(projectId: string): Promise<Project> {
-    return this.get<Project>(`/api/cli/projects/${projectId}`);
+    const project = await convexQuery(refs.getProject, { projectId });
+    if (!project) {
+      throw new APIError("Project not found", 404, "PROJECT_NOT_FOUND");
+    }
+    return {
+      _id: project._id,
+      name: project.name,
+      slug: project.slug,
+      organizationId: project.organizationId,
+      description: project.description,
+      icon: project.icon,
+      color: project.color,
+    };
   }
 
   /**
-   * List variables in a project (with decrypted values).
-   *
-   * Returns both the variable list and any keys that failed vault decryption.
-   * Decryption failures are skipped server-side — they will NOT appear in
-   * `variables`. Callers should warn the user about `decryptionFailures`
-   * so they know those secrets weren't injected.
+   * Compute the variable fingerprint from Convex METADATA (no vault decryption).
+   * Byte-compatible with the fingerprint writeCache stores from a full fetch:
+   * both hash `${_id}:${version}:${updatedAt}` over the accessible variables in
+   * the requested environment.
+   */
+  async checkFingerprint(
+    projectId: string,
+    environment?: string,
+    _organizationId?: string
+  ): Promise<string> {
+    const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
+    const filtered = rows.filter(
+      (row) =>
+        row.hasAccess &&
+        (!environment || row.environments.includes(environment))
+    );
+    const asVariables = filtered.map(
+      (row) =>
+        ({
+          _id: row._id,
+          version: row.version,
+          updatedAt: row.updatedAt,
+        }) as Variable
+    );
+    return computeFingerprint(asVariables);
+  }
+
+  /** List variable requests for a project (Convex). */
+  async listVariableRequests(
+    projectId: string,
+    status?: VariableRequestStatus
+  ): Promise<VariableRequest[]> {
+    return convexQuery(refs.listVariableRequests, { projectId, status });
+  }
+
+  /** Tier + usage snapshot for an organization (Convex). */
+  async getUsage(organizationId: string): Promise<UsageInfo> {
+    const membership = await convexQuery(refs.getMembership, {
+      organizationId,
+    });
+    if (!membership) {
+      throw new APIError(
+        "You are not a member of this organization",
+        403,
+        "FORBIDDEN"
+      );
+    }
+
+    const [usageData, enforcementEnabled, resolved] = await Promise.all([
+      convexQuery(refs.getOrganizationUsage, { organizationId }),
+      convexQuery(refs.isEnforcementEnabled, {}),
+      convexQuery(refs.getResolvedFeatures, { organizationId }),
+    ]);
+
+    if (!usageData) {
+      throw new APIError(
+        "Organization not found",
+        404,
+        "ORGANIZATION_NOT_FOUND"
+      );
+    }
+
+    return {
+      tier: (resolved?.tierName ?? usageData.tier) as UsageInfo["tier"],
+      enforcementEnabled,
+      limits: {
+        projects: numericFeature(resolved, "max_projects"),
+        variablesPerProject: numericFeature(
+          resolved,
+          "max_variables_per_project"
+        ),
+        teamMembers: numericFeature(resolved, "max_team_members"),
+      },
+      usage: usageData.usage,
+      features: {
+        versionHistory: booleanFeature(resolved, "variable_version_history"),
+        bulkImport: booleanFeature(resolved, "bulk_import"),
+        extensionAccess: booleanFeature(resolved, "extension_access", true),
+        granularPermissions: booleanFeature(resolved, "granular_permissions"),
+        auditLogRetentionDays:
+          numericFeature(resolved, "audit_log_retention_days") ?? 7,
+      },
+    };
+  }
+
+  // ============================================
+  // High-level methods — VAULT (over HTTP)
+  // ============================================
+
+  /**
+   * List variables in a project WITH decrypted values (vault path).
+   * Returns the variable list, the response meta (unified role / scope info),
+   * and any keys that failed vault decryption (skipped server-side).
    */
   async listVariables(
     projectId: string,
     environment?: string,
     organizationId?: string
-  ): Promise<{ variables: Variable[]; decryptionFailures: string[] }> {
+  ): Promise<{
+    variables: Variable[];
+    meta: VariablesMeta | undefined;
+    decryptionFailures: string[];
+  }> {
     const params: Record<string, string> = { projectId };
-    if (environment) {
-      params.environment = environment;
-    }
-    if (organizationId) {
-      params.organizationId = organizationId;
-    }
-    const response = await this.get<
-      ApiResponse<Variable[]> & {
-        meta?: { decryptionFailures?: string[] };
-      }
-    >("/api/cli/variables", params);
+    if (environment) params.environment = environment;
+    if (organizationId) params.organizationId = organizationId;
+
+    const response = await this.vaultRequest<
+      ApiResponse<Variable[]> & { meta?: VariablesMeta }
+    >("GET", "/api/cli/variables", { params });
+
     return {
       variables: response.data || [],
+      meta: response.meta,
       decryptionFailures: response.meta?.decryptionFailures ?? [],
     };
   }
 
-  /**
-   * Check the variable fingerprint for a project/environment.
-   *
-   * Returns a short hash of variable metadata (id + version + updatedAt)
-   * WITHOUT decrypting vault secrets. The CLI uses this to decide whether
-   * a cached variable set is still current before doing a full (expensive)
-   * fetch. If the fingerprint matches, the cache can be extended for free.
-   */
-  async checkFingerprint(
-    projectId: string,
-    environment?: string,
-    organizationId?: string
-  ): Promise<string> {
-    const params: Record<string, string> = { projectId };
-    if (environment) params.environment = environment;
-    if (organizationId) params.organizationId = organizationId;
-    const response = await this.get<{ fingerprint: string }>(
-      "/api/cli/variables/fingerprint",
-      params
-    );
-    return response.fingerprint;
-  }
-
-  /**
-   * Get a variable by ID (with decrypted value)
-   */
-  async getVariable(variableId: string): Promise<Variable> {
-    return this.get<Variable>(`/api/cli/variables/${variableId}`);
-  }
-
-  /**
-   * Create a new variable
-   */
-  async createVariable(data: {
-    projectId: string;
-    key: string;
-    value: string;
-    environment: string;
-    description?: string;
-    isSensitive?: boolean;
-    organizationId?: string;
-  }): Promise<Variable> {
-    return this.post<Variable>("/api/cli/variables", data);
-  }
-
-  /**
-   * Update a variable
-   */
-  async updateVariable(
-    variableId: string,
-    data: {
-      value?: string;
-      description?: string;
-      isSensitive?: boolean;
-    }
-  ): Promise<Variable> {
-    return this.patch<Variable>(`/api/cli/variables/${variableId}`, data);
-  }
-
-  /**
-   * Delete a variable
-   */
-  async deleteVariable(variableId: string): Promise<void> {
-    return this.delete(`/api/cli/variables/${variableId}`);
-  }
-
-  /**
-   * Bulk create/update variables
-   */
+  /** Bulk create/update variables (vault path — encrypts values server-side). */
   async bulkUpsertVariables(data: {
     projectId: string;
     environment: string;
@@ -616,87 +799,50 @@ export class APIClient {
     }>;
     mode: "merge" | "replace";
     organizationId?: string;
-  }): Promise<{ created: number; updated: number; deleted: number }> {
-    return this.post("/api/cli/variables/bulk", data);
+  }): Promise<{
+    created: number;
+    updated: number;
+    deleted: number;
+    total: number;
+    skipped?: number;
+    deniedKeys?: string[];
+  }> {
+    const response = await this.vaultRequest<
+      ApiResponse<{
+        created: number;
+        updated: number;
+        deleted: number;
+        total: number;
+        skipped?: number;
+        deniedKeys?: string[];
+      }>
+    >("POST", "/api/cli/variables/bulk", { body: data });
+    if (!response.data) {
+      throw new APIError("No result returned by server", 500);
+    }
+    return response.data;
   }
 
   /**
-   * Submit a variable request (developers only — owners/PMs/team leads
-   * create variables directly and get a 403 from the server here).
+   * Submit a variable request (developers only). Goes over the vault path
+   * because the requested value is encrypted into WorkOS Vault server-side;
+   * owners/PMs/team leads get a 403 here and create variables directly.
    */
   async createVariableRequest(
     data: CreateVariableRequestBody
   ): Promise<VariableRequest> {
-    const response = await this.post<ApiResponse<{ request: VariableRequest }>>(
-      "/api/cli/variable-requests",
-      data
-    );
+    const response = await this.vaultRequest<
+      ApiResponse<{ request: VariableRequest }>
+    >("POST", "/api/cli/variable-requests", { body: data });
     if (!response.data) {
       throw new APIError("No variable request returned by server", 500);
     }
     return response.data.request;
   }
-
-  /**
-   * List variable requests for a project, optionally filtered by status.
-   */
-  async listVariableRequests(
-    projectId: string,
-    status?: VariableRequestStatus
-  ): Promise<VariableRequest[]> {
-    const params: Record<string, string> = { projectId };
-    if (status) params.status = status;
-    const response = await this.get<
-      ApiResponse<{ requests: VariableRequest[] }>
-    >("/api/cli/variable-requests", params);
-    return response.data?.requests ?? [];
-  }
-
-  // ============================================
-  // Authentication methods
-  // ============================================
-
-  /**
-   * Initiate CLI authentication flow
-   */
-  async initiateAuth(
-    deviceName: string
-  ): Promise<{ code: string; url: string; expiresAt: number }> {
-    return this.post("/api/cli/auth?action=initiate", { deviceName });
-  }
-
-  /**
-   * Poll for authentication status
-   */
-  async pollAuth(code: string): Promise<{
-    status: "pending" | "authenticated" | "expired";
-    accessToken?: string;
-    refreshToken?: string;
-    user?: User;
-  }> {
-    return this.get("/api/cli/auth", { action: "poll", code });
-  }
-
-  /**
-   * Refresh access token
-   */
-  async refreshToken(refreshToken: string): Promise<{
-    accessToken: string;
-    refreshToken: string;
-  }> {
-    return this.post("/api/cli/auth?action=refresh", { refreshToken });
-  }
-
-  /**
-   * Revoke access token (logout)
-   */
-  async revokeToken(): Promise<void> {
-    return this.post("/api/cli/auth?action=revoke", {});
-  }
 }
 
 /**
- * Create a new API client with default config
+ * Create a new API client with default config.
  */
 export function createAPIClient(): APIClient {
   return new APIClient();

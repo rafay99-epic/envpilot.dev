@@ -3,7 +3,7 @@ import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers } from "./helpers";
 import { createAuditLog } from "./auditHelpers";
-import { requireAuthedUser, requireBearerUser } from "./identity";
+import { requireAuthedUser } from "./identity";
 import {
   assertOrgMembership,
   assertProjectAction,
@@ -194,22 +194,6 @@ export const listForProject = query({
   },
 });
 
-export const listForProjectForToken = query({
-  args: {
-    accessToken: v.string(),
-    projectId: v.id("projects"),
-    status: listForProjectStatusArg,
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
-    return listForProjectCore(ctx, {
-      projectId: args.projectId,
-      userId: actor._id,
-      status: args.status,
-    });
-  },
-});
-
 async function getByIdCore(
   ctx: QueryCtx,
   args: {
@@ -262,17 +246,6 @@ export const getById = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    return getByIdCore(ctx, { requestId: args.requestId, userId: actor._id });
-  },
-});
-
-export const getByIdForToken = query({
-  args: {
-    accessToken: v.string(),
-    requestId: v.id("environmentVariableRequests"),
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
     return getByIdCore(ctx, { requestId: args.requestId, userId: actor._id });
   },
 });
@@ -548,18 +521,6 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     return createCore(ctx, { ...args, requestedBy: actor._id });
-  },
-});
-
-export const createForToken = mutation({
-  args: {
-    accessToken: v.string(),
-    ...createRequestArgs,
-  },
-  handler: async (ctx, args) => {
-    const actor = await requireBearerUser(ctx, args.accessToken);
-    const { accessToken: _accessToken, ...rest } = args;
-    return createCore(ctx, { ...rest, requestedBy: actor._id });
   },
 });
 

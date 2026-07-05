@@ -138,36 +138,37 @@ export const getOwnSessions = query({
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
 
-    const cliTokens = await ctx.db
+    // Since the device-flow cutover, cliTokens is the device-session record for
+    // BOTH the CLI and the extension — split by clientType. Legacy rows with no
+    // clientType are treated as CLI.
+    const deviceSessions = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
         q.eq("userId", actor._id).eq("isActive", true)
       )
       .collect();
 
-    const extensionSessions = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_user", (q) => q.eq("userId", actor._id))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.isActive === true));
-
     return {
-      cli: cliTokens.map((t) => ({
-        id: t._id,
-        type: "cli" as const,
-        deviceName: t.deviceName ?? "CLI",
-        lastUsedAt: t.lastUsedAt,
-        createdAt: t.createdAt,
-        expiresAt: t.expiresAt,
-      })),
-      extension: extensionSessions.map((s) => ({
-        id: s._id,
-        type: "extension" as const,
-        deviceName: s.deviceName ?? "VS Code Extension",
-        lastUsedAt: s.lastUsedAt,
-        createdAt: s.createdAt,
-        expiresAt: s.expiresAt,
-      })),
+      cli: deviceSessions
+        .filter((t) => t.clientType !== "extension")
+        .map((t) => ({
+          id: t._id,
+          type: "cli" as const,
+          deviceName: t.deviceName ?? "CLI",
+          lastUsedAt: t.lastUsedAt,
+          createdAt: t.createdAt,
+          expiresAt: t.expiresAt,
+        })),
+      extension: deviceSessions
+        .filter((t) => t.clientType === "extension")
+        .map((t) => ({
+          id: t._id,
+          type: "extension" as const,
+          deviceName: t.deviceName ?? "VS Code Extension",
+          lastUsedAt: t.lastUsedAt,
+          createdAt: t.createdAt,
+          expiresAt: t.expiresAt,
+        })),
     };
   },
 });
@@ -179,30 +180,36 @@ export const revokeOwnSessions = mutation({
     const actor = await requireAuthedUser(ctx);
     const now = Date.now();
     let count = 0;
+    // WorkOS session ids to revoke server-side (in the calling Next.js route,
+    // which holds the WorkOS SDK) so remote sign-out is real.
+    const sessionIds: string[] = [];
 
-    const cliTokens = await ctx.db
+    const deviceSessions = await ctx.db
       .query("cliTokens")
       .withIndex("by_user_active", (q) =>
         q.eq("userId", actor._id).eq("isActive", true)
       )
       .collect();
 
-    for (const token of cliTokens) {
+    for (const token of deviceSessions) {
       await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
+      if (token.sessionId) sessionIds.push(token.sessionId);
       count++;
     }
 
-    const extensionSessions = await ctx.db
+    // Also tear down any active project-access (extension link) scoping records
+    // so "sign out everywhere" fully de-scopes linked devices.
+    const projectLinks = await ctx.db
       .query("projectAccess")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect()
       .then((rows) => rows.filter((doc) => doc.isActive === true));
 
-    for (const session of extensionSessions) {
-      await ctx.db.patch(session._id, { isActive: false });
+    for (const link of projectLinks) {
+      await ctx.db.patch(link._id, { isActive: false });
       count++;
     }
 
-    return { revoked: count };
+    return { revoked: count, sessionIds };
   },
 });

@@ -58,23 +58,6 @@ export async function checkOrganizationMembership(
 }
 
 /**
- * Bearer-path variant for CLI/extension routes: the caller identity is
- * resolved inside Convex from the validated bearer token (cliTokens), so the
- * route passes the raw token it already holds. Returns the membership if
- * found, null otherwise.
- */
-export async function checkOrganizationMembershipForToken(
-  convex: ConvexHttpClient,
-  accessToken: string,
-  organizationId: Id<"organizations">
-): Promise<Doc<"organizationMembers"> | null> {
-  return await convex.query(api.organizations.getMembershipForToken, {
-    accessToken,
-    organizationId,
-  });
-}
-
-/**
  * Get the organization that owns a project
  */
 export async function getProjectOrganization(

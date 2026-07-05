@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
+import { revokeWorkosSessions } from "@/lib/workos-sessions";
 import { reportApiError } from "@/lib/api-errors";
 
 /**
@@ -51,6 +52,10 @@ export async function DELETE() {
       api.users.revokeOwnSessions,
       {}
     );
+
+    // Revoke the WorkOS sessions too, so device refresh tokens actually stop
+    // working (the Convex rows above are display/scoping records only).
+    await revokeWorkosSessions(result.sessionIds ?? []);
 
     return NextResponse.json({ success: true, revoked: result.revoked });
   } catch (error) {

@@ -7,9 +7,10 @@ import type { Doc } from "./_generated/dataModel";
  *
  * ✅ ACTIVE since the auth cutover (docs/CONVEX_AUTH_MIGRATION.md):
  * convex/auth.config.ts registers the WorkOS AuthKit JWT providers and
- * converted functions derive their actor from `requireAuthedUser` /
- * `getAuthedUser` (JWT paths) or `requireBearerUser` (CLI/extension bearer
- * paths) instead of an argument.
+ * every function derives its actor from `requireAuthedUser` / `getAuthedUser`.
+ * Since the Stage 2 device-flow cutover the CLI and VS Code extension attach a
+ * WorkOS JWT (device flow) and call these same helpers — the old
+ * `requireBearerUser` bridge and every `*ForToken` variant have been removed.
  *
  * How it works:
  *   1. The caller attaches a WorkOS AuthKit JWT to the Convex request
@@ -68,58 +69,6 @@ export async function requireAuthedUser(
   const user = await getAuthedUser(ctx);
   if (!user) {
     throw new Error("Unauthenticated: no verified user identity on request");
-  }
-  return user;
-}
-
-/**
- * Resolve the acting user from a CLI/extension bearer token (`cliTokens`
- * table), for `*ForToken` function variants called by the bearer-authenticated
- * Next.js routes (`/api/cli/**`, `/api/extension/**`).
- *
- * The token itself is the proof of identity — it is validated INSIDE Convex
- * (active, unexpired, user exists), so even a compromised route cannot
- * impersonate an arbitrary user by passing a made-up id. Covers BOTH bearer
- * planes: CLI/extension session tokens (`cliTokens`) and extension
- * project-scoped tokens (`projectAccess`, resolved to the linking user).
- *
- * TEMPORARY BRIDGE: goes away in Stage 2 when the CLI/extension move to
- * WorkOS device-flow JWTs and call the JWT-verified functions directly.
- */
-export async function requireBearerUser(
-  ctx: MutationCtx | QueryCtx,
-  accessToken: string
-): Promise<Doc<"users">> {
-  const cliToken = await ctx.db
-    .query("cliTokens")
-    .withIndex("by_access_token", (q) => q.eq("accessToken", accessToken))
-    .first();
-
-  let userId = null;
-  if (cliToken) {
-    if (!cliToken.isActive || cliToken.expiresAt < Date.now()) {
-      throw new Error("Unauthenticated: invalid or expired bearer token");
-    }
-    userId = cliToken.userId;
-  } else {
-    // Fall back to the extension's project-scoped token plane.
-    const projectToken = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_access_token", (q) => q.eq("accessToken", accessToken))
-      .first();
-    if (
-      !projectToken ||
-      !projectToken.isActive ||
-      projectToken.expiresAt < Date.now()
-    ) {
-      throw new Error("Unauthenticated: invalid or expired bearer token");
-    }
-    userId = projectToken.userId;
-  }
-
-  const user = await ctx.db.get(userId);
-  if (!user) {
-    throw new Error("Unauthenticated: bearer token user not found");
   }
   return user;
 }

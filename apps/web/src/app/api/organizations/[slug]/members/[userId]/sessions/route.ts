@@ -5,6 +5,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
+import { revokeWorkosSessions } from "@/lib/workos-sessions";
 import { reportApiError } from "@/lib/api-errors";
 
 const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
@@ -112,15 +113,19 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     const { type, sessionId } = parsed.data;
     let revokedCount = 0;
+    // WorkOS session ids returned by the mutations — revoked server-side below
+    // so remote sign-out actually invalidates the device's refresh token.
+    const workosSessionIds: Array<string | null | undefined> = [];
 
     if (type === "cli" && sessionId) {
-      await createAuthedConvexClient(accessToken!).mutation(
+      const result = await createAuthedConvexClient(accessToken!).mutation(
         api.organizations.revokeMemberCliToken,
         {
           organizationId,
           tokenId: sessionId as Id<"cliTokens">,
         }
       );
+      workosSessionIds.push(result.sessionId);
       revokedCount = 1;
     } else if (type === "extension" && sessionId) {
       await createAuthedConvexClient(accessToken!).mutation(
@@ -139,6 +144,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
           targetUserId: userId as Id<"users">,
         }
       );
+      workosSessionIds.push(...(result.sessionIds ?? []));
       revokedCount = result.revokedCliTokens + result.revokedExtensionSessions;
     } else {
       return NextResponse.json(
@@ -146,6 +152,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    // Revoke the WorkOS sessions so the devices' refresh tokens stop working
+    // (the Convex rows are display/scoping records only).
+    await revokeWorkosSessions(workosSessionIds);
 
     // Send email notification to the affected user
     if (revokedCount > 0) {

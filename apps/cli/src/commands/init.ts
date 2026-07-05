@@ -140,11 +140,7 @@ async function addProject(
   if (roleLevel(role) < ROLE_LEVEL.team_lead) {
     // Verify against the API in case the cached role is stale.
     const orgs = await withSpinner("Checking permissions...", async () => {
-      const response = await api.get<{
-        success: boolean;
-        data: Organization[];
-      }>("/api/cli/organizations");
-      return response.data || [];
+      return api.listOrganizations();
     });
 
     const freshOrg = orgs.find(
@@ -256,11 +252,7 @@ export async function selectOrgProjectEnv(options: {
   const organizations = await withSpinner(
     "Fetching organizations...",
     async () => {
-      const response = await api.get<{
-        success: boolean;
-        data: Organization[];
-      }>("/api/cli/organizations");
-      return response.data || [];
+      return api.listOrganizations();
     }
   );
 
@@ -301,11 +293,7 @@ export async function selectOrgProjectEnv(options: {
 
   // Get projects
   const projects = await withSpinner("Fetching projects...", async () => {
-    const response = await api.get<{ success: boolean; data: Project[] }>(
-      "/api/cli/projects",
-      { organizationId: selectedOrg._id }
-    );
-    return response.data || [];
+    return api.listProjects(selectedOrg._id);
   });
 
   if (projects.length === 0) {
