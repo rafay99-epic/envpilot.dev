@@ -1,0 +1,81 @@
+convex/variableValues.ts
+  s_8ac05b3f82c26d::t_2071468f00f52e 690,721-728
+  s_8ac05b3f82c26d::t_3d9d5e245bff23 279-280
+  s_8ac05b3f82c26d::t_0f7d91dbc7bacf 10
+  s_8ac05b3f82c26d::t_676cd309a7f91f 326-327
+  s_8ac05b3f82c26d::t_1c55815263de09 504-689,691-720,729-788
+convex/accountValues.ts
+  s_8ac05b3f82c26d::t_0ca583245d74d7 1-2,4-26,28-186
+  s_8ac05b3f82c26d::t_18efb7eaa008fe 27
+  s_8ac05b3f82c26d::t_7a23edfa746757 3
+apps/web/src/app/api/shares/[token]/verify-otp/route.ts
+  s_8ac05b3f82c26d::t_bbb71f0bfafb01 49-53,62
+  s_8ac05b3f82c26d::t_0331cf0f86fb0e 70-82
+convex/variableRequests.ts
+  s_8ac05b3f82c26d::t_37ecb7a037b118 936-962
+apps/web/src/app/api/accounts/__tests__/website-url-validation.test.ts
+  s_8ac05b3f82c26d::t_234988548cbad3 34-36
+apps/web/src/app/api/shares/[token]/revoke/route.ts
+  s_8ac05b3f82c26d::t_04a078bcc15eec 31-35
+apps/web/src/app/api/projects/[id]/export/route.ts
+  s_8ac05b3f82c26d::t_f96155838a0127 104-108,111,115-117
+apps/web/src/app/api/accounts/route.ts
+  s_8ac05b3f82c26d::t_76c5c9b35c95dd 86-93,98-99,103
+  s_8ac05b3f82c26d::t_4f8b1b0ba90229 13
+apps/web/src/app/api/variables/route.ts
+  s_8ac05b3f82c26d::t_55eb89e8c6932f 156-170
+apps/web/src/app/api/vault/status/route.ts
+  s_8ac05b3f82c26d::t_1e7f71d1eb89e1 4-9,12-14
+apps/web/src/app/api/variable-requests/route.ts
+  s_8ac05b3f82c26d::t_21d0a339ce8017 156-159,161,168
+apps/web/src/app/api/accounts/[id]/route.ts
+  s_8ac05b3f82c26d::t_dc6ccb1f334e62 69
+  s_8ac05b3f82c26d::t_e46c2310942f8d 3,9
+  s_8ac05b3f82c26d::t_92f837336ad9a1 104-113,117-118,122
+apps/web/src/app/api/projects/[id]/import/route.ts
+  s_8ac05b3f82c26d::t_b2048f67abf785 7
+  s_8ac05b3f82c26d::t_868b500d64267a 151-158,160-166,168,177-178,191-193
+apps/web/src/app/api/shares/route.ts
+  s_8ac05b3f82c26d::t_06e90ca9f406af 69-71,73-74,77-80
+apps/web/src/app/api/variable-requests/[id]/value/route.ts
+  s_8ac05b3f82c26d::t_d2ee60cc740e24 54-60
+  s_8ac05b3f82c26d::t_25251419fbab15 35-39
+apps/web/src/app/api/variables/[id]/route.ts
+  s_8ac05b3f82c26d::t_2545736cf7b468 192-207,209
+convex/vault.ts
+  s_8ac05b3f82c26d::t_efd58be85df0da 71-75
+convex/shareValues.ts
+  s_8ac05b3f82c26d::t_765911c38f44bc 48-55
+  s_8ac05b3f82c26d::t_abb765d2edc295 1-47,56-184
+convex/_generated/api.d.ts
+  s_7f5c5d4a996959::t_3a80bbb5550a97 12,43,67,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "cdc8011d934c3bdbdf31da11d80307b85f43efe8",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_7f5c5d4a996959": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a37d9b505efaecba5",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
