@@ -474,35 +474,23 @@ export async function checkCountedLimit(
  *   the common case (limit reached within the first page or two).
  */
 async function countMatchingUpTo<Doc>(
-  // A FACTORY, not a query: Convex query builders are single-use ("A query
-  // can only be chained once"), so each .paginate() loop iteration must
-  // rebuild the query from scratch — reusing one builder threw at runtime
-  // as soon as a range spanned more than one page.
   makeQuery: () => Pageable<Doc>,
   isCounted: (doc: Doc) => boolean,
   limit: number | undefined
 ): Promise<number> {
-  if (limit === undefined) {
-    const rows = await makeQuery().collect();
-    return rows.filter(isCounted).length;
-  }
-
-  const pageSize = Math.max(limit + 1, 25);
-  let cursor: string | null = null;
-  let count = 0;
-  for (;;) {
-    const result = await makeQuery().paginate({ cursor, numItems: pageSize });
-    for (const doc of result.page) {
-      if (isCounted(doc)) count++;
-    }
-    // Stop at equality: the downstream decision is `count < limit`, which
-    // is already false once count reaches limit — reading further can't
-    // change the outcome.
-    if (count >= limit || result.isDone) {
-      return count;
-    }
-    cursor = result.continueCursor;
-  }
+  // Single read via collect() + in-memory filter — NOT a .paginate() loop.
+  // Convex forbids more than one paginate() call per function execution, and
+  // the multi-project fan-out (countActiveAccounts / countRotationEnabled-
+  // Variables) calls this once per project, so any paginate-based approach
+  // crashed those paths outright. collect() is correct and cheap here: a
+  // finite `limit` only exists for FREE-tier scopes — unlimited/Pro tiers
+  // early-return in checkCountedLimit before counting — so the scanned range
+  // is inherently bounded by the (small) tier cap plus not-yet-purged trash.
+  // `limit` is accepted for signature stability with the display path but
+  // does not change the read strategy.
+  void limit;
+  const rows = await makeQuery().collect();
+  return rows.filter(isCounted).length;
 }
 
 export async function countActiveProjects(
