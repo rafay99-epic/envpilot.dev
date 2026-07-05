@@ -11,7 +11,6 @@ import {
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
-import { createSecret, deleteSecret } from "@/lib/vault";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 const log = createLogger("api/variables/[id]");
@@ -190,50 +189,24 @@ export async function PATCH(request: Request, context: RouteContext) {
       tagIds,
     } = validation.data;
 
-    // If value is being updated, mint a NEW vault object instead of
-    // overwriting in place (same pattern as the CLI bulk-push route). The
-    // previous vaultRef stays referenced by earlier variableVersions rows,
-    // which is what makes rollback actually restore the old value —
-    // in-place updates left every version row pointing at the same object.
-    let vaultRef: string | undefined;
-    if (value !== undefined) {
-      const vaultResult = await createSecret(variable.key, value, {
-        organizationId,
-        projectId: variable.projectId,
-      });
-      vaultRef = vaultResult.id;
-    }
-
-    try {
-      await createAuthedConvexClient(accessToken!).mutation(
-        api.variables.update,
-        {
-          variableId: id as Id<"environmentVariables">,
-          vaultRef,
-          description,
-          environments,
-          isSensitive,
-          changeReason,
-          rotationFrequencyDays,
-          tagIds: tagIds as Id<"variableTags">[] | undefined,
-        }
-      );
-    } catch (mutationError) {
-      // The mutation performs write authorization and validation — if it
-      // rejects, the freshly minted vault object is referenced by nothing
-      // and would leak forever (no GC exists). Best-effort cleanup, same
-      // pattern as the accounts create route.
-      if (vaultRef) {
-        try {
-          await deleteSecret(vaultRef);
-        } catch (cleanupError) {
-          reportApiError(cleanupError, "PATCH /api/variables/[id]", {
-            phase: "vault-orphan-cleanup",
-          });
-        }
+    // When the value changes, the composed Convex action mints a NEW vault
+    // object (the previous ref stays referenced by earlier variableVersions
+    // rows — that is what makes rollback restore the old value) and best-effort
+    // deletes the new ref if the write authorization rejects. Metadata-only
+    // updates skip Vault entirely.
+    await createAuthedConvexClient(accessToken!).action(
+      api.variableValues.updateWithValue,
+      {
+        variableId: id as Id<"environmentVariables">,
+        value,
+        description,
+        environments,
+        isSensitive,
+        changeReason,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
       }
-      throw mutationError;
-    }
+    );
 
     const updatedVariable = await convex.query(api.variables.getById, {
       variableId: id as Id<"environmentVariables">,

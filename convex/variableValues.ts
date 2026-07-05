@@ -7,6 +7,7 @@ import {
   legacyProjectRoleValidator,
   orgRoleValidator,
 } from "./roleCompat";
+import { roleLevel, ROLE_LEVEL } from "./authz";
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -275,6 +276,8 @@ export const createWithValue = action({
     environments: v.array(v.string()),
     isSensitive: v.optional(v.boolean()),
     description: v.optional(v.string()),
+    rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
   },
   returns: v.object({ _id: v.id("environmentVariables") }),
   handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
@@ -320,6 +323,8 @@ export const createWithValue = action({
       environments: args.environments,
       projectId: args.projectId,
       isSensitive: args.isSensitive ?? false,
+      rotationFrequencyDays: args.rotationFrequencyDays,
+      tagIds: args.tagIds,
     });
 
     return { _id: variableId };
@@ -494,5 +499,290 @@ export const pushBulk = action({
       ...(skipped > 0 ? { skipped } : {}),
       ...(deniedKeys.length > 0 ? { deniedKeys } : {}),
     };
+  },
+});
+
+/**
+ * Replaces the WorkOS Vault write path of PATCH /api/variables/[id].
+ *
+ * When a value is supplied, a NEW vault object is minted (the old ref stays
+ * referenced by earlier variableVersions rows, which is what makes rollback
+ * restore the previous value — never overwrite in place). The variable mutation
+ * is the write-authorization authority; if it rejects, the freshly minted vault
+ * object is referenced by nothing, so it is best-effort deleted to avoid a leak
+ * — byte-for-byte the same orphan-cleanup ordering the route used.
+ *
+ * ZERO-DATA-LOSS: deleteSecret is only reached when the mutation threw (so no
+ * Convex row ever points at the new ref); the existing ref is never touched.
+ */
+export const updateWithValue = action({
+  args: {
+    variableId: v.id("environmentVariables"),
+    value: v.optional(v.string()),
+    description: v.optional(v.string()),
+    environments: v.optional(v.array(v.string())),
+    isSensitive: v.optional(v.boolean()),
+    changeReason: v.optional(v.string()),
+    rotationFrequencyDays: v.optional(v.number()),
+    tagIds: v.optional(v.array(v.id("variableTags"))),
+  },
+  returns: v.object({ _id: v.id("environmentVariables") }),
+  handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
+    let vaultRef: string | undefined;
+
+    // Mint a new vault object only when the value is actually changing. Needs
+    // the variable's key + owning org for the key context — mirrors the route.
+    if (args.value !== undefined) {
+      const variable = await ctx.runQuery(api.variables.getById, {
+        variableId: args.variableId,
+      });
+      if (!variable) {
+        throw new Error("Variable not found");
+      }
+      const project = await ctx.runQuery(api.projects.getById, {
+        projectId: variable.projectId,
+      });
+      if (!project) {
+        throw new Error("Project not found");
+      }
+
+      const vault = await ctx.runAction(internal.vault.createSecret, {
+        name: variable.key,
+        value: args.value,
+        organizationId: project.organizationId,
+        projectId: variable.projectId,
+      });
+      vaultRef = vault.id;
+    }
+
+    try {
+      await ctx.runMutation(api.variables.update, {
+        variableId: args.variableId,
+        vaultRef,
+        description: args.description,
+        environments: args.environments,
+        isSensitive: args.isSensitive,
+        changeReason: args.changeReason,
+        rotationFrequencyDays: args.rotationFrequencyDays,
+        tagIds: args.tagIds,
+      });
+    } catch (mutationError) {
+      // The mutation performs write authorization + validation. On rejection
+      // the newly minted vault object is unreferenced and would leak forever.
+      if (vaultRef) {
+        try {
+          await ctx.runAction(internal.vault.deleteSecret, { vaultRef });
+        } catch {
+          // Best-effort — vaultGc reconciles any straggler.
+        }
+      }
+      throw mutationError;
+    }
+
+    return { _id: args.variableId };
+  },
+});
+
+/**
+ * Replaces the WorkOS Vault read path of GET /api/projects/[id]/export.
+ *
+ * Lists the caller's accessible, in-scope variables and decrypts each value.
+ * Per-variable decrypt errors yield "[DECRYPTION_FAILED]" (never fail the whole
+ * export). Returns key/value pairs; the route serializes them into the chosen
+ * format. Authorization is enforced by listWithAccess (identity-verified — it
+ * only returns a vaultRef for entries the caller may read).
+ */
+export const exportValues = action({
+  args: {
+    projectId: v.id("projects"),
+    environment: v.optional(v.string()),
+  },
+  returns: v.object({
+    values: v.array(v.object({ key: v.string(), value: v.string() })),
+  }),
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ values: Array<{ key: string; value: string }> }> => {
+    const rows = await ctx.runQuery(api.variables.listWithAccess, {
+      projectId: args.projectId,
+    });
+
+    const environment = args.environment;
+    const accessible = rows
+      .filter((r) => r.hasAccess)
+      .filter((r) => !environment || r.environments.includes(environment));
+
+    const values: Array<{ key: string; value: string }> = [];
+    for (const r of accessible) {
+      let value = "";
+      if (r.vaultRef) {
+        try {
+          value = await ctx.runAction(internal.vault.readSecret, {
+            vaultRef: r.vaultRef,
+          });
+        } catch {
+          value = DECRYPTION_FAILED;
+        }
+      }
+      values.push({ key: r.key, value: value || "" });
+    }
+
+    return { values };
+  },
+});
+
+/**
+ * Replaces the WorkOS Vault write path of POST /api/projects/[id]/import.
+ *
+ * Two behaviours, chosen server-side from the caller's role (NOT a client flag,
+ * so the decrypt-to-diff direct path can never be reached by a developer):
+ *  - team_lead+ (canWriteDirectly): diff against existing values, re-encrypt +
+ *    update changed keys, create new keys, and in replace-mode remove keys not
+ *    present. Any mutation error aborts (mirrors the route).
+ *  - developer: encrypt each proposed value and file a variable request; per-key
+ *    errors are swallowed as skipped (mirrors the route).
+ *
+ * ZERO-DATA-LOSS: refs pass byte-for-byte to the mutations; removals go through
+ * variables.remove (soft-delete only — no vault object is purged here).
+ */
+export const importValues = action({
+  args: {
+    projectId: v.id("projects"),
+    environment: v.string(),
+    mode: v.union(v.literal("merge"), v.literal("replace")),
+    changeReason: v.optional(v.string()),
+    entries: v.array(v.object({ key: v.string(), value: v.string() })),
+  },
+  returns: v.object({
+    path: v.union(v.literal("direct"), v.literal("requests")),
+    created: v.number(),
+    updated: v.number(),
+    deleted: v.number(),
+    requested: v.number(),
+    skipped: v.number(),
+  }),
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    path: "direct" | "requests";
+    created: number;
+    updated: number;
+    deleted: number;
+    requested: number;
+    skipped: number;
+  }> => {
+    const project = await ctx.runQuery(api.projects.getById, {
+      projectId: args.projectId,
+    });
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const membership = await ctx.runQuery(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
+    if (!membership) {
+      throw new Error("You are not a member of this organization");
+    }
+
+    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.team_lead;
+
+    let created = 0;
+    let updated = 0;
+    let deleted = 0;
+    let requested = 0;
+    let skipped = 0;
+
+    // Developer path: file a variable request per proposed key. Per-key errors
+    // are swallowed (skipped), exactly like the route.
+    if (!canWriteDirectly) {
+      for (const entry of args.entries) {
+        try {
+          const vault = await ctx.runAction(internal.vault.createSecret, {
+            name: entry.key,
+            value: entry.value,
+            organizationId: project.organizationId,
+            projectId: args.projectId,
+          });
+          await ctx.runMutation(api.variableRequests.create, {
+            key: entry.key,
+            vaultRef: vault.id,
+            environments: [args.environment],
+            projectId: args.projectId,
+            isSensitive: false,
+          });
+          requested++;
+        } catch {
+          skipped++;
+        }
+      }
+      return {
+        path: "requests",
+        created,
+        updated,
+        deleted,
+        requested,
+        skipped,
+      };
+    }
+
+    // Direct path (team_lead+): diff against the environment's existing values.
+    const existing = await ctx.runQuery(api.variables.listByProject, {
+      projectId: args.projectId,
+      environment: args.environment,
+    });
+    const existingByKey = new Map(existing.map((e) => [e.key, e]));
+
+    for (const entry of args.entries) {
+      const current = existingByKey.get(entry.key);
+      if (current) {
+        const currentValue = await ctx.runAction(internal.vault.readSecret, {
+          vaultRef: current.vaultRef,
+        });
+        if (currentValue !== entry.value) {
+          const vault = await ctx.runAction(internal.vault.createSecret, {
+            name: entry.key,
+            value: entry.value,
+            organizationId: project.organizationId,
+            projectId: args.projectId,
+          });
+          await ctx.runMutation(api.variables.update, {
+            variableId: current._id,
+            vaultRef: vault.id,
+            changeReason: args.changeReason,
+          });
+          updated++;
+        }
+        existingByKey.delete(entry.key);
+      } else {
+        const vault = await ctx.runAction(internal.vault.createSecret, {
+          name: entry.key,
+          value: entry.value,
+          organizationId: project.organizationId,
+          projectId: args.projectId,
+        });
+        await ctx.runMutation(api.variables.create, {
+          key: entry.key,
+          vaultRef: vault.id,
+          environments: [args.environment],
+          projectId: args.projectId,
+          isSensitive: false,
+        });
+        created++;
+      }
+    }
+
+    if (args.mode === "replace") {
+      for (const [, variable] of existingByKey) {
+        await ctx.runMutation(api.variables.remove, {
+          variableId: variable._id,
+        });
+        deleted++;
+      }
+    }
+
+    return { path: "direct", created, updated, deleted, requested, skipped };
   },
 });

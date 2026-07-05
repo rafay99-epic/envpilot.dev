@@ -4,10 +4,8 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { handleApiError, reportApiError } from "@/lib/api-errors";
-import { createSecret, readSecret } from "@/lib/vault";
+import { handleApiError } from "@/lib/api-errors";
 import { parse, ALL_FORMATS, type FormatType } from "@/lib/format-converter";
-import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -119,11 +117,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Unified RBAC: owner / project_manager / team_lead write directly;
-    // developers go through variable requests. Convex mutations enforce
-    // project-assignment scoping for non-owners.
-    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.team_lead;
-
     // Parse the content
     let parsedVars: Record<string, string>;
     try {
@@ -155,35 +148,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // For developers, create pending requests
-    if (!canWriteDirectly) {
-      let requested = 0;
-      let skipped = 0;
+    // All Vault crypto + diffing lives in Convex. The composed action decides,
+    // from the caller's role, whether to write directly (team_lead+: encrypt +
+    // create/update/remove with a value diff) or file variable requests
+    // (developers). It returns which path it took so the response shape matches.
+    const entries = Object.entries(validVars).map(([key, value]) => ({
+      key,
+      value,
+    }));
 
-      for (const [key, value] of Object.entries(validVars)) {
-        try {
-          const vaultResult = await createSecret(key, value, {
-            organizationId: project.organizationId,
-            projectId: id,
-          });
+    const result = await authed.action(api.variableValues.importValues, {
+      projectId: id as Id<"projects">,
+      environment,
+      mode,
+      changeReason: `Updated via ${format} import`,
+      entries,
+    });
 
-          await authed.mutation(api.variableRequests.create, {
-            key,
-            vaultRef: vaultResult.id,
-            environments: [environment],
-            projectId: id as Id<"projects">,
-            isSensitive: false,
-          });
-          requested++;
-        } catch (requestError) {
-          reportApiError(requestError, "POST /api/projects/[id]/import", {
-            phase: "developer-request",
-            key,
-          });
-          skipped++;
-        }
-      }
-
+    if (result.path === "requests") {
       return NextResponse.json(
         {
           success: true,
@@ -192,8 +174,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             created: 0,
             updated: 0,
             deleted: 0,
-            requested,
-            skipped,
+            requested: result.requested,
+            skipped: result.skipped,
             invalidKeys,
             total: Object.keys(parsedVars).length,
           },
@@ -203,73 +185,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Get existing variables for comparison
-    const existingVariables = await convex.query(api.variables.listByProject, {
-      projectId: id as Id<"projects">,
-      environment,
-    });
-
-    const existingByKey = new Map(existingVariables.map((v) => [v.key, v]));
-
-    let created = 0;
-    let updated = 0;
-    let deleted = 0;
-
-    // Process each variable
-    for (const [key, value] of Object.entries(validVars)) {
-      const existing = existingByKey.get(key);
-
-      if (existing) {
-        // Check if value changed
-        const currentValue = await readSecret(existing.vaultRef);
-        if (currentValue !== value) {
-          const vaultResult = await createSecret(key, value, {
-            organizationId: project.organizationId,
-            projectId: id,
-          });
-
-          await authed.mutation(api.variables.update, {
-            variableId: existing._id,
-            vaultRef: vaultResult.id,
-            changeReason: `Updated via ${format} import`,
-          });
-          updated++;
-        }
-        existingByKey.delete(key);
-      } else {
-        // Create new variable
-        const vaultResult = await createSecret(key, value, {
-          organizationId: project.organizationId,
-          projectId: id,
-        });
-
-        await authed.mutation(api.variables.create, {
-          key,
-          vaultRef: vaultResult.id,
-          environments: [environment],
-          projectId: id as Id<"projects">,
-          isSensitive: false,
-        });
-        created++;
-      }
-    }
-
-    // In replace mode, delete remaining existing variables
-    if (mode === "replace") {
-      for (const [, variable] of existingByKey) {
-        await authed.mutation(api.variables.remove, {
-          variableId: variable._id,
-        });
-        deleted++;
-      }
-    }
-
     return NextResponse.json({
       success: true,
       data: {
-        created,
-        updated,
-        deleted,
+        created: result.created,
+        updated: result.updated,
+        deleted: result.deleted,
         invalidKeys,
         total: Object.keys(parsedVars).length,
       },

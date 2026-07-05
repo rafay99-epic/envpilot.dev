@@ -4,9 +4,7 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { createLogger } from "@/lib/logger";
 import { reportApiError } from "@/lib/api-errors";
-import { readSecret } from "@/lib/vault";
 import {
   serialize,
   getFileExtension,
@@ -18,8 +16,6 @@ import {
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
-
-const log = createLogger("api/projects/export");
 
 /**
  * GET /api/projects/[id]/export - Export environment variables
@@ -105,37 +101,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Get variables with access control
-    const variables = await createAuthedConvexClient(accessToken!).query(
-      api.variables.listWithAccess,
+    // Fetch + decrypt the caller's accessible, in-scope variable values via the
+    // composed Convex action (access control + Vault reads live in Convex; a
+    // per-variable decrypt failure yields "[DECRYPTION_FAILED]" for that key).
+    const { values } = await createAuthedConvexClient(accessToken!).action(
+      api.variableValues.exportValues,
       {
         projectId: id as Id<"projects">,
+        environment,
       }
     );
 
-    // Filter by access and environment
-    const accessible = variables
-      .filter((v) => v.hasAccess)
-      .filter((v) => !environment || v.environments.includes(environment));
-
-    // Decrypt values
-    const decrypted: Record<string, string> = {};
-    for (const variable of accessible) {
-      try {
-        // vaultRef is only returned for entries with hasAccess (filtered above)
-        const value = variable.vaultRef
-          ? await readSecret(variable.vaultRef)
-          : "";
-        decrypted[variable.key] = value || "";
-      } catch (decryptErr) {
-        log.error(
-          "variable_decrypt_failed",
-          { variableId: variable._id, key: variable.key, projectId: id },
-          decryptErr
-        );
-        decrypted[variable.key] = "[DECRYPTION_FAILED]";
-      }
-    }
+    const decrypted: Record<string, string> = Object.fromEntries(
+      values.map((entry) => [entry.key, entry.value])
+    );
 
     const body = serialize(decrypted, format, {
       projectName: project.name,

@@ -68,7 +68,11 @@ export const createSecret = internalAction({
     const res = await fetch(VAULT_BASE, {
       method: "POST",
       headers: authHeaders(true),
-      body: JSON.stringify({ name: uniqueName, value: args.value, key_context }),
+      body: JSON.stringify({
+        name: uniqueName,
+        value: args.value,
+        key_context,
+      }),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");

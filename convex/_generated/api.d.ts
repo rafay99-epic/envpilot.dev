@@ -9,6 +9,7 @@
  */
 
 import type * as accountPermissions from "../accountPermissions.js";
+import type * as accountValues from "../accountValues.js";
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
@@ -39,6 +40,7 @@ import type * as rateLimits from "../rateLimits.js";
 import type * as roleCompat from "../roleCompat.js";
 import type * as seedChangelog from "../seedChangelog.js";
 import type * as seedFeatureRequests from "../seedFeatureRequests.js";
+import type * as shareValues from "../shareValues.js";
 import type * as sharedSecrets from "../sharedSecrets.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as supportTickets from "../supportTickets.js";
@@ -62,6 +64,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accountPermissions: typeof accountPermissions;
+  accountValues: typeof accountValues;
   accounts: typeof accounts;
   admin: typeof admin;
   analytics: typeof analytics;
@@ -92,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   roleCompat: typeof roleCompat;
   seedChangelog: typeof seedChangelog;
   seedFeatureRequests: typeof seedFeatureRequests;
+  shareValues: typeof shareValues;
   sharedSecrets: typeof sharedSecrets;
   subscriptions: typeof subscriptions;
   supportTickets: typeof supportTickets;

@@ -1,6 +1,5 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -11,8 +10,7 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
-import { createSecret, deleteSecret } from "@/lib/vault";
-import { serializeAccountVault, websiteUrlSchema } from "@/lib/account-payload";
+import { websiteUrlSchema } from "@/lib/account-payload";
 
 export const createAccountSchema = z.object({
   // organizationId is intentionally NOT accepted here — the server resolves the
@@ -85,48 +83,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Encrypt the credentials in Vault first. Vault write happens before the
-    // Convex mutation, matching the variable-create flow.
-    const vaultResult = await createSecret(
-      `account:${name}:${Date.now()}`,
-      serializeAccountVault({ username, password }),
+    // Unified RBAC: assigned developers create accounts directly (they get an
+    // auto write-grant on accounts they create). The composed Convex action
+    // encrypts the credentials into WorkOS Vault (deriving the caller's identity
+    // from the JWT) and inserts the account with the ref, rolling the vault
+    // object back if the insert rejects. Authorization — including project
+    // assignment + environment scoping + tier gating — is enforced there.
+    const { accountId } = await createAuthedConvexClient(accessToken!).action(
+      api.accountValues.createWithCredentials,
       {
-        organizationId,
-        projectId,
-        environment: "account",
-      }
-    );
-    const vaultRef = vaultResult.id;
-
-    let accountId: Id<"projectAccounts">;
-    try {
-      // Unified RBAC: assigned developers create accounts directly (they get
-      // an auto write-grant on accounts they create). Authorization —
-      // including project assignment + environment scoping + tier gating —
-      // is enforced by the Convex mutation.
-      accountId = await convex.mutation(api.accounts.create, {
         projectId: projectId as Id<"projects">,
-        createdBy: convexUser._id,
         name,
         websiteUrl,
+        username,
+        password,
         description,
         environments,
-        vaultRef,
-      });
-    } catch (mutationError) {
-      // Best-effort cleanup: the Convex insert failed after the Vault write
-      // succeeded, so remove the now-orphaned encrypted credentials.
-      // (Same pattern as shares/[token]/revoke's best-effort vault delete.)
-      try {
-        await deleteSecret(vaultRef);
-      } catch (cleanupError) {
-        Sentry.captureException(cleanupError, {
-          tags: { source: "account-vault", action: "create-rollback" },
-          extra: { vaultRef, organizationId, projectId },
-        });
       }
-      throw mutationError;
-    }
+    );
 
     const account = await convex.query(api.accounts.get, {
       accountId,

@@ -933,3 +933,30 @@ export const createWithValue = action({
     };
   },
 });
+
+/**
+ * Replaces the WorkOS Vault read path of GET /api/variable-requests/[id]/value.
+ *
+ * Reveals a request's proposed secret value. Authorization is delegated entirely
+ * to getById, which throws unless the caller is the requester OR a reviewer
+ * (owner / assigned project manager / team lead) of the request's project. The
+ * plaintext is fetched on demand from WorkOS Vault and is NEVER logged.
+ */
+export const revealValue = action({
+  args: { requestId: v.id("environmentVariableRequests") },
+  returns: v.object({ value: v.string() }),
+  handler: async (ctx, args): Promise<{ value: string }> => {
+    const request = await ctx.runQuery(api.variableRequests.getById, {
+      requestId: args.requestId,
+    });
+    if (!request) {
+      throw new Error("Variable request not found");
+    }
+
+    const value = await ctx.runAction(internal.vault.readSecret, {
+      vaultRef: request.vaultRef,
+    });
+
+    return { value };
+  },
+});
