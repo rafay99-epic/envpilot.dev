@@ -1,0 +1,25 @@
+.plans/access-revocation/design.md
+  s_8ac05b3f82c26d::t_143b9fd5085544 1-218
+  s_8ac05b3f82c26d::t_91e43998ab14f5 219-235
+.plans/access-revocation/current-model.md
+  s_8ac05b3f82c26d::t_e5e267775cf9a7 1-94
+  s_8ac05b3f82c26d::t_b37b79743efbac 95-101
+.plans/README.md
+  s_8ac05b3f82c26d::t_a9eecdf82c1ce9 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "573541cbb5189cff47b2509079151f535557fe78",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
