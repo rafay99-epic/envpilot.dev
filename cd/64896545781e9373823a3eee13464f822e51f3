@@ -1,0 +1,22 @@
+CLAUDE.md
+  s_8ac05b3f82c26d::t_32c9877659f546 22-34
+apps/cli/scripts/cli-dev.sh
+  s_8ac05b3f82c26d::t_bc20c3053a843a 1-27,35-44
+  s_8ac05b3f82c26d::t_e4826b9d03fa17 28-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "cd64896545781e9373823a3eee13464f822e51f3",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
