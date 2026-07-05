@@ -1,5 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import {
+  action,
+  mutation,
+  query,
+  MutationCtx,
+  QueryCtx,
+} from "./_generated/server";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { batchGetUsers } from "./helpers";
 import { createAuditLog } from "./auditHelpers";
@@ -776,5 +783,153 @@ export const cancel = mutation({
     });
 
     return args.requestId;
+  },
+});
+
+const requestUserValidator = v.union(
+  v.object({
+    _id: v.id("users"),
+    email: v.string(),
+    name: v.optional(v.string()),
+  }),
+  v.null()
+);
+
+/**
+ * Replaces POST /api/cli/variable-requests AND POST /api/extension/variable-requests.
+ *
+ * Encrypts the proposed value into WorkOS Vault, then creates the request with
+ * the returned ref. Authorization mirrors the routes: the caller must be a
+ * developer assigned to the project (owners / PMs / team leads create variables
+ * directly and are rejected here; grant-only / unassigned users are blocked).
+ * Returns the created request (trimmed to the fields the CLI/extension consume,
+ * vaultRef intentionally omitted).
+ */
+export const createWithValue = action({
+  args: {
+    projectId: v.id("projects"),
+    key: v.string(),
+    value: v.string(),
+    environments: v.array(v.string()),
+    isSensitive: v.optional(v.boolean()),
+    description: v.optional(v.string()),
+  },
+  returns: v.object({
+    _id: v.id("environmentVariableRequests"),
+    key: v.string(),
+    description: v.optional(v.string()),
+    environments: v.array(v.string()),
+    projectId: v.id("projects"),
+    organizationId: v.id("organizations"),
+    isSensitive: v.boolean(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("canceled")
+    ),
+    reviewReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    requester: requestUserValidator,
+    reviewer: requestUserValidator,
+  }),
+  // Explicit return type breaks the same-module circular inference caused by
+  // referencing api.variableRequests.{create,getById} from within this module.
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    _id: Id<"environmentVariableRequests">;
+    key: string;
+    description?: string;
+    environments: string[];
+    projectId: Id<"projects">;
+    organizationId: Id<"organizations">;
+    isSensitive: boolean;
+    status: "pending" | "approved" | "rejected" | "canceled";
+    reviewReason?: string;
+    createdAt: number;
+    updatedAt: number;
+    requester: { _id: Id<"users">; email: string; name?: string } | null;
+    reviewer: { _id: Id<"users">; email: string; name?: string } | null;
+  }> => {
+    const project = await ctx.runQuery(api.projects.getById, {
+      projectId: args.projectId,
+    });
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const membership = await ctx.runQuery(api.organizations.getMembership, {
+      organizationId: project.organizationId,
+    });
+    if (!membership) {
+      throw new Error("You are not a member of this organization");
+    }
+
+    const legacy = await ctx.runQuery(api.roleCompat.resolveLegacyRoles, {
+      projectId: args.projectId,
+    });
+
+    if (!legacy.assigned) {
+      if (legacy.grantOnly) {
+        throw new Error(
+          "You have Viewer access to this project. Variable requests are not allowed."
+        );
+      }
+      throw new Error(
+        "You are not assigned to this project. Variable requests are not allowed."
+      );
+    }
+
+    // Owners, project managers, and team leads should create directly.
+    if (legacy.role !== "developer") {
+      throw new Error(
+        "You have direct write access. Use direct variable creation instead of submitting a request."
+      );
+    }
+
+    // Encrypt the proposed value first — the mutation only ever stores a ref.
+    const vault = await ctx.runAction(internal.vault.createSecret, {
+      name: args.key,
+      value: args.value,
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+    });
+
+    const requestId = await ctx.runMutation(api.variableRequests.create, {
+      key: args.key,
+      vaultRef: vault.id,
+      description: args.description,
+      environments: args.environments,
+      projectId: args.projectId,
+      isSensitive: args.isSensitive ?? false,
+    });
+
+    const created = await ctx.runQuery(api.variableRequests.getById, {
+      requestId,
+    });
+    if (!created) {
+      throw new Error("Failed to load the created variable request");
+    }
+
+    // Trim to the fields the CLI/extension parse (drops vaultRef / _creationTime
+    // / review metadata that clients ignore).
+    return {
+      _id: created._id,
+      key: created.key,
+      description: created.description,
+      environments: created.environments,
+      projectId: created.projectId,
+      organizationId: created.organizationId,
+      isSensitive: created.isSensitive,
+      status: created.status,
+      reviewReason: created.reviewReason,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+      requester: created.requester,
+      reviewer: created.reviewer,
+    };
   },
 });
