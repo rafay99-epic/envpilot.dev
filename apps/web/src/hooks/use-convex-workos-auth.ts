@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import {
-  useAccessToken,
-  useAuth,
-} from "@workos-inc/authkit-nextjs/components";
+import { useAccessToken, useAuth } from "@workos-inc/authkit-nextjs/components";
 
 /**
  * Bridges the WorkOS AuthKit session to Convex's `ConvexProviderWithAuth`

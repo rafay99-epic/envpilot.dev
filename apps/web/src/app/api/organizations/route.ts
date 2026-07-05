@@ -125,14 +125,13 @@ export async function POST(request: Request) {
 
     const { name, slug, description } = validation.data;
 
-    const organizationId = await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.create,
-      {
-        name,
-        slug,
-        description,
-      }
-    );
+    const organizationId = await createAuthedConvexClient(
+      accessToken!
+    ).mutation(api.organizations.create, {
+      name,
+      slug,
+      description,
+    });
 
     const organization = await convex.query(api.organizations.getById, {
       organizationId,

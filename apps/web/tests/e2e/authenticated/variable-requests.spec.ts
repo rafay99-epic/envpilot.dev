@@ -7,7 +7,14 @@ import {
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
-import { E2E_TEST_EMAIL, hasE2ECredentials, SKIP_REASON } from "../env";
+import { readFileSync } from "node:fs";
+
+import {
+  E2E_TEST_EMAIL,
+  hasE2ECredentials,
+  SKIP_REASON,
+  STORAGE_STATE_PATH,
+} from "../env";
 import { trackClientErrors } from "./support";
 
 /**
@@ -16,14 +23,21 @@ import { trackClientErrors } from "./support";
  * reveal → env-chip toggle → approve, plus reject via ConfirmDialog, plus the
  * unauthenticated authorization guard on the value endpoint.
  *
- * ── Seeding ────────────────────────────────────────────────────────────────
- * Only org-role *developers* may submit variable requests (enforced by both
- * the POST /api/variable-requests route and the `variableRequests.create`
- * Convex mutation). The single E2E login is the fixture-org OWNER, so there is
- * no authenticated developer path from the browser. Instead this spec seeds
- * requests directly against the Convex dev deployment with a ConvexHttpClient,
- * passing `requestedBy = <fixture developer>` — the mutation's own role check
- * then passes because that user really is a developer assigned to the project.
+ * ── Seeding (post auth-cutover) ────────────────────────────────────────────
+ * Only org-role *developers* may submit variable requests, and since the
+ * Convex auth cutover every mutation derives its actor from a verified
+ * identity — the old trick of passing `requestedBy = <fixture developer>`
+ * from an unauthenticated client IS the impersonation hole the cutover
+ * closed, so it can no longer work (by design).
+ *
+ * Reads now run through an owner-authenticated ConvexHttpClient (the saved
+ * Playwright session → /api/auth/me → setAuth). Seeding uses the CLI's real
+ * submit surface, `variableRequests:createForToken`, authenticated by a CLI
+ * token belonging to the fixture DEVELOPER. Set `E2E_DEVELOPER_CLI_TOKEN` in
+ * the root .env.local (mint one by running `envpilot login` as the fixture
+ * developer, or copy an active token from the developer's CLI config). Tests
+ * that need seeding self-skip when the token is absent; the read-only
+ * authorization test (C) always runs.
  *
  * Nothing is hardcoded: the developer, org, project and a *real* vault ref are
  * all derived at runtime from the pre-existing fixture pending request
@@ -52,8 +66,47 @@ const fn = {
     "variableRequests:listForReviewer"
   ),
   getById: makeFunctionReference<"query">("variableRequests:getById"),
-  create: makeFunctionReference<"mutation">("variableRequests:create"),
+  createForToken: makeFunctionReference<"mutation">(
+    "variableRequests:createForToken"
+  ),
 };
+
+/** CLI token of the fixture DEVELOPER — required only by the seeding tests. */
+const DEVELOPER_CLI_TOKEN = process.env.E2E_DEVELOPER_CLI_TOKEN;
+const DEVELOPER_TOKEN_SKIP =
+  "Skipped: set E2E_DEVELOPER_CLI_TOKEN in the root .env.local (an active " +
+  "CLI token of the fixture developer) so this spec can seed requests " +
+  "through the real CLI submit surface. See the seeding notes at the top of " +
+  "this file.";
+
+/**
+ * The owner's WorkOS access token, obtained exactly like the app does:
+ * saved session cookies → GET /api/auth/me. Convex then verifies the JWT on
+ * every fixture read (post-cutover, unauthenticated reads are rejected).
+ */
+async function fetchOwnerAccessToken(): Promise<string> {
+  const state = JSON.parse(readFileSync(STORAGE_STATE_PATH, "utf-8")) as {
+    cookies: Array<{ name: string; value: string; domain: string }>;
+  };
+  const cookieHeader = state.cookies
+    .filter((c) => c.domain.includes("localhost"))
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+  const res = await fetch("http://localhost:3000/api/auth/me", {
+    headers: { Cookie: cookieHeader },
+  });
+  if (!res.ok) {
+    throw new Error(
+      `GET /api/auth/me failed (${res.status}) — is the saved e2e session ` +
+        "still valid? Re-run the setup project."
+    );
+  }
+  const me = (await res.json()) as { accessToken: string | null };
+  if (!me.accessToken) {
+    throw new Error("/api/auth/me returned no accessToken for the e2e owner.");
+  }
+  return me.accessToken;
+}
 
 interface FixtureContext {
   convex: ConvexHttpClient;
@@ -80,6 +133,7 @@ async function resolveFixtureContext(): Promise<FixtureContext> {
     );
   }
   const convex = new ConvexHttpClient(CONVEX_URL);
+  convex.setAuth(await fetchOwnerAccessToken());
 
   const owner = await convex.query(fn.getByEmail, { email: E2E_TEST_EMAIL });
   if (!owner) {
@@ -89,9 +143,11 @@ async function resolveFixtureContext(): Promise<FixtureContext> {
     );
   }
 
-  const orgs = (await convex.query(fn.listForUser, {
-    userId: owner._id,
-  })) as Array<{ _id: string; name: string; role: string }>;
+  const orgs = (await convex.query(fn.listForUser, {})) as Array<{
+    _id: string;
+    name: string;
+    role: string;
+  }>;
   const org = orgs.find((o) => FIXTURE_ORG_NAME.test(o.name));
   if (!org) {
     throw new Error(
@@ -113,7 +169,6 @@ async function resolveFixtureContext(): Promise<FixtureContext> {
   // Derive the developer + a real vault ref from the pre-existing smoke request.
   const pending = (await convex.query(fn.listForReviewer, {
     organizationId: org._id,
-    userId: owner._id,
     status: "pending",
   })) as Array<{
     _id: string;
@@ -131,7 +186,6 @@ async function resolveFixtureContext(): Promise<FixtureContext> {
 
   const full = (await convex.query(fn.getById, {
     requestId: smoke._id,
-    userId: owner._id,
   })) as { vaultRef: string } | null;
   if (!full?.vaultRef) {
     throw new Error("Could not read a vault ref from the smoke request.");
@@ -169,18 +223,22 @@ async function pinActiveOrg(
   ]);
 }
 
-/** Seed a pending request as the fixture developer; returns its id + key. */
+/**
+ * Seed a pending request AS the fixture developer through the CLI's real
+ * submit surface — the developer's identity comes from their CLI token,
+ * validated inside Convex (requireBearerUser).
+ */
 async function seedRequest(
   key: string,
   environments: string[]
 ): Promise<string> {
-  const requestId = (await ctx.convex.mutation(fn.create, {
+  const requestId = (await ctx.convex.mutation(fn.createForToken, {
+    accessToken: DEVELOPER_CLI_TOKEN!,
     key,
     vaultRef: ctx.vaultRef,
     environments,
     projectId: ctx.projectId,
     isSensitive: false,
-    requestedBy: ctx.developerId,
   })) as string;
   return requestId;
 }
@@ -194,6 +252,7 @@ test.describe("variable requests — reviewer approvals page", () => {
   test("A: reveal → toggle env → approve moves the request to Approved", async ({
     page,
   }) => {
+    test.skip(!DEVELOPER_CLI_TOKEN, DEVELOPER_TOKEN_SKIP);
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
@@ -323,6 +382,7 @@ test.describe("variable requests — reviewer approvals page", () => {
   test("B: reject via ConfirmDialog moves the request to Rejected", async ({
     page,
   }) => {
+    test.skip(!DEVELOPER_CLI_TOKEN, DEVELOPER_TOKEN_SKIP);
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 

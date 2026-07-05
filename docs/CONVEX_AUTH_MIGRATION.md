@@ -1,6 +1,19 @@
 # Convex Auth Migration — Binding Functions to Server-Verified Identity
 
-**Status: FOUNDATION LAID (dormant). Cutover NOT executed.**
+**Status: EXECUTED (feat/convex-auth-cutover, 2026-07-05).** Phases 1–3 are
+live: `auth.config.ts` registers the WorkOS AuthKit providers (per the
+official guide — two `customJwt` entries, JWKS at
+`api.workos.com/sso/jwks/<clientId>`), the browser attaches JWTs via
+`AuthKitProvider` + `ConvexProviderWithAuth`, and every actor-arg function
+has been converted to `requireAuthedUser`/`getAuthedUser`. One deliberate
+deviation from the plan below: the CLI/extension bridge is **`*ForToken`
+public variants** (bearer token validated inside Convex by
+`identity.requireBearerUser` across `cliTokens` + `projectAccess`) instead of
+Option B internal variants — `ConvexHttpClient` cannot call internal
+functions, and in-Convex token validation is a stronger trust boundary
+anyway. ⚠️ Before the first production deploy: set `WORKOS_CLIENT_ID` in the
+prod Convex deployment (`npx convex env set`), or every push will be
+rejected. The original plan is preserved below for reference.
 
 This document is the ordered plan to close the hole where **every Convex
 function trusts a client-supplied `userId` arg**. Today any client that can

@@ -95,10 +95,9 @@ export async function GET(req: Request) {
   }
 
   // Get user's first owned organization for billing association
-  const organizations = await createAuthedConvexClient(workosAccessToken!).query(
-    api.organizations.listForUser,
-    {}
-  );
+  const organizations = await createAuthedConvexClient(
+    workosAccessToken!
+  ).query(api.organizations.listForUser, {});
   const primaryOrg = organizations[0];
 
   // --- Ensure Polar customer exists BEFORE checkout ---
