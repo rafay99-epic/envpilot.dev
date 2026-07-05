@@ -61,15 +61,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
     }
 
     const { organizationId } = resolved;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves in the
+    // authenticated Convex calls below.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
 
     // Check membership
-    const membership = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMembership,
-      {
-        organizationId,
-      }
-    );
+    const membership = await authed.query(api.organizations.getMembership, {
+      organizationId,
+    });
 
     if (!membership) {
       return NextResponse.json(
@@ -83,11 +83,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     });
 
     // Also get pending invitations
-    const invitations = await convex.query(
+    const invitations = await authed.query(
       api.invitations.listPendingByOrganization,
       {
         organizationId,
-        requestingUserId: convexUser._id,
       }
     );
 
@@ -107,7 +106,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -161,15 +160,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       organizationId
     );
 
-    const result = await convex.mutation(api.invitations.create, {
-      email,
-      organizationId,
-      role,
-      projectIds: projectIds as Id<"projects">[] | undefined,
-      // Developer environment scope — omitted means unrestricted.
-      ...(environments ? { environments } : {}),
-      invitedBy: convexUser._id,
-    });
+    const result = await createAuthedConvexClient(accessToken!).mutation(
+      api.invitations.create,
+      {
+        email,
+        organizationId,
+        role,
+        projectIds: projectIds as Id<"projects">[] | undefined,
+        // Developer environment scope — omitted means unrestricted.
+        ...(environments ? { environments } : {}),
+      }
+    );
 
     console.log(
       "[INVITE] Invitation created:",

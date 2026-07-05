@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -76,7 +76,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
  */
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -110,9 +110,13 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const organizationId = await convex.mutation(api.invitations.accept, {
+    // The accepting user is derived server-side from the session JWT
+    // (requireAuthedUser); the getByWorkosId/upsert above guarantees the
+    // `users` row exists so that identity resolves.
+    const organizationId = await createAuthedConvexClient(
+      accessToken!
+    ).mutation(api.invitations.accept, {
       token,
-      userId: convexUser._id,
     });
 
     const organization = await convex.query(api.organizations.getById, {
@@ -174,22 +178,19 @@ export async function POST(_request: Request, { params }: RouteParams) {
  */
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     const resolvedParams = await params;
     const { token } = resolvedParams;
 
-    // Get user ID if authenticated (optional for declining)
-    let convexUserId = undefined;
-    if (user) {
-      const convexUser = await convex.query(api.users.getByWorkosId, {
-        workosId: user.id,
-      });
-      convexUserId = convexUser?._id;
-    }
+    // Declining is anonymous-capable. When the invitee is signed in, use an
+    // authenticated client so the decline is attributed to their verified JWT
+    // identity (getAuthedUser); otherwise fall back to the anonymous client and
+    // the mutation records no actor.
+    const client =
+      user && accessToken ? createAuthedConvexClient(accessToken) : convex;
 
-    await convex.mutation(api.invitations.decline, {
+    await client.mutation(api.invitations.decline, {
       token,
-      userId: convexUserId,
     });
 
     return NextResponse.json({ declined: true });

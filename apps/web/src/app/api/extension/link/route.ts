@@ -40,8 +40,6 @@ export async function POST(request: Request) {
 
     const { projectId, deviceId, deviceName, expiresInDays } = validation.data;
 
-    const convexUser = auth.convexUser;
-
     // Get project and verify membership
     const { project, organizationId } = await getProjectOrganization(
       convex,
@@ -62,14 +60,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Link the extension
-    const access = await convex.mutation(api.projectAccess.linkExtension, {
-      projectId: projectId as Id<"projects">,
-      userId: convexUser._id,
-      deviceId,
-      deviceName,
-      expiresInDays,
-    });
+    // Link the extension — the acting user is resolved server-side from the
+    // bearer token inside the ForToken mutation (requireBearerUser).
+    const access = await convex.mutation(
+      api.projectAccess.linkExtensionForToken,
+      {
+        accessToken: auth.accessToken!,
+        projectId: projectId as Id<"projects">,
+        deviceId,
+        deviceName,
+        expiresInDays,
+      }
+    );
 
     return NextResponse.json({
       data: {

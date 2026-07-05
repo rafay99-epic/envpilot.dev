@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   log.info("request_start");
 
   try {
-    const { user } = await withAuth();
+    const { user, accessToken: sessionAccessToken } = await withAuth();
 
     if (!user) {
       log.warn("unauthenticated", { duration_ms: since(start) });
@@ -52,7 +52,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create or get the Convex user
+    // Create or get the Convex user. This also guarantees the `users` row
+    // exists so the JWT identity can be resolved server-side by the
+    // authenticated storeExtensionToken mutation below.
     const userStart = Date.now();
     const convexUser = await getOrCreateConvexUser(convex, user);
     log.debug("convex_user_resolved", {
@@ -67,15 +69,19 @@ export async function POST(request: Request) {
     const now = Date.now();
     const expiresAt = now + 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    // Persist the long-lived extension token for later validation
+    // Persist the long-lived extension token for later validation. The owning
+    // user is derived server-side from the session JWT (requireAuthedUser), so
+    // this call goes through an authenticated Convex client.
     const tokenStart = Date.now();
-    await convex.mutation(api.cliSessions.storeExtensionToken, {
-      userId: convexUser._id,
-      accessToken,
-      refreshToken,
-      deviceName: "VS Code Extension",
-      expiresAt,
-    });
+    await createAuthedConvexClient(sessionAccessToken!).mutation(
+      api.cliSessions.storeExtensionToken,
+      {
+        accessToken,
+        refreshToken,
+        deviceName: "VS Code Extension",
+        expiresAt,
+      }
+    );
     log.debug("token_stored", { duration_ms: since(tokenStart) });
 
     // Store the short-lived handshake record in Convex so the polling

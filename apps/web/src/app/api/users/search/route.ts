@@ -1,6 +1,6 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -28,7 +28,7 @@ const searchSchema = z.object({
  */
 export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -56,9 +56,10 @@ export async function GET(request: Request) {
     const { q, organizationId, limit } = validation.data;
     const orgId = organizationId as Id<"organizations">;
 
-    // Resolve the authenticated Convex user for the org-membership check on the
-    // invitations listing.
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the `users` row exists so the session JWT resolves in the
+    // authenticated invitations listing below (org-membership check happens
+    // server-side via requireAuthedUser).
+    await getOrCreateConvexUser(convex, user);
 
     // Search for users scoped to the organization
     const users = await convex.query(api.users.search, {
@@ -70,10 +71,12 @@ export async function GET(request: Request) {
     // Check membership status and pending invitations
     const [members, invitations] = await Promise.all([
       convex.query(api.organizations.getMembers, { organizationId: orgId }),
-      convex.query(api.invitations.listPendingByOrganization, {
-        organizationId: orgId,
-        requestingUserId: convexUser._id,
-      }),
+      createAuthedConvexClient(accessToken!).query(
+        api.invitations.listPendingByOrganization,
+        {
+          organizationId: orgId,
+        }
+      ),
     ]);
 
     const memberIds = new Set(

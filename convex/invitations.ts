@@ -13,6 +13,7 @@ import {
   assertCanAssignRole,
   normalizeOrgRole,
 } from "./authz";
+import { requireAuthedUser, getAuthedUser } from "./identity";
 
 /**
  * Invitation Queries and Mutations
@@ -31,12 +32,11 @@ function generateToken(): string {
 export const listPendingByOrganization = query({
   args: {
     organizationId: v.id("organizations"),
-    // Caller must be a member of the org to see its pending invitations.
-    requestingUserId: v.id("users"),
   },
   handler: async (ctx, args) => {
     // Authorization: only members of the org may list its pending invitations.
-    await assertOrgMembership(ctx, args.requestingUserId, args.organizationId);
+    const actor = await requireAuthedUser(ctx);
+    await assertOrgMembership(ctx, actor._id, args.organizationId);
 
     const invitations = await ctx.db
       .query("invitations")
@@ -110,14 +110,15 @@ export const create = mutation({
     // (owners/PMs/team leads are always unrestricted). Omit for all
     // environments.
     environments: v.optional(v.array(v.string())),
-    invitedBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     // Authorization: owners, project managers, and team leads can invite
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.invitedBy,
+      actor._id,
       args.organizationId,
       "org:invite_member"
     );
@@ -227,7 +228,7 @@ export const create = mutation({
       projectIds: args.projectIds,
       environments: args.environments,
       token,
-      invitedBy: args.invitedBy,
+      invitedBy: actor._id,
       status: "pending",
       expiresAt,
       createdAt: now,
@@ -235,7 +236,7 @@ export const create = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
-      userId: args.invitedBy,
+      userId: actor._id,
       action: "invitation.sent",
       details: JSON.stringify({
         email: args.email,
@@ -252,9 +253,9 @@ export const create = mutation({
 export const accept = mutation({
   args: {
     token: v.string(),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const invitation = await ctx.db
@@ -280,10 +281,7 @@ export const accept = mutation({
 
     // The accepting user's email must match the invited email — an invitation
     // is addressed to a specific person, not a bearer token.
-    const acceptingUser = await ctx.db.get(args.userId);
-    if (!acceptingUser) {
-      throw new Error("User not found");
-    }
+    const acceptingUser = actor;
     if (
       (acceptingUser.email ?? "").toLowerCase() !==
       invitation.email.toLowerCase()
@@ -296,7 +294,7 @@ export const accept = mutation({
       .withIndex("by_org_and_user", (q) =>
         q
           .eq("organizationId", invitation.organizationId)
-          .eq("userId", args.userId)
+          .eq("userId", actor._id)
       )
       .first();
 
@@ -308,7 +306,7 @@ export const accept = mutation({
 
     await ctx.db.insert("organizationMembers", {
       organizationId: invitation.organizationId,
-      userId: args.userId,
+      userId: actor._id,
       role: invitedRole,
       joinedAt: now,
       invitedBy: invitation.invitedBy,
@@ -332,7 +330,7 @@ export const accept = mutation({
           // Pure scope assignment — capabilities come from the org role
           await ctx.db.insert("projectMembers", {
             projectId,
-            userId: args.userId,
+            userId: actor._id,
             ...(environmentScope ? { environments: environmentScope } : {}),
             addedBy: invitation.invitedBy,
             addedAt: now,
@@ -348,7 +346,7 @@ export const accept = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: invitation.organizationId,
-      userId: args.userId,
+      userId: actor._id,
       action: "invitation.accepted",
       details: JSON.stringify({
         invitationId: invitation._id,
@@ -369,9 +367,12 @@ export const accept = mutation({
 export const decline = mutation({
   args: {
     token: v.string(),
-    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    // Declining is anonymous-capable: an invitee may decline from the email
+    // link without ever signing in. Derive the actor only if a verified
+    // identity is present; otherwise keep the anonymous path (no audit row).
+    const actor = await getAuthedUser(ctx);
     const now = Date.now();
 
     const invitation = await ctx.db
@@ -392,10 +393,10 @@ export const decline = mutation({
       respondedAt: now,
     });
 
-    if (args.userId) {
+    if (actor) {
       await ctx.db.insert("auditLogs", {
         organizationId: invitation.organizationId,
-        userId: args.userId,
+        userId: actor._id,
         action: "invitation.declined",
         details: JSON.stringify({
           invitationId: invitation._id,
@@ -411,9 +412,10 @@ export const decline = mutation({
 export const cancel = mutation({
   args: {
     invitationId: v.id("invitations"),
-    cancelledBy: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) {
       throw new Error("Invitation not found");
@@ -422,7 +424,7 @@ export const cancel = mutation({
     // Authorization: only admins and team_leads can cancel invitations
     await assertOrgAction(
       ctx,
-      args.cancelledBy,
+      actor._id,
       invitation.organizationId,
       "org:invite_member"
     );
@@ -435,7 +437,7 @@ export const cancel = mutation({
 
     await ctx.db.insert("auditLogs", {
       organizationId: invitation.organizationId,
-      userId: args.cancelledBy,
+      userId: actor._id,
       action: "invitation.canceled",
       details: JSON.stringify({
         invitationId: args.invitationId,
@@ -452,10 +454,11 @@ export const cancel = mutation({
 export const resend = mutation({
   args: {
     invitationId: v.id("invitations"),
-    resentBy: v.id("users"),
     expiresInDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) {
       throw new Error("Invitation not found");
@@ -464,7 +467,7 @@ export const resend = mutation({
     // Authorization: owners, project managers, and team leads can resend
     const { membership: callerMembership } = await assertOrgAction(
       ctx,
-      args.resentBy,
+      actor._id,
       invitation.organizationId,
       "org:invite_member"
     );
@@ -486,12 +489,12 @@ export const resend = mutation({
     await ctx.db.patch(args.invitationId, {
       token: newToken,
       expiresAt,
-      invitedBy: args.resentBy,
+      invitedBy: actor._id,
     });
 
     await ctx.db.insert("auditLogs", {
       organizationId: invitation.organizationId,
-      userId: args.resentBy,
+      userId: actor._id,
       action: "invitation.resent",
       details: JSON.stringify({
         invitationId: args.invitationId,

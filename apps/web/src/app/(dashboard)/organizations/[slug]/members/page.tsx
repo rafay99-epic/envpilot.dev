@@ -83,10 +83,11 @@ function OrganizationMembersPageContent({
     orgId ? { organizationId: orgId } : "skip"
   );
   const invitationsData = useQuery(
+    // The requesting user is derived server-side from the browser's verified
+    // JWT identity (requireAuthedUser). convexUserId is kept only as an
+    // auth-ready skip gate so the query waits until identity is resolvable.
     api.invitations.listPendingByOrganization,
-    orgId && convexUserId
-      ? { organizationId: orgId, requestingUserId: convexUserId }
-      : "skip"
+    orgId && convexUserId ? { organizationId: orgId } : "skip"
   );
   const projectsData = useQuery(
     api.projects.listByOrganization,

@@ -108,9 +108,11 @@ function CLIAuthPageContent() {
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      // The acting user is derived server-side from the browser's verified JWT
+      // identity (requireAuthedUser); no userId is sent. convexUser is still
+      // used as a readiness/existence gate above.
       await authenticate({
         code: code.toUpperCase(),
-        userId: convexUser._id,
       });
     } catch (error) {
       setSubmitError(

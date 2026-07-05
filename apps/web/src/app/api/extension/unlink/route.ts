@@ -34,12 +34,11 @@ export async function POST(request: Request) {
 
     const { projectId, deviceId } = validation.data;
 
-    const convexUser = auth.convexUser;
-
-    // Unlink the extension
-    await convex.mutation(api.projectAccess.unlinkExtension, {
+    // Unlink the extension — the acting user is resolved server-side from the
+    // bearer token inside the ForToken mutation (requireBearerUser).
+    await convex.mutation(api.projectAccess.unlinkExtensionForToken, {
+      accessToken: auth.accessToken!,
       projectId: projectId as Id<"projects">,
-      userId: convexUser._id,
       deviceId,
     });
 
