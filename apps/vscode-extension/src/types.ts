@@ -80,10 +80,9 @@ export interface Project {
   userRole?: MembershipRole | null;
   projectRole?: ProjectRole | null;
   /**
-   * Additive unified-role fields, mirroring `apps/cli`'s `ProjectAccess`
-   * shape. Sent by `/api/extension/projects`; still optional and safe to omit
-   * so legacy server deployments remain tolerated. When present, prefer these
-   * over `userRole`/`projectRole` via `normalizeOrgRole`/`formatRoleLabel`.
+   * Unified-role fields, mirroring `apps/cli`'s `ProjectAccess` shape. Resolved
+   * directly from Convex (projects + membership queries). Prefer these over
+   * `userRole`/`projectRole` via `normalizeOrgRole`/`formatRoleLabel`.
    */
   unifiedRole?: string;
   /** Whether the user is actually assigned to this project (vs. grant-only). */
@@ -159,9 +158,19 @@ export interface LinkedProject {
 
 export interface AuthSession {
   user: User;
+  /** WorkOS AuthKit access token (JWT, ~5 min lifetime). */
   accessToken: string;
+  /** WorkOS AuthKit refresh token (long-lived, may rotate on refresh). */
   refreshToken: string;
+  /**
+   * Account-expiry timestamp used by StorageService to auto-evict a dead
+   * account. Left at 0 (falsy = never) for WorkOS sessions: the short-lived
+   * access-token `exp` must NOT evict the account — session death is detected
+   * solely by a refresh grant being rejected (see TokenManager).
+   */
   expiresAt: number;
+  /** WorkOS session id (`sid` claim) — recorded for the active-sessions UI. */
+  sessionId?: string;
 }
 
 export interface TokenValidation {

@@ -1,57 +1,73 @@
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
 
+/** Async fetcher returning a fresh WorkOS access token (or null when signed out). */
+export type TokenFetcher = () => Promise<string | null>;
+
+/** A single active project-access scoping record for the caller. */
+export interface CallerProjectAccess {
+  _id: string;
+  projectId: string;
+  deviceId?: string;
+  deviceName?: string;
+  expiresAt: number;
+}
+
+/** A permission-revocation event delivered to the signed-in user. */
+export interface RevocationEvent {
+  accessToken: string;
+  eventId: string;
+  projectId: string;
+  userId: string;
+  reason: string;
+  revokedAt: number;
+}
+
 /**
- * ConvexService manages a persistent WebSocket connection to Convex.
+ * ConvexService manages a persistent, authenticated WebSocket connection to
+ * Convex.
  *
- * Replaces HTTP polling with reactive subscriptions:
- * - Revocation events: fires instantly when a token is revoked
- * - Token validation: fires when a token becomes invalid
- * - Variable metadata: fires when variables change (triggers HTTP fetch for decrypted values)
+ * Auth: the socket is authenticated with a WorkOS AuthKit JWT via
+ * `client.setAuth(getFreshToken)`. Every subscription/mutation is therefore
+ * identity-scoped server-side — no per-project access token strings are passed
+ * as args anymore.
  *
- * Cost impact: ~744 HTTP calls/hr/user → 1 WebSocket connection
+ * Reactive subscriptions (replace the old HTTP polling):
+ * - Revocation events (`permissionRevocationEvents.listMine`): fires instantly
+ *   when any of the caller's project accesses is revoked.
+ * - Project access (`projectAccess.listForCaller`): the caller's live set of
+ *   linked projects — a project dropping out means access ended.
+ * - Variable metadata (`variables.listMetadataByProject`): fires when variables
+ *   change (triggers an HTTP fetch for decrypted values).
  */
 export class ConvexService {
   private client: ConvexClient;
   private subscriptions = new Map<string, () => void>();
   private _disposed = false;
 
-  constructor(convexUrl: string) {
+  constructor(convexUrl: string, getFreshToken: TokenFetcher) {
     this.client = new ConvexClient(convexUrl);
+    // Authenticate the socket with a WorkOS JWT, refreshed on demand. Convex
+    // calls this fetcher whenever it needs a (fresh) token.
+    this.client.setAuth(getFreshToken);
   }
 
   /**
-   * Subscribe to revocation events for the given access tokens.
-   * Callback fires with events array whenever revocations are detected.
+   * Subscribe to the signed-in user's unacknowledged revocation events.
+   * Identity-scoped — no access tokens are passed. Callback fires with the
+   * events array whenever new revocations appear.
    */
   subscribeToRevocations(
-    accessTokens: string[],
-    callback: (
-      events: Array<{
-        accessToken: string;
-        eventId: string;
-        projectId: string;
-        userId: string;
-        reason: string;
-        revokedAt: number;
-      }>
-    ) => void
+    callback: (events: RevocationEvent[]) => void
   ): string {
     const id = `revocations-${Date.now()}`;
 
     const unsubscribe = this.client.onUpdate(
-      anyApi.permissionRevocationEvents.checkForTokens,
-      { accessTokens },
+      anyApi.permissionRevocationEvents.listMine,
+      {},
       (events: unknown) => {
-        const arr = events as Array<{
-          accessToken: string;
-          eventId: string;
-          projectId: string;
-          userId: string;
-          reason: string;
-          revokedAt: number;
-        }>;
-        if (arr && arr.length > 0) {
+        const arr = (events as RevocationEvent[]) ?? [];
+        if (arr.length > 0) {
           callback(arr);
         }
       }
@@ -62,32 +78,21 @@ export class ConvexService {
   }
 
   /**
-   * Subscribe to token validation for a single access token.
-   * Callback fires with the access info (null if token is invalid/expired).
+   * Subscribe to the caller's active project-access scoping records. Fires with
+   * the current set whenever it changes — a previously linked project vanishing
+   * from this set means its access has ended (expired/revoked). Replaces the
+   * old per-access-token validation subscription.
    */
-  subscribeToTokenValidation(
-    accessToken: string,
-    callback: (
-      result: {
-        projectId: string;
-        userId: string;
-        expiresAt: number;
-      } | null
-    ) => void
+  subscribeToProjectAccess(
+    callback: (records: CallerProjectAccess[]) => void
   ): string {
-    const id = `token-${accessToken.slice(0, 8)}-${Date.now()}`;
+    const id = `access-${Date.now()}`;
 
     const unsubscribe = this.client.onUpdate(
-      anyApi.projectAccess.getByAccessToken,
-      { accessToken },
-      (result: unknown) => {
-        callback(
-          result as {
-            projectId: string;
-            userId: string;
-            expiresAt: number;
-          } | null
-        );
+      anyApi.projectAccess.listForCaller,
+      {},
+      (records: unknown) => {
+        callback((records as CallerProjectAccess[]) ?? []);
       }
     );
 
@@ -138,40 +143,13 @@ export class ConvexService {
   }
 
   /**
-   * Update an existing subscription with new args (e.g., when tokens change).
-   * Unsubscribes the old one and creates a new subscription.
+   * Acknowledge revocation events via mutation. Identity-scoped — the backend
+   * only acknowledges events that belong to the signed-in user.
    */
-  updateRevocationSubscription(
-    oldId: string,
-    accessTokens: string[],
-    callback: (
-      events: Array<{
-        accessToken: string;
-        eventId: string;
-        projectId: string;
-        userId: string;
-        reason: string;
-        revokedAt: number;
-      }>
-    ) => void
-  ): string {
-    this.unsubscribe(oldId);
-    return this.subscribeToRevocations(accessTokens, callback);
-  }
-
-  /**
-   * Acknowledge revocation events via mutation (skip HTTP middleman).
-   *
-   * `userId` is the extension user's Convex id — the backend now requires it
-   * and rejects acknowledging events that belong to another user.
-   */
-  async acknowledgeRevocations(
-    eventIds: string[],
-    userId: string
-  ): Promise<void> {
+  async acknowledgeRevocations(eventIds: string[]): Promise<void> {
     await this.client.mutation(
-      anyApi.permissionRevocationEvents.acknowledgeMultiple,
-      { eventIds, userId }
+      anyApi.permissionRevocationEvents.acknowledgeMine,
+      { eventIds }
     );
   }
 

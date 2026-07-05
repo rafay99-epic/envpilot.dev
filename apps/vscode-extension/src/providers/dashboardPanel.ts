@@ -122,8 +122,7 @@ export class DashboardPanelProvider implements vscode.Disposable {
           if (dir) {
             const vars = await this.apiService.getVariablesMetadata(
               activeProject.projectId,
-              dir.environments[0] || "development",
-              activeProject.accessToken
+              dir.environments[0] || "development"
             );
             variableCount = vars.length;
           }

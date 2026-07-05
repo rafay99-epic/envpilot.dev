@@ -16,6 +16,12 @@ const define = {
   ...(serverUrl && {
     __DEFAULT_SERVER_URL__: JSON.stringify(serverUrl),
   }),
+  // WorkOS AuthKit device-flow client id (public) and the Convex deployment
+  // URL, baked in at build time from the same env vars the web app uses so a
+  // single build environment configures every surface. See utils/config.ts for
+  // the runtime consumers (getWorkosClientId / getConvexUrl).
+  __WORKOS_CLIENT_ID__: JSON.stringify(process.env.WORKOS_CLIENT_ID || ""),
+  __CONVEX_URL__: JSON.stringify(process.env.NEXT_PUBLIC_CONVEX_URL || ""),
   __EXTENSION_SENTRY_DSN__: JSON.stringify(
     process.env.SENTRY_EXTENSION_DSN || ""
   ),

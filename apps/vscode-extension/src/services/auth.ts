@@ -1,107 +1,125 @@
 import * as vscode from "vscode";
-import * as crypto from "crypto";
-import axios from "axios";
-import { getServerUrl } from "../utils/config";
+import { ConvexHttpClient } from "convex/browser";
+import { anyApi } from "convex/server";
+import { getConvexUrl, getWorkosClientId } from "../utils/config";
 import { openUrlReliably } from "../utils/browser";
 import * as output from "../utils/outputChannel";
 import { captureError } from "../utils/sentry";
 import { StorageService } from "../utils/storage";
-import type { AuthSession, User, ApiResponse } from "../types";
+import { TokenManager } from "./tokenManager";
+import { getDeviceName } from "../utils/device";
+import { getJwtSessionId, getJwtSubject } from "../utils/jwt";
+import {
+  requestDeviceCode,
+  pollForToken,
+  WorkosAuthError,
+  type DeviceCodeResponse,
+  type TokenResponse,
+} from "./workos";
+import type { AuthSession, User } from "../types";
 
-const AUTH_CHECK_PATH = "/api/extension/auth/check";
+const MAX_CONSECUTIVE_ERRORS = 5;
 
-/** Only log the first 8 chars of the session token — enough to correlate. */
-function sessionPrefix(token: string): string {
-  return token.slice(0, 8);
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * The most recently constructed `AuthService` instance, if any.
+ * Authentication service for the extension.
  *
- * `ApiService` needs to trigger a token refresh / reauth prompt on a 401
- * response, but it is only ever given a `StorageService` (see api.ts) and
- * the extension wires services up purely via constructor injection in
- * extension.ts. Rather than changing that wiring (which would ripple into
- * extension.ts), `AuthService` publishes itself here so `api.ts` can reach
- * it without a constructor change. There is only ever one live
- * `AuthService` per extension host.
- */
-let activeAuthService: AuthService | null = null;
-
-/** Get the currently active `AuthService`, if the extension has activated one. */
-export function getActiveAuthService(): AuthService | null {
-  return activeAuthService;
-}
-
-/**
- * Authentication service for the extension
- * Uses OAuth flow through the browser for secure authentication
+ * Uses the WorkOS AuthKit **device authorization flow**: it requests a device +
+ * user code, opens the verification URL in the browser, and polls WorkOS until
+ * the user approves. The resulting AuthKit JWTs (access + refresh) are stored in
+ * VS Code SecretStorage via {@link StorageService}. Token freshness is owned by
+ * {@link TokenManager}; this service only mints the initial session and records
+ * / revokes the WorkOS device session for the active-sessions UI.
  */
 export class AuthService {
   private storage: StorageService;
-  private context: vscode.ExtensionContext;
+  private tokenManager: TokenManager;
   private _onAuthStateChanged = new vscode.EventEmitter<AuthSession | null>();
   readonly onAuthStateChanged = this._onAuthStateChanged.event;
 
-  constructor(context: vscode.ExtensionContext, storage: StorageService) {
-    this.context = context;
+  constructor(storage: StorageService, tokenManager: TokenManager) {
     this.storage = storage;
-    // Intentional self-registration (see `getActiveAuthService` above), not
-    // an accidental `this` alias.
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    activeAuthService = this;
+    this.tokenManager = tokenManager;
   }
 
   /**
-   * Start the sign-in flow
-   * Opens the browser to authenticate and registers a URI handler for callback
+   * Run the WorkOS device-authorization login flow. Returns true on success.
    */
   async signIn(): Promise<boolean> {
-    const serverUrl = getServerUrl();
+    if (!getWorkosClientId()) {
+      vscode.window.showErrorMessage(
+        "Envpilot: this build has no WorkOS client id embedded. Reinstall the extension."
+      );
+      return false;
+    }
 
-    // Create a unique session token for this auth attempt
-    const sessionToken = generateSessionToken();
-    const session = sessionPrefix(sessionToken);
+    output.logEvent("signIn.start");
 
-    output.logEvent("signIn.start", { session, serverUrl });
+    let device: DeviceCodeResponse;
+    try {
+      device = await requestDeviceCode();
+    } catch (err) {
+      captureError(err, { phase: "device-code-request" });
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`Envpilot: sign-in failed — ${message}`);
+      return false;
+    }
 
-    // Store pending session
-    await this.context.globalState.update("pendingAuthSession", sessionToken);
+    await this.presentDeviceCode(device);
 
-    // Build the auth URL
-    const authUrl = `${serverUrl}/extension/auth?session=${sessionToken}`;
+    return this.pollForAuthCompletion(device);
+  }
 
-    // Open in browser (also copies URL to clipboard as safety net)
-    const browserOpened = await openUrlReliably(authUrl);
+  /**
+   * Show the user code and open the verification URL in the browser (also
+   * copies the URL to the clipboard as a safety net).
+   */
+  private async presentDeviceCode(device: DeviceCodeResponse): Promise<void> {
+    output.logEvent("signIn.device_code", {
+      user_code: device.user_code,
+    });
 
-    if (browserOpened) {
-      output.logEvent("signIn.browser_opened", { session });
+    // Copy the code so the user can paste it if the page asks for it.
+    try {
+      await vscode.env.clipboard.writeText(device.user_code);
+    } catch {
+      // Non-fatal.
+    }
+
+    const opened = await openUrlReliably(device.verification_uri_complete);
+    if (opened) {
+      output.logEvent("signIn.browser_opened");
+      vscode.window.showInformationMessage(
+        `Envpilot: confirm the code "${device.user_code}" in your browser to finish signing in.`
+      );
     } else {
-      output.warnEvent("signIn.browser_open_failed", { session });
-      // Browser failed — tell user about clipboard and output channel
+      output.warnEvent("signIn.browser_open_failed");
       const action = await vscode.window.showWarningMessage(
-        "Could not open browser. The sign-in URL has been copied to your clipboard.",
+        `Envpilot: open ${device.verification_uri_complete} and enter code "${device.user_code}" to sign in. The URL has been copied to your clipboard.`,
         "Show Output Log"
       );
+      try {
+        await vscode.env.clipboard.writeText(device.verification_uri_complete);
+      } catch {
+        // Non-fatal.
+      }
       if (action === "Show Output Log") {
         output.show();
       }
     }
-
-    // Auto-poll for auth completion with progress indicator
-    return this.pollForAuthCompletion(sessionToken);
   }
 
   /**
-   * Poll the server for auth completion with a progress indicator.
-   * Automatically detects when the user completes sign-in in the browser.
+   * Poll WorkOS for approval with a cancellable progress notification. WorkOS
+   * dictates the poll cadence (interval, may increase on slow_down) and the
+   * overall window (expires_in).
    */
-  private async pollForAuthCompletion(sessionToken: string): Promise<boolean> {
-    const serverUrl = getServerUrl();
-    const POLL_INTERVAL_MS = 2000;
-    const MAX_POLL_DURATION_MS = 120000; // 2 minutes timeout
-    const session = sessionPrefix(sessionToken);
-
+  private async pollForAuthCompletion(
+    device: DeviceCodeResponse
+  ): Promise<boolean> {
     return vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -109,140 +127,205 @@ export class AuthService {
         cancellable: true,
       },
       async (progress, cancellationToken) => {
-        const startTime = Date.now();
-        let attempts = 0;
-
         progress.report({ message: "Complete sign-in in your browser" });
 
-        while (!cancellationToken.isCancellationRequested) {
-          // Check timeout
-          if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
-            output.warnEvent("poll.timeout", {
-              session,
-              attempts,
-              elapsed_ms: Date.now() - startTime,
-            });
-            await this.context.globalState.update(
-              "pendingAuthSession",
-              undefined
-            );
-            vscode.window.showWarningMessage(
-              "Sign-in timed out. Please try again."
-            );
-            return false;
-          }
+        let intervalMs = device.interval * 1000;
+        const deadline = Date.now() + device.expires_in * 1000;
+        let consecutiveErrors = 0;
+        let firstPoll = true;
 
-          // Wait before polling (skip first attempt for faster response)
-          if (attempts > 0) {
-            await new Promise<void>((resolve) => {
-              const timer = setTimeout(resolve, POLL_INTERVAL_MS);
-              cancellationToken.onCancellationRequested(() => {
-                clearTimeout(timer);
-                resolve();
-              });
-            });
+        while (
+          !cancellationToken.isCancellationRequested &&
+          Date.now() < deadline
+        ) {
+          // Skip the delay before the FIRST poll — the user has already been
+          // sent to the browser, so check WorkOS immediately rather than
+          // waiting a full interval before the first attempt.
+          if (!firstPoll) {
+            await sleep(intervalMs);
           }
-
+          firstPoll = false;
           if (cancellationToken.isCancellationRequested) {
             break;
           }
 
-          attempts++;
           progress.report({
-            message: `Waiting for browser sign-in... (${Math.floor((Date.now() - startTime) / 1000)}s)`,
+            message: `Waiting for browser sign-in... (${Math.floor(
+              (deadline - Date.now()) / 1000
+            )}s left)`,
           });
 
-          const reqStart = Date.now();
-          try {
-            const response = await axios.get<ApiResponse<AuthSession>>(
-              `${serverUrl}${AUTH_CHECK_PATH}`,
-              {
-                params: { session: sessionToken },
-                timeout: 10000,
+          const result = await pollForToken(device.device_code);
+
+          if (result.status === "complete") {
+            return this.completeLogin(result.token);
+          }
+
+          switch (result.status) {
+            case "pending":
+              consecutiveErrors = 0;
+              break;
+            case "slow_down":
+              consecutiveErrors = 0;
+              intervalMs += 5000;
+              break;
+            case "network":
+              consecutiveErrors++;
+              if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                output.warnEvent("signIn.network_errors");
+                vscode.window.showErrorMessage(
+                  "Envpilot: too many network errors while signing in. Check your connection and try again."
+                );
+                return false;
               }
-            );
-
-            if (response.data.data) {
-              output.logEvent("poll.success", {
-                session,
-                attempts,
-                status: response.status,
-                duration_ms: Date.now() - reqStart,
-                elapsed_ms: Date.now() - startTime,
-              });
-
-              await this.storage.setAuthSession(response.data.data);
-              this._onAuthStateChanged.fire(response.data.data);
-              await this.context.globalState.update(
-                "pendingAuthSession",
-                undefined
+              break;
+            case "denied":
+              vscode.window.showWarningMessage(
+                "Envpilot: sign-in was denied. Please try again."
               );
-
-              vscode.window.showInformationMessage(
-                `Signed in as ${response.data.data.user.email}`
+              return false;
+            case "expired":
+              vscode.window.showWarningMessage(
+                "Envpilot: the sign-in code expired. Please try again."
               );
-              return true;
-            }
-
-            // 200 with no data shouldn't happen, but log it so we see it.
-            output.warnEvent("poll.empty_response", {
-              session,
-              attempts,
-              status: response.status,
-            });
-          } catch (err: unknown) {
-            const axErr = err as {
-              response?: { status?: number };
-              code?: string;
-              message?: string;
-            };
-            const status = axErr?.response?.status;
-            // 404 is the expected "not yet" response while the user is
-            // still on the browser auth page — log it at debug granularity
-            // so it doesn't drown the channel, but include it when status
-            // is unexpected (429, 5xx, network errors).
-            if (status === 404) {
-              output.logEvent("poll.waiting", {
-                session,
-                attempts,
-                duration_ms: Date.now() - reqStart,
-              });
-            } else {
-              output.warnEvent("poll.error", {
-                session,
-                attempts,
-                status: status ?? "network",
-                code: axErr?.code ?? "-",
-                message: axErr?.message ?? "unknown",
-                duration_ms: Date.now() - reqStart,
-              });
-            }
+              return false;
           }
         }
 
-        output.warnEvent("poll.cancelled", {
-          session,
-          attempts,
-          elapsed_ms: Date.now() - startTime,
-        });
-        await this.context.globalState.update("pendingAuthSession", undefined);
+        if (cancellationToken.isCancellationRequested) {
+          output.warnEvent("signIn.cancelled");
+          return false;
+        }
+
+        output.warnEvent("signIn.timeout");
+        vscode.window.showWarningMessage(
+          "Envpilot: sign-in timed out. Please try again."
+        );
         return false;
       }
     );
   }
 
   /**
-   * Sign out and clear stored credentials
+   * Persist the AuthKit tokens as the active account, record the device session,
+   * and notify listeners.
+   */
+  private async completeLogin(token: TokenResponse): Promise<boolean> {
+    const session = this.sessionFromToken(token);
+
+    await this.storage.setAuthSession(session);
+    this._onAuthStateChanged.fire(session);
+
+    output.logEvent("signIn.success", { user: session.user.email });
+
+    // Best-effort — never block a successful login.
+    await this.recordDeviceSession(session, token.access_token);
+
+    vscode.window.showInformationMessage(`Signed in as ${session.user.email}`);
+    return true;
+  }
+
+  /** Build an AuthSession from a WorkOS token response. */
+  private sessionFromToken(token: TokenResponse): AuthSession {
+    const workosUser = token.user;
+    const userId =
+      workosUser?.id ??
+      getJwtSubject(token.access_token) ??
+      `session-${token.access_token.slice(0, 8)}`;
+    const email = workosUser?.email || `${userId}@extension.local`;
+    const name =
+      [workosUser?.first_name, workosUser?.last_name]
+        .filter(Boolean)
+        .join(" ") || null;
+
+    const user: User = {
+      id: userId,
+      email,
+      name,
+      avatarUrl: null,
+    };
+
+    return {
+      user,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      // 0 = never auto-evict on a timestamp; session death is refresh-driven.
+      expiresAt: 0,
+      sessionId: getJwtSessionId(token.access_token) ?? undefined,
+    };
+  }
+
+  /**
+   * Record this device as an active WorkOS session (best-effort). Uses the
+   * just-obtained access token directly so it works even before the token
+   * manager has cached anything.
+   */
+  private async recordDeviceSession(
+    session: AuthSession,
+    accessToken: string
+  ): Promise<void> {
+    if (!session.sessionId) return;
+    try {
+      const client = this.buildConvexClient(accessToken);
+      if (!client) return;
+      await client.mutation(anyApi.deviceSessions.record, {
+        deviceName: getDeviceName(),
+        clientType: "extension",
+        sessionId: session.sessionId,
+      });
+    } catch (err) {
+      // Non-fatal — the session record is a convenience, not load-bearing.
+      captureError(err, { phase: "device-session-record" });
+    }
+  }
+
+  /** Best-effort remote revoke of a WorkOS session by its session id. */
+  /**
+   * Revoke a specific account's WorkOS device session. Authenticates with THAT
+   * account's own token (deviceSessions.revoke is identity-scoped — the active
+   * account's token cannot revoke another user's session).
+   */
+  private async revokeDeviceSession(session: AuthSession): Promise<void> {
+    if (!session.sessionId) return;
+    try {
+      const token = await this.tokenManager.getFreshTokenForAccount(session);
+      const client = this.buildConvexClient(token);
+      if (!client) return;
+      await client.mutation(anyApi.deviceSessions.revoke, {
+        sessionId: session.sessionId,
+      });
+    } catch (err) {
+      // Non-fatal — local credentials are cleared regardless.
+      captureError(err, { phase: "device-session-revoke" });
+    }
+  }
+
+  private buildConvexClient(token: string | null): ConvexHttpClient | null {
+    const url = getConvexUrl();
+    if (!url || !token) return null;
+    const client = new ConvexHttpClient(url);
+    client.setAuth(token);
+    return client;
+  }
+
+  /**
+   * Sign out of the ACTIVE account: revoke its WorkOS session (best-effort),
+   * then clear its stored credentials.
    */
   async signOut(): Promise<void> {
+    const session = await this.getSession();
+    if (session) {
+      await this.revokeDeviceSession(session);
+    }
+    // Abandon any in-flight refresh so it can't hand back a token for the
+    // account we're about to clear.
+    this.tokenManager.clearInflight();
     await this.storage.clearAuthSession();
     this._onAuthStateChanged.fire(null);
     vscode.window.showInformationMessage("Signed out of Envpilot");
   }
 
-  /**
-   * Get the current auth session if valid
-   */
+  /** Get the current active account's auth session, or null when signed out. */
   async getSession(): Promise<AuthSession | null> {
     return this.storage.getAuthSession();
   }
@@ -250,12 +333,6 @@ export class AuthService {
   // ============================================
   // Multi-account pass-throughs (for the UI layer)
   // ============================================
-  //
-  // signIn() already ADDS an account via storage.setAuthSession (upsert +
-  // activate) and signOut() logs out only the ACTIVE account via
-  // clearAuthSession — both unchanged externally. These wrappers expose the
-  // rest of the account surface so the UI agent can drive it through
-  // AuthService (and get onAuthStateChanged notifications on active switches).
 
   /** List every signed-in account. */
   async listAccounts(): Promise<AuthSession[]> {
@@ -293,104 +370,40 @@ export class AuthService {
     return result;
   }
 
+  /**
+   * Best-effort revoke of every signed-in account's WorkOS session. Called by
+   * the "Sign Out of All Accounts" flow before clearing storage.
+   */
+  async revokeAllSessions(): Promise<void> {
+    const accounts = await this.storage.listAccounts();
+    for (const account of accounts) {
+      // Each revoke authenticates with its OWN account's token (identity-scoped
+      // mutation) — see revokeDeviceSession.
+      await this.revokeDeviceSession(account);
+    }
+  }
+
   /** Sign out of every account at once. */
   async signOutAll(): Promise<void> {
+    await this.revokeAllSessions();
+    this.tokenManager.clearInflight();
     await this.storage.clearAllAccounts();
     this._onAuthStateChanged.fire(null);
   }
 
-  /**
-   * Check if the user is currently authenticated
-   */
+  /** Whether the user is currently authenticated. */
   async isAuthenticated(): Promise<boolean> {
     const session = await this.getSession();
     return session !== null;
   }
 
-  /**
-   * Get the current user if authenticated
-   */
+  /** Get the current user if authenticated. */
   async getCurrentUser(): Promise<User | null> {
     const session = await this.getSession();
     return session?.user || null;
   }
 
-  /**
-   * Refresh the access token if needed
-   */
-  async refreshToken(): Promise<boolean> {
-    const session = await this.getSession();
-    if (!session?.refreshToken) {
-      return false;
-    }
-
-    const serverUrl = getServerUrl();
-
-    try {
-      const response = await axios.post<ApiResponse<AuthSession>>(
-        `${serverUrl}/api/extension/auth/refresh`,
-        { refreshToken: session.refreshToken },
-        { timeout: 10000 }
-      );
-
-      if (response.data.data) {
-        await this.storage.setAuthSession(response.data.data);
-        this._onAuthStateChanged.fire(response.data.data);
-        return true;
-      }
-
-      return false;
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response
-        ?.status;
-      captureError(err, { phase: "auth-refresh-token" });
-      // Only sign out when the server definitively rejects the refresh
-      // token (4xx). Transient network errors or server outages must not
-      // destroy an otherwise valid session.
-      if (status !== undefined && status >= 400 && status < 500) {
-        await this.signOut();
-      }
-      return false;
-    }
-  }
-
-  /**
-   * Validate the current session with the server
-   */
-  async validateSession(): Promise<boolean> {
-    const session = await this.getSession();
-    if (!session) {
-      return false;
-    }
-
-    const serverUrl = getServerUrl();
-
-    try {
-      const response = await axios.get<ApiResponse<{ valid: boolean }>>(
-        `${serverUrl}/api/extension/auth/validate`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.accessToken}`,
-          },
-          timeout: 10000,
-        }
-      );
-
-      return response.data.data?.valid === true;
-    } catch {
-      return false;
-    }
-  }
-
   dispose(): void {
-    if (activeAuthService === this) {
-      activeAuthService = null;
-    }
     this._onAuthStateChanged.dispose();
   }
-}
-
-function generateSessionToken(): string {
-  // Use crypto module for cryptographically secure random tokens
-  return crypto.randomBytes(32).toString("hex");
 }

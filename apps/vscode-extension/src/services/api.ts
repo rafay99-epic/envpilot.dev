@@ -4,39 +4,92 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
 } from "axios";
-import { getServerUrl } from "../utils/config";
-import { StorageService } from "../utils/storage";
+import { ConvexHttpClient } from "convex/browser";
+import { anyApi } from "convex/server";
+import { getServerUrl, getConvexUrl } from "../utils/config";
 import { SingleFlight } from "../utils/singleFlight";
-import { getActiveAuthService } from "./auth";
+import { TokenManager } from "./tokenManager";
 import { captureError } from "../utils/sentry";
+import { normalizeOrgRole } from "../roles";
 import type {
   Organization,
   Project,
   EnvironmentVariable,
-  ProjectAccess,
-  TokenValidation,
-  ApiResponse,
   DeviceInfo,
-  MembershipRole,
-  ProjectRole,
   VariableRequest,
   UsageInfo,
 } from "../types";
 
+// ============================================================================
+// Convex row shapes (typed against the confirmed Stage-2 contract; anyApi is
+// untyped so results are cast to these).
+// ============================================================================
+
+interface OrgRow {
+  _id: string;
+  name: string;
+  slug: string;
+  role?: string;
+  description?: string;
+  logoUrl?: string;
+}
+interface ProjectRow {
+  _id: string;
+  name: string;
+  slug: string;
+  organizationId: string;
+  description?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  userRole?: string | null;
+  projectRole?: string | null;
+}
+interface MembershipRow {
+  role: string;
+}
+interface ProjectMembershipRow {
+  environments?: string[];
+}
+type ResolvedFeatures = {
+  tierName: string;
+  features: Record<
+    string,
+    { value: boolean | number | null; valueType: string }
+  >;
+} | null;
+interface OrganizationUsage {
+  tier: "free" | "pro";
+  usage: UsageInfo["usage"];
+}
+interface CheckFeatureResult {
+  allowed: boolean;
+  value: boolean | number | null;
+  tierName: string;
+  reason?: string;
+}
+
+const LINK_EXPIRES_DAYS_DEFAULT = 30;
+
 /**
- * API service for communicating with the Envpilot backend
+ * API service for communicating with the Envpilot backend.
+ *
+ * Stage-2 cutover: identity is a WorkOS AuthKit JWT. All non-vault data
+ * (organizations, projects, variable metadata/requests, tier/usage) is read
+ * DIRECTLY from Convex over an authenticated HTTP client. The only calls that
+ * still go over HTTP to the Next.js app are the WorkOS-Vault crypto paths —
+ * reading decrypted secret VALUES and creating variable requests (encrypted
+ * server-side) — carrying an `Authorization: Bearer <fresh JWT>` header.
  */
 export class ApiService {
   private client: AxiosInstance;
-  private storage: StorageService;
-  private roleCache: Map<string, MembershipRole> = new Map();
-  private projectRoleCache: Map<string, ProjectRole> = new Map();
+  private tokenManager: TokenManager;
+  private roleCache: Map<string, string> = new Map();
+  private projectRoleCache: Map<string, string> = new Map();
   /**
    * Authoritative unified access facts returned alongside each getVariables
    * response (additive server fields). Populated on the SAME request that
-   * fetches the variables, so it never goes stale relative to a sync — unlike
-   * projectRoleCache (populated only by getProjects). File protection reads
-   * this first; the legacy role/projectRole caches are the fallback.
+   * fetches the variables, so it never goes stale relative to a sync. File
+   * protection reads this first; the role caches are the fallback.
    */
   private accessMetaCache: Map<
     string,
@@ -48,42 +101,33 @@ export class ApiService {
       scopeRestricted?: boolean;
     }
   > = new Map();
-  /**
-   * Short-TTL response cache. One sync triggers refreshes of the variables
-   * tree, dashboard panel, and status bar — without this, each refresh
-   * re-fetches identical data (including vault-decrypted variables).
-   */
+  /** Short-TTL response cache (one sync fans out to several refreshes). */
   private responseCache: Map<string, { at: number; value: unknown }> =
     new Map();
   private static readonly CACHE_TTL_MS = 30_000;
-  /**
-   * In-flight GET coalescing keyed by cache key. The 30s response cache only
-   * helps AFTER a response lands — when a sync fans out to many directories
-   * and subscriptions at once, several identical cold-cache fetches would
-   * otherwise stampede the server. This makes concurrent callers for the same
-   * key share one HTTP request (single-flight).
-   */
+  /** In-flight GET coalescing keyed by cache key (single-flight). */
   private inflight = new SingleFlight();
   /** Guards against stacking multiple "session expired" prompts at once. */
   private reauthPromptActive = false;
 
-  constructor(storage: StorageService) {
-    this.storage = storage;
+  constructor(tokenManager: TokenManager) {
+    this.tokenManager = tokenManager;
     this.client = axios.create({
       timeout: 30000,
     });
 
-    // Add auth interceptor
+    // Attach a fresh WorkOS JWT bearer to every vault HTTP request.
     this.client.interceptors.request.use(async (config) => {
       config.baseURL = getServerUrl();
-      const session = await this.storage.getAuthSession();
-      if (session?.accessToken) {
-        config.headers.Authorization = `Bearer ${session.accessToken}`;
+      const token = await this.tokenManager.getFreshToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
     });
 
-    // Add response interceptor for error handling
+    // On a 401 the token was already fresh, so a rejected request means the
+    // session is dead server-side — surface a single reauth prompt.
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<{ error?: string }>) => {
@@ -92,49 +136,63 @@ export class ApiService {
           | (InternalAxiosRequestConfig & { _envpilotRetried?: boolean })
           | undefined;
 
-        // On a 401, attempt a single token refresh + retry before giving up.
-        // The `_envpilotRetried` guard prevents an infinite retry loop if the
-        // refreshed token is itself rejected.
         if (status === 401 && config && !config._envpilotRetried) {
           config._envpilotRetried = true;
-          const refreshed = await this.tryRefreshSession();
-          if (refreshed) {
-            return this.client.request(config);
-          }
           void this.promptReauth();
         }
 
         const message = error.response?.data?.error || error.message;
-        // Preserve the HTTP status so callers can distinguish auth failures
-        // (401) from transient/network errors instead of matching on message.
         throw Object.assign(new Error(message), { status });
       }
     );
   }
 
-  /**
-   * Attempt to refresh the current session's access token via
-   * `AuthService.refreshToken()`. Returns true only if a new token was
-   * persisted and the retried request can proceed.
-   */
-  private async tryRefreshSession(): Promise<boolean> {
-    const authService = getActiveAuthService();
-    if (!authService) {
-      return false;
-    }
-    try {
-      return await authService.refreshToken();
-    } catch (err) {
-      captureError(err, { phase: "token-refresh" });
-      return false;
-    }
-  }
+  // ============================================
+  // Auth-scoped Convex client
+  // ============================================
 
   /**
-   * Surface a clear "session expired" prompt so the user knows to sign in
-   * again, instead of a generic error toast. Debounced so a burst of
-   * concurrent 401s (e.g. multiple in-flight requests) only shows one.
+   * Build a ConvexHttpClient authed with a freshly-minted WorkOS JWT. The HTTP
+   * client's setAuth takes a token STRING, so the token is resolved up front —
+   * every call therefore carries a non-expired JWT.
    */
+  private async getConvexClient(): Promise<ConvexHttpClient> {
+    const url = getConvexUrl();
+    if (!url) {
+      throw new Error(
+        "No Convex URL available. Set envpilot.convexUrl or reinstall the extension."
+      );
+    }
+    const token = await this.tokenManager.getFreshToken();
+    if (!token) {
+      throw Object.assign(new Error("You are not signed in."), { status: 401 });
+    }
+    const client = new ConvexHttpClient(url);
+    client.setAuth(token);
+    return client;
+  }
+
+  private async convexQuery<T>(
+    ref: unknown,
+    args: Record<string, unknown> = {}
+  ): Promise<T> {
+    const client = await this.getConvexClient();
+    // anyApi refs are untyped — the concrete shape is enforced by our casts.
+    return client.query(ref as never, args as never) as Promise<T>;
+  }
+
+  private async convexMutation<T>(
+    ref: unknown,
+    args: Record<string, unknown> = {}
+  ): Promise<T> {
+    const client = await this.getConvexClient();
+    return client.mutation(ref as never, args as never) as Promise<T>;
+  }
+
+  // ============================================
+  // Caching / reauth helpers
+  // ============================================
+
   private async promptReauth(): Promise<void> {
     if (this.reauthPromptActive) {
       return;
@@ -167,56 +225,96 @@ export class ApiService {
     this.responseCache.set(key, { at: Date.now(), value });
   }
 
-  /**
-   * Run `fetcher` under single-flight for `key`: if an identical request is
-   * already in flight, return its promise instead of issuing a second one.
-   */
   private coalesce<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     return this.inflight.run(key, fetcher);
   }
 
-  /** Drop all cached responses (manual refresh, sign-out). */
+  /** Drop all cached responses (manual refresh, sign-out, account switch). */
   clearCache(): void {
     this.responseCache.clear();
-    // Stop new callers from joining a request that was issued under the
-    // previous session/token; the in-flight promises still settle for their
-    // original callers.
     this.inflight.clear();
+    this.roleCache.clear();
+    this.projectRoleCache.clear();
+    this.accessMetaCache.clear();
   }
 
-  // Organizations
+  private static numericFeature(
+    resolved: ResolvedFeatures,
+    key: string,
+    fallback: number | null = null
+  ): number | null {
+    const value = resolved?.features?.[key]?.value;
+    return typeof value === "number" ? value : fallback;
+  }
+
+  private static booleanFeature(
+    resolved: ResolvedFeatures,
+    key: string,
+    fallback = false
+  ): boolean {
+    const value = resolved?.features?.[key]?.value;
+    return typeof value === "boolean" ? value : fallback;
+  }
+
+  // ============================================
+  // Organizations — DIRECT Convex
+  // ============================================
+
   async getOrganizations(): Promise<Organization[]> {
     const cached = this.getCached<Organization[]>("orgs");
     if (cached) return cached;
 
     return this.coalesce("orgs", async () => {
-      const response = await this.client.get<
-        ApiResponse<{ organizations: Organization[] }>
-      >("/api/extension/organizations");
-      const organizations = response.data.data?.organizations || [];
+      const orgs = await this.convexQuery<OrgRow[]>(
+        anyApi.organizations.listForUser,
+        {}
+      );
+
+      const orgIds = orgs.map((o) => o._id);
+      let tiers: ResolvedFeatures[] = [];
+      if (orgIds.length > 0) {
+        try {
+          tiers = await this.convexQuery<ResolvedFeatures[]>(
+            anyApi.featureRegistry.getResolvedFeaturesBatch,
+            { organizationIds: orgIds }
+          );
+        } catch {
+          tiers = [];
+        }
+      }
+
+      const organizations: Organization[] = orgs.map((org, index) => ({
+        _id: org._id,
+        name: org.name,
+        slug: org.slug,
+        tier: (tiers[index]?.tierName === "pro"
+          ? "pro"
+          : "free") as Organization["tier"],
+        unifiedRole: normalizeOrgRole(org.role),
+      }));
+
       this.setCached("orgs", organizations);
       return organizations;
     });
   }
 
-  // Projects
+  // ============================================
+  // Projects — DIRECT Convex
+  // ============================================
+
   async getProjects(organizationId?: string): Promise<Project[]> {
     const cacheKey = `projects:${organizationId ?? "all"}`;
     const cached = this.getCached<Project[]>(cacheKey);
     if (cached) return cached;
 
     return this.coalesce(cacheKey, async () => {
-      const response = await this.client.get<
-        ApiResponse<{ projects: Project[] }>
-      >("/api/extension/projects", {
-        params: organizationId ? { organizationId } : undefined,
-      });
-      const projects = response.data.data?.projects || [];
+      const projects = organizationId
+        ? await this.listProjectsForOrg(organizationId)
+        : await this.listAllProjects();
 
-      // Cache both org-level and project-level roles from the response
       for (const project of projects) {
-        if (project.userRole) {
-          this.roleCache.set(project._id, project.userRole);
+        if (project.unifiedRole) {
+          this.roleCache.set(project._id, project.unifiedRole);
         }
         if (project.projectRole) {
           this.projectRoleCache.set(project._id, project.projectRole);
@@ -228,23 +326,116 @@ export class ApiService {
     });
   }
 
+  /** Projects within one organization, with unified-role + assignment info. */
+  private async listProjectsForOrg(organizationId: string): Promise<Project[]> {
+    const [projects, membership] = await Promise.all([
+      this.convexQuery<ProjectRow[]>(anyApi.projects.listWithStats, {
+        organizationId,
+      }),
+      this.convexQuery<MembershipRow | null>(
+        anyApi.organizations.getMembership,
+        { organizationId }
+      ),
+    ]);
+
+    const unifiedRole = normalizeOrgRole(membership?.role);
+    return Promise.all(
+      projects.map((project) =>
+        this.mapProject(project, unifiedRole, unifiedRole === "owner")
+      )
+    );
+  }
+
+  /** Every accessible project across all orgs (per-project role). */
+  private async listAllProjects(): Promise<Project[]> {
+    const projects = await this.convexQuery<ProjectRow[]>(
+      anyApi.projects.listForUser,
+      {}
+    );
+    return Promise.all(
+      projects.map((project) => {
+        const unifiedRole = normalizeOrgRole(project.userRole);
+        return this.mapProject(project, unifiedRole, unifiedRole === "owner");
+      })
+    );
+  }
+
+  /**
+   * Resolve per-project assignment + environment scope. Owners are implicitly
+   * assigned to every project; everyone else's assignment/scope comes from the
+   * projectMembers row.
+   */
+  private async mapProject(
+    project: ProjectRow,
+    unifiedRole: ReturnType<typeof normalizeOrgRole>,
+    isOwner: boolean
+  ): Promise<Project> {
+    const legacyProjectRole = isOwner
+      ? null
+      : unifiedRole === "developer"
+        ? "developer"
+        : "manager";
+
+    let assigned = isOwner;
+    let environmentScope: string[] | null = null;
+    if (!isOwner) {
+      const projectMembership =
+        await this.convexQuery<ProjectMembershipRow | null>(
+          anyApi.projectMembers.getProjectMembership,
+          { projectId: project._id }
+        );
+      assigned = projectMembership !== null;
+      environmentScope =
+        unifiedRole === "developer"
+          ? (projectMembership?.environments ?? null)
+          : null;
+    }
+
+    return {
+      _id: project._id,
+      name: project.name,
+      slug: project.slug,
+      description: project.description ?? null,
+      organizationId: project.organizationId,
+      icon: project.icon ?? null,
+      color: project.color ?? null,
+      userRole: null,
+      projectRole: legacyProjectRole,
+      unifiedRole,
+      assigned,
+      environmentScope,
+    };
+  }
+
   async getProject(projectId: string): Promise<Project | null> {
     try {
-      const response = await this.client.get<ApiResponse<{ project: Project }>>(
-        `/api/extension/projects/${projectId}`
+      const project = await this.convexQuery<ProjectRow | null>(
+        anyApi.projects.getById,
+        { projectId }
       );
-      return response.data.data?.project || null;
+      if (!project) return null;
+      return {
+        _id: project._id,
+        name: project.name,
+        slug: project.slug,
+        description: project.description ?? null,
+        organizationId: project.organizationId,
+        icon: project.icon ?? null,
+        color: project.color ?? null,
+      };
     } catch (err) {
       captureError(err, { phase: "get-project" });
       return null;
     }
   }
 
-  // Variables
+  // ============================================
+  // Variables — VAULT over HTTP (JWT bearer)
+  // ============================================
+
   async getVariables(
     projectId: string,
     environment: string,
-    accessToken?: string,
     organizationId?: string,
     options?: { fresh?: boolean }
   ): Promise<EnvironmentVariable[]> {
@@ -255,32 +446,23 @@ export class ApiService {
     }
 
     return this.coalesce(cacheKey, async () => {
-      const headers: Record<string, string> = {};
-      if (accessToken) {
-        headers["X-Access-Token"] = accessToken;
-      }
-
       const params: Record<string, string> = { projectId, environment };
       if (organizationId) {
         params.organizationId = organizationId;
       }
 
-      const response = await this.client.get<
-        ApiResponse<{
+      const response = await this.client.get<{
+        data?: {
           variables: EnvironmentVariable[];
-          role?: MembershipRole;
+          role?: string;
           unifiedRole?: string;
           assigned?: boolean;
           environmentScope?: string[] | null;
           hasWriteAccess?: boolean;
           scopeRestricted?: boolean;
-        }>
-      >("/api/extension/variables", {
-        params,
-        headers,
-      });
+        };
+      }>("/api/extension/variables", { params });
 
-      // Cache the user's role for this project
       if (response.data.data?.role) {
         this.roleCache.set(projectId, response.data.data.role);
       }
@@ -292,7 +474,6 @@ export class ApiService {
     });
   }
 
-  /** Store the additive unified access fields from a variables response. */
   private cacheAccessMeta(
     projectId: string,
     data:
@@ -322,10 +503,6 @@ export class ApiService {
     }
   }
 
-  /**
-   * Authoritative unified access facts for a project (populated by
-   * getVariables). Undefined against a legacy server that omits them.
-   */
   getAccessMeta(projectId: string):
     | {
         unifiedRole?: string;
@@ -340,14 +517,12 @@ export class ApiService {
 
   /**
    * Variable metadata only — `value` is always empty. Used by UI surfaces
-   * (tree view, dashboard) that never display values: skips per-variable
-   * vault decryption on the server, which is the slow part of getVariables,
-   * and avoids logging spurious "export" audit events for mere rendering.
+   * (tree view, dashboard) that never display values: skips per-variable vault
+   * decryption on the server and avoids logging spurious "export" audit events.
    */
   async getVariablesMetadata(
     projectId: string,
     environment: string,
-    accessToken?: string,
     organizationId?: string
   ): Promise<EnvironmentVariable[]> {
     const cacheKey = `varsmeta:${projectId}:${environment}:${organizationId ?? ""}`;
@@ -355,11 +530,6 @@ export class ApiService {
     if (cached) return cached;
 
     return this.coalesce(cacheKey, async () => {
-      const headers: Record<string, string> = {};
-      if (accessToken) {
-        headers["X-Access-Token"] = accessToken;
-      }
-
       const params: Record<string, string> = {
         projectId,
         environment,
@@ -369,20 +539,17 @@ export class ApiService {
         params.organizationId = organizationId;
       }
 
-      const response = await this.client.get<
-        ApiResponse<{
+      const response = await this.client.get<{
+        data?: {
           variables: EnvironmentVariable[];
-          role?: MembershipRole;
+          role?: string;
           unifiedRole?: string;
           assigned?: boolean;
           environmentScope?: string[] | null;
           hasWriteAccess?: boolean;
           scopeRestricted?: boolean;
-        }>
-      >("/api/extension/variables", {
-        params,
-        headers,
-      });
+        };
+      }>("/api/extension/variables", { params });
 
       if (response.data.data?.role) {
         this.roleCache.set(projectId, response.data.data.role);
@@ -395,108 +562,143 @@ export class ApiService {
     });
   }
 
-  /**
-   * Get the cached org role for a project (populated after getVariables call)
-   */
-  getUserRole(projectId: string): MembershipRole | undefined {
+  /** Cached org role for a project (raw role string; normalize before use). */
+  getUserRole(projectId: string): string | undefined {
     return this.roleCache.get(projectId);
   }
 
-  /**
-   * Get the cached project role (populated after getProjects call)
-   */
-  getProjectRole(projectId: string): ProjectRole | undefined {
+  /** Cached project role (raw role string; compare after normalizing). */
+  getProjectRole(projectId: string): string | undefined {
     return this.projectRoleCache.get(projectId);
   }
 
-  // Project Access (Extension Linking)
+  // ============================================
+  // Project linking — DIRECT Convex mutations
+  // ============================================
+
+  /**
+   * Record this device's scoping row for a project. Identity is the JWT; the
+   * mutation returns the projectAccess id + token but the extension no longer
+   * stores that token as a credential — it stores the deviceId as a link
+   * marker and computes the local expiry.
+   */
   async linkExtension(
     projectId: string,
     deviceInfo: DeviceInfo,
-    expiresInDays?: number
-  ): Promise<ProjectAccess> {
-    const response = await this.client.post<
-      ApiResponse<{ access: ProjectAccess }>
-    >("/api/extension/link", {
+    expiresInDays: number = LINK_EXPIRES_DAYS_DEFAULT
+  ): Promise<{ accessToken: string; expiresAt: number }> {
+    await this.convexMutation(anyApi.projectAccess.linkExtension, {
       projectId,
       deviceId: deviceInfo.deviceId,
       deviceName: deviceInfo.deviceName,
-      expiresInDays: expiresInDays || 30,
+      expiresInDays,
     });
-
-    if (!response.data.data?.access) {
-      throw new Error("Failed to link extension");
-    }
-
-    return response.data.data.access;
+    return {
+      // Link marker (NOT the projectAccess token) — kept only so storage's
+      // presence filter treats the project as linked.
+      accessToken: deviceInfo.deviceId,
+      expiresAt: Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
+    };
   }
 
   async unlinkExtension(projectId: string, deviceId: string): Promise<void> {
-    await this.client.post("/api/extension/unlink", {
+    await this.convexMutation(anyApi.projectAccess.unlinkExtension, {
       projectId,
       deviceId,
     });
   }
 
-  async validateAccessToken(accessToken: string): Promise<TokenValidation> {
-    const response = await this.client.post<ApiResponse<TokenValidation>>(
-      "/api/extension/validate-token",
-      { accessToken }
-    );
+  // ============================================
+  // Tier / usage — DIRECT Convex
+  // ============================================
 
-    return (
-      response.data.data || {
-        valid: false,
-        reason: "Invalid response from server",
-      }
-    );
-  }
-
-  async refreshAccessToken(
-    accessToken: string,
-    expiresInDays?: number
-  ): Promise<{ expiresAt: number }> {
-    const response = await this.client.post<ApiResponse<{ expiresAt: number }>>(
-      "/api/extension/refresh-token",
-      { accessToken, expiresInDays: expiresInDays || 30 }
-    );
-
-    if (!response.data.data?.expiresAt) {
-      throw new Error("Failed to refresh access token");
-    }
-
-    return { expiresAt: response.data.data.expiresAt };
-  }
-
-  async updateLastUsed(accessToken: string): Promise<void> {
-    await this.client.post("/api/extension/update-last-used", { accessToken });
-  }
-
-  // Check if extension access is enabled for the organization's tier
+  /** Check whether extension access is enabled for the organization's tier. */
   async checkExtensionAccess(
     organizationId: string
   ): Promise<{ enabled: boolean; reason?: string }> {
-    const response = await this.client.get<
-      ApiResponse<{ enabled: boolean; reason?: string }>
-    >(`/api/extension/check-access/${organizationId}`);
-    return response.data.data || { enabled: false, reason: "Unknown error" };
+    try {
+      const result = await this.convexQuery<CheckFeatureResult>(
+        anyApi.featureRegistry.checkFeature,
+        { organizationId, featureKey: "extension_access" }
+      );
+      return {
+        enabled: result.allowed,
+        reason: result.allowed
+          ? undefined
+          : (result.reason ?? "Extension access requires Pro tier"),
+      };
+    } catch (err) {
+      captureError(err, { phase: "check-extension-access" });
+      return { enabled: false, reason: "Unable to verify extension access" };
+    }
   }
 
-  // Usage info
   async getUsage(organizationId: string): Promise<UsageInfo | null> {
     const cacheKey = `usage:${organizationId}`;
     const cached = this.getCached<UsageInfo>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await this.client.get<ApiResponse<UsageInfo>>(
-        "/api/extension/usage",
-        { params: { organizationId } }
+      const membership = await this.convexQuery<MembershipRow | null>(
+        anyApi.organizations.getMembership,
+        { organizationId }
       );
-      const usage = response.data.data || null;
-      if (usage) {
-        this.setCached(cacheKey, usage);
+      if (!membership) {
+        return null;
       }
+
+      const [usageData, enforcementEnabled, resolved] = await Promise.all([
+        this.convexQuery<OrganizationUsage | null>(
+          anyApi.tierLimits.getOrganizationUsage,
+          { organizationId }
+        ),
+        this.convexQuery<boolean>(anyApi.tierLimits.isEnforcementEnabled, {}),
+        this.convexQuery<ResolvedFeatures>(
+          anyApi.featureRegistry.getResolvedFeatures,
+          { organizationId }
+        ),
+      ]);
+
+      if (!usageData) {
+        return null;
+      }
+
+      const usage: UsageInfo = {
+        tier: (resolved?.tierName === "pro"
+          ? "pro"
+          : usageData.tier) as UsageInfo["tier"],
+        enforcementEnabled,
+        limits: {
+          projects: ApiService.numericFeature(resolved, "max_projects"),
+          variablesPerProject: ApiService.numericFeature(
+            resolved,
+            "max_variables_per_project"
+          ),
+          teamMembers: ApiService.numericFeature(resolved, "max_team_members"),
+        },
+        usage: usageData.usage,
+        features: {
+          versionHistory: ApiService.booleanFeature(
+            resolved,
+            "variable_version_history"
+          ),
+          bulkImport: ApiService.booleanFeature(resolved, "bulk_import"),
+          extensionAccess: ApiService.booleanFeature(
+            resolved,
+            "extension_access",
+            true
+          ),
+          granularPermissions: ApiService.booleanFeature(
+            resolved,
+            "granular_permissions"
+          ),
+          auditLogRetentionDays:
+            ApiService.numericFeature(resolved, "audit_log_retention_days") ??
+            7,
+        },
+      };
+
+      this.setCached(cacheKey, usage);
       return usage;
     } catch (err) {
       captureError(err, { phase: "get-usage" });
@@ -504,11 +706,11 @@ export class ApiService {
     }
   }
 
-  // Variable Requests
+  // ============================================
+  // Variable requests
+  // ============================================
 
-  /**
-   * Submit a variable request (members only)
-   */
+  /** Submit a variable request — VAULT over HTTP (value encrypted server-side). */
   async submitVariableRequest(request: {
     key: string;
     value: string;
@@ -517,9 +719,9 @@ export class ApiService {
     projectId: string;
     isSensitive: boolean;
   }): Promise<VariableRequest> {
-    const response = await this.client.post<
-      ApiResponse<{ request: VariableRequest }>
-    >("/api/extension/variable-requests", request);
+    const response = await this.client.post<{
+      data?: { request: VariableRequest };
+    }>("/api/extension/variable-requests", request);
 
     if (!response.data.data?.request) {
       throw new Error("Failed to submit variable request");
@@ -528,18 +730,18 @@ export class ApiService {
     return response.data.data.request;
   }
 
-  /**
-   * Get variable requests for a project
-   */
+  /** List variable requests for a project — DIRECT Convex. */
   async getVariableRequests(
     projectId: string,
     status?: string
   ): Promise<VariableRequest[]> {
-    const response = await this.client.get<
-      ApiResponse<{ requests: VariableRequest[] }>
-    >("/api/extension/variable-requests", {
-      params: { projectId, status },
-    });
-    return response.data.data?.requests || [];
+    const args: Record<string, unknown> = { projectId };
+    if (status) {
+      args.status = status;
+    }
+    return this.convexQuery<VariableRequest[]>(
+      anyApi.variableRequests.listForProject,
+      args
+    );
   }
 }

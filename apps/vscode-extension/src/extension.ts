@@ -4,6 +4,7 @@ import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
 import { RealTimeSyncService } from "./services/realTimeSync";
 import { ConvexService } from "./services/convex";
+import { TokenManager } from "./services/tokenManager";
 import { StorageService } from "./utils/storage";
 import {
   ProjectsTreeProvider,
@@ -60,6 +61,7 @@ function wrapCommand(
 
 let authService: AuthService;
 let apiService: ApiService;
+let tokenManager: TokenManager;
 let syncService: SyncService;
 let realTimeSyncService: RealTimeSyncService;
 let convexService: ConvexService | null = null;
@@ -138,7 +140,7 @@ async function initializeConvexService(): Promise<void> {
       return;
     }
 
-    convexService = new ConvexService(convexUrl);
+    convexService = new ConvexService(convexUrl, tokenManager.getFreshToken);
     syncService.setConvexService(convexService);
     realTimeSyncService.setConvexService(convexService);
     output.log("Convex WebSocket connection initialized");
@@ -181,9 +183,12 @@ export async function activate(context: vscode.ExtensionContext) {
   // Run storage migration if needed
   await storageService.migrateIfNeeded();
 
-  // Initialize services
-  authService = new AuthService(context, storageService);
-  apiService = new ApiService(storageService);
+  // Initialize services. The TokenManager owns WorkOS access-token freshness
+  // and is shared by every surface that authenticates to Convex or the vault
+  // HTTP routes (Convex WS setAuth, one-shot Convex calls, vault requests).
+  tokenManager = new TokenManager(storageService);
+  authService = new AuthService(storageService, tokenManager);
+  apiService = new ApiService(tokenManager);
   fileProtectionService = new FileProtectionService();
   clipboardGuardService = new ClipboardGuardService();
   clipboardGuardService.activate();
@@ -191,7 +196,11 @@ export async function activate(context: vscode.ExtensionContext) {
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
   syncService.setClipboardGuard(clipboardGuardService);
-  realTimeSyncService = new RealTimeSyncService(syncService, storageService);
+  realTimeSyncService = new RealTimeSyncService(
+    syncService,
+    storageService,
+    tokenManager.getFreshToken
+  );
 
   // Initialize Convex WebSocket connection in the background — the
   // auto-detect path makes an HTTP call (up to 5s) that must not block
@@ -647,6 +656,9 @@ async function handleSignOutAll(): Promise<void> {
     return;
   }
 
+  // Best-effort remote revoke of every account's WorkOS session before the
+  // local credentials are wiped.
+  await authService.revokeAllSessions();
   await storageService.clearAllAccounts();
   clearSentryUser();
 

@@ -338,6 +338,42 @@ export class StorageService {
   }
 
   /**
+   * Patch an EXISTING account's rotated tokens in place, for the token-refresh
+   * path. Unlike setAuthSession this:
+   *   - does NOT change `activeAccountId` — a background refresh of account A
+   *     that finishes after the user switched to B must not flip active back to A;
+   *   - does NOT resurrect an account that was removed (signed out / switched
+   *     away) while its refresh was in flight — it is a no-op in that case,
+   *     instead of silently re-creating cleared credentials.
+   */
+  async updateAccountTokens(
+    userId: string,
+    patch: { accessToken: string; refreshToken: string; sessionId?: string }
+  ): Promise<void> {
+    await this.enqueueAuthWrite(async () => {
+      const blob = await this.loadAccounts();
+      const existing = blob.accounts[userId];
+      if (!existing) {
+        return; // removed while the refresh was in flight — do not resurrect.
+      }
+      await this.persistAccounts({
+        accounts: {
+          ...blob.accounts,
+          [userId]: {
+            ...existing,
+            accessToken: patch.accessToken,
+            refreshToken: patch.refreshToken,
+            sessionId: patch.sessionId ?? existing.sessionId,
+            // Preserve the "never auto-evict" semantics.
+            expiresAt: 0,
+          },
+        },
+        activeAccountId: blob.activeAccountId, // unchanged — no active flip.
+      });
+    });
+  }
+
+  /**
    * Single-account logout: remove the ACTIVE account. If other accounts remain,
    * the active pointer moves to one of them; otherwise the blob becomes empty.
    */
