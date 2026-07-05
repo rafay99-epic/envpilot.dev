@@ -1,0 +1,27 @@
+convex/schema.ts
+  s_8ac05b3f82c26d::t_17d1e6f83072e3 1024
+package.json
+  s_8ac05b3f82c26d::t_3578fb5052facc 3
+convex/projects.ts
+  s_8ac05b3f82c26d::t_17d1e6f83072e3 110
+apps/web/src/lib/cli-auth.ts
+  s_8ac05b3f82c26d::t_17d1e6f83072e3 14-16,40-42
+apps/web/package.json
+  s_8ac05b3f82c26d::t_3578fb5052facc 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0cda9968cc85d86beddcf28c877a64add5e01b68",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
