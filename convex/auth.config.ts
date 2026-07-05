@@ -14,13 +14,16 @@
  *    access tokens. No `aud` claim, but the issuer itself embeds the client
  *    id, so tokens are already application-scoped.
  *
- * ⚠️ WORKOS_CLIENT_ID must be set in the Convex deployment BEFORE this file
- * is pushed (`npx convex env set WORKOS_CLIENT_ID client_...`) — the Convex
- * CLI statically scans this file at push time and rejects the deployment if a
- * referenced env var is unset. Set it on prod before the first prod deploy of
- * this config.
+ * ⚠️ TEMPORARY EMERGENCY FIX: the client id is HARDCODED below instead of read
+ * from `process.env.WORKOS_CLIENT_ID`. This removes deploy-time env resolution
+ * as a failure source — a prior prod deploy had frozen the providers against a
+ * stale/mismatched client id, causing "No auth provider found matching the
+ * given token". The WorkOS client id is a PUBLIC value (already baked into the
+ * CLI/extension), so hardcoding it is not a secret leak. Revert to
+ * `process.env.WORKOS_CLIENT_ID` once the env var is confirmed correct on the
+ * Convex deployment and re-deployed.
  */
-const clientId = process.env.WORKOS_CLIENT_ID;
+const clientId = "client_01KHWDD75944NBADKY0ANTRXR8";
 
 export default {
   providers: [
