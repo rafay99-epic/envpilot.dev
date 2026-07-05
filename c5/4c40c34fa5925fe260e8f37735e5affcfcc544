@@ -1,0 +1,47 @@
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_53bfe4b41edb34::t_d8c7587cd136a9 131
+  s_53bfe4b41edb34::t_9bc50fe8ac7dc1 186,193
+  s_53bfe4b41edb34::t_b5cbf4bb612900 4-10
+apps/web/tests/e2e/authenticated/accounts.spec.ts
+  s_53bfe4b41edb34::t_4174437082af67 232-238,240-248
+  s_53bfe4b41edb34::t_3e434a31b18edb 83-125,134-158,161-169,171-176,249
+  s_53bfe4b41edb34::t_c2f9b143e88a42 177-178,180-182,184-193,250-256,258-264
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_53bfe4b41edb34::t_7f5d388a94098e 238-248,256,258-268,270-288
+  s_53bfe4b41edb34::t_a19244e149096d 249-254
+  s_53bfe4b41edb34::t_9ef63e882715e0 255,289-290
+convex/variables.ts
+  s_53bfe4b41edb34::t_00267b2110af94 1106-1114,1118
+apps/web/tests/e2e/authenticated/search-projects-org.spec.ts
+  s_53bfe4b41edb34::t_08eee6f25ca82f 76-83,250
+  s_53bfe4b41edb34::t_ad6bc83d5d14c5 214-218,223-236,238-245
+  s_53bfe4b41edb34::t_9099a2beb1b03b 299-309,311-322
+  s_53bfe4b41edb34::t_691546065da58c 1,6-7,11
+  s_53bfe4b41edb34::t_41dcad2bde0c68 116,124-126,128
+  s_53bfe4b41edb34::t_a08d69cf3f84fa 246-249,323-327
+apps/web/tests/e2e/authenticated/sharing-tags-export.spec.ts
+  s_53bfe4b41edb34::t_f6733b6220eaf3 388-390
+  s_53bfe4b41edb34::t_4fed1b737d6608 7
+  s_53bfe4b41edb34::t_be4bd1c96c81c0 137-144
+apps/web/tests/e2e/authenticated/variables-lifecycle.spec.ts
+  s_53bfe4b41edb34::t_4721285075aed5 62-67
+  s_53bfe4b41edb34::t_01f75e261ddf55 198,205
+  s_53bfe4b41edb34::t_6e0e0e220eba30 1,4-10
+  s_53bfe4b41edb34::t_527927a7352442 165-168,170-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c54c40c34fa5925fe260e8f37735e5affcfcc544",
+  "prompts": {},
+  "sessions": {
+    "s_53bfe4b41edb34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7121b30-2e9f-42d8-9316-5139d78bba19",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
