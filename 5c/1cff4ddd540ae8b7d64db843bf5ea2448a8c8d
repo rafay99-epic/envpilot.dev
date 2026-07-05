@@ -1,0 +1,23 @@
+apps/web/src/lib/share-emails.ts
+  s_8ac05b3f82c26d::t_743ba597c59cd4 127-132
+  s_8ac05b3f82c26d::t_12d8f0dedcb332 47-52
+  s_8ac05b3f82c26d::t_f976e6afdc3499 13-22
+convex/emails.ts
+  s_8ac05b3f82c26d::t_0a3b7592e47b30 160-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5c1cff4ddd540ae8b7d64db843bf5ea2448a8c8d",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
