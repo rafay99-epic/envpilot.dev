@@ -19,11 +19,21 @@
  * as a failure source — a prior prod deploy had frozen the providers against a
  * stale/mismatched client id, causing "No auth provider found matching the
  * given token". The WorkOS client id is a PUBLIC value (already baked into the
- * CLI/extension), so hardcoding it is not a secret leak. Revert to
- * `process.env.WORKOS_CLIENT_ID` once the env var is confirmed correct on the
- * Convex deployment and re-deployed.
+ * CLI/extension), so hardcoding it is not a secret leak.
+ *
+ * ⚠️ MUST read the env var FIRST: this file is deployed to BOTH the staging/dev
+ * and prod Convex deployments, which trust DIFFERENT WorkOS clients (dev =
+ * staging `client_01KHWD…6RSW9`, prod = `client_01KHWD…75944`). A pure hardcode
+ * makes dev trust the PROD client, so every dev CLI/extension/web JWT (issued
+ * for the staging client) fails to verify → "No auth provider found matching
+ * the given token" → login broken on dev. Reading `process.env.WORKOS_CLIENT_ID`
+ * lets each deployment use its OWN client (dev has staging set; prod has prod
+ * set or falls back to the prod hardcode), fixing dev without breaking the prod
+ * emergency fix. Each deployment MUST have WORKOS_CLIENT_ID set (the Convex CLI
+ * rejects a push that references an unset env var).
  */
-const clientId = "client_01KHWDD75944NBADKY0ANTRXR8";
+const clientId =
+  process.env.WORKOS_CLIENT_ID || "client_01KHWDD75944NBADKY0ANTRXR8";
 
 export default {
   providers: [
