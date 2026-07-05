@@ -327,9 +327,7 @@ export class ApiService {
   }
 
   /** Projects within one organization, with unified-role + assignment info. */
-  private async listProjectsForOrg(
-    organizationId: string
-  ): Promise<Project[]> {
+  private async listProjectsForOrg(organizationId: string): Promise<Project[]> {
     const [projects, membership] = await Promise.all([
       this.convexQuery<ProjectRow[]>(anyApi.projects.listWithStats, {
         organizationId,

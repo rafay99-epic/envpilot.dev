@@ -61,8 +61,7 @@ export class TokenManager {
           refreshToken: result.refresh_token,
           // Preserve the "never auto-evict" semantics (see AuthSession.expiresAt).
           expiresAt: 0,
-          sessionId:
-            getJwtSessionId(result.access_token) ?? session.sessionId,
+          sessionId: getJwtSessionId(result.access_token) ?? session.sessionId,
         });
         return result.access_token;
       } catch (err) {

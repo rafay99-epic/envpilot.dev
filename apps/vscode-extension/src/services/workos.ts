@@ -124,8 +124,7 @@ function parseDeviceCode(body: unknown): DeviceCodeResponse | null {
     user_code,
     verification_uri,
     verification_uri_complete,
-    expires_in:
-      typeof body.expires_in === "number" ? body.expires_in : 300,
+    expires_in: typeof body.expires_in === "number" ? body.expires_in : 300,
     interval: typeof body.interval === "number" ? body.interval : 5,
   };
 }

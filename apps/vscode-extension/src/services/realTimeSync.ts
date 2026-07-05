@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
-import { ConvexService, type RevocationEvent, type TokenFetcher } from "./convex";
+import {
+  ConvexService,
+  type RevocationEvent,
+  type TokenFetcher,
+} from "./convex";
 import { getConvexUrl, getServerUrl } from "../utils/config";
 import { captureError } from "../utils/sentry";
 import type { LinkedProjectV2 } from "../types";
@@ -342,10 +346,7 @@ export class RealTimeSyncService {
           reason: "Access expired or revoked",
         });
         await Promise.race([
-          this.triggerRevocationCleanup(
-            project,
-            "Access expired or revoked"
-          ),
+          this.triggerRevocationCleanup(project, "Access expired or revoked"),
           new Promise<void>((_, reject) =>
             setTimeout(
               () => reject(new Error("Revocation cleanup timed out")),

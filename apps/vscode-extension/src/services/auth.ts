@@ -285,9 +285,7 @@ export class AuthService {
     }
   }
 
-  private buildConvexClient(
-    token: string | null
-  ): ConvexHttpClient | null {
+  private buildConvexClient(token: string | null): ConvexHttpClient | null {
     const url = getConvexUrl();
     if (!url || !token) return null;
     const client = new ConvexHttpClient(url);
