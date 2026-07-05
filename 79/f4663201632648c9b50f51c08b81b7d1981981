@@ -1,0 +1,20 @@
+apps/vscode-extension/src/services/auth.ts
+  s_8ac05b3f82c26d::t_3fca0961a51177 139-141,144,152
+  s_8ac05b3f82c26d::t_ac1be83ecce555 143,145-151,153-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "79f4663201632648c9b50f51c08b81b7d1981981",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
