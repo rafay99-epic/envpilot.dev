@@ -132,12 +132,19 @@ export class AuthService {
         let intervalMs = device.interval * 1000;
         const deadline = Date.now() + device.expires_in * 1000;
         let consecutiveErrors = 0;
+        let firstPoll = true;
 
         while (
           !cancellationToken.isCancellationRequested &&
           Date.now() < deadline
         ) {
-          await sleep(intervalMs);
+          // Skip the delay before the FIRST poll — the user has already been
+          // sent to the browser, so check WorkOS immediately rather than
+          // waiting a full interval before the first attempt.
+          if (!firstPoll) {
+            await sleep(intervalMs);
+          }
+          firstPoll = false;
           if (cancellationToken.isCancellationRequested) {
             break;
           }
@@ -273,12 +280,20 @@ export class AuthService {
   }
 
   /** Best-effort remote revoke of a WorkOS session by its session id. */
-  private async revokeDeviceSession(sessionId: string): Promise<void> {
+  /**
+   * Revoke a specific account's WorkOS device session. Authenticates with THAT
+   * account's own token (deviceSessions.revoke is identity-scoped — the active
+   * account's token cannot revoke another user's session).
+   */
+  private async revokeDeviceSession(session: AuthSession): Promise<void> {
+    if (!session.sessionId) return;
     try {
-      const token = await this.tokenManager.getFreshToken();
+      const token = await this.tokenManager.getFreshTokenForAccount(session);
       const client = this.buildConvexClient(token);
       if (!client) return;
-      await client.mutation(anyApi.deviceSessions.revoke, { sessionId });
+      await client.mutation(anyApi.deviceSessions.revoke, {
+        sessionId: session.sessionId,
+      });
     } catch (err) {
       // Non-fatal — local credentials are cleared regardless.
       captureError(err, { phase: "device-session-revoke" });
@@ -299,9 +314,12 @@ export class AuthService {
    */
   async signOut(): Promise<void> {
     const session = await this.getSession();
-    if (session?.sessionId) {
-      await this.revokeDeviceSession(session.sessionId);
+    if (session) {
+      await this.revokeDeviceSession(session);
     }
+    // Abandon any in-flight refresh so it can't hand back a token for the
+    // account we're about to clear.
+    this.tokenManager.clearInflight();
     await this.storage.clearAuthSession();
     this._onAuthStateChanged.fire(null);
     vscode.window.showInformationMessage("Signed out of Envpilot");
@@ -359,15 +377,16 @@ export class AuthService {
   async revokeAllSessions(): Promise<void> {
     const accounts = await this.storage.listAccounts();
     for (const account of accounts) {
-      if (account.sessionId) {
-        await this.revokeDeviceSession(account.sessionId);
-      }
+      // Each revoke authenticates with its OWN account's token (identity-scoped
+      // mutation) — see revokeDeviceSession.
+      await this.revokeDeviceSession(account);
     }
   }
 
   /** Sign out of every account at once. */
   async signOutAll(): Promise<void> {
     await this.revokeAllSessions();
+    this.tokenManager.clearInflight();
     await this.storage.clearAllAccounts();
     this._onAuthStateChanged.fire(null);
   }

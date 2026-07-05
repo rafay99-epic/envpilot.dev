@@ -12,6 +12,7 @@
 // tokens.
 
 import { StorageService } from "../utils/storage";
+import type { AuthSession } from "../types";
 import { SingleFlight } from "../utils/singleFlight";
 import { isTokenExpiring, getJwtSessionId } from "../utils/jwt";
 import { refreshAccessToken, WorkosAuthError } from "./workos";
@@ -40,14 +41,39 @@ export class TokenManager {
    */
   async getFreshToken(): Promise<string | null> {
     const session = await this.storage.getAuthSession();
-    if (!session?.accessToken) {
+    if (!session) {
       return null;
     }
+    return this.freshTokenFor(session);
+  }
 
+  /**
+   * Like getFreshToken but for a SPECIFIC account, not just the active one.
+   * Used by "sign out of all accounts", which must revoke each account's WorkOS
+   * session under THAT account's own identity — the active account's token
+   * can't authenticate a revoke for a different user.
+   */
+  async getFreshTokenForAccount(session: AuthSession): Promise<string | null> {
+    return this.freshTokenFor(session);
+  }
+
+  /**
+   * Abandon any in-flight refreshes. Called from sign-out before clearing
+   * storage so a refresh that is mid-flight can't hand a stale token to a new
+   * caller after the account is gone. (updateAccountTokens already refuses to
+   * resurrect a removed account, so this is belt-and-braces.)
+   */
+  clearInflight(): void {
+    this.refresh.clear();
+  }
+
+  private async freshTokenFor(session: AuthSession): Promise<string | null> {
+    if (!session.accessToken) {
+      return null;
+    }
     if (!isTokenExpiring(session.accessToken)) {
       return session.accessToken;
     }
-
     if (!session.refreshToken) {
       return null;
     }
@@ -55,12 +81,11 @@ export class TokenManager {
     return this.refresh.run(`refresh:${session.user.id}`, async () => {
       try {
         const result = await refreshAccessToken(session.refreshToken);
-        await this.storage.setAuthSession({
-          ...session,
+        // Patch THIS account's tokens in place — never changes the active
+        // account and never resurrects an account removed mid-refresh.
+        await this.storage.updateAccountTokens(session.user.id, {
           accessToken: result.access_token,
           refreshToken: result.refresh_token,
-          // Preserve the "never auto-evict" semantics (see AuthSession.expiresAt).
-          expiresAt: 0,
           sessionId: getJwtSessionId(result.access_token) ?? session.sessionId,
         });
         return result.access_token;
@@ -68,7 +93,8 @@ export class TokenManager {
         if (err instanceof WorkosAuthError && err.code === "access_denied") {
           // Refresh token revoked/expired — the session is genuinely dead.
           output.warn("Session refresh rejected — signing out.");
-          await this.storage.clearAuthSession();
+          this.refresh.clear();
+          await this.storage.removeAccount(session.user.id);
           return null;
         }
         // Transient (network / 5xx / 429) — keep creds, let the caller retry.

@@ -325,18 +325,19 @@ export class RealTimeSyncService {
     if (this.isProcessingRevocation) {
       return;
     }
-
-    const linkedProjects = await this.storage.getLinkedProjectsV2();
-    if (linkedProjects.length === 0) return;
-
-    const activeProjectIds = new Set(records.map((r) => r.projectId));
-    const orphaned = linkedProjects.filter(
-      (p) => !activeProjectIds.has(p.projectId)
-    );
-    if (orphaned.length === 0) return;
-
+    // Claim the guard SYNCHRONOUSLY — before the first await — so two
+    // concurrent updates can't both pass the check and duplicate cleanup.
     this.isProcessingRevocation = true;
     try {
+      const linkedProjects = await this.storage.getLinkedProjectsV2();
+      if (linkedProjects.length === 0) return;
+
+      const activeProjectIds = new Set(records.map((r) => r.projectId));
+      const orphaned = linkedProjects.filter(
+        (p) => !activeProjectIds.has(p.projectId)
+      );
+      if (orphaned.length === 0) return;
+
       for (const project of orphaned) {
         console.log(
           `[RealTimeSync] Access ended for project: ${project.projectName}`
