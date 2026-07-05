@@ -11,7 +11,9 @@
 // never to make an authorization decision.
 
 /** Decode a JWT payload (middle segment) into a plain object, or null. */
-export function decodeJwtPayload(token: string): Record<string, unknown> | null {
+export function decodeJwtPayload(
+  token: string
+): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length < 2) return null;

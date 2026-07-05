@@ -206,26 +206,20 @@ type OrganizationUsage = {
 const fnRef = makeFunctionReference;
 
 const refs = {
-  listOrganizations: fnRef<
-    "query",
-    Record<string, never>,
-    OrgRow[]
-  >("organizations:listForUser"),
-  getMembership: fnRef<
-    "query",
-    { organizationId: string },
-    MembershipRow
-  >("organizations:getMembership"),
+  listOrganizations: fnRef<"query", Record<string, never>, OrgRow[]>(
+    "organizations:listForUser"
+  ),
+  getMembership: fnRef<"query", { organizationId: string }, MembershipRow>(
+    "organizations:getMembership"
+  ),
   listProjectsWithStats: fnRef<
     "query",
     { organizationId: string },
     ProjectRow[]
   >("projects:listWithStats"),
-  getProject: fnRef<
-    "query",
-    { projectId: string },
-    ProjectRow | null
-  >("projects:getById"),
+  getProject: fnRef<"query", { projectId: string }, ProjectRow | null>(
+    "projects:getById"
+  ),
   getProjectMembership: fnRef<
     "query",
     { projectId: string },
@@ -256,21 +250,17 @@ const refs = {
     { organizationId: string },
     OrganizationUsage
   >("tierLimits:getOrganizationUsage"),
-  isEnforcementEnabled: fnRef<
-    "query",
-    Record<string, never>,
-    boolean
-  >("tierLimits:isEnforcementEnabled"),
+  isEnforcementEnabled: fnRef<"query", Record<string, never>, boolean>(
+    "tierLimits:isEnforcementEnabled"
+  ),
   deviceSessionRecord: fnRef<
     "mutation",
     { deviceName: string; clientType: "cli" | "extension"; sessionId: string },
     unknown
   >("deviceSessions:record"),
-  deviceSessionRevoke: fnRef<
-    "mutation",
-    { sessionId: string },
-    unknown
-  >("deviceSessions:revoke"),
+  deviceSessionRevoke: fnRef<"mutation", { sessionId: string }, unknown>(
+    "deviceSessions:revoke"
+  ),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(
@@ -734,7 +724,11 @@ export class APIClient {
     ]);
 
     if (!usageData) {
-      throw new APIError("Organization not found", 404, "ORGANIZATION_NOT_FOUND");
+      throw new APIError(
+        "Organization not found",
+        404,
+        "ORGANIZATION_NOT_FOUND"
+      );
     }
 
     return {

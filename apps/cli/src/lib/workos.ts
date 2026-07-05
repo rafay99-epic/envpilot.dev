@@ -215,7 +215,8 @@ export async function refreshAccessToken(
   }
 
   if (result.status >= 400) {
-    const message = extractOauthError(result.body) ?? extractErrorMessage(result.body);
+    const message =
+      extractOauthError(result.body) ?? extractErrorMessage(result.body);
     // A rejected refresh means the session is dead (revoked/expired) — surface
     // as access_denied so callers clear local creds and prompt re-login.
     throw new WorkosAuthError(
