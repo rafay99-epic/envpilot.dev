@@ -48,6 +48,7 @@ import type * as userPreferences from "../userPreferences.js";
 import type * as users from "../users.js";
 import type * as variableRequests from "../variableRequests.js";
 import type * as variables from "../variables.js";
+import type * as vault from "../vault.js";
 import type * as vaultGc from "../vaultGc.js";
 import type * as workflows from "../workflows.js";
 
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   variableRequests: typeof variableRequests;
   variables: typeof variables;
+  vault: typeof vault;
   vaultGc: typeof vaultGc;
   workflows: typeof workflows;
 }>;
