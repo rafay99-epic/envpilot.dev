@@ -1,0 +1,34 @@
+convex/identity.ts
+  s_8ac05b3f82c26d::t_2ffbd709d4617a 74-106
+  s_8ac05b3f82c26d::t_2ff0e4ad6e467a 5-6,8-12,14
+convex/authz.ts
+  s_8ac05b3f82c26d::t_67d914ac4ecb7b 695-698,703
+  s_8ac05b3f82c26d::t_1e7df0e8267089 4
+  s_8ac05b3f82c26d::t_b951c89d6e5d78 740
+convex/auth.config.ts
+  s_8ac05b3f82c26d::t_c7ed6fc6ecf3c3 2,4-7,9-15,17-21,23-24,26-40
+apps/web/src/hooks/use-convex-workos-auth.ts
+  s_8ac05b3f82c26d::t_9659e7607ca4cd 1-39
+apps/web/src/app/api/auth/me/route.ts
+  s_8ac05b3f82c26d::t_35850372fa240b 82-86
+  s_8ac05b3f82c26d::t_f54f6c8320db50 4
+apps/web/src/components/ConvexClientProvider.tsx
+  s_8ac05b3f82c26d::t_7affb5b7e1c0a5 3-5
+  s_8ac05b3f82c26d::t_8902a1fbafb1fd 194-199,201-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "297baa207de1d538a013d7577223ce0bff470294",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
