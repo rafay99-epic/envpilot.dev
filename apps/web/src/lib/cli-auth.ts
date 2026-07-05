@@ -11,7 +11,9 @@ const log = createLogger("lib/cli-auth");
 // client id is public (baked into the CLI/extension at build time) and shared
 // server-side via process.env — mirror the browser-side NEXT_PUBLIC value.
 const WORKOS_CLIENT_ID =
-  process.env.NEXT_PUBLIC_WORKOS_CLIENT_ID ?? process.env.WORKOS_CLIENT_ID ?? "";
+  process.env.NEXT_PUBLIC_WORKOS_CLIENT_ID ??
+  process.env.WORKOS_CLIENT_ID ??
+  "";
 const WORKOS_ISSUER = `https://api.workos.com/user_management/${WORKOS_CLIENT_ID}`;
 // createRemoteJWKSet caches keys in-process, so this is created once per server.
 const workosJwks = createRemoteJWKSet(
@@ -35,7 +37,9 @@ export interface CLIAuthResult {
 /**
  * Extract the Bearer token from the Authorization header
  */
-export function extractBearerToken(request: NextRequest | Request): string | null {
+export function extractBearerToken(
+  request: NextRequest | Request
+): string | null {
   const authHeader = request.headers.get("Authorization");
 
   if (!authHeader) {

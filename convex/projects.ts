@@ -107,9 +107,7 @@ async function listWithStatsCore(
       assignedProjectIds.add(pm.projectId.toString());
     }
 
-    projects = projects.filter((p) =>
-      assignedProjectIds.has(p._id.toString())
-    );
+    projects = projects.filter((p) => assignedProjectIds.has(p._id.toString()));
   }
 
   const projectsWithStats = await Promise.all(

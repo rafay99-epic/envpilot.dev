@@ -1021,9 +1021,7 @@ export default defineSchema({
     // calling workos.userManagement.revokeSession({ sessionId }) on revoke.
     sessionId: v.optional(v.string()),
     // Which client surface this device-session belongs to.
-    clientType: v.optional(
-      v.union(v.literal("cli"), v.literal("extension"))
-    ),
+    clientType: v.optional(v.union(v.literal("cli"), v.literal("extension"))),
     // Device name for identification
     deviceName: v.optional(v.string()),
     // Device ID (for unique identification)
