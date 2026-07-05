@@ -1200,6 +1200,15 @@ export const listMigrations = query({
         destructive: false,
         runOnce: true,
       },
+      {
+        name: "cleanup-dead-data",
+        description:
+          "Drains legacy data left behind by the backend cleanup: unsets the removed `settings` field (the dead teamLeadsCanCreateProjects toggle) on all organizations and deletes any orphaned usageCounters rows. Bounded to 500 writes per run and idempotent — re-run until it reports 0 remaining, after which both schema declarations can be dropped in a later PR.",
+        category: "One-Time Migrations",
+        priority: 3,
+        destructive: false,
+        runOnce: true,
+      },
     ] as Array<{
       name: string;
       description: string;
