@@ -1,0 +1,65 @@
+convex/variableRequests.ts
+  s_8ac05b3f82c26d::t_e7751830c1bce3 871
+  s_8ac05b3f82c26d::t_aeadb397cffa95 837-856
+  s_8ac05b3f82c26d::t_47a5345e47d1ad 2-9
+  s_8ac05b3f82c26d::t_e18bb4ca2d0267 788-836,857-870,872-935
+apps/web/src/proxy.ts
+  s_8ac05b3f82c26d::t_9ace1c3ece7ca1 41-43,45-46
+apps/vscode-extension/src/services/api.ts
+  s_8ac05b3f82c26d::t_601a95d80cc1d6 71-96
+  s_8ac05b3f82c26d::t_07d4ed8b05ca4f 740,749-761,763,767
+  s_8ac05b3f82c26d::t_eb8367f0aba5ac 483-488,490-491,493-495,501-515
+  s_8ac05b3f82c26d::t_420e12954d9e10 574-579,581-582,584-586
+  s_8ac05b3f82c26d::t_d79cd675ae66d8 218-225,516
+  s_8ac05b3f82c26d::t_1e69b8dcb42306 517
+convex/roleCompat.ts
+  s_8ac05b3f82c26d::t_b05cca31e686f9 4-8
+  s_8ac05b3f82c26d::t_5887e29a4fa9ef 1-3,9-139
+apps/cli/src/lib/api.ts
+  s_8ac05b3f82c26d::t_e406422564b8c2 200-241
+  s_8ac05b3f82c26d::t_548d10cff10c5a 643-665
+  s_8ac05b3f82c26d::t_d712cb7d2f50b5 300-326
+  s_8ac05b3f82c26d::t_f51d88bbb12eeb 630,636-641,667-681,684-686
+  s_8ac05b3f82c26d::t_5413f6ac4a5129 345-352
+  s_8ac05b3f82c26d::t_aba9c292cb0288 728-738,741
+  s_8ac05b3f82c26d::t_6ee5a76051e2b0 710-717
+  s_8ac05b3f82c26d::t_b05cca31e686f9 26
+  s_8ac05b3f82c26d::t_017db85a7eaa00 666
+convex/variableValues.ts
+  s_8ac05b3f82c26d::t_fb06c807cda41d 351-358
+  s_8ac05b3f82c26d::t_b05cca31e686f9 239-240,280
+  s_8ac05b3f82c26d::t_739e047288e3d9 135
+  s_8ac05b3f82c26d::t_4baa3f8dc5feec 1,3,51-106,136-152,154-238,241-278,281-294,296-350,360-375,377-498
+  s_8ac05b3f82c26d::t_b454c400040800 4,10-50
+  s_8ac05b3f82c26d::t_bcab8d2ca92810 359
+  s_8ac05b3f82c26d::t_c71fe674517ae6 2,5-9
+  s_8ac05b3f82c26d::t_a23854a85a4b47 107-134
+  s_8ac05b3f82c26d::t_e7751830c1bce3 153,295,376
+  s_8ac05b3f82c26d::t_8f37ede2a2cd78 279
+convex/_generated/api.d.ts
+  s_4f0cc16f3e8e6c::t_cc08fc95e67d71 39,51,92,104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c9546c114a26b1c9e4f859dee7f378169c178923",
+  "prompts": {},
+  "sessions": {
+    "s_4f0cc16f3e8e6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a41fdc43f679f46d4",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
