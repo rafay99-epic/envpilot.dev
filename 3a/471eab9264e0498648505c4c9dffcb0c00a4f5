@@ -1,0 +1,21 @@
+convex/vault.ts
+  s_8ac05b3f82c26d::t_460468191d0249 1-159
+convex/_generated/api.d.ts
+  s_8ac05b3f82c26d::t_bc1bc19f7c30f7 51,102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3a471eab9264e0498648505c4c9dffcb0c00a4f5",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
