@@ -1,0 +1,30 @@
+apps/vscode-extension/src/services/tokenManager.ts
+  s_8ac05b3f82c26d::t_cd922638af543d 44,47-68,70-73,84-86,96-97
+  s_8ac05b3f82c26d::t_c587ab00cdee4c 15
+apps/vscode-extension/src/services/auth.ts
+  s_8ac05b3f82c26d::t_351aa50b436761 317-318,320-322
+  s_8ac05b3f82c26d::t_bcc2c72ebabf2c 135,141-147
+  s_8ac05b3f82c26d::t_a2ee9072206701 283-289,291,294-296
+  s_8ac05b3f82c26d::t_99c7ddf0bb73c3 380-382,389
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_8ac05b3f82c26d::t_7ae36dd377cb7f 328-329,332-340
+apps/vscode-extension/src/utils/storage.ts
+  s_8ac05b3f82c26d::t_384108c79ea72d 341-375
+  s_8ac05b3f82c26d::t_f9a4951aa9a23e 340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "01685ae0837ba3bf1a78c4656c8ff56860cdd1b3",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
