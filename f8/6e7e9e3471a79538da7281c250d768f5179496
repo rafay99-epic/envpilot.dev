@@ -1,0 +1,41 @@
+apps/web/src/app/api/checkout/route.ts
+  s_8ac05b3f82c26d::t_f97a4b720c3b62 98-100
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_8ac05b3f82c26d::t_93e6fa26e0742e 255
+  s_8ac05b3f82c26d::t_13828e226e2e49 26-40
+  s_8ac05b3f82c26d::t_35e7b692b68530 385
+  s_8ac05b3f82c26d::t_55dc3657aa7551 226-230,235-236
+  s_8ac05b3f82c26d::t_add131e223eda4 69-71,74-109
+  s_8ac05b3f82c26d::t_59445bc836ffec 10-17
+  s_8ac05b3f82c26d::t_be80b52a7e6a27 136
+  s_8ac05b3f82c26d::t_cccc645e3c389a 146-150
+  s_8ac05b3f82c26d::t_2d0dd4f90101a8 110
+apps/web/package.json
+  s_8ac05b3f82c26d::t_05fdfd4dd414fc 3
+docs/CONVEX_AUTH_MIGRATION.md
+  s_8ac05b3f82c26d::t_b0f43e945b102d 3-16
+apps/web/src/app/api/organizations/route.ts
+  s_8ac05b3f82c26d::t_f97a4b720c3b62 128-134
+apps/web/src/hooks/use-convex-workos-auth.ts
+  s_8ac05b3f82c26d::t_f97a4b720c3b62 4
+apps/web/tests/e2e/authenticated/auth-cutover.spec.ts
+  s_8ac05b3f82c26d::t_731b10d6d08c0d 1-91
+package.json
+  s_8ac05b3f82c26d::t_05fdfd4dd414fc 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f86e7e9e3471a79538da7281c250d768f5179496",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
