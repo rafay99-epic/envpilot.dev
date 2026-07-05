@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
@@ -40,7 +40,7 @@ const createShareSchema = z
  */
 export async function POST(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -80,27 +80,29 @@ export async function POST(request: Request) {
 
     // Create share in Convex (with feature gating + rate limiting)
     const expiresAt = Date.now() + data.ttlMs;
-    const result = await convex.mutation(api.sharedSecrets.createShare, {
-      token,
-      vaultRef: vaultResult.id,
-      resourceType: data.resourceType,
-      variableId:
-        data.resourceType === "variable"
-          ? (data.variableId as Id<"environmentVariables">)
-          : undefined,
-      accountId:
-        data.resourceType === "account"
-          ? (data.accountId as Id<"projectAccounts">)
-          : undefined,
-      variableKey: data.variableKey,
-      organizationId: data.organizationId as Id<"organizations">,
-      projectId: data.projectId as Id<"projects">,
-      userId: convexUser._id,
-      mode: data.mode,
-      expiresAt,
-      hasPassphrase: data.hasPassphrase,
-      recipientEmails: data.recipientEmails,
-    });
+    const result = await createAuthedConvexClient(accessToken!).mutation(
+      api.sharedSecrets.createShare,
+      {
+        token,
+        vaultRef: vaultResult.id,
+        resourceType: data.resourceType,
+        variableId:
+          data.resourceType === "variable"
+            ? (data.variableId as Id<"environmentVariables">)
+            : undefined,
+        accountId:
+          data.resourceType === "account"
+            ? (data.accountId as Id<"projectAccounts">)
+            : undefined,
+        variableKey: data.variableKey,
+        organizationId: data.organizationId as Id<"organizations">,
+        projectId: data.projectId as Id<"projects">,
+        mode: data.mode,
+        expiresAt,
+        hasPassphrase: data.hasPassphrase,
+        recipientEmails: data.recipientEmails,
+      }
+    );
 
     // Construct the full share URL with client key in fragment
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -151,7 +153,7 @@ export async function POST(request: Request) {
  */
 export async function GET(request: Request) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -174,10 +176,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const shares = await convex.query(api.sharedSecrets.listByVariable, {
-      variableId: variableId as Id<"environmentVariables">,
-      userId: convexUser._id,
-    });
+    const shares = await createAuthedConvexClient(accessToken!).query(
+      api.sharedSecrets.listByVariable,
+      {
+        variableId: variableId as Id<"environmentVariables">,
+      }
+    );
 
     return NextResponse.json(shares);
   } catch (error) {

@@ -8,84 +8,11 @@ import {
 } from "@/lib/convex-helpers";
 import { authenticateExtensionRequest } from "@/lib/extension-auth";
 import { createLogger } from "@/lib/logger";
-import {
-  normalizeOrgRole,
-  toLegacyOrgRole,
-  toLegacyProjectRole,
-} from "@/lib/roles";
+import { toLegacyOrgRole } from "@/lib/roles";
 import { readSecret } from "@/lib/vault";
-import {
-  resolveLegacyRoles,
-  type ResolvedLegacyRoles,
-} from "../_lib/legacy-roles";
+import { resolveLegacyRoles } from "../_lib/legacy-roles";
 
 const log = createLogger("api/extension/variables");
-
-/**
- * DEVIATION (auth cutover): the X-Access-Token branch below authenticates with
- * a `projectAccess` token (not a WorkOS JWT and not a `cliTokens` bearer), so
- * the server-verified identity helpers (requireAuthedUser / requireBearerUser)
- * cannot resolve it, and the *ForToken Convex variants do not accept it. That
- * projectAccess-token surface was NOT modelled by the cutover inventory. To
- * keep this route's linked-extension flow working without inventing a new
- * Convex identity resolver, this helper reconstructs the same legacy-role
- * answer `resolveLegacyRoles` produces, but for an already server-resolved
- * `userId`, using ONLY unchanged (non-actor) public queries. Once a proper
- * projectAccess-token identity resolver exists, delete this and route the
- * X-Access-Token path through it.
- *
- * NOTE: `getUsersWithProjectAccess` filters grants by isActive only (not
- * expiry), so an active-but-expired grant is treated as grant-only here —
- * that errs toward the read-only "viewer" .env protection, i.e. the safe
- * direction.
- */
-async function resolveLegacyRolesByProjectToken(
-  convexClient: typeof convex,
-  args: {
-    userId: Id<"users">;
-    projectId: Id<"projects">;
-    orgRole: string | null | undefined;
-  }
-): Promise<ResolvedLegacyRoles> {
-  const role = normalizeOrgRole(args.orgRole);
-
-  let assigned = role === "owner";
-  let environmentScope: string[] | null = null;
-  if (!assigned) {
-    const members = await convexClient.query(api.projectMembers.listByProject, {
-      projectId: args.projectId,
-    });
-    const membership = members.find((m) => m.userId === args.userId) ?? null;
-    assigned = membership !== null;
-    if (role === "developer") {
-      environmentScope = membership?.environments ?? null;
-    }
-  }
-
-  let grantOnly = false;
-  let legacyProjectRole = toLegacyProjectRole(args.orgRole, assigned);
-  if (!assigned) {
-    const usersWithAccess = await convexClient.query(
-      api.permissions.getUsersWithProjectAccess,
-      { projectId: args.projectId }
-    );
-    grantOnly = usersWithAccess.some(
-      (u) => u.user?._id === args.userId && u.totalVariables > 0
-    );
-    if (grantOnly) {
-      legacyProjectRole = "viewer";
-    }
-  }
-
-  return {
-    role,
-    legacyRole: toLegacyOrgRole(args.orgRole),
-    assigned,
-    grantOnly,
-    legacyProjectRole,
-    environmentScope,
-  };
-}
 
 /**
  * GET /api/extension/variables - List variables for a project (with decrypted values)
@@ -117,9 +44,12 @@ export async function GET(request: Request) {
 
     let authorizedUserId: Id<"users">;
     let userRole: string = "member";
-    // Non-null only on the cliTokens bearer path — drives whether legacy-role
-    // resolution uses the ForToken variant or the projectAccess reconstruction.
-    let bearerToken: string | null = null;
+    // The token that authenticated this request — a projectAccess token on the
+    // X-Access-Token path, or a cliTokens bearer on the session/bearer path.
+    // requireBearerUser (inside the *ForToken Convex variants) resolves the
+    // acting user from EITHER plane, so both branches drive the same ForToken
+    // calls and legacy-role resolution.
+    let authToken: string;
 
     // Validate access token if provided
     if (accessToken) {
@@ -142,6 +72,8 @@ export async function GET(request: Request) {
       }
 
       authorizedUserId = validation.userId as Id<"users">;
+      // requireBearerUser resolves this projectAccess token to the linking user.
+      authToken = accessToken;
 
       // Resolve user role from project's organization
       const { organizationId: projOrgId } = await getProjectOrganization(
@@ -203,15 +135,20 @@ export async function GET(request: Request) {
 
       userRole = membership.role || "member";
       authorizedUserId = convexUser._id;
-      bearerToken = auth.accessToken;
+      // Bearer-only data route: a non-null auth here always carries a cliTokens
+      // bearer (session fallback yields no token and is unreachable without
+      // AuthKit middleware on this path).
+      authToken = auth.accessToken!;
     }
 
-    // Get only variables this user can access.
+    // Get only variables this user can access. Identity is resolved server-side
+    // from the authenticating token via the ForToken variant (which accepts
+    // both the cliTokens and projectAccess planes).
     const variablesWithAccess = await convex.query(
-      api.variables.listWithAccess,
+      api.variables.listWithAccessForToken,
       {
+        accessToken: authToken,
         projectId: projectId as Id<"projects">,
-        userId: authorizedUserId,
       }
     );
 
@@ -223,17 +160,11 @@ export async function GET(request: Request) {
     // builds derive .env file protection from. Owners get projectRole null
     // exactly like legacy admins did; grant-only users (per-variable viewer
     // sharing, no assignment) get "viewer" so files stay strictly read-only.
-    const legacy = bearerToken
-      ? await resolveLegacyRoles(convex, {
-          accessToken: bearerToken,
-          projectId: projectId as Id<"projects">,
-          orgRole: userRole,
-        })
-      : await resolveLegacyRolesByProjectToken(convex, {
-          userId: authorizedUserId,
-          projectId: projectId as Id<"projects">,
-          orgRole: userRole,
-        });
+    const legacy = await resolveLegacyRoles(convex, {
+      accessToken: authToken,
+      projectId: projectId as Id<"projects">,
+      orgRole: userRole,
+    });
 
     // Additive unified-model meta for new extension builds. Old extension
     // builds read only `role` and ignore these keys.
@@ -338,9 +269,9 @@ export async function GET(request: Request) {
       variablesWithValues
         .filter((v) => v.value !== "[DECRYPTION_FAILED]")
         .map((v) =>
-          convex.mutation(api.variables.logAccess, {
+          convex.mutation(api.variables.logAccessForToken, {
+            accessToken: authToken,
             variableId: v._id as Id<"environmentVariables">,
-            accessedBy: authorizedUserId,
             accessType: "export" as const,
             ipAddress,
             userAgent,

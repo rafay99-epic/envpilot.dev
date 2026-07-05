@@ -87,10 +87,11 @@ export async function POST(request: Request, context: RouteContext) {
     // valueRestored is false when the target is a legacy version written
     // before value updates minted distinct vault objects — those rollbacks
     // only restore metadata, not the secret value.
-    const { valueRestored } = await convex.mutation(api.variables.rollback, {
+    const { valueRestored } = await createAuthedConvexClient(
+      accessToken!
+    ).mutation(api.variables.rollback, {
       variableId: id as Id<"environmentVariables">,
       targetVersion,
-      rolledBackBy: convexUser._id,
     });
 
     const updatedVariable = await convex.query(api.variables.getById, {

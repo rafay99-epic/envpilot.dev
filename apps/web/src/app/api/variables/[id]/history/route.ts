@@ -66,13 +66,11 @@ export async function GET(request: Request, context: RouteContext) {
 
     // Developers can only view history for variables they hold a grant on.
     if (normalizeOrgRole(membership.role) === "developer") {
-      const accessibleVariables = await convex.query(
-        api.variables.listWithAccess,
-        {
-          projectId: variable.projectId,
-          userId: convexUser._id,
-        }
-      );
+      const accessibleVariables = await createAuthedConvexClient(
+        accessToken!
+      ).query(api.variables.listWithAccess, {
+        projectId: variable.projectId,
+      });
 
       const canAccessVariable = accessibleVariables.some(
         (entry) => entry._id === variable._id && entry.hasAccess
@@ -86,11 +84,13 @@ export async function GET(request: Request, context: RouteContext) {
       }
     }
 
-    const history = await convex.query(api.variables.getVersionHistory, {
-      variableId: id as Id<"environmentVariables">,
-      userId: convexUser._id,
-      limit,
-    });
+    const history = await createAuthedConvexClient(accessToken!).query(
+      api.variables.getVersionHistory,
+      {
+        variableId: id as Id<"environmentVariables">,
+        limit,
+      }
+    );
 
     return NextResponse.json({ history });
   } catch (error) {

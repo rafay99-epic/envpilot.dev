@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
@@ -15,7 +15,7 @@ export async function DELETE(
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -30,11 +30,14 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Revoke share in Convex (admin check happens server-side)
-    const result = await convex.mutation(api.sharedSecrets.revokeShare, {
-      shareId: shareId as Id<"sharedSecrets">,
-      userId: convexUser._id,
-    });
+    // Revoke share in Convex (admin check happens server-side; identity is
+    // derived from the attached JWT).
+    const result = await createAuthedConvexClient(accessToken!).mutation(
+      api.sharedSecrets.revokeShare,
+      {
+        shareId: shareId as Id<"sharedSecrets">,
+      }
+    );
 
     // Delete from Vault (best-effort, report failures to Sentry)
     try {

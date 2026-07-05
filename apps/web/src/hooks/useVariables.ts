@@ -19,7 +19,9 @@ export function useProjectVariables(
 ) {
   const variables = useQuery(
     api.variables.listWithAccess,
-    projectId && userId ? { projectId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    projectId && userId ? { projectId } : "skip"
   );
 
   if (!variables) return variables;
@@ -48,7 +50,9 @@ export function useVariableHistory(
 ) {
   return useQuery(
     api.variables.getVersionHistory,
-    variableId && userId ? { variableId, userId, limit } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    variableId && userId ? { variableId, limit } : "skip"
   );
 }
 
@@ -61,7 +65,9 @@ export function useVariablesWithAccess(
 ) {
   return useQuery(
     api.variables.listWithAccess,
-    projectId && userId ? { projectId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    projectId && userId ? { projectId } : "skip"
   );
 }
 

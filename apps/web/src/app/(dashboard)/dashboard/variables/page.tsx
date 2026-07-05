@@ -81,8 +81,10 @@ export default function VariablesPage() {
     loadMore,
   } = usePaginatedQuery(
     api.variables.listOrgVariablesWithAccessPaginated,
+    // Identity is derived server-side from the attached JWT; `convexUserId`
+    // gates the query until the current user is known (auth ready).
     activeOrganizationId && convexUserId
-      ? { organizationId: activeOrganizationId, userId: convexUserId }
+      ? { organizationId: activeOrganizationId }
       : "skip",
     { initialNumItems: PAGE_SIZE }
   );

@@ -78,13 +78,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const variablesWithAccess = await convex.query(
-      api.variables.listWithAccess,
-      {
-        projectId: projectId as Id<"projects">,
-        userId: convexUser._id,
-      }
-    );
+    const variablesWithAccess = await createAuthedConvexClient(
+      accessToken!
+    ).query(api.variables.listWithAccess, {
+      projectId: projectId as Id<"projects">,
+    });
 
     const variables = variablesWithAccess
       .filter((variable) => variable.hasAccess)
@@ -165,17 +163,19 @@ export async function POST(request: Request) {
     // Unified RBAC: assigned developers create variables directly (they get a
     // write grant on variables they create). Authorization — including project
     // assignment scoping — is enforced by the Convex mutation.
-    const variableId = await convex.mutation(api.variables.create, {
-      key,
-      vaultRef,
-      description,
-      environments,
-      projectId: projectId as Id<"projects">,
-      isSensitive,
-      createdBy: convexUser._id,
-      rotationFrequencyDays,
-      tagIds: tagIds as Id<"variableTags">[] | undefined,
-    });
+    const variableId = await createAuthedConvexClient(accessToken!).mutation(
+      api.variables.create,
+      {
+        key,
+        vaultRef,
+        description,
+        environments,
+        projectId: projectId as Id<"projects">,
+        isSensitive,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
+      }
+    );
 
     const variable = await convex.query(api.variables.getById, { variableId });
 

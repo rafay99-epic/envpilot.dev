@@ -83,10 +83,11 @@ export async function GET(request: NextRequest) {
       return forbiddenResponse("You are not a member of this organization");
     }
 
-    // Get variables with access info
-    const variables = await convex.query(api.variables.listWithAccess, {
+    // Get variables with access info. Identity is resolved server-side from
+    // the bearer token via the ForToken variant.
+    const variables = await convex.query(api.variables.listWithAccessForToken, {
+      accessToken: token,
       projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
     });
 
     // Decrypt values for accessible variables.
@@ -156,9 +157,9 @@ export async function GET(request: NextRequest) {
     // Fire-and-forget: log access for the audit trail (non-blocking)
     Promise.allSettled(
       variablesWithValues.map((v) =>
-        convex.mutation(api.variables.logAccess, {
+        convex.mutation(api.variables.logAccessForToken, {
+          accessToken: token,
           variableId: v._id as Id<"environmentVariables">,
-          accessedBy: authResult.userId!,
           accessType: "export" as const,
           ipAddress,
           userAgent,
@@ -309,14 +310,14 @@ export async function POST(request: NextRequest) {
     const vaultRef = vaultResult.id;
 
     // Create variable
-    const variableId = await convex.mutation(api.variables.create, {
+    const variableId = await convex.mutation(api.variables.createForToken, {
+      accessToken: token,
       key,
       vaultRef,
       description,
       environments,
       projectId: projectId as Id<"projects">,
       isSensitive: isSensitive ?? false,
-      createdBy: authResult.userId,
     });
 
     return NextResponse.json({

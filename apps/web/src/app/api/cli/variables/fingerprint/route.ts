@@ -80,10 +80,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch variable metadata — same access rules as the full endpoint,
-    // but we never call readSecret() so vault is untouched.
-    const variables = await convex.query(api.variables.listWithAccess, {
+    // but we never call readSecret() so vault is untouched. Identity is
+    // resolved server-side from the bearer token via the ForToken variant.
+    const variables = await convex.query(api.variables.listWithAccessForToken, {
+      accessToken: token,
       projectId: projectId as Id<"projects">,
-      userId: authResult.userId,
     });
 
     const accessible = variables

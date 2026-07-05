@@ -67,10 +67,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await convex.mutation(api.variables.bulkDelete, {
-      variableIds: variableIds as Id<"environmentVariables">[],
-      deletedBy: convexUser._id,
-    });
+    const result = await createAuthedConvexClient(accessToken!).mutation(
+      api.variables.bulkDelete,
+      {
+        variableIds: variableIds as Id<"environmentVariables">[],
+      }
+    );
 
     return NextResponse.json({
       success: true,

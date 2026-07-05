@@ -106,10 +106,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get variables with access control
-    const variables = await convex.query(api.variables.listWithAccess, {
-      projectId: id as Id<"projects">,
-      userId: convexUser._id,
-    });
+    const variables = await createAuthedConvexClient(accessToken!).query(
+      api.variables.listWithAccess,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     // Filter by access and environment
     const accessible = variables

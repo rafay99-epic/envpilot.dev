@@ -139,12 +139,12 @@ export async function POST(request: NextRequest) {
             );
             const vaultRef = vaultResult.id;
 
-            await convex.mutation(api.variables.update, {
+            await convex.mutation(api.variables.updateForToken, {
+              accessToken: token,
               variableId: existing._id,
               vaultRef,
               description: variable.description,
               isSensitive: variable.isSensitive,
-              updatedBy: authResult.userId,
               changeReason: "Updated via CLI push",
             });
 
@@ -158,14 +158,14 @@ export async function POST(request: NextRequest) {
           });
           const vaultRef = vaultResult.id;
 
-          await convex.mutation(api.variables.create, {
+          await convex.mutation(api.variables.createForToken, {
+            accessToken: token,
             key: variable.key,
             vaultRef,
             description: variable.description,
             environments: [environment],
             projectId: projectId as Id<"projects">,
             isSensitive: variable.isSensitive ?? false,
-            createdBy: authResult.userId,
           });
 
           created++;
@@ -191,9 +191,9 @@ export async function POST(request: NextRequest) {
     if (mode === "replace") {
       for (const [key, variable] of existingByKey) {
         try {
-          await convex.mutation(api.variables.remove, {
+          await convex.mutation(api.variables.removeForToken, {
+            accessToken: token,
             variableId: variable._id,
-            deletedBy: authResult.userId,
           });
           deleted++;
         } catch (error) {

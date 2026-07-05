@@ -54,7 +54,9 @@ export function RecentlyDeleted({ projectId, userId }: RecentlyDeletedProps) {
 
   const deletedVariables = useQuery(
     api.variables.getDeleted,
-    userId ? { projectId, userId } : "skip"
+    // Identity is derived server-side from the attached JWT; `userId` gates the
+    // query until the current user is known (auth ready).
+    userId ? { projectId } : "skip"
   );
   const deletedAccounts = useQuery(
     api.accounts.getDeleted,
@@ -81,7 +83,8 @@ export function RecentlyDeleted({ projectId, userId }: RecentlyDeletedProps) {
     if (!userId) return;
     setRestoringId(variableId);
     try {
-      await restoreVariable({ variableId, restoredBy: userId });
+      // Actor identity is derived server-side from the attached JWT.
+      await restoreVariable({ variableId });
       toast.success(`Restored ${key}`);
     } catch (err) {
       toast.error(
