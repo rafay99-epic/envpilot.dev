@@ -107,17 +107,6 @@ export const listPlanned = query({
 });
 
 /**
- * Get vote count for a feature request
- */
-export const getVoteCount = query({
-  args: { featureRequestId: v.id("featureRequests") },
-  handler: async (ctx, args) => {
-    const feature = await ctx.db.get(args.featureRequestId);
-    return feature?.voteCount ?? 0;
-  },
-});
-
-/**
  * Check if a user/email has voted for a feature
  */
 export const hasVoted = query({

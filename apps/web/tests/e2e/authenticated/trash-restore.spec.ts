@@ -1,7 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
-import { getFirstProjectSlug, trackClientErrors } from "./support";
+import {
+  createVariable,
+  deleteVariableByKey,
+  getFirstProjectSlug,
+  trackClientErrors,
+  variableRow,
+} from "./support";
 
 // Authenticated e2e — soft-delete / trash / restore for variables and shared
 // accounts (7-day retention window shipped alongside RecentlyDeleted, see
@@ -22,10 +28,6 @@ import { getFirstProjectSlug, trackClientErrors } from "./support";
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
 test.describe.serial("trash & restore", () => {
-  function variableRow(page: Page, key: string): Locator {
-    return page.locator("div.px-6.py-4").filter({ hasText: key });
-  }
-
   function accountRow(page: Page, name: string): Locator {
     return page.locator("div.px-6.py-4").filter({ hasText: name });
   }
@@ -125,21 +127,8 @@ test.describe.serial("trash & restore", () => {
 
     try {
       // ── Create the variable via the drawer ──
-      await addButton.click();
-      const createDrawer = page.getByRole("dialog");
-      await expect(createDrawer).toBeVisible({ timeout: 10_000 });
-
-      await createDrawer.locator("#key").fill(key);
-      await createDrawer.locator("#value").fill(`value-${Date.now()}`);
       // Environments default to ["development"] pre-selected — leave as is.
-
-      await createDrawer
-        .getByRole("button", { name: "Create Variable" })
-        .click();
-      await expect(
-        createDrawer,
-        "create drawer should close on success"
-      ).toBeHidden({ timeout: 15_000 });
+      await createVariable(page, { key, value: `value-${Date.now()}` });
       created = true;
 
       const row = variableRow(page, key);
@@ -194,29 +183,14 @@ test.describe.serial("trash & restore", () => {
       ).toBeVisible({ timeout: 20_000 });
 
       // ── Clean up: delete it again so reruns start from a clean list ──
-      const restoredRow = variableRow(page, key);
-      await restoredRow.getByTitle("Delete variable").click();
-      await expect(confirmHeading).toBeVisible({ timeout: 10_000 });
-      await page.getByRole("button", { name: "Delete", exact: true }).click();
-      await expect(confirmHeading).toBeHidden({ timeout: 15_000 });
+      await deleteVariableByKey(page, key);
       created = false;
       await expect(variableRow(page, key)).toHaveCount(0, {
         timeout: 20_000,
       });
     } finally {
       if (created) {
-        const cleanupRow = variableRow(page, key);
-        const cleanupDeleteButton = cleanupRow.getByTitle("Delete variable");
-        if (await cleanupDeleteButton.isVisible().catch(() => false)) {
-          await cleanupDeleteButton.click();
-          const confirmDeleteButton = page.getByRole("button", {
-            name: "Delete",
-            exact: true,
-          });
-          if (await confirmDeleteButton.isVisible().catch(() => false)) {
-            await confirmDeleteButton.click();
-          }
-        }
+        await deleteVariableByKey(page, key).catch(() => undefined);
       }
     }
 

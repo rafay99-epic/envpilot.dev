@@ -1,11 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
-import {
-  checkBooleanFeature,
-  checkNumericLimit,
-  countMembersAndPendingInvites,
-  resolveFeatureForUser,
-} from "./featureRegistry";
+import { checkBooleanFeature, resolveFeatureForUser } from "./featureRegistry";
 import { getDefaultTierName } from "./tierLimits";
 import { rateLimiter } from "./rateLimits";
 import {
@@ -518,84 +513,6 @@ export const remove = mutation({
 });
 
 /**
- * Add a member to an organization
- */
-export const addMember = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-    userId: v.id("users"),
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer")
-    ),
-    invitedBy: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    // Authorization: owners, project managers, and team leads can add members
-    const { membership: callerMembership } = await assertOrgAction(
-      ctx,
-      args.invitedBy,
-      args.organizationId,
-      "org:invite_member"
-    );
-
-    // Hierarchy: can only assign roles below your own (owners may assign any)
-    assertCanAssignRole(callerMembership.role, args.role);
-
-    const now = Date.now();
-
-    // Check tier limits for adding team members
-    const currentMemberCount = await countMembersAndPendingInvites(
-      ctx.db,
-      args.organizationId
-    );
-    const memberCheck = await checkNumericLimit(
-      ctx.db,
-      args.organizationId,
-      "max_team_members",
-      currentMemberCount
-    );
-    if (!memberCheck.allowed) {
-      throw new Error(memberCheck.reason!);
-    }
-
-    const existingMembership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", args.userId)
-      )
-      .first();
-
-    if (existingMembership) {
-      throw new Error("User is already a member of this organization");
-    }
-
-    const membershipId = await ctx.db.insert("organizationMembers", {
-      organizationId: args.organizationId,
-      userId: args.userId,
-      role: args.role,
-      joinedAt: now,
-      invitedBy: args.invitedBy,
-    });
-
-    await ctx.db.insert("auditLogs", {
-      organizationId: args.organizationId,
-      userId: args.invitedBy,
-      action: "org.member_added",
-      details: JSON.stringify({
-        addedUserId: args.userId,
-        role: args.role,
-      }),
-      createdAt: now,
-    });
-
-    return membershipId;
-  },
-});
-
-/**
  * Remove a member from an organization
  */
 export const removeMember = mutation({
@@ -882,46 +799,6 @@ export const updateMemberRole = mutation({
     });
 
     return membership._id;
-  },
-});
-
-/**
- * Update organization settings
- * Only admins can modify settings
- */
-export const updateSettings = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-    settings: v.object({
-      teamLeadsCanCreateProjects: v.boolean(),
-    }),
-    updatedBy: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    // Authorization: only admins can update org settings
-    await assertOrgAction(
-      ctx,
-      args.updatedBy,
-      args.organizationId,
-      "org:update_settings"
-    );
-
-    const now = Date.now();
-
-    await ctx.db.patch(args.organizationId, {
-      settings: args.settings,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("auditLogs", {
-      organizationId: args.organizationId,
-      userId: args.updatedBy,
-      action: "org.updated",
-      details: JSON.stringify({ settings: args.settings }),
-      createdAt: now,
-    });
-
-    return args.organizationId;
   },
 });
 

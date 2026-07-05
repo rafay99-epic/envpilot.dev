@@ -475,10 +475,17 @@ function AuditLogRow({ log }: { log: AuditLogData }) {
   const severityClass =
     severityColors[log.severity ?? "info"] ?? "text-zinc-500";
 
-  // Extract useful details from parsed JSON
+  // Extract useful details from parsed JSON. Backend call sites store the
+  // resource identifier under different names per resource type: `key`
+  // (variables), `name` (accounts/projects), `tagName` (tags) — the older
+  // variableKey/projectName spellings never matched what audit writes
+  // actually record, so rows rendered without any resource identifier.
   const details = log.parsedDetails;
   const detailText = details
-    ? (details.variableKey as string) ||
+    ? (details.key as string) ||
+      (details.name as string) ||
+      (details.tagName as string) ||
+      (details.variableKey as string) ||
       (details.projectName as string) ||
       (details.description as string) ||
       null

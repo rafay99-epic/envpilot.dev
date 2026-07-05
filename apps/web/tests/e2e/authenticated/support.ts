@@ -123,3 +123,119 @@ export function trackClientErrors(page: Page): string[] {
 
 export const ACCESS_DENIED_TEXT =
   /you.?re not authorized|you don.t have access to this page/i;
+
+/**
+ * Locate a variable's row on the project page by its key.
+ *
+ * Each VariableListItem row renders as `<div className="px-6 py-4">...`
+ * (apps/web/src/components/variables/variable-list-item.tsx) — a plain div,
+ * not a `tr`/`li`/`[data-variable-row]` element. Scoping on that class pair
+ * mirrors the variableRow/accountRow pattern used by the sibling
+ * history-rollback.spec.ts, search-projects-org.spec.ts, and
+ * sharing-tags-export.spec.ts.
+ */
+export function variableRow(page: Page, key: string) {
+  return page.locator("div.px-6.py-4").filter({ hasText: key });
+}
+
+/**
+ * Create a variable through the real "Add Variable" drawer, resilient to the
+ * dev-mode React remounts that detach the drawer mid-interaction (the whole
+ * open→fill→submit sequence is retried as a unit via toPass, so a remount
+ * between two steps just restarts the sequence instead of failing). Returns
+ * once the new row is visible in the list. Caller must ensure the "Add
+ * Variable" button is present (role can create).
+ *
+ * `environments` beyond the default-selected "development" are toggled on.
+ */
+export async function createVariable(
+  page: Page,
+  opts: {
+    key: string;
+    value: string;
+    environments?: string[];
+    sensitive?: boolean;
+    description?: string;
+  }
+): Promise<void> {
+  const addButton = page.getByRole("button", { name: "Add Variable" });
+  const row = variableRow(page, opts.key);
+
+  await expect(async () => {
+    // Already created on a prior attempt (the mutation landed but a remount
+    // tore the drawer down before we observed it) — done.
+    if (
+      await row
+        .first()
+        .isVisible()
+        .catch(() => false)
+    )
+      return;
+
+    const drawer = page.getByRole("dialog");
+    if (!(await drawer.isVisible().catch(() => false))) {
+      await addButton.click({ timeout: 8_000 });
+      await expect(drawer).toBeVisible({ timeout: 10_000 });
+    }
+
+    // Every interactive step below gets a short, explicit timeout instead of
+    // the default unbounded wait. Under sustained dev-mode remounts (e.g. a
+    // concurrent test elsewhere mutating the same shared project, which
+    // re-renders this drawer's contents), an element can keep detaching and
+    // reattaching indefinitely — an unbounded action would then block for
+    // the entire outer toPass budget on a single step. Failing fast here
+    // instead lets toPass retry the whole open→fill→submit sequence several
+    // times within its budget, each attempt getting a fresh chance to land
+    // in a stable moment.
+    await drawer.locator("#key").fill(opts.key, { timeout: 8_000 });
+    await drawer.locator("#value").fill(opts.value, { timeout: 8_000 });
+
+    for (const env of opts.environments ?? []) {
+      const envButton = drawer.getByRole("button", { name: env, exact: true });
+      // The toggle has no aria-pressed; selection is class-based — an
+      // UNselected env carries the neutral `bg-zinc-100` background, a
+      // selected one carries a colored ring instead. Only click to turn on.
+      const cls = (await envButton.getAttribute("class").catch(() => "")) ?? "";
+      const selected = !cls.includes("bg-zinc-100");
+      if (!selected) await envButton.click({ timeout: 8_000 });
+    }
+
+    if (opts.sensitive) {
+      const box = drawer.getByRole("checkbox", { name: /mark as sensitive/i });
+      if (!(await box.isChecked().catch(() => false))) {
+        await box.check({ timeout: 8_000 });
+      }
+    }
+
+    if (opts.description) {
+      await drawer.locator("#description").fill(opts.description, {
+        timeout: 8_000,
+      });
+    }
+
+    // Submit via Enter (implicit form submit) — avoids the "button not
+    // stable" actionability failure when the drawer re-renders on input.
+    await drawer.locator("#value").press("Enter", { timeout: 8_000 });
+    await expect(drawer).toBeHidden({ timeout: 15_000 });
+    await expect(row.first()).toBeVisible({ timeout: 15_000 });
+  }).toPass({ timeout: 90_000 });
+}
+
+/**
+ * Delete a variable through the row's Delete control + ConfirmDialog.
+ * No-op if the row/control isn't present, so it's safe in finally blocks.
+ */
+export async function deleteVariableByKey(
+  page: Page,
+  key: string
+): Promise<void> {
+  const row = variableRow(page, key).first();
+  const deleteButton = row.getByTitle("Delete variable");
+  if (!(await deleteButton.isVisible().catch(() => false))) return;
+  await deleteButton.click();
+  const confirmHeading = page.getByRole("heading", { name: "Delete Variable" });
+  if (await confirmHeading.isVisible().catch(() => false)) {
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(confirmHeading).toBeHidden({ timeout: 15_000 });
+  }
+}

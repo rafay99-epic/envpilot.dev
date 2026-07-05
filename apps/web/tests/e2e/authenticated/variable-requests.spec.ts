@@ -235,30 +235,59 @@ test.describe("variable requests — reviewer approvals page", () => {
     const revealedValue = row.locator("code.text-green-400");
     await expect(revealedValue).toHaveCount(0);
 
-    // Reveal → the value route is hit and plaintext appears.
-    await row.getByTestId("request-value-toggle").click();
-    await expect(revealedValue).toBeVisible({ timeout: 15_000 });
-    const shown = (await revealedValue.textContent())?.trim() ?? "";
-    expect(
-      shown.length,
-      "revealed plaintext should be non-empty"
-    ).toBeGreaterThan(0);
+    // Reveal → toggle env off/on → approve, retried as a unit: RequestRow
+    // keeps its reveal/toggle state in local React state, so a dev-mode
+    // remount of this row (e.g. the pending-list Convex subscription
+    // re-rendering mid-click) resets it back to its initial props — a plain
+    // one-shot `.click()` sequence can then hit a detached-element
+    // actionability timeout. Each guard re-reads live DOM state instead of
+    // assuming a prior attempt's progress survived, so a mid-sequence
+    // remount just replays the remaining steps rather than failing, and the
+    // final approve click never fires twice (it only runs while the row is
+    // still on the Pending tab).
+    await expect(async () => {
+      // Already approved by a prior attempt whose final disappearance check
+      // simply hadn't caught up yet (e.g. the toHaveCount(0) below timed out
+      // on websocket lag, not on a real failure) — nothing left to do, and
+      // re-entering the steps below would find a vanished row.
+      const pendingRow = page
+        .getByTestId("request-row")
+        .filter({ hasText: key });
+      if ((await pendingRow.count()) === 0) return;
 
-    // Toggle an environment chip off then back on (leave it selected so the
-    // approve below still targets development).
-    const devChip = row.getByTestId("request-env-development");
-    await expect(devChip).toHaveAttribute("aria-pressed", "true");
-    await devChip.click();
-    await expect(devChip).toHaveAttribute("aria-pressed", "false");
-    await devChip.click();
-    await expect(devChip).toHaveAttribute("aria-pressed", "true");
+      // Reveal — idempotent: skip the click if a remount already re-revealed
+      // it via cached parent-level state (see handleToggleReveal).
+      if (!(await revealedValue.isVisible().catch(() => false))) {
+        await row.getByTestId("request-value-toggle").click();
+        await expect(revealedValue).toBeVisible({ timeout: 15_000 });
+      }
+      const shown = (await revealedValue.textContent())?.trim() ?? "";
+      expect(
+        shown.length,
+        "revealed plaintext should be non-empty"
+      ).toBeGreaterThan(0);
 
-    // Approve → the row leaves the Pending list.
-    await row.getByTestId("request-accept").click();
-    await expect(
-      page.getByTestId("request-row").filter({ hasText: key }),
-      "approved request should disappear from the Pending tab"
-    ).toHaveCount(0, { timeout: 20_000 });
+      // Toggle an environment chip off then back on (leave it selected so
+      // the approve below still targets development). A remount resets the
+      // chip to its initial (pressed) state, so only toggle off if it isn't
+      // already off.
+      const devChip = row.getByTestId("request-env-development");
+      const pressed = await devChip.getAttribute("aria-pressed");
+      if (pressed !== "false") {
+        await expect(devChip).toHaveAttribute("aria-pressed", "true");
+        await devChip.click();
+        await expect(devChip).toHaveAttribute("aria-pressed", "false");
+      }
+      await devChip.click();
+      await expect(devChip).toHaveAttribute("aria-pressed", "true");
+
+      // Approve → the row leaves the Pending list.
+      await row.getByTestId("request-accept").click();
+      await expect(
+        page.getByTestId("request-row").filter({ hasText: key }),
+        "approved request should disappear from the Pending tab"
+      ).toHaveCount(0, { timeout: 20_000 });
+    }).toPass({ timeout: 60_000 });
 
     // Switch to Approved → the request is there.
     await page.getByRole("button", { name: "Approved" }).click();

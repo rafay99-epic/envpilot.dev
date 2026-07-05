@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { normalizeOrgRole } from "./authz";
 
 /**
  * User Queries and Mutations
@@ -142,15 +141,6 @@ export const updateProfile = mutation({
   },
 });
 
-export const updateLastActive = mutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.userId, {
-      lastActiveAt: Date.now(),
-    });
-  },
-});
-
 export const getOwnSessions = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
@@ -221,115 +211,5 @@ export const revokeOwnSessions = mutation({
     }
 
     return { revoked: count };
-  },
-});
-
-/**
- * Permanently delete a user account (self-service).
- *
- * Authorization: this is a self-service account deletion — the caller
- * (`requestingUserId`) MUST be the same user being deleted. There is no
- * admin-initiated user-deletion path here; platform admins ban accounts via
- * admin.ts (isBanned) rather than hard-deleting, so no admin bypass is wired
- * in. The API route MUST populate `requestingUserId` from the authenticated
- * session, never from untrusted request input.
- *
- * Safety: an account cannot be deleted while it is the SOLE owner of any
- * organization — that would orphan the org. Ownership must be transferred (or
- * the org deleted) first.
- */
-export const remove = mutation({
-  args: {
-    userId: v.id("users"),
-    requestingUserId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    // Authorization: self-service only.
-    if (args.requestingUserId !== args.userId) {
-      throw new Error("You can only delete your own account");
-    }
-
-    const now = Date.now();
-
-    const memberships = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    // Sole-owner guard: for every org where this user is an owner, ensure at
-    // least one OTHER owner remains. Mirrors the last-owner counting pattern in
-    // organizations.removeMember.
-    for (const membership of memberships) {
-      if (normalizeOrgRole(membership.role) !== "owner") continue;
-
-      const orgMembers = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", membership.organizationId)
-        )
-        .collect();
-
-      const ownerCount = orgMembers.filter(
-        (m) => normalizeOrgRole(m.role) === "owner"
-      ).length;
-
-      if (ownerCount <= 1) {
-        throw new Error(
-          "Cannot delete account while you are the sole owner of an organization; transfer ownership or delete the org first."
-        );
-      }
-    }
-
-    // Audit-log the deletion against each org the user belonged to BEFORE the
-    // membership rows disappear (so the trail survives the delete).
-    for (const membership of memberships) {
-      await ctx.db.insert("auditLogs", {
-        organizationId: membership.organizationId,
-        userId: args.userId,
-        action: "org.member_removed",
-        details: JSON.stringify({
-          reason: "account_deleted",
-          selfService: true,
-          removedUserId: args.userId,
-        }),
-        severity: "warning",
-        resourceType: "organization",
-        createdAt: now,
-      });
-    }
-
-    for (const membership of memberships) {
-      await ctx.db.delete(membership._id);
-    }
-
-    const permissions = await ctx.db
-      .query("variablePermissions")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.userId).eq("isActive", true)
-      )
-      .collect();
-
-    for (const perm of permissions) {
-      await ctx.db.patch(perm._id, {
-        isActive: false,
-        revokedAt: now,
-      });
-    }
-
-    const accessTokens = await ctx.db
-      .query("projectAccess")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.isActive === true));
-
-    for (const token of accessTokens) {
-      await ctx.db.patch(token._id, {
-        isActive: false,
-      });
-    }
-
-    await ctx.db.delete(args.userId);
-
-    return args.userId;
   },
 });

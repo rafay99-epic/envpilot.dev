@@ -100,6 +100,80 @@ export async function getOrgOwnerTier(
 }
 
 // ==========================================
+// PER-REQUEST GATE CONTEXT (dedupe org/tier/grace reads across dual-gate calls)
+// ==========================================
+
+/**
+ * Pre-resolved org/tier/grace-period context, shared across multiple
+ * `resolveFeatureValue` calls for the SAME organization within one request.
+ *
+ * The CLAUDE.md dual-gate pattern (boolean feature + numeric limit, e.g.
+ * `secret_rotation` + `secret_rotation_limit`) calls `checkBooleanFeature`
+ * then `checkNumericLimit`/`checkCountedLimit` back-to-back for the same
+ * org — each independently re-fetched `adminSettings`, `organizations`,
+ * and `subscriptionGracePeriods`. Resolve this once via
+ * `resolveOrgGateContext` and pass it to both calls to cut that ~doubled
+ * read cost back to a single resolution + two `featureRegistry`/
+ * `tierFeatures` lookups.
+ */
+export interface OrgGateContext {
+  enforced: boolean;
+  organizationId: Id<"organizations">;
+  /** Owner's raw tier, before grace-period override. */
+  ownerTierName: string;
+  ownerId: Id<"users"> | null;
+  /** Tier to actually resolve features against (accounts for an active grace period). */
+  effectiveTier: string;
+}
+
+/**
+ * Resolve the shared org/tier/grace-period context once. Pass the result to
+ * `resolveFeatureValue`/`checkBooleanFeature`/`checkNumericLimit`/
+ * `checkCountedLimit` for every feature key checked against the same org
+ * within a single mutation/query to avoid re-fetching the same rows.
+ *
+ * Mirrors `resolveFeatureValue`'s own resolution chain exactly (including
+ * short-circuiting the org/grace lookups entirely when enforcement is off),
+ * so passing a context never changes the resolved value — only the read
+ * count.
+ */
+export async function resolveOrgGateContext(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<OrgGateContext> {
+  const enforced = await isEnforcementEnabledFromDb(db);
+  if (!enforced) {
+    return {
+      enforced: false,
+      organizationId,
+      ownerTierName: "unlimited",
+      ownerId: null,
+      effectiveTier: "unlimited",
+    };
+  }
+
+  const { tierName, ownerId } = await getOrgOwnerTier(db, organizationId);
+
+  const grace = await db
+    .query("subscriptionGracePeriods")
+    .withIndex("by_user", (q) => q.eq("userId", ownerId))
+    .first();
+
+  let effectiveTier = tierName;
+  if (grace?.isActive && grace.gracePeriodEnd > Date.now()) {
+    effectiveTier = grace.previousTier;
+  }
+
+  return {
+    enforced: true,
+    organizationId,
+    ownerTierName: tierName,
+    ownerId,
+    effectiveTier,
+  };
+}
+
+// ==========================================
 // CORE RESOLVER
 // ==========================================
 
@@ -107,19 +181,26 @@ export async function getOrgOwnerTier(
  * Resolve a feature's value for an organization.
  *
  * Chain: org → owner → userTiers → grace period check → tierFeatures → featureRegistry default
+ *
+ * Pass a pre-resolved `context` (from `resolveOrgGateContext`) to skip the
+ * `adminSettings`/`organizations`/`subscriptionGracePeriods` reads when
+ * checking multiple feature keys against the same org (the dual-gate
+ * boolean + numeric-limit pattern). Omit it for a single-key check — the
+ * behavior and read cost are identical to before.
  */
 export async function resolveFeatureValue(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
-  featureKey: string
+  featureKey: string,
+  context?: OrgGateContext
 ): Promise<{
   value: boolean | number | null;
   tierName: string;
   valueType: "boolean" | "numeric";
 }> {
-  // 1. Check enforcement
-  const enforced = await isEnforcementEnabledFromDb(db);
-  if (!enforced) {
+  const gate = context ?? (await resolveOrgGateContext(db, organizationId));
+
+  if (!gate.enforced) {
     // When enforcement is off, look up the feature type for a sensible unlimited value
     const feature = await db
       .query("featureRegistry")
@@ -133,7 +214,7 @@ export async function resolveFeatureValue(
     };
   }
 
-  // 2. Look up the feature definition
+  // Look up the feature definition
   const feature = await db
     .query("featureRegistry")
     .withIndex("by_key", (q) => q.eq("key", featureKey))
@@ -143,35 +224,21 @@ export async function resolveFeatureValue(
     return { value: false, tierName: "unknown", valueType: "boolean" };
   }
 
-  // 3. Get org owner's tier
-  const { tierName, ownerId } = await getOrgOwnerTier(db, organizationId);
-
-  // 4. Check grace period — if active, use the previous (higher) tier
-  const grace = await db
-    .query("subscriptionGracePeriods")
-    .withIndex("by_user", (q) => q.eq("userId", ownerId))
-    .first();
-
-  let effectiveTier = tierName;
-  if (grace?.isActive && grace.gracePeriodEnd > Date.now()) {
-    effectiveTier = grace.previousTier;
-  }
-
-  // 5. Look up tier-specific override
+  // Look up tier-specific override for the (grace-period-adjusted) effective tier
   const override = await db
     .query("tierFeatures")
     .withIndex("by_tier_and_feature", (q) =>
-      q.eq("tierName", effectiveTier).eq("featureKey", featureKey)
+      q.eq("tierName", gate.effectiveTier).eq("featureKey", featureKey)
     )
     .first();
 
-  // 6. Parse and return
+  // Parse and return
   const rawValue = override?.value ?? feature.defaultValue;
   const parsed = parseFeatureValue(rawValue, feature.valueType);
 
   return {
     value: parsed,
-    tierName: effectiveTier,
+    tierName: gate.effectiveTier,
     valueType: feature.valueType,
   };
 }
@@ -248,13 +315,25 @@ export async function resolveFeatureForUser(
 /**
  * Check a boolean feature for an organization.
  * Returns { allowed, reason, tierName }.
+ *
+ * Pass `context` (from `resolveOrgGateContext`) when checking this org
+ * against another feature key in the same request — e.g. the dual-gate
+ * pattern pairing this with `checkNumericLimit`/`checkCountedLimit` for a
+ * `*_limit` companion feature — to reuse the org/tier/grace resolution
+ * instead of re-fetching it.
  */
 export async function checkBooleanFeature(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
-  featureKey: string
+  featureKey: string,
+  context?: OrgGateContext
 ): Promise<{ allowed: boolean; reason?: string; tierName: string }> {
-  const resolved = await resolveFeatureValue(db, organizationId, featureKey);
+  const resolved = await resolveFeatureValue(
+    db,
+    organizationId,
+    featureKey,
+    context
+  );
   const allowed = resolved.value === true;
   return {
     allowed,
@@ -273,7 +352,8 @@ export async function checkNumericLimit(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
   featureKey: string,
-  currentCount: number
+  currentCount: number,
+  context?: OrgGateContext
 ): Promise<{
   allowed: boolean;
   current: number;
@@ -281,7 +361,12 @@ export async function checkNumericLimit(
   reason?: string;
   tierName: string;
 }> {
-  const resolved = await resolveFeatureValue(db, organizationId, featureKey);
+  const resolved = await resolveFeatureValue(
+    db,
+    organizationId,
+    featureKey,
+    context
+  );
   const limit = resolved.value as number | null;
 
   if (limit === null) {
@@ -326,7 +411,8 @@ export async function checkCountedLimit(
   db: DatabaseReader,
   organizationId: Id<"organizations">,
   featureKey: string,
-  countFn: (limit: number) => Promise<number>
+  countFn: (limit: number) => Promise<number>,
+  context?: OrgGateContext
 ): Promise<{
   allowed: boolean;
   current: number;
@@ -334,7 +420,12 @@ export async function checkCountedLimit(
   reason?: string;
   tierName: string;
 }> {
-  const resolved = await resolveFeatureValue(db, organizationId, featureKey);
+  const resolved = await resolveFeatureValue(
+    db,
+    organizationId,
+    featureKey,
+    context
+  );
   const limit = resolved.value as number | null;
 
   if (limit === null) {
@@ -383,31 +474,23 @@ export async function checkCountedLimit(
  *   the common case (limit reached within the first page or two).
  */
 async function countMatchingUpTo<Doc>(
-  query: Pageable<Doc>,
+  makeQuery: () => Pageable<Doc>,
   isCounted: (doc: Doc) => boolean,
   limit: number | undefined
 ): Promise<number> {
-  if (limit === undefined) {
-    const rows = await query.collect();
-    return rows.filter(isCounted).length;
-  }
-
-  const pageSize = Math.max(limit + 1, 25);
-  let cursor: string | null = null;
-  let count = 0;
-  for (;;) {
-    const result = await query.paginate({ cursor, numItems: pageSize });
-    for (const doc of result.page) {
-      if (isCounted(doc)) count++;
-    }
-    // Stop at equality: the downstream decision is `count < limit`, which
-    // is already false once count reaches limit — reading further can't
-    // change the outcome.
-    if (count >= limit || result.isDone) {
-      return count;
-    }
-    cursor = result.continueCursor;
-  }
+  // Single read via collect() + in-memory filter — NOT a .paginate() loop.
+  // Convex forbids more than one paginate() call per function execution, and
+  // the multi-project fan-out (countActiveAccounts / countRotationEnabled-
+  // Variables) calls this once per project, so any paginate-based approach
+  // crashed those paths outright. collect() is correct and cheap here: a
+  // finite `limit` only exists for FREE-tier scopes — unlimited/Pro tiers
+  // early-return in checkCountedLimit before counting — so the scanned range
+  // is inherently bounded by the (small) tier cap plus not-yet-purged trash.
+  // `limit` is accepted for signature stability with the display path but
+  // does not change the read strategy.
+  void limit;
+  const rows = await makeQuery().collect();
+  return rows.filter(isCounted).length;
 }
 
 export async function countActiveProjects(
@@ -433,10 +516,14 @@ export async function countActiveVariables(
   projectId: Id<"projects">,
   limit?: number
 ): Promise<number> {
-  const query = db
-    .query("environmentVariables")
-    .withIndex("by_project", (q) => q.eq("projectId", projectId));
-  return countMatchingUpTo(query, (v) => v.deletedAt === undefined, limit);
+  return countMatchingUpTo(
+    () =>
+      db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId)),
+    (v) => v.deletedAt === undefined,
+    limit
+  );
 }
 
 export async function countMembersAndPendingInvites(
@@ -500,10 +587,14 @@ export async function countRotationEnabledVariables(
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
-    const query = db
-      .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id));
-    count += await countMatchingUpTo(query, isRotationEnabled, remaining);
+    count += await countMatchingUpTo(
+      () =>
+        db
+          .query("environmentVariables")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
+      isRotationEnabled,
+      remaining
+    );
   }
   return count;
 }
@@ -529,11 +620,11 @@ export async function countActiveAccounts(
     if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects
 
     const remaining = limit === undefined ? undefined : limit - count;
-    const query = db
-      .query("projectAccounts")
-      .withIndex("by_project", (q) => q.eq("projectId", project._id));
     count += await countMatchingUpTo(
-      query,
+      () =>
+        db
+          .query("projectAccounts")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id)),
       (a) => a.deletedAt === undefined,
       remaining
     );
@@ -863,48 +954,6 @@ export const getTierByName = query({
   },
 });
 
-/**
- * Get all tiers that have Polar products (for pricing page).
- */
-export const getAvailableTiers = query({
-  args: {},
-  handler: async (ctx) => {
-    const tiers = await ctx.db.query("tierDefinitions").collect();
-    return tiers
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((t) => ({
-        name: t.name,
-        displayName: t.displayName,
-        description: t.description,
-        color: t.color,
-        sortOrder: t.sortOrder,
-        isDefault: t.isDefault,
-        polarProductId: t.polarProductId,
-        monthlyPrice: t.monthlyPrice,
-        yearlyPrice: t.yearlyPrice,
-        badge: t.badge,
-        badgeColor: t.badgeColor,
-        ctaText: t.ctaText,
-        ctaLink: t.ctaLink,
-        isComingSoon: t.isComingSoon,
-        highlightFeatures: t.highlightFeatures,
-      }));
-  },
-});
-
-/**
- * Get user's usage counters (consumption-based).
- */
-export const getUserUsage = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("usageCounters")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-  },
-});
-
 // ==========================================
 // SEED FUNCTION (Developer-only)
 // ==========================================
@@ -1164,168 +1213,6 @@ const SEED_FEATURES = [
     sortOrder: 0,
   },
 ];
-
-/**
- * Seed the feature registry with all known features.
- * Idempotent — skips features that already exist.
- *
- * Run this during deployment or via admin migration panel.
- */
-export const seedFeatureRegistry = internalMutation({
-  handler: async (ctx) => {
-    let created = 0;
-    let updated = 0;
-    let skipped = 0;
-
-    for (const f of SEED_FEATURES) {
-      const existing = await ctx.db
-        .query("featureRegistry")
-        .withIndex("by_key", (q) => q.eq("key", f.key))
-        .first();
-
-      if (existing) {
-        // Update if properties have drifted (upsert pattern)
-        const needsUpdate =
-          existing.displayName !== f.displayName ||
-          existing.valueType !== f.valueType ||
-          existing.category !== f.category ||
-          existing.defaultValue !== f.defaultValue ||
-          existing.resettable !== f.resettable ||
-          existing.sortOrder !== f.sortOrder;
-
-        if (needsUpdate) {
-          await ctx.db.patch(existing._id, {
-            displayName: f.displayName,
-            valueType: f.valueType,
-            category: f.category,
-            defaultValue: f.defaultValue,
-            resettable: f.resettable,
-            sortOrder: f.sortOrder,
-            updatedAt: Date.now(),
-          });
-          updated++;
-        } else {
-          skipped++;
-        }
-        continue;
-      }
-
-      const now = Date.now();
-      await ctx.db.insert("featureRegistry", {
-        key: f.key,
-        displayName: f.displayName,
-        description: undefined,
-        valueType: f.valueType,
-        category: f.category,
-        defaultValue: f.defaultValue,
-        resettable: f.resettable,
-        sortOrder: f.sortOrder,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      });
-      created++;
-    }
-
-    return { created, updated, skipped, total: SEED_FEATURES.length };
-  },
-});
-
-/**
- * Seed tier-feature overrides for the default free and pro tiers.
- * Idempotent — skips overrides that already exist.
- */
-export const seedDefaultTierFeatures = internalMutation({
-  handler: async (ctx) => {
-    const tierConfigs: Record<string, Record<string, string>> = {
-      free: {
-        max_projects: "3",
-        max_variables_per_project: "50",
-        max_organizations: "1",
-        max_team_members: "3",
-        max_invitations: "5",
-        variable_version_history: "false",
-        bulk_import: "false",
-        bulk_delete: "true",
-        bulk_export: "false",
-        variable_tags: "true",
-        api_access: "true",
-        extension_access: "false",
-        cli_access: "false",
-        granular_permissions: "true",
-        audit_log_retention_days: "7",
-        sso_enabled: "false",
-        secret_rotation: "false",
-        secret_rotation_limit: "7",
-        secret_sharing: "false",
-        max_active_shares: "0",
-        shared_accounts: "true",
-        shared_accounts_limit: "5",
-        keyboard_shortcuts_custom: "true",
-        custom_branding: "false",
-        analytics_retention_days: "7",
-        priority_support: "false",
-      },
-      pro: {
-        max_projects: "null",
-        max_variables_per_project: "null",
-        max_organizations: "null",
-        max_team_members: "null",
-        max_invitations: "null",
-        variable_version_history: "true",
-        bulk_import: "true",
-        bulk_delete: "true",
-        bulk_export: "true",
-        variable_tags: "true",
-        api_access: "true",
-        extension_access: "true",
-        cli_access: "true",
-        granular_permissions: "true",
-        audit_log_retention_days: "365",
-        sso_enabled: "false",
-        secret_rotation: "true",
-        secret_rotation_limit: "null",
-        secret_sharing: "true",
-        max_active_shares: "null",
-        shared_accounts: "true",
-        shared_accounts_limit: "null",
-        keyboard_shortcuts_custom: "true",
-        custom_branding: "true",
-        analytics_retention_days: "30",
-        priority_support: "true",
-      },
-    };
-
-    let created = 0;
-    let skipped = 0;
-
-    for (const [tierName, features] of Object.entries(tierConfigs)) {
-      for (const [featureKey, value] of Object.entries(features)) {
-        const existing = await ctx.db
-          .query("tierFeatures")
-          .withIndex("by_tier_and_feature", (q) =>
-            q.eq("tierName", tierName).eq("featureKey", featureKey)
-          )
-          .first();
-
-        if (existing) {
-          skipped++;
-          continue;
-        }
-
-        await ctx.db.insert("tierFeatures", {
-          tierName,
-          featureKey,
-          value,
-          updatedAt: Date.now(),
-        });
-        created++;
-      }
-    }
-
-    return { created, skipped };
-  },
-});
 
 /**
  * Get pricing data for the public pricing page.

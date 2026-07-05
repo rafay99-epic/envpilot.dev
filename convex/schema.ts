@@ -66,10 +66,11 @@ export default defineSchema({
     description: v.optional(v.string()),
     // Organization logo URL
     logoUrl: v.optional(v.string()),
-    // Organization-level settings for access control
+    // LEGACY — write path removed, field retained so existing rows validate; drop after a cleanup migration unsets it.
+    // (`teamLeadsCanCreateProjects` was never consulted by any authorization check — a pre-unified-RBAC leftover.
+    //  The `cleanup-dead-data` migration in admin.ts unsets `settings` on all orgs.)
     settings: v.optional(
       v.object({
-        // Whether team leads can create new projects (default: true)
         teamLeadsCanCreateProjects: v.boolean(),
       })
     ),
@@ -359,7 +360,15 @@ export default defineSchema({
     .index("by_variable", ["variableId"])
     .index("by_user", ["userId"])
     .index("by_variable_and_user", ["variableId", "userId"])
-    .index("by_user_active", ["userId", "isActive"]),
+    .index("by_user_active", ["userId", "isActive"])
+    // Bounds the daily permission-expiry sweep (permissions.cleanupExpired) to
+    // active rows that actually carry an expiry. expiresAt is optional;
+    // undefined sorts BELOW all numbers in Convex's index ordering (same
+    // caveat as environmentVariables.by_deleted_at), so the sweep pairs a
+    // `gt(0)` floor with an `lte(now)` ceiling to exclude permanent
+    // (no-expiry) grants at the index level instead of reading every grant
+    // ever issued, across every tenant, every day.
+    .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
   // PROJECT ACCOUNTS (Shared service-account credentials)
@@ -432,7 +441,11 @@ export default defineSchema({
     .index("by_account", ["accountId"])
     .index("by_user", ["userId"])
     .index("by_account_and_user", ["accountId", "userId"])
-    .index("by_user_active", ["userId", "isActive"]),
+    .index("by_user_active", ["userId", "isActive"])
+    // Bounds the daily permission-expiry sweep (accountPermissions.cleanupExpired)
+    // — see the twin index on variablePermissions.by_active_and_expires for
+    // the ordering rationale.
+    .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
   // PROJECT ACCESS (for extension linking)
@@ -867,8 +880,10 @@ export default defineSchema({
 
   // ==========================================
   // USAGE COUNTERS (Consumption-based metrics per user)
-  // Tracks counters that reset on billing cycle.
-  // NOT for persistent resources (projects, variables, members).
+  // DEAD — never inserted into anywhere; consumption tracking was never wired up.
+  // All code references removed; table declaration retained only so a potential
+  // stray row still validates. The `cleanup-dead-data` migration in admin.ts
+  // deletes any rows; drop this defineTable in a later PR once confirmed empty.
   // ==========================================
   usageCounters: defineTable({
     // Reference to the user
@@ -1326,7 +1341,10 @@ export default defineSchema({
   // ==========================================
   // TIER DEFINITIONS (Dynamic, admin-managed tiers)
   // ==========================================
-  // DEPRECATED: Will be removed after migration clears remaining records.
+  // DEPRECATED / DRAIN-ONLY: no code inserts or patches this table anymore; the
+  // only remaining readers are the one-shot `migrate-phase6` handler in admin.ts
+  // (organizationTiers -> userTiers). Will be removed after that migration has
+  // cleared remaining records in every environment.
   organizationTiers: defineTable({
     organizationId: v.id("organizations"),
     tier: v.string(),

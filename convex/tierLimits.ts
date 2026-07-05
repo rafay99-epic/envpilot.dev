@@ -171,28 +171,43 @@ export const getOrganizationUsage = query({
         .then((rows) => rows.filter((i) => i.status === "pending")),
     ]);
 
-    // Parallel fetch: variable counts per project
-    const variableResults = await Promise.all(
-      projects.map(async (project) => {
-        const variables = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect()
-          .then((rows) => rows.filter((v2) => !v2.deletedAt));
-        return {
-          projectId: project._id as string,
-          projectName: project.name,
-          count: variables.length,
-        };
-      })
-    );
-
+    // Count variables per project with a bounded global scan — same
+    // VARIABLE_SCAN_CAP pattern as dashboard.ts::getStats. Collecting every
+    // variable of every project reactively re-ran on every variable write
+    // for any open usage view (CLI/extension/web); we cap the total
+    // documents scanned across all projects and mark the result
+    // `variablesApproximate` if the cap is hit (matches dashboard.ts's
+    // `approximate` convention).
+    const VARIABLE_SCAN_CAP = 2000;
     let totalVariables = 0;
     let maxVariableProject = { projectId: "", projectName: "", count: 0 };
-    for (const vc of variableResults) {
-      totalVariables += vc.count;
-      if (vc.count > maxVariableProject.count) {
-        maxVariableProject = vc;
+    let variablesApproximate = false;
+    let variableBudget = VARIABLE_SCAN_CAP;
+    const variableResults: {
+      projectId: string;
+      projectName: string;
+      count: number;
+    }[] = [];
+    for (const project of projects) {
+      if (variableBudget <= 0) {
+        variablesApproximate = true;
+        break;
+      }
+      const projectVars = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .take(variableBudget);
+      variableBudget -= projectVars.length;
+      const count = projectVars.filter((v2) => !v2.deletedAt).length;
+      const entry = {
+        projectId: project._id as string,
+        projectName: project.name,
+        count,
+      };
+      variableResults.push(entry);
+      totalVariables += count;
+      if (count > maxVariableProject.count) {
+        maxVariableProject = entry;
       }
     }
 
@@ -212,6 +227,9 @@ export const getOrganizationUsage = query({
         maxVariablesInProject: maxVariableProject.count,
         maxVariablesProjectName: maxVariableProject.projectName,
         variablesPerProject: variableResults,
+        // True when the variable scan hit VARIABLE_SCAN_CAP; totals above
+        // are a lower-bound approximation in that case.
+        variablesApproximate,
       },
     };
   },
@@ -358,28 +376,40 @@ export const getExtendedUsage = query({
       countActiveAccounts(ctx.db, args.organizationId),
     ]);
 
-    // Variable counts per project
-    const variableResults = await Promise.all(
-      projects.map(async (project) => {
-        const variables = await ctx.db
-          .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
-          .collect()
-          .then((rows) => rows.filter((v2) => !v2.deletedAt));
-        return {
-          projectId: project._id as string,
-          projectName: project.name,
-          count: variables.length,
-        };
-      })
-    );
-
+    // Variable counts per project — same bounded-scan pattern as
+    // getOrganizationUsage above / dashboard.ts::getStats. Caps total
+    // documents read across all projects instead of collecting every
+    // variable of every project on every reactive re-run.
+    const VARIABLE_SCAN_CAP = 2000;
     let totalVariables = 0;
     let maxVariableProject = { projectId: "", projectName: "", count: 0 };
-    for (const vc of variableResults) {
-      totalVariables += vc.count;
-      if (vc.count > maxVariableProject.count) {
-        maxVariableProject = vc;
+    let variablesApproximate = false;
+    let variableBudget = VARIABLE_SCAN_CAP;
+    const variableResults: {
+      projectId: string;
+      projectName: string;
+      count: number;
+    }[] = [];
+    for (const project of projects) {
+      if (variableBudget <= 0) {
+        variablesApproximate = true;
+        break;
+      }
+      const projectVars = await ctx.db
+        .query("environmentVariables")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .take(variableBudget);
+      variableBudget -= projectVars.length;
+      const count = projectVars.filter((v2) => !v2.deletedAt).length;
+      const entry = {
+        projectId: project._id as string,
+        projectName: project.name,
+        count,
+      };
+      variableResults.push(entry);
+      totalVariables += count;
+      if (count > maxVariableProject.count) {
+        maxVariableProject = entry;
       }
     }
 
@@ -393,6 +423,9 @@ export const getExtendedUsage = query({
         maxVariablesInProject: maxVariableProject.count,
         maxVariablesProjectName: maxVariableProject.projectName,
         variablesPerProject: variableResults,
+        // True when the variable scan hit VARIABLE_SCAN_CAP; totals above
+        // are a lower-bound approximation in that case.
+        variablesApproximate,
         activeShares,
         rotationEnabledVars,
         sharedAccounts,
