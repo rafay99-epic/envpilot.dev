@@ -1,0 +1,19 @@
+convex/auth.config.ts
+  s_292e44dbe57624::t_eeaecb45c72c75 17-24,26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "58a6582ae83e690a7a0d9580a5eb967d3f5bf433",
+  "prompts": {},
+  "sessions": {
+    "s_292e44dbe57624": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "219ab7a0-b25b-4bb7-bd24-a876b892e8ce",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
