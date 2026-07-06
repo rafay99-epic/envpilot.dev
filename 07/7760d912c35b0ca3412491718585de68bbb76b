@@ -1,0 +1,26 @@
+.github/workflows/deploy-extension.yml
+  s_8ac05b3f82c26d::t_95f9b4ff767d53 93-100,108,110-114,124-126,129
+.github/workflows/deploy-cli.yml
+  s_8ac05b3f82c26d::t_78b2f44b61fac7 129-133,139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "077760d912c35b0ca3412491718585de68bbb76b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
