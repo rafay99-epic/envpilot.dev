@@ -126,12 +126,17 @@ jobs:
           fi
           echo "WorkOS client id embedded in CLI bundle ✓"
 
+      # --ignore-scripts is CRITICAL: the CLI has "prepublishOnly": "npm run
+      # build", so a plain `bun publish` would RE-RUN tsup here — without the
+      # WORKOS_CLIENT_ID env that only the Build step above had — overwriting the
+      # just-verified bundle with an empty-client-id one. --ignore-scripts
+      # publishes the exact dist the guard verified, so what ships == what passed.
       - name: Publish to npm
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/cli
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: bun publish --access public
+        run: bun publish --ignore-scripts --access public
 
       - name: Tag CLI release
         if: steps.guard.outputs.should_publish == 'true'
