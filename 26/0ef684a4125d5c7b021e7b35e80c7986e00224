@@ -1,0 +1,55 @@
+apps/vscode-extension/package.json
+  s_8ac05b3f82c26d::t_85246425117362 5
+apps/cli/src/lib/version-check.ts
+  s_8ac05b3f82c26d::t_85246425117362 3,8-15,17-18,20,29-31,33-46,48-68,70-73,75-83,85,87-143,145-167,169-178,180-203
+.github/workflows/deploy-extension.yml
+  s_8ac05b3f82c26d::t_85246425117362 93-100,102,105-106,108,110-115,118-144
+apps/cli/src/lib/program.ts
+  s_8ac05b3f82c26d::t_85246425117362 4,23-31
+apps/cli/package.json
+  s_8ac05b3f82c26d::t_85246425117362 3
+apps/web/src/lib/versions.ts
+  s_8ac05b3f82c26d::t_c1b8d5be15a677 17
+  s_8ac05b3f82c26d::t_85246425117362 2-14,18-24,26-27
+apps/web/src/proxy.ts
+  s_8ac05b3f82c26d::t_85246425117362 36-39
+apps/cli/src/lib/version-check.test.ts
+  s_8ac05b3f82c26d::t_85246425117362 1-62
+apps/vscode-extension/src/extension.ts
+  s_8ac05b3f82c26d::t_85246425117362 22-25,54-70
+convex/auth.config.ts
+  s_8ac05b3f82c26d::t_85246425117362 17-33,35-36
+apps/web/tests/e2e/version-endpoint.spec.ts
+  s_8ac05b3f82c26d::t_85246425117362 1-49
+apps/web/package.json
+  s_8ac05b3f82c26d::t_4de4d674ee4575 3
+CLAUDE.md
+  s_8ac05b3f82c26d::t_85246425117362 111-148
+.github/workflows/deploy-cli.yml
+  s_8ac05b3f82c26d::t_85246425117362 86-91,94-95,97-105,111-144,150
+apps/vscode-extension/src/services/versionCheck.ts
+  s_8ac05b3f82c26d::t_85246425117362 5-6,8-54,63-67,69-74,76-79,81-94,96-101,103-111,120-153
+package.json
+  s_8ac05b3f82c26d::t_d5bb4a9dbef582 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "260ef684a4125d5c7b021e7b35e80c7986e00224",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
