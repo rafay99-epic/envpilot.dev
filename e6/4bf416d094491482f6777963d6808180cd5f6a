@@ -1,0 +1,48 @@
+apps/cli/src/lib/version-check.ts
+  s_8ac05b3f82c26d::t_9e18f16b24f2a6 159-163
+  s_8ac05b3f82c26d::t_c524d79e9157aa 3,8-15,17-18,20,29-31,33-46,48-53,55-73,75-83,85,87-98,100-113,115-158,164-172
+apps/cli/src/lib/version-check.test.ts
+  s_8ac05b3f82c26d::t_4ae701a733ec46 1-62
+apps/vscode-extension/package.json
+  s_8ac05b3f82c26d::t_584bed51c5e7b9 5
+apps/web/src/proxy.ts
+  s_8ac05b3f82c26d::t_ecf5719ad68e81 36-39
+apps/vscode-extension/src/services/versionCheck.ts
+  s_8ac05b3f82c26d::t_7e966639951a22 5-6,8-54,64,66-68,70-83,85-90,92-100,109-142
+package.json
+  s_8ac05b3f82c26d::t_584bed51c5e7b9 3
+apps/cli/package.json
+  s_8ac05b3f82c26d::t_584bed51c5e7b9 3
+apps/web/tests/e2e/version-endpoint.spec.ts
+  s_8ac05b3f82c26d::t_9dfe9d28688169 1-49
+apps/cli/src/lib/program.ts
+  s_8ac05b3f82c26d::t_32e861ab41c5df 4,23-31
+apps/web/src/lib/versions.ts
+  s_8ac05b3f82c26d::t_6ee96ec95ccd32 2-14,17-24,26-27
+apps/vscode-extension/src/extension.ts
+  s_8ac05b3f82c26d::t_34c8e00616d12e 54-70
+  s_8ac05b3f82c26d::t_b23514957a2629 22-25
+apps/web/package.json
+  s_8ac05b3f82c26d::t_584bed51c5e7b9 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "e64bf416d094491482f6777963d6808180cd5f6a",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
