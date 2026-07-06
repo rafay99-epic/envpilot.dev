@@ -108,6 +108,44 @@ Package versions to bump when making changes:
 - **VS Code extension** (`apps/vscode-extension/`): bump `apps/vscode-extension/package.json`
 - **Root monorepo** (`package.json`): bump when features span multiple packages
 
+#### Release manifest — `package.json` is NOT the only file (CRITICAL)
+
+Bumping `package.json` alone is **incomplete**. The platform serves a release
+manifest at `GET /api/version` (source: **`apps/web/src/lib/versions.ts` →
+`APP_VERSIONS`**) that the CLI and extension poll to decide update notices and
+**hard-blocks**. When you change a version you MUST also update this manifest,
+or clients get wrong/stale enforcement.
+
+For every release, in `apps/web/src/lib/versions.ts`:
+
+1. **Set the `latest` value** to the new package version:
+   - CLI bump → set `APP_VERSIONS.cli` to `apps/cli/package.json` version.
+   - Extension bump → set `APP_VERSIONS.extension` to the extension's version.
+   - Web bump → set `APP_VERSIONS.web` to `apps/web/package.json` version.
+     These must **match** the corresponding `package.json` exactly (behind → no
+     update notice fires; ahead → clients think they're outdated).
+
+2. **Bump `minCli` / `minExtension` ONLY on a breaking release** — i.e. when the
+   new server/Convex contract makes older clients genuinely stop working (like
+   the Stage 2 auth cutover). This hard-blocks everything below it with an
+   upgrade prompt. Leave it untouched for ordinary feature/patch releases.
+
+   ⚠️ **NEVER set `minCli`/`minExtension` higher than a version that is actually
+   published and installable.** Setting a minimum above the latest published
+   build locks out **every** user with no valid upgrade target — a total
+   lockout. Rule: `min ≤ latest`, and `latest` must already be (or be
+   simultaneously) published. The Playwright spec
+   `apps/web/tests/e2e/version-endpoint.spec.ts` asserts `min ≤ latest` as a
+   backstop, but it cannot verify "actually published" — that's on you.
+
+**Enforcement wiring** (don't move without updating both ends): `/api/version`
+must stay in `unauthenticatedPaths` (`apps/web/src/proxy.ts`) or signed-out
+clients get an HTML redirect instead of JSON. CLI enforces in
+`apps/cli/src/lib/program.ts` (`preAction` → `enforceVersion()`); the extension
+enforces in `wrapCommand` (`apps/vscode-extension/src/extension.ts`) via
+`isExtensionOutdated()`. Both **fail open** on network errors — a flaky network
+never bricks a client.
+
 ## Commands
 
 ```bash
