@@ -95,15 +95,15 @@ jobs:
         run: bunx turbo build --filter=envpilot
         env:
           ENVPILOT_SERVER_URL: https://www.envpilot.dev
-          # WorkOS AuthKit device-flow client id (a PUBLIC identifier) and the
-          # prod Convex deployment URL, baked into the bundle at build time
-          # (esbuild define, see apps/vscode-extension/scripts/build.mjs).
-          # WITHOUT THESE the published extension embeds empty strings and
-          # sign-in fails with "this build has no WorkOS client id embedded.
-          # Reinstall the extension." Both are public values (the client id is
-          # public; NEXT_PUBLIC_* ships to browsers).
-          WORKOS_CLIENT_ID: client_01KHWDD75944NBADKY0ANTRXR8
-          NEXT_PUBLIC_CONVEX_URL: https://reliable-spider-677.convex.cloud
+          # WorkOS AuthKit device-flow client id and the prod Convex deployment
+          # URL, baked into the bundle at build time (esbuild define, see
+          # apps/vscode-extension/scripts/build.mjs). WITHOUT THESE the published
+          # extension embeds empty strings and sign-in fails with "this build has
+          # no WorkOS client id embedded. Reinstall the extension." Stored as
+          # repo secrets (kept out of the workflow source and CI logs); note they
+          # are still embedded in the published artifact at runtime.
+          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           # DSNs are publishable identifiers, not secrets. Baked into the
           # bundle at build time (esbuild define) — without this the published
           # extension ships with Sentry disabled.
