@@ -60,9 +60,20 @@ export class VersionCheckService {
   }
 
   async checkForUpdate(): Promise<void> {
+    // Best-effort manifest refresh, isolated from enforcement. A fetch failure
+    // (offline, server down) must NOT skip the cached min/latest evaluation
+    // below — otherwise the hard block silently disappears the moment the
+    // network blips after the fetch interval lapses. Enforce from last-known
+    // cached state regardless.
     try {
       await this.refreshManifest();
+    } catch (err) {
+      output.warn(
+        `Version manifest refresh failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
+    try {
       const current = this.context.extension.packageJSON.version as string;
       const latest = this.context.globalState.get<string>(LATEST_KEY);
       const min = this.context.globalState.get<string>(MIN_KEY);
