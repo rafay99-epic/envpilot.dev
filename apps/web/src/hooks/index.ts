@@ -46,9 +46,6 @@ export {
   useAnalytics,
 } from "./useDashboard";
 
-// Vault hooks (WorkOS Vault integration)
-export { useVault } from "./useVault";
-
 // Shared account hooks (Convex reads + Vault-backed CRUD + permission grants)
 export {
   useAccounts,

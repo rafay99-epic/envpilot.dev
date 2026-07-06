@@ -10,6 +10,16 @@ import * as Sentry from "@sentry/nextjs";
  *   2. OTP — sent when recipient verifies their email
  */
 
+/**
+ * Dev/test kill-switch. Set DISABLE_EMAILS=true in .env.local so local runs
+ * (and Playwright e2e) don't fire real Resend sends and rack up cost / hit
+ * sending limits. Prod (Vercel) leaves it unset → real sends. Mirrors the
+ * DISABLE_EMAILS guard in convex/emails.ts.
+ */
+function emailsDisabled(): boolean {
+  return process.env.DISABLE_EMAILS === "true";
+}
+
 function getResendClient(): Resend {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -34,6 +44,12 @@ export async function sendShareNotificationEmail(params: {
   shareUrl: string;
   resourceType?: "variable" | "account";
 }): Promise<void> {
+  if (emailsDisabled()) {
+    console.log(
+      `[EMAIL] Skipped share notification (DISABLE_EMAILS=true) → ${params.recipientEmail}`
+    );
+    return;
+  }
   const resend = getResendClient();
   const from = getFromEmail();
 
@@ -108,6 +124,12 @@ export async function sendShareOtpEmail(params: {
   recipientEmail: string;
   otp: string;
 }): Promise<void> {
+  if (emailsDisabled()) {
+    console.log(
+      `[EMAIL] Skipped share OTP (DISABLE_EMAILS=true) → ${params.recipientEmail}`
+    );
+    return;
+  }
   const resend = getResendClient();
   const from = getFromEmail();
 

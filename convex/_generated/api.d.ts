@@ -9,6 +9,7 @@
  */
 
 import type * as accountPermissions from "../accountPermissions.js";
+import type * as accountValues from "../accountValues.js";
 import type * as accounts from "../accounts.js";
 import type * as admin from "../admin.js";
 import type * as analytics from "../analytics.js";
@@ -36,8 +37,10 @@ import type * as projectAccess from "../projectAccess.js";
 import type * as projectMembers from "../projectMembers.js";
 import type * as projects from "../projects.js";
 import type * as rateLimits from "../rateLimits.js";
+import type * as roleCompat from "../roleCompat.js";
 import type * as seedChangelog from "../seedChangelog.js";
 import type * as seedFeatureRequests from "../seedFeatureRequests.js";
+import type * as shareValues from "../shareValues.js";
 import type * as sharedSecrets from "../sharedSecrets.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as supportTickets from "../supportTickets.js";
@@ -47,8 +50,11 @@ import type * as tierLimits from "../tierLimits.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as users from "../users.js";
 import type * as variableRequests from "../variableRequests.js";
+import type * as variableValues from "../variableValues.js";
 import type * as variables from "../variables.js";
+import type * as vault from "../vault.js";
 import type * as vaultGc from "../vaultGc.js";
+import type * as vaultReveal from "../vaultReveal.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -59,6 +65,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accountPermissions: typeof accountPermissions;
+  accountValues: typeof accountValues;
   accounts: typeof accounts;
   admin: typeof admin;
   analytics: typeof analytics;
@@ -86,8 +93,10 @@ declare const fullApi: ApiFromModules<{
   projectMembers: typeof projectMembers;
   projects: typeof projects;
   rateLimits: typeof rateLimits;
+  roleCompat: typeof roleCompat;
   seedChangelog: typeof seedChangelog;
   seedFeatureRequests: typeof seedFeatureRequests;
+  shareValues: typeof shareValues;
   sharedSecrets: typeof sharedSecrets;
   subscriptions: typeof subscriptions;
   supportTickets: typeof supportTickets;
@@ -97,8 +106,11 @@ declare const fullApi: ApiFromModules<{
   userPreferences: typeof userPreferences;
   users: typeof users;
   variableRequests: typeof variableRequests;
+  variableValues: typeof variableValues;
   variables: typeof variables;
+  vault: typeof vault;
   vaultGc: typeof vaultGc;
+  vaultReveal: typeof vaultReveal;
   workflows: typeof workflows;
 }>;
 

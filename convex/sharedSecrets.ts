@@ -649,6 +649,32 @@ export const verifyRecipientEmail = mutation({
 });
 
 /**
+ * Compensating action for a one-time reveal whose Vault read failed AFTER
+ * verifyOtp already burned the share. Un-burns it so a transient Vault outage
+ * doesn't permanently destroy the link — the recipient can request a fresh OTP
+ * and retry. No-op unless the share is a one-time share currently `burned`.
+ */
+export const restoreBurnedShare = mutation({
+  args: { token: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const share = await ctx.db
+      .query("sharedSecrets")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+    if (!share || share.mode !== "one_time" || share.status !== "burned") {
+      return null;
+    }
+    await ctx.db.patch(share._id, {
+      status: "active",
+      burnedAt: undefined,
+      totalViewCount: Math.max(0, share.totalViewCount - 1),
+    });
+    return null;
+  },
+});
+
+/**
  * Verify the OTP and claim the shared secret.
  * For one-time shares, atomically burns the share.
  *

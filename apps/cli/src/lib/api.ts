@@ -23,18 +23,12 @@ import {
   type OptionalRestArgs,
 } from "convex/server";
 import { CONVEX_URL } from "./env.js";
-import {
-  getApiUrl,
-  getActiveAccount,
-  updateActiveAccount,
-  clearAuth,
-} from "./config.js";
+import { getActiveAccount, updateActiveAccount, clearAuth } from "./config.js";
 import { isTokenExpiring } from "./jwt.js";
 import { refreshAccessToken, WorkosAuthError } from "./workos.js";
 import { computeFingerprint } from "./variables-cache.js";
 import { normalizeOrgRole } from "./roles.js";
 import type {
-  ApiResponse,
   Organization,
   Project,
   Variable,
@@ -203,6 +197,48 @@ type OrganizationUsage = {
   usage: UsageInfo["usage"];
 } | null;
 
+// Direct-to-Convex value read/write (Stage 3, Phase 2) — replaces the deleted
+// /api/cli/variables{,/bulk} and /api/cli/variable-requests vault routes.
+type PulledVariableRow = {
+  _id: string;
+  key: string;
+  value: string;
+  description?: string;
+  environments: string[];
+  projectId: string;
+  isSensitive: boolean;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+  access: "read" | "write";
+};
+type PullMeta = {
+  role: "admin" | "team_lead" | "member";
+  projectRole: "manager" | "developer" | "viewer" | null;
+  unifiedRole: string;
+  assigned: boolean;
+  grantOnly: boolean;
+  environmentScope: string[] | null;
+  hasWriteAccess: boolean;
+  scopeRestricted: boolean;
+  decryptionFailures?: string[];
+};
+type PullValuesResult = { variables: PulledVariableRow[]; meta: PullMeta };
+type PushBulkResult = {
+  created: number;
+  updated: number;
+  deleted: number;
+  total: number;
+  skipped?: number;
+  deniedKeys?: string[];
+};
+type PushVariableInput = {
+  key: string;
+  value: string;
+  description?: string;
+  isSensitive?: boolean;
+};
+
 const fnRef = makeFunctionReference;
 
 const refs = {
@@ -261,6 +297,33 @@ const refs = {
   deviceSessionRevoke: fnRef<"mutation", { sessionId: string }, unknown>(
     "deviceSessions:revoke"
   ),
+  pullValues: fnRef<
+    "action",
+    { projectId: string; environment?: string; metadataOnly?: boolean },
+    PullValuesResult
+  >("variableValues:pullValues"),
+  pushBulk: fnRef<
+    "action",
+    {
+      projectId: string;
+      environment: string;
+      variables: PushVariableInput[];
+      mode?: "merge" | "replace";
+    },
+    PushBulkResult
+  >("variableValues:pushBulk"),
+  createVariableRequest: fnRef<
+    "action",
+    {
+      projectId: string;
+      key: string;
+      value: string;
+      environments: string[];
+      isSensitive?: boolean;
+      description?: string;
+    },
+    VariableRequest
+  >("variableRequests:createWithValue"),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(
@@ -277,6 +340,14 @@ async function convexMutation<Ref extends FunctionReference<"mutation">>(
 ): Promise<FunctionReturnType<Ref>> {
   const client = await getConvexClient();
   return client.mutation(ref, ...args);
+}
+
+async function convexAction<Ref extends FunctionReference<"action">>(
+  ref: Ref,
+  ...args: OptionalRestArgs<Ref>
+): Promise<FunctionReturnType<Ref>> {
+  const client = await getConvexClient();
+  return client.action(ref, ...args);
 }
 
 // ============================================================================
@@ -342,217 +413,7 @@ function booleanFeature(
 // API client
 // ============================================================================
 
-/**
- * Return the registrable domain (eTLD+1 approximation) for a hostname, used to
- * decide whether a redirect is "same site" and safe to re-issue with the
- * Authorization header.
- */
-function registrableDomain(hostname: string): string {
-  const parts = hostname.toLowerCase().split(".").filter(Boolean);
-  if (parts.length <= 2) return parts.join(".");
-  return parts.slice(-2).join(".");
-}
-
-const MAX_MANUAL_REDIRECTS = 5;
-
 export class APIClient {
-  private baseUrl: string;
-
-  constructor(options?: { baseUrl?: string }) {
-    this.baseUrl = options?.baseUrl ?? getApiUrl();
-  }
-
-  // ── Vault HTTP path (decrypted secret values) ──────────────────────────
-
-  /**
-   * Follow 3xx redirects manually, re-attaching Authorization only within the
-   * same registrable domain (defends against the apex→www redirect that would
-   * otherwise drop the header and yield a bogus 401).
-   */
-  private async fetchWithSafeRedirects(
-    initialUrl: string,
-    init: RequestInit
-  ): Promise<Response> {
-    let currentUrl = initialUrl;
-    let currentInit: RequestInit = { ...init, redirect: "manual" };
-
-    for (let hop = 0; hop < MAX_MANUAL_REDIRECTS; hop++) {
-      const response = await fetch(currentUrl, currentInit);
-
-      if (response.status < 300 || response.status >= 400) {
-        return response;
-      }
-
-      const location = response.headers.get("location");
-      if (!location) return response;
-
-      const nextUrl = new URL(location, currentUrl);
-      const prevHost = new URL(currentUrl).hostname;
-      const sameSite =
-        registrableDomain(nextUrl.hostname) === registrableDomain(prevHost);
-
-      const headers = new Headers(currentInit.headers);
-      if (!sameSite) headers.delete("Authorization");
-
-      let nextMethod = (currentInit.method || "GET").toUpperCase();
-      let nextBody = currentInit.body;
-      if (
-        response.status === 301 ||
-        response.status === 302 ||
-        response.status === 303
-      ) {
-        if (nextMethod !== "GET" && nextMethod !== "HEAD") {
-          nextMethod = "GET";
-          nextBody = undefined;
-          headers.delete("Content-Type");
-        }
-      }
-
-      currentUrl = nextUrl.toString();
-      currentInit = {
-        ...currentInit,
-        method: nextMethod,
-        headers,
-        body: nextBody,
-        redirect: "manual",
-      };
-    }
-
-    throw new APIError(
-      `Too many redirects while calling ${initialUrl}`,
-      0,
-      "TOO_MANY_REDIRECTS"
-    );
-  }
-
-  /** Perform an authed vault request carrying a fresh WorkOS JWT bearer. */
-  private async vaultRequest<T>(
-    method: string,
-    path: string,
-    options?: { params?: Record<string, string>; body?: unknown }
-  ): Promise<T> {
-    const token = await ensureFreshAccessToken();
-    const url = new URL(path, this.baseUrl);
-    if (options?.params) {
-      for (const [key, value] of Object.entries(options.params)) {
-        url.searchParams.set(key, value);
-      }
-    }
-
-    const response = await this.fetchWithSafeRedirects(url.toString(), {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: options?.body ? JSON.stringify(options.body) : undefined,
-    });
-
-    return this.handleResponse<T>(response);
-  }
-
-  private isAuthRedirect(response: Response, bodyText?: string): boolean {
-    const location = response.headers.get("location") || "";
-    const finalUrl = response.url || "";
-    const contentType = response.headers.get("content-type") || "";
-    const preview = (bodyText || "").slice(0, 512).toLowerCase();
-    return (
-      location.includes("authkit") ||
-      finalUrl.includes("authkit") ||
-      (contentType.includes("text/html") &&
-        (preview.includes("authorization_session_id") ||
-          preview.includes("client_id=") ||
-          preview.includes("<!doctype html")))
-    );
-  }
-
-  private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      await this.handleError(response);
-    }
-
-    const contentType = response.headers.get("content-type") || "";
-    const body = await response.text();
-
-    if (!contentType.includes("application/json")) {
-      if (this.isAuthRedirect(response, body)) {
-        throw new APIError(
-          "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
-          401,
-          "AUTH_REDIRECT"
-        );
-      }
-      const preview = body.replace(/\s+/g, " ").slice(0, 160);
-      throw new APIError(
-        `Expected JSON but got ${contentType || "unknown content type"} from ${response.url}. Response starts with: ${preview}`,
-        response.status || 500
-      );
-    }
-
-    try {
-      return JSON.parse(body) as T;
-    } catch {
-      const preview = body.replace(/\s+/g, " ").slice(0, 160);
-      throw new APIError(
-        `Failed to parse JSON response from ${response.url}. Response starts with: ${preview}`,
-        response.status || 500
-      );
-    }
-  }
-
-  private async handleError(response: Response): Promise<never> {
-    const bodyText = await response.text();
-
-    let message = `Request failed with status ${response.status}`;
-    let code: string | undefined;
-    try {
-      const data = JSON.parse(bodyText) as Record<string, string>;
-      message = data.error || data.message || message;
-      code = data.code;
-    } catch {
-      // Non-JSON error body — fall through with the default message.
-    }
-
-    if (response.status === 401) {
-      if (this.isAuthRedirect(response, bodyText)) {
-        throw new APIError(
-          "Your CLI session is not authorized for this endpoint. Please run `envpilot login` and try again.",
-          401,
-          "AUTH_REDIRECT"
-        );
-      }
-      throw new APIError(
-        message || "Authentication failed. Please run `envpilot login`.",
-        401,
-        code || "UNAUTHORIZED"
-      );
-    }
-
-    if (response.status === 403 && code === "TIER_LIMIT_REACHED") {
-      throw new APIError(
-        message ||
-          "Tier limit reached. Run `envpilot usage` to see your plan limits.",
-        403,
-        "TIER_LIMIT_REACHED"
-      );
-    }
-
-    if (response.status === 403) {
-      throw new APIError(message || "Access denied.", 403, code || "FORBIDDEN");
-    }
-
-    if (response.status === 402) {
-      throw new APIError(
-        message ||
-          "Tier limit reached. Run `envpilot usage` to see your plan limits.",
-        402,
-        "PAYMENT_REQUIRED"
-      );
-    }
-
-    throw new APIError(message, response.status, code);
-  }
-
   // ============================================
   // High-level methods — DIRECT to Convex
   // ============================================
@@ -766,24 +627,63 @@ export class APIClient {
   async listVariables(
     projectId: string,
     environment?: string,
-    organizationId?: string
+    _organizationId?: string
   ): Promise<{
     variables: Variable[];
     meta: VariablesMeta | undefined;
     decryptionFailures: string[];
   }> {
-    const params: Record<string, string> = { projectId };
-    if (environment) params.environment = environment;
-    if (organizationId) params.organizationId = organizationId;
+    // Direct Convex action (encrypts/decrypts server-side) — replaces the
+    // deleted GET /api/cli/variables vault route.
+    const result = await convexAction(refs.pullValues, {
+      projectId,
+      ...(environment ? { environment } : {}),
+    });
 
-    const response = await this.vaultRequest<
-      ApiResponse<Variable[]> & { meta?: VariablesMeta }
-    >("GET", "/api/cli/variables", { params });
+    const variables: Variable[] = result.variables
+      // Variables whose value failed to decrypt are surfaced via
+      // meta.decryptionFailures and NOT injected — matching the old
+      // GET /api/cli/variables route, which omitted them from `data`
+      // entirely (never wrote a "[DECRYPTION_FAILED]" placeholder to .env).
+      .filter((row) => row.value !== "[DECRYPTION_FAILED]")
+      .map((row) => ({
+        _id: row._id,
+        key: row.key,
+        value: row.value,
+        // The CLI Variable type expects a single environment string. Echo the
+        // requested one, else the first the variable belongs to.
+        environment: (environment ??
+          row.environments[0] ??
+          "development") as Variable["environment"],
+        projectId: row.projectId,
+        description: row.description,
+        isSensitive: row.isSensitive,
+        version: row.version,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        access: row.access,
+      }));
+
+    // Preserve the legacy meta block old CLI builds derive .env protection
+    // from (role / projectRole are passthrough keys of CliVariablesMeta).
+    const meta = {
+      total: variables.length,
+      environment: environment ?? "all",
+      role: result.meta.role,
+      projectRole: result.meta.projectRole,
+      unifiedRole: result.meta.unifiedRole,
+      assigned: result.meta.assigned,
+      grantOnly: result.meta.grantOnly,
+      environmentScope: result.meta.environmentScope,
+      hasWriteAccess: result.meta.hasWriteAccess,
+      scopeRestricted: result.meta.scopeRestricted,
+      decryptionFailures: result.meta.decryptionFailures,
+    } as unknown as VariablesMeta;
 
     return {
-      variables: response.data || [],
-      meta: response.meta,
-      decryptionFailures: response.meta?.decryptionFailures ?? [],
+      variables,
+      meta,
+      decryptionFailures: result.meta.decryptionFailures ?? [],
     };
   }
 
@@ -807,20 +707,14 @@ export class APIClient {
     skipped?: number;
     deniedKeys?: string[];
   }> {
-    const response = await this.vaultRequest<
-      ApiResponse<{
-        created: number;
-        updated: number;
-        deleted: number;
-        total: number;
-        skipped?: number;
-        deniedKeys?: string[];
-      }>
-    >("POST", "/api/cli/variables/bulk", { body: data });
-    if (!response.data) {
-      throw new APIError("No result returned by server", 500);
-    }
-    return response.data;
+    // Direct Convex action (encrypts server-side, diffs against existing) —
+    // replaces the deleted POST /api/cli/variables/bulk vault route.
+    return convexAction(refs.pushBulk, {
+      projectId: data.projectId,
+      environment: data.environment,
+      variables: data.variables,
+      mode: data.mode,
+    });
   }
 
   /**
@@ -831,13 +725,20 @@ export class APIClient {
   async createVariableRequest(
     data: CreateVariableRequestBody
   ): Promise<VariableRequest> {
-    const response = await this.vaultRequest<
-      ApiResponse<{ request: VariableRequest }>
-    >("POST", "/api/cli/variable-requests", { body: data });
-    if (!response.data) {
+    // Direct Convex action (encrypts the proposed value server-side) —
+    // replaces the deleted POST /api/cli/variable-requests vault route.
+    const created = await convexAction(refs.createVariableRequest, {
+      projectId: data.projectId,
+      key: data.key,
+      value: data.value,
+      environments: data.environments,
+      isSensitive: data.isSensitive,
+      description: data.description,
+    });
+    if (!created) {
       throw new APIError("No variable request returned by server", 500);
     }
-    return response.data.request;
+    return created;
   }
 }
 

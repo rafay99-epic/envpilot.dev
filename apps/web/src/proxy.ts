@@ -42,14 +42,12 @@ export default authkitMiddleware({
       "/api/auth/me",
       "/api/telemetry-envelope",
       "/api/webhooks/polar",
-      // Surviving CLI vault routes authenticate with a WorkOS JWT bearer
-      // (verifyWorkosBearer), not a browser session. All other /api/cli
-      // routes were deleted in the Stage 2 device-flow cutover — the CLI
-      // calls Convex directly.
-      "/api/cli/variables",
-      "/api/cli/variables/bulk",
-      "/api/cli/variable-requests",
+      // The CLI now calls Convex directly for everything, including secret
+      // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
+      // CLI path needs an unauthenticated bypass anymore.
       // Extension API endpoints use bearer token auth, not browser session auth
+      // (only /api/extension/config survives — variables/requests moved to
+      // direct Convex actions in Stage 3).
       "/api/extension/(.*)",
       // Secret sharing public pages (email-verified, no browser session needed)
       "/s/(.*)",

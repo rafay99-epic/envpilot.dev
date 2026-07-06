@@ -4,7 +4,6 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { readSecret } from "@/lib/vault";
 import { reportApiError } from "@/lib/api-errors";
 
 interface RouteContext {
@@ -33,23 +32,15 @@ export async function GET(_request: Request, context: RouteContext) {
     await getOrCreateConvexUser(convex, user);
     const requestId = id as Id<"environmentVariableRequests">;
 
-    // getById enforces authorization (requester or reviewer) and returns the
-    // request document including its vaultRef.
-    const variableRequest = await createAuthedConvexClient(accessToken!).query(
-      api.variableRequests.getById,
+    // The composed Convex action enforces authorization (requester or reviewer,
+    // via getById) and reads the plaintext from WorkOS Vault — the value never
+    // leaves Convex except in this response and is never logged.
+    const { value } = await createAuthedConvexClient(accessToken!).action(
+      api.variableRequests.revealValue,
       {
         requestId,
       }
     );
-
-    if (!variableRequest) {
-      return NextResponse.json(
-        { error: "Variable request not found" },
-        { status: 404 }
-      );
-    }
-
-    const value = await readSecret(variableRequest.vaultRef);
 
     return NextResponse.json({ data: { value } });
   } catch (error) {
@@ -58,6 +49,13 @@ export async function GET(_request: Request, context: RouteContext) {
 
     if (message.includes("Not authorized")) {
       return NextResponse.json({ error: message }, { status: 403 });
+    }
+
+    if (message.includes("not found") || message.includes("Not found")) {
+      return NextResponse.json(
+        { error: "Variable request not found" },
+        { status: 404 }
+      );
     }
 
     reportApiError(error, "GET /api/variable-requests/[id]/value");

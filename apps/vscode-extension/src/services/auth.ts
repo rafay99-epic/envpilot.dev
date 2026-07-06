@@ -20,10 +20,6 @@ import type { AuthSession, User } from "../types";
 
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Authentication service for the extension.
  *
@@ -140,9 +136,23 @@ export class AuthService {
         ) {
           // Skip the delay before the FIRST poll — the user has already been
           // sent to the browser, so check WorkOS immediately rather than
-          // waiting a full interval before the first attempt.
+          // waiting a full interval before the first attempt. The wait is
+          // cancellation-aware: cancelling sign-in resolves immediately instead
+          // of blocking for the full interval (the listener is always disposed).
           if (!firstPoll) {
-            await sleep(intervalMs);
+            const disposables: vscode.Disposable[] = [];
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, intervalMs);
+              disposables.push(
+                cancellationToken.onCancellationRequested(() => {
+                  clearTimeout(timer);
+                  resolve();
+                })
+              );
+            });
+            // Resolved by the timer OR by cancellation — dispose the listener
+            // either way so it doesn't accumulate across poll iterations.
+            disposables.forEach((d) => d.dispose());
           }
           firstPoll = false;
           if (cancellationToken.isCancellationRequested) {

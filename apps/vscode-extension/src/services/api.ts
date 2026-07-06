@@ -68,6 +68,32 @@ interface CheckFeatureResult {
   reason?: string;
 }
 
+// Shape returned by the variableValues.pullValues Convex action (Stage 3,
+// Phase 2) — the direct replacement for GET /api/extension/variables.
+interface PullValuesResult {
+  variables: Array<{
+    _id: string;
+    key: string;
+    value: string;
+    description?: string;
+    environments: string[];
+    projectId: string;
+    isSensitive: boolean;
+    version: number;
+    access: "read" | "write";
+  }>;
+  meta: {
+    role: string;
+    unifiedRole: string;
+    assigned: boolean;
+    grantOnly: boolean;
+    environmentScope: string[] | null;
+    hasWriteAccess: boolean;
+    scopeRestricted: boolean;
+    decryptionFailures?: string[];
+  };
+}
+
 const LINK_EXPIRES_DAYS_DEFAULT = 30;
 
 /**
@@ -176,17 +202,56 @@ export class ApiService {
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    const client = await this.getConvexClient();
-    // anyApi refs are untyped — the concrete shape is enforced by our casts.
-    return client.query(ref as never, args as never) as Promise<T>;
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      // anyApi refs are untyped — the concrete shape is enforced by our casts.
+      return client.query(ref as never, args as never) as Promise<T>;
+    });
   }
 
   private async convexMutation<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    const client = await this.getConvexClient();
-    return client.mutation(ref as never, args as never) as Promise<T>;
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      return client.mutation(ref as never, args as never) as Promise<T>;
+    });
+  }
+
+  private async convexAction<T>(
+    ref: unknown,
+    args: Record<string, unknown> = {}
+  ): Promise<T> {
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      return client.action(ref as never, args as never) as Promise<T>;
+    });
+  }
+
+  /**
+   * Run a Convex call and, on a dead/expired session, surface the same single
+   * reauth prompt the old HTTP path showed on a 401 — otherwise the direct
+   * Convex path fails with repeated auth errors and no recovery hint. The error
+   * is always rethrown so callers still handle the failure.
+   */
+  private async withReauth<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      if (this.isSessionExpired(err)) {
+        void this.promptReauth();
+      }
+      throw err;
+    }
+  }
+
+  private isSessionExpired(err: unknown): boolean {
+    if ((err as { status?: number })?.status === 401) return true;
+    const message = err instanceof Error ? err.message : String(err);
+    return /unauthenticated|unauthorized|not signed in|invalid or expired bearer|no auth provider/i.test(
+      message
+    );
   }
 
   // ============================================
@@ -446,32 +511,39 @@ export class ApiService {
     }
 
     return this.coalesce(cacheKey, async () => {
-      const params: Record<string, string> = { projectId, environment };
-      if (organizationId) {
-        params.organizationId = organizationId;
-      }
+      // Direct Convex action (decrypts server-side) — replaces the deleted
+      // GET /api/extension/variables vault route.
+      const result = await this.convexAction<PullValuesResult>(
+        anyApi.variableValues.pullValues,
+        { projectId, environment }
+      );
 
-      const response = await this.client.get<{
-        data?: {
-          variables: EnvironmentVariable[];
-          role?: string;
-          unifiedRole?: string;
-          assigned?: boolean;
-          environmentScope?: string[] | null;
-          hasWriteAccess?: boolean;
-          scopeRestricted?: boolean;
-        };
-      }>("/api/extension/variables", { params });
+      this.roleCache.set(projectId, result.meta.role);
+      this.cacheAccessMeta(projectId, result.meta);
 
-      if (response.data.data?.role) {
-        this.roleCache.set(projectId, response.data.data.role);
-      }
-      this.cacheAccessMeta(projectId, response.data.data);
-
-      const variables = response.data.data?.variables || [];
+      const variables = result.variables.map((row) =>
+        ApiService.toEnvironmentVariable(row)
+      );
       this.setCached(cacheKey, variables);
       return variables;
     });
+  }
+
+  /** Map a pullValues row into the extension's EnvironmentVariable shape. */
+  private static toEnvironmentVariable(
+    row: PullValuesResult["variables"][number]
+  ): EnvironmentVariable {
+    return {
+      _id: row._id,
+      key: row.key,
+      value: row.value,
+      description: row.description ?? null,
+      environments: row.environments,
+      projectId: row.projectId,
+      isSensitive: row.isSensitive,
+      version: row.version,
+      access: row.access,
+    };
   }
 
   private cacheAccessMeta(
@@ -530,33 +602,19 @@ export class ApiService {
     if (cached) return cached;
 
     return this.coalesce(cacheKey, async () => {
-      const params: Record<string, string> = {
-        projectId,
-        environment,
-        metadataOnly: "true",
-      };
-      if (organizationId) {
-        params.organizationId = organizationId;
-      }
+      // Direct Convex action, metadata-only (no vault decryption, no export
+      // audit) — replaces the deleted GET /api/extension/variables?metadataOnly.
+      const result = await this.convexAction<PullValuesResult>(
+        anyApi.variableValues.pullValues,
+        { projectId, environment, metadataOnly: true }
+      );
 
-      const response = await this.client.get<{
-        data?: {
-          variables: EnvironmentVariable[];
-          role?: string;
-          unifiedRole?: string;
-          assigned?: boolean;
-          environmentScope?: string[] | null;
-          hasWriteAccess?: boolean;
-          scopeRestricted?: boolean;
-        };
-      }>("/api/extension/variables", { params });
+      this.roleCache.set(projectId, result.meta.role);
+      this.cacheAccessMeta(projectId, result.meta);
 
-      if (response.data.data?.role) {
-        this.roleCache.set(projectId, response.data.data.role);
-      }
-      this.cacheAccessMeta(projectId, response.data.data);
-
-      const variables = response.data.data?.variables || [];
+      const variables = result.variables.map((row) =>
+        ApiService.toEnvironmentVariable(row)
+      );
       this.setCached(cacheKey, variables);
       return variables;
     });
@@ -710,7 +768,7 @@ export class ApiService {
   // Variable requests
   // ============================================
 
-  /** Submit a variable request — VAULT over HTTP (value encrypted server-side). */
+  /** Submit a variable request — DIRECT Convex (value encrypted server-side). */
   async submitVariableRequest(request: {
     key: string;
     value: string;
@@ -719,15 +777,25 @@ export class ApiService {
     projectId: string;
     isSensitive: boolean;
   }): Promise<VariableRequest> {
-    const response = await this.client.post<{
-      data?: { request: VariableRequest };
-    }>("/api/extension/variable-requests", request);
+    // Direct Convex action — replaces the deleted
+    // POST /api/extension/variable-requests vault route.
+    const created = await this.convexAction<VariableRequest | null>(
+      anyApi.variableRequests.createWithValue,
+      {
+        projectId: request.projectId,
+        key: request.key,
+        value: request.value,
+        environments: request.environments,
+        isSensitive: request.isSensitive,
+        description: request.description,
+      }
+    );
 
-    if (!response.data.data?.request) {
+    if (!created) {
       throw new Error("Failed to submit variable request");
     }
 
-    return response.data.data.request;
+    return created;
   }
 
   /** List variable requests for a project — DIRECT Convex. */

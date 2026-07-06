@@ -157,6 +157,16 @@ async function sendEmail(
   html: string,
   text: string
 ): Promise<SendResult> {
+  // Dev/test kill-switch: on non-prod deployments set the Convex env var
+  // DISABLE_EMAILS=true so e2e runs (member updates, session revocations,
+  // rotation reminders, …) don't fire real Resend sends and rack up cost /
+  // hit sending limits. Prod leaves it unset → real sends. Returns success so
+  // callers behave exactly as if the send happened.
+  if (process.env.DISABLE_EMAILS === "true") {
+    console.log(`[EMAIL] Skipped (DISABLE_EMAILS=true): "${subject}" → ${to}`);
+    return { success: true };
+  }
+
   const config = getEmailConfig();
   if (!config) {
     console.error("[EMAIL] RESEND_API_KEY not configured");

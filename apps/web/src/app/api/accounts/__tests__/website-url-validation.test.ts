@@ -31,11 +31,10 @@ vi.mock("@/lib/convex-helpers", () => ({
   checkOrganizationMembership: vi.fn(),
   getProjectOrganization: vi.fn(),
 }));
-vi.mock("@/lib/vault", () => ({
-  createSecret: vi.fn(),
-  deleteSecret: vi.fn(),
+vi.mock("@/lib/convex-client", () => ({
+  convex: {},
+  createAuthedConvexClient: vi.fn(),
 }));
-vi.mock("@/lib/convex-client", () => ({ convex: {} }));
 
 const { createAccountSchema } = await import("@/app/api/accounts/route");
 

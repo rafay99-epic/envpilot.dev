@@ -9,7 +9,6 @@ import {
   checkOrganizationMembership,
   getProjectOrganization,
 } from "@/lib/convex-helpers";
-import { createSecret } from "@/lib/vault";
 import { normalizeOrgRole } from "@/lib/roles";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -154,22 +153,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const vaultResult = await createSecret(key, value, {
-      organizationId,
-      projectId,
-    });
-
-    const requestId = await authed.mutation(api.variableRequests.create, {
+    // The composed Convex action encrypts the proposed value into WorkOS Vault
+    // and files the request in one hop; vault crypto now lives in Convex.
+    const created = await authed.action(api.variableRequests.createWithValue, {
+      projectId: projectId as Id<"projects">,
       key,
-      vaultRef: vaultResult.id,
+      value,
       description,
       environments,
-      projectId: projectId as Id<"projects">,
       isSensitive,
     });
 
     const createdRequest = await authed.query(api.variableRequests.getById, {
-      requestId,
+      requestId: created._id,
     });
 
     return NextResponse.json({ request: createdRequest }, { status: 201 });

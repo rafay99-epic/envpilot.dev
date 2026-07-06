@@ -73,19 +73,11 @@ test.describe("convex auth cutover", () => {
     expect(result.errorMessage).toMatch(/Unauthenticated|ArgumentValidation/);
   });
 
-  test("ForToken variants reject unknown bearer tokens", async ({
-    request,
-  }) => {
-    test.skip(!CONVEX_URL, "NEXT_PUBLIC_CONVEX_URL not set");
-
-    const result = await convexQuery(
-      request,
-      "organizations:listForUserForToken",
-      { accessToken: "e2e-bogus-token-never-minted" }
-    );
-    expect(result.status).toBe("error");
-    expect(result.errorMessage).toContain(
-      "Unauthenticated: invalid or expired bearer token"
-    );
-  });
+  // NOTE: the old "ForToken variants reject unknown bearer tokens" probe was
+  // removed — every `*ForToken` Convex function was deleted in the Stage 2
+  // device-flow cutover (see convex/identity.ts). Probing a now-nonexistent
+  // function only ever returns "Could not find function", so the test asserted
+  // an impossible error string. The two probes above already pin the security
+  // posture (tokenless + impersonation-arg rejection) for the surviving,
+  // identity-scoped functions.
 });

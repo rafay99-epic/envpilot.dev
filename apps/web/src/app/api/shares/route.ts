@@ -6,7 +6,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
 import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
-import { createSecret } from "@/lib/vault";
 import { handleApiError, sanitizeConvexError } from "@/lib/api-errors";
 import { sendShareNotificationEmail } from "@/lib/share-emails";
 
@@ -67,24 +66,18 @@ export async function POST(request: Request) {
     // Generate cryptographically secure token
     const token = "shr_" + crypto.randomBytes(32).toString("hex");
 
-    // Store client-encrypted ciphertext in WorkOS Vault
-    const vaultResult = await createSecret(
-      `share:${data.variableKey}:${Date.now()}`,
-      data.encryptedPayload,
-      {
-        organizationId: data.organizationId,
-        projectId: data.projectId,
-        environment: "share",
-      }
-    );
-
-    // Create share in Convex (with feature gating + rate limiting)
+    // Store the client-encrypted ciphertext in WorkOS Vault and create the
+    // share (feature gating + rate limiting) in one composed Convex action;
+    // the ciphertext crypto now lives in Convex, never in the web app.
     const expiresAt = Date.now() + data.ttlMs;
-    const result = await createAuthedConvexClient(accessToken!).mutation(
-      api.sharedSecrets.createShare,
+    const result = await createAuthedConvexClient(accessToken!).action(
+      api.shareValues.createWithPayload,
       {
         token,
-        vaultRef: vaultResult.id,
+        encryptedPayload: data.encryptedPayload,
+        variableKey: data.variableKey,
+        organizationId: data.organizationId as Id<"organizations">,
+        projectId: data.projectId as Id<"projects">,
         resourceType: data.resourceType,
         variableId:
           data.resourceType === "variable"
@@ -94,9 +87,6 @@ export async function POST(request: Request) {
           data.resourceType === "account"
             ? (data.accountId as Id<"projectAccounts">)
             : undefined,
-        variableKey: data.variableKey,
-        organizationId: data.organizationId as Id<"organizations">,
-        projectId: data.projectId as Id<"projects">,
         mode: data.mode,
         expiresAt,
         hasPassphrase: data.hasPassphrase,

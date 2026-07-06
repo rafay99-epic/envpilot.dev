@@ -11,7 +11,6 @@ import {
   getProjectOrganization,
 } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
-import { createSecret } from "@/lib/vault";
 
 const log = createLogger("api/variables");
 
@@ -153,29 +152,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Encrypt value in Vault first.
-    const vaultResult = await createSecret(key, value, {
-      organizationId,
-      projectId,
-    });
-    const vaultRef = vaultResult.id;
-
     // Unified RBAC: assigned developers create variables directly (they get a
-    // write grant on variables they create). Authorization — including project
-    // assignment scoping — is enforced by the Convex mutation.
-    const variableId = await createAuthedConvexClient(accessToken!).mutation(
-      api.variables.create,
-      {
-        key,
-        vaultRef,
-        description,
-        environments,
-        projectId: projectId as Id<"projects">,
-        isSensitive,
-        rotationFrequencyDays,
-        tagIds: tagIds as Id<"variableTags">[] | undefined,
-      }
-    );
+    // write grant on variables they create). The composed Convex action
+    // encrypts the value into WorkOS Vault and persists the ref in one hop;
+    // authorization — including project assignment scoping — is enforced there.
+    const { _id: variableId } = await createAuthedConvexClient(
+      accessToken!
+    ).action(api.variableValues.createWithValue, {
+      projectId: projectId as Id<"projects">,
+      key,
+      value,
+      description,
+      environments,
+      isSensitive,
+      rotationFrequencyDays,
+      tagIds: tagIds as Id<"variableTags">[] | undefined,
+    });
 
     const variable = await convex.query(api.variables.getById, { variableId });
 

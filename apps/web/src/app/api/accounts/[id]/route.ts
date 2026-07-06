@@ -1,14 +1,12 @@
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
-import { convex } from "@/lib/convex-client";
+import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { z } from "zod";
-import * as Sentry from "@sentry/nextjs";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { reportApiError } from "@/lib/api-errors";
-import { readSecret, updateSecret } from "@/lib/vault";
-import { serializeAccountVault, websiteUrlSchema } from "@/lib/account-payload";
+import { websiteUrlSchema } from "@/lib/account-payload";
 
 const updateAccountSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -68,7 +66,7 @@ function errorResponseFor(
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -103,67 +101,25 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    // Credentials are only rewritten in Vault when BOTH username and password
-    // are present together — a partial credential update would corrupt the
-    // JSON payload stored in Vault.
-    const credentialsChanged = username !== undefined && password !== undefined;
-
-    // Fetch the account via a Convex query first — this both resolves the
-    // vaultRef and verifies the caller's access server-side (throws
-    // "Account not found" / "Insufficient permissions" otherwise). When the
-    // request will rotate credentials we require WRITE access here so the
-    // request is rejected BEFORE the Vault write; metadata-only PATCHes stay
-    // on READ (the mutation still enforces write, and no Vault write happens).
-    const account = await convex.query(api.accounts.get, {
-      accountId: id as Id<"projectAccounts">,
-      userId: convexUser._id,
-      minimumAccess: credentialsChanged ? "write" : "read",
-    });
-
-    // Vault is written before the Convex metadata/version commit, so a failure
-    // in the mutation (e.g. environment-scope validation) would otherwise leave
-    // the credentials changed in Vault without a matching Convex version/audit
-    // entry. Snapshot the previous value first and roll it back if the mutation
-    // throws, keeping Vault and Convex consistent with the HTTP result.
-    let previousVaultValue: string | null = null;
-    if (credentialsChanged) {
-      previousVaultValue = await readSecret(account.vaultRef);
-      // In-place update: the same vaultRef is reused (updateSecret overwrites
-      // the existing Vault object), so Convex never needs a new vaultRef.
-      await updateSecret(
-        account.vaultRef,
-        serializeAccountVault({ username, password })
-      );
-    }
-
-    // No role gate here: owners/project managers/team leads can update, and
-    // developers holding a write grant on this account can too. The Convex
-    // mutation enforces the full access rules (getAccountAccess).
-    try {
-      await convex.mutation(api.accounts.update, {
+    // The composed Convex action resolves the account + its vaultRef (verifying
+    // the caller's access server-side — WRITE when rotating credentials so the
+    // request is rejected before any Vault write), rewrites the credentials in
+    // place when BOTH username and password are present (metadata-only PATCHes
+    // skip Vault), and rolls the vault value back if the mutation rejects. It
+    // derives the caller's identity from the JWT, so it is called with an
+    // authenticated Convex client.
+    await createAuthedConvexClient(accessToken!).action(
+      api.accountValues.updateWithCredentials,
+      {
         accountId: id as Id<"projectAccounts">,
-        userId: convexUser._id,
         name,
         websiteUrl,
+        username,
+        password,
         description,
         environments,
-        credentialsChanged,
-      });
-    } catch (mutationError) {
-      // Compensating rollback: restore the prior credentials so a failed
-      // request does not leave the account's Vault value mutated.
-      if (previousVaultValue !== null) {
-        try {
-          await updateSecret(account.vaultRef, previousVaultValue);
-        } catch (rollbackError) {
-          Sentry.captureException(rollbackError, {
-            tags: { source: "accounts-patch", action: "vault-rollback" },
-            extra: { vaultRef: account.vaultRef },
-          });
-        }
       }
-      throw mutationError;
-    }
+    );
 
     const updatedAccount = await convex.query(api.accounts.get, {
       accountId: id as Id<"projectAccounts">,

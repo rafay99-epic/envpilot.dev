@@ -4,7 +4,6 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
-import { readSecret, deleteSecret } from "@/lib/vault";
 
 const verifyOtpSchema = z.object({
   email: z.string().email(),
@@ -47,8 +46,11 @@ export async function POST(
       undefined;
     const userAgent = request.headers.get("user-agent") || undefined;
 
-    // Verify OTP via Convex (atomically validates + burns for one-time)
-    const result = await convex.mutation(api.sharedSecrets.verifyOtp, {
+    // Verify OTP (atomically validates + burns for one-time), read the
+    // client-encrypted ciphertext from Vault, and best-effort delete one-time
+    // entries — all inside a single public Convex action (no session; the OTP
+    // is the authorization). Vault crypto now lives entirely in Convex.
+    const result = await convex.action(api.shareValues.verifyOtpAndReveal, {
       token,
       email,
       otpHash,
@@ -56,41 +58,27 @@ export async function POST(
       userAgent,
     });
 
-    // OTP verified — read the client-encrypted ciphertext from Vault
-    let encryptedPayload: string;
-    try {
-      encryptedPayload = await readSecret(result.vaultRef);
-    } catch (vaultErr) {
-      Sentry.captureException(vaultErr, {
-        tags: { source: "share-vault", action: "read" },
-        extra: { token, vaultRef: result.vaultRef },
-      });
-      return NextResponse.json(
-        { error: "Failed to retrieve the secret. Please try again." },
-        { status: 502 }
-      );
-    }
-
-    // For one-time shares, delete the vault entry (best-effort)
-    if (result.mode === "one_time") {
-      try {
-        await deleteSecret(result.vaultRef);
-      } catch (deleteErr) {
-        Sentry.captureException(deleteErr, {
-          tags: { source: "share-vault", action: "delete" },
-          extra: { token, vaultRef: result.vaultRef },
-        });
-      }
-    }
-
     return NextResponse.json({
-      encryptedPayload,
+      encryptedPayload: result.encryptedPayload,
       hasPassphrase: result.hasPassphrase,
       resourceType: result.resourceType,
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Verification failed";
+
+    // The OTP verified but the Vault read failed inside the composed action —
+    // surface as 502, distinct from OTP/validation errors (matches prior route).
+    if (message.includes("SHARE_VAULT_READ_FAILED")) {
+      Sentry.captureException(error, {
+        tags: { source: "share-vault", action: "read" },
+        extra: { token },
+      });
+      return NextResponse.json(
+        { error: "Failed to retrieve the secret. Please try again." },
+        { status: 502 }
+      );
+    }
 
     // Classify Convex errors into proper HTTP status codes
     if (message.includes("already viewed") || message.includes("destroyed")) {
