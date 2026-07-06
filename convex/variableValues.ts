@@ -438,6 +438,26 @@ export const pushBulk = action({
             });
 
             updated++;
+          } else {
+            // Value unchanged, but metadata may have changed — apply a
+            // metadata-only update (no new vault version) so a push that only
+            // edits the description / sensitivity isn't silently dropped. Only
+            // fields the caller actually sent that differ are treated as changes.
+            const descChanged =
+              variable.description !== undefined &&
+              variable.description !== existing.description;
+            const sensChanged =
+              variable.isSensitive !== undefined &&
+              variable.isSensitive !== existing.isSensitive;
+            if (descChanged || sensChanged) {
+              await ctx.runMutation(api.variables.update, {
+                variableId: existing._id,
+                description: variable.description,
+                isSensitive: variable.isSensitive,
+                changeReason: "Updated via CLI push (metadata)",
+              });
+              updated++;
+            }
           }
         } else {
           const vault = await ctx.runAction(internal.vault.createSecret, {

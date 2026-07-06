@@ -100,8 +100,10 @@ export const readSecret = internalAction({
       const body = await res.text().catch(() => "");
       throw new Error(`Vault read failed (${res.status}): ${body}`);
     }
-    const data = (await res.json()) as { value?: string };
-    if (!data.value) {
+    const data = (await res.json()) as { value?: string | null };
+    // Distinguish a genuinely-missing value (undefined/null) from a valid
+    // empty-string secret — `!data.value` would wrongly reject "".
+    if (data.value === undefined || data.value === null) {
       throw new Error(`Secret "${args.vaultRef}" has no value`);
     }
     return data.value;

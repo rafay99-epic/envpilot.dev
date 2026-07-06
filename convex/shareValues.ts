@@ -135,6 +135,18 @@ export const verifyOtpAndReveal = action({
         vaultRef: result.vaultRef,
       });
     } catch {
+      // verifyOtp already burned a one-time share before we got here, so a
+      // transient Vault read failure would destroy the link for good. Un-burn it
+      // so the recipient can request a fresh OTP and retry.
+      if (result.mode === "one_time") {
+        try {
+          await ctx.runMutation(api.sharedSecrets.restoreBurnedShare, {
+            token: args.token,
+          });
+        } catch {
+          // Best-effort — the reveal error below is what the recipient sees.
+        }
+      }
       throw new Error("SHARE_VAULT_READ_FAILED");
     }
 

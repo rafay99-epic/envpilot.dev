@@ -202,25 +202,56 @@ export class ApiService {
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    const client = await this.getConvexClient();
-    // anyApi refs are untyped — the concrete shape is enforced by our casts.
-    return client.query(ref as never, args as never) as Promise<T>;
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      // anyApi refs are untyped — the concrete shape is enforced by our casts.
+      return client.query(ref as never, args as never) as Promise<T>;
+    });
   }
 
   private async convexMutation<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    const client = await this.getConvexClient();
-    return client.mutation(ref as never, args as never) as Promise<T>;
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      return client.mutation(ref as never, args as never) as Promise<T>;
+    });
   }
 
   private async convexAction<T>(
     ref: unknown,
     args: Record<string, unknown> = {}
   ): Promise<T> {
-    const client = await this.getConvexClient();
-    return client.action(ref as never, args as never) as Promise<T>;
+    return this.withReauth(async () => {
+      const client = await this.getConvexClient();
+      return client.action(ref as never, args as never) as Promise<T>;
+    });
+  }
+
+  /**
+   * Run a Convex call and, on a dead/expired session, surface the same single
+   * reauth prompt the old HTTP path showed on a 401 — otherwise the direct
+   * Convex path fails with repeated auth errors and no recovery hint. The error
+   * is always rethrown so callers still handle the failure.
+   */
+  private async withReauth<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (err) {
+      if (this.isSessionExpired(err)) {
+        void this.promptReauth();
+      }
+      throw err;
+    }
+  }
+
+  private isSessionExpired(err: unknown): boolean {
+    if ((err as { status?: number })?.status === 401) return true;
+    const message = err instanceof Error ? err.message : String(err);
+    return /unauthenticated|unauthorized|not signed in|invalid or expired bearer|no auth provider/i.test(
+      message
+    );
   }
 
   // ============================================

@@ -145,14 +145,16 @@ export const updateWithCredentials = action({
     });
 
     let previousVaultValue: string | null = null;
+    let updatedVersionId: string | undefined;
     if (credentialsChanged) {
       previousVaultValue = await ctx.runAction(internal.vault.readSecret, {
         vaultRef: account.vaultRef,
       });
-      await ctx.runAction(internal.vault.updateSecret, {
+      const updated = await ctx.runAction(internal.vault.updateSecret, {
         vaultRef: account.vaultRef,
         value: serializeAccountVault(args.username!, args.password!),
       });
+      updatedVersionId = updated.versionId;
     }
 
     try {
@@ -167,15 +169,20 @@ export const updateWithCredentials = action({
       });
     } catch (mutationError) {
       // Compensating rollback: restore the prior credentials so a failed
-      // request does not leave the account's vault value mutated.
+      // request does not leave the account's vault value mutated. Guard it with
+      // the version we just wrote (version_check): if a concurrent update has
+      // since moved the object forward, the rollback is rejected rather than
+      // clobbering that newer value (lost-update).
       if (previousVaultValue !== null) {
         try {
           await ctx.runAction(internal.vault.updateSecret, {
             vaultRef: account.vaultRef,
             value: previousVaultValue,
+            versionCheck: updatedVersionId,
           });
         } catch {
-          // Best-effort — surfaced via the original mutation error below.
+          // Best-effort — either a version conflict (a newer write won, keep
+          // it) or a transient failure; surfaced via the original error below.
         }
       }
       throw mutationError;

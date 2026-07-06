@@ -898,14 +898,29 @@ export const createWithValue = action({
       projectId: args.projectId,
     });
 
-    const requestId = await ctx.runMutation(api.variableRequests.create, {
-      key: args.key,
-      vaultRef: vault.id,
-      description: args.description,
-      environments: args.environments,
-      projectId: args.projectId,
-      isSensitive: args.isSensitive ?? false,
-    });
+    // If the validating mutation rejects, the freshly-minted vault object would
+    // be orphaned (an encrypted secret with no owning row) — delete it so Vault
+    // and Convex stay consistent. Best-effort; vaultGc reconciles any straggler.
+    let requestId;
+    try {
+      requestId = await ctx.runMutation(api.variableRequests.create, {
+        key: args.key,
+        vaultRef: vault.id,
+        description: args.description,
+        environments: args.environments,
+        projectId: args.projectId,
+        isSensitive: args.isSensitive ?? false,
+      });
+    } catch (mutationError) {
+      try {
+        await ctx.runAction(internal.vault.deleteSecret, {
+          vaultRef: vault.id,
+        });
+      } catch {
+        // Best-effort — vaultGc reconciles any straggler.
+      }
+      throw mutationError;
+    }
 
     const created = await ctx.runQuery(api.variableRequests.getById, {
       requestId,
