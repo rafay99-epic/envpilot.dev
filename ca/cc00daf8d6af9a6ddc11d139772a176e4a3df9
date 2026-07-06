@@ -1,0 +1,25 @@
+.github/workflows/deploy-extension.yml
+  s_8ac05b3f82c26d::t_b550e65c6f1199 98-106
+apps/vscode-extension/package.json
+  s_8ac05b3f82c26d::t_954b3c1296977e 5
+.github/workflows/deploy-cli.yml
+  s_8ac05b3f82c26d::t_65b356952e8201 90-98
+apps/cli/package.json
+  s_8ac05b3f82c26d::t_140e8595e5dd01 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "cacc00daf8d6af9a6ddc11d139772a176e4a3df9",
+  "prompts": {},
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
