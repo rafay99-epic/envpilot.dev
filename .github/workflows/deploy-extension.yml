@@ -90,9 +90,14 @@ jobs:
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Build DIRECTLY (not via `turbo`) — turbo did not propagate the WorkOS
+      # client id / Convex URL into esbuild in CI, so every turbo-built VSIX
+      # shipped an EMPTY client id. A direct `bun run build` embeds them
+      # reliably (verified in the guard step below).
       - name: Build extension
         if: steps.guard.outputs.should_publish == 'true'
-        run: bunx turbo build --filter=envpilot
+        working-directory: apps/vscode-extension
+        run: bun run build
         env:
           ENVPILOT_SERVER_URL: https://www.envpilot.dev
           # WorkOS AuthKit device-flow client id and the prod Convex deployment
@@ -108,6 +113,24 @@ jobs:
           # bundle at build time (esbuild define) — without this the published
           # extension ships with Sentry disabled.
           SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
+
+      # Fail the publish if the client id did not make it into the bundle, so a
+      # broken extension can NEVER reach the marketplace again.
+      - name: Verify WorkOS client id is embedded
+        if: steps.guard.outputs.should_publish == 'true'
+        working-directory: apps/vscode-extension
+        env:
+          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+        run: |
+          if [ -z "$WORKOS_CLIENT_ID" ]; then
+            echo "::error::WORKOS_CLIENT_ID secret is empty — refusing to publish."
+            exit 1
+          fi
+          if ! grep -rqF "$WORKOS_CLIENT_ID" dist; then
+            echo "::error::Built extension does not contain the WorkOS client id — refusing to publish a broken build."
+            exit 1
+          fi
+          echo "WorkOS client id embedded in extension bundle ✓"
 
       - name: Package VSIX
         if: steps.guard.outputs.should_publish == 'true'
