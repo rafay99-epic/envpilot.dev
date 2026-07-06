@@ -90,29 +90,58 @@ jobs:
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build extension
-        if: steps.guard.outputs.should_publish == 'true'
-        run: bunx turbo build --filter=envpilot
-        env:
-          ENVPILOT_SERVER_URL: https://www.envpilot.dev
-          # WorkOS AuthKit device-flow client id and the prod Convex deployment
-          # URL, baked into the bundle at build time (esbuild define, see
-          # apps/vscode-extension/scripts/build.mjs). WITHOUT THESE the published
-          # extension embeds empty strings and sign-in fails with "this build has
-          # no WorkOS client id embedded. Reinstall the extension." Stored as
-          # repo secrets (kept out of the workflow source and CI logs); note they
-          # are still embedded in the published artifact at runtime.
-          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          # DSNs are publishable identifiers, not secrets. Baked into the
-          # bundle at build time (esbuild define) — without this the published
-          # extension ships with Sentry disabled.
-          SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
-
+      # The build-time env MUST be on THIS step, not a separate build step:
+      # `vsce package` runs the extension's "vscode:prepublish" script, which
+      # RE-BUILDS the bundle (node scripts/build.mjs). Any dist produced earlier
+      # is overwritten here, so if these vars aren't present at package time the
+      # VSIX ships an EMPTY client id (turbo dropped them before; a plain build
+      # step gets wiped by this rebuild). Values from repo secrets; still baked
+      # into the shipped artifact at runtime, which is unavoidable.
       - name: Package VSIX
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/vscode-extension
+        env:
+          ENVPILOT_SERVER_URL: https://www.envpilot.dev
+          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
         run: bunx @vscode/vsce package --no-dependencies
+
+      # Verify the PACKAGED VSIX (the exact bytes we publish), not an
+      # intermediate dist that vsce's prepublish rebuild would have replaced.
+      # Fail the publish if either secret isn't in it, so a broken extension can
+      # NEVER reach the marketplace again. Both matter: an empty client id breaks
+      # sign-in; an empty Convex URL leaves getConvexUrl() blank and breaks sync.
+      - name: Verify build-time secrets are embedded in the VSIX
+        if: steps.guard.outputs.should_publish == 'true'
+        working-directory: apps/vscode-extension
+        env:
+          WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+        run: |
+          if [ -z "$WORKOS_CLIENT_ID" ]; then
+            echo "::error::WORKOS_CLIENT_ID secret is empty — refusing to publish."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_CONVEX_URL" ]; then
+            echo "::error::NEXT_PUBLIC_CONVEX_URL secret is empty — refusing to publish."
+            exit 1
+          fi
+          VSIX="envpilot-$(jq -r '.version' package.json).vsix"
+          if [ ! -f "$VSIX" ]; then
+            echo "::error::Expected package $VSIX not found."
+            exit 1
+          fi
+          BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
+          if ! printf '%s' "$BUNDLE" | grep -qF "$WORKOS_CLIENT_ID"; then
+            echo "::error::Packaged $VSIX does not contain the WorkOS client id — refusing to publish a broken build."
+            exit 1
+          fi
+          if ! printf '%s' "$BUNDLE" | grep -qF "$NEXT_PUBLIC_CONVEX_URL"; then
+            echo "::error::Packaged $VSIX does not contain the Convex URL — refusing to publish a broken build."
+            exit 1
+          fi
+          echo "WorkOS client id + Convex URL embedded in $VSIX ✓"
 
       - name: Publish to Open VSX
         if: steps.guard.outputs.should_publish == 'true'
