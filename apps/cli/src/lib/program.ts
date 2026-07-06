@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { CLI_VERSION } from "./cli-version.js";
 import { getTopLevelCommandCatalog } from "./command-catalog.js";
-import { checkForUpdate } from "./version-check.js";
+import { enforceVersion } from "./version-check.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -20,8 +20,15 @@ export function createProgram(): Command {
     }
   }
 
-  program.hook("postAction", () => {
-    checkForUpdate();
+  // Enforce the version policy BEFORE any command runs (parseAsync awaits this).
+  // Below the server's minimum supported version → hard-block and exit, since
+  // the command would otherwise call server/Convex contracts that no longer
+  // exist. Merely-outdated just prints a soft update notice and proceeds.
+  // `--version`/`--help` short-circuit Commander before actions, so they are
+  // naturally exempt (users can always check their version / read help).
+  program.hook("preAction", async () => {
+    const blocked = await enforceVersion();
+    if (blocked) process.exit(1);
   });
 
   return program;
