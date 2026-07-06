@@ -236,7 +236,10 @@ export default defineSchema({
     // Serves the per-project trash listing (getDeleted): reads exactly the
     // project's soft-deleted rows in the restore window, instead of paging
     // through active rows and filtering in memory.
-    .index("by_project_deleted", ["projectId", "deletedAt"]),
+    .index("by_project_deleted", ["projectId", "deletedAt"])
+    // Reverse lookup used by vaultReveal to authorize a value reveal by its
+    // opaque vaultRef (the browser reveal path holds the ref, not the id).
+    .index("by_vaultRef", ["vaultRef"]),
 
   // ==========================================
   // VARIABLE TAGS (organization-scoped)
@@ -328,7 +331,10 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_variable", ["variableId"])
-    .index("by_variable_and_version", ["variableId", "version"]),
+    .index("by_variable_and_version", ["variableId", "version"])
+    // Reverse lookup for vaultReveal: a historical version's value is revealed
+    // by its own per-version vaultRef (the diff view holds refs, not ids).
+    .index("by_vaultRef", ["vaultRef"]),
 
   // ==========================================
   // VARIABLE ACCESS PERMISSIONS
@@ -409,7 +415,10 @@ export default defineSchema({
     .index("by_deleted_at", ["deletedAt"])
     // Serves the per-project trash listing (getDeleted) — see the twin index
     // on environmentVariables.
-    .index("by_project_deleted", ["projectId", "deletedAt"]),
+    .index("by_project_deleted", ["projectId", "deletedAt"])
+    // Reverse lookup for vaultReveal: an account's credentials are revealed by
+    // its opaque vaultRef.
+    .index("by_vaultRef", ["vaultRef"]),
 
   // ==========================================
   // ACCOUNT ACCESS PERMISSIONS (per-account grants)

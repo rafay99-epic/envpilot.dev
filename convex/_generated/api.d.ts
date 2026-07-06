@@ -54,6 +54,7 @@ import type * as variableValues from "../variableValues.js";
 import type * as variables from "../variables.js";
 import type * as vault from "../vault.js";
 import type * as vaultGc from "../vaultGc.js";
+import type * as vaultReveal from "../vaultReveal.js";
 import type * as workflows from "../workflows.js";
 
 import type {
@@ -109,6 +110,7 @@ declare const fullApi: ApiFromModules<{
   variables: typeof variables;
   vault: typeof vault;
   vaultGc: typeof vaultGc;
+  vaultReveal: typeof vaultReveal;
   workflows: typeof workflows;
 }>;
 
