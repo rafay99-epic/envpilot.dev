@@ -130,10 +130,16 @@ function printUpdateAvailable(latest: string): void {
 
 /** Fetch the manifest and persist latest/min. Never throws (fetch fails soft). */
 async function refreshCache(cache: Conf<VersionCacheShape>): Promise<void> {
-  const info = await fetchVersionInfo();
-  if (!info) return;
-  if (info.cli) cache.set("latest", info.cli);
-  if (info.minCli) cache.set("min", info.minCli);
+  try {
+    const info = await fetchVersionInfo();
+    if (!info) return;
+    if (info.cli) cache.set("latest", info.cli);
+    if (info.minCli) cache.set("min", info.minCli);
+  } catch {
+    // A cache write failure (disk full/read-only) must never surface — this
+    // runs fire-and-forget on the background path where a rejection would be
+    // unhandled.
+  }
 }
 
 /**
@@ -153,39 +159,46 @@ async function refreshCache(cache: Conf<VersionCacheShape>): Promise<void> {
  * hit at most once per interval — it can never repeatedly stall the CLI.
  */
 export async function enforceVersion(): Promise<boolean> {
-  const cache = getCache();
-  const now = Date.now();
-  const lastCheck = cache.get("lastVersionCheck") ?? 0;
-  const hasData = cache.get("min") != null || cache.get("latest") != null;
-  const stale = now - lastCheck >= CHECK_INTERVAL;
+  try {
+    const cache = getCache();
+    const now = Date.now();
+    const lastCheck = cache.get("lastVersionCheck") ?? 0;
+    const hasData = cache.get("min") != null || cache.get("latest") != null;
+    const stale = now - lastCheck >= CHECK_INTERVAL;
 
-  if (stale) {
-    // Throttle up front: one attempt per interval regardless of the outcome,
-    // so a down server never turns every command into a 3s hang.
-    cache.set("lastVersionCheck", now);
-    if (hasData) {
-      // We can already decide — refresh for NEXT time without blocking now.
-      void refreshCache(cache);
-    } else {
-      // Nothing to decide with yet; must wait for the first fetch (≤3s).
-      await refreshCache(cache);
+    if (stale) {
+      // Throttle up front: one attempt per interval regardless of the outcome,
+      // so a down server never turns every command into a 3s hang.
+      cache.set("lastVersionCheck", now);
+      if (hasData) {
+        // We can already decide — refresh for NEXT time without blocking now.
+        void refreshCache(cache);
+      } else {
+        // Nothing to decide with yet; must wait for the first fetch (≤3s).
+        await refreshCache(cache);
+      }
     }
-  }
 
-  const latest = cache.get("latest");
-  const min = cache.get("min");
-  const { blocked, updateAvailable } = evaluateVersion(
-    CLI_VERSION,
-    latest,
-    min
-  );
+    const latest = cache.get("latest");
+    const min = cache.get("min");
+    const { blocked, updateAvailable } = evaluateVersion(
+      CLI_VERSION,
+      latest,
+      min
+    );
 
-  if (blocked) {
-    printHardBlock(min as string, latest);
-    return true;
+    if (blocked) {
+      printHardBlock(min as string, latest);
+      return true;
+    }
+    if (updateAvailable) {
+      printUpdateAvailable(updateAvailable);
+    }
+    return false;
+  } catch {
+    // FAIL OPEN. A version-check failure (corrupt cache file, disk/permission
+    // error, unexpected Conf throw) must NEVER block a command — the check is a
+    // guardrail, not a gate on the CLI working at all.
+    return false;
   }
-  if (updateAvailable) {
-    printUpdateAvailable(updateAvailable);
-  }
-  return false;
 }
