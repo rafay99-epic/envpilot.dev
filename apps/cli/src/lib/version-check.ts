@@ -128,29 +128,47 @@ function printUpdateAvailable(latest: string): void {
   console.log();
 }
 
+/** Fetch the manifest and persist latest/min. Never throws (fetch fails soft). */
+async function refreshCache(cache: Conf<VersionCacheShape>): Promise<void> {
+  const info = await fetchVersionInfo();
+  if (!info) return;
+  if (info.cli) cache.set("latest", info.cli);
+  if (info.minCli) cache.set("min", info.minCli);
+}
+
 /**
  * Enforce the version policy before a command runs. Returns true when the
  * command must be BLOCKED (caller should exit non-zero); prints a soft update
  * notice and returns false when merely outdated or up to date.
  *
- * Caching: the latest/min values are cached for {@link CHECK_INTERVAL}. The
- * first run (and once per hour after) awaits a fetch — bounded to 3s and
- * fail-open. Within the interval the decision is made instantly from cache, so
- * a hard block still applies offline once the minimum has been learned.
+ * PERFORMANCE — the hot path adds ZERO network latency:
+ *  - Fresh cache (checked within {@link CHECK_INTERVAL}): pure disk read, no
+ *    network. This is the case for essentially every command.
+ *  - Stale but we already have data: decide instantly from cache and refresh in
+ *    the BACKGROUND (fire-and-forget, unref'd) — the command never waits.
+ *  - No data at all (first-ever run, or cleared cache): the ONLY time we await
+ *    a fetch, bounded to 3s and fail-open (offline → not blocked).
+ *
+ * The throttle timestamp is written up front, so even a failing/slow server is
+ * hit at most once per interval — it can never repeatedly stall the CLI.
  */
 export async function enforceVersion(): Promise<boolean> {
   const cache = getCache();
   const now = Date.now();
   const lastCheck = cache.get("lastVersionCheck") ?? 0;
-  const hasCache = cache.get("min") != null || cache.get("latest") != null;
+  const hasData = cache.get("min") != null || cache.get("latest") != null;
   const stale = now - lastCheck >= CHECK_INTERVAL;
 
-  if (!hasCache || stale) {
-    const info = await fetchVersionInfo();
-    if (info) {
-      cache.set("lastVersionCheck", now);
-      if (info.cli) cache.set("latest", info.cli);
-      if (info.minCli) cache.set("min", info.minCli);
+  if (stale) {
+    // Throttle up front: one attempt per interval regardless of the outcome,
+    // so a down server never turns every command into a 3s hang.
+    cache.set("lastVersionCheck", now);
+    if (hasData) {
+      // We can already decide — refresh for NEXT time without blocking now.
+      void refreshCache(cache);
+    } else {
+      // Nothing to decide with yet; must wait for the first fetch (≤3s).
+      await refreshCache(cache);
     }
   }
 
