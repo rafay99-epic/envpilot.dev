@@ -19,7 +19,10 @@ import { ClipboardGuardService } from "./services/clipboardGuard";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
-import { VersionCheckService } from "./services/versionCheck";
+import {
+  VersionCheckService,
+  isExtensionOutdated,
+} from "./services/versionCheck";
 import { openUrlReliably } from "./utils/browser";
 import {
   initSentry,
@@ -48,6 +51,23 @@ function wrapCommand(
 ): (...args: any[]) => Promise<void> {
   return async (...args: any[]) => {
     /* eslint-enable @typescript-eslint/no-explicit-any */
+    // Hard-block every command when the extension is below the server's minimum
+    // supported version — older builds hit auth/Convex contracts that no longer
+    // exist and fail confusingly. The version check sets this latch shortly
+    // after activation; direct the user to update instead of running anything.
+    if (isExtensionOutdated()) {
+      const action = await vscode.window.showErrorMessage(
+        "Envpilot must be updated before you can use it — your version no longer works with the server.",
+        { modal: true },
+        "Update"
+      );
+      if (action === "Update") {
+        void vscode.env.openExternal(
+          vscode.Uri.parse("vscode:extension/envpilot.envpilot")
+        );
+      }
+      return;
+    }
     try {
       await fn(...args);
     } catch (err) {

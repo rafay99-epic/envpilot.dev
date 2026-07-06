@@ -33,6 +33,10 @@ export default authkitMiddleware({
       "/api/health",
       "/api/config",
       "/api/status",
+      // Release-version manifest polled by signed-out clients (CLI, extension,
+      // web boot) for update/enforcement checks — must return JSON, never a
+      // WorkOS redirect.
+      "/api/version",
       // Returns 401 JSON for signed-out users; must not redirect to WorkOS
       // (a cross-origin redirect makes client fetches throw on public pages)
       "/api/auth/me",
