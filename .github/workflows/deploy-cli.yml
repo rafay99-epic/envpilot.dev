@@ -108,23 +108,34 @@ jobs:
           # CLI ships with Sentry disabled.
           SENTRY_CLI_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
 
-      # Fail the publish if the client id did not make it into the bundle, so a
-      # broken build can NEVER reach npm again (the whole reason logins broke).
-      - name: Verify WorkOS client id is embedded
+      # Fail the publish if either build-time secret did not make it into the
+      # bundle, so a broken build can NEVER reach npm again (the whole reason
+      # logins broke). Both matter: an empty client id breaks auth; an empty
+      # Convex URL breaks every backend call.
+      - name: Verify build-time secrets are embedded
         if: steps.guard.outputs.should_publish == 'true'
         working-directory: apps/cli
         env:
           WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
         run: |
           if [ -z "$WORKOS_CLIENT_ID" ]; then
             echo "::error::WORKOS_CLIENT_ID secret is empty — refusing to publish."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_CONVEX_URL" ]; then
+            echo "::error::NEXT_PUBLIC_CONVEX_URL secret is empty — refusing to publish."
             exit 1
           fi
           if ! grep -rqF "$WORKOS_CLIENT_ID" dist; then
             echo "::error::Built CLI does not contain the WorkOS client id — refusing to publish a broken build."
             exit 1
           fi
-          echo "WorkOS client id embedded in CLI bundle ✓"
+          if ! grep -rqF "$NEXT_PUBLIC_CONVEX_URL" dist; then
+            echo "::error::Built CLI does not contain the Convex URL — refusing to publish a broken build."
+            exit 1
+          fi
+          echo "WorkOS client id + Convex URL embedded in CLI bundle ✓"
 
       # --ignore-scripts is CRITICAL: the CLI has "prepublishOnly": "npm run
       # build", so a plain `bun publish` would RE-RUN tsup here — without the
