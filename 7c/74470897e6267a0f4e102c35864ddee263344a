@@ -1,0 +1,38 @@
+convex/variableRequests.ts
+  s_8ac05b3f82c26d::t_1b63243fd4913d 901-915,919-923
+  s_8ac05b3f82c26d::t_60f41cedd89381 916-918
+apps/vscode-extension/src/services/api.ts
+  s_8ac05b3f82c26d::t_a9914345a70a7e 205-209,216-219,226-254
+convex/vault.ts
+  s_8ac05b3f82c26d::t_53fe8ea739ab25 103-106
+convex/sharedSecrets.ts
+  s_8ac05b3f82c26d::t_1e199db4edf67a 652-676
+  s_8ac05b3f82c26d::t_3835a4008677d0 651
+convex/accountValues.ts
+  s_8ac05b3f82c26d::t_af2d2a701e243b 148,153,157,172-175,181,184-185
+convex/shareValues.ts
+  s_8ac05b3f82c26d::t_4ad63953e147b8 138-149
+convex/variableValues.ts
+  s_8ac05b3f82c26d::t_0297479455e4e5 441-460
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7c74470897e6267a0f4e102c35864ddee263344a",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_8ac05b3f82c26d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a64b70ae-7edb-4ffd-8857-ddc6a1e11121",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
