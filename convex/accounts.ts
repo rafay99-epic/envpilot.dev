@@ -655,11 +655,13 @@ export const getDeleted = query({
 
     // by_project_deleted reads exactly this project's soft-deleted rows in
     // the restore window — see variables.getDeleted for the ordering note.
+    // desc: newest deletions first so the 100-row cap drops the oldest.
     const deletedAccounts = await ctx.db
       .query("projectAccounts")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).gte("deletedAt", cutoff)
       )
+      .order("desc")
       .take(100);
 
     return deletedAccounts.map((account) => ({

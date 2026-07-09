@@ -91,10 +91,17 @@ export class GitCommitGuardService {
         `Git commit guard active. Watching ${this.gitApi.repositories.length} repository(ies).`
       );
     } catch (err) {
-      captureError(err, { phase: "commit-guard-init" });
-      output.error(
-        `Failed to initialize Git API: ${err instanceof Error ? err.message : String(err)}`
-      );
+      // "Git model not found" is thrown by the built-in git extension's
+      // getAPI() when its internal model hasn't finished loading yet (e.g.
+      // the workspace has no repositories, or the git extension is still
+      // activating). It's an expected, transient condition — not an
+      // actionable bug — so we degrade gracefully (gitApi stays null, the
+      // pre-commit hook fallback still runs) without reporting to Sentry.
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.includes("Git model not found")) {
+        captureError(err, { phase: "commit-guard-init" });
+      }
+      output.error(`Failed to initialize Git API: ${message}`);
     }
   }
 

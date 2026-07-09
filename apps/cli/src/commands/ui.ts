@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { openTUI } from "../ui/render-tui.js";
+import { openTUI, isInteractiveTerminal } from "../ui/render-tui.js";
 
 export function createUICommand(): Command {
   return new Command("ui")
@@ -11,6 +11,17 @@ export function createUICommand(): Command {
       if (process.env.ENVPILOT_TUI_CHILD === "1") {
         return;
       }
+
+      // Ink's raw-mode input needs a real TTY on both ends; piped/CI stdin
+      // crashes with "Raw mode is not supported on the current
+      // process.stdin" as soon as the TUI tries to render.
+      if (!isInteractiveTerminal()) {
+        console.error(
+          "The interactive dashboard requires an interactive terminal (TTY). Run `envpilot --help` for command usage."
+        );
+        process.exit(1);
+      }
+
       await openTUI();
     });
 }

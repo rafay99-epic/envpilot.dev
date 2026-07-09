@@ -2020,11 +2020,15 @@ export const getDeleted = query({
     // sorts below all numbers) fall outside the gte range, and active rows
     // never inflate the read like a by_project scan would (a project with
     // >500 active variables previously hid its trash entirely).
+    // desc: newest deletions first, so when the trash exceeds the 100-row
+    // cap it's the OLDEST (closest to auto-purge) that fall off — an
+    // ascending take(100) hid a just-deleted item behind old trash.
     const deletedVariables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).gte("deletedAt", cutoff)
       )
+      .order("desc")
       .take(100);
 
     return deletedVariables.map((variable) => ({

@@ -2,14 +2,16 @@
 
 import { initSentry, captureError, flushSentry } from "./lib/sentry.js";
 import { createProgram } from "./lib/program.js";
-import { openTUI } from "./ui/render-tui.js";
+import { openTUI, isInteractiveTerminal } from "./ui/render-tui.js";
 
 initSentry();
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const shouldOpenTUI =
-    process.env.ENVPILOT_TUI_CHILD !== "1" && args.length === 0;
+    process.env.ENVPILOT_TUI_CHILD !== "1" &&
+    args.length === 0 &&
+    isInteractiveTerminal();
 
   if (shouldOpenTUI) {
     await openTUI();

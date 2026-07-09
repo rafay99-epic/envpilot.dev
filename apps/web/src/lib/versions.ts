@@ -14,9 +14,9 @@
  * device-flow auth cutover broke every pre-1.12.1 CLI / pre-1.7.2 extension).
  */
 export const APP_VERSIONS = {
-  web: "1.33.0",
-  cli: "1.15.0",
-  extension: "1.9.0",
+  web: "1.33.1",
+  cli: "1.15.1",
+  extension: "1.9.1",
   // First builds that actually work post-auth-cutover: the pre-1.12.1 CLI and
   // pre-1.7.2 extension either use deleted token routes or shipped with an
   // empty embedded WorkOS client id, so both are unusable — block them.

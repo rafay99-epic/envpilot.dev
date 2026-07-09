@@ -39,6 +39,15 @@ export function initSentry(): void {
     // Free tier: disable performance monitoring
     tracesSampleRate: 0,
 
+    // VS Code lifecycle noise, not actionable application errors:
+    // - CancellationError ("Canceled") fires whenever a pending operation is
+    //   cancelled, e.g. a window reload or the extension host shutting down.
+    // - "Channel has been closed" fires when an IPC channel to the extension
+    //   host is torn down mid-request during shutdown/reload.
+    // Anchored regex so we only drop the exact VS Code message, not any
+    // error that happens to mention "Canceled" as part of a longer message.
+    ignoreErrors: [/^Canceled$/, "Channel has been closed"],
+
     beforeSend(event) {
       // Strip home directory paths from stack frames for privacy
       if (event.exception?.values) {
