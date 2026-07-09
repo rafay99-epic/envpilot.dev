@@ -1,0 +1,24 @@
+convex/README.md
+  s_104585532ec370::t_bcdd0f7a4d062e 83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "018214414b6662add11c192da0f74bd9676365ff",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_104585532ec370": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cd8997-3ba0-4854-957c-83d58ae00a03",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
