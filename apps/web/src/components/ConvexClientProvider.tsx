@@ -18,6 +18,7 @@ import {
   sanitizeConvexError,
   isTierLimitError,
   isAuthorizationError,
+  isConflictError,
 } from "@/lib/error-messages";
 
 function convexLogArgsToMessage(args: unknown[]): string {
@@ -80,6 +81,7 @@ const convexLogger = {
     if (
       isTierLimitError(friendly) ||
       isAuthorizationError(friendly) ||
+      isConflictError(friendly) ||
       isTransientAuthRace
     ) {
       if (isFunctionFailure) {

@@ -499,11 +499,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       // An expired session makes the auth middleware redirect this fetch to
       // the HTML sign-in page (a followed redirect, so res.ok is TRUE) —
       // calling res.json() on it throws `Unexpected token '<'`. Check the
-      // content type before parsing.
+      // content type before parsing. Only the HTML/redirect shape gets the
+      // session-expired message; any other non-JSON response (plain-text
+      // 500, gateway error page) reports its status instead.
       const contentType = res.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
+        if (res.redirected || contentType.includes("text/html")) {
+          throw new Error(
+            "Your session has expired. Please refresh the page and sign in again."
+          );
+        }
         throw new Error(
-          "Your session has expired. Please refresh the page and sign in again."
+          `Failed to read secret (unexpected ${res.status} response).`
         );
       }
       const data = await res.json();

@@ -45,7 +45,13 @@ for (const route of ROUTES) {
     await expect(page.locator("aside").first()).toBeVisible({
       timeout: 20_000,
     });
-    await page.waitForTimeout(3_000);
+    // Console errors arrive asynchronously after render: settle on network
+    // idle (websocket traffic doesn't count, so this resolves quickly on a
+    // healthy run) plus a short fixed grace period.
+    await page
+      .waitForLoadState("networkidle", { timeout: 10_000 })
+      .catch(() => {});
+    await page.waitForTimeout(1_000);
 
     expect(failures, failures.join("\n---\n")).toHaveLength(0);
   });
