@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
+import { AuthErrorPage } from "@/components/auth/auth-error-page";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
@@ -21,18 +22,29 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Server-side auth check
-  const { user, accessToken } = await withAuth();
+  // ─── STEP 1: Critical — session auth ──────────────────────────────────
+  let user;
+  let accessToken: string | undefined;
+  try {
+    const result = await withAuth();
+    user = result.user;
+    accessToken = result.accessToken;
+  } catch (err) {
+    log.error("auth_failure", {}, err);
+    return (
+      <AuthErrorPage
+        error={err instanceof Error ? err : undefined}
+        message="We couldn't verify your identity. Please sign in again."
+      />
+    );
+  }
 
   if (!user) {
     redirect("/sign-in");
   }
 
+  // ─── STEP 2: Critical — Convex user sync ──────────────────────────────
   let convexUser;
-  let organizations: OrganizationWithMembershipRole[] = [];
-  let activeOrganization: OrganizationWithMembershipRole | null = null;
-  let orgTier = "free";
-
   try {
     convexUser = await getOrCreateConvexUser(convex, {
       id: user.id,
@@ -41,46 +53,62 @@ export default async function DashboardLayout({
       lastName: user.lastName ?? null,
       profilePictureUrl: user.profilePictureUrl ?? null,
     });
+  } catch (err) {
+    log.error("convex_user_sync_failed", { userId: user.id }, err);
+    return (
+      <AuthErrorPage
+        error={err instanceof Error ? err : undefined}
+        title="Account Sync Error"
+        message="We couldn't load your account data. Please try again or contact support."
+      />
+    );
+  }
 
-    // Check if user is banned
-    if (convexUser.isBanned) {
-      return (
-        <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] text-zinc-100">
-          <div className="mx-auto max-w-md rounded-lg border border-red-500/20 bg-red-950/20 p-8 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
-              <svg
-                className="h-6 w-6 text-red-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                />
-              </svg>
-            </div>
-            <h1 className="mb-2 text-xl font-semibold text-red-400">
-              Account Suspended
-            </h1>
-            <p className="mb-4 text-sm text-zinc-400">
-              Your account has been suspended.
-              {convexUser.banReason && (
-                <span className="mt-2 block text-zinc-500">
-                  Reason: {convexUser.banReason}
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-zinc-500">
-              If you believe this is a mistake, please contact support.
-            </p>
+  // Check if user is banned
+  if (convexUser.isBanned) {
+    return (
+      <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a] text-zinc-100">
+        <div className="mx-auto max-w-md rounded-lg border border-red-500/20 bg-red-950/20 p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+            <svg
+              className="h-6 w-6 text-red-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+              />
+            </svg>
           </div>
+          <h1 className="mb-2 text-xl font-semibold text-red-400">
+            Account Suspended
+          </h1>
+          <p className="mb-4 text-sm text-zinc-400">
+            Your account has been suspended.
+            {convexUser.banReason && (
+              <span className="mt-2 block text-zinc-500">
+                Reason: {convexUser.banReason}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-zinc-500">
+            If you believe this is a mistake, please contact support.
+          </p>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
+  // ─── STEP 3: Non-critical — org and tier data ────────────────────────
+  let organizations: OrganizationWithMembershipRole[] = [];
+  let activeOrganization: OrganizationWithMembershipRole | null = null;
+  let orgTier = "free";
+
+  try {
     const cookieStore = await cookies();
     const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
 
@@ -128,7 +156,7 @@ export default async function DashboardLayout({
     );
   }
 
-  // Transform to our AuthUser type
+  // ─── Build AuthUser / Organization and render ────────────────────────
   const authUser: AuthUser = {
     id: user.id,
     email: user.email,
