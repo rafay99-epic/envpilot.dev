@@ -13,3 +13,6 @@ These are **committed** (unlike `.frugal-fable/`, which is gitignored scratch).
   (account / project / environment) with RBAC opt-in cascade and real-time
   propagation to CLI + VS Code extension. **Status: designed, not started.**
   Decisions locked with the product owner. Build AFTER Stage 3 (Vault → Convex).
+- [homebrew-distribution/](homebrew-distribution/) — Homebrew distribution for
+  the `envpilot` CLI via the existing `rafay99-epic/homebrew-apps` public tap +
+  npm-origin formula. **Status: implemented, awaiting `HOMEBREW_TAP_PAT` secret.**
