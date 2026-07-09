@@ -2,30 +2,11 @@
 
 import { useEffect, useReducer, useRef } from "react";
 import { AuthErrorPage } from "@/components/auth/auth-error-page";
+import { isAuthError } from "@/lib/auth-errors";
 import { createLogger } from "@/lib/logger";
 
 const MAX_AUTO_RETRIES = 2;
 const log = createLogger("app/dashboard/error");
-
-/**
- * Check whether an error is auth-related so the error boundary can show the
- * dedicated auth error page instead of a generic terminal error.
- */
-function isAuthError(error: Error): boolean {
-  const msg = error.message.toLowerCase();
-  return (
-    msg.includes("unauthorized") ||
-    msg.includes("unauthenticated") ||
-    msg.includes("auth") ||
-    msg.includes("token") ||
-    msg.includes("session") ||
-    msg.includes("workos") ||
-    msg.includes("sign in") ||
-    msg.includes("forbidden") ||
-    msg.includes("401") ||
-    msg.includes("403")
-  );
-}
 
 export default function DashboardError({
   error,
@@ -83,7 +64,7 @@ export default function DashboardError({
 
   // Auth errors get a dedicated full-page error with contact support
   if (isAuthError(error)) {
-    return <AuthErrorPage error={error} />;
+    return <AuthErrorPage error={error} onRetry={reset} />;
   }
 
   return (
