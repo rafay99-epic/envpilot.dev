@@ -30,7 +30,25 @@ NPM_TARBALL="https://registry.npmjs.org/@envpilot/cli/-/envpilot-cli-${VERSION}.
 echo "==> Fetching tarball from npm registry ..." >&2
 echo "    $NPM_TARBALL" >&2
 
-SHA256="$(curl -fsSL "$NPM_TARBALL" | shasum -a 256 | cut -d' ' -f1)"
+# npm registry has a propagation delay after publish — retry with
+# exponential backoff (max ~60 s) so a brief 404 doesn't break the
+# automated deploy.
+SHA256=""
+TARBALL_FILE=$(mktemp)
+trap 'rm -f "$TARBALL_FILE"' EXIT
+
+for i in 1 2 3 4 5; do
+  if curl -fsSL --max-time 15 -o "$TARBALL_FILE" "$NPM_TARBALL" 2>/dev/null; then
+    SHA256=$(shasum -a 256 "$TARBALL_FILE" | cut -d' ' -f1)
+    break
+  fi
+  echo "    Retry $i/5 — tarball not available yet, waiting $((i * 3)) s ..." >&2
+  sleep "$((i * 3))"
+done
+if [ -z "$SHA256" ]; then
+  echo "::error::Failed to fetch tarball from npm after 5 retries" >&2
+  exit 1
+fi
 echo "    SHA256: $SHA256" >&2
 
 # ---- Build the formula ---------------------------------------------------
