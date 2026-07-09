@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import type { AuthUser, Organization } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
 
@@ -89,6 +90,15 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     window.addEventListener("org-context-changed", handler);
     return () => window.removeEventListener("org-context-changed", handler);
   }, [fetchUser]);
+
+  // Keep Sentry user attribution in sync with auth state
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({ id: user.id, email: user.email });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
 
   const signOutHandler = useCallback(async () => {
     window.location.href = "/sign-out";

@@ -18,6 +18,7 @@ import {
   sanitizeConvexError,
   isTierLimitError,
   isAuthorizationError,
+  isConflictError,
 } from "@/lib/error-messages";
 
 function convexLogArgsToMessage(args: unknown[]): string {
@@ -71,7 +72,18 @@ const convexLogger = {
     // Tier-limit and authorization failures are expected conditions
     // (mirrors the server-side triage in @/lib/api-errors) — tell the USER
     // what happened, but breadcrumb-only for Sentry so they don't alert.
-    if (isTierLimitError(friendly) || isAuthorizationError(friendly)) {
+    // "Unauthenticated: no verified user identity" is the transient
+    // token-propagation race (a query fired before the WorkOS JWT attached
+    // to the socket) — it self-heals on reconnect and AuthErrorBoundary
+    // auto-retries past it, so treat it the same way.
+    const isTransientAuthRace =
+      /unauthenticated: no verified user identity/i.test(message);
+    if (
+      isTierLimitError(friendly) ||
+      isAuthorizationError(friendly) ||
+      isConflictError(friendly) ||
+      isTransientAuthRace
+    ) {
       if (isFunctionFailure) {
         // Dedupe by message: a re-clicked failing action updates the
         // existing toast instead of stacking.
@@ -136,6 +148,14 @@ function handleGlobalQueryError(
       id: friendly,
       description: friendly,
     });
+  }
+
+  // Convex function failures already reach Sentry exactly once through
+  // convexLogger.error above (the request manager routes EVERY failure
+  // there) — capturing here again files a twin issue titled
+  // "Error: [CONVEX ...]" for the same event (ENVPILOT-Y/X, W/V).
+  if (/\[CONVEX (?:[MAQ]\(|FATAL)/.test(error.message)) {
+    return;
   }
 
   Sentry.captureException(error, {

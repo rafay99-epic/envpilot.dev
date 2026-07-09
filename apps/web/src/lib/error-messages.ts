@@ -41,11 +41,31 @@ export function sanitizeConvexError(error: unknown): string {
 
 /**
  * Returns true if the error message indicates a tier limit was reached.
+ *
+ * Must cover every wording the backend actually throws — matched
+ * case-insensitively because the sources differ in casing:
+ * - `checkNumericLimit`/`checkCountedLimit`: "Limit reached (n/m). Upgrade
+ *   your tier for more." (convex/featureRegistry.ts)
+ * - `checkBooleanFeature`: "<feature> requires a higher tier."
+ * - Legacy REST copy: "... Upgrade to Pro ..."
  */
 export function isTierLimitError(message: string): boolean {
+  const normalized = message.toLowerCase();
   return (
-    message.includes("limit reached") || message.includes("Upgrade to Pro")
+    normalized.includes("limit reached") ||
+    normalized.includes("upgrade your tier") ||
+    normalized.includes("upgrade to pro") ||
+    normalized.includes("requires a higher tier")
   );
+}
+
+/**
+ * Returns true for uniqueness/duplicate validation conflicts (e.g.
+ * "Variable key already exists in this project") — user-correctable input
+ * the UI surfaces inline, not a defect worth a Sentry issue.
+ */
+export function isConflictError(message: string): boolean {
+  return /already exists/i.test(message);
 }
 
 /**

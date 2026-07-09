@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -234,6 +234,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     {}
   );
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
+
+  // Resolved post-hydration only: `navigator` is undefined during SSR, so
+  // branching on it inline guarantees a server/client hydration mismatch on
+  // every Mac client. Server and first client render both show the
+  // Windows/Linux label; Macs update right after mount.
+  const [isMacPlatform, setIsMacPlatform] = useState(false);
+  useEffect(() => {
+    setIsMacPlatform(/Mac/.test(navigator.userAgent));
+  }, []);
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0 || !projectId) return;
@@ -487,6 +496,23 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
       const res = await fetch(
         `/api/vault?vaultRef=${encodeURIComponent(variable.vaultRef)}&organizationId=${encodeURIComponent(organization.id)}`
       );
+      // An expired session makes the auth middleware redirect this fetch to
+      // the HTML sign-in page (a followed redirect, so res.ok is TRUE) —
+      // calling res.json() on it throws `Unexpected token '<'`. Check the
+      // content type before parsing. Only the HTML/redirect shape gets the
+      // session-expired message; any other non-JSON response (plain-text
+      // 500, gateway error page) reports its status instead.
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        if (res.redirected || contentType.includes("text/html")) {
+          throw new Error(
+            "Your session has expired. Please refresh the page and sign in again."
+          );
+        }
+        throw new Error(
+          `Failed to read secret (unexpected ${res.status} response).`
+        );
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to read secret");
       setRevealedValues((prev) => ({
@@ -779,10 +805,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 </svg>
                 {canCreateVariable ? "Add Variable" : "Request Variable"}
                 <kbd className="ml-1.5 hidden rounded bg-white/20 px-1.5 py-0.5 text-xs font-normal sm:inline-block">
-                  {typeof navigator !== "undefined" &&
-                  /Mac/.test(navigator.userAgent)
-                    ? "⌘⇧K"
-                    : "Ctrl+Shift+K"}
+                  {isMacPlatform ? "⌘⇧K" : "Ctrl+Shift+K"}
                 </kbd>
               </button>
             )}

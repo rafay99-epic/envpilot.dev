@@ -1,4 +1,10 @@
 import * as Sentry from "@sentry/nextjs";
+import {
+  sanitizeConvexError,
+  isTierLimitError,
+  isAuthorizationError,
+  isConflictError,
+} from "@/lib/error-messages";
 
 /**
  * Structured JSON logger for Next.js API routes.
@@ -52,6 +58,44 @@ function scrub(data: LogData): LogData {
   return out;
 }
 
+/**
+ * Triage for caught-error causes, mirroring the server-side
+ * `reportApiError` policy: expected, user-facing conditions become
+ * breadcrumbs instead of alertable Issues.
+ *
+ * - Tier-limit / authorization / duplicate-key conflicts are handled UX
+ *   (toast or inline form error), not defects.
+ * - 4xx API responses were already triaged by the server route that
+ *   produced them — re-capturing client-side files noise twins.
+ * - In the browser, Convex function failures ("[CONVEX M/A/Q(...)]",
+ *   "[CONVEX FATAL ERROR]") already reach Sentry exactly once via the
+ *   ConvexReactClient logger hook (ConvexClientProvider); capturing the
+ *   same failure here files a twin issue titled "Error: [CONVEX ...]".
+ *   Server-side (API routes, layouts) there is no such hook, so Convex
+ *   causes still capture normally there.
+ */
+function shouldCaptureCause(cause: Error): boolean {
+  const friendly = sanitizeConvexError(cause);
+  if (
+    isTierLimitError(friendly) ||
+    isAuthorizationError(friendly) ||
+    isConflictError(friendly)
+  ) {
+    return false;
+  }
+  const status = (cause as { status?: unknown }).status;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    return false;
+  }
+  if (
+    typeof window !== "undefined" &&
+    /\[CONVEX (?:[MAQ]\(|FATAL)/.test(cause.message)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function emit(
   level: LogLevel,
   module: string,
@@ -86,6 +130,15 @@ function emit(
   //           subsequent actual Issue but don't alert on their own.
   if (level === "error") {
     if (cause instanceof Error) {
+      if (!shouldCaptureCause(cause)) {
+        Sentry.addBreadcrumb({
+          category: module,
+          message: `${event}: ${cause.message.slice(0, 500)}`,
+          level: "error",
+          data: scrubbed,
+        });
+        return;
+      }
       Sentry.captureException(cause, {
         tags: { module, event },
         extra: scrubbed,

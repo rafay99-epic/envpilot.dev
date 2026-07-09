@@ -580,7 +580,7 @@ function ExpiringSecretRow({
   const expiresDate = new Date(variable.expiresAt);
   const label = isExpired
     ? "expired"
-    : `expires ${expiresDate.toLocaleDateString([], { month: "short", day: "numeric" })}`;
+    : `expires ${expiresDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 
   return (
     <div className="flex items-center justify-between px-5 py-3 font-mono text-xs">
@@ -603,7 +603,10 @@ function formatTimestamp(timestamp: number): string {
   const hours = Math.floor(diff / (1000 * 60 * 60));
 
   if (hours < 24) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

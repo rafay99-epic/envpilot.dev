@@ -1,5 +1,13 @@
 import { executeCommand } from "./execute-command.js";
 
+// Ink's raw-mode input requires a real interactive terminal on both ends.
+// Piped/CI/non-TTY stdin or stdout throws "Raw mode is not supported on the
+// current process.stdin" as soon as the TUI tries to render, so callers must
+// gate on this before ever invoking openTUI().
+export function isInteractiveTerminal(): boolean {
+  return Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
+}
+
 export async function openTUI(): Promise<void> {
   const [{ render }, { CLIApp }, { PressAnyKey }] = await Promise.all([
     import("ink"),
