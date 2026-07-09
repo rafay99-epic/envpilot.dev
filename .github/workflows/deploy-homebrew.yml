@@ -15,6 +15,14 @@ on:
       updated:
         description: Whether the formula was updated
         value: ${{ jobs.deploy.outputs.updated }}
+  # Manual retry when a previous automated push failed — the release gets
+  # created without it, so you can dispatch this independently to catch up.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: CLI version to publish to Homebrew (e.g. 1.15.0)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -40,9 +48,9 @@ jobs:
           # PAT with contents:write access to rafay99-epic/homebrew-apps
           GH_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
-          TAP_REPO="https://x-access-token:${GH_TAP_TOKEN}@github.com/rafay99-epic/homebrew-apps.git"
-          git clone "$TAP_REPO" /tmp/homebrew-apps
+          git clone "https://github.com/rafay99-epic/homebrew-apps.git" /tmp/homebrew-apps
           cd /tmp/homebrew-apps
+          git remote set-url origin "https://x-access-token:${GH_TAP_TOKEN}@github.com/rafay99-epic/homebrew-apps.git"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -56,7 +64,9 @@ jobs:
         id: push
         run: |
           cd /tmp/homebrew-apps
-          if git diff --quiet && git diff --cached --quiet; then
+          UNTRACKED=$(git ls-files --others --exclude-standard Formula/)
+
+          if git diff --quiet && git diff --cached --quiet && [ -z "$UNTRACKED" ]; then
             echo "No changes to formula — skipping push."
             echo "updated=false" >> "$GITHUB_OUTPUT"
             exit 0

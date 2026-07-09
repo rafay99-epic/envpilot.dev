@@ -30,7 +30,7 @@ NPM_TARBALL="https://registry.npmjs.org/@envpilot/cli/-/envpilot-cli-${VERSION}.
 echo "==> Fetching tarball from npm registry ..." >&2
 echo "    $NPM_TARBALL" >&2
 
-SHA256="$(curl -sL "$NPM_TARBALL" | shasum -a 256 | cut -d' ' -f1)"
+SHA256="$(curl -fsSL "$NPM_TARBALL" | shasum -a 256 | cut -d' ' -f1)"
 echo "    SHA256: $SHA256" >&2
 
 # ---- Build the formula ---------------------------------------------------

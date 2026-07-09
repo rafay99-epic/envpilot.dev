@@ -369,13 +369,21 @@ jobs:
       - deploy-homebrew
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
+    #
+    # deploy-homebrew is listed in needs only for its status row in the
+    # release notes — a failed Homebrew push must NOT block the release.
+    # Retry failed Homebrew pushes via workflow_dispatch on that workflow.
     if: |
       always() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.any == 'true' &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+      needs.deploy-convex.result != 'failure' &&
+      needs.deploy-convex.result != 'cancelled' &&
+      needs.deploy-cli.result != 'failure' &&
+      needs.deploy-cli.result != 'cancelled' &&
+      needs.deploy-extension.result != 'failure' &&
+      needs.deploy-extension.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
