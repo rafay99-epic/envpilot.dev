@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useReducer, useRef } from "react";
+import { AuthErrorPage } from "@/components/auth/auth-error-page";
+import { isAuthError } from "@/lib/auth-errors";
 import { createLogger } from "@/lib/logger";
 
 const MAX_AUTO_RETRIES = 2;
@@ -58,6 +60,11 @@ export default function DashboardError({
         </p>
       </div>
     );
+  }
+
+  // Auth errors get a dedicated full-page error with contact support
+  if (isAuthError(error)) {
+    return <AuthErrorPage error={error} onRetry={reset} />;
   }
 
   return (

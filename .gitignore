@@ -55,3 +55,6 @@ playwright-report/
 apps/web/tests/e2e/.auth/
 .claude/worktrees/
 .frugal-fable/
+
+# commandcode tool config
+.commandcode/
