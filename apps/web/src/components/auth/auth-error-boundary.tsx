@@ -16,6 +16,13 @@ interface AuthErrorBoundaryProps {
 
 interface AuthErrorBoundaryState {
   error: Error | null;
+  /**
+   * True while an auto-retry timer is pending. Must live in state (not just
+   * the instance field): React renders the error state BEFORE
+   * componentDidCatch runs, so an instance-field check alone would flash the
+   * full error page during the retry window.
+   */
+  retrying: boolean;
 }
 
 export class AuthErrorBoundary extends Component<
@@ -27,10 +34,12 @@ export class AuthErrorBoundary extends Component<
 
   constructor(props: AuthErrorBoundaryProps) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, retrying: false };
   }
 
-  static getDerivedStateFromError(error: Error): AuthErrorBoundaryState {
+  static getDerivedStateFromError(
+    error: Error
+  ): Partial<AuthErrorBoundaryState> {
     return { error };
   }
 
@@ -50,8 +59,11 @@ export class AuthErrorBoundary extends Component<
       });
       this.retryTimer = setTimeout(() => {
         this.retryTimer = null;
-        this.setState({ error: null });
+        this.setState({ error: null, retrying: false });
       }, delay);
+      // setState from componentDidCatch flushes before paint, so the retry
+      // indicator renders without the full error page flashing first.
+      this.setState({ retrying: true });
       return;
     }
 
@@ -67,8 +79,12 @@ export class AuthErrorBoundary extends Component<
   }
 
   handleRetry = () => {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
     this.retryCount = 0;
-    this.setState({ error: null });
+    this.setState({ error: null, retrying: false });
   };
 
   render() {
@@ -76,7 +92,7 @@ export class AuthErrorBoundary extends Component<
       if (isAuthError(this.state.error)) {
         // Auto-retry pending — show the suite's standard retry indicator
         // instead of flashing the full error page for a self-healing race.
-        if (this.retryTimer) {
+        if (this.state.retrying) {
           return (
             <div className="dark flex min-h-screen items-center justify-center bg-[#0f172a]">
               <p className="font-mono text-sm text-zinc-500">
