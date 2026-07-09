@@ -1,0 +1,78 @@
+apps/cli/src/index.tsx
+  s_104585532ec370::t_fcacb9d463c7a2 5,12-14
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_104585532ec370::t_aff3aad630a3d4 3
+  s_104585532ec370::t_47f7b9357ebaaa 499-508
+  s_104585532ec370::t_4023ac145e1f82 238-246
+  s_104585532ec370::t_df74d62fa96831 801
+apps/web/src/components/dashboard/dashboard-shell.tsx
+  s_104585532ec370::t_e1006c0056a3b9 58
+  s_104585532ec370::t_f0fd7c3fa17cd5 15-25,28-37,39-40,42-47,49-53,55-57
+  s_104585532ec370::t_0e9f1be8a5b16f 11-14,27
+apps/web/src/components/ConvexClientProvider.tsx
+  s_104585532ec370::t_c9c3b05eefdc3b 75-77
+  s_104585532ec370::t_0623d38af8ec91 74,80-84
+  s_104585532ec370::t_7dc90c95cc8ac5 151-158
+  s_104585532ec370::t_38aebcc3328045 78-79
+apps/cli/src/commands/ui.ts
+  s_104585532ec370::t_495d227d1d90a9 2,14-21,23-24
+  s_104585532ec370::t_66c339af0c4c67 22
+apps/web/tests/e2e/authenticated/console-health.spec.ts
+  s_104585532ec370::t_4f29dea7b8d9b0 6,10-17,23,42-46
+  s_104585532ec370::t_febe860d04bbca 1-5,7-9,18-22,24-41,47-52
+convex/variables.ts
+  s_104585532ec370::t_4cd16ae69a269b 2023-2025,2031
+convex/accounts.ts
+  s_104585532ec370::t_8db0de36ad202f 658,664
+apps/web/src/hooks/use-auth.ts
+  s_104585532ec370::t_620119af00d923 94-102
+  s_104585532ec370::t_faff604b8d568f 4
+apps/web/src/app/(dashboard)/dashboard/page.tsx
+  s_104585532ec370::t_7c794c5de6671b 611
+  s_104585532ec370::t_d60d685a68ad65 583
+  s_104585532ec370::t_38aebcc3328045 606-609
+apps/vscode-extension/src/services/gitCommitGuard.ts
+  s_104585532ec370::t_04913e66bc7ca7 94-104
+apps/vscode-extension/package.json
+  s_104585532ec370::t_1947e69b996ccf 5
+apps/web/package.json
+  s_104585532ec370::t_1947e69b996ccf 3
+apps/web/src/lib/error-messages.ts
+  s_104585532ec370::t_3126efaac64875 44-50,53,55-58,62-68
+  s_104585532ec370::t_532d9505fcc299 69-70
+apps/web/src/lib/versions.ts
+  s_104585532ec370::t_2685b2381941d5 17-19
+apps/web/src/lib/logger.ts
+  s_104585532ec370::t_f9a069ac869f77 2-7
+  s_104585532ec370::t_0039f4911e1dd1 133-141
+  s_104585532ec370::t_1937ac701a6525 61-98
+apps/cli/package.json
+  s_104585532ec370::t_1947e69b996ccf 3
+apps/cli/src/ui/render-tui.tsx
+  s_104585532ec370::t_fef9584755178c 3-10
+package.json
+  s_104585532ec370::t_1947e69b996ccf 3
+apps/vscode-extension/src/utils/sentryRuntime.ts
+  s_104585532ec370::t_d33a0da6c3dc50 42-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c691dd93d287e63765f6fae8830b969f56e7879a",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_104585532ec370": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cd8997-3ba0-4854-957c-83d58ae00a03",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
