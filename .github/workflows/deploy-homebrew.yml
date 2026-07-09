@@ -3,6 +3,10 @@ name: Deploy Homebrew formula
 # Updates the Formula/envpilot.rb in the EXISTING public tap
 # (rafay99-epic/homebrew-apps) whenever a new CLI version is published
 # to npm. No separate tap repo needed — the monorepo stays private.
+#
+# inputs.version is NEVER interpolated directly into run: blocks —
+# it's passed through env:, validated, exported to $GITHUB_ENV, then
+# consumed as $VERSION. This prevents shell injection.
 
 on:
   workflow_call:
@@ -38,13 +42,19 @@ jobs:
     outputs:
       updated: ${{ steps.push.outputs.updated }}
     steps:
-      - name: Validate version format
+      # RAW_VERSION is set via env: (not shell interpolation), so GitHub
+      # passes it as a true environment variable — safe from injection.
+      - name: Validate and export version
+        id: validate
+        env:
+          RAW_VERSION: ${{ inputs.version }}
         run: |
-          if ! echo "${{ inputs.version }}" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
-            echo "::error::Invalid version '${{ inputs.version }}' — expected semver (e.g. 1.15.0)"
+          if ! echo "$RAW_VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid version '$RAW_VERSION' — expected semver (e.g. 1.15.0)"
             exit 1
           fi
-          echo "Version ${{ inputs.version }} is valid semver ✓"
+          echo "VERSION=$RAW_VERSION" >> "$GITHUB_ENV"
+          echo "Version $RAW_VERSION is valid semver ✓"
 
       - name: Checkout main repo (for the update script)
         uses: actions/checkout@v4
@@ -53,7 +63,6 @@ jobs:
 
       - name: Clone the public homebrew-apps tap
         env:
-          # PAT with contents:write access to rafay99-epic/homebrew-apps
           GH_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
           git clone "https://github.com/rafay99-epic/homebrew-apps.git" /tmp/homebrew-apps
@@ -65,7 +74,7 @@ jobs:
       - name: Generate and write formula
         run: |
           repo/apps/cli/scripts/update-homebrew-formula.sh \
-            "${{ inputs.version }}" \
+            "$VERSION" \
             --tap-dir /tmp/homebrew-apps
 
       - name: Commit and push formula
@@ -81,10 +90,10 @@ jobs:
           fi
 
           git add Formula/envpilot.rb
-          git commit -m "chore: update envpilot to v${{ inputs.version }}"
+          git commit -m "chore: update envpilot to v${VERSION}"
 
           # Tag the tap so we can trace versions in a single repo
-          TAG="envpilot-v${{ inputs.version }}"
+          TAG="envpilot-v${VERSION}"
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
             git tag "$TAG"
           fi
