@@ -1,0 +1,23 @@
+apps/web/src/components/auth/auth-error-boundary.tsx
+  s_3548b96ef2d1c7::t_c9ef91ce35d344 62,64-66
+  s_3548b96ef2d1c7::t_13614013a9cc5f 19-25
+  s_3548b96ef2d1c7::t_03ddb5fd18eb6c 95
+  s_3548b96ef2d1c7::t_bf2fdfefc968bc 37,40-42
+  s_3548b96ef2d1c7::t_55e0a296547644 82-85,87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9ee0fc6f42abaa5e8b4539351eb13d11f2cfad2e",
+  "prompts": {},
+  "sessions": {
+    "s_3548b96ef2d1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c52a429-18d4-467d-b286-a378558d4347",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
