@@ -1,0 +1,55 @@
+apps/web/src/components/auth/auth-error-page.tsx
+  s_3548b96ef2d1c7::t_272cb41a8eca53 1-5,12-16,24,28,38-41,43,46-48,51,66-74,76,84,87,92
+apps/web/tests/e2e/authenticated/auth-error-boundary.spec.ts
+  s_3548b96ef2d1c7::t_64fa3b6ba4293b 183-192
+  s_3548b96ef2d1c7::t_a6e5927ec6a18d 34-36,43-53,58-165
+  s_3548b96ef2d1c7::t_0d75025be6ac18 55
+  s_3548b96ef2d1c7::t_2d59c33692f165 177-178
+  s_3548b96ef2d1c7::t_72c85bd4228f50 6,14,18-32
+  s_3548b96ef2d1c7::t_bb5ce8a0ed42cc 37-38
+  s_3548b96ef2d1c7::t_5318b12d43648b 3-5
+  s_3548b96ef2d1c7::t_c8357c3ac1fc1b 7-9,11-13
+  s_3548b96ef2d1c7::t_32aa299cf65dfc 15-17
+  s_3548b96ef2d1c7::t_468ef5016f91f9 33
+  s_3548b96ef2d1c7::t_00e0d599753fd7 39-42
+  s_3548b96ef2d1c7::t_1d1380bc7d51f6 54
+  s_3548b96ef2d1c7::t_07bba0f0e5c744 56-57
+  s_3548b96ef2d1c7::t_f72b381c071c6a 166-168,174-176
+  s_3548b96ef2d1c7::t_5cd0931d62b203 179-182
+  s_3548b96ef2d1c7::t_1265fceee94117 193-195
+  s_3548b96ef2d1c7::t_6ca992cdfa9b27 1-2,10,169-173
+apps/web/src/app/(dashboard)/error.tsx
+  s_3548b96ef2d1c7::t_d6c47bcb44124b 5
+  s_3548b96ef2d1c7::t_7de9afff077a66 67
+apps/web/src/lib/auth-errors.ts
+  s_3548b96ef2d1c7::t_ac98eedde0db6a 21-22
+  s_3548b96ef2d1c7::t_542baebf1ad59c 1-20,23-34,37-38
+  s_3548b96ef2d1c7::t_a6e5927ec6a18d 35-36
+apps/web/src/lib/versions.ts
+  s_3548b96ef2d1c7::t_eddfbc3f1e54f9 17
+apps/web/src/components/auth/auth-error-boundary.tsx
+  s_3548b96ef2d1c7::t_c82f312ee3d711 8,25-27,38-57,65-66,70,77-87,92-93
+  s_3548b96ef2d1c7::t_b537300d56ff66 5-6,9,58-60,68-69,71-72,88-90
+  s_3548b96ef2d1c7::t_5844fd09987470 67
+  s_3548b96ef2d1c7::t_c83e433214807e 73
+.gitignore
+  s_3548b96ef2d1c7::t_9846d7733def27 58-60
+apps/web/package.json
+  s_3548b96ef2d1c7::t_7f45a3f10a0244 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c418d390b1686aedf35cac435790b0074ac77982",
+  "prompts": {},
+  "sessions": {
+    "s_3548b96ef2d1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c52a429-18d4-467d-b286-a378558d4347",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
