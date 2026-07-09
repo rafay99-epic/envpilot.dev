@@ -1,0 +1,76 @@
+name: Deploy Homebrew formula
+
+# Updates the Formula/envpilot.rb in the EXISTING public tap
+# (rafay99-epic/homebrew-apps) whenever a new CLI version is published
+# to npm. No separate tap repo needed — the monorepo stays private.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: CLI version to publish to Homebrew
+        required: true
+        type: string
+    outputs:
+      updated:
+        description: Whether the formula was updated
+        value: ${{ jobs.deploy.outputs.updated }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-homebrew-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Update Homebrew formula
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.push.outputs.updated }}
+    steps:
+      - name: Checkout main repo (for the update script)
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Clone the public homebrew-apps tap
+        env:
+          # PAT with contents:write access to rafay99-epic/homebrew-apps
+          GH_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
+        run: |
+          TAP_REPO="https://x-access-token:${GH_TAP_TOKEN}@github.com/rafay99-epic/homebrew-apps.git"
+          git clone "$TAP_REPO" /tmp/homebrew-apps
+          cd /tmp/homebrew-apps
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Generate and write formula
+        run: |
+          repo/apps/cli/scripts/update-homebrew-formula.sh \
+            "${{ inputs.version }}" \
+            --tap-dir /tmp/homebrew-apps
+
+      - name: Commit and push formula
+        id: push
+        run: |
+          cd /tmp/homebrew-apps
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes to formula — skipping push."
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add Formula/envpilot.rb
+          git commit -m "chore: update envpilot to v${{ inputs.version }}"
+
+          # Tag the tap so we can trace versions in a single repo
+          TAG="envpilot-v${{ inputs.version }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+          fi
+
+          git push origin main --tags
+
+          echo "updated=true" >> "$GITHUB_OUTPUT"

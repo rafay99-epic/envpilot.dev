@@ -15,7 +15,7 @@
  */
 export const APP_VERSIONS = {
   web: "1.32.0",
-  cli: "1.14.0",
+  cli: "1.15.0",
   extension: "1.9.0",
   // First builds that actually work post-auth-cutover: the pre-1.12.1 CLI and
   // pre-1.7.2 extension either use deleted token routes or shipped with an

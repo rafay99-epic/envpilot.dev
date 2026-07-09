@@ -342,6 +342,18 @@ jobs:
     permissions:
       contents: write
 
+  deploy-homebrew:
+    name: Deploy Homebrew formula
+    needs: [changes, deploy-cli]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_cli == 'true' &&
+      needs.deploy-cli.outputs.published == 'true'
+    uses: ./.github/workflows/deploy-homebrew.yml
+    with:
+      version: ${{ needs.deploy-cli.outputs.version }}
+    secrets: inherit
+
   # ------------------------------------------------------------------
   # Stage 5: release — aggregate tag + GitHub Release
   # ------------------------------------------------------------------
@@ -354,6 +366,7 @@ jobs:
       - deploy-convex
       - deploy-cli
       - deploy-extension
+      - deploy-homebrew
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
     if: |
@@ -412,8 +425,9 @@ jobs:
             echo "| Convex | — | $(status '${{ needs.deploy-convex.result }}') |"
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
+            echo "| Homebrew | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-homebrew.result }}') |"
             echo ""
-            echo "**Install:** \`npm i -g @envpilot/cli\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
+            echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
           } > /tmp/release-body.md
           cat /tmp/release-body.md
 
