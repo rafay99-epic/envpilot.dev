@@ -25,7 +25,9 @@ if [ "${2:-}" = "--tap-dir" ] && [ -n "${3:-}" ]; then
   TAP_DIR="$3"
 fi
 
-NPM_TARBALL="https://registry.npmjs.org/@envpilot/cli/-/envpilot-cli-${VERSION}.tgz"
+# For scoped packages (@envpilot/cli) npm strips the scope from the
+# tarball filename: cli-{version}.tgz, NOT envpilot-cli-{version}.tgz.
+NPM_TARBALL="https://registry.npmjs.org/@envpilot/cli/-/cli-${VERSION}.tgz"
 
 echo "==> Fetching tarball from npm registry ..." >&2
 echo "    $NPM_TARBALL" >&2
@@ -60,7 +62,7 @@ read -r -d '' FORMULA << RUBY || true
 class Envpilot < Formula
   desc "Envpilot CLI \u2014 sync and manage environment variables from the terminal"
   homepage "https://www.envpilot.dev"
-  url "https://registry.npmjs.org/@envpilot/cli/-/envpilot-cli-${VERSION}.tgz"
+  url "https://registry.npmjs.org/@envpilot/cli/-/cli-${VERSION}.tgz"
   version "${VERSION}"
   sha256 "${SHA256}"
   license "UNLICENSED"
