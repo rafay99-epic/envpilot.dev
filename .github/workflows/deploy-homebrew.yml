@@ -38,6 +38,14 @@ jobs:
     outputs:
       updated: ${{ steps.push.outputs.updated }}
     steps:
+      - name: Validate version format
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid version '${{ inputs.version }}' — expected semver (e.g. 1.15.0)"
+            exit 1
+          fi
+          echo "Version ${{ inputs.version }} is valid semver ✓"
+
       - name: Checkout main repo (for the update script)
         uses: actions/checkout@v4
         with:
