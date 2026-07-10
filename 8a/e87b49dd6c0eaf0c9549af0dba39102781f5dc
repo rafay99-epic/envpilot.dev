@@ -1,0 +1,23 @@
+convex/README.md
+  s_655596e5f5983b::t_c3131a4e109b31 1,3,5,8-40,43,45-47,49-51,53-59,61
+CLAUDE.md
+  s_655596e5f5983b::t_83c51664bd8318 48-49,92
+  s_655596e5f5983b::t_4fb7ac6c4b40fa 203-206
+  s_655596e5f5983b::t_1f217910cb1461 43,45-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8ae87b49dd6c0eaf0c9549af0dba39102781f5dc",
+  "prompts": {},
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
