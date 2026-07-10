@@ -319,9 +319,12 @@ jobs:
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium
 
+      # playwright.config.ts already applies these when CI is set; the
+      # explicit flags pin the gate's serial-run + retry contract here so
+      # a config refactor can't silently reintroduce the parallel flakes.
       - name: Run Playwright suite
         working-directory: apps/web
-        run: bunx playwright test
+        run: bunx playwright test --workers=1 --retries=2
 
       - name: Upload Playwright report
         if: failure()
