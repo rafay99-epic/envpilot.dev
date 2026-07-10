@@ -44,14 +44,36 @@ export const _createGracePeriod = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    // Prevent grace period abuse: enforce 30-day cooldown between grace periods
+    // Prevent grace period abuse: enforce 30-day cooldown between grace
+    // periods. The skip must DOWNGRADE IMMEDIATELY, not no-op — with no
+    // grace row the expiry cron never fires, so a silent return here would
+    // leave the revoked user on their paid tier forever
+    // (subscribe → cancel → resubscribe → cancel again within 30 days).
     const recentGrace = await ctx.db
       .query("subscriptionGracePeriods")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .first();
     if (recentGrace && now - recentGrace.createdAt < 30 * 24 * 60 * 60 * 1000) {
-      // Previous grace period was created less than 30 days ago — skip
+      const defaultTier = await getDefaultTierName(ctx.db);
+      const existingTier = await ctx.db
+        .query("userTiers")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .first();
+      if (existingTier) {
+        await ctx.db.patch(existingTier._id, {
+          tier: defaultTier,
+          updatedAt: now,
+          reason: "billing.grace_period_cooldown_immediate_downgrade",
+        });
+      } else {
+        await ctx.db.insert("userTiers", {
+          userId: args.userId,
+          tier: defaultTier,
+          updatedAt: now,
+          reason: "billing.grace_period_cooldown_immediate_downgrade",
+        });
+      }
       return;
     }
 

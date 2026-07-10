@@ -30,21 +30,6 @@ export function useSubscription(
   });
 }
 
-export function useCreateCheckout() {
-  return useMutation({
-    mutationFn: (data: {
-      organizationId: string;
-      tierName: string;
-      successUrl: string;
-      cancelUrl: string;
-    }) =>
-      api.post<{ checkoutUrl: string; sessionId: string }>(
-        "/api/billing/checkout",
-        data
-      ),
-  });
-}
-
 export function useCreatePortalSession() {
   return useMutation({
     mutationFn: (data: { organizationId: string }) =>

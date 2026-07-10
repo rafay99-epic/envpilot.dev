@@ -14,7 +14,7 @@
  * device-flow auth cutover broke every pre-1.12.1 CLI / pre-1.7.2 extension).
  */
 export const APP_VERSIONS = {
-  web: "1.33.1",
+  web: "1.33.2",
   cli: "1.16.0",
   extension: "1.10.0",
   // First CLI build on the Stage 3 vault path: ≤1.13.x fetch secret values

@@ -35,33 +35,44 @@ export const prepareCheckout = mutation({
       throw new Error("Only the organization owner can manage billing");
     }
 
-    // Check if user already has active subscription
-    const userSubscription = await ctx.db
+    // The tier resolver derives an org's features from the CREATOR's
+    // userTiers row (featureRegistry/resolver getOrgOwnerTier). A purchase
+    // by any other owner-role member would land on the payer's userTiers
+    // and never reach this org — paid, no features. Restrict purchase to
+    // the account the resolver actually reads.
+    const organization = await ctx.db.get(args.organizationId);
+    if (!organization) {
+      throw new Error("Organization not found");
+    }
+    if (organization.createdBy !== actor._id) {
+      throw new Error(
+        "Only the organization's creating account can purchase a subscription for it — the org's tier is derived from that account"
+      );
+    }
+
+    // Block double-subscribe. Scan ALL of the user's/org's subscription
+    // rows: .first() returns the OLDEST row, so an old revoked row would
+    // shadow a newer active one. A cancel-at-period-end subscription keeps
+    // status "active" until the period ends and must also block.
+    const isLive = (s: { status: string }) =>
+      s.status === "active" || s.status === "trialing";
+
+    const userSubscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
-      .first();
-
-    if (
-      userSubscription &&
-      (userSubscription.status === "active" ||
-        userSubscription.status === "trialing")
-    ) {
+      .collect();
+    if (userSubscriptions.some(isLive)) {
       throw new Error("You already have an active subscription");
     }
 
-    // Fallback: check org-level subscription (legacy)
-    const orgSubscription = await ctx.db
+    // Fallback: check org-level subscriptions (legacy)
+    const orgSubscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId)
       )
-      .first();
-
-    if (
-      orgSubscription &&
-      (orgSubscription.status === "active" ||
-        orgSubscription.status === "trialing")
-    ) {
+      .collect();
+    if (orgSubscriptions.some(isLive)) {
       throw new Error("Organization already has an active subscription");
     }
 

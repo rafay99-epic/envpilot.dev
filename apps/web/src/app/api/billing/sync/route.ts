@@ -75,12 +75,21 @@ export async function POST(req: Request) {
       });
     }
 
+    const bridgeSecret = process.env.BILLING_WEBHOOK_BRIDGE_SECRET;
+    if (!bridgeSecret) {
+      return NextResponse.json(
+        { error: "Payment system not configured" },
+        { status: 503 }
+      );
+    }
+
     // Dispatch a checkout.updated event to our existing handler
     // This is idempotent — if the webhook already processed it, the
     // handler will update the same records with the same data.
     await convex.action(api.features.billing.webhooks.processWebhookEvent, {
       type: "checkout.updated",
       data: JSON.stringify(checkout),
+      bridgeSecret,
     });
 
     return NextResponse.json({ synced: true });

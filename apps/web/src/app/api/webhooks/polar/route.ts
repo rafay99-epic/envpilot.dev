@@ -72,6 +72,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // The Convex action is public (this server has no Convex admin identity),
+  // so the signature check above is only half the trust boundary — the
+  // action re-authenticates every call via this shared bridge secret.
+  const bridgeSecret = process.env.BILLING_WEBHOOK_BRIDGE_SECRET;
+  if (!bridgeSecret) {
+    console.error("BILLING_WEBHOOK_BRIDGE_SECRET is not configured");
+    return NextResponse.json(
+      { error: "Payment system is not configured" },
+      { status: 503 }
+    );
+  }
+
   try {
     // Dispatch the verified event to Convex for processing.
     // All billing mutations are internal — only this action gateway is public.
@@ -83,6 +95,7 @@ export async function POST(request: Request) {
       type: event.type,
       data: JSON.stringify(event.data),
       webhookId,
+      bridgeSecret,
     });
 
     return NextResponse.json({ received: true });

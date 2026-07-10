@@ -179,8 +179,7 @@ export const runMigration = mutation({
           badge: "Pro",
           badgeColor: "green",
           ctaText: "Upgrade to Pro",
-          ctaLink:
-            "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23",
+          ctaLink: "/api/checkout?tier=pro",
           isComingSoon: false,
           highlightFeatures: [
             "Unlimited projects",
