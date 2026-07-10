@@ -16,37 +16,45 @@ export const listCronJobs = query({
     const cronRegistry = [
       {
         name: "cleanup expired project access",
-        function: "projectAccess.cleanupExpired",
+        function: "features/users/projectAccess.cleanupExpired",
         interval: "Every 1 hour",
         settingKey: "cron_pause_cleanup_project_access",
       },
       {
         name: "cleanup revocation events",
-        function: "permissionRevocationEvents.cleanup",
+        function: "features/permissions/revocationEvents.cleanup",
         interval: "Every 1 hour",
         settingKey: "cron_pause_cleanup_revocation_events",
       },
       {
         name: "cleanup expired invitations",
-        function: "invitations.cleanupExpired",
+        function: "features/organizations/invitations.cleanupExpired",
         interval: "Every 6 hours",
         settingKey: "cron_pause_cleanup_invitations",
       },
       {
         name: "cleanup expired permissions",
-        function: "permissions.cleanupExpired",
+        function:
+          "features/permissions/variablePermissions/cleanup.cleanupExpired",
         interval: "Daily at 3:00 AM UTC",
         settingKey: "cron_pause_cleanup_permissions",
       },
       {
+        name: "cleanup expired account permissions",
+        function:
+          "features/permissions/accountPermissions/mutations.cleanupExpired",
+        interval: "Daily at 3:10 AM UTC",
+        settingKey: "cron_pause_cleanup_account_permissions",
+      },
+      {
         name: "expire grace periods",
-        function: "subscriptions.expireGracePeriods",
+        function: "features/billing/gracePeriods.expireGracePeriods",
         interval: "Every 1 hour",
         settingKey: "cron_pause_expire_grace_periods",
       },
       {
         name: "process secret rotation expiry",
-        function: "variables.processRotationExpiry",
+        function: "features/variables/rotation.processRotationExpiry",
         interval: "Every 1 hour",
         settingKey: "cron_pause_rotation_expiry",
       },
