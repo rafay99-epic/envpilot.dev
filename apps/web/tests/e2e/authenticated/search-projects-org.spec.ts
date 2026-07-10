@@ -5,8 +5,8 @@ import {
   ACCESS_DENIED_TEXT,
   createVariable,
   deleteVariableByKey,
-  getFirstProjectSlug,
   getOwnedOrgSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
   variableRow,
 } from "./support";
@@ -45,11 +45,7 @@ test.describe("global search (command palette)", () => {
     test.setTimeout(120_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to search for"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     const uniqueKey = `E2E_SEARCH_${Date.now()}`;
     let created = false;
@@ -429,7 +425,13 @@ test.describe("usage dashboard renders after query capping", () => {
     // straight out of the rewritten capped-scan tierLimits usage query, so
     // seeing a real value here proves the query still returns data instead
     // of getting stuck loading or throwing.
-    await expect(page.getByText("Projects", { exact: true })).toBeVisible({
+    // `.first()`: "Projects" also appears in the sidebar nav link and a
+    // truncated org-name span, so an exact-text match resolves to 3 elements
+    // (strict-mode violation). The usage-meter label is first in DOM order;
+    // asserting it is present is all this needs.
+    await expect(
+      page.getByText("Projects", { exact: true }).first()
+    ).toBeVisible({
       timeout: 20_000,
     });
     await expect(

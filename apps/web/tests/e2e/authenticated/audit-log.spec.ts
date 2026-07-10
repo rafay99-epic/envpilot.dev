@@ -21,20 +21,25 @@ test.describe("audit log page", () => {
     );
 
     // Category filter must include the newer Tags / Templates categories.
+    // Read the options via a retrying poll — allTextContents() is a one-shot
+    // DOM query, and an auth-gate remount (RequireRole flickering back to its
+    // loading state) landing between toBeVisible() and the read returns []
+    // even though the option list is a static array in the page source.
     const categorySelect = page.locator("select").first();
     await expect(categorySelect).toBeVisible({ timeout: 20_000 });
-    const optionTexts = await categorySelect
-      .locator("option")
-      .allTextContents();
-    const normalized = optionTexts.map((t) => t.trim());
-    expect(
-      normalized,
-      `category filter should include "Tags": got ${JSON.stringify(normalized)}`
-    ).toContain("Tags");
-    expect(
-      normalized,
-      `category filter should include "Templates": got ${JSON.stringify(normalized)}`
-    ).toContain("Templates");
+    await expect
+      .poll(
+        async () =>
+          (await categorySelect.locator("option").allTextContents()).map((t) =>
+            t.trim()
+          ),
+        {
+          message:
+            'category filter should include the "Tags" and "Templates" categories',
+          timeout: 15_000,
+        }
+      )
+      .toEqual(expect.arrayContaining(["Tags", "Templates"]));
 
     // The log list must resolve to real rows or the documented empty state.
     const emptyState = page.getByText(

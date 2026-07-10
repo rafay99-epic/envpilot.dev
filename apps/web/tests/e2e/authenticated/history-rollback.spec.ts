@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
-import { getFirstProjectSlug, trackClientErrors } from "./support";
+import { getWorkerProjectSlug, trackClientErrors } from "./support";
 
 // Authenticated e2e — variable version history & rollback. Proves the
 // version-history/rollback surface still works end to end after the Convex
@@ -74,11 +74,7 @@ test.describe("variable version history & rollback", () => {
     test.setTimeout(180_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise history/rollback against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",
@@ -212,14 +208,39 @@ test.describe("variable version history & rollback", () => {
         "history modal should close automatically after a successful rollback"
       ).toBeHidden({ timeout: 20_000 });
 
+      // Success toast OR the durable v4 badge — sonner toasts are ephemeral
+      // (~4s) and a dev-mode remount can unmount the toaster before we
+      // sample it. When the toast IS caught, also assert it's the restored-
+      // value copy, not the legacy settings-only warning; the v4/value
+      // checks below prove the rollback itself either way.
       const toaster = page.locator("[data-sonner-toaster]");
-      await expect(toaster.getByText("Rolled back to version 1")).toBeVisible({
-        timeout: 15_000,
-      });
-      await expect(
-        toaster.getByText("Value and settings restored."),
-        "success toast (not the legacy settings-only warning) should confirm the value itself was restored"
-      ).toBeVisible({ timeout: 5_000 });
+      let sawToast = false;
+      await expect
+        .poll(
+          async () => {
+            sawToast = await toaster
+              .getByText("Rolled back to version 1")
+              .isVisible()
+              .catch(() => false);
+            if (sawToast) return true;
+            return row
+              .getByText("v4", { exact: true })
+              .isVisible()
+              .catch(() => false);
+          },
+          {
+            message:
+              "rollback should surface the success toast or mint the v4 badge",
+            timeout: 20_000,
+          }
+        )
+        .toBe(true);
+      if (sawToast) {
+        await expect(
+          toaster.getByText("Value and settings restored."),
+          "success toast (not the legacy settings-only warning) should confirm the value itself was restored"
+        ).toBeVisible({ timeout: 5_000 });
+      }
 
       // Reveal the now-current value — the real proof the vault pointer
       // flip worked end to end, not just that a toast fired.

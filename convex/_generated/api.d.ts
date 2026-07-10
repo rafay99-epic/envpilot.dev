@@ -18,6 +18,7 @@ import type * as features_admin_analytics from "../features/admin/analytics.js";
 import type * as features_admin_auth from "../features/admin/auth.js";
 import type * as features_admin_changelog from "../features/admin/changelog.js";
 import type * as features_admin_crons from "../features/admin/crons.js";
+import type * as features_admin_e2e from "../features/admin/e2e.js";
 import type * as features_admin_featureFlags from "../features/admin/featureFlags.js";
 import type * as features_admin_featureRequests from "../features/admin/featureRequests.js";
 import type * as features_admin_inbox from "../features/admin/inbox.js";
@@ -123,6 +124,7 @@ declare const fullApi: ApiFromModules<{
   "features/admin/auth": typeof features_admin_auth;
   "features/admin/changelog": typeof features_admin_changelog;
   "features/admin/crons": typeof features_admin_crons;
+  "features/admin/e2e": typeof features_admin_e2e;
   "features/admin/featureFlags": typeof features_admin_featureFlags;
   "features/admin/featureRequests": typeof features_admin_featureRequests;
   "features/admin/inbox": typeof features_admin_inbox;

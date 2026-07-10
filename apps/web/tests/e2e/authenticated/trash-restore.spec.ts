@@ -4,26 +4,26 @@ import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   createVariable,
   deleteVariableByKey,
-  getFirstProjectSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
   variableRow,
 } from "./support";
 
 // Authenticated e2e — soft-delete / trash / restore for variables and shared
 // accounts (7-day retention window shipped alongside RecentlyDeleted, see
-// apps/web/src/components/variables/recently-deleted.tsx). Runs against the
-// same shared owned-org project the sibling accounts/variables specs use, so
-// tests are kept serial (test.describe.serial) to avoid two workers racing
-// on the same project's variable/account lists and trash section.
+// apps/web/src/components/variables/recently-deleted.tsx). Runs against this
+// worker's own fixture project (getWorkerProjectSlug); tests stay serial
+// (test.describe.serial) because they share that project's trash state with
+// each other — under fullyParallel, non-serial tests in one file can land on
+// different workers.
 //
-// The shared project accumulates soft-deleted rows across CI/local runs
-// (accounts.spec.ts deletes an account on every run; this file's own tests
-// leave their cleanup deletes behind too — deleting no longer purges
-// immediately, it just re-enters the trash). That makes "the trash is empty"
-// an assumption we can't force without new fixture infrastructure, so the
-// empty-trash test tolerates a non-empty trash left over from prior runs by
-// skipping with an explanation, mirroring the tolerant-skip pattern used in
-// variables-pagination.spec.ts for "Load more".
+// The worker project still accumulates soft-deleted rows across runs (this
+// file's own tests leave their cleanup deletes behind — deleting no longer
+// purges immediately, it just re-enters the trash, and trash entries persist
+// for 7 days). That makes "the trash is empty" an assumption we can't force,
+// so the empty-trash test tolerates a non-empty trash left over from prior
+// runs by skipping with an explanation, mirroring the tolerant-skip pattern
+// used in variables-pagination.spec.ts for "Load more".
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
@@ -61,11 +61,7 @@ test.describe.serial("trash & restore", () => {
   }) => {
     test.setTimeout(60_000);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise trash against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",
@@ -102,11 +98,7 @@ test.describe.serial("trash & restore", () => {
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise the trash feature against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",
@@ -171,11 +163,29 @@ test.describe.serial("trash & restore", () => {
       await expect(variableTrashRow).toContainText(/deleted \d+ days? ago/i);
       await expect(variableTrashRow).toContainText(/\d+ days? left/i);
 
-      // ── Restore: sonner toast + item reappears in the normal list ──
+      // ── Restore: item leaves the trash list + reappears in the normal
+      // list. The sonner toast is ephemeral (~4s) and a dev-mode remount can
+      // unmount the toaster before the assertion samples it, so accept
+      // either success signal — the durable reappearance check follows.
       await variableTrashRow.getByRole("button", { name: "Restore" }).click();
-      await expect(
-        page.locator("[data-sonner-toaster]").getByText(`Restored ${key}`)
-      ).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(
+          async () => {
+            const toastVisible = await page
+              .locator("[data-sonner-toaster]")
+              .getByText(`Restored ${key}`)
+              .isVisible()
+              .catch(() => false);
+            const rowGone = (await variableTrashRow.count()) === 0;
+            return toastVisible || rowGone;
+          },
+          {
+            message:
+              "restore should surface the success toast or remove the row from the trash list",
+            timeout: 15_000,
+          }
+        )
+        .toBe(true);
 
       await expect(
         variableRow(page, key),
@@ -206,11 +216,7 @@ test.describe.serial("trash & restore", () => {
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise the trash feature against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}/accounts`, {
       waitUntil: "domcontentloaded",
@@ -303,13 +309,28 @@ test.describe.serial("trash & restore", () => {
       await expect(accountTrashRow).toContainText(/deleted \d+ days? ago/i);
       await expect(accountTrashRow).toContainText(/\d+ days? left/i);
 
-      // ── Restore: sonner toast, then confirm it's back on /accounts ──
+      // ── Restore: row leaves the trash list, then confirm it's back on
+      // /accounts. Same ephemeral-toast tolerance as the variable round-trip
+      // above (a remount can unmount the toaster before we sample it).
       await accountTrashRow.getByRole("button", { name: "Restore" }).click();
-      await expect(
-        page
-          .locator("[data-sonner-toaster]")
-          .getByText(`Restored ${accountName}`)
-      ).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(
+          async () => {
+            const toastVisible = await page
+              .locator("[data-sonner-toaster]")
+              .getByText(`Restored ${accountName}`)
+              .isVisible()
+              .catch(() => false);
+            const rowGone = (await accountTrashRow.count()) === 0;
+            return toastVisible || rowGone;
+          },
+          {
+            message:
+              "restore should surface the success toast or remove the row from the trash list",
+            timeout: 15_000,
+          }
+        )
+        .toBe(true);
 
       await page.goto(`/dashboard/projects/${slug}/accounts`, {
         waitUntil: "domcontentloaded",
