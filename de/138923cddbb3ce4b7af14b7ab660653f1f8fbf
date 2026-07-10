@@ -1,0 +1,44 @@
+apps/web/src/components/variables/variable-create-drawer.tsx
+  s_f59315d63e71a6::t_2b30eb69459ca9 40-46
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_f59315d63e71a6::t_e374681b304cdb 108-134
+apps/vscode-extension/src/extension.ts
+  s_f59315d63e71a6::t_3cbb47c5ea9f4d 451-481,483,492-497,501-504
+  s_f59315d63e71a6::t_637b024b8803cc 482,484-491
+  s_f59315d63e71a6::t_6cd4eec377368b 40
+  s_f59315d63e71a6::t_bf8a4a5a7d3555 100-106
+apps/vscode-extension/src/types.ts
+  s_f59315d63e71a6::t_39e2f57f5a00cb 206
+apps/vscode-extension/src/services/sync.ts
+  s_f59315d63e71a6::t_1bbe69263ec139 224-244
+convex/features/projects/helpers.ts
+  s_f59315d63e71a6::t_e3018091938122 61-68,71,73-76,80
+convex/features/variables/queries.ts
+  s_f59315d63e71a6::t_1e423b4c672af8 38-40,156-158,361-363,505-507,585-587,636-638,686-688
+  s_f59315d63e71a6::t_2c05ba77780d8f 933-937,939-941
+apps/vscode-extension/src/utils/config.ts
+  s_f59315d63e71a6::t_c134aae81b1385 81-87
+  s_f59315d63e71a6::t_f7315c1da1e92a 52
+  s_f59315d63e71a6::t_65d75a5faab682 80
+apps/web/src/lib/versions.ts
+  s_f59315d63e71a6::t_9e2a1f1d526d86 19
+apps/vscode-extension/package.json
+  s_f59315d63e71a6::t_9e2a1f1d526d86 5
+  s_f59315d63e71a6::t_e816845b1b6c0a 363-368
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "de138923cddbb3ce4b7af14b7ab660653f1f8fbf",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
