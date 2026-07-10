@@ -1,0 +1,23 @@
+apps/web/tests/e2e/authenticated/support.ts
+  s_655596e5f5983b::t_18c986042c19dc 97-106,124-129
+apps/web/tests/e2e/authenticated/accounts.spec.ts
+  s_655596e5f5983b::t_43deac6d817c86 57-67
+apps/web/tests/e2e/authenticated/search-projects-org.spec.ts
+  s_655596e5f5983b::t_f9690a171240cf 432-438
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "aee71c760c6f9f3ba8ed9edb79f73f287365d886",
+  "prompts": {},
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
