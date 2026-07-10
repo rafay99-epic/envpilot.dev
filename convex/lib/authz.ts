@@ -665,4 +665,3 @@ export async function getAccountAccess(
 
   return grant.permission === "read" ? "read" : "write";
 }
-
