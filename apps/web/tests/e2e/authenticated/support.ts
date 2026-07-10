@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // Shared fixtures for authenticated RBAC specs. Kept separate from
 // invite-panel.spec.ts so existing passing specs are never touched.
@@ -49,25 +49,75 @@ export async function getOwnedOrgSlug(page: Page): Promise<string> {
 }
 
 /**
- * Navigates to /dashboard/projects and returns the slug of the first
- * project, or null if the owned org has no projects yet.
+ * Per-worker fixture project: returns the slug of `E2E Worker Project <n>`
+ * (n = this worker's parallelIndex), creating it through the authenticated
+ * API on first use. Every parallel worker mutating its OWN project is what
+ * makes `fullyParallel` safe — with a single shared project, one worker's
+ * writes re-render/paginate the variable list out from under another
+ * worker's open drawer or row assertions (the "element detached" flake
+ * family). Requires the e2e account's org to allow enough projects (the
+ * account is provisioned on the pro tier — see convex/features/admin/e2e.ts).
+ *
+ * The project is intentionally REUSED across runs (cleanup.setup.ts purges
+ * its stale E2E_* variables instead of deleting the project) to avoid
+ * create/delete churn in the org.
  */
-export async function getFirstProjectSlug(page: Page): Promise<string | null> {
-  await page.goto("/dashboard/projects", { waitUntil: "domcontentloaded" });
+const workerProjectSlugCache = new Map<number, string>();
 
-  const projectLinks = page.locator(
-    'main a[href^="/dashboard/projects/"]:not([href="/dashboard/projects/new"])'
+export async function getWorkerProjectSlug(page: Page): Promise<string> {
+  const workerIndex = test.info().parallelIndex;
+  const cached = workerProjectSlugCache.get(workerIndex);
+  if (cached) return cached;
+
+  const slug = `e2e-worker-project-${workerIndex}`;
+  const name = `E2E Worker Project ${workerIndex}`;
+
+  const orgsResponse = await page.request.get("/api/organizations");
+  if (!orgsResponse.ok()) {
+    throw fixtureError(
+      `GET /api/organizations failed (${orgsResponse.status()}) — is the saved auth session still valid?`
+    );
+  }
+  const { organizations } = (await orgsResponse.json()) as {
+    organizations: Array<{ _id: string; role: string }>;
+  };
+  const ownedOrg = organizations.find((o) => o.role === "owner");
+  if (!ownedOrg) throw fixtureError("the test user OWNS no organization");
+
+  const projectsResponse = await page.request.get(
+    `/api/projects?organizationId=${ownedOrg._id}`
   );
-  const emptyState = page.getByText(/No projects found/i);
-  await expect(projectLinks.first().or(emptyState), {
-    message: "the projects page never finished loading",
-  }).toBeVisible({ timeout: 30_000 });
+  if (!projectsResponse.ok()) {
+    throw fixtureError(
+      `GET /api/projects failed (${projectsResponse.status()})`
+    );
+  }
+  const { projects } = (await projectsResponse.json()) as {
+    projects: Array<{ slug: string }>;
+  };
 
-  if ((await projectLinks.count()) === 0) return null;
+  if (!projects.some((p) => p.slug === slug)) {
+    const createResponse = await page.request.post("/api/projects", {
+      data: {
+        name,
+        slug,
+        organizationId: ownedOrg._id,
+        description: "Per-worker Playwright fixture project (auto-created)",
+      },
+    });
+    // 409 = another test in this worker raced us to it — that's fine.
+    if (!createResponse.ok() && createResponse.status() !== 409) {
+      throw fixtureError(
+        `creating the worker fixture project failed ` +
+          `(${createResponse.status()}): ${await createResponse.text()}. ` +
+          `If this is a tier-limit error, the e2e account must be on the ` +
+          `pro tier (bunx convex run features/admin/e2e:ensureE2EUserPro)`
+      );
+    }
+  }
 
-  const href = await projectLinks.first().getAttribute("href");
-  if (!href) return null;
-  return href.replace(/^\/dashboard\/projects\//, "");
+  workerProjectSlugCache.set(workerIndex, slug);
+  return slug;
 }
 
 /**

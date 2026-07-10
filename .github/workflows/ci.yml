@@ -315,6 +315,17 @@ jobs:
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
 
+      # The suite runs parallel workers against per-worker fixture projects
+      # (support.ts getWorkerProjectSlug). Free-tier caps (max_projects: 3,
+      # max_variables_per_project: 50) would block that scale, so the e2e
+      # account is provisioned on the pro tier. Idempotent; no-ops when the
+      # user hasn't signed in yet or is already pro.
+      - name: Ensure the e2e account is on the pro tier
+        run: |
+          bunx convex run features/admin/e2e:ensureE2EUserPro "{\"email\": \"$E2E_TEST_EMAIL\"}"
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+
       - name: Install Playwright browsers
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium
@@ -329,14 +340,15 @@ jobs:
         working-directory: apps/web
         run: bun run build
 
-      # playwright.config.ts already applies workers/retries when CI is set;
-      # the explicit flags pin the gate's serial-run + retry contract here so
-      # a config refactor can't silently reintroduce the parallel flakes.
+      # Parallel workers (pinned in playwright.config.ts: 4 on CI) are safe
+      # now that every worker mutates its OWN fixture project — the old
+      # serial pin existed because workers contended on one shared project.
+      # Retries stay pinned here so a config refactor can't drop them.
       - name: Run Playwright suite
         working-directory: apps/web
         env:
           PLAYWRIGHT_WEB_CMD: bun run start
-        run: bunx playwright test --workers=1 --retries=2
+        run: bunx playwright test --retries=2
 
       - name: Upload Playwright report
         if: failure()

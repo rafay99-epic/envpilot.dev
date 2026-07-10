@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   ACCESS_DENIED_TEXT,
-  getFirstProjectSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
 } from "./support";
 
@@ -22,11 +22,7 @@ test.describe("project members — add member drawer", () => {
     test.setTimeout(60_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to assert structurally beyond page load"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}/members`, {
       waitUntil: "domcontentloaded",

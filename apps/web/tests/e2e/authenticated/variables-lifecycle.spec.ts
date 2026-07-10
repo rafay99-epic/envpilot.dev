@@ -4,7 +4,7 @@ import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   createVariable,
   deleteVariableByKey,
-  getFirstProjectSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
   variableRow,
 } from "./support";
@@ -31,11 +31,7 @@ test.describe.serial("variable lifecycle", () => {
     test.setTimeout(120_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise the variable lifecycle against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",

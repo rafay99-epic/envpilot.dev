@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { hasE2ECredentials, SKIP_REASON } from "../env";
-import { getFirstProjectSlug, trackClientErrors } from "./support";
+import { getWorkerProjectSlug, trackClientErrors } from "./support";
 
 // Authenticated e2e — Shared Accounts (PLAN.md Slice C). Exercises the full
 // lifecycle against a real project: nav visibility, page load, create via
@@ -35,11 +35,7 @@ test.describe("shared accounts", () => {
     test.setTimeout(120_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to exercise the Accounts feature against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     // ── Nav item visible on a project ──
     await page.goto(`/dashboard/projects/${slug}`, {

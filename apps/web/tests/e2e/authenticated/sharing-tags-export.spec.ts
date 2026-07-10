@@ -5,8 +5,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   createVariable,
-  getFirstProjectSlug,
   getOwnedOrgSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
 } from "./support";
 
@@ -114,11 +114,7 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to create a variable against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",
@@ -201,7 +197,11 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
         "share generation should succeed with default settings"
       ).toBeVisible();
 
-      const shareUrlCode = shareDrawer.locator("code");
+      // The success view keeps the key's <code> block AND adds the URL's —
+      // filter on the share-route path so the locator stays unambiguous.
+      const shareUrlCode = shareDrawer
+        .locator("code")
+        .filter({ hasText: /\/s\// });
       await expect(shareUrlCode).toBeVisible({ timeout: 10_000 });
       const shareUrl = (await shareUrlCode.textContent())?.trim() ?? "";
       expect(
@@ -238,11 +238,7 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to create a variable against"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",
@@ -274,22 +270,33 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
         "tag UI not reachable from the variable create form — variable_tags feature may be gated off for this org/tier"
       );
 
-      await newTagButton.click();
-      await createDrawer.getByPlaceholder("Tag name").fill(tagName);
-      await createDrawer.getByRole("button", { name: "Add Tag" }).click();
-      tagCreated = true;
-      auditMarkers.push(tagName);
-
       // The newly created tag reactively appears as an unselected toggle
-      // chip in availableTags — select it before submitting.
+      // chip in availableTags. The open→fill→submit sub-flow retries as a
+      // unit (support.ts createVariable pattern): the drawer re-renders on
+      // live query updates, and a swallowed "Add Tag" click means the
+      // mutation never runs and the chip never appears. Duplicate names are
+      // rejected server-side, so a retry after an unobserved success is
+      // harmless — the chip check at the top short-circuits it anyway.
       const tagChip = createDrawer.getByRole("button", {
         name: tagName,
         exact: true,
       });
-      await expect(
-        tagChip,
-        "newly created tag should appear as a selectable chip"
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(async () => {
+        if (await tagChip.isVisible().catch(() => false)) return;
+        const nameInput = createDrawer.getByPlaceholder("Tag name");
+        if (!(await nameInput.isVisible().catch(() => false))) {
+          await newTagButton.click({ timeout: 5_000 });
+        }
+        await nameInput.fill(tagName, { timeout: 5_000 });
+        await createDrawer
+          .getByRole("button", { name: "Add Tag" })
+          .click({ timeout: 5_000 });
+        await expect(tagChip, {
+          message: "newly created tag should appear as a selectable chip",
+        }).toBeVisible({ timeout: 10_000 });
+      }).toPass({ timeout: 60_000 });
+      tagCreated = true;
+      auditMarkers.push(tagName);
       await tagChip.click();
       await expect(
         createDrawer.locator("span").filter({ hasText: tagName }),
@@ -364,11 +371,7 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     test.setTimeout(90_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to export"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     await page.goto(`/dashboard/projects/${slug}`, {
       waitUntil: "domcontentloaded",

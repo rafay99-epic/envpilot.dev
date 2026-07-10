@@ -57,11 +57,20 @@ async function openOwnedOrgMembersPage(page: Page): Promise<void> {
   await page.goto(`${href}/members`, { waitUntil: "domcontentloaded" });
 }
 
-/** Sets a checkbox to the desired state regardless of its default. */
+/**
+ * Sets a checkbox to the desired state regardless of its default. The
+ * read+click+verify runs as a retried unit — the invite drawer re-renders on
+ * live query updates and dev-mode remounts can detach the input mid-click
+ * (same pattern as support.ts createVariable). The final isChecked assert
+ * also catches a click that landed on a just-replaced node and got swallowed.
+ */
 async function setChecked(checkbox: Locator, checked: boolean): Promise<void> {
-  if ((await checkbox.isChecked()) !== checked) {
-    await checkbox.click();
-  }
+  await expect(async () => {
+    if ((await checkbox.isChecked()) !== checked) {
+      await checkbox.click({ timeout: 5_000 });
+    }
+    expect(await checkbox.isChecked()).toBe(checked);
+  }).toPass({ timeout: 30_000 });
 }
 
 test.describe("org members invite panel", () => {

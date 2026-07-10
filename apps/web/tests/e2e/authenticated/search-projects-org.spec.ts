@@ -5,8 +5,8 @@ import {
   ACCESS_DENIED_TEXT,
   createVariable,
   deleteVariableByKey,
-  getFirstProjectSlug,
   getOwnedOrgSlug,
+  getWorkerProjectSlug,
   trackClientErrors,
   variableRow,
 } from "./support";
@@ -45,11 +45,7 @@ test.describe("global search (command palette)", () => {
     test.setTimeout(120_000);
     const clientErrors = trackClientErrors(page);
 
-    const slug = await getFirstProjectSlug(page);
-    test.skip(
-      slug === null,
-      "the owned org has no projects yet — nothing to search for"
-    );
+    const slug = await getWorkerProjectSlug(page);
 
     const uniqueKey = `E2E_SEARCH_${Date.now()}`;
     let created = false;
