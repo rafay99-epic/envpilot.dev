@@ -1,0 +1,19 @@
+convex/features/admin/migrations.ts
+  s_f59315d63e71a6::t_4a5111fd83c9d1 203-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "27c685338048cc876bb50f0d8012a8616047113e",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
