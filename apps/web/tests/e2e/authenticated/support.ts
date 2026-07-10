@@ -94,6 +94,16 @@ export async function getFirstProjectSlug(page: Page): Promise<string | null> {
 function isBenignNoise(text: string): boolean {
   return (
     /favicon|Download the React DevTools/i.test(text) ||
+    // Vercel Web Analytics / Speed Insights injects a
+    // <script src="/_vercel/insights/script.js"> into the dashboard layout.
+    // That path is served ONLY by Vercel's edge in real production; under a
+    // local `next start` or in CI (a production build NOT running on Vercel)
+    // it 404s on every page. It's an environment artifact — on real Vercel
+    // prod the script loads fine and analytics no-ops gracefully off-Vercel —
+    // not a product error, so it must not fail the zero-client-errors specs.
+    // The generic "Failed to load resource: 404" console text carries no URL;
+    // trackClientErrors matches this against the message's location URL too.
+    /_vercel\/(insights|speed-insights)/.test(text) ||
     /"module":"hooks\/use-auth".*"event":"fetch_user_failed"/.test(text) ||
     /Hydration failed because the server rendered HTML didn't match the client/.test(
       text
@@ -111,7 +121,12 @@ export function trackClientErrors(page: Page): string[] {
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
     const text = msg.text();
-    if (isBenignNoise(text)) return;
+    // A failed resource load (e.g. a 404) surfaces as a generic
+    // "Failed to load resource: ..." message whose text has no URL — the
+    // offending URL is only on the message location. Filter on both so
+    // known-benign resource 404s (Vercel insights) are dropped by URL.
+    const locationUrl = msg.location()?.url ?? "";
+    if (isBenignNoise(text) || isBenignNoise(locationUrl)) return;
     errors.push(text);
   });
   page.on("pageerror", (err) => {

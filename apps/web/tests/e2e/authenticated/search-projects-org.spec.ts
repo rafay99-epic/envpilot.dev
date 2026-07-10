@@ -429,7 +429,13 @@ test.describe("usage dashboard renders after query capping", () => {
     // straight out of the rewritten capped-scan tierLimits usage query, so
     // seeing a real value here proves the query still returns data instead
     // of getting stuck loading or throwing.
-    await expect(page.getByText("Projects", { exact: true })).toBeVisible({
+    // `.first()`: "Projects" also appears in the sidebar nav link and a
+    // truncated org-name span, so an exact-text match resolves to 3 elements
+    // (strict-mode violation). The usage-meter label is first in DOM order;
+    // asserting it is present is all this needs.
+    await expect(
+      page.getByText("Projects", { exact: true }).first()
+    ).toBeVisible({
       timeout: 20_000,
     });
     await expect(

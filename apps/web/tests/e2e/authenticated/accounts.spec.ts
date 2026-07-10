@@ -54,10 +54,17 @@ test.describe("shared accounts", () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // ── Page loads with header ──
-    await accountsNavLink.first().click();
-    await expect(page).toHaveURL(
-      new RegExp(`/dashboard/projects/${slug}/accounts$`)
-    );
+    // Clicking immediately after load can race Next.js hydration (the Link
+    // handler isn't attached yet, so the click is swallowed) — retry the
+    // click until the navigation actually happens. Same pattern as the
+    // project-create flow in search-projects-org.spec.ts.
+    await expect(async () => {
+      await accountsNavLink.first().click();
+      await page.waitForURL(
+        new RegExp(`/dashboard/projects/${slug}/accounts$`),
+        { timeout: 5_000 }
+      );
+    }).toPass({ timeout: 20_000 });
     await expect(
       page.getByRole("heading", { level: 1, name: "Accounts" })
     ).toBeVisible({ timeout: 20_000 });
