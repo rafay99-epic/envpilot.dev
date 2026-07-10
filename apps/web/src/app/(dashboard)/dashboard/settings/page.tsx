@@ -1748,8 +1748,7 @@ function BillingSettings({
                     {paymentsEnabled && (
                       <button
                         onClick={() => {
-                          window.location.href =
-                            "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                          window.location.href = "/api/checkout?tier=pro";
                         }}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
                       >
@@ -1799,8 +1798,7 @@ function BillingSettings({
               {paymentsEnabled && (
                 <button
                   onClick={() => {
-                    window.location.href =
-                      "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+                    window.location.href = "/api/checkout?tier=pro";
                   }}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 transition-colors hover:bg-green-500/20"
                 >

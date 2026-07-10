@@ -209,15 +209,15 @@ export default function CheckoutSuccessPage() {
             </div>
           </div>
 
-          {/* Pro Badge */}
+          {/* Upgrade Badge */}
           <div className="mx-auto flex max-w-sm items-center justify-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-6 py-4">
             <Crown className="h-6 w-6 text-amber-400" />
             <div>
               <p className="font-mono text-lg font-semibold text-amber-400">
-                Pro Tier
+                Your upgrade is active
               </p>
               <p className="font-mono text-xs text-zinc-500">
-                All premium features unlocked
+                All plan features are now unlocked
               </p>
             </div>
             <Sparkles className="h-5 w-5 text-amber-400/60" />
@@ -226,27 +226,11 @@ export default function CheckoutSuccessPage() {
           {/* What's Included */}
           <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
             <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">
-              $ cat pro-features.txt
+              $ cat plan-features.txt
             </p>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {[
-                "Unlimited Projects",
-                "Unlimited Variables",
-                "Team Members (10+)",
-                "Audit Log (90 days)",
-                "Secret Sharing",
-                "Variable Tags",
-                "Priority Support",
-                "API Access",
-              ].map((feature) => (
-                <div
-                  key={feature}
-                  className="flex items-center gap-2 font-mono text-sm text-zinc-300"
-                >
-                  <Check className="h-3.5 w-3.5 shrink-0 text-green-400" />
-                  {feature}
-                </div>
-              ))}
+            <div className="mt-3 flex items-center gap-2 font-mono text-sm text-zinc-300">
+              <Check className="h-3.5 w-3.5 shrink-0 text-green-400" />
+              All plan features are now unlocked.
             </div>
           </div>
 

@@ -19,13 +19,15 @@ import { requireAuthedUser } from "../../lib/identity";
 // ==========================================
 
 /**
- * Maps a Polar product ID to a tier name by looking up tierDefinitions.
- * Falls back to default tier if no match found.
+ * Maps a Polar product ID to a tier name, or null when the product is not
+ * seeded anywhere. Activation paths MUST treat null as a hard error — a
+ * silent default-tier fallback turns "product not seeded yet" into "customer
+ * paid and got the free tier".
  */
-async function mapProductIdToTier(
+async function mapProductIdToTierStrict(
   db: DatabaseReader,
   productId: string
-): Promise<string> {
+): Promise<string | null> {
   // Strategy 1: Look up in paymentProducts table (provider-agnostic)
   const paymentProduct = await db
     .query("paymentProducts")
@@ -38,7 +40,20 @@ async function mapProductIdToTier(
   const match = allTiers.find((t) => t.polarProductId === productId);
   if (match) return match.name;
 
-  return await getDefaultTierName(db);
+  return null;
+}
+
+/**
+ * Maps a Polar product ID to a tier name by looking up tierDefinitions.
+ * Falls back to default tier if no match found — display paths only; never
+ * use this on a subscription-activation path (see mapProductIdToTierStrict).
+ */
+async function mapProductIdToTier(
+  db: DatabaseReader,
+  productId: string
+): Promise<string> {
+  const strict = await mapProductIdToTierStrict(db, productId);
+  return strict ?? (await getDefaultTierName(db));
 }
 
 // ==========================================
@@ -90,16 +105,34 @@ export const getByOrganization = query({
 });
 
 /**
+ * Pick the CURRENT subscription from a user's rows: a live one
+ * (active/trialing) wins; otherwise the most recently updated. `.first()`
+ * returns the oldest row, which lets a stale revoked subscription shadow a
+ * newer active one.
+ */
+function pickCurrentSubscription<
+  T extends { status: string; updatedAt: number },
+>(subscriptions: T[]): T | null {
+  if (subscriptions.length === 0) return null;
+  const live = subscriptions.filter(
+    (s) => s.status === "active" || s.status === "trialing"
+  );
+  const pool = live.length > 0 ? live : subscriptions;
+  return pool.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a));
+}
+
+/**
  * The caller's own subscription (self-service billing: cancel, portal).
  */
 export const getOwn = query({
   args: {},
   handler: async (ctx) => {
     const actor = await requireAuthedUser(ctx);
-    return await ctx.db
+    const subscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
-      .first();
+      .collect();
+    return pickCurrentSubscription(subscriptions);
   },
 });
 
@@ -117,10 +150,11 @@ export const getForOrgOwner = query({
       actor._id,
       args.organizationId
     );
-    return await ctx.db
+    const subscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", organization.createdBy))
-      .first();
+      .collect();
+    return pickCurrentSubscription(subscriptions);
   },
 });
 
@@ -236,27 +270,24 @@ export const _mapProductToTier = internalQuery({
 });
 
 /**
+ * Strict product→tier mapping for activation paths: null when the product is
+ * not seeded (caller must throw so Polar retries — never grant a default).
+ */
+export const _mapProductToTierStrict = internalQuery({
+  args: { productId: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    return await mapProductIdToTierStrict(ctx.db, args.productId);
+  },
+});
+
+/**
  * Get user's current tier name (used in action context)
  */
 export const _getUserTierName = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await getUserTier(ctx.db, args.userId);
-  },
-});
-
-// ==========================================
-// WEBHOOK DEDUPLICATION
-// ==========================================
-
-export const _checkWebhookProcessed = internalQuery({
-  args: { webhookId: v.string() },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("processedWebhookEvents")
-      .withIndex("by_webhook_id", (q) => q.eq("webhookId", args.webhookId))
-      .first();
-    return !!existing;
   },
 });
 

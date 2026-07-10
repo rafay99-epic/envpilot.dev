@@ -7,15 +7,23 @@ import { api } from "@convex/_generated/api";
 import { isPaymentsEnabled } from "@/lib/polar";
 
 /**
- * GET /api/checkout?products=<product-id>
+ * GET /api/checkout?tier=<tier-name>   (default: "pro")
  *
- * Authenticated Polar checkout with customer pre-creation.
+ * THE single checkout entry point. Authenticated Polar checkout with
+ * customer pre-creation.
  *
- * Following the "always ensure customer exists BEFORE checkout" pattern:
+ * The Polar product is resolved SERVER-SIDE from the tier name
+ * (paymentProducts, then legacy tierDefinitions.polarProductId) — a
+ * client-supplied product id is never trusted. The legacy
+ * `?products=<id>` form is accepted for old links but the id itself is
+ * ignored; it simply means "the default paid tier".
+ *
+ * Flow:
  * 1. Authenticate user
- * 2. Look up or create Polar customer (linked via externalId = convexUserId)
- * 3. Create checkout session with the existing customer
- * 4. Redirect to Polar's hosted checkout page
+ * 2. prepareCheckout (Convex) — org-creator check + double-subscribe guard
+ * 3. Look up or create Polar customer (linked via externalId = convexUserId)
+ * 4. Create checkout session with the existing customer
+ * 5. Redirect to Polar's hosted checkout page
  *
  * This prevents "CheckoutCustomerDeleted" errors and ensures the customer
  * binding is always established before payment begins.
@@ -37,14 +45,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/pricing", url.origin));
   }
 
-  const products = url.searchParams.getAll("products");
-
-  if (products.length === 0) {
-    return NextResponse.json(
-      { error: "Missing products in query params" },
-      { status: 400 }
-    );
-  }
+  const tierName = url.searchParams.get("tier") ?? "pro";
 
   // --- Authentication required ---
   const { user, accessToken: workosAccessToken } = await withAuth();
@@ -96,11 +97,63 @@ export async function GET(req: Request) {
     );
   }
 
-  // Get user's first owned organization for billing association
+  // Derive the app origin from the incoming request so redirects always
+  // match the domain the user is on (localhost, ngrok, production).
+  const origin = url.origin;
+  const redirectWithError = (message: string) => {
+    const errorUrl = new URL("/dashboard/checkout-success", origin);
+    errorUrl.searchParams.set("error", message);
+    return NextResponse.redirect(errorUrl.toString());
+  };
+
+  // Resolve the Polar product from the tier SERVER-SIDE:
+  // paymentProducts first, legacy tierDefinitions.polarProductId fallback.
+  const paymentProductId = await convex.query(
+    api.features.billing.queries.getProductIdForTier,
+    { tierName, provider: "polar" }
+  );
+  const tierDef = await convex.query(
+    api.features.featureRegistry.queries.getTierByName,
+    { name: tierName }
+  );
+  const polarProductId = paymentProductId ?? tierDef?.polarProductId;
+  if (!polarProductId) {
+    return redirectWithError(
+      `The "${tierName}" plan is not available for purchase right now. Please contact support.`
+    );
+  }
+
+  // Get user's billing organization: the org this account CREATED (the tier
+  // resolver derives org features from the creator's tier), preferring it
+  // over invited-into orgs.
   const organizations = await createAuthedConvexClient(
     workosAccessToken!
   ).query(api.features.organizations.queries.listForUser, {});
-  const primaryOrg = organizations[0];
+  const primaryOrg =
+    organizations.find((o) => o && o.createdBy === convexUser._id) ??
+    organizations[0];
+
+  if (!primaryOrg) {
+    return redirectWithError(
+      "You need an organization before purchasing a plan. Create one first, then upgrade."
+    );
+  }
+
+  // Authorization + double-subscribe guard (Convex verifies the caller is
+  // the org's creating account and has no live subscription).
+  try {
+    await createAuthedConvexClient(workosAccessToken!).mutation(
+      api.features.billing.checkout.prepareCheckout,
+      { organizationId: primaryOrg._id }
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Checkout is not available";
+    // Convex prefixes mutation errors; keep just the human-readable tail.
+    const clean =
+      message.split("Uncaught Error:").pop()?.trim() ?? "Checkout failed";
+    return redirectWithError(clean);
+  }
 
   // --- Ensure Polar customer exists BEFORE checkout ---
   // This prevents "CheckoutCustomerDeleted" 409 errors and ensures
@@ -125,8 +178,8 @@ export async function GET(req: Request) {
             : user.firstName || user.lastName || undefined,
         metadata: {
           userId: convexUser._id,
-          organizationId: primaryOrg?._id ?? "",
-          organizationName: primaryOrg?.name ?? "",
+          organizationId: primaryOrg._id,
+          organizationName: primaryOrg.name,
         },
       });
       polarCustomerId = newCustomer.id;
@@ -159,20 +212,26 @@ export async function GET(req: Request) {
     }
   }
 
-  // Derive the app origin from the incoming request so the success redirect
-  // always matches the domain the user is on (localhost, ngrok, production).
-  const origin = url.origin;
   const successUrl = `${origin}/dashboard/checkout-success?checkout_id={CHECKOUT_ID}`;
+
+  // Client IP for Polar's tax/currency detection (first hop of
+  // x-forwarded-for is the browser when behind Vercel's proxy).
+  const customerIpAddress = req.headers
+    .get("x-forwarded-for")
+    ?.split(",")[0]
+    ?.trim();
 
   try {
     const checkoutParams: Parameters<typeof polar.checkouts.create>[0] = {
-      products,
+      products: [polarProductId],
       successUrl,
       customerEmail: user.email,
+      ...(customerIpAddress ? { customerIpAddress } : {}),
       metadata: {
         userId: convexUser._id,
-        organizationId: primaryOrg?._id ?? "",
-        organizationName: primaryOrg?.name ?? "",
+        organizationId: primaryOrg._id,
+        organizationName: primaryOrg.name,
+        tierName,
       },
     };
 
@@ -191,7 +250,7 @@ export async function GET(req: Request) {
     console.error("Polar checkout error:", error);
     Sentry.captureException(error, {
       tags: { source: "checkout", action: "create-checkout" },
-      extra: { userId: convexUser._id, products },
+      extra: { userId: convexUser._id, tierName, polarProductId },
     });
 
     // User-friendly error page redirect instead of raw JSON error
@@ -208,8 +267,6 @@ export async function GET(req: Request) {
       ? "There was an issue with your billing account. Please try again."
       : "Something went wrong during checkout. Please try again.";
 
-    const errorUrl = new URL("/dashboard/checkout-success", origin);
-    errorUrl.searchParams.set("error", userMessage);
-    return NextResponse.redirect(errorUrl.toString());
+    return redirectWithError(userMessage);
   }
 }

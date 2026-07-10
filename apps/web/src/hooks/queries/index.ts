@@ -51,8 +51,4 @@ export {
   type Tag,
 } from "./useTagsQuery";
 
-export {
-  useSubscription,
-  useCreateCheckout,
-  useCreatePortalSession,
-} from "./useBillingQuery";
+export { useSubscription, useCreatePortalSession } from "./useBillingQuery";

@@ -59,8 +59,7 @@ export function UpgradePrompt({
     if (onUpgradeClick) {
       onUpgradeClick();
     } else {
-      window.location.href =
-        "/api/checkout?products=d1edde6d-3201-4cec-b1e4-e053d7edba23";
+      window.location.href = "/api/checkout?tier=pro";
     }
   };
 
