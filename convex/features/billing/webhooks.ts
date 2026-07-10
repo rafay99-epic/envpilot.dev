@@ -510,15 +510,19 @@ async function activateSubscriptionFromEvent(
 
 /**
  * Constant-time string comparison for the bridge secret — a plain `===`
- * leaks length/prefix timing on a money-path credential.
+ * leaks length/prefix timing on a money-path credential. No early return on
+ * length mismatch either: the loop always runs over the longer input, so an
+ * attacker can't binary-search the secret's byte-length through timing.
  */
 function timingSafeEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder();
   const aBytes = encoder.encode(a);
   const bBytes = encoder.encode(b);
-  if (aBytes.length !== bBytes.length) return false;
-  let diff = 0;
-  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  const maxLength = Math.max(aBytes.length, bBytes.length);
+  let diff = aBytes.length ^ bBytes.length;
+  for (let i = 0; i < maxLength; i++) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
   return diff === 0;
 }
 
@@ -592,12 +596,17 @@ export const processWebhookEvent = action({
           const organizationId = metadata.organizationId;
           const userId = metadata.userId;
 
+          // A dropped succeeded-checkout never seeds the polarCustomers
+          // mapping, and Polar won't redeliver on a 200 — so missing fields
+          // must fail for redelivery, same as the subscription events.
           if (!organizationId || !userId) {
             console.error("subscriptions.processWebhookEvent.missingMetadata", {
               eventType: args.type,
               eventId: eventData.id,
             });
-            return;
+            throw new Error(
+              `Polar checkout.updated event ${eventData.id} succeeded but carries no userId/organizationId metadata — failing for redelivery`
+            );
           }
 
           const customerId = eventData.customerId as string;
@@ -612,7 +621,9 @@ export const processWebhookEvent = action({
                 eventId: eventData.id,
               }
             );
-            return;
+            throw new Error(
+              `Polar checkout.updated event ${eventData.id} succeeded but carries no customer id/email — failing for redelivery`
+            );
           }
 
           // Map Polar customer to org and user
@@ -911,23 +922,30 @@ export const processWebhookEvent = action({
               )
             )?.createdBy;
 
-          if (resolvedUserId) {
-            // Get user's current tier before downgrade
-            const currentTier = await ctx.runQuery(
-              internal.features.billing.queries._getUserTierName,
-              { userId: resolvedUserId }
-            );
-
-            // Start grace period instead of immediate downgrade
-            await ctx.runMutation(
-              internal.features.billing.gracePeriods._createGracePeriod,
-              {
-                userId: resolvedUserId,
-                previousTier: currentTier,
-                gracePeriodDays: GRACE_PERIOD_DAYS,
-              }
+          if (!resolvedUserId) {
+            // A revocation we can't attribute would leave the user on a
+            // paid tier forever — fail for redelivery like every other
+            // resolution failure on a financially significant event.
+            throw new Error(
+              `Polar subscription.revoked event ${eventData.id} could not be resolved to a user — failing for redelivery`
             );
           }
+
+          // Get user's current tier before downgrade
+          const currentTier = await ctx.runQuery(
+            internal.features.billing.queries._getUserTierName,
+            { userId: resolvedUserId }
+          );
+
+          // Start grace period instead of immediate downgrade
+          await ctx.runMutation(
+            internal.features.billing.gracePeriods._createGracePeriod,
+            {
+              userId: resolvedUserId,
+              previousTier: currentTier,
+              gracePeriodDays: GRACE_PERIOD_DAYS,
+            }
+          );
 
           console.log("Polar: subscription revoked (grace period started)");
           break;
