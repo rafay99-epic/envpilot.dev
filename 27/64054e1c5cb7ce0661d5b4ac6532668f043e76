@@ -1,0 +1,35 @@
+apps/vscode-extension/package.json
+  s_655596e5f5983b::t_536d423e9c6371 5
+  s_655596e5f5983b::t_3bfed60f04ad14 384
+apps/web/package.json
+  s_655596e5f5983b::t_3bfed60f04ad14 60
+package.json
+  s_655596e5f5983b::t_cca9d9fff1b831 3
+apps/web/src/lib/versions.ts
+  s_655596e5f5983b::t_536d423e9c6371 18-19
+apps/cli/package.json
+  s_655596e5f5983b::t_536d423e9c6371 3
+  s_655596e5f5983b::t_3bfed60f04ad14 52
+.github/workflows/ci.yml
+  s_655596e5f5983b::t_008aabca2d5cce 382-393,397,399,401,408,410,412,423,425,427
+  s_655596e5f5983b::t_771b1396392aab 260-333
+  s_655596e5f5983b::t_1868afc287cc9a 457,464,474
+bun.lock
+  s_655596e5f5983b::t_53e9ba1ddcca39 58,92,101,114,155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "2764054e1c5cb7ce0661d5b4ac6532668f043e76",
+  "prompts": {},
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
