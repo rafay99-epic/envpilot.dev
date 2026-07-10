@@ -1,5 +1,5 @@
 import { Id } from "../../_generated/dataModel";
-import { resolveFeatureValue } from "../../featureRegistry";
+import { resolveFeatureValue } from "../featureRegistry/resolver";
 
 /**
  * Get the audit log retention cutoff timestamp for an organization.

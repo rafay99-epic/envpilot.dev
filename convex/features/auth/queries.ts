@@ -113,7 +113,7 @@ export const getMyPermissions = query({
 // role strings so the composed value actions (features/variables/values.ts,
 // features/variables/requests/) can return the same role `meta` the deleted
 // routes did. Lives outside those modules so the value actions can call it via
-// ctx.runQuery(api.roleCompat.resolveLegacyRoles) without a same-module
+// ctx.runQuery(api.features.auth.queries.resolveLegacyRoles) without a same-module
 // circular type reference.
 
 /**

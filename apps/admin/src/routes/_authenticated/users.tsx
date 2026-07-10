@@ -28,9 +28,9 @@ interface UserRow extends Record<string, unknown> {
 }
 
 function UsersPage() {
-  const users = useAdminQuery(api.admin.listUsers, {});
-  const banUser = useAdminMutation(api.admin.banUser);
-  const unbanUser = useAdminMutation(api.admin.unbanUser);
+  const users = useAdminQuery(api.features.admin.users.listUsers, {});
+  const banUser = useAdminMutation(api.features.admin.users.banUser);
+  const unbanUser = useAdminMutation(api.features.admin.users.unbanUser);
   const { confirm } = useConfirmStore();
 
   const [search, setSearch] = useState("");

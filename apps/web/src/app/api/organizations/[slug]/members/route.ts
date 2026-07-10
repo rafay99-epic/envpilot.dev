@@ -67,9 +67,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const authed = createAuthedConvexClient(accessToken!);
 
     // Check membership
-    const membership = await authed.query(api.organizations.getMembership, {
-      organizationId,
-    });
+    const membership = await authed.query(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId,
+      }
+    );
 
     if (!membership) {
       return NextResponse.json(
@@ -78,13 +81,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
-    });
+    const members = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId,
+      }
+    );
 
     // Also get pending invitations
     const invitations = await authed.query(
-      api.invitations.listPendingByOrganization,
+      api.features.organizations.invitations.listPendingByOrganization,
       {
         organizationId,
       }
@@ -140,9 +146,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     const { email, role, projectIds, environments } = validation.data;
 
     // Get organization details for the email
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     if (!organization) {
       return NextResponse.json(
@@ -161,7 +170,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
 
     const result = await createAuthedConvexClient(accessToken!).mutation(
-      api.invitations.create,
+      api.features.organizations.invitations.create,
       {
         email,
         organizationId,
@@ -192,14 +201,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       organization.name
     );
 
-    const emailResult = await convex.action(api.emails.sendInvitationEmail, {
-      to: email,
-      inviterName,
-      organizationName: organization.name,
-      role,
-      token: result.token,
-      expiresAt,
-    });
+    const emailResult = await convex.action(
+      api.features.emails.emails.sendInvitationEmail,
+      {
+        to: email,
+        inviterName,
+        organizationName: organization.name,
+        role,
+        token: result.token,
+        expiresAt,
+      }
+    );
 
     console.log("[INVITE] Email result:", JSON.stringify(emailResult));
 
@@ -279,12 +291,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const { userId: targetUserId, role } = validation.data;
 
     // Get target user info before updating
-    const targetUser = await convex.query(api.users.getById, {
+    const targetUser = await convex.query(api.features.users.users.getById, {
       userId: targetUserId as Id<"users">,
     });
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.updateMemberRole,
+      api.features.organizations.mutations.updateMemberRole,
       {
         organizationId,
         userId: targetUserId as Id<"users">,
@@ -362,12 +374,12 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     // Users can remove themselves; the mutation handles self-removal logic.
 
     // Get target user info before removing
-    const targetUser = await convex.query(api.users.getById, {
+    const targetUser = await convex.query(api.features.users.users.getById, {
       userId: targetUserId,
     });
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.removeMember,
+      api.features.organizations.mutations.removeMember,
       {
         organizationId,
         userId: targetUserId,
@@ -404,18 +416,21 @@ async function notifyMemberUpdate(
   role?: string
 ) {
   try {
-    const org = await convex.query(api.organizations.getById, {
+    const org = await convex.query(api.features.organizations.queries.getById, {
       organizationId,
     });
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
-    });
+    const members = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId,
+      }
+    );
     const orgName = org?.name || "Unknown organization";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === subjectUserId) continue;
       convex
-        .action(api.emails.sendMemberUpdateEmail, {
+        .action(api.features.emails.emails.sendMemberUpdateEmail, {
           userId: member.user._id,
           to: member.user.email,
           organizationName: orgName,

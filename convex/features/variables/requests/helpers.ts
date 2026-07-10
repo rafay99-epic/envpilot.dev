@@ -1,6 +1,6 @@
 import { MutationCtx, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
-import { assertOrgMembership, assertProjectAction } from "../../../authz";
+import { assertOrgMembership, assertProjectAction } from "../../../lib/authz";
 
 export async function getProjectAndOrgRole(
   ctx: MutationCtx | QueryCtx,

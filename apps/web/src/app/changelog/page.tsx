@@ -20,9 +20,12 @@ export default async function ChangelogPage() {
   let entries: ChangelogEntry[] = [];
   try {
     entries =
-      ((await convex.query(api.changelog.listPublished, {
-        limit: 50,
-      })) as ChangelogEntry[]) ?? [];
+      ((await convex.query(
+        api.features.community.changelog.queries.listPublished,
+        {
+          limit: 50,
+        }
+      )) as ChangelogEntry[]) ?? [];
   } catch {
     // Graceful fallback — client will render empty state; page still builds in CI
   }

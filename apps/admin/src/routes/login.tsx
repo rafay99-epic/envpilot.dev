@@ -24,7 +24,7 @@ function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await convex.query(api.admin.verifySecret, {
+      const result = await convex.query(api.features.admin.auth.verifySecret, {
         secret: password,
       });
       if (result.valid) {

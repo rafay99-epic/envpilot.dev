@@ -6,14 +6,14 @@ import {
   QueryCtx,
 } from "../../../_generated/server";
 import { Doc, Id } from "../../../_generated/dataModel";
-import { isCronPaused } from "../../../tierLimits";
-import { checkBooleanFeature } from "../../../featureRegistry";
-import { createAuditLog } from "../../../auditHelpers";
+import { isCronPaused } from "../../billing/tierLimits";
+import { checkBooleanFeature } from "../../featureRegistry/gates";
+import { createAuditLog } from "../../../lib/audit";
 import {
   assertProjectAction,
   assertCanManageUser,
   type OrgRole,
-} from "../../../authz";
+} from "../../../lib/authz";
 
 /**
  * Per-account permission grants — the shared-account analog of

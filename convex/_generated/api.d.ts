@@ -8,24 +8,9 @@
  * @module
  */
 
-import type * as accountPermissions from "../accountPermissions.js";
-import type * as accountValues from "../accountValues.js";
-import type * as accounts from "../accounts.js";
-import type * as admin from "../admin.js";
-import type * as analytics from "../analytics.js";
-import type * as auditHelpers from "../auditHelpers.js";
-import type * as auditLogs from "../auditLogs.js";
-import type * as authHelpers from "../authHelpers.js";
-import type * as authz from "../authz.js";
-import type * as changelog from "../changelog.js";
-import type * as contactMessages from "../contactMessages.js";
 import type * as crons from "../crons.js";
-import type * as dashboard from "../dashboard.js";
 import type * as deviceSessions from "../deviceSessions.js";
-import type * as emails from "../emails.js";
-import type * as favorites from "../favorites.js";
 import type * as featureRegistry from "../featureRegistry.js";
-import type * as featureRequests from "../featureRequests.js";
 import type * as features_accounts_mutations from "../features/accounts/mutations.js";
 import type * as features_accounts_queries from "../features/accounts/queries.js";
 import type * as features_accounts_values from "../features/accounts/values.js";
@@ -105,9 +90,6 @@ import type * as features_variables_values from "../features/variables/values.js
 import type * as features_vault_gc from "../features/vault/gc.js";
 import type * as features_vault_reveal from "../features/vault/reveal.js";
 import type * as features_vault_vault from "../features/vault/vault.js";
-import type * as helpers from "../helpers.js";
-import type * as identity from "../identity.js";
-import type * as invitations from "../invitations.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_authz from "../lib/authz.js";
@@ -117,28 +99,12 @@ import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_seedData from "../lib/seedData.js";
 import type * as lib_users from "../lib/users.js";
 import type * as organizations from "../organizations.js";
-import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
-import type * as permissions from "../permissions.js";
-import type * as projectAccess from "../projectAccess.js";
 import type * as projectMembers from "../projectMembers.js";
 import type * as projects from "../projects.js";
-import type * as rateLimits from "../rateLimits.js";
-import type * as roleCompat from "../roleCompat.js";
-import type * as shareValues from "../shareValues.js";
-import type * as sharedSecrets from "../sharedSecrets.js";
-import type * as subscriptions from "../subscriptions.js";
-import type * as supportTickets from "../supportTickets.js";
-import type * as tags from "../tags.js";
-import type * as templates from "../templates.js";
 import type * as tierLimits from "../tierLimits.js";
-import type * as userPreferences from "../userPreferences.js";
-import type * as users from "../users.js";
 import type * as variableRequests from "../variableRequests.js";
 import type * as variableValues from "../variableValues.js";
 import type * as variables from "../variables.js";
-import type * as vault from "../vault.js";
-import type * as vaultGc from "../vaultGc.js";
-import type * as vaultReveal from "../vaultReveal.js";
 
 import type {
   ApiFromModules,
@@ -147,24 +113,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  accountPermissions: typeof accountPermissions;
-  accountValues: typeof accountValues;
-  accounts: typeof accounts;
-  admin: typeof admin;
-  analytics: typeof analytics;
-  auditHelpers: typeof auditHelpers;
-  auditLogs: typeof auditLogs;
-  authHelpers: typeof authHelpers;
-  authz: typeof authz;
-  changelog: typeof changelog;
-  contactMessages: typeof contactMessages;
   crons: typeof crons;
-  dashboard: typeof dashboard;
   deviceSessions: typeof deviceSessions;
-  emails: typeof emails;
-  favorites: typeof favorites;
   featureRegistry: typeof featureRegistry;
-  featureRequests: typeof featureRequests;
   "features/accounts/mutations": typeof features_accounts_mutations;
   "features/accounts/queries": typeof features_accounts_queries;
   "features/accounts/values": typeof features_accounts_values;
@@ -244,9 +195,6 @@ declare const fullApi: ApiFromModules<{
   "features/vault/gc": typeof features_vault_gc;
   "features/vault/reveal": typeof features_vault_reveal;
   "features/vault/vault": typeof features_vault_vault;
-  helpers: typeof helpers;
-  identity: typeof identity;
-  invitations: typeof invitations;
   "lib/audit": typeof lib_audit;
   "lib/authHelpers": typeof lib_authHelpers;
   "lib/authz": typeof lib_authz;
@@ -256,28 +204,12 @@ declare const fullApi: ApiFromModules<{
   "lib/seedData": typeof lib_seedData;
   "lib/users": typeof lib_users;
   organizations: typeof organizations;
-  permissionRevocationEvents: typeof permissionRevocationEvents;
-  permissions: typeof permissions;
-  projectAccess: typeof projectAccess;
   projectMembers: typeof projectMembers;
   projects: typeof projects;
-  rateLimits: typeof rateLimits;
-  roleCompat: typeof roleCompat;
-  shareValues: typeof shareValues;
-  sharedSecrets: typeof sharedSecrets;
-  subscriptions: typeof subscriptions;
-  supportTickets: typeof supportTickets;
-  tags: typeof tags;
-  templates: typeof templates;
   tierLimits: typeof tierLimits;
-  userPreferences: typeof userPreferences;
-  users: typeof users;
   variableRequests: typeof variableRequests;
   variableValues: typeof variableValues;
   variables: typeof variables;
-  vault: typeof vault;
-  vaultGc: typeof vaultGc;
-  vaultReveal: typeof vaultReveal;
 }>;
 
 /**

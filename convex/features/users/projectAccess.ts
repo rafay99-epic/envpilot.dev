@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "../../_generated/server";
-import { rateLimiter } from "../../rateLimits";
-import { isCronPaused } from "../../tierLimits";
-import { assertOrgAction } from "../../authz";
-import { requireAuthedUser } from "../../identity";
+import { rateLimiter } from "../../lib/rateLimits";
+import { isCronPaused } from "../billing/tierLimits";
+import { assertOrgAction } from "../../lib/authz";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Project Access Queries and Mutations (for extension linking)

@@ -20,7 +20,7 @@ export async function GET() {
     // Ensure the `users` row exists so the session JWT resolves server-side.
     await getOrCreateConvexUser(convex, user);
     const preferences = await createAuthedConvexClient(accessToken!).query(
-      api.userPreferences.getByUserId,
+      api.features.users.preferences.getByUserId,
       {}
     );
 
@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest) {
     await getOrCreateConvexUser(convex, user);
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.userPreferences.upsert,
+      api.features.users.preferences.upsert,
       {
         emailNotifications: validation.data.emailNotifications,
         keyboardShortcuts: validation.data.keyboardShortcuts,

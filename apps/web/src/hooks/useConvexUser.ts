@@ -10,7 +10,7 @@ import { api } from "@convex/_generated/api";
  */
 export function useConvexUser(workosId: string | undefined) {
   const convexUser = useQuery(
-    api.users.getByWorkosId,
+    api.features.users.users.getByWorkosId,
     workosId ? { workosId } : "skip"
   );
 

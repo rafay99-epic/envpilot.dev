@@ -1,14 +1,14 @@
 import { v } from "convex/values";
 import { query, MutationCtx, QueryCtx } from "../../../_generated/server";
 import { Doc, Id } from "../../../_generated/dataModel";
-import { requireAuthedUser } from "../../../identity";
-import { batchGetUsers, userInfo } from "../../../helpers";
+import { requireAuthedUser } from "../../../lib/identity";
+import { batchGetUsers, userInfo } from "../../../lib/users";
 import {
   assertProjectAction,
   normalizeOrgRole,
   roleLevel,
   type OrgRole,
-} from "../../../authz";
+} from "../../../lib/authz";
 
 /**
  * Unified authorization for variable-permission management.

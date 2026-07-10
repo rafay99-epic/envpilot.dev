@@ -1,23 +1,23 @@
 import { v } from "convex/values";
 import { mutation, type MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../identity";
-import { MAX_BULK_IMPORT_SIZE } from "../../tierLimits";
+import { requireAuthedUser } from "../../lib/identity";
+import { MAX_BULK_IMPORT_SIZE } from "../billing/tierLimits";
 import {
   checkCountedLimit,
   checkBooleanFeature,
   countActiveVariables,
   countRotationEnabledVariables,
-  resolveOrgGateContext,
-} from "../../featureRegistry";
-import { createAuditLog, logVariableAccess } from "../../auditHelpers";
-import { rateLimiter } from "../../rateLimits";
+} from "../featureRegistry/gates";
+import { resolveOrgGateContext } from "../featureRegistry/resolver";
+import { createAuditLog, logVariableAccess } from "../../lib/audit";
+import { rateLimiter } from "../../lib/rateLimits";
 import {
   authorizeVariableAccess,
   requireVariableAccess,
-} from "../../authHelpers";
-import { PURGE_RETENTION_DAYS } from "../../vaultGc";
-import { assertOrgAction, normalizeOrgRole } from "../../authz";
+} from "../../lib/authHelpers";
+import { PURGE_RETENTION_DAYS } from "../vault/gc";
+import { assertOrgAction, normalizeOrgRole } from "../../lib/authz";
 import { assertWithinEnvironmentScope } from "./helpers";
 
 /**

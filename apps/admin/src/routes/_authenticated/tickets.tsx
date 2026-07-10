@@ -75,8 +75,13 @@ function TicketsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const allTickets = useAdminQuery(api.admin.listSupportTickets, {});
-  const updateStatus = useAdminMutation(api.admin.updateSupportTicketStatus);
+  const allTickets = useAdminQuery(
+    api.features.admin.inbox.listSupportTickets,
+    {}
+  );
+  const updateStatus = useAdminMutation(
+    api.features.admin.inbox.updateSupportTicketStatus
+  );
 
   const tickets = allTickets
     ? allTickets.filter((t) => {

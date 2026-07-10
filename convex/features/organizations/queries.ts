@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../identity";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Organization Queries and Mutations

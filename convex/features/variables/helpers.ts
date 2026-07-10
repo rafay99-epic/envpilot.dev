@@ -4,7 +4,7 @@ import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
-} from "../../authz";
+} from "../../lib/authz";
 
 /**
  * Environment Variable shared helpers

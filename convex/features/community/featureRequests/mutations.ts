@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "../../../_generated/server";
-import { normalizeOrgRole } from "../../../authz";
-import { getAuthedUser, requireAuthedUser } from "../../../identity";
+import { normalizeOrgRole } from "../../../lib/authz";
+import { getAuthedUser, requireAuthedUser } from "../../../lib/identity";
 
 /**
  * Feature Requests (Wishlist) Mutations

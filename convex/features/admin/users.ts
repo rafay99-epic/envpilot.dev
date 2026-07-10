@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { normalizeOrgRole } from "../../authz";
+import { normalizeOrgRole } from "../../lib/authz";
 import { verifyAdmin } from "./auth";
 
 export const listUsers = query({

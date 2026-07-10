@@ -10,7 +10,10 @@ import { Id } from "@convex/_generated/dataModel";
 export function useUserOrganizations(userId: Id<"users"> | undefined) {
   // Identity is derived server-side from the attached JWT; `userId` gates the
   // query until the current user is known (auth ready).
-  return useQuery(api.organizations.listForUser, userId ? {} : "skip");
+  return useQuery(
+    api.features.organizations.queries.listForUser,
+    userId ? {} : "skip"
+  );
 }
 
 /**
@@ -20,7 +23,7 @@ export function useOrganization(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.organizations.getById,
+    api.features.organizations.queries.getById,
     organizationId ? { organizationId } : "skip"
   );
 }
@@ -32,7 +35,7 @@ export function useOrganizationMembers(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.organizations.getMembers,
+    api.features.organizations.queries.getMembers,
     organizationId ? { organizationId } : "skip"
   );
 }

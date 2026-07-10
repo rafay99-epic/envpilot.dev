@@ -3,17 +3,17 @@ import { mutation, query, internalMutation } from "../../_generated/server";
 import {
   checkNumericLimit,
   countMembersAndPendingInvites,
-} from "../../featureRegistry";
-import { rateLimiter } from "../../rateLimits";
-import { isCronPaused } from "../../tierLimits";
-import { batchGetUsers } from "../../helpers";
+} from "../featureRegistry/gates";
+import { rateLimiter } from "../../lib/rateLimits";
+import { isCronPaused } from "../billing/tierLimits";
+import { batchGetUsers } from "../../lib/users";
 import {
   assertOrgAction,
   assertOrgMembership,
   assertCanAssignRole,
   normalizeOrgRole,
-} from "../../authz";
-import { requireAuthedUser, getAuthedUser } from "../../identity";
+} from "../../lib/authz";
+import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 
 /**
  * Invitation Queries and Mutations

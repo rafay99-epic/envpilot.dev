@@ -28,7 +28,9 @@ export function TierBadge({
   showLabel = true,
 }: TierBadgeProps) {
   // Fetch dynamic tier definition for display name and color
-  const tierDef = useQuery(api.featureRegistry.getTierByName, { name: tier });
+  const tierDef = useQuery(api.features.featureRegistry.queries.getTierByName, {
+    name: tier,
+  });
 
   const sizeClasses = {
     sm: "text-xs px-1.5 py-0.5",

@@ -2,11 +2,11 @@ import { v } from "convex/values";
 import { query, internalMutation } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../identity";
-import { isCronPaused } from "../../tierLimits";
-import { checkBooleanFeature } from "../../featureRegistry";
-import { createAuditLog } from "../../auditHelpers";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../authz";
+import { requireAuthedUser } from "../../lib/identity";
+import { isCronPaused } from "../billing/tierLimits";
+import { checkBooleanFeature } from "../featureRegistry/gates";
+import { createAuditLog } from "../../lib/audit";
+import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
 
 /**
  * Environment Variable Secret Rotation & Expiry
@@ -211,7 +211,7 @@ export const processRotationExpiry = internalMutation({
             patchData.lastReminderSentAt = now;
             await ctx.scheduler.runAfter(
               0,
-              internal.emails.sendRotationReminderEmail,
+              internal.features.emails.emails.sendRotationReminderEmail,
               {
                 variableName: variable.key,
                 projectName: project.name,
@@ -248,7 +248,7 @@ export const processRotationExpiry = internalMutation({
             patchData.lastReminderSentAt = now;
             await ctx.scheduler.runAfter(
               0,
-              internal.emails.sendRotationReminderEmail,
+              internal.features.emails.emails.sendRotationReminderEmail,
               {
                 variableName: variable.key,
                 projectName: project.name,
@@ -279,7 +279,7 @@ export const processRotationExpiry = internalMutation({
           await ctx.db.patch(variable._id, { lastReminderSentAt: now });
           await ctx.scheduler.runAfter(
             0,
-            internal.emails.sendRotationReminderEmail,
+            internal.features.emails.emails.sendRotationReminderEmail,
             {
               variableName: variable.key,
               projectName: project.name,

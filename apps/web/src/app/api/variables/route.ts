@@ -79,7 +79,7 @@ export async function GET(request: Request) {
 
     const variablesWithAccess = await createAuthedConvexClient(
       accessToken!
-    ).query(api.variables.listWithAccess, {
+    ).query(api.features.variables.queries.listWithAccess, {
       projectId: projectId as Id<"projects">,
     });
 
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     // authorization — including project assignment scoping — is enforced there.
     const { _id: variableId } = await createAuthedConvexClient(
       accessToken!
-    ).action(api.variableValues.createWithValue, {
+    ).action(api.features.variables.values.createWithValue, {
       projectId: projectId as Id<"projects">,
       key,
       value,
@@ -169,7 +169,10 @@ export async function POST(request: Request) {
       tagIds: tagIds as Id<"variableTags">[] | undefined,
     });
 
-    const variable = await convex.query(api.variables.getById, { variableId });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      { variableId }
+    );
 
     // Notify project members about variable creation (non-blocking)
     notifyVariableChange(
@@ -209,17 +212,22 @@ async function notifyVariableChange(
   changeType: "created" | "updated" | "deleted"
 ) {
   try {
-    const project = await convex.query(api.projects.getById, { projectId });
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
+    const project = await convex.query(api.features.projects.queries.getById, {
+      projectId,
     });
+    const members = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId,
+      }
+    );
 
     const projectName = project?.name || "Unknown project";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === changerUserId) continue;
       convex
-        .action(api.emails.sendVariableChangeEmail, {
+        .action(api.features.emails.emails.sendVariableChangeEmail, {
           userId: member.user._id,
           to: member.user.email,
           variableName,

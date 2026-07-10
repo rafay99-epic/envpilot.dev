@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
-import { batchGetUsers, userDisplay } from "../../helpers";
+import { batchGetUsers, userDisplay } from "../../lib/users";
 import { getRetentionCutoff } from "./helpers";
 
 /**

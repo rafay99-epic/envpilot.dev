@@ -2,8 +2,8 @@ import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
-import { isEnforcementEnabledFromDb } from "../../tierLimits";
-import { requireAuthedUser } from "../../identity";
+import { isEnforcementEnabledFromDb } from "../billing/tierLimits";
+import { requireAuthedUser } from "../../lib/identity";
 import {
   parseFeatureValue,
   resolveFeatureValue,

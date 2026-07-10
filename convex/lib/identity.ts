@@ -21,7 +21,7 @@ import type { Doc } from "../_generated/dataModel";
  *      `subject` is the WorkOS user id (the JWT `sub` claim).
  *   4. We map that WorkOS id → the `users` row via the `by_workos_id` index —
  *      the SAME lookup the web app already does server-side through
- *      `getOrCreateConvexUser` → `api.users.getByWorkosId`.
+ *      `getOrCreateConvexUser` → `api.features.users.users.getByWorkosId`.
  *
  * Until every caller attaches a token, `getUserIdentity()` returns `null`, so
  * `getAuthedUser` returns `null` and `requireAuthedUser` throws — which is why

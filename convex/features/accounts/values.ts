@@ -29,7 +29,7 @@ async function requireCurrentUserId(ctx: ActionCtx): Promise<Id<"users">> {
   if (!identity) {
     throw new Error("Unauthenticated: no verified user identity on request");
   }
-  const user = await ctx.runQuery(api.users.getByWorkosId, {
+  const user = await ctx.runQuery(api.features.users.users.getByWorkosId, {
     workosId: identity.subject,
   });
   if (!user) {
@@ -63,7 +63,7 @@ export const createWithCredentials = action({
   handler: async (ctx, args): Promise<{ accountId: Id<"projectAccounts"> }> => {
     const userId = await requireCurrentUserId(ctx);
 
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
@@ -72,28 +72,34 @@ export const createWithCredentials = action({
 
     // The project's own organizationId is authoritative for the vault key
     // context and the mutation — never a client-supplied value.
-    const vault = await ctx.runAction(internal.vault.createSecret, {
-      name: `account:${args.name}:${Date.now()}`,
-      value: serializeAccountVault(args.username, args.password),
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-      environment: "account",
-    });
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: `account:${args.name}:${Date.now()}`,
+        value: serializeAccountVault(args.username, args.password),
+        organizationId: project.organizationId,
+        projectId: args.projectId,
+        environment: "account",
+      }
+    );
 
     let accountId: Id<"projectAccounts">;
     try {
-      accountId = await ctx.runMutation(api.accounts.create, {
-        projectId: args.projectId,
-        createdBy: userId,
-        name: args.name,
-        websiteUrl: args.websiteUrl,
-        description: args.description,
-        environments: args.environments,
-        vaultRef: vault.id,
-      });
+      accountId = await ctx.runMutation(
+        api.features.accounts.mutations.create,
+        {
+          projectId: args.projectId,
+          createdBy: userId,
+          name: args.name,
+          websiteUrl: args.websiteUrl,
+          description: args.description,
+          environments: args.environments,
+          vaultRef: vault.id,
+        }
+      );
     } catch (mutationError) {
       try {
-        await ctx.runAction(internal.vault.deleteSecret, {
+        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
           vaultRef: vault.id,
         });
       } catch {
@@ -138,7 +144,7 @@ export const updateWithCredentials = action({
     // WRITE when rotating credentials so the request is rejected BEFORE any
     // vault write; metadata-only stays on READ (the mutation still enforces
     // write and no vault write happens).
-    const account = await ctx.runQuery(api.accounts.get, {
+    const account = await ctx.runQuery(api.features.accounts.queries.get, {
       accountId: args.accountId,
       userId,
       minimumAccess: credentialsChanged ? "write" : "read",
@@ -147,18 +153,24 @@ export const updateWithCredentials = action({
     let previousVaultValue: string | null = null;
     let updatedVersionId: string | undefined;
     if (credentialsChanged) {
-      previousVaultValue = await ctx.runAction(internal.vault.readSecret, {
-        vaultRef: account.vaultRef,
-      });
-      const updated = await ctx.runAction(internal.vault.updateSecret, {
-        vaultRef: account.vaultRef,
-        value: serializeAccountVault(args.username!, args.password!),
-      });
+      previousVaultValue = await ctx.runAction(
+        internal.features.vault.vault.readSecret,
+        {
+          vaultRef: account.vaultRef,
+        }
+      );
+      const updated = await ctx.runAction(
+        internal.features.vault.vault.updateSecret,
+        {
+          vaultRef: account.vaultRef,
+          value: serializeAccountVault(args.username!, args.password!),
+        }
+      );
       updatedVersionId = updated.versionId;
     }
 
     try {
-      await ctx.runMutation(api.accounts.update, {
+      await ctx.runMutation(api.features.accounts.mutations.update, {
         accountId: args.accountId,
         userId,
         name: args.name,
@@ -175,7 +187,7 @@ export const updateWithCredentials = action({
       // clobbering that newer value (lost-update).
       if (previousVaultValue !== null) {
         try {
-          await ctx.runAction(internal.vault.updateSecret, {
+          await ctx.runAction(internal.features.vault.vault.updateSecret, {
             vaultRef: account.vaultRef,
             value: previousVaultValue,
             versionCheck: updatedVersionId,

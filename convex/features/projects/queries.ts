@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
+import { requireAuthedUser } from "../../lib/identity";
 import { listWithStatsCore, listForUserCore } from "./helpers";
 
 /**

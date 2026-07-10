@@ -29,7 +29,7 @@ export function useOrganizationTags(
   organizationId: Id<"organizations"> | string | undefined
 ) {
   const tags = useQuery(
-    api.tags.listByOrganization,
+    api.features.projects.tags.listByOrganization,
     organizationId
       ? { organizationId: organizationId as Id<"organizations"> }
       : "skip"
@@ -47,7 +47,7 @@ export function useOrganizationTags(
  * Create a tag directly via Convex (no API route needed).
  */
 export function useCreateTag() {
-  const mutate = useMutation(api.tags.create);
+  const mutate = useMutation(api.features.projects.tags.create);
   const [isPending, setIsPending] = useState(false);
 
   return {
@@ -85,7 +85,7 @@ export function useCreateTag() {
  * Update a tag directly via Convex.
  */
 export function useUpdateTag() {
-  const mutate = useMutation(api.tags.update);
+  const mutate = useMutation(api.features.projects.tags.update);
   const [isPending, setIsPending] = useState(false);
 
   return {
@@ -123,7 +123,7 @@ export function useUpdateTag() {
  * Delete a tag directly via Convex.
  */
 export function useDeleteTag() {
-  const mutate = useMutation(api.tags.remove);
+  const mutate = useMutation(api.features.projects.tags.remove);
   const [isPending, setIsPending] = useState(false);
 
   return {

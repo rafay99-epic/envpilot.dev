@@ -54,7 +54,9 @@ const CHANNELS = [
 ];
 
 export default function ContactPage() {
-  const submitMessage = useMutation(api.contactMessages.submit);
+  const submitMessage = useMutation(
+    api.features.support.contactMessages.submit
+  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

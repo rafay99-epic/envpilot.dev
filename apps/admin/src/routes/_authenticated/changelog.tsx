@@ -92,9 +92,16 @@ function ChangelogPage() {
 // ==========================================
 
 function ListView() {
-  const entries = useAdminQuery(api.admin.listAllChangelog, {});
-  const deleteEntry = useAdminMutation(api.admin.deleteChangelog);
-  const togglePublish = useAdminMutation(api.admin.toggleChangelogPublish);
+  const entries = useAdminQuery(
+    api.features.admin.changelog.listAllChangelog,
+    {}
+  );
+  const deleteEntry = useAdminMutation(
+    api.features.admin.changelog.deleteChangelog
+  );
+  const togglePublish = useAdminMutation(
+    api.features.admin.changelog.toggleChangelogPublish
+  );
 
   const filterType = useChangelogStore((s) => s.filterType);
   const openCreate = useChangelogStore((s) => s.openCreate);
@@ -347,8 +354,12 @@ function ListView() {
 // ==========================================
 
 function EditorView() {
-  const createEntry = useAdminMutation(api.admin.createChangelog);
-  const updateEntry = useAdminMutation(api.admin.updateChangelog);
+  const createEntry = useAdminMutation(
+    api.features.admin.changelog.createChangelog
+  );
+  const updateEntry = useAdminMutation(
+    api.features.admin.changelog.updateChangelog
+  );
 
   const {
     editingId,

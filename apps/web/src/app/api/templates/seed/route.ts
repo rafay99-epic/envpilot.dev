@@ -64,7 +64,10 @@ export async function GET() {
     }
 
     // Get current templates from database
-    const existingTemplates = await convex.query(api.templates.listBuiltIn, {});
+    const existingTemplates = await convex.query(
+      api.features.projects.templates.listBuiltIn,
+      {}
+    );
 
     return NextResponse.json({
       constantsCount: BUILT_IN_TEMPLATES.length,

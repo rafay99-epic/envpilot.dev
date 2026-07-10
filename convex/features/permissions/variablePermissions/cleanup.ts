@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../../_generated/server";
 import { Doc } from "../../../_generated/dataModel";
-import { isCronPaused } from "../../../tierLimits";
+import { isCronPaused } from "../../billing/tierLimits";
 
 /**
  * Runs are capped per invocation (mirrors vaultGc.PURGE_BATCH_SIZE): the work

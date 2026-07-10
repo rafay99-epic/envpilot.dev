@@ -4,7 +4,7 @@ import { hasE2ECredentials, SKIP_REASON } from "../env";
 import { trackClientErrors } from "./support";
 
 // Authenticated e2e — the global variables list at /dashboard/variables.
-// Renders via a Convex usePaginatedQuery (api.variables.listOrgVariablesWithAccessPaginated).
+// Renders via a Convex usePaginatedQuery (api.features.variables.queries.listOrgVariablesWithAccessPaginated).
 // This spec asserts the list resolves to either real rows or the documented
 // empty state (never stuck loading), and that "Load more" — when present —
 // actually grows the row count. Account data varies, so a missing

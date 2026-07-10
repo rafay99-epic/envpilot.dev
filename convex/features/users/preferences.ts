@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "../../_generated/server";
-import { resolveFeatureForUser } from "../../featureRegistry";
-import { requireAuthedUser } from "../../identity";
+import { resolveFeatureForUser } from "../featureRegistry/resolver";
+import { requireAuthedUser } from "../../lib/identity";
 
 const DEFAULT_NOTIFICATIONS = {
   variableChanges: true,

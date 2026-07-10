@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { checkBooleanFeature } from "../../featureRegistry";
-import { createAuditLog } from "../../auditHelpers";
-import { normalizeOrgRole } from "../../authz";
-import { rateLimiter } from "../../rateLimits";
+import { checkBooleanFeature } from "../featureRegistry/gates";
+import { createAuditLog } from "../../lib/audit";
+import { normalizeOrgRole } from "../../lib/authz";
+import { rateLimiter } from "../../lib/rateLimits";
 
 /**
  * Variable Tags — Organization-scoped tag management.

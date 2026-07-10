@@ -13,63 +13,63 @@ const crons = cronJobs();
 crons.interval(
   "cleanup expired project access",
   { hours: 1 },
-  internal.projectAccess.cleanupExpired
+  internal.features.users.projectAccess.cleanupExpired
 );
 
 // Clean up acknowledged/expired revocation events every hour
 crons.interval(
   "cleanup revocation events",
   { hours: 1 },
-  internal.permissionRevocationEvents.cleanup
+  internal.features.permissions.revocationEvents.cleanup
 );
 
 // Clean up expired invitations every 6 hours
 crons.interval(
   "cleanup expired invitations",
   { hours: 6 },
-  internal.invitations.cleanupExpired
+  internal.features.organizations.invitations.cleanupExpired
 );
 
 // Clean up expired variable permissions daily at 3:00 AM UTC
 crons.daily(
   "cleanup expired permissions",
   { hourUTC: 3, minuteUTC: 0 },
-  internal.permissions.cleanupExpired
+  internal.features.permissions.variablePermissions.cleanup.cleanupExpired
 );
 
 // Clean up expired account permissions daily at 3:10 AM UTC
 crons.daily(
   "cleanup expired account permissions",
   { hourUTC: 3, minuteUTC: 10 },
-  internal.accountPermissions.cleanupExpired
+  internal.features.permissions.accountPermissions.mutations.cleanupExpired
 );
 
 // Expire grace periods and downgrade users whose grace has ended
 crons.interval(
   "expire grace periods",
   { hours: 1 },
-  internal.subscriptions.expireGracePeriods
+  internal.features.billing.gracePeriods.expireGracePeriods
 );
 
 // Process secret rotation expiry — transition statuses and send reminder emails
 crons.interval(
   "process secret rotation expiry",
   { hours: 1 },
-  internal.variables.processRotationExpiry
+  internal.features.variables.rotation.processRotationExpiry
 );
 
 // Clean up expired shared secrets every hour
 crons.interval(
   "cleanup expired shared secrets",
   { hours: 1 },
-  internal.sharedSecrets.cleanupExpiredShares
+  internal.features.sharing.cleanup.cleanupExpiredShares
 );
 
 // Clean up stale OTP codes every 30 minutes
 crons.interval(
   "cleanup expired share OTPs",
   { minutes: 30 },
-  internal.sharedSecrets.cleanupExpiredOtps
+  internal.features.sharing.cleanup.cleanupExpiredOtps
 );
 
 // Auto-publish scheduled changelog entries hourly. A marketing changelog
@@ -80,14 +80,14 @@ crons.interval(
 crons.interval(
   "publish scheduled changelog entries",
   { hours: 1 },
-  internal.changelog.publishScheduledEntries
+  internal.features.community.changelog.publish.publishScheduledEntries
 );
 
 // Clean up processed webhook events older than 7 days
 crons.interval(
   "cleanup processed webhook events",
   { hours: 6 },
-  internal.subscriptions.cleanupProcessedWebhooks
+  internal.features.billing.webhooks.cleanupProcessedWebhooks
 );
 
 // Permanently purge trashed variables/accounts past the 7-day retention window
@@ -96,7 +96,7 @@ crons.interval(
 crons.daily(
   "purge expired trashed secrets",
   { hourUTC: 4, minuteUTC: 0 },
-  internal.vaultGc.purgeExpiredBatch,
+  internal.features.vault.gc.purgeExpiredBatch,
   {}
 );
 

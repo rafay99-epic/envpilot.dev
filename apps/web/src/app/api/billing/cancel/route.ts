@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
     const dbPaymentsEnabled = await convex.query(
-      api.tierLimits.isPaymentsEnabled,
+      api.features.billing.tierLimits.isPaymentsEnabled,
       {}
     );
     if (!dbPaymentsEnabled) {
@@ -79,9 +79,12 @@ export async function POST(request: Request) {
     const { organizationId, reason, comment } = validation.data;
 
     // Get Convex user
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    const convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
 
     // Verify user is admin of the organization
     const membership = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId: organizationId as Id<"organizations">,
       }
@@ -106,12 +109,18 @@ export async function POST(request: Request) {
     // Get the subscription — the caller's own first, fallback to org-level.
     // Both derive/gate identity inside Convex from the attached JWT.
     const authed = createAuthedConvexClient(accessToken!);
-    let subscription = await authed.query(api.subscriptions.getOwn, {});
+    let subscription = await authed.query(
+      api.features.billing.queries.getOwn,
+      {}
+    );
 
     if (!subscription) {
-      subscription = await authed.query(api.subscriptions.getByOrganization, {
-        organizationId: organizationId as Id<"organizations">,
-      });
+      subscription = await authed.query(
+        api.features.billing.queries.getByOrganization,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
     }
 
     if (!subscription || !subscription.polarSubscriptionId) {

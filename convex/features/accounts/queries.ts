@@ -4,13 +4,13 @@ import type { Doc } from "../../_generated/dataModel";
 import {
   requireAccountAccess,
   authorizeAccountAccess,
-} from "../../authHelpers";
-import { PURGE_RETENTION_DAYS } from "../../vaultGc";
+} from "../../lib/authHelpers";
+import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
-} from "../../authz";
+} from "../../lib/authz";
 
 /**
  * Shared Account Queries

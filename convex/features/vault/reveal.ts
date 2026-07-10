@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { action, query } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
-import { requireAuthedUser } from "../../identity";
-import { getVariableAccess, getAccountAccess } from "../../authz";
+import { requireAuthedUser } from "../../lib/identity";
+import { getVariableAccess, getAccountAccess } from "../../lib/authz";
 
 /**
  * Browser value-reveal path — Stage 3.
@@ -12,7 +12,7 @@ import { getVariableAccess, getAccountAccess } from "../../authz";
  * into Convex and deleted the old `/api/vault` route + `lib/vault.ts`; this is
  * its identity-scoped replacement.
  *
- * SECURITY: `internal.vault.readSecret` has no authorization of its own, so this
+ * SECURITY: `internal.features.vault.vault.readSecret` has no authorization of its own, so this
  * public action must fully authorize the caller BEFORE reading. Authorization is
  * done by RESOURCE, not by a client-supplied org id: we reverse-look-up the row
  * that owns the ref and run the same per-resource access check the rest of the
@@ -76,15 +76,21 @@ export const reveal = action({
   args: { vaultRef: v.string() },
   returns: v.object({ value: v.string() }),
   handler: async (ctx, args): Promise<{ value: string }> => {
-    const allowed = await ctx.runQuery(api.vaultReveal.canRevealVaultRef, {
-      vaultRef: args.vaultRef,
-    });
+    const allowed = await ctx.runQuery(
+      api.features.vault.reveal.canRevealVaultRef,
+      {
+        vaultRef: args.vaultRef,
+      }
+    );
     if (!allowed) {
       throw new Error("Forbidden: no access to this secret");
     }
-    const value = await ctx.runAction(internal.vault.readSecret, {
-      vaultRef: args.vaultRef,
-    });
+    const value = await ctx.runAction(
+      internal.features.vault.vault.readSecret,
+      {
+        vaultRef: args.vaultRef,
+      }
+    );
     return { value };
   },
 });

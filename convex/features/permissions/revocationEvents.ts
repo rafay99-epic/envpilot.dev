@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "../../_generated/server";
-import { isCronPaused } from "../../tierLimits";
-import { requireAuthedUser } from "../../identity";
+import { isCronPaused } from "../billing/tierLimits";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Permission Revocation Events

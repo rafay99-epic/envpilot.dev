@@ -1,13 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../identity";
+import { requireAuthedUser } from "../../lib/identity";
 import {
   assertProjectAction,
   assertCanManageUser,
   normalizeOrgRole,
   roleLevel,
-} from "../../authz";
+} from "../../lib/authz";
 
 /**
  * Project Members - Project-level access control

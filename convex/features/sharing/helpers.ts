@@ -1,7 +1,7 @@
 import type { DatabaseReader, QueryCtx } from "../../_generated/server";
 import type { Doc } from "../../_generated/dataModel";
 import { Id } from "../../_generated/dataModel";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../authz";
+import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
 
 /**
  * Normalize a share's resource type. Legacy rows created before shared

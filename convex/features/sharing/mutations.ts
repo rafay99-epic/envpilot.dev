@@ -1,14 +1,17 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
-import { createAuditLog } from "../../auditHelpers";
-import { checkBooleanFeature, checkNumericLimit } from "../../featureRegistry";
-import { rateLimiter } from "../../rateLimits";
+import { requireAuthedUser } from "../../lib/identity";
+import { createAuditLog } from "../../lib/audit";
+import {
+  checkBooleanFeature,
+  checkNumericLimit,
+} from "../featureRegistry/gates";
+import { rateLimiter } from "../../lib/rateLimits";
 import {
   assertOrgMembership,
   getVariableAccess,
   getAccountAccess,
-} from "../../authz";
+} from "../../lib/authz";
 import { normalizeResourceType, countActiveShares } from "./helpers";
 
 /**

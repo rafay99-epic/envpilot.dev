@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
-import { batchGetUsers } from "../../helpers";
-import { resolveFeatureValue } from "../../featureRegistry";
-import { normalizeOrgRole } from "../../authz";
-import { requireAuthedUser } from "../../identity";
+import { batchGetUsers } from "../../lib/users";
+import { resolveFeatureValue } from "../featureRegistry/resolver";
+import { normalizeOrgRole } from "../../lib/authz";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Dashboard Statistics Queries

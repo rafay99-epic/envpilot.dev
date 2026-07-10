@@ -1,5 +1,5 @@
 import { internalMutation } from "../../_generated/server";
-import { createAuditLog } from "../../auditHelpers";
+import { createAuditLog } from "../../lib/audit";
 import { normalizeResourceType } from "./helpers";
 
 // ==========================================

@@ -17,9 +17,16 @@ export const Route = createFileRoute("/_authenticated/messages")({
 });
 
 function MessagesPage() {
-  const messages = useAdminQuery(api.admin.listContactMessages, {});
-  const toggleRead = useAdminMutation(api.admin.markContactMessageRead);
-  const deleteMessage = useAdminMutation(api.admin.deleteContactMessage);
+  const messages = useAdminQuery(
+    api.features.admin.inbox.listContactMessages,
+    {}
+  );
+  const toggleRead = useAdminMutation(
+    api.features.admin.inbox.markContactMessageRead
+  );
+  const deleteMessage = useAdminMutation(
+    api.features.admin.inbox.deleteContactMessage
+  );
   const { confirm } = useConfirmStore();
 
   const [search, setSearch] = useState("");

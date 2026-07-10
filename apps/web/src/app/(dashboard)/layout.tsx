@@ -118,12 +118,12 @@ export default async function DashboardLayout({
     // we avoid a waterfall.
     const [orgList, tierByGuess] = await Promise.all([
       createAuthedConvexClient(accessToken!).query(
-        api.organizations.listForUser,
+        api.features.organizations.queries.listForUser,
         {}
       ) as Promise<OrganizationWithMembershipRole[]>,
       preferredOrgId
         ? convex
-            .query(api.featureRegistry.getResolvedFeatures, {
+            .query(api.features.featureRegistry.queries.getResolvedFeatures, {
               organizationId:
                 preferredOrgId as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
             })

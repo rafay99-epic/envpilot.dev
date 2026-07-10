@@ -92,13 +92,13 @@ function DataBrowserPage() {
     status,
     loadMore,
   } = useAdminPaginatedQuery(
-    api.admin.browseTablePaginated,
+    api.features.admin.tables.browseTablePaginated,
     table ? { tableName: table } : "skip",
     { initialNumItems: PAGE_SIZE }
   );
 
-  const updateRow = useAdminMutation(api.admin.updateTableRow);
-  const deleteRow = useAdminMutation(api.admin.deleteTableRow);
+  const updateRow = useAdminMutation(api.features.admin.tables.updateTableRow);
+  const deleteRow = useAdminMutation(api.features.admin.tables.deleteTableRow);
 
   const [search, setSearch] = useState("");
   const [editRow, setEditRow] = useState<Record<string, unknown> | null>(null);

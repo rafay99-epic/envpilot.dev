@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Device-session records for the CLI and VS Code extension.

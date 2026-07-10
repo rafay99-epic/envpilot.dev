@@ -1,13 +1,16 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
-import { createAuditLog } from "../../../auditHelpers";
-import { requireAuthedUser } from "../../../identity";
-import { assertProjectAction, isEnvironmentScopeAllowed } from "../../../authz";
+import { createAuditLog } from "../../../lib/audit";
+import { requireAuthedUser } from "../../../lib/identity";
+import {
+  assertProjectAction,
+  isEnvironmentScopeAllowed,
+} from "../../../lib/authz";
 import {
   checkCountedLimit,
   countActiveVariables,
-} from "../../../featureRegistry";
+} from "../../featureRegistry/gates";
 import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 
 const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;

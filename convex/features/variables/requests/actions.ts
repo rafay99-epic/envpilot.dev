@@ -52,7 +52,7 @@ export const createWithValue = action({
     reviewer: requestUserValidator,
   }),
   // Explicit return type breaks the same-module circular inference caused by
-  // referencing api.variableRequests.{create,getById} from within this module.
+  // referencing api.features.variables.requests.{mutations.create,queries.getById} from within this module.
   handler: async (
     ctx,
     args
@@ -71,23 +71,29 @@ export const createWithValue = action({
     requester: { _id: Id<"users">; email: string; name?: string } | null;
     reviewer: { _id: Id<"users">; email: string; name?: string } | null;
   }> => {
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
       throw new Error("Project not found");
     }
 
-    const membership = await ctx.runQuery(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await ctx.runQuery(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
 
-    const legacy = await ctx.runQuery(api.roleCompat.resolveLegacyRoles, {
-      projectId: args.projectId,
-    });
+    const legacy = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: args.projectId,
+      }
+    );
 
     if (!legacy.assigned) {
       if (legacy.grantOnly) {
@@ -108,29 +114,35 @@ export const createWithValue = action({
     }
 
     // Encrypt the proposed value first — the mutation only ever stores a ref.
-    const vault = await ctx.runAction(internal.vault.createSecret, {
-      name: args.key,
-      value: args.value,
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-    });
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: args.key,
+        value: args.value,
+        organizationId: project.organizationId,
+        projectId: args.projectId,
+      }
+    );
 
     // If the validating mutation rejects, the freshly-minted vault object would
     // be orphaned (an encrypted secret with no owning row) — delete it so Vault
     // and Convex stay consistent. Best-effort; vaultGc reconciles any straggler.
     let requestId;
     try {
-      requestId = await ctx.runMutation(api.variableRequests.create, {
-        key: args.key,
-        vaultRef: vault.id,
-        description: args.description,
-        environments: args.environments,
-        projectId: args.projectId,
-        isSensitive: args.isSensitive ?? false,
-      });
+      requestId = await ctx.runMutation(
+        api.features.variables.requests.mutations.create,
+        {
+          key: args.key,
+          vaultRef: vault.id,
+          description: args.description,
+          environments: args.environments,
+          projectId: args.projectId,
+          isSensitive: args.isSensitive ?? false,
+        }
+      );
     } catch (mutationError) {
       try {
-        await ctx.runAction(internal.vault.deleteSecret, {
+        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
           vaultRef: vault.id,
         });
       } catch {
@@ -139,9 +151,12 @@ export const createWithValue = action({
       throw mutationError;
     }
 
-    const created = await ctx.runQuery(api.variableRequests.getById, {
-      requestId,
-    });
+    const created = await ctx.runQuery(
+      api.features.variables.requests.queries.getById,
+      {
+        requestId,
+      }
+    );
     if (!created) {
       throw new Error("Failed to load the created variable request");
     }
@@ -178,16 +193,22 @@ export const revealValue = action({
   args: { requestId: v.id("environmentVariableRequests") },
   returns: v.object({ value: v.string() }),
   handler: async (ctx, args): Promise<{ value: string }> => {
-    const request = await ctx.runQuery(api.variableRequests.getById, {
-      requestId: args.requestId,
-    });
+    const request = await ctx.runQuery(
+      api.features.variables.requests.queries.getById,
+      {
+        requestId: args.requestId,
+      }
+    );
     if (!request) {
       throw new Error("Variable request not found");
     }
 
-    const value = await ctx.runAction(internal.vault.readSecret, {
-      vaultRef: request.vaultRef,
-    });
+    const value = await ctx.runAction(
+      internal.features.vault.vault.readSecret,
+      {
+        vaultRef: request.vaultRef,
+      }
+    );
 
     return { value };
   },

@@ -2,16 +2,16 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query, type QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../identity";
-import { checkBooleanFeature } from "../../featureRegistry";
-import { authorizeVariableAccess } from "../../authHelpers";
-import { PURGE_RETENTION_DAYS } from "../../vaultGc";
+import { requireAuthedUser } from "../../lib/identity";
+import { checkBooleanFeature } from "../featureRegistry/gates";
+import { authorizeVariableAccess } from "../../lib/authHelpers";
+import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import {
   getVariableAccess,
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
-} from "../../authz";
+} from "../../lib/authz";
 import {
   buildActiveGrantMap,
   mapVariableRow,

@@ -368,11 +368,11 @@ export function PricingContent({
 }) {
   // Client-side fallback: if server couldn't fetch (e.g. CI build), fetch on client
   const clientPricingData = useQuery(
-    api.featureRegistry.getPricingData,
+    api.features.featureRegistry.queries.getPricingData,
     serverPricingData ? "skip" : undefined
   );
   const clientPaymentsEnabled = useQuery(
-    api.tierLimits.isPaymentsEnabled,
+    api.features.billing.tierLimits.isPaymentsEnabled,
     serverPaymentsEnabled !== null ? "skip" : undefined
   );
 

@@ -12,7 +12,7 @@ export function useOrganizationAuditLogs(
   options?: { limit?: number; offset?: number }
 ) {
   return useQuery(
-    api.auditLogs.listByOrganization,
+    api.features.audit.queries.listByOrganization,
     organizationId
       ? { organizationId, limit: options?.limit, offset: options?.offset }
       : "skip"
@@ -26,7 +26,7 @@ export function useOrganizationAuditLogCount(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.auditLogs.countByOrganization,
+    api.features.audit.queries.countByOrganization,
     organizationId ? { organizationId } : "skip"
   );
 }
@@ -39,7 +39,7 @@ export function useProjectAuditLogs(
   options?: { limit?: number }
 ) {
   return useQuery(
-    api.auditLogs.listByProject,
+    api.features.audit.queries.listByProject,
     projectId ? { projectId, limit: options?.limit } : "skip"
   );
 }
@@ -52,7 +52,7 @@ export function useVariableAuditLogs(
   options?: { limit?: number }
 ) {
   return useQuery(
-    api.auditLogs.listByVariable,
+    api.features.audit.queries.listByVariable,
     variableId ? { variableId, limit: options?.limit } : "skip"
   );
 }
@@ -65,7 +65,7 @@ export function useSecurityEvents(
   options?: { limit?: number; includeSeverity?: string[] }
 ) {
   return useQuery(
-    api.auditLogs.listSecurityEvents,
+    api.features.audit.security.listSecurityEvents,
     organizationId
       ? {
           organizationId,
@@ -84,7 +84,7 @@ export function useSensitiveDataAccess(
   options?: { startTime?: number; endTime?: number; limit?: number }
 ) {
   return useQuery(
-    api.auditLogs.listSensitiveDataAccess,
+    api.features.audit.security.listSensitiveDataAccess,
     organizationId
       ? {
           organizationId,
@@ -104,7 +104,7 @@ export function usePermissionChanges(
   options?: { startTime?: number; endTime?: number; limit?: number }
 ) {
   return useQuery(
-    api.auditLogs.listPermissionChanges,
+    api.features.audit.security.listPermissionChanges,
     organizationId
       ? {
           organizationId,
@@ -124,7 +124,7 @@ export function useAuditLogSummary(
   daysBack?: number
 ) {
   return useQuery(
-    api.auditLogs.getSummary,
+    api.features.audit.compliance.getSummary,
     organizationId ? { organizationId, daysBack } : "skip"
   );
 }
@@ -138,7 +138,7 @@ export function useComplianceReport(
   endTime: number
 ) {
   return useQuery(
-    api.auditLogs.getComplianceReport,
+    api.features.audit.compliance.getComplianceReport,
     organizationId ? { organizationId, startTime, endTime } : "skip"
   );
 }
@@ -151,7 +151,7 @@ export function useRecentAlerts(
   limit?: number
 ) {
   return useQuery(
-    api.auditLogs.getRecentAlerts,
+    api.features.audit.security.getRecentAlerts,
     organizationId ? { organizationId, limit } : "skip"
   );
 }
@@ -164,7 +164,7 @@ export function useAlertCount(
   since?: number
 ) {
   return useQuery(
-    api.auditLogs.getAlertCount,
+    api.features.audit.security.getAlertCount,
     organizationId ? { organizationId, since } : "skip"
   );
 }
@@ -184,7 +184,7 @@ export function useAuditLogsByTimeRange(
   }
 ) {
   return useQuery(
-    api.auditLogs.listByTimeRange,
+    api.features.audit.queries.listByTimeRange,
     organizationId
       ? {
           organizationId,
@@ -210,7 +210,7 @@ export function useAuditLogsForExport(
   includeDetails?: boolean
 ) {
   return useQuery(
-    api.auditLogs.getForExport,
+    api.features.audit.compliance.getForExport,
     organizationId
       ? { organizationId, startTime, endTime, format, includeDetails }
       : "skip"
@@ -220,7 +220,7 @@ export function useAuditLogsForExport(
 /**
  * Hook for audit-related mutations
  * Note: These mutations are defined in convex/auditHelpers.ts
- * After running `npx convex dev`, they will be available as api.auditHelpers.*
+ * After running `npx convex dev`, they will be available as lib/audit helpers
  */
 export function useAuditMutations() {
   // Placeholder functions - will use actual Convex mutations after codegen

@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     // Check membership
     const membership = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId,
       }
@@ -55,9 +55,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     if (!organization) {
       return NextResponse.json(
@@ -121,7 +124,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const { name, description, logoUrl } = validation.data;
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.update,
+      api.features.organizations.mutations.update,
       {
         organizationId,
         name,
@@ -130,9 +133,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     );
 
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     return NextResponse.json({ organization });
   } catch (error) {
@@ -167,7 +173,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     // Authorization is enforced in the Convex mutation (assertOrgAction)
     await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.remove,
+      api.features.organizations.mutations.remove,
       {
         organizationId,
       }

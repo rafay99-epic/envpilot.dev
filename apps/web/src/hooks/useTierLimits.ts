@@ -24,7 +24,7 @@ export type TierAction =
  * Hook to check if tier enforcement is enabled (reads from Convex server env var)
  */
 export function useEnforcementEnabled(): boolean {
-  const data = useQuery(api.tierLimits.isEnforcementEnabled);
+  const data = useQuery(api.features.billing.tierLimits.isEnforcementEnabled);
   return data ?? true; // Default to enforcing while loading
 }
 
@@ -37,7 +37,7 @@ export function useTierLimitCheck(
   projectId?: Id<"projects">
 ) {
   const data = useQuery(
-    api.tierLimits.checkTierLimit,
+    api.features.billing.tierLimits.checkTierLimit,
     organizationId
       ? {
           organizationId,

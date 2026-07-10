@@ -11,7 +11,7 @@ export function useOrganizationProjects(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.projects.listByOrganization,
+    api.features.projects.queries.listByOrganization,
     organizationId ? { organizationId } : "skip"
   );
 }
@@ -23,7 +23,7 @@ export function useOrganizationProjectsWithStats(
   organizationId: Id<"organizations"> | undefined
 ) {
   return useQuery(
-    api.projects.listWithStats,
+    api.features.projects.queries.listWithStats,
     organizationId ? { organizationId } : "skip"
   );
 }
@@ -32,7 +32,10 @@ export function useOrganizationProjectsWithStats(
  * Hook for getting a single project
  */
 export function useProject(projectId: Id<"projects"> | undefined) {
-  return useQuery(api.projects.getById, projectId ? { projectId } : "skip");
+  return useQuery(
+    api.features.projects.queries.getById,
+    projectId ? { projectId } : "skip"
+  );
 }
 
 /**
@@ -41,7 +44,10 @@ export function useProject(projectId: Id<"projects"> | undefined) {
 export function useUserProjects(userId: Id<"users"> | undefined) {
   // Identity is derived server-side from the attached JWT; `userId` only gates
   // the query until the current user is known (auth ready).
-  return useQuery(api.projects.listForUser, userId ? {} : "skip");
+  return useQuery(
+    api.features.projects.queries.listForUser,
+    userId ? {} : "skip"
+  );
 }
 
 /**
@@ -52,7 +58,7 @@ export function useProjectBySlug(
   slug: string | undefined
 ) {
   return useQuery(
-    api.projects.getBySlug,
+    api.features.projects.queries.getBySlug,
     organizationId && slug
       ? { organizationId: organizationId as Id<"organizations">, slug }
       : "skip"

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
     const dbPaymentsEnabled = await convex.query(
-      api.tierLimits.isPaymentsEnabled,
+      api.features.billing.tierLimits.isPaymentsEnabled,
       {}
     );
     if (!dbPaymentsEnabled) {
@@ -71,12 +71,15 @@ export async function POST(request: Request) {
     const { organizationId, tierName, successUrl, cancelUrl } = validation.data;
 
     // Get Convex user
-    let convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    let convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
-      const userId = await convex.mutation(api.users.upsert, {
+      const userId = await convex.mutation(api.features.users.users.upsert, {
         workosId: user.id,
         email: user.email,
         name:
@@ -85,7 +88,9 @@ export async function POST(request: Request) {
             : user.firstName || user.lastName || undefined,
         avatarUrl: user.profilePictureUrl || undefined,
       });
-      convexUser = await convex.query(api.users.getById, { userId });
+      convexUser = await convex.query(api.features.users.users.getById, {
+        userId,
+      });
     }
 
     if (!convexUser) {
@@ -97,12 +102,15 @@ export async function POST(request: Request) {
 
     // Look up Polar product ID — try paymentProducts first, fall back to tierDefinitions
     const paymentProductId = await convex.query(
-      api.subscriptions.getProductIdForTier,
+      api.features.billing.queries.getProductIdForTier,
       { tierName, provider: "polar" }
     );
-    const tierDef = await convex.query(api.featureRegistry.getTierByName, {
-      name: tierName,
-    });
+    const tierDef = await convex.query(
+      api.features.featureRegistry.queries.getTierByName,
+      {
+        name: tierName,
+      }
+    );
     const polarProductId = paymentProductId ?? tierDef?.polarProductId;
     if (!polarProductId) {
       return NextResponse.json(
@@ -114,16 +122,19 @@ export async function POST(request: Request) {
     // Verify checkout is allowed (user is owner, no active subscription).
     // Identity is derived server-side from the attached JWT.
     const checkoutData = await createAuthedConvexClient(accessToken!).mutation(
-      api.subscriptions.prepareCheckout,
+      api.features.billing.checkout.prepareCheckout,
       {
         organizationId: organizationId as Id<"organizations">,
       }
     );
 
     // Get organization details
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId: organizationId as Id<"organizations">,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     if (!organization) {
       return NextResponse.json(

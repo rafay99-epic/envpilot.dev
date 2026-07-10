@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
-import { batchGetUsers, userDisplay } from "../../helpers";
+import { batchGetUsers, userDisplay } from "../../lib/users";
 import { getRetentionCutoff } from "./helpers";
 
 // Read caps. auditLogs is the fastest-growing table (one row per mutation), and

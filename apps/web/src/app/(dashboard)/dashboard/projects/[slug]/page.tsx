@@ -174,7 +174,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     status: variablesStatus,
     loadMore: loadMoreVariables,
   } = usePaginatedQuery(
-    api.variables.listWithAccessPaginated,
+    api.features.variables.queries.listWithAccessPaginated,
     // Identity is derived server-side from the attached JWT; `convexUserId`
     // gates the query until the current user is known (auth ready).
     projectId && convexUserId ? { projectId } : "skip",

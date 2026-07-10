@@ -369,7 +369,7 @@ async function activateSubscriptionFromEvent(
   // Strategy 3: polarCustomers table lookup (original approach)
   if (!resolvedUserId) {
     const polarCustomer = await ctx.runQuery(
-      internal.subscriptions._getPolarCustomerById,
+      internal.features.billing.queries._getPolarCustomerById,
       { polarCustomerId: customerId }
     );
     if (polarCustomer) {
@@ -398,7 +398,7 @@ async function activateSubscriptionFromEvent(
   // Resolve org ID — if we still don't have one, look up user's first org
   if (!resolvedOrgId) {
     const userOrgs = await ctx.runQuery(
-      internal.subscriptions._getUserOwnedOrgs,
+      internal.features.billing.queries._getUserOwnedOrgs,
       { userId: resolvedUserId as any }
     );
     if (userOrgs.length > 0) {
@@ -418,17 +418,20 @@ async function activateSubscriptionFromEvent(
   }
 
   // Ensure polarCustomers record exists (handles race condition)
-  await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
-    organizationId: resolvedOrgId as any,
-    userId: resolvedUserId as any,
-    polarCustomerId: customerId,
-    email:
-      eventData.customer?.email ??
-      eventData.customerEmail ??
-      "unknown@polar.sh",
-  });
+  await ctx.runMutation(
+    internal.features.billing.webhooks.upsertPolarCustomer,
+    {
+      organizationId: resolvedOrgId as any,
+      userId: resolvedUserId as any,
+      polarCustomerId: customerId,
+      email:
+        eventData.customer?.email ??
+        eventData.customerEmail ??
+        "unknown@polar.sh",
+    }
+  );
 
-  await ctx.runMutation(internal.subscriptions.createSubscription, {
+  await ctx.runMutation(internal.features.billing.webhooks.createSubscription, {
     organizationId: resolvedOrgId as any,
     userId: resolvedUserId as any,
     polarCustomerId: customerId,
@@ -446,29 +449,35 @@ async function activateSubscriptionFromEvent(
 
   // Dynamic tier mapping from product ID
   const tierName = await ctx.runQuery(
-    internal.subscriptions._mapProductToTier,
+    internal.features.billing.queries._mapProductToTier,
     { productId }
   );
 
   if (eventData.status === "active" || eventData.status === "trialing") {
     // Primary: sync user tier (user-level, not org-level)
-    await ctx.runMutation(internal.subscriptions._syncUserTier, {
+    await ctx.runMutation(internal.features.billing.webhooks._syncUserTier, {
       userId: resolvedUserId as any,
       tier: tierName,
       reason: "billing.subscription_created",
     });
 
     // Reset consumption counters on new subscription
-    await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-      userId: resolvedUserId as any,
-      periodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
-      periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
-    });
+    await ctx.runMutation(
+      internal.features.billing.gracePeriods._resetUsageCounters,
+      {
+        userId: resolvedUserId as any,
+        periodStart: polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+        periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+      }
+    );
 
     // Clear any active grace period
-    await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-      userId: resolvedUserId as any,
-    });
+    await ctx.runMutation(
+      internal.features.billing.gracePeriods._clearGracePeriod,
+      {
+        userId: resolvedUserId as any,
+      }
+    );
   }
 
   return { userId: resolvedUserId, tierName };
@@ -499,7 +508,7 @@ export const processWebhookEvent = action({
     // --- Webhook deduplication ---
     if (args.webhookId) {
       const alreadyProcessed = await ctx.runQuery(
-        internal.subscriptions._checkWebhookProcessed,
+        internal.features.billing.queries._checkWebhookProcessed,
         { webhookId: args.webhookId }
       );
       if (alreadyProcessed) {
@@ -546,12 +555,15 @@ export const processWebhookEvent = action({
         }
 
         // Map Polar customer to org and user
-        await ctx.runMutation(internal.subscriptions.upsertPolarCustomer, {
-          organizationId,
-          userId,
-          polarCustomerId: customerId,
-          email: customerEmail,
-        });
+        await ctx.runMutation(
+          internal.features.billing.webhooks.upsertPolarCustomer,
+          {
+            organizationId,
+            userId,
+            polarCustomerId: customerId,
+            email: customerEmail,
+          }
+        );
 
         console.log("Polar: checkout completed");
         break;
@@ -588,7 +600,7 @@ export const processWebhookEvent = action({
       // -----------------------------------------------
       case "subscription.updated": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByPolarSubscriptionId,
+          internal.features.billing.queries._getByPolarSubscriptionId,
           { polarSubscriptionId: eventData.id }
         );
 
@@ -614,32 +626,38 @@ export const processWebhookEvent = action({
         const newStatus = eventData.status;
         const productId = eventData.productId as string;
 
-        await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          polarSubscriptionId: eventData.id,
-          status: newStatus,
-          currentPeriodStart: polarTimestamp(eventData.currentPeriodStart),
-          currentPeriodEnd: polarTimestamp(eventData.currentPeriodEnd),
-          cancelAtPeriodEnd: eventData.cancelAtPeriodEnd,
-          cancelAt: polarTimestamp(eventData.endsAt),
-          trialEnd: polarTimestamp(eventData.endsAt),
-        });
+        await ctx.runMutation(
+          internal.features.billing.webhooks.updateSubscription,
+          {
+            polarSubscriptionId: eventData.id,
+            status: newStatus,
+            currentPeriodStart: polarTimestamp(eventData.currentPeriodStart),
+            currentPeriodEnd: polarTimestamp(eventData.currentPeriodEnd),
+            cancelAtPeriodEnd: eventData.cancelAtPeriodEnd,
+            cancelAt: polarTimestamp(eventData.endsAt),
+            trialEnd: polarTimestamp(eventData.endsAt),
+          }
+        );
 
         // Determine tier from product
         const previousTierName = await ctx.runQuery(
-          internal.subscriptions._mapProductToTier,
+          internal.features.billing.queries._mapProductToTier,
           { productId: existingSubscription.polarProductId }
         );
         const newTierName = productId
-          ? await ctx.runQuery(internal.subscriptions._mapProductToTier, {
-              productId,
-            })
+          ? await ctx.runQuery(
+              internal.features.billing.queries._mapProductToTier,
+              {
+                productId,
+              }
+            )
           : "free";
 
         // Resolve userId from subscription or org owner
         const resolvedUserId =
           existingSubscription.userId ??
           (
-            await ctx.runQuery(internal.subscriptions._getOrgById, {
+            await ctx.runQuery(internal.features.billing.queries._getOrgById, {
               organizationId: existingSubscription.organizationId,
             })
           )?.createdBy;
@@ -662,27 +680,40 @@ export const processWebhookEvent = action({
 
         if (isNowActive && !wasActive) {
           // Reactivated — sync tier up, reset counters, clear grace
-          await ctx.runMutation(internal.subscriptions._syncUserTier, {
-            userId: resolvedUserId,
-            tier: newTierName,
-            reason: "billing.subscription_updated",
-          });
-          await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-            userId: resolvedUserId,
-            periodStart:
-              polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
-            periodEnd: polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
-          });
-          await ctx.runMutation(internal.subscriptions._clearGracePeriod, {
-            userId: resolvedUserId,
-          });
+          await ctx.runMutation(
+            internal.features.billing.webhooks._syncUserTier,
+            {
+              userId: resolvedUserId,
+              tier: newTierName,
+              reason: "billing.subscription_updated",
+            }
+          );
+          await ctx.runMutation(
+            internal.features.billing.gracePeriods._resetUsageCounters,
+            {
+              userId: resolvedUserId,
+              periodStart:
+                polarTimestamp(eventData.currentPeriodStart) ?? Date.now(),
+              periodEnd:
+                polarTimestamp(eventData.currentPeriodEnd) ?? Date.now(),
+            }
+          );
+          await ctx.runMutation(
+            internal.features.billing.gracePeriods._clearGracePeriod,
+            {
+              userId: resolvedUserId,
+            }
+          );
         } else if (isNowActive && previousTierName !== newTierName) {
           // Tier changed (upgrade/downgrade between paid tiers)
-          await ctx.runMutation(internal.subscriptions._syncUserTier, {
-            userId: resolvedUserId,
-            tier: newTierName,
-            reason: "billing.subscription_updated",
-          });
+          await ctx.runMutation(
+            internal.features.billing.webhooks._syncUserTier,
+            {
+              userId: resolvedUserId,
+              tier: newTierName,
+              reason: "billing.subscription_updated",
+            }
+          );
         } else if (!isNowActive && wasActive) {
           // Deactivated — will be handled by subscription.revoked or grace period
         }
@@ -697,7 +728,7 @@ export const processWebhookEvent = action({
       // -----------------------------------------------
       case "subscription.canceled": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByPolarSubscriptionId,
+          internal.features.billing.queries._getByPolarSubscriptionId,
           { polarSubscriptionId: eventData.id }
         );
 
@@ -706,12 +737,15 @@ export const processWebhookEvent = action({
           return;
         }
 
-        await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          polarSubscriptionId: eventData.id,
-          status: "canceled",
-          cancelAtPeriodEnd: true,
-          cancelAt: polarTimestamp(eventData.endsAt),
-        });
+        await ctx.runMutation(
+          internal.features.billing.webhooks.updateSubscription,
+          {
+            polarSubscriptionId: eventData.id,
+            status: "canceled",
+            cancelAtPeriodEnd: true,
+            cancelAt: polarTimestamp(eventData.endsAt),
+          }
+        );
 
         console.log("Polar: subscription canceled (will end at period end)");
         break;
@@ -722,7 +756,7 @@ export const processWebhookEvent = action({
       // -----------------------------------------------
       case "subscription.uncanceled": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByPolarSubscriptionId,
+          internal.features.billing.queries._getByPolarSubscriptionId,
           { polarSubscriptionId: eventData.id }
         );
 
@@ -731,11 +765,14 @@ export const processWebhookEvent = action({
           return;
         }
 
-        await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          polarSubscriptionId: eventData.id,
-          status: eventData.status ?? "active",
-          cancelAtPeriodEnd: false,
-        });
+        await ctx.runMutation(
+          internal.features.billing.webhooks.updateSubscription,
+          {
+            polarSubscriptionId: eventData.id,
+            status: eventData.status ?? "active",
+            cancelAtPeriodEnd: false,
+          }
+        );
 
         console.log("Polar: subscription uncanceled");
         break;
@@ -747,7 +784,7 @@ export const processWebhookEvent = action({
       // -----------------------------------------------
       case "subscription.revoked": {
         const existingSubscription = await ctx.runQuery(
-          internal.subscriptions._getByPolarSubscriptionId,
+          internal.features.billing.queries._getByPolarSubscriptionId,
           { polarSubscriptionId: eventData.id }
         );
 
@@ -756,17 +793,20 @@ export const processWebhookEvent = action({
           return;
         }
 
-        await ctx.runMutation(internal.subscriptions.updateSubscription, {
-          polarSubscriptionId: eventData.id,
-          status: "revoked",
-          cancelAtPeriodEnd: false,
-        });
+        await ctx.runMutation(
+          internal.features.billing.webhooks.updateSubscription,
+          {
+            polarSubscriptionId: eventData.id,
+            status: "revoked",
+            cancelAtPeriodEnd: false,
+          }
+        );
 
         // Resolve user
         const resolvedUserId =
           existingSubscription.userId ??
           (
-            await ctx.runQuery(internal.subscriptions._getOrgById, {
+            await ctx.runQuery(internal.features.billing.queries._getOrgById, {
               organizationId: existingSubscription.organizationId,
             })
           )?.createdBy;
@@ -774,16 +814,19 @@ export const processWebhookEvent = action({
         if (resolvedUserId) {
           // Get user's current tier before downgrade
           const currentTier = await ctx.runQuery(
-            internal.subscriptions._getUserTierName,
+            internal.features.billing.queries._getUserTierName,
             { userId: resolvedUserId }
           );
 
           // Start grace period instead of immediate downgrade
-          await ctx.runMutation(internal.subscriptions._createGracePeriod, {
-            userId: resolvedUserId,
-            previousTier: currentTier,
-            gracePeriodDays: GRACE_PERIOD_DAYS,
-          });
+          await ctx.runMutation(
+            internal.features.billing.gracePeriods._createGracePeriod,
+            {
+              userId: resolvedUserId,
+              previousTier: currentTier,
+              gracePeriodDays: GRACE_PERIOD_DAYS,
+            }
+          );
         }
 
         console.log("Polar: subscription revoked (grace period started)");
@@ -799,7 +842,7 @@ export const processWebhookEvent = action({
         if (!subscriptionId) return;
 
         const subscription = await ctx.runQuery(
-          internal.subscriptions._getByPolarSubscriptionId,
+          internal.features.billing.queries._getByPolarSubscriptionId,
           { polarSubscriptionId: subscriptionId }
         );
 
@@ -808,30 +851,39 @@ export const processWebhookEvent = action({
           return;
         }
 
-        const org = await ctx.runQuery(internal.subscriptions._getOrgById, {
-          organizationId: subscription.organizationId,
-        });
+        const org = await ctx.runQuery(
+          internal.features.billing.queries._getOrgById,
+          {
+            organizationId: subscription.organizationId,
+          }
+        );
 
         if (org) {
-          await ctx.runMutation(internal.subscriptions.logBillingEvent, {
-            organizationId: subscription.organizationId,
-            userId: org.createdBy,
-            action: "billing.payment_succeeded",
-            details: JSON.stringify({
-              orderId: eventData.id,
-              amount: eventData.totalAmount,
-              currency: eventData.currency,
-              billingReason: eventData.billingReason,
-            }),
-          });
+          await ctx.runMutation(
+            internal.features.billing.webhooks.logBillingEvent,
+            {
+              organizationId: subscription.organizationId,
+              userId: org.createdBy,
+              action: "billing.payment_succeeded",
+              details: JSON.stringify({
+                orderId: eventData.id,
+                amount: eventData.totalAmount,
+                currency: eventData.currency,
+                billingReason: eventData.billingReason,
+              }),
+            }
+          );
 
           // On successful payment, reset usage counters
           if (subscription.userId) {
-            await ctx.runMutation(internal.subscriptions._resetUsageCounters, {
-              userId: subscription.userId,
-              periodStart: subscription.currentPeriodStart,
-              periodEnd: subscription.currentPeriodEnd,
-            });
+            await ctx.runMutation(
+              internal.features.billing.gracePeriods._resetUsageCounters,
+              {
+                userId: subscription.userId,
+                periodStart: subscription.currentPeriodStart,
+                periodEnd: subscription.currentPeriodEnd,
+              }
+            );
           }
         }
 
@@ -845,10 +897,13 @@ export const processWebhookEvent = action({
 
     // --- Record processed webhook ---
     if (args.webhookId) {
-      await ctx.runMutation(internal.subscriptions._recordWebhookProcessed, {
-        webhookId: args.webhookId,
-        eventType: args.type,
-      });
+      await ctx.runMutation(
+        internal.features.billing.webhooks._recordWebhookProcessed,
+        {
+          webhookId: args.webhookId,
+          eventType: args.type,
+        }
+      );
     }
   },
 });

@@ -34,9 +34,12 @@ export async function GET(request: Request, context: RouteContext) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const variable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     if (!variable) {
       return NextResponse.json(
@@ -68,7 +71,7 @@ export async function GET(request: Request, context: RouteContext) {
     if (normalizeOrgRole(membership.role) === "developer") {
       const accessibleVariables = await createAuthedConvexClient(
         accessToken!
-      ).query(api.variables.listWithAccess, {
+      ).query(api.features.variables.queries.listWithAccess, {
         projectId: variable.projectId,
       });
 
@@ -85,7 +88,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const history = await createAuthedConvexClient(accessToken!).query(
-      api.variables.getVersionHistory,
+      api.features.variables.queries.getVersionHistory,
       {
         variableId: id as Id<"environmentVariables">,
         limit,

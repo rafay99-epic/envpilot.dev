@@ -54,35 +54,41 @@ export const createWithPayload = action({
     }
 
     // Store the client-encrypted ciphertext in WorkOS Vault first.
-    const vault = await ctx.runAction(internal.vault.createSecret, {
-      name: `share:${args.variableKey}:${Date.now()}`,
-      value: args.encryptedPayload,
-      organizationId: args.organizationId,
-      projectId: args.projectId,
-      environment: "share",
-    });
-
-    try {
-      const result = await ctx.runMutation(api.sharedSecrets.createShare, {
-        token: args.token,
-        vaultRef: vault.id,
-        resourceType: args.resourceType,
-        variableId: args.variableId,
-        accountId: args.accountId,
-        variableKey: args.variableKey,
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: `share:${args.variableKey}:${Date.now()}`,
+        value: args.encryptedPayload,
         organizationId: args.organizationId,
         projectId: args.projectId,
-        mode: args.mode,
-        expiresAt: args.expiresAt,
-        hasPassphrase: args.hasPassphrase,
-        recipientEmails: args.recipientEmails,
-      });
+        environment: "share",
+      }
+    );
+
+    try {
+      const result = await ctx.runMutation(
+        api.features.sharing.mutations.createShare,
+        {
+          token: args.token,
+          vaultRef: vault.id,
+          resourceType: args.resourceType,
+          variableId: args.variableId,
+          accountId: args.accountId,
+          variableKey: args.variableKey,
+          organizationId: args.organizationId,
+          projectId: args.projectId,
+          mode: args.mode,
+          expiresAt: args.expiresAt,
+          hasPassphrase: args.hasPassphrase,
+          recipientEmails: args.recipientEmails,
+        }
+      );
       return { shareId: result.shareId };
     } catch (mutationError) {
       // createShare enforces gating + rate limiting; on rejection the vault
       // object is referenced by nothing, so best-effort delete it.
       try {
-        await ctx.runAction(internal.vault.deleteSecret, {
+        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
           vaultRef: vault.id,
         });
       } catch {
@@ -121,28 +127,37 @@ export const verifyOtpAndReveal = action({
     hasPassphrase: boolean;
     resourceType: "variable" | "account";
   }> => {
-    const result = await ctx.runMutation(api.sharedSecrets.verifyOtp, {
-      token: args.token,
-      email: args.email,
-      otpHash: args.otpHash,
-      ipAddress: args.ipAddress,
-      userAgent: args.userAgent,
-    });
+    const result = await ctx.runMutation(
+      api.features.sharing.mutations.verifyOtp,
+      {
+        token: args.token,
+        email: args.email,
+        otpHash: args.otpHash,
+        ipAddress: args.ipAddress,
+        userAgent: args.userAgent,
+      }
+    );
 
     let encryptedPayload: string;
     try {
-      encryptedPayload = await ctx.runAction(internal.vault.readSecret, {
-        vaultRef: result.vaultRef,
-      });
+      encryptedPayload = await ctx.runAction(
+        internal.features.vault.vault.readSecret,
+        {
+          vaultRef: result.vaultRef,
+        }
+      );
     } catch {
       // verifyOtp already burned a one-time share before we got here, so a
       // transient Vault read failure would destroy the link for good. Un-burn it
       // so the recipient can request a fresh OTP and retry.
       if (result.mode === "one_time") {
         try {
-          await ctx.runMutation(api.sharedSecrets.restoreBurnedShare, {
-            token: args.token,
-          });
+          await ctx.runMutation(
+            api.features.sharing.mutations.restoreBurnedShare,
+            {
+              token: args.token,
+            }
+          );
         } catch {
           // Best-effort — the reveal error below is what the recipient sees.
         }
@@ -153,7 +168,7 @@ export const verifyOtpAndReveal = action({
     // For one-time shares, delete the vault entry (best-effort) after reading.
     if (result.mode === "one_time") {
       try {
-        await ctx.runAction(internal.vault.deleteSecret, {
+        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
           vaultRef: result.vaultRef,
         });
       } catch {
@@ -179,12 +194,15 @@ export const revokeAndPurge = action({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args): Promise<{ success: boolean }> => {
-    const result = await ctx.runMutation(api.sharedSecrets.revokeShare, {
-      shareId: args.shareId,
-    });
+    const result = await ctx.runMutation(
+      api.features.sharing.mutations.revokeShare,
+      {
+        shareId: args.shareId,
+      }
+    );
 
     try {
-      await ctx.runAction(internal.vault.deleteSecret, {
+      await ctx.runAction(internal.features.vault.vault.deleteSecret, {
         vaultRef: result.vaultRef,
       });
     } catch {

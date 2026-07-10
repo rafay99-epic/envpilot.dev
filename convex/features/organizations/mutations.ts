@@ -1,18 +1,16 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
-import {
-  checkBooleanFeature,
-  resolveFeatureForUser,
-} from "../../featureRegistry";
-import { getDefaultTierName } from "../../tierLimits";
-import { rateLimiter } from "../../rateLimits";
+import { requireAuthedUser } from "../../lib/identity";
+import { checkBooleanFeature } from "../featureRegistry/gates";
+import { resolveFeatureForUser } from "../featureRegistry/resolver";
+import { getDefaultTierName } from "../billing/tierLimits";
+import { rateLimiter } from "../../lib/rateLimits";
 import {
   assertOrgAction,
   assertCanManageUser,
   assertCanAssignRole,
   normalizeOrgRole,
-} from "../../authz";
+} from "../../lib/authz";
 
 // ==========================================
 // MUTATIONS

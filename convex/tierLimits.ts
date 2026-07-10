@@ -1,21 +1,15 @@
 /**
- * Compat barrel — preserves the public `api.tierLimits.*` paths and the
- * helper/constant exports imported by sibling modules. Implementation lives
- * in features/billing/tierLimits.ts.
+ * LEGACY CLIENT COMPAT SHIM — DO NOT ADD EXPORTS, DO NOT IMPORT FROM HERE.
+ *
+ * Published CLI (>= 1.14.0) / VS Code extension (>= 1.7.2) builds call
+ * the function path(s) below by baked-in string refs. This shim keeps those
+ * exact paths registered on the deployment. All monorepo code uses the real
+ * feature paths.
+ *
+ * Removal: once the CLI/extension releases that use the features/* paths are
+ * the minimum supported versions (minCli/minExtension in
+ * apps/web/src/lib/versions.ts), delete this file.
  */
 
-export {
-  // Registered functions
-  isPaymentsEnabled,
-  isEnforcementEnabled,
-  getOrganizationUsage,
-  checkTierLimit,
-  getExtendedUsage,
-  // Constants + helpers
-  MAX_BULK_IMPORT_SIZE,
-  getDefaultTierName,
-  isCronPaused,
-  isEnforcementEnabledFromDb,
-  isEnforcementEnabledServer,
-  isPaymentsEnabledFromDb,
-} from "./features/billing/tierLimits";
+export { getOrganizationUsage } from "./features/billing/tierLimits";
+export { isEnforcementEnabled } from "./features/billing/tierLimits";

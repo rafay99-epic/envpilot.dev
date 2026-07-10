@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     // object back if the insert rejects. Authorization — including project
     // assignment + environment scoping + tier gating — is enforced there.
     const { accountId } = await createAuthedConvexClient(accessToken!).action(
-      api.accountValues.createWithCredentials,
+      api.features.accounts.values.createWithCredentials,
       {
         projectId: projectId as Id<"projects">,
         name,
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       }
     );
 
-    const account = await convex.query(api.accounts.get, {
+    const account = await convex.query(api.features.accounts.queries.get, {
       accountId,
       userId: convexUser._id,
     });

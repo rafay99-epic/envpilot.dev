@@ -11,7 +11,7 @@ export function useVariablePermissions(
   variableId: Id<"environmentVariables"> | undefined
 ) {
   return useQuery(
-    api.permissions.getForVariable,
+    api.features.permissions.variablePermissions.queries.getForVariable,
     variableId ? { variableId } : "skip"
   );
 }
@@ -22,7 +22,10 @@ export function useVariablePermissions(
 export function useUserPermissions(userId: Id<"users"> | undefined) {
   // Identity is derived server-side from the attached JWT; `userId` gates the
   // query until the current user is known (auth ready).
-  return useQuery(api.permissions.getForUser, userId ? {} : "skip");
+  return useQuery(
+    api.features.permissions.variablePermissions.queries.getForUser,
+    userId ? {} : "skip"
+  );
 }
 
 /**
@@ -34,7 +37,7 @@ export function useCheckPermission(
   requiredPermission: "read" | "write"
 ) {
   return useQuery(
-    api.permissions.checkPermission,
+    api.features.permissions.variablePermissions.queries.checkPermission,
     variableId && userId ? { variableId, requiredPermission } : "skip"
   );
 }
@@ -47,7 +50,7 @@ export function usePermissionHistory(
   limit?: number
 ) {
   return useQuery(
-    api.permissions.getHistory,
+    api.features.permissions.variablePermissions.queries.getHistory,
     variableId ? { variableId, limit } : "skip"
   );
 }
@@ -59,7 +62,8 @@ export function useUsersWithProjectAccess(
   projectId: Id<"projects"> | undefined
 ) {
   return useQuery(
-    api.permissions.getUsersWithProjectAccess,
+    api.features.permissions.variablePermissions.queries
+      .getUsersWithProjectAccess,
     projectId ? { projectId } : "skip"
   );
 }
@@ -72,7 +76,8 @@ export function useCanManageVariablePermissions(
   userId: Id<"users"> | undefined
 ) {
   return useQuery(
-    api.permissions.canManageVariablePermissions,
+    api.features.permissions.variablePermissions.queries
+      .canManageVariablePermissions,
     variableId && userId ? { variableId } : "skip"
   );
 }
@@ -85,7 +90,7 @@ export function useAssignableMembers(
   requestingUserId: Id<"users"> | undefined
 ) {
   return useQuery(
-    api.permissions.getAssignableMembers,
+    api.features.permissions.variablePermissions.queries.getAssignableMembers,
     variableId && requestingUserId ? { variableId } : "skip"
   );
 }

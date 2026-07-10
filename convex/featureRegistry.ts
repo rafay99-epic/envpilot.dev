@@ -1,43 +1,15 @@
 /**
- * Compat barrel — preserves the public `api.featureRegistry.*` paths.
- * Implementation lives in features/featureRegistry/.
+ * LEGACY CLIENT COMPAT SHIM — DO NOT ADD EXPORTS, DO NOT IMPORT FROM HERE.
  *
- * Many other convex modules import the resolver/gate helpers via
- * "./featureRegistry"; re-exporting them here keeps those imports working.
+ * Published CLI (>= 1.14.0) / VS Code extension (>= 1.7.2) builds call
+ * the function path(s) below by baked-in string refs. This shim keeps those
+ * exact paths registered on the deployment. All monorepo code uses the real
+ * feature paths.
+ *
+ * Removal: once the CLI/extension releases that use the features/* paths are
+ * the minimum supported versions (minCli/minExtension in
+ * apps/web/src/lib/versions.ts), delete this file.
  */
 
-// Registered queries (client-facing).
-export {
-  checkFeature,
-  getResolvedFeatures,
-  getResolvedFeaturesBatch,
-  getMyTierInfo,
-  getOrgOwnerTierInfo,
-  getTierByName,
-  getPricingData,
-} from "./features/featureRegistry/queries";
-
-// Resolver helpers.
-export {
-  getUserTier,
-  getOrgOwnerTier,
-  resolveOrgGateContext,
-  resolveFeatureValue,
-  resolveFeatureForUser,
-} from "./features/featureRegistry/resolver";
-export type { OrgGateContext } from "./features/featureRegistry/resolver";
-
-// Gate + count helpers.
-export {
-  checkBooleanFeature,
-  checkNumericLimit,
-  checkCountedLimit,
-  countActiveProjects,
-  countActiveVariables,
-  countMembersAndPendingInvites,
-  countRotationEnabledVariables,
-  countActiveAccounts,
-} from "./features/featureRegistry/gates";
-
-// Migration function migrateOrgTiersToUserTiers has been removed.
-// The organizationTiers table no longer exists (Phase 6 cleanup).
+export { getResolvedFeatures } from "./features/featureRegistry/queries";
+export { getResolvedFeaturesBatch } from "./features/featureRegistry/queries";

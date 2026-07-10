@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
     const dbPaymentsEnabled = await convex.query(
-      api.tierLimits.isPaymentsEnabled,
+      api.features.billing.tierLimits.isPaymentsEnabled,
       {}
     );
     if (!dbPaymentsEnabled) {
@@ -67,9 +67,12 @@ export async function POST(request: Request) {
     const { organizationId, returnUrl } = validation.data;
 
     // Get Convex user
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    const convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
 
     // Verify user is admin of the organization
     const membership = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId: organizationId as Id<"organizations">,
       }
@@ -95,14 +98,17 @@ export async function POST(request: Request) {
     // Both derive/gate identity inside Convex from the attached JWT.
     const authed = createAuthedConvexClient(accessToken!);
     let polarCustomer = await authed.query(
-      api.subscriptions.getOwnPolarCustomer,
+      api.features.billing.queries.getOwnPolarCustomer,
       {}
     );
 
     if (!polarCustomer) {
-      polarCustomer = await authed.query(api.subscriptions.getPolarCustomer, {
-        organizationId: organizationId as Id<"organizations">,
-      });
+      polarCustomer = await authed.query(
+        api.features.billing.queries.getPolarCustomer,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
     }
 
     if (!polarCustomer) {

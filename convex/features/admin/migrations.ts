@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { normalizeOrgRole } from "../../authz";
-import { SEED_CHANGELOG } from "../../changelog";
-import { SEED_FEATURE_REQUESTS } from "../../featureRequests";
+import { normalizeOrgRole } from "../../lib/authz";
+import { SEED_CHANGELOG } from "../community/changelog/seed";
+import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
 import { SEED_FEATURES } from "../../lib/seedData";
 import { verifyAdmin } from "./auth";
 

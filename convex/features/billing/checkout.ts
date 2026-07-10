@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
-import { normalizeOrgRole } from "../../authz";
-import { requireAuthedUser } from "../../identity";
+import { normalizeOrgRole } from "../../lib/authz";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Billing checkout — user-initiated actions.

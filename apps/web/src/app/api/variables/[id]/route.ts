@@ -47,9 +47,12 @@ export async function GET(request: Request, context: RouteContext) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const variable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     if (!variable) {
       return NextResponse.json(
@@ -81,7 +84,7 @@ export async function GET(request: Request, context: RouteContext) {
     if (normalizeOrgRole(membership.role) === "developer") {
       const accessibleVariables = await createAuthedConvexClient(
         accessToken!
-      ).query(api.variables.listWithAccess, {
+      ).query(api.features.variables.queries.listWithAccess, {
         projectId: variable.projectId,
       });
 
@@ -104,7 +107,7 @@ export async function GET(request: Request, context: RouteContext) {
     let history = null;
     if (includeHistory) {
       history = await createAuthedConvexClient(accessToken!).query(
-        api.variables.getVersionHistory,
+        api.features.variables.queries.getVersionHistory,
         {
           variableId: id as Id<"environmentVariables">,
           limit: 50,
@@ -146,9 +149,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const variable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     if (!variable) {
       return NextResponse.json(
@@ -195,7 +201,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     // deletes the new ref if the write authorization rejects. Metadata-only
     // updates skip Vault entirely.
     await createAuthedConvexClient(accessToken!).action(
-      api.variableValues.updateWithValue,
+      api.features.variables.values.updateWithValue,
       {
         variableId: id as Id<"environmentVariables">,
         value,
@@ -208,9 +214,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     );
 
-    const updatedVariable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const updatedVariable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     // Notify project members about variable update (non-blocking)
     notifyVariableChange(
@@ -259,9 +268,12 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const variable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     if (!variable) {
       return NextResponse.json(
@@ -299,7 +311,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     }
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.variables.remove,
+      api.features.variables.mutations.remove,
       {
         variableId: id as Id<"environmentVariables">,
       }
@@ -337,17 +349,22 @@ async function notifyVariableChange(
   changeType: "created" | "updated" | "deleted"
 ) {
   try {
-    const project = await convex.query(api.projects.getById, { projectId });
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
+    const project = await convex.query(api.features.projects.queries.getById, {
+      projectId,
     });
+    const members = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId,
+      }
+    );
 
     const projectName = project?.name || "Unknown project";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === changerUserId) continue;
       convex
-        .action(api.emails.sendVariableChangeEmail, {
+        .action(api.features.emails.emails.sendVariableChangeEmail, {
           userId: member.user._id,
           to: member.user.email,
           variableName,

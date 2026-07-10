@@ -1,6 +1,6 @@
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { normalizeOrgRole, toLegacyProjectRole } from "../../authz";
+import { normalizeOrgRole, toLegacyProjectRole } from "../../lib/authz";
 
 /**
  * Shared private helpers for projects queries/mutations.

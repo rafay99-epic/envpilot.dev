@@ -11,9 +11,9 @@ import {
   countActiveAccounts,
   countMembersAndPendingInvites,
   countRotationEnabledVariables,
-  getUserTier,
-} from "../../featureRegistry";
-import { countActiveShares } from "../../sharedSecrets";
+} from "../featureRegistry/gates";
+import { getUserTier } from "../featureRegistry/resolver";
+import { countActiveShares } from "../sharing/helpers";
 
 /**
  * Tier Limits — Phase 6 cleanup

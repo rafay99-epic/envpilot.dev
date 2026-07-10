@@ -3,8 +3,8 @@ import { query, internalQuery } from "../../_generated/server";
 import type { DatabaseReader, QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { getDefaultTierName } from "./tierLimits";
-import { getUserTier } from "../../featureRegistry";
-import { requireAuthedUser } from "../../identity";
+import { getUserTier } from "../featureRegistry/resolver";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Subscription Management for Polar.sh Integration — read paths.

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
-import { getVariableAccess } from "../../authz";
+import { requireAuthedUser } from "../../lib/identity";
+import { getVariableAccess } from "../../lib/authz";
 import {
   MAX_SHARE_SCAN,
   normalizeResourceType,

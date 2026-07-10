@@ -16,7 +16,7 @@ import { internalAction } from "../../_generated/server";
  * These are INTERNAL actions on purpose: reading a secret by ref has no
  * authorization of its own, so only trusted composed functions (which run
  * requireAuthedUser + per-variable access checks first) may call them via
- * ctx.runAction(internal.vault.*). Never expose them publicly.
+ * ctx.runAction(internal.features.vault.vault.*). Never expose them publicly.
  *
  * ZERO-DATA-LOSS CONTRACT: the `vaultRef` is the opaque WorkOS object id string.
  * Existing refs created by the old lib/vault.ts path MUST keep resolving — the

@@ -303,7 +303,10 @@ export const purgeExpiredBatch = internalAction({
       };
     }
 
-    const batch = await ctx.runQuery(internal.vaultGc.listPurgeEligible, {});
+    const batch = await ctx.runQuery(
+      internal.features.vault.gc.listPurgeEligible,
+      {}
+    );
 
     let purgedVariables = 0;
     let purgedAccounts = 0;
@@ -323,7 +326,7 @@ export const purgeExpiredBatch = internalAction({
       }
 
       const deleted = await ctx.runMutation(
-        internal.vaultGc.hardDeleteVariable,
+        internal.features.vault.gc.hardDeleteVariable,
         { variableId: variable.id }
       );
       if (deleted) purgedVariables++;
@@ -343,7 +346,7 @@ export const purgeExpiredBatch = internalAction({
       }
 
       const deleted = await ctx.runMutation(
-        internal.vaultGc.hardDeleteAccount,
+        internal.features.vault.gc.hardDeleteAccount,
         {
           accountId: account.id,
         }
@@ -359,9 +362,13 @@ export const purgeExpiredBatch = internalAction({
 
     let rescheduled = false;
     if (fullBatch && depth + 1 < MAX_RESCHEDULE_DEPTH) {
-      await ctx.scheduler.runAfter(0, internal.vaultGc.purgeExpiredBatch, {
-        depth: depth + 1,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.vault.gc.purgeExpiredBatch,
+        {
+          depth: depth + 1,
+        }
+      );
       rescheduled = true;
     }
 

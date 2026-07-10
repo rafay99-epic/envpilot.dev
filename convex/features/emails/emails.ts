@@ -4,7 +4,7 @@ import { action, internalAction } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { roleLevel, ROLE_LEVEL } from "../../authz";
+import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import {
   CODE_STYLE,
   emailWrapper,
@@ -352,7 +352,7 @@ export const sendVariableChangeEmail = action({
   },
   handler: async (ctx, args) => {
     const prefs = await ctx.runQuery(
-      internal.userPreferences.getByUserIdInternal,
+      internal.features.users.preferences.getByUserIdInternal,
       {
         userId: args.userId,
       }
@@ -415,7 +415,7 @@ export const sendMemberUpdateEmail = action({
   },
   handler: async (ctx, args) => {
     const prefs = await ctx.runQuery(
-      internal.userPreferences.getByUserIdInternal,
+      internal.features.users.preferences.getByUserIdInternal,
       {
         userId: args.userId,
       }
@@ -478,7 +478,7 @@ export const sendRotationReminderEmail = internalAction({
   handler: async (ctx, args) => {
     // Get all org members to notify
     const members = await ctx.runQuery(
-      internal.organizations.getMembersInternal,
+      internal.features.organizations.queries.getMembersInternal,
       { organizationId: args.organizationId }
     );
 
@@ -538,7 +538,7 @@ export const sendRotationReminderEmail = internalAction({
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(
-        internal.userPreferences.getByUserIdInternal,
+        internal.features.users.preferences.getByUserIdInternal,
         { userId: member.user._id }
       );
       if (prefs?.emailNotifications?.rotationReminders === false) continue;

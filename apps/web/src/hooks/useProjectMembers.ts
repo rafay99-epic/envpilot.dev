@@ -9,7 +9,7 @@ import { Id } from "@convex/_generated/dataModel";
  */
 export function useProjectMembers(projectId: Id<"projects"> | undefined) {
   const members = useQuery(
-    api.projectMembers.listByProject,
+    api.features.projects.members.listByProject,
     projectId ? { projectId } : "skip"
   );
 
@@ -27,7 +27,7 @@ export function useProjectMembership(
   userId: Id<"users"> | undefined
 ) {
   const membership = useQuery(
-    api.projectMembers.getProjectMembership,
+    api.features.projects.members.getProjectMembership,
     projectId && userId ? { projectId } : "skip"
   );
 
@@ -45,7 +45,7 @@ export function useAssignableProjectMembers(
   requestingUserId: Id<"users"> | undefined
 ) {
   const members = useQuery(
-    api.projectMembers.getAssignableOrgMembers,
+    api.features.projects.members.getAssignableOrgMembers,
     projectId && requestingUserId ? { projectId } : "skip"
   );
 

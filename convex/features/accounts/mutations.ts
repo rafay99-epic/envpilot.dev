@@ -4,15 +4,15 @@ import {
   checkBooleanFeature,
   checkCountedLimit,
   countActiveAccounts,
-  resolveOrgGateContext,
-} from "../../featureRegistry";
-import { createAuditLog } from "../../auditHelpers";
+} from "../featureRegistry/gates";
+import { resolveOrgGateContext } from "../featureRegistry/resolver";
+import { createAuditLog } from "../../lib/audit";
 import {
   authorizeAccountAccess,
   requireAccountAccess,
-} from "../../authHelpers";
-import { PURGE_RETENTION_DAYS } from "../../vaultGc";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../authz";
+} from "../../lib/authHelpers";
+import { PURGE_RETENTION_DAYS } from "../vault/gc";
+import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
 
 /**
  * Shared Account Mutations

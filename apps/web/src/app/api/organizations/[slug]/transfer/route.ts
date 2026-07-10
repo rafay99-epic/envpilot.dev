@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Authorization is enforced in the Convex mutation (assertOrgAction)
 
     // Look up target user by email
-    const targetUser = await convex.query(api.users.getByEmail, {
+    const targetUser = await convex.query(api.features.users.users.getByEmail, {
       email: targetUserEmail,
     });
 
@@ -75,13 +75,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get org details for email notifications
-    const org = await convex.query(api.organizations.getById, {
+    const org = await convex.query(api.features.organizations.queries.getById, {
       organizationId,
     });
 
     // Execute the transfer
     await createAuthedConvexClient(accessToken!).mutation(
-      api.organizations.transferOwnership,
+      api.features.organizations.mutations.transferOwnership,
       {
         organizationId,
         targetUserId: targetUser._id,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Send email to new owner (non-blocking)
     try {
-      await convex.action(api.emails.sendOrgTransferEmail, {
+      await convex.action(api.features.emails.emails.sendOrgTransferEmail, {
         to: targetUserEmail,
         organizationName: orgName,
         previousOwnerName,
@@ -112,12 +112,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Send confirmation to previous owner (non-blocking)
     try {
-      await convex.action(api.emails.sendOrgTransferConfirmationEmail, {
-        to: user.email,
-        organizationName: orgName,
-        newOwnerEmail: targetUserEmail,
-        orgSlug: slug,
-      });
+      await convex.action(
+        api.features.emails.emails.sendOrgTransferConfirmationEmail,
+        {
+          to: user.email,
+          organizationName: orgName,
+          newOwnerEmail: targetUserEmail,
+          orgSlug: slug,
+        }
+      );
     } catch (emailErr) {
       log.error(
         "org_transfer_confirmation_email_failed",

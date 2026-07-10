@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
   const dbPaymentsEnabled = await convex.query(
-    api.tierLimits.isPaymentsEnabled,
+    api.features.billing.tierLimits.isPaymentsEnabled,
     {}
   );
   if (!dbPaymentsEnabled) {
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     // Dispatch a checkout.updated event to our existing handler
     // This is idempotent — if the webhook already processed it, the
     // handler will update the same records with the same data.
-    await convex.action(api.subscriptions.processWebhookEvent, {
+    await convex.action(api.features.billing.webhooks.processWebhookEvent, {
       type: "checkout.updated",
       data: JSON.stringify(checkout),
     });

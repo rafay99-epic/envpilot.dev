@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { assertOrgMembership } from "../../authz";
-import { createAuditLog } from "../../auditHelpers";
+import { assertOrgMembership } from "../../lib/authz";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * Environment Template Queries and Mutations

@@ -18,7 +18,7 @@ export function useProjectVariables(
   environment?: string
 ) {
   const variables = useQuery(
-    api.variables.listWithAccess,
+    api.features.variables.queries.listWithAccess,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     projectId && userId ? { projectId } : "skip"
@@ -35,7 +35,10 @@ export function useProjectVariables(
 export function useVariable(
   variableId: Id<"environmentVariables"> | undefined
 ) {
-  return useQuery(api.variables.getById, variableId ? { variableId } : "skip");
+  return useQuery(
+    api.features.variables.queries.getById,
+    variableId ? { variableId } : "skip"
+  );
 }
 
 /**
@@ -49,7 +52,7 @@ export function useVariableHistory(
   limit?: number
 ) {
   return useQuery(
-    api.variables.getVersionHistory,
+    api.features.variables.queries.getVersionHistory,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     variableId && userId ? { variableId, limit } : "skip"
@@ -64,7 +67,7 @@ export function useVariablesWithAccess(
   userId: Id<"users"> | undefined
 ) {
   return useQuery(
-    api.variables.listWithAccess,
+    api.features.variables.queries.listWithAccess,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     projectId && userId ? { projectId } : "skip"
@@ -79,7 +82,7 @@ export function useVariableSearch(
   searchTerm: string
 ) {
   return useQuery(
-    api.variables.search,
+    api.features.variables.queries.search,
     organizationId && searchTerm.length > 0
       ? { organizationId, searchTerm }
       : "skip"

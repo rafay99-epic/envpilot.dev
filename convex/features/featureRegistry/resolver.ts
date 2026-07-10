@@ -3,7 +3,7 @@ import { Id } from "../../_generated/dataModel";
 import {
   isEnforcementEnabledFromDb,
   getDefaultTierName,
-} from "../../tierLimits";
+} from "../billing/tierLimits";
 
 /**
  * Dynamic Feature Registry

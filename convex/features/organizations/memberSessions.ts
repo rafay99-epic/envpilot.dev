@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { requireAuthedUser } from "../../identity";
-import { assertOrgAction, assertCanManageUser } from "../../authz";
+import { requireAuthedUser } from "../../lib/identity";
+import { assertOrgAction, assertCanManageUser } from "../../lib/authz";
 
 // ==========================================
 // SESSION MANAGEMENT

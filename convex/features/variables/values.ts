@@ -6,8 +6,8 @@ import {
   legacyOrgRoleValidator,
   legacyProjectRoleValidator,
   orgRoleValidator,
-} from "../../roleCompat";
-import { roleLevel, ROLE_LEVEL } from "../../authz";
+} from "../../lib/roleCompat";
+import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -58,7 +58,7 @@ type PushResult = {
  * /api/extension/variables). Secret VALUES now travel straight to Convex: each
  * action authenticates + authorizes (via runQuery to identity-verified queries),
  * then talks to WorkOS Vault through the internal vault primitive
- * (internal.vault.*), and persists refs via the existing variable mutations.
+ * (internal.features.vault.vault.*), and persists refs via the existing variable mutations.
  *
  * Why actions: only actions may perform the outbound WorkOS Vault fetch. Actions
  * have no ctx.db, so all DB access (authz, reads, writes) is delegated via
@@ -66,7 +66,7 @@ type PushResult = {
  * to those functions.
  *
  * ZERO-DATA-LOSS: vaultRef strings are passed byte-for-byte between
- * internal.vault.* and the variable mutations — never re-encoded. deleteSecret
+ * internal.features.vault.vault.* and the variable mutations — never re-encoded. deleteSecret
  * semantics are honored by the mutations (soft-delete only), so no vault object
  * is ever orphaned.
  */
@@ -134,26 +134,35 @@ export const pullValues = action({
     }),
   }),
   handler: async (ctx, args): Promise<PullResult> => {
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
       throw new Error("Project not found");
     }
 
-    const membership = await ctx.runQuery(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await ctx.runQuery(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
 
-    const rows = await ctx.runQuery(api.variables.listWithAccess, {
-      projectId: args.projectId,
-    });
-    const legacy = await ctx.runQuery(api.roleCompat.resolveLegacyRoles, {
-      projectId: args.projectId,
-    });
+    const rows = await ctx.runQuery(
+      api.features.variables.queries.listWithAccess,
+      {
+        projectId: args.projectId,
+      }
+    );
+    const legacy = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: args.projectId,
+      }
+    );
 
     const environment = args.environment;
     const accessible = rows
@@ -183,9 +192,12 @@ export const pullValues = action({
           value = DECRYPTION_FAILED;
         } else {
           try {
-            value = await ctx.runAction(internal.vault.readSecret, {
-              vaultRef: r.vaultRef,
-            });
+            value = await ctx.runAction(
+              internal.features.vault.vault.readSecret,
+              {
+                vaultRef: r.vaultRef,
+              }
+            );
           } catch {
             decryptionFailures.push(r.key);
             value = DECRYPTION_FAILED;
@@ -222,7 +234,7 @@ export const pullValues = action({
         variables
           .filter((entry) => entry.value !== DECRYPTION_FAILED)
           .map((entry) =>
-            ctx.runMutation(api.variables.logAccess, {
+            ctx.runMutation(api.features.variables.mutations.logAccess, {
               variableId: entry._id as never,
               accessType: "export" as const,
               environment: environment || undefined,
@@ -281,23 +293,29 @@ export const createWithValue = action({
   },
   returns: v.object({ _id: v.id("environmentVariables") }),
   handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
       throw new Error("Project not found");
     }
 
-    const membership = await ctx.runQuery(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await ctx.runQuery(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
 
-    const legacy = await ctx.runQuery(api.roleCompat.resolveLegacyRoles, {
-      projectId: args.projectId,
-    });
+    const legacy = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!legacy.assigned) {
       if (legacy.grantOnly) {
         throw new Error(
@@ -309,23 +327,29 @@ export const createWithValue = action({
       );
     }
 
-    const vault = await ctx.runAction(internal.vault.createSecret, {
-      name: args.key,
-      value: args.value,
-      organizationId: project.organizationId,
-      projectId: args.projectId,
-    });
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: args.key,
+        value: args.value,
+        organizationId: project.organizationId,
+        projectId: args.projectId,
+      }
+    );
 
-    const variableId = await ctx.runMutation(api.variables.create, {
-      key: args.key,
-      vaultRef: vault.id,
-      description: args.description,
-      environments: args.environments,
-      projectId: args.projectId,
-      isSensitive: args.isSensitive ?? false,
-      rotationFrequencyDays: args.rotationFrequencyDays,
-      tagIds: args.tagIds,
-    });
+    const variableId = await ctx.runMutation(
+      api.features.variables.mutations.create,
+      {
+        key: args.key,
+        vaultRef: vault.id,
+        description: args.description,
+        environments: args.environments,
+        projectId: args.projectId,
+        isSensitive: args.isSensitive ?? false,
+        rotationFrequencyDays: args.rotationFrequencyDays,
+        tagIds: args.tagIds,
+      }
+    );
 
     return { _id: variableId };
   },
@@ -364,23 +388,29 @@ export const pushBulk = action({
   handler: async (ctx, args): Promise<PushResult> => {
     const mode = args.mode ?? "merge";
 
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
       throw new Error("Project not found");
     }
 
-    const membership = await ctx.runQuery(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await ctx.runQuery(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
 
-    const legacy = await ctx.runQuery(api.roleCompat.resolveLegacyRoles, {
-      projectId: args.projectId,
-    });
+    const legacy = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!legacy.assigned) {
       if (legacy.grantOnly) {
         throw new Error(
@@ -392,10 +422,13 @@ export const pushBulk = action({
       );
     }
 
-    const existingVariables = await ctx.runQuery(api.variables.listByProject, {
-      projectId: args.projectId,
-      environment: args.environment,
-    });
+    const existingVariables = await ctx.runQuery(
+      api.features.variables.queries.listByProject,
+      {
+        projectId: args.projectId,
+        environment: args.environment,
+      }
+    );
     const existingByKey = new Map(existingVariables.map((v2) => [v2.key, v2]));
 
     let created = 0;
@@ -417,19 +450,25 @@ export const pushBulk = action({
         if (existing) {
           // Compare against the current decrypted value; only touch vault +
           // Convex when the value actually changed.
-          const currentValue = await ctx.runAction(internal.vault.readSecret, {
-            vaultRef: existing.vaultRef,
-          });
+          const currentValue = await ctx.runAction(
+            internal.features.vault.vault.readSecret,
+            {
+              vaultRef: existing.vaultRef,
+            }
+          );
 
           if (currentValue !== variable.value) {
-            const vault = await ctx.runAction(internal.vault.createSecret, {
-              name: variable.key,
-              value: variable.value,
-              organizationId: project.organizationId,
-              projectId: args.projectId,
-            });
+            const vault = await ctx.runAction(
+              internal.features.vault.vault.createSecret,
+              {
+                name: variable.key,
+                value: variable.value,
+                organizationId: project.organizationId,
+                projectId: args.projectId,
+              }
+            );
 
-            await ctx.runMutation(api.variables.update, {
+            await ctx.runMutation(api.features.variables.mutations.update, {
               variableId: existing._id,
               vaultRef: vault.id,
               description: variable.description,
@@ -450,7 +489,7 @@ export const pushBulk = action({
               variable.isSensitive !== undefined &&
               variable.isSensitive !== existing.isSensitive;
             if (descChanged || sensChanged) {
-              await ctx.runMutation(api.variables.update, {
+              await ctx.runMutation(api.features.variables.mutations.update, {
                 variableId: existing._id,
                 description: variable.description,
                 isSensitive: variable.isSensitive,
@@ -460,14 +499,17 @@ export const pushBulk = action({
             }
           }
         } else {
-          const vault = await ctx.runAction(internal.vault.createSecret, {
-            name: variable.key,
-            value: variable.value,
-            organizationId: project.organizationId,
-            projectId: args.projectId,
-          });
+          const vault = await ctx.runAction(
+            internal.features.vault.vault.createSecret,
+            {
+              name: variable.key,
+              value: variable.value,
+              organizationId: project.organizationId,
+              projectId: args.projectId,
+            }
+          );
 
-          await ctx.runMutation(api.variables.create, {
+          await ctx.runMutation(api.features.variables.mutations.create, {
             key: variable.key,
             vaultRef: vault.id,
             description: variable.description,
@@ -497,7 +539,7 @@ export const pushBulk = action({
     if (mode === "replace") {
       for (const [key, variable] of existingByKey) {
         try {
-          await ctx.runMutation(api.variables.remove, {
+          await ctx.runMutation(api.features.variables.mutations.remove, {
             variableId: variable._id,
           });
           deleted++;
@@ -553,30 +595,39 @@ export const updateWithValue = action({
     // Mint a new vault object only when the value is actually changing. Needs
     // the variable's key + owning org for the key context — mirrors the route.
     if (args.value !== undefined) {
-      const variable = await ctx.runQuery(api.variables.getById, {
-        variableId: args.variableId,
-      });
+      const variable = await ctx.runQuery(
+        api.features.variables.queries.getById,
+        {
+          variableId: args.variableId,
+        }
+      );
       if (!variable) {
         throw new Error("Variable not found");
       }
-      const project = await ctx.runQuery(api.projects.getById, {
-        projectId: variable.projectId,
-      });
+      const project = await ctx.runQuery(
+        api.features.projects.queries.getById,
+        {
+          projectId: variable.projectId,
+        }
+      );
       if (!project) {
         throw new Error("Project not found");
       }
 
-      const vault = await ctx.runAction(internal.vault.createSecret, {
-        name: variable.key,
-        value: args.value,
-        organizationId: project.organizationId,
-        projectId: variable.projectId,
-      });
+      const vault = await ctx.runAction(
+        internal.features.vault.vault.createSecret,
+        {
+          name: variable.key,
+          value: args.value,
+          organizationId: project.organizationId,
+          projectId: variable.projectId,
+        }
+      );
       vaultRef = vault.id;
     }
 
     try {
-      await ctx.runMutation(api.variables.update, {
+      await ctx.runMutation(api.features.variables.mutations.update, {
         variableId: args.variableId,
         vaultRef,
         description: args.description,
@@ -591,7 +642,9 @@ export const updateWithValue = action({
       // the newly minted vault object is unreferenced and would leak forever.
       if (vaultRef) {
         try {
-          await ctx.runAction(internal.vault.deleteSecret, { vaultRef });
+          await ctx.runAction(internal.features.vault.vault.deleteSecret, {
+            vaultRef,
+          });
         } catch {
           // Best-effort — vaultGc reconciles any straggler.
         }
@@ -624,9 +677,12 @@ export const exportValues = action({
     ctx,
     args
   ): Promise<{ values: Array<{ key: string; value: string }> }> => {
-    const rows = await ctx.runQuery(api.variables.listWithAccess, {
-      projectId: args.projectId,
-    });
+    const rows = await ctx.runQuery(
+      api.features.variables.queries.listWithAccess,
+      {
+        projectId: args.projectId,
+      }
+    );
 
     const environment = args.environment;
     const accessible = rows
@@ -638,9 +694,12 @@ export const exportValues = action({
       let value = "";
       if (r.vaultRef) {
         try {
-          value = await ctx.runAction(internal.vault.readSecret, {
-            vaultRef: r.vaultRef,
-          });
+          value = await ctx.runAction(
+            internal.features.vault.vault.readSecret,
+            {
+              vaultRef: r.vaultRef,
+            }
+          );
         } catch {
           value = DECRYPTION_FAILED;
         }
@@ -693,16 +752,19 @@ export const importValues = action({
     requested: number;
     skipped: number;
   }> => {
-    const project = await ctx.runQuery(api.projects.getById, {
+    const project = await ctx.runQuery(api.features.projects.queries.getById, {
       projectId: args.projectId,
     });
     if (!project) {
       throw new Error("Project not found");
     }
 
-    const membership = await ctx.runQuery(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await ctx.runQuery(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
@@ -720,19 +782,25 @@ export const importValues = action({
     if (!canWriteDirectly) {
       for (const entry of args.entries) {
         try {
-          const vault = await ctx.runAction(internal.vault.createSecret, {
-            name: entry.key,
-            value: entry.value,
-            organizationId: project.organizationId,
-            projectId: args.projectId,
-          });
-          await ctx.runMutation(api.variableRequests.create, {
-            key: entry.key,
-            vaultRef: vault.id,
-            environments: [args.environment],
-            projectId: args.projectId,
-            isSensitive: false,
-          });
+          const vault = await ctx.runAction(
+            internal.features.vault.vault.createSecret,
+            {
+              name: entry.key,
+              value: entry.value,
+              organizationId: project.organizationId,
+              projectId: args.projectId,
+            }
+          );
+          await ctx.runMutation(
+            api.features.variables.requests.mutations.create,
+            {
+              key: entry.key,
+              vaultRef: vault.id,
+              environments: [args.environment],
+              projectId: args.projectId,
+              isSensitive: false,
+            }
+          );
           requested++;
         } catch {
           skipped++;
@@ -749,26 +817,35 @@ export const importValues = action({
     }
 
     // Direct path (team_lead+): diff against the environment's existing values.
-    const existing = await ctx.runQuery(api.variables.listByProject, {
-      projectId: args.projectId,
-      environment: args.environment,
-    });
+    const existing = await ctx.runQuery(
+      api.features.variables.queries.listByProject,
+      {
+        projectId: args.projectId,
+        environment: args.environment,
+      }
+    );
     const existingByKey = new Map(existing.map((e) => [e.key, e]));
 
     for (const entry of args.entries) {
       const current = existingByKey.get(entry.key);
       if (current) {
-        const currentValue = await ctx.runAction(internal.vault.readSecret, {
-          vaultRef: current.vaultRef,
-        });
+        const currentValue = await ctx.runAction(
+          internal.features.vault.vault.readSecret,
+          {
+            vaultRef: current.vaultRef,
+          }
+        );
         if (currentValue !== entry.value) {
-          const vault = await ctx.runAction(internal.vault.createSecret, {
-            name: entry.key,
-            value: entry.value,
-            organizationId: project.organizationId,
-            projectId: args.projectId,
-          });
-          await ctx.runMutation(api.variables.update, {
+          const vault = await ctx.runAction(
+            internal.features.vault.vault.createSecret,
+            {
+              name: entry.key,
+              value: entry.value,
+              organizationId: project.organizationId,
+              projectId: args.projectId,
+            }
+          );
+          await ctx.runMutation(api.features.variables.mutations.update, {
             variableId: current._id,
             vaultRef: vault.id,
             changeReason: args.changeReason,
@@ -777,13 +854,16 @@ export const importValues = action({
         }
         existingByKey.delete(entry.key);
       } else {
-        const vault = await ctx.runAction(internal.vault.createSecret, {
-          name: entry.key,
-          value: entry.value,
-          organizationId: project.organizationId,
-          projectId: args.projectId,
-        });
-        await ctx.runMutation(api.variables.create, {
+        const vault = await ctx.runAction(
+          internal.features.vault.vault.createSecret,
+          {
+            name: entry.key,
+            value: entry.value,
+            organizationId: project.organizationId,
+            projectId: args.projectId,
+          }
+        );
+        await ctx.runMutation(api.features.variables.mutations.create, {
           key: entry.key,
           vaultRef: vault.id,
           environments: [args.environment],
@@ -796,7 +876,7 @@ export const importValues = action({
 
     if (args.mode === "replace") {
       for (const [, variable] of existingByKey) {
-        await ctx.runMutation(api.variables.remove, {
+        await ctx.runMutation(api.features.variables.mutations.remove, {
           variableId: variable._id,
         });
         deleted++;

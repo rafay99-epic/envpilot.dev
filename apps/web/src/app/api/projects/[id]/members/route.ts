@@ -48,7 +48,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -67,14 +67,20 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const members = await convex.query(api.projectMembers.listByProject, {
-      projectId: id as Id<"projects">,
-    });
+    const members = await convex.query(
+      api.features.projects.members.listByProject,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     // Fetch org owners who have implicit access to all projects
-    const orgMembers = await convex.query(api.organizations.getMembers, {
-      organizationId: project.organizationId,
-    });
+    const orgMembers = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId: project.organizationId,
+      }
+    );
     const ownerMembers = (orgMembers ?? [])
       .filter(
         (m): m is NonNullable<typeof m> =>
@@ -98,7 +104,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     let assignableMembers = null;
     if (roleLevel(membership.role) >= ROLE_LEVEL.team_lead) {
       assignableMembers = await createAuthedConvexClient(accessToken!).query(
-        api.projectMembers.getAssignableOrgMembers,
+        api.features.projects.members.getAssignableOrgMembers,
         {
           projectId: id as Id<"projects">,
         }
@@ -141,7 +147,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     const membershipId = await createAuthedConvexClient(accessToken!).mutation(
-      api.projectMembers.addMember,
+      api.features.projects.members.addMember,
       {
         projectId: id as Id<"projects">,
         userId: validation.data.userId as Id<"users">,
@@ -191,7 +197,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     // Authorization (actor can manage target, target must be a developer)
     // is enforced in the Convex mutation.
     await createAuthedConvexClient(accessToken!).mutation(
-      api.projectMembers.setMemberEnvironments,
+      api.features.projects.members.setMemberEnvironments,
       {
         projectId: id as Id<"projects">,
         userId: validation.data.userId as Id<"users">,
@@ -233,7 +239,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.projectMembers.removeMember,
+      api.features.projects.members.removeMember,
       {
         projectId: id as Id<"projects">,
         userId: targetUserIdParam as Id<"users">,

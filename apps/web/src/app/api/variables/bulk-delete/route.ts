@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const result = await createAuthedConvexClient(accessToken!).mutation(
-      api.variables.bulkDelete,
+      api.features.variables.mutations.bulkDelete,
       {
         variableIds: variableIds as Id<"environmentVariables">[],
       }

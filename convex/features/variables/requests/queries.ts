@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { query, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
-import { batchGetUsers } from "../../../helpers";
-import { requireAuthedUser } from "../../../identity";
-import { assertOrgMembership } from "../../../authz";
+import { batchGetUsers } from "../../../lib/users";
+import { requireAuthedUser } from "../../../lib/identity";
+import { assertOrgMembership } from "../../../lib/authz";
 import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 
 async function listForProjectCore(

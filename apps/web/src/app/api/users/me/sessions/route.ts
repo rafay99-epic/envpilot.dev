@@ -20,7 +20,7 @@ export async function GET() {
     // Ensure the `users` row exists so the session JWT resolves server-side.
     await getOrCreateConvexUser(convex, user);
     const sessions = await createAuthedConvexClient(accessToken!).query(
-      api.users.getOwnSessions,
+      api.features.users.users.getOwnSessions,
       {}
     );
 
@@ -49,7 +49,7 @@ export async function DELETE() {
     // Ensure the `users` row exists so the session JWT resolves server-side.
     await getOrCreateConvexUser(convex, user);
     const result = await createAuthedConvexClient(accessToken!).mutation(
-      api.users.revokeOwnSessions,
+      api.features.users.users.revokeOwnSessions,
       {}
     );
 

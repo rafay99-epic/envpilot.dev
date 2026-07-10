@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { value } = await createAuthedConvexClient(accessToken).action(
-      api.vaultReveal.reveal,
+      api.features.vault.reveal.reveal,
       { vaultRef }
     );
     return NextResponse.json({ success: true, data: { value } });

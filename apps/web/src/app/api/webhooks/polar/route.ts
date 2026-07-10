@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     // Extract webhook-id for deduplication
     const webhookId = request.headers.get("webhook-id") ?? undefined;
 
-    await convex.action(api.subscriptions.processWebhookEvent, {
+    await convex.action(api.features.billing.webhooks.processWebhookEvent, {
       type: event.type,
       data: JSON.stringify(event.data),
       webhookId,

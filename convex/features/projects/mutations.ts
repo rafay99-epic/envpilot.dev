@@ -1,8 +1,11 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
-import { checkNumericLimit, countActiveProjects } from "../../featureRegistry";
-import { requireAuthedUser } from "../../identity";
-import { assertOrgAction, assertProjectAction } from "../../authz";
+import {
+  checkNumericLimit,
+  countActiveProjects,
+} from "../featureRegistry/gates";
+import { requireAuthedUser } from "../../lib/identity";
+import { assertOrgAction, assertProjectAction } from "../../lib/authz";
 
 // ==========================================
 // MUTATIONS

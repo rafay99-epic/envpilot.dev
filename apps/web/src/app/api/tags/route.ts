@@ -59,9 +59,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const tags = await convex.query(api.tags.listByOrganization, {
-      organizationId: organizationId as Id<"organizations">,
-    });
+    const tags = await convex.query(
+      api.features.projects.tags.listByOrganization,
+      {
+        organizationId: organizationId as Id<"organizations">,
+      }
+    );
 
     return NextResponse.json({ tags });
   } catch (error) {
@@ -120,14 +123,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const tagId = await convex.mutation(api.tags.create, {
+    const tagId = await convex.mutation(api.features.projects.tags.create, {
       organizationId: organizationId as Id<"organizations">,
       name,
       color,
       createdBy: convexUser._id,
     });
 
-    const tag = await convex.query(api.tags.getById, { tagId });
+    const tag = await convex.query(api.features.projects.tags.getById, {
+      tagId,
+    });
 
     return NextResponse.json({ tag }, { status: 201 });
   } catch (error) {

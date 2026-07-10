@@ -43,7 +43,7 @@ export default function OrganizationsPage() {
 
   // Use Convex real-time query directly instead of fetch("/api/organizations")
   const rawOrgs = useQuery(
-    api.organizations.listForUser,
+    api.features.organizations.queries.listForUser,
     convexUserId ? {} : "skip"
   );
   const isLoading = rawOrgs === undefined;

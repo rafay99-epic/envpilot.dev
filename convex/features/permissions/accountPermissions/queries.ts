@@ -1,13 +1,13 @@
 import { v } from "convex/values";
 import { query, MutationCtx, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
-import { batchGetUsers, userInfo } from "../../../helpers";
+import { batchGetUsers, userInfo } from "../../../lib/users";
 import {
   assertProjectAction,
   normalizeOrgRole,
   roleLevel,
   type OrgRole,
-} from "../../../authz";
+} from "../../../lib/authz";
 
 /**
  * Per-account permission grants — the shared-account analog of

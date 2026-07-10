@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     await getOrCreateConvexUser(convex, user);
 
     // Search for users scoped to the organization
-    const users = await convex.query(api.users.search, {
+    const users = await convex.query(api.features.users.users.search, {
       searchTerm: q,
       organizationId: orgId,
       limit,
@@ -70,9 +70,11 @@ export async function GET(request: Request) {
 
     // Check membership status and pending invitations
     const [members, invitations] = await Promise.all([
-      convex.query(api.organizations.getMembers, { organizationId: orgId }),
+      convex.query(api.features.organizations.queries.getMembers, {
+        organizationId: orgId,
+      }),
       createAuthedConvexClient(accessToken!).query(
-        api.invitations.listPendingByOrganization,
+        api.features.organizations.invitations.listPendingByOrganization,
         {
           organizationId: orgId,
         }

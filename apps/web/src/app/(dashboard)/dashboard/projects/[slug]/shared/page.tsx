@@ -362,7 +362,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   const projectId = project?._id as Id<"projects"> | undefined;
 
   const projectShares = useConvexQuery(
-    api.sharedSecrets.listByProject,
+    api.features.sharing.queries.listByProject,
     // Identity is derived server-side from the attached JWT; `convexUserId`
     // gates the query until the current user is known (auth ready).
     projectId && convexUserId ? { projectId } : "skip"

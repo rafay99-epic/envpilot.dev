@@ -24,7 +24,7 @@ export function SharedSecretsWidget({
   userId,
 }: SharedSecretsWidgetProps) {
   const shares = useQuery(
-    api.sharedSecrets.listActiveByOrg,
+    api.features.sharing.queries.listActiveByOrg,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     userId ? { organizationId } : "skip"

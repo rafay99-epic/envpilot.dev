@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { createAuditLog } from "../../auditHelpers";
-import { requireAuthedUser } from "../../identity";
+import { createAuditLog } from "../../lib/audit";
+import { requireAuthedUser } from "../../lib/identity";
 
 /**
  * Favorite Projects — user-specific project bookmarking
