@@ -1,90 +1,61 @@
-# Welcome to your Convex functions directory!
+# Convex backend
 
-Write your Convex functions here.
-See https://docs.convex.dev/functions for more.
+Envpilot's Convex backend, organized by feature.
 
-A query function that takes two arguments looks like:
+## Layout
 
-```ts
-// convex/myFunctions.ts
-import { query } from "./_generated/server";
-import { v } from "convex/values";
-
-export const myQueryFunction = query({
-  // Validators for arguments.
-  args: {
-    first: v.number(),
-    second: v.string(),
-  },
-
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Read the database as many times as you need here.
-    // See https://docs.convex.dev/database/reading-data.
-    const documents = await ctx.db.query("tablename").collect();
-
-    // Arguments passed from the client are properties of the args object.
-    console.log(args.first, args.second);
-
-    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
-    // remove non-public properties, or create new objects.
-    return documents;
-  },
-});
+```
+convex/
+├── schema.ts            # database schema (must stay at root)
+├── crons.ts             # scheduled jobs (must stay at root)
+├── auth.config.ts       # WorkOS AuthKit JWT providers (must stay at root)
+├── convex.config.ts     # installed components (rate-limiter, workflow, workpool)
+├── <module>.ts          # ★ compat barrels — one per public module (see below)
+├── lib/                 # shared pure helpers — NO registered functions
+│   ├── identity.ts      #   verified-JWT actor resolution (requireAuthedUser)
+│   ├── authz.ts         #   unified RBAC: roles, actions, assert*/get*Access
+│   ├── authHelpers.ts   #   variable/account access wrappers
+│   ├── audit.ts         #   createAuditLog + audit log helpers
+│   ├── rateLimits.ts    #   rate limiter rules
+│   ├── roleCompat.ts    #   legacy role validators
+│   ├── seedData.ts      #   SEED_FEATURES (single source for registry seeding)
+│   └── users.ts         #   batchGetUsers / user display helpers
+└── features/            # ALL implementation code, by feature / sub-feature
+    ├── auth/            #   getMyPermissions, resolveLegacyRoles
+    ├── variables/       #   queries, mutations, rotation, values, share, requests/
+    ├── accounts/        #   shared-account CRUD + credential values
+    ├── permissions/     #   variablePermissions/, accountPermissions/, revocationEvents
+    ├── sharing/         #   shared-secret links (queries, mutations, cleanup)
+    ├── projects/        #   projects, members, favorites, tags, templates
+    ├── organizations/   #   orgs, member sessions, invitations
+    ├── users/           #   users, preferences, deviceSessions, projectAccess
+    ├── billing/         #   subscriptions (queries, webhooks, checkout, gracePeriods), tierLimits
+    ├── featureRegistry/ #   tier-gating registry (queries, resolver, gates)
+    ├── admin/           #   admin panel backend, split by sub-feature + analytics
+    ├── dashboard/       #   dashboard aggregate queries
+    ├── audit/           #   audit log queries, security, compliance
+    ├── community/       #   featureRequests/, changelog/
+    ├── support/         #   contactMessages, supportTickets
+    ├── emails/          #   Resend email actions + templates
+    └── vault/           #   WorkOS Vault internal actions, GC, reveal
 ```
 
-Using this query function in a React component looks like:
+## Compat barrels (IMPORTANT)
 
-```ts
-const data = useQuery(api.myFunctions.myQueryFunction, {
-  first: 10,
-  second: "hello",
-});
-```
+Convex function paths are derived from file paths, and they are the wire
+contract: the web app, admin panel, and **published CLI / VS Code extension
+builds** call functions as `api.<module>.<fn>` / `internal.<module>.<fn>`.
 
-A mutation function looks like:
+Each root `<module>.ts` is a thin barrel that re-exports its feature's
+registered functions (and helper exports), keeping every historical path
+registered. Rules:
 
-```ts
-// convex/myFunctions.ts
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+- **Never delete or rename a barrel or one of its exports** — that breaks
+  deployed clients.
+- New functions go in the feature directory and get re-exported from the
+  matching barrel.
+- Cross-feature imports go through the root barrels (e.g.
+  `import { rateLimiter } from "../../rateLimits"`), keeping features
+  decoupled from each other's internal layout.
 
-export const myMutationFunction = mutation({
-  // Validators for arguments.
-  args: {
-    first: v.string(),
-    second: v.string(),
-  },
-
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Insert or modify documents in the database here.
-    // Mutations can also read from the database like queries.
-    // See https://docs.convex.dev/database/writing-data.
-    const message = { body: args.first, author: args.second };
-    const id = await ctx.db.insert("messages", message);
-
-    // Optionally, return a value from your mutation.
-    return await ctx.db.get("messages", id);
-  },
-});
-```
-
-Using this mutation function in a React component looks like:
-
-```ts
-const mutation = useMutation(api.myFunctions.myMutationFunction);
-function handleButtonPress() {
-  // fire and forget, the most common way to use mutations
-  mutation({ first: "Hello!", second: "me" });
-  // OR
-  // use the result once the mutation has completed
-  mutation({ first: "Hello!", second: "me" }).then((result) =>
-    console.log(result)
-  );
-}
-```
-
-Use the Convex CLI to push your functions to a deployment. See everything
-the Convex CLI can do by running `npx convex -h` in your project root
-directory. To learn more, launch the docs with `npx convex docs`.
+See https://docs.convex.dev/functions for Convex function basics.

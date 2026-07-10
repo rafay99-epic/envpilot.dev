@@ -40,14 +40,13 @@ The developer has the **production `@envpilot/cli` installed globally** and uses
 
 ### Feature Registry & Tier Gating (CRITICAL)
 
-Every gatable feature in the platform is managed through the **dynamic feature registry** (`convex/featureRegistry.ts`). When implementing any new feature that should be tier-gated:
+Every gatable feature in the platform is managed through the **dynamic feature registry** (`convex/features/featureRegistry/`, re-exported via the `convex/featureRegistry.ts` barrel). When implementing any new feature that should be tier-gated:
 
-1. **Add the feature to `SEED_FEATURES`** in `convex/featureRegistry.ts` with key, displayName, valueType, category, defaultValue, resettable, sortOrder.
-2. **Add tier overrides** to `seedDefaultTierFeatures` in the same file (free/pro values).
-3. **Mirror the seed data** in `convex/admin.ts` → `runMigration` → `seed-feature-registry` and `seed-tier-features` handlers.
-4. **Enforce on the backend** using `checkBooleanFeature(db, orgId, key)` or `checkNumericLimit(db, orgId, key, count)` from `convex/featureRegistry.ts` in the relevant mutation/query.
-5. **Enforce on the frontend** by wrapping UI with `<FeatureGate organizationId={orgId} featureKey="key_name" featureName="Display Name">`.
-6. **For API routes** (CLI/extension), use `api.featureRegistry.checkFeature` query via ConvexHttpClient.
+1. **Add the feature to `SEED_FEATURES`** in `convex/lib/seedData.ts` (single source of truth — consumed by `runMigration`'s `seed-feature-registry` handler in `convex/features/admin/migrations.ts`; no mirroring needed) with key, displayName, valueType, category, defaultValue, resettable, sortOrder.
+2. **Add tier overrides** to the `tierConfigs` map in `convex/features/admin/migrations.ts` → `seed-tier-features` handler (free/pro values).
+3. **Enforce on the backend** using `checkBooleanFeature(db, orgId, key)` or `checkNumericLimit(db, orgId, key, count)` imported from `convex/featureRegistry.ts` (implementations in `convex/features/featureRegistry/gates.ts`) in the relevant mutation/query.
+4. **Enforce on the frontend** by wrapping UI with `<FeatureGate organizationId={orgId} featureKey="key_name" featureName="Display Name">`.
+5. **For API routes** (CLI/extension), use `api.featureRegistry.checkFeature` query via ConvexHttpClient.
 
 The seed functions use an **upsert pattern** — running them multiple times is safe. Existing features get updated if properties changed, new features get inserted, nothing duplicates.
 
@@ -90,7 +89,7 @@ if (!limit.allowed)
   throw new Error(`Limit reached (${limit.current}/${limit.limit})`);
 ```
 
-Add a `count*` helper in `convex/featureRegistry.ts` for each limited feature (e.g., `countRotationEnabledVariables`).
+Add a `count*` helper in `convex/features/featureRegistry/gates.ts` (re-exported by the `convex/featureRegistry.ts` barrel) for each limited feature (e.g., `countRotationEnabledVariables`).
 
 ### Versioning
 
@@ -201,6 +200,10 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 ### Key Directories
 
 - `convex/` — Backend functions (queries, mutations) and `schema.ts` (database schema). Auto-generates types in `convex/_generated/`. Has its own independent tsconfig. **Must stay at the monorepo root** (Convex CLI requirement).
+  - `convex/features/<feature>/` — ALL implementation code, organized by feature/sub-feature (variables, accounts, permissions, sharing, projects, organizations, users, billing, featureRegistry, admin, dashboard, audit, community, support, emails, vault, auth).
+  - `convex/lib/` — shared pure helpers (identity, authz, audit, rateLimits, roleCompat, seedData, users). No registered functions here.
+  - **Root `<module>.ts` files are compat barrels** that re-export a feature's registered functions + helpers. They freeze the public `api.<module>.<fn>` / `internal.<module>.<fn>` paths that the web app, admin panel, and published CLI/extension builds call — NEVER remove or rename a barrel export; add new functions to the feature dir and re-export them from the barrel.
+  - `schema.ts`, `crons.ts`, `auth.config.ts`, `convex.config.ts` stay at the convex root (Convex requirements).
 - `apps/web/` — Next.js web app (`@envpilot/web`).
   - `apps/web/src/app/api/` — REST API routes. Use `withAuth()` middleware for auth. Use `ConvexHttpClient` for server-side Convex calls.
   - `apps/web/src/hooks/` — Custom React hooks wrapping Convex queries.
