@@ -1,7 +1,7 @@
 "use client";
 
 import { RequireRole, useAuthContext } from "@/components/auth";
-import { useCachedTierData } from "@/hooks/useTierStore";
+import { useCachedTierData, useExtendedUsageSync } from "@/hooks/useTierStore";
 import { useAllFeatures, useConvexUser } from "@/hooks";
 import { useUserOrganizations } from "@/hooks/useOrganizations";
 import {
@@ -27,6 +27,9 @@ export default function UsagePage() {
 function UsagePageContent() {
   const { organization, user } = useAuthContext();
   const paymentsEnabled = usePaymentsEnabled();
+  // The heavyweight usage scan subscribes ONLY while this page is mounted —
+  // the global nav sync deliberately excludes it (see useTierStore.ts).
+  useExtendedUsageSync();
   const { isLoading, tier, usage, isFree, enforcementEnabled } =
     useCachedTierData();
   const orgId = organization?.id as Id<"organizations"> | undefined;
