@@ -1,0 +1,20 @@
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_655596e5f5983b::t_1432ef4925aa74 62-66
+  s_655596e5f5983b::t_b9400347975830 67-68,70-73,76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8f5f83db6386ca3e9391b44e169fee7b06c0d991",
+  "prompts": {},
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
