@@ -1,0 +1,22 @@
+convex/features/billing/webhooks.ts
+  s_f59315d63e71a6::t_2a867f30d738b9 513-515,521-525
+  s_f59315d63e71a6::t_446830def1ecbc 925-930,934-948
+  s_f59315d63e71a6::t_bf69c189e26619 599-601,607-609,624-626
+  s_f59315d63e71a6::t_86f955fcea1c35 949
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "bb2db9455d5b9c6f61e9796e1d1f040b1da0dc9d",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
