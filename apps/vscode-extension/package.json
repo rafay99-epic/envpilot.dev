@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -360,6 +360,12 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically install a pre-commit hook to block .env file commits"
+        },
+        "envpilot.idlePauseMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "description": "Minutes the window must stay unfocused before real-time sync (Convex WebSocket subscriptions) is paused. Set to 0 to disable idle-pausing and keep real-time sync running regardless of focus."
         }
       }
     }

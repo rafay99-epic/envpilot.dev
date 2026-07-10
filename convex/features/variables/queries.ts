@@ -35,7 +35,9 @@ export const listByProject = query({
   handler: async (ctx, args) => {
     const allVariables = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
       .take(args.limit ?? 500);
     const variables = allVariables.filter(
       (variable) => variable.deletedAt === undefined
@@ -151,7 +153,9 @@ export const listOrgVariablesWithAccess = query({
 
       const allVariables = await ctx.db
         .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
         .take(perProjectLimit);
 
       // Scoped developers never receive out-of-scope variables at all.
@@ -354,7 +358,9 @@ export const listOrgVariablesWithAccessPaginated = query({
 
       const inner = await ctx.db
         .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
         .order("desc")
         .paginate({ numItems, cursor: ic });
 
@@ -496,7 +502,9 @@ async function listWithAccessCore(
 
   const allVariables = await ctx.db
     .query("environmentVariables")
-    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .withIndex("by_project_deleted", (q) =>
+      q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+    )
     .take(args.limit ?? 500);
   // Scoped developers never receive out-of-scope variables at all —
   // not even their metadata/keys
@@ -574,7 +582,9 @@ export const listWithAccessPaginated = query({
     // from this result and are never recomputed after filtering.
     const result = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
       .order("desc")
       .paginate(args.paginationOpts);
 
@@ -623,7 +633,9 @@ export const listMetadataByProject = query({
   handler: async (ctx, args) => {
     const allVariables = await ctx.db
       .query("environmentVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
       .take(args.limit ?? 500);
     const variables = allVariables.filter(
       (variable) => variable.deletedAt === undefined
@@ -671,7 +683,9 @@ export const search = query({
       // budget is filled, so a large org never reads its entire variable set.
       const allVariables = await ctx.db
         .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
         .take(resultLimit);
       const variables = allVariables.filter(
         (variable) => variable.deletedAt === undefined
@@ -916,13 +930,16 @@ export const globalSearchWithAccess = query({
         // RETURNED. (If per-keystroke search cost becomes a problem on very
         // large orgs, the right fix is a Convex search index on `key`, not a
         // correctness-breaking read cap.)
-        const allVariables = await ctx.db
+        //
+        // by_project_deleted skips soft-deleted rows AT THE INDEX — trash
+        // can dwarf the active set (hundreds of dead docs per project) and
+        // was previously read on every keystroke just to be filtered out.
+        const variables = await ctx.db
           .query("environmentVariables")
-          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .withIndex("by_project_deleted", (q) =>
+            q.eq("projectId", project._id).eq("deletedAt", undefined)
+          )
           .collect();
-        const variables = allVariables.filter(
-          (variable) => variable.deletedAt === undefined
-        );
 
         // Resolve tags for variables in this project batch (one batched fetch)
         await preloadTags(variables);

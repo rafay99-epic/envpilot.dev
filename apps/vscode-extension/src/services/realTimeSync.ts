@@ -106,6 +106,33 @@ export class RealTimeSyncService {
   }
 
   /**
+   * Pause real-time sync — tears down the WebSocket subscriptions and stops
+   * the reconnect backstop timer, but leaves `desiredRunning` untouched (this
+   * is NOT a user-intent stop like `stopRealTimeSync()`/sign-out). Meant for
+   * transient pauses (e.g. window idle) where the caller will `resume()`
+   * later. Idempotent — a no-op if already paused.
+   */
+  pause(): void {
+    if (!this.isRunning && !this.reconnectTimer) return;
+    console.log("[RealTimeSync] Pausing WebSocket subscriptions (idle)");
+    this.isRunning = false;
+    this.teardownSubscriptions();
+    this.stopReconnectTimer();
+    this.syncService.setConnectionState("disconnected");
+  }
+
+  /**
+   * Resume real-time sync after `pause()` — re-establishes the WebSocket
+   * subscriptions and re-arms the reconnect backstop timer exactly the way
+   * `startRealTimeSync()` does (this simply delegates to it). Idempotent — a
+   * no-op if already running.
+   */
+  async resume(): Promise<void> {
+    if (this.isRunning) return;
+    await this.startRealTimeSync();
+  }
+
+  /**
    * Low-frequency (every few minutes) check for whether the WebSocket
    * connection is up; only acts when disconnected. Bounded and cheap — this
    * is a backstop, not a polling replacement for the subscriptions.

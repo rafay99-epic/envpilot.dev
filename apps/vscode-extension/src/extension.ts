@@ -37,6 +37,7 @@ import {
   getConvexUrl,
   shouldAutoSync,
   isCommitGuardEnabled,
+  getIdlePauseMinutes,
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
@@ -96,6 +97,13 @@ let variablesTreeProvider: VariablesTreeProvider;
 let statusBarProvider: StatusBarProvider;
 let linkProjectDialog: LinkProjectDialog;
 let requestVariableDialog: RequestVariableDialog;
+/** Pending idle-grace timer armed on window blur; cleared on focus or re-blur. */
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+/** True once the idle timer has actually paused real-time sync — distinct
+ * from "window is blurred" so focus-return only calls resume() when WE were
+ * the ones who paused it (never resurrects a sync the user explicitly
+ * stopped, e.g. via sign-out, while idle). */
+let isIdlePaused = false;
 
 /** Update context flags used by menu when-clauses and welcome views */
 async function updateContextFlags(): Promise<void> {
@@ -440,9 +448,60 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Pause real-time Convex subscriptions after the window sits unfocused for
+  // envpilot.idlePauseMinutes, resume them the moment focus returns. Inert
+  // when signed out or auto-sync is off — a forgotten, unfocused window
+  // should stop holding a live WebSocket + reconnect timer all day.
+  context.subscriptions.push(
+    vscode.window.onDidChangeWindowState(async (windowState) => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+
+      if (windowState.focused) {
+        if (!isIdlePaused) return;
+        isIdlePaused = false;
+        const authenticated = await authService.isAuthenticated();
+        if (!authenticated || !shouldAutoSync()) return;
+        realTimeSyncService.resume();
+        syncService.resume();
+        output.log("Envpilot: real-time sync resumed");
+        return;
+      }
+
+      // Window just lost focus — arm the idle-grace timer. Re-read the
+      // setting on every blur so a config change applies without reload.
+      const idleMinutes = getIdlePauseMinutes();
+      if (idleMinutes <= 0) return; // 0 disables idle-pausing
+
+      const authenticated = await authService.isAuthenticated();
+      if (!authenticated || !shouldAutoSync()) return;
+
+      idleTimer = setTimeout(
+        async () => {
+          idleTimer = null;
+          const stillAuthenticated = await authService.isAuthenticated();
+          if (!stillAuthenticated || !shouldAutoSync()) return;
+          realTimeSyncService.pause();
+          syncService.pause();
+          isIdlePaused = true;
+          output.log(
+            `Envpilot: real-time sync paused after ${idleMinutes} min without focus`
+          );
+        },
+        idleMinutes * 60 * 1000
+      );
+    })
+  );
+
   // Add cleanup to subscriptions
   context.subscriptions.push({
     dispose: () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
       authService.dispose();
       syncService.dispose();
       realTimeSyncService.dispose();

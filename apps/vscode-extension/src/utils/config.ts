@@ -49,6 +49,7 @@ export function getConfig(): ExtensionConfig {
       "commitGuard.autoInstallHook",
       true
     ),
+    idlePauseMinutes: config.get<number>("idlePauseMinutes", 10),
   };
 }
 
@@ -74,6 +75,14 @@ export function shouldAutoSync(): boolean {
 
 export function shouldPreventCopyOnRevoke(): boolean {
   return getConfig().preventCopyOnRevoke;
+}
+
+/**
+ * Minutes the window must stay unfocused before real-time Convex
+ * subscriptions are paused. 0 disables idle-pausing entirely.
+ */
+export function getIdlePauseMinutes(): number {
+  return getConfig().idlePauseMinutes;
 }
 
 /**

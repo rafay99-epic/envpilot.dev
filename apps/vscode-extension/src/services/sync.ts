@@ -221,6 +221,27 @@ export class SyncService {
     this.teardownMetadataSubscriptions();
   }
 
+  /**
+   * Pause reactive sync — tears down the metadata subscriptions (and their
+   * pending debounce timers) the same way `stopPeriodicSync()` does. Meant
+   * for transient pauses (e.g. window idle) where the caller will `resume()`
+   * later. Idempotent — a no-op if already paused (no active subscriptions).
+   */
+  pause(): void {
+    if (this.metadataSubIds.length === 0) return;
+    this.teardownMetadataSubscriptions();
+  }
+
+  /**
+   * Resume reactive sync after `pause()` — re-establishes the metadata
+   * subscriptions exactly the way `startPeriodicSync()` does (this simply
+   * delegates to it). Idempotent — a no-op if already running.
+   */
+  resume(): void {
+    if (this.metadataSubIds.length > 0) return;
+    this.startPeriodicSync();
+  }
+
   // ============================================
   // V1 Legacy Methods (kept for compatibility)
   // ============================================

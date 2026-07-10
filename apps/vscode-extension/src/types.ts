@@ -203,6 +203,7 @@ export interface ExtensionConfig {
   preventCopyOnRevoke: boolean;
   commitGuardEnabled: boolean;
   commitGuardAutoInstallHook: boolean;
+  idlePauseMinutes: number;
 }
 
 export interface ApiResponse<T> {
