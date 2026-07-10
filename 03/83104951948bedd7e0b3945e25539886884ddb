@@ -1,0 +1,19 @@
+convex/features/admin/crons.ts
+  s_655596e5f5983b::t_ccfa03232e896a 19,25,31,37-38,42-48,51,57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0383104951948bedd7e0b3945e25539886884ddb",
+  "prompts": {},
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
