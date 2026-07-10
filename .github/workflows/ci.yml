@@ -258,6 +258,83 @@ jobs:
           echo "All required checks passed (skipped = not applicable)."
 
   # ------------------------------------------------------------------
+  # Stage 2.5: E2E gate — full Playwright suite against a real backend.
+  # Runs on main pushes only (deploys are main-only) and BLOCKS every
+  # deploy below: if the suite fails, nothing ships.
+  #
+  # Requires an isolated e2e Convex deployment + a WorkOS test account,
+  # configured as repo secrets (see the guard step for the full list).
+  # The job pushes the NEW convex functions to that deployment first, so
+  # the suite exercises exactly the code that is about to deploy.
+  # ------------------------------------------------------------------
+  e2e:
+    name: E2E gate (Playwright)
+    needs: [changes, checks-passed]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Real values override the workflow-level CI stubs (job env wins).
+      NEXT_PUBLIC_CONVEX_URL: ${{ secrets.E2E_CONVEX_URL }}
+      WORKOS_API_KEY: ${{ secrets.E2E_WORKOS_API_KEY }}
+      WORKOS_CLIENT_ID: ${{ secrets.E2E_WORKOS_CLIENT_ID }}
+      WORKOS_COOKIE_PASSWORD: ${{ secrets.E2E_WORKOS_COOKIE_PASSWORD }}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      WORKOS_REDIRECT_URI: http://localhost:3000/callback
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # A gate that silently skips is fake safety: the authenticated specs
+      # self-skip without credentials and the suite would go green having
+      # tested nothing. Fail loudly instead until the secrets exist.
+      - name: Verify e2e secrets are configured
+        env:
+          E2E_CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+        run: |
+          missing=""
+          [ -z "$E2E_CONVEX_DEPLOY_KEY" ] && missing="$missing E2E_CONVEX_DEPLOY_KEY"
+          [ -z "$NEXT_PUBLIC_CONVEX_URL" ] && missing="$missing E2E_CONVEX_URL"
+          [ -z "$WORKOS_API_KEY" ] && missing="$missing E2E_WORKOS_API_KEY"
+          [ -z "$WORKOS_CLIENT_ID" ] && missing="$missing E2E_WORKOS_CLIENT_ID"
+          [ -z "$WORKOS_COOKIE_PASSWORD" ] && missing="$missing E2E_WORKOS_COOKIE_PASSWORD"
+          [ -z "$E2E_TEST_EMAIL" ] && missing="$missing E2E_TEST_EMAIL"
+          [ -z "$E2E_TEST_PASSWORD" ] && missing="$missing E2E_TEST_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::E2E gate cannot run — missing repo secrets:$missing. Deploys are blocked until they are configured (isolated e2e Convex deployment + WorkOS test account)."
+            exit 1
+          fi
+          echo "All e2e secrets present ✓"
+
+      - name: Push convex functions to the e2e deployment
+        run: bunx convex deploy --yes
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.E2E_CONVEX_DEPLOY_KEY }}
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium
+
+      # playwright.config.ts already applies these when CI is set; the
+      # explicit flags pin the gate's serial-run + retry contract here so
+      # a config refactor can't silently reintroduce the parallel flakes.
+      - name: Run Playwright suite
+        working-directory: apps/web
+        run: bunx playwright test --workers=1 --retries=2
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: apps/web/playwright-report
+          retention-days: 14
+
+  # ------------------------------------------------------------------
   # Stage 3: artifact builds — only after every check is green
   # ------------------------------------------------------------------
   build-cli:
@@ -305,22 +382,37 @@ jobs:
           overwrite: true
 
   # ------------------------------------------------------------------
-  # Stage 4: deploys — main only, fully verified, via reusable workflows
+  # Stage 4: deploys — main only, fully verified, via reusable workflows.
+  #
+  # Strict ordering (each arrow is a hard dependency; an e2e or upstream
+  # deploy failure blocks everything downstream):
+  #
+  #   e2e gate → deploy-convex (backend FIRST)
+  #            → deploy-cli + deploy-extension (clients call the paths the
+  #              backend just deployed)
+  #            → deploy-homebrew (formula points at the npm publish)
+  #
+  # The `!failure() && !cancelled()` guards let a SKIPPED upstream job
+  # (surface unchanged) fall through, while a FAILED one still blocks.
   # ------------------------------------------------------------------
   deploy-convex:
     name: Deploy Convex
-    needs: [changes, checks-passed]
+    needs: [changes, checks-passed, e2e]
     if: |
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.e2e.result == 'success' &&
       needs.changes.outputs.deploy_convex == 'true'
     uses: ./.github/workflows/deploy-convex.yml
     secrets: inherit
 
   deploy-cli:
     name: Deploy CLI
-    needs: [changes, build-cli]
+    needs: [changes, build-cli, e2e, deploy-convex]
     if: |
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.e2e.result == 'success' &&
       needs.changes.outputs.run_cli == 'true'
     uses: ./.github/workflows/deploy-cli.yml
     with:
@@ -331,9 +423,11 @@ jobs:
 
   deploy-extension:
     name: Deploy extension
-    needs: [changes, build-extension]
+    needs: [changes, build-extension, e2e, deploy-convex]
     if: |
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.e2e.result == 'success' &&
       needs.changes.outputs.run_extension == 'true'
     uses: ./.github/workflows/deploy-extension.yml
     with:
@@ -363,12 +457,14 @@ jobs:
       - changes
       - build-cli
       - build-extension
+      - e2e
       - deploy-convex
       - deploy-cli
       - deploy-extension
       - deploy-homebrew
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
+    # A failed e2e gate DOES block the release — nothing shipped.
     #
     # deploy-homebrew is listed in needs only for its status row in the
     # release notes — a failed Homebrew push must NOT block the release.
@@ -378,6 +474,7 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.any == 'true' &&
+      needs.e2e.result == 'success' &&
       needs.deploy-convex.result != 'failure' &&
       needs.deploy-convex.result != 'cancelled' &&
       needs.deploy-cli.result != 'failure' &&

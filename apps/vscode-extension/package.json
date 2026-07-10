@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -381,7 +381,7 @@
   "devDependencies": {
     "@envpilot/eslint-config": "workspace:*",
     "@envpilot/tsconfig": "workspace:*",
-    "@types/node": "^20.10.0",
+    "@types/node": "^22",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.19.8",
