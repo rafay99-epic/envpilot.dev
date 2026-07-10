@@ -1,0 +1,100 @@
+convex/features/admin/tiers.ts
+  s_f59315d63e71a6::t_38c0b39503f0d8 360
+apps/web/src/components/tier/UpgradePrompt.tsx
+  s_f59315d63e71a6::t_d3a01332085052 62
+apps/web/src/app/(dashboard)/dashboard/checkout-success/page.tsx
+  s_f59315d63e71a6::t_bd52e37088705a 212,217,220,229,231-233
+convex/features/billing/gracePeriods.ts
+  s_f59315d63e71a6::t_cfceb9a9952cdc 47-51,58-76
+docs/SECURITY-TODO.md
+  s_f59315d63e71a6::t_e21bc19c5816fb 7,15-17,21,24,26,32
+  s_f59315d63e71a6::t_74f37be7f12799 8-14,22,25,27-28,33-35
+apps/web/src/hooks/usePaymentsEnabled.ts
+  s_f59315d63e71a6::t_aee1fdeef5e62f 21
+  s_f59315d63e71a6::t_9b26179760681d 9-16,22,24
+apps/web/src/hooks/queries/index.ts
+  s_f59315d63e71a6::t_2004579d66dd04 54
+apps/web/src/app/(dashboard)/dashboard/usage/page.tsx
+  s_f59315d63e71a6::t_dc753c30a978a7 17
+apps/web/src/app/(dashboard)/dashboard/settings/page.tsx
+  s_f59315d63e71a6::t_9fec6762bc39f1 1751
+  s_f59315d63e71a6::t_a6a061c2b1154a 1801
+apps/web/src/components/tier/GracePeriodBanner.tsx
+  s_f59315d63e71a6::t_54f22501d30958 33
+convex/features/billing/queries.ts
+  s_f59315d63e71a6::t_656e0f76894653 107,273-274,276-278,280,284
+  s_f59315d63e71a6::t_138fc539550179 153,156-157
+  s_f59315d63e71a6::t_08bdcf07577f6e 22-25,27,30,43-56
+  s_f59315d63e71a6::t_f19b12b4946b0d 108-123,131,134-135,286
+  s_f59315d63e71a6::t_bd9f806cc86573 285
+  s_f59315d63e71a6::t_25ff9bc675ea82 287-288
+  s_f59315d63e71a6::t_b2743ef1203ad0 290
+apps/web/src/app/api/checkout/route.ts
+  s_f59315d63e71a6::t_09cf3b0fb7f19b 217-223,226,229,232-234
+  s_f59315d63e71a6::t_d781a9c05b7e84 253,270
+  s_f59315d63e71a6::t_f8e88fc66726be 100-128,132-156
+  s_f59315d63e71a6::t_75650f0b5b7898 181-182
+  s_f59315d63e71a6::t_67b26437cb7532 10,12-13,15-21,23-26,48
+convex/features/billing/webhooks.ts
+  s_f59315d63e71a6::t_ddd4365491ec05 165-167,174
+  s_f59315d63e71a6::t_e2059df92ae0b9 430-432
+  s_f59315d63e71a6::t_2ecca4134322c6 565-568,570-572,574,580
+  s_f59315d63e71a6::t_da0f82289b19eb 406-408
+  s_f59315d63e71a6::t_6182cf29e2ae4d 947
+  s_f59315d63e71a6::t_0a328ec5151d0f 512-524,532-538,550,553-562
+  s_f59315d63e71a6::t_e08c41738ad23e 465-466,468,471-479
+  s_f59315d63e71a6::t_ebb6d85e678fb7 869
+  s_f59315d63e71a6::t_bdc130871faa7f 511,1019-1025,1027,1029-1033,1039-1056
+  s_f59315d63e71a6::t_12a9bc2d86f567 1001-1010
+  s_f59315d63e71a6::t_b3754231b23f52 748,754-755,757-758
+  s_f59315d63e71a6::t_3912efe1767ac4 853
+  s_f59315d63e71a6::t_524432eedca54d 194-196
+  s_f59315d63e71a6::t_3ea4d211658c75 581-589,591-593,595-596,599-600,603-605,607-616,618-627,629-631,633-643,648-649,653,658-665,667-676,678-686,688-690,693,695-704,707-715,717-730,732-733,735-747,749-753,756,760-804,806-807,810-818,820-827,829-840,842-843,846-852,855-860,862-868,871-872,875-882,885-892,894,896-898,902-919,921-930,932-934,936-940,942,944-946,949-955,958-959,965,967,969-977,980-991,993-995,998-999
+  s_f59315d63e71a6::t_2d008495517e5d 335-339,347,356-358
+  s_f59315d63e71a6::t_c1fdb4b29a9c6b 948
+apps/web/src/app/api/webhooks/polar/route.ts
+  s_f59315d63e71a6::t_2ddab89e2532a8 75-86,98
+convex/features/admin/migrations.ts
+  s_f59315d63e71a6::t_0dfbe415771ef4 182
+apps/web/src/app/api/billing/sync/route.ts
+  s_f59315d63e71a6::t_48a8b707b16087 78-85,92
+apps/web/src/app/(dashboard)/dashboard/projects/new/page.tsx
+  s_f59315d63e71a6::t_f2fedeb0d801ae 183
+apps/web/src/components/tier/FeatureGate.tsx
+  s_f59315d63e71a6::t_c087a050a955d8 241
+apps/web/tests/e2e/authenticated/billing.spec.ts
+  s_f59315d63e71a6::t_041d5ee0606d4f 1-25,27-35,37-77
+  s_f59315d63e71a6::t_2ffded2889d29e 26,36
+convex/features/billing/checkout.ts
+  s_f59315d63e71a6::t_e6424018afac3a 38-60,63-64,68-69,74-75
+apps/web/package.json
+  s_b59d1dac2ef154::t_877381e9fc96fc 3
+apps/web/src/lib/versions.ts
+  s_f59315d63e71a6::t_125b1a6ccd7faa 17
+package.json
+  s_f59315d63e71a6::t_ff210ea4235ede 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0dd12add49dd71e1ab352f3e0b2122673172cfe6",
+  "prompts": {},
+  "sessions": {
+    "s_b59d1dac2ef154": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20525871-0d71-414b-93ca-68c8be6570fe",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
