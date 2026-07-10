@@ -1,0 +1,19 @@
+package.json
+  s_f59315d63e71a6::t_783ca8124f5f65 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3db51c60bf34a3b012c97a293cb313160466019e",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
