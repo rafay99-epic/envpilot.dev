@@ -168,7 +168,10 @@ test.describe("project lifecycle", () => {
     // click until the navigation actually happens.
     await expect(async () => {
       await newProjectLink.click();
-      await page.waitForURL(/\/dashboard\/projects\/new$/, { timeout: 3_000 });
+      // 5s (not 3s): the inner timeout is the click-retry cadence, but on a
+      // slow CI runner a legitimate navigation can exceed 3s, turning every
+      // attempt into a false miss until the outer budget drains.
+      await page.waitForURL(/\/dashboard\/projects\/new$/, { timeout: 5_000 });
     }).toPass({ timeout: 20_000 });
     await expect(
       page.getByRole("heading", { name: "Create New Project" })
