@@ -80,7 +80,7 @@ export default function VariablesPage() {
     status: variablesStatus,
     loadMore,
   } = usePaginatedQuery(
-    api.variables.listOrgVariablesWithAccessPaginated,
+    api.features.variables.queries.listOrgVariablesWithAccessPaginated,
     // Identity is derived server-side from the attached JWT; `convexUserId`
     // gates the query until the current user is known (auth ready).
     activeOrganizationId && convexUserId

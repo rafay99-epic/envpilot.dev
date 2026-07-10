@@ -108,8 +108,13 @@ function formatResult(result: MigrationResult): string {
 }
 
 function MigrationsPage() {
-  const migrations = useAdminQuery(api.admin.listMigrations, {});
-  const runMigration = useAdminMutation(api.admin.runMigration);
+  const migrations = useAdminQuery(
+    api.features.admin.migrations.listMigrations,
+    {}
+  );
+  const runMigration = useAdminMutation(
+    api.features.admin.migrations.runMigration
+  );
   const { confirm } = useConfirmStore();
 
   const [runningName, setRunningName] = useState<string | null>(null);

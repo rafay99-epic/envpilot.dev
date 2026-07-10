@@ -61,26 +61,35 @@ export async function GET(request: Request) {
 
     // If searching, use the search query
     if (search) {
-      const templates = await convex.query(api.templates.search, {
-        query: search,
-        organizationId: organizationId as Id<"organizations"> | undefined,
-      });
+      const templates = await convex.query(
+        api.features.projects.templates.search,
+        {
+          query: search,
+          organizationId: organizationId as Id<"organizations"> | undefined,
+        }
+      );
       return NextResponse.json({ templates });
     }
 
     // If built-in only, use the built-in query
     if (builtInOnly) {
-      const templates = await convex.query(api.templates.listBuiltIn, {
-        projectType: projectType || undefined,
-      });
+      const templates = await convex.query(
+        api.features.projects.templates.listBuiltIn,
+        {
+          projectType: projectType || undefined,
+        }
+      );
       return NextResponse.json({ templates });
     }
 
     // Otherwise, list all available templates
-    const templates = await convex.query(api.templates.listAll, {
-      organizationId: organizationId as Id<"organizations"> | undefined,
-      projectType: projectType || undefined,
-    });
+    const templates = await convex.query(
+      api.features.projects.templates.listAll,
+      {
+        organizationId: organizationId as Id<"organizations"> | undefined,
+        projectType: projectType || undefined,
+      }
+    );
 
     return NextResponse.json({ templates });
   } catch (error) {
@@ -135,21 +144,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const templateId = await convex.mutation(api.templates.create, {
-      name: data.name,
-      description: data.description,
-      projectType: data.projectType,
-      icon: data.icon,
-      color: data.color,
-      version: data.version,
-      tags: data.tags,
-      organizationId: data.organizationId as Id<"organizations">,
-      createdBy: convexUser._id,
-      isPublished: data.isPublished,
-      variables: data.variables,
-    });
+    const templateId = await convex.mutation(
+      api.features.projects.templates.create,
+      {
+        name: data.name,
+        description: data.description,
+        projectType: data.projectType,
+        icon: data.icon,
+        color: data.color,
+        version: data.version,
+        tags: data.tags,
+        organizationId: data.organizationId as Id<"organizations">,
+        createdBy: convexUser._id,
+        isPublished: data.isPublished,
+        variables: data.variables,
+      }
+    );
 
-    const template = await convex.query(api.templates.getById, { templateId });
+    const template = await convex.query(
+      api.features.projects.templates.getById,
+      { templateId }
+    );
 
     return NextResponse.json({ template }, { status: 201 });
   } catch (error) {

@@ -50,13 +50,16 @@ export async function POST(
     // client-encrypted ciphertext from Vault, and best-effort delete one-time
     // entries — all inside a single public Convex action (no session; the OTP
     // is the authorization). Vault crypto now lives entirely in Convex.
-    const result = await convex.action(api.shareValues.verifyOtpAndReveal, {
-      token,
-      email,
-      otpHash,
-      ipAddress,
-      userAgent,
-    });
+    const result = await convex.action(
+      api.features.variables.share.verifyOtpAndReveal,
+      {
+        token,
+        email,
+        otpHash,
+        ipAddress,
+        userAgent,
+      }
+    );
 
     return NextResponse.json({
       encryptedPayload: result.encryptedPayload,

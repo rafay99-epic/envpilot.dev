@@ -75,22 +75,22 @@ function OrganizationMembersPageContent({
   // ---------------------------------------------------------------------------
   // Convex queries — real-time via WebSocket, no fetch() round-trip
   // ---------------------------------------------------------------------------
-  const org = useQuery(api.organizations.getBySlug, { slug });
+  const org = useQuery(api.features.organizations.queries.getBySlug, { slug });
   const orgId = org?._id;
 
   const membersData = useQuery(
-    api.organizations.getMembers,
+    api.features.organizations.queries.getMembers,
     orgId ? { organizationId: orgId } : "skip"
   );
   const invitationsData = useQuery(
     // The requesting user is derived server-side from the browser's verified
     // JWT identity (requireAuthedUser). convexUserId is kept only as an
     // auth-ready skip gate so the query waits until identity is resolvable.
-    api.invitations.listPendingByOrganization,
+    api.features.organizations.invitations.listPendingByOrganization,
     orgId && convexUserId ? { organizationId: orgId } : "skip"
   );
   const projectsData = useQuery(
-    api.projects.listByOrganization,
+    api.features.projects.queries.listByOrganization,
     orgId ? { organizationId: orgId } : "skip"
   );
 

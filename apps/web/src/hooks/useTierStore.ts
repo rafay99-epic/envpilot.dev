@@ -21,22 +21,24 @@ export function useTierStoreSync() {
   const { convexUserId } = useConvexUser(user?.id);
 
   const usageData = useQuery(
-    api.tierLimits.getExtendedUsage,
+    api.features.billing.tierLimits.getExtendedUsage,
     orgId ? { organizationId: orgId } : "skip"
   );
 
-  const enforcementEnabled = useQuery(api.tierLimits.isEnforcementEnabled);
+  const enforcementEnabled = useQuery(
+    api.features.billing.tierLimits.isEnforcementEnabled
+  );
 
   // Hydrate user-level tier info (self, derived from the verified JWT;
   // convexUserId only gates readiness)
   const userTierInfo = useQuery(
-    api.featureRegistry.getMyTierInfo,
+    api.features.featureRegistry.queries.getMyTierInfo,
     convexUserId ? {} : "skip"
   );
 
   // Hydrate resolved features for the current org
   const resolvedFeatures = useQuery(
-    api.featureRegistry.getResolvedFeatures,
+    api.features.featureRegistry.queries.getResolvedFeatures,
     orgId ? { organizationId: orgId } : "skip"
   );
 

@@ -57,11 +57,19 @@ function ReadinessItem({
 // ==========================================
 
 function DashboardPage() {
-  const stats = useAdminQuery(api.admin.getStats, {});
-  const analytics = useAdminQuery(api.admin.getAnalytics, {});
-  const settings = useAdminQuery(api.admin.getAdminSettings, {});
-  const updateSetting = useAdminMutation(api.admin.updateAdminSetting);
-  const paymentReadiness = useAdminQuery(api.admin.getPaymentReadiness, {});
+  const stats = useAdminQuery(api.features.admin.stats.getStats, {});
+  const analytics = useAdminQuery(api.features.admin.stats.getAnalytics, {});
+  const settings = useAdminQuery(
+    api.features.admin.settings.getAdminSettings,
+    {}
+  );
+  const updateSetting = useAdminMutation(
+    api.features.admin.settings.updateAdminSetting
+  );
+  const paymentReadiness = useAdminQuery(
+    api.features.admin.stats.getPaymentReadiness,
+    {}
+  );
   const { confirm } = useConfirmStore();
 
   if (!stats) return <Spinner />;

@@ -19,9 +19,12 @@ interface Organization {
 }
 
 function OrgProBadge({ orgId }: { orgId: string }) {
-  const tierData = useQuery(api.featureRegistry.getResolvedFeatures, {
-    organizationId: orgId as Id<"organizations">,
-  });
+  const tierData = useQuery(
+    api.features.featureRegistry.queries.getResolvedFeatures,
+    {
+      organizationId: orgId as Id<"organizations">,
+    }
+  );
   if (tierData?.tierName !== "pro") return null;
   return (
     <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">

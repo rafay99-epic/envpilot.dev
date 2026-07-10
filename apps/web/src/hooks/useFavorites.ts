@@ -7,7 +7,10 @@ import type { Id } from "@convex/_generated/dataModel";
 export function useFavoriteProjects(userId: Id<"users"> | undefined) {
   // Identity is derived server-side from the attached JWT; `userId` only gates
   // the query until the current user is known (auth ready).
-  const favorites = useQuery(api.favorites.listByUser, userId ? {} : "skip");
+  const favorites = useQuery(
+    api.features.projects.favorites.listByUser,
+    userId ? {} : "skip"
+  );
 
   const favoriteProjectIds = new Set(
     favorites?.map((f) => f.projectId as string) ?? []
@@ -17,7 +20,7 @@ export function useFavoriteProjects(userId: Id<"users"> | undefined) {
 }
 
 export function useToggleFavorite() {
-  const toggleMutation = useMutation(api.favorites.toggle);
+  const toggleMutation = useMutation(api.features.projects.favorites.toggle);
 
   // `userId` is accepted for call-site compatibility but no longer forwarded;
   // the acting user is derived server-side from the JWT.

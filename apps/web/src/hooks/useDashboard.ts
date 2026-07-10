@@ -13,7 +13,7 @@ export function useProjects(
   userId?: Id<"users">
 ) {
   const projects = useQuery(
-    api.projects.listWithStats,
+    api.features.projects.queries.listWithStats,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     organizationId && userId ? { organizationId } : "skip"
@@ -35,7 +35,7 @@ export function useVariables(
   userId: Id<"users"> | undefined
 ) {
   const variables = useQuery(
-    api.variables.listOrgVariablesWithAccess,
+    api.features.variables.queries.listOrgVariablesWithAccess,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     organizationId && userId ? { organizationId } : "skip"
@@ -54,7 +54,7 @@ export function useDashboardStats(
   organizationId: Id<"organizations"> | undefined
 ) {
   const stats = useQuery(
-    api.dashboard.getStats,
+    api.features.dashboard.dashboard.getStats,
     organizationId ? { organizationId } : "skip"
   );
 
@@ -74,7 +74,7 @@ export function useRecentActivity(
   userId: Id<"users"> | undefined
 ) {
   const activity = useQuery(
-    api.dashboard.getRecentActivity,
+    api.features.dashboard.dashboard.getRecentActivity,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     organizationId && userId ? { organizationId } : "skip"
@@ -93,7 +93,7 @@ export function useRecentProjects(
   organizationId: Id<"organizations"> | undefined
 ) {
   const projects = useQuery(
-    api.dashboard.getRecentProjects,
+    api.features.dashboard.dashboard.getRecentProjects,
     organizationId ? { organizationId } : "skip"
   );
 
@@ -110,7 +110,7 @@ export function useTeamMembersQuickView(
   organizationId: Id<"organizations"> | undefined
 ) {
   const members = useQuery(
-    api.dashboard.getTeamMembers,
+    api.features.dashboard.dashboard.getTeamMembers,
     organizationId ? { organizationId } : "skip"
   );
 
@@ -128,7 +128,7 @@ export function useAnalytics(
   daysBack?: number
 ) {
   const analytics = useQuery(
-    api.dashboard.getAnalytics,
+    api.features.dashboard.dashboard.getAnalytics,
     organizationId ? { organizationId, daysBack } : "skip"
   );
 
@@ -145,7 +145,7 @@ export function useOnboardingStatus(
   organizationId: Id<"organizations"> | undefined
 ) {
   const status = useQuery(
-    api.dashboard.getOnboardingStatus,
+    api.features.dashboard.dashboard.getOnboardingStatus,
     organizationId ? { organizationId } : "skip"
   );
 

@@ -12,7 +12,7 @@ export function useVariableRequests(
   userId: Id<"users"> | string | undefined
 ) {
   const requests = useQuery(
-    api.variableRequests.listForProject,
+    api.features.variables.requests.queries.listForProject,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     projectId && userId
@@ -32,8 +32,8 @@ export function useVariableRequests(
  * Resolve (approve/reject) a variable request directly via Convex.
  */
 export function useResolveVariableRequest() {
-  const review = useMutation(api.variableRequests.review);
-  const cancel = useMutation(api.variableRequests.cancel);
+  const review = useMutation(api.features.variables.requests.mutations.review);
+  const cancel = useMutation(api.features.variables.requests.mutations.cancel);
 
   return {
     mutateAsync: async (data: {

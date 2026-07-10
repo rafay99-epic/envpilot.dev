@@ -145,7 +145,7 @@ function AuditPageContent() {
     status: logsStatus,
     loadMore: loadMoreLogs,
   } = usePaginatedQuery(
-    api.auditLogs.listByOrganizationPaginated,
+    api.features.audit.queries.listByOrganizationPaginated,
     activeOrganizationId ? { organizationId: activeOrganizationId } : "skip",
     { initialNumItems: PAGE_SIZE }
   );

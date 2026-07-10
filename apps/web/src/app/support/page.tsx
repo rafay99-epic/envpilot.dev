@@ -80,7 +80,7 @@ const QUICK_LINKS = [
 ];
 
 export default function SupportPage() {
-  const submitTicket = useMutation(api.supportTickets.submit);
+  const submitTicket = useMutation(api.features.support.supportTickets.submit);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

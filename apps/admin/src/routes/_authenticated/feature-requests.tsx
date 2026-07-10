@@ -55,14 +55,25 @@ export const Route = createFileRoute("/_authenticated/feature-requests")({
 type RequestItem = Record<string, any>;
 
 function FeatureRequestsPage() {
-  const requests = useAdminQuery(api.admin.listFeatureRequests, {});
-  const updateStatus = useAdminMutation(api.admin.updateFeatureRequestStatus);
-  const updateNotes = useAdminMutation(
-    api.admin.updateFeatureRequestAdminNotes
+  const requests = useAdminQuery(
+    api.features.admin.featureRequests.listFeatureRequests,
+    {}
   );
-  const deleteRequest = useAdminMutation(api.admin.deleteFeatureRequest);
-  const createRequest = useAdminMutation(api.admin.createFeatureRequest);
-  const clearAll = useAdminMutation(api.admin.clearAllFeatureRequests);
+  const updateStatus = useAdminMutation(
+    api.features.admin.featureRequests.updateFeatureRequestStatus
+  );
+  const updateNotes = useAdminMutation(
+    api.features.admin.featureRequests.updateFeatureRequestAdminNotes
+  );
+  const deleteRequest = useAdminMutation(
+    api.features.admin.featureRequests.deleteFeatureRequest
+  );
+  const createRequest = useAdminMutation(
+    api.features.admin.featureRequests.createFeatureRequest
+  );
+  const clearAll = useAdminMutation(
+    api.features.admin.featureRequests.clearAllFeatureRequests
+  );
   const { confirm } = useConfirmStore();
 
   const store = useFeatureRequestStore();

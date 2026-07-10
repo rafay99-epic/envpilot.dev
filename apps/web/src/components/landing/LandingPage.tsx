@@ -725,11 +725,11 @@ function PricingCards({
   // Server-rendered data is passed down from app/page.tsx; the client
   // query only runs as a fallback when the server fetch failed.
   const clientPricingData = useQuery(
-    api.featureRegistry.getPricingData,
+    api.features.featureRegistry.queries.getPricingData,
     serverPricingData ? "skip" : {}
   );
   const clientPaymentsEnabled = useQuery(
-    api.tierLimits.isPaymentsEnabled,
+    api.features.billing.tierLimits.isPaymentsEnabled,
     serverPaymentsEnabled !== null ? "skip" : {}
   );
   const pricingData =

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get the project
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Check org membership
     const membership = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId: project.organizationId,
       }
@@ -87,10 +87,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check bulk_export feature gate
-    const featureCheck = await convex.query(api.featureRegistry.checkFeature, {
-      organizationId: project.organizationId,
-      featureKey: "bulk_export",
-    });
+    const featureCheck = await convex.query(
+      api.features.featureRegistry.queries.checkFeature,
+      {
+        organizationId: project.organizationId,
+        featureKey: "bulk_export",
+      }
+    );
 
     if (featureCheck && !featureCheck.allowed) {
       return NextResponse.json(
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // composed Convex action (access control + Vault reads live in Convex; a
     // per-variable decrypt failure yields "[DECRYPTION_FAILED]" for that key).
     const { values } = await createAuthedConvexClient(accessToken!).action(
-      api.variableValues.exportValues,
+      api.features.variables.values.exportValues,
       {
         projectId: id as Id<"projects">,
         environment,

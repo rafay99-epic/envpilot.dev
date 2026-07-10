@@ -7,7 +7,7 @@ export function useExpiringVariables(
   userId: Id<"users"> | undefined
 ) {
   const data = useQuery(
-    api.variables.listExpiringVariables,
+    api.features.variables.rotation.listExpiringVariables,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     organizationId && userId ? { organizationId } : "skip"

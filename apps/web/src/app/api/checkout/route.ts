@@ -30,7 +30,7 @@ export async function GET(req: Request) {
 
   // Check if payments are enabled (DB toggle = inner gate, admin-controllable)
   const dbPaymentsEnabled = await convex.query(
-    api.tierLimits.isPaymentsEnabled,
+    api.features.billing.tierLimits.isPaymentsEnabled,
     {}
   );
   if (!dbPaymentsEnabled) {
@@ -70,12 +70,12 @@ export async function GET(req: Request) {
   });
 
   // Resolve Convex user so we can pass metadata for webhook processing
-  let convexUser = await convex.query(api.users.getByWorkosId, {
+  let convexUser = await convex.query(api.features.users.users.getByWorkosId, {
     workosId: user.id,
   });
 
   if (!convexUser) {
-    const userId = await convex.mutation(api.users.upsert, {
+    const userId = await convex.mutation(api.features.users.users.upsert, {
       workosId: user.id,
       email: user.email,
       name:
@@ -84,7 +84,9 @@ export async function GET(req: Request) {
           : user.firstName || user.lastName || undefined,
       avatarUrl: user.profilePictureUrl || undefined,
     });
-    convexUser = await convex.query(api.users.getById, { userId });
+    convexUser = await convex.query(api.features.users.users.getById, {
+      userId,
+    });
   }
 
   if (!convexUser) {
@@ -97,7 +99,7 @@ export async function GET(req: Request) {
   // Get user's first owned organization for billing association
   const organizations = await createAuthedConvexClient(
     workosAccessToken!
-  ).query(api.organizations.listForUser, {});
+  ).query(api.features.organizations.queries.listForUser, {});
   const primaryOrg = organizations[0];
 
   // --- Ensure Polar customer exists BEFORE checkout ---

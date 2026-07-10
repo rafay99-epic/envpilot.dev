@@ -23,9 +23,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const resolvedParams = await params;
     const { token } = resolvedParams;
 
-    const invitation = await convex.query(api.invitations.getByToken, {
-      token,
-    });
+    const invitation = await convex.query(
+      api.features.organizations.invitations.getByToken,
+      {
+        token,
+      }
+    );
 
     if (!invitation) {
       return NextResponse.json(
@@ -86,12 +89,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const { token } = resolvedParams;
 
     // Ensure user exists in Convex
-    let convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    let convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
-      const userId = await convex.mutation(api.users.upsert, {
+      const userId = await convex.mutation(api.features.users.users.upsert, {
         workosId: user.id,
         email: user.email,
         name:
@@ -100,7 +106,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
             : user.firstName || user.lastName || undefined,
         avatarUrl: user.profilePictureUrl || undefined,
       });
-      convexUser = await convex.query(api.users.getById, { userId });
+      convexUser = await convex.query(api.features.users.users.getById, {
+        userId,
+      });
     }
 
     if (!convexUser) {
@@ -115,13 +123,16 @@ export async function POST(_request: Request, { params }: RouteParams) {
     // `users` row exists so that identity resolves.
     const organizationId = await createAuthedConvexClient(
       accessToken!
-    ).mutation(api.invitations.accept, {
+    ).mutation(api.features.organizations.invitations.accept, {
       token,
     });
 
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     // Notify existing org members about the new member (non-blocking)
     notifyMemberUpdate(
@@ -189,7 +200,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     const client =
       user && accessToken ? createAuthedConvexClient(accessToken) : convex;
 
-    await client.mutation(api.invitations.decline, {
+    await client.mutation(api.features.organizations.invitations.decline, {
       token,
     });
 
@@ -215,18 +226,21 @@ async function notifyMemberUpdate(
   role?: string
 ) {
   try {
-    const org = await convex.query(api.organizations.getById, {
+    const org = await convex.query(api.features.organizations.queries.getById, {
       organizationId,
     });
-    const members = await convex.query(api.organizations.getMembers, {
-      organizationId,
-    });
+    const members = await convex.query(
+      api.features.organizations.queries.getMembers,
+      {
+        organizationId,
+      }
+    );
     const orgName = org?.name || "Unknown organization";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === subjectUserId) continue;
       convex
-        .action(api.emails.sendMemberUpdateEmail, {
+        .action(api.features.emails.emails.sendMemberUpdateEmail, {
           userId: member.user._id,
           to: member.user.email,
           organizationName: orgName,

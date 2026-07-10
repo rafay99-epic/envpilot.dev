@@ -66,9 +66,15 @@ function WebTrafficPage() {
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
 
-  const fetchShareUrl = useAdminAction(api.analytics.getShareUrl);
-  const fetchStats = useAdminAction(api.analytics.getWebTrafficStats);
-  const fetchPageviews = useAdminAction(api.analytics.getWebTrafficPageviews);
+  const fetchShareUrl = useAdminAction(
+    api.features.admin.analytics.getShareUrl
+  );
+  const fetchStats = useAdminAction(
+    api.features.admin.analytics.getWebTrafficStats
+  );
+  const fetchPageviews = useAdminAction(
+    api.features.admin.analytics.getWebTrafficPageviews
+  );
 
   // Store action refs in refs to avoid infinite useEffect loops
   const fetchStatsRef = useRef(fetchStats);

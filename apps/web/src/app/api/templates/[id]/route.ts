@@ -41,9 +41,12 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     const { id } = await params;
-    const template = await convex.query(api.templates.getById, {
-      templateId: id as Id<"environmentTemplates">,
-    });
+    const template = await convex.query(
+      api.features.projects.templates.getById,
+      {
+        templateId: id as Id<"environmentTemplates">,
+      }
+    );
 
     if (!template) {
       return NextResponse.json(
@@ -88,9 +91,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Get the template to check ownership
-    const template = await convex.query(api.templates.getById, {
-      templateId: id as Id<"environmentTemplates">,
-    });
+    const template = await convex.query(
+      api.features.projects.templates.getById,
+      {
+        templateId: id as Id<"environmentTemplates">,
+      }
+    );
 
     if (!template) {
       return NextResponse.json(
@@ -131,15 +137,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    await convex.mutation(api.templates.update, {
+    await convex.mutation(api.features.projects.templates.update, {
       templateId: id as Id<"environmentTemplates">,
       updatedBy: convexUser._id,
       ...validation.data,
     });
 
-    const updatedTemplate = await convex.query(api.templates.getById, {
-      templateId: id as Id<"environmentTemplates">,
-    });
+    const updatedTemplate = await convex.query(
+      api.features.projects.templates.getById,
+      {
+        templateId: id as Id<"environmentTemplates">,
+      }
+    );
 
     return NextResponse.json({ template: updatedTemplate });
   } catch (error) {
@@ -166,9 +175,12 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     const convexUser = await getOrCreateConvexUser(convex, user);
 
     // Get the template to check ownership
-    const template = await convex.query(api.templates.getById, {
-      templateId: id as Id<"environmentTemplates">,
-    });
+    const template = await convex.query(
+      api.features.projects.templates.getById,
+      {
+        templateId: id as Id<"environmentTemplates">,
+      }
+    );
 
     if (!template) {
       return NextResponse.json(
@@ -209,7 +221,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       );
     }
 
-    await convex.mutation(api.templates.remove, {
+    await convex.mutation(api.features.projects.templates.remove, {
       templateId: id as Id<"environmentTemplates">,
       deletedBy: convexUser._id,
     });

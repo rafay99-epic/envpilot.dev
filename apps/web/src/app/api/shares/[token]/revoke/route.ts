@@ -21,9 +21,12 @@ export async function DELETE(
     const { token: shareId } = await params;
 
     // Resolve Convex user
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    const convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
     if (!convexUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -32,7 +35,7 @@ export async function DELETE(
     // best-effort delete its Vault object in one composed Convex action — the
     // vault crypto now lives entirely in Convex.
     await createAuthedConvexClient(accessToken!).action(
-      api.shareValues.revokeAndPurge,
+      api.features.variables.share.revokeAndPurge,
       {
         shareId: shareId as Id<"sharedSecrets">,
       }

@@ -11,7 +11,7 @@ import { api } from "@convex/_generated/api";
  * we know the toggle state.
  */
 export function usePaymentsEnabled(): boolean {
-  const enabled = useQuery(api.tierLimits.isPaymentsEnabled);
+  const enabled = useQuery(api.features.billing.tierLimits.isPaymentsEnabled);
   // Default to false while loading — don't show upgrade UI until we know
   return enabled ?? false;
 }

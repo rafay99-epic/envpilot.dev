@@ -16,7 +16,7 @@ type FeatureStatus =
  * Hook for listing all public feature requests
  */
 export function useFeatureRequests(status?: FeatureStatus, category?: string) {
-  return useQuery(api.featureRequests.listPublic, {
+  return useQuery(api.features.community.featureRequests.queries.listPublic, {
     status,
     category,
   });
@@ -26,7 +26,10 @@ export function useFeatureRequests(status?: FeatureStatus, category?: string) {
  * Hook for getting planned/in-progress/completed features (roadmap view)
  */
 export function usePlannedFeatures() {
-  return useQuery(api.featureRequests.listPlanned, {});
+  return useQuery(
+    api.features.community.featureRequests.queries.listPlanned,
+    {}
+  );
 }
 
 /**
@@ -36,7 +39,7 @@ export function useFeatureRequest(
   featureRequestId: Id<"featureRequests"> | undefined
 ) {
   return useQuery(
-    api.featureRequests.getById,
+    api.features.community.featureRequests.queries.getById,
     featureRequestId ? { featureRequestId } : "skip"
   );
 }
@@ -45,7 +48,10 @@ export function useFeatureRequest(
  * Hook for getting all categories
  */
 export function useFeatureCategories() {
-  return useQuery(api.featureRequests.listCategories, {});
+  return useQuery(
+    api.features.community.featureRequests.queries.listCategories,
+    {}
+  );
 }
 
 /**
@@ -59,7 +65,7 @@ export function useHasVoted(
   // Identity (for signed-in voters) is derived server-side from the attached
   // JWT; only the anonymous `voterEmail` fallback is still passed.
   return useQuery(
-    api.featureRequests.hasVoted,
+    api.features.community.featureRequests.queries.hasVoted,
     featureRequestId ? { featureRequestId, voterEmail } : "skip"
   );
 }
@@ -68,9 +74,15 @@ export function useHasVoted(
  * Hook for public feature request mutations (submit, vote, unvote)
  */
 export function useFeatureRequestMutations() {
-  const submit = useMutation(api.featureRequests.submit);
-  const vote = useMutation(api.featureRequests.vote);
-  const unvote = useMutation(api.featureRequests.unvote);
+  const submit = useMutation(
+    api.features.community.featureRequests.mutations.submit
+  );
+  const vote = useMutation(
+    api.features.community.featureRequests.mutations.vote
+  );
+  const unvote = useMutation(
+    api.features.community.featureRequests.mutations.unvote
+  );
 
   return {
     submit,
@@ -84,9 +96,15 @@ export function useFeatureRequestMutations() {
  * These require admin privileges on the server-side
  */
 export function useAdminFeatureRequestMutations() {
-  const updateStatus = useMutation(api.featureRequests.updateStatus);
-  const update = useMutation(api.featureRequests.update);
-  const remove = useMutation(api.featureRequests.remove);
+  const updateStatus = useMutation(
+    api.features.community.featureRequests.mutations.updateStatus
+  );
+  const update = useMutation(
+    api.features.community.featureRequests.mutations.update
+  );
+  const remove = useMutation(
+    api.features.community.featureRequests.mutations.remove
+  );
 
   return {
     updateStatus,

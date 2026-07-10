@@ -59,15 +59,21 @@ const FIXTURE_PROJECT_NAME = "E2E Fixture Project";
 // Untyped function references (avoids importing the generated `api`, which
 // lives under a path alias the Playwright transpiler doesn't resolve).
 const fn = {
-  getByEmail: makeFunctionReference<"query">("users:getByEmail"),
-  listForUser: makeFunctionReference<"query">("organizations:listForUser"),
-  getBySlug: makeFunctionReference<"query">("projects:getBySlug"),
-  listForReviewer: makeFunctionReference<"query">(
-    "variableRequests:listForReviewer"
+  getByEmail: makeFunctionReference<"query">("features/users/users:getByEmail"),
+  listForUser: makeFunctionReference<"query">(
+    "features/organizations/queries:listForUser"
   ),
-  getById: makeFunctionReference<"query">("variableRequests:getById"),
+  getBySlug: makeFunctionReference<"query">(
+    "features/projects/queries:getBySlug"
+  ),
+  listForReviewer: makeFunctionReference<"query">(
+    "features/variables/requests/queries:listForReviewer"
+  ),
+  getById: makeFunctionReference<"query">(
+    "features/variables/requests/queries:getById"
+  ),
   createForToken: makeFunctionReference<"mutation">(
-    "variableRequests:createForToken"
+    "features/variables/requests/mutations:createForToken"
   ),
 };
 

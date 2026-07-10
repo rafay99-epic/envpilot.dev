@@ -2,7 +2,7 @@
 // backend source of truth in convex/authz.ts (resolved via the @convex alias).
 import { describe, expect, it } from "vitest";
 
-import { isEnvironmentScopeAllowed } from "@convex/authz";
+import { isEnvironmentScopeAllowed } from "@convex/lib/authz";
 
 describe("isEnvironmentScopeAllowed", () => {
   it("allows everything when the scope is undefined (unrestricted)", () => {

@@ -43,7 +43,7 @@ async function resolveTagWithAuth(tagId: string) {
 
   const convexUser = await getOrCreateConvexUser(convex, user);
 
-  const tag = await convex.query(api.tags.getById, {
+  const tag = await convex.query(api.features.projects.tags.getById, {
     tagId: tagId as Id<"variableTags">,
   });
 
@@ -116,14 +116,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { convexUser } = resolved;
 
-    await convex.mutation(api.tags.update, {
+    await convex.mutation(api.features.projects.tags.update, {
       tagId: id as Id<"variableTags">,
       name: validation.data.name,
       color: validation.data.color,
       updatedBy: convexUser._id,
     });
 
-    const updatedTag = await convex.query(api.tags.getById, {
+    const updatedTag = await convex.query(api.features.projects.tags.getById, {
       tagId: id as Id<"variableTags">,
     });
 
@@ -154,7 +154,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     const { convexUser } = resolved;
 
-    const result = await convex.mutation(api.tags.remove, {
+    const result = await convex.mutation(api.features.projects.tags.remove, {
       tagId: id as Id<"variableTags">,
       deletedBy: convexUser._id,
     });

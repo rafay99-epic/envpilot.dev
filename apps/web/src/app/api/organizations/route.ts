@@ -36,13 +36,16 @@ export async function GET() {
     }
 
     // First, ensure the user exists in Convex
-    let convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    let convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
       // Sync the user first
-      const userId = await convex.mutation(api.users.upsert, {
+      const userId = await convex.mutation(api.features.users.users.upsert, {
         workosId: user.id,
         email: user.email,
         name:
@@ -51,7 +54,9 @@ export async function GET() {
             : user.firstName || user.lastName || undefined,
         avatarUrl: user.profilePictureUrl || undefined,
       });
-      convexUser = await convex.query(api.users.getById, { userId });
+      convexUser = await convex.query(api.features.users.users.getById, {
+        userId,
+      });
     }
 
     if (!convexUser) {
@@ -62,7 +67,7 @@ export async function GET() {
     }
 
     const organizations = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.listForUser,
+      api.features.organizations.queries.listForUser,
       {}
     );
 
@@ -99,12 +104,15 @@ export async function POST(request: Request) {
     }
 
     // Ensure user exists in Convex
-    let convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    let convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
 
     if (!convexUser) {
-      const userId = await convex.mutation(api.users.upsert, {
+      const userId = await convex.mutation(api.features.users.users.upsert, {
         workosId: user.id,
         email: user.email,
         name:
@@ -113,7 +121,9 @@ export async function POST(request: Request) {
             : user.firstName || user.lastName || undefined,
         avatarUrl: user.profilePictureUrl || undefined,
       });
-      convexUser = await convex.query(api.users.getById, { userId });
+      convexUser = await convex.query(api.features.users.users.getById, {
+        userId,
+      });
     }
 
     if (!convexUser) {
@@ -127,15 +137,18 @@ export async function POST(request: Request) {
 
     const organizationId = await createAuthedConvexClient(
       accessToken!
-    ).mutation(api.organizations.create, {
+    ).mutation(api.features.organizations.mutations.create, {
       name,
       slug,
       description,
     });
 
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     const response = NextResponse.json({ organization }, { status: 201 });
     response.cookies.set(ACTIVE_ORG_COOKIE_NAME, organizationId, {

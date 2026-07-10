@@ -46,9 +46,12 @@ export async function POST(request: Request, context: RouteContext) {
 
     const convexUser = await getOrCreateConvexUser(convex, user);
 
-    const variable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const variable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     if (!variable) {
       return NextResponse.json(
@@ -89,14 +92,17 @@ export async function POST(request: Request, context: RouteContext) {
     // only restore metadata, not the secret value.
     const { valueRestored } = await createAuthedConvexClient(
       accessToken!
-    ).mutation(api.variables.rollback, {
+    ).mutation(api.features.variables.mutations.rollback, {
       variableId: id as Id<"environmentVariables">,
       targetVersion,
     });
 
-    const updatedVariable = await convex.query(api.variables.getById, {
-      variableId: id as Id<"environmentVariables">,
-    });
+    const updatedVariable = await convex.query(
+      api.features.variables.queries.getById,
+      {
+        variableId: id as Id<"environmentVariables">,
+      }
+    );
 
     return NextResponse.json({ variable: updatedVariable, valueRestored });
   } catch (error) {

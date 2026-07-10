@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     });
 
     const organizations = (await createAuthedConvexClient(accessToken!).query(
-      api.organizations.listForUser,
+      api.features.organizations.queries.listForUser,
       {}
     )) as OrganizationWithMembershipRole[];
 
@@ -74,15 +74,18 @@ export async function GET(request: Request) {
     // active org tier → all tiers → permissions (waterfall of 3 round-trips).
     const [orgTiers, perms] = await Promise.all([
       organizations.length > 0
-        ? convex.query(api.featureRegistry.getResolvedFeaturesBatch, {
-            organizationIds: organizations.map(
-              (o) => o._id as Id<"organizations">
-            ),
-          })
+        ? convex.query(
+            api.features.featureRegistry.queries.getResolvedFeaturesBatch,
+            {
+              organizationIds: organizations.map(
+                (o) => o._id as Id<"organizations">
+              ),
+            }
+          )
         : Promise.resolve([]),
       activeOrganization && accessToken
         ? createAuthedConvexClient(accessToken).query(
-            api.authz.getMyPermissions,
+            api.features.auth.queries.getMyPermissions,
             { organizationId: activeOrganization._id as Id<"organizations"> }
           )
         : Promise.resolve({ actions: [] }),

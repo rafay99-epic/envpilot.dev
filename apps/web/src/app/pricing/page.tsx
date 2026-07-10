@@ -65,8 +65,8 @@ export default async function PricingPage() {
 
   try {
     const [pricing, payments] = await Promise.all([
-      convex.query(api.featureRegistry.getPricingData),
-      convex.query(api.tierLimits.isPaymentsEnabled),
+      convex.query(api.features.featureRegistry.queries.getPricingData),
+      convex.query(api.features.billing.tierLimits.isPaymentsEnabled),
     ]);
     pricingData = pricing as PricingData;
     paymentsEnabled = payments ?? false;

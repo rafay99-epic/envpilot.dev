@@ -109,7 +109,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     // derives the caller's identity from the JWT, so it is called with an
     // authenticated Convex client.
     await createAuthedConvexClient(accessToken!).action(
-      api.accountValues.updateWithCredentials,
+      api.features.accounts.values.updateWithCredentials,
       {
         accountId: id as Id<"projectAccounts">,
         name,
@@ -121,10 +121,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     );
 
-    const updatedAccount = await convex.query(api.accounts.get, {
-      accountId: id as Id<"projectAccounts">,
-      userId: convexUser._id,
-    });
+    const updatedAccount = await convex.query(
+      api.features.accounts.queries.get,
+      {
+        accountId: id as Id<"projectAccounts">,
+        userId: convexUser._id,
+      }
+    );
 
     return NextResponse.json({ account: updatedAccount });
   } catch (error) {
@@ -155,7 +158,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     // Authorization (role-only, no grant fallback — parity with
     // variables.remove) is enforced entirely by the Convex mutation.
-    await convex.mutation(api.accounts.remove, {
+    await convex.mutation(api.features.accounts.mutations.remove, {
       accountId: id as Id<"projectAccounts">,
       deletedBy: convexUser._id,
     });

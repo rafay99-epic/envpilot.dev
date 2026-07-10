@@ -113,7 +113,7 @@ export async function requireWorkosUser(
     };
   }
 
-  const user = await convex.query(api.users.getByWorkosId, {
+  const user = await convex.query(api.features.users.users.getByWorkosId, {
     workosId: verified.workosUserId,
   });
   if (!user) {
@@ -152,7 +152,7 @@ export async function authenticateCLIRequest(
     };
   }
 
-  const user = await convex.query(api.users.getByWorkosId, {
+  const user = await convex.query(api.features.users.users.getByWorkosId, {
     workosId: verified.workosUserId,
   });
 
@@ -203,18 +203,20 @@ export async function checkCLIAccess(
   convex: ConvexHttpClient,
   organizationId: Id<"organizations">
 ): Promise<{ allowed: boolean; tier: string; reason?: string }> {
-  const org = await convex.query(api.organizations.getById, { organizationId });
+  const org = await convex.query(api.features.organizations.queries.getById, {
+    organizationId,
+  });
 
   if (!org) {
     return { allowed: false, tier: "free", reason: "Organization not found" };
   }
 
   const [cliCheck, apiCheck] = await Promise.all([
-    convex.query(api.featureRegistry.checkFeature, {
+    convex.query(api.features.featureRegistry.queries.checkFeature, {
       organizationId: org._id,
       featureKey: "cli_access",
     }),
-    convex.query(api.featureRegistry.checkFeature, {
+    convex.query(api.features.featureRegistry.queries.checkFeature, {
       organizationId: org._id,
       featureKey: "api_access",
     }),
@@ -247,18 +249,20 @@ export async function checkExtensionAccess(
   convex: ConvexHttpClient,
   organizationId: Id<"organizations">
 ): Promise<{ allowed: boolean; tier: string; reason?: string }> {
-  const org = await convex.query(api.organizations.getById, { organizationId });
+  const org = await convex.query(api.features.organizations.queries.getById, {
+    organizationId,
+  });
 
   if (!org) {
     return { allowed: false, tier: "free", reason: "Organization not found" };
   }
 
   const [extCheck, apiCheck] = await Promise.all([
-    convex.query(api.featureRegistry.checkFeature, {
+    convex.query(api.features.featureRegistry.queries.checkFeature, {
       organizationId: org._id,
       featureKey: "extension_access",
     }),
-    convex.query(api.featureRegistry.checkFeature, {
+    convex.query(api.features.featureRegistry.queries.checkFeature, {
       organizationId: org._id,
       featureKey: "api_access",
     }),

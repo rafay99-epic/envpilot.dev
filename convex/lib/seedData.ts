@@ -1,0 +1,259 @@
+// ==========================================
+// SEED FUNCTION (Developer-only)
+// ==========================================
+
+/**
+ * All gatable features in the system.
+ * When adding a new feature, add an entry here and run the seed.
+ */
+export const SEED_FEATURES = [
+  // Resources
+  {
+    key: "max_projects",
+    displayName: "Max Projects",
+    valueType: "numeric" as const,
+    category: "Resources",
+    defaultValue: "3",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "max_variables_per_project",
+    displayName: "Max Variables per Project",
+    valueType: "numeric" as const,
+    category: "Resources",
+    defaultValue: "50",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "max_organizations",
+    displayName: "Max Organizations",
+    valueType: "numeric" as const,
+    category: "Resources",
+    defaultValue: "1",
+    resettable: false,
+    sortOrder: 2,
+  },
+
+  // Team
+  {
+    key: "max_team_members",
+    displayName: "Max Team Members",
+    valueType: "numeric" as const,
+    category: "Team",
+    defaultValue: "3",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "max_invitations",
+    displayName: "Max Pending Invitations",
+    valueType: "numeric" as const,
+    category: "Team",
+    defaultValue: "5",
+    resettable: false,
+    sortOrder: 1,
+  },
+
+  // Variables
+  {
+    key: "variable_version_history",
+    displayName: "Variable Version History",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "bulk_import",
+    displayName: "Bulk Import",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "bulk_delete",
+    displayName: "Bulk Delete",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 2,
+  },
+  {
+    key: "bulk_export",
+    displayName: "Bulk Export",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
+    key: "variable_tags",
+    displayName: "Variable Tags",
+    valueType: "boolean" as const,
+    category: "Variables",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 4,
+  },
+
+  // Tools
+  {
+    key: "api_access",
+    displayName: "API Access",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "extension_access",
+    displayName: "VS Code Extension",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "cli_access",
+    displayName: "CLI Access",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 2,
+  },
+
+  // Security
+  {
+    key: "granular_permissions",
+    displayName: "Granular Permissions",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "audit_log_retention_days",
+    displayName: "Audit Log Retention (days)",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "7",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "sso_enabled",
+    displayName: "SSO",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 2,
+  },
+  {
+    key: "secret_rotation",
+    displayName: "Secret Rotation & Expiry",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
+    key: "secret_rotation_limit",
+    displayName: "Max Rotation-Enabled Variables",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 4,
+  },
+  {
+    key: "secret_sharing",
+    displayName: "Secret Sharing Links",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 5,
+  },
+  {
+    key: "max_active_shares",
+    displayName: "Max Active Shares",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 6,
+  },
+  {
+    key: "shared_accounts",
+    displayName: "Shared Accounts",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 7,
+  },
+  {
+    key: "shared_accounts_limit",
+    displayName: "Max Shared Accounts",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 8,
+  },
+
+  // Customization
+  {
+    key: "keyboard_shortcuts_custom",
+    displayName: "Custom Keyboard Shortcuts",
+    valueType: "boolean" as const,
+    category: "Customization",
+    defaultValue: "true",
+    resettable: false,
+    sortOrder: 0,
+  },
+  {
+    key: "custom_branding",
+    displayName: "Custom Branding",
+    valueType: "boolean" as const,
+    category: "Customization",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 1,
+  },
+
+  // Analytics
+  {
+    key: "analytics_retention_days",
+    displayName: "Analytics Retention (days)",
+    valueType: "numeric" as const,
+    category: "Analytics",
+    defaultValue: "7",
+    resettable: false,
+    sortOrder: 0,
+  },
+
+  // Support
+  {
+    key: "priority_support",
+    displayName: "Priority Support",
+    valueType: "boolean" as const,
+    category: "Support",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 0,
+  },
+];

@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest) {
     const name = `${firstName} ${lastName}`.trim();
 
     await createAuthedConvexClient(accessToken!).mutation(
-      api.users.updateProfile,
+      api.features.users.users.updateProfile,
       { name }
     );
 

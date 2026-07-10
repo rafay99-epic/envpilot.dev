@@ -22,7 +22,10 @@ export interface ChangelogEntry {
  * Hook to fetch published changelog entries
  */
 export function useChangelogEntries(limit?: number) {
-  const entries = useQuery(api.changelog.listPublished, { limit });
+  const entries = useQuery(
+    api.features.community.changelog.queries.listPublished,
+    { limit }
+  );
   return {
     entries,
     isLoading: entries === undefined,
@@ -33,7 +36,10 @@ export function useChangelogEntries(limit?: number) {
  * Hook to fetch a single changelog entry by ID
  */
 export function useChangelogEntry(id: Id<"changelog"> | undefined) {
-  const entry = useQuery(api.changelog.getById, id ? { id } : "skip");
+  const entry = useQuery(
+    api.features.community.changelog.queries.getById,
+    id ? { id } : "skip"
+  );
   return {
     entry,
     isLoading: entry === undefined,
@@ -45,7 +51,7 @@ export function useChangelogEntry(id: Id<"changelog"> | undefined) {
  */
 export function useChangelogByVersion(version: string | undefined) {
   const entry = useQuery(
-    api.changelog.getByVersion,
+    api.features.community.changelog.queries.getByVersion,
     version ? { version } : "skip"
   );
   return {
@@ -62,7 +68,7 @@ export function useChangelogByType(
   limit?: number
 ) {
   const entries = useQuery(
-    api.changelog.listByType,
+    api.features.community.changelog.queries.listByType,
     type ? { type, limit } : "skip"
   );
   return {
@@ -75,7 +81,10 @@ export function useChangelogByType(
  * Hook to fetch all unique versions
  */
 export function useChangelogVersions() {
-  const versions = useQuery(api.changelog.listVersions, {});
+  const versions = useQuery(
+    api.features.community.changelog.queries.listVersions,
+    {}
+  );
   return {
     versions,
     isLoading: versions === undefined,

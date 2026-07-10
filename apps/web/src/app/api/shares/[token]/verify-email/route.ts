@@ -41,7 +41,7 @@ export async function POST(
 
     // Call Convex mutation to verify email and store hashed OTP
     const result = await convex.mutation(
-      api.sharedSecrets.verifyRecipientEmail,
+      api.features.sharing.mutations.verifyRecipientEmail,
       {
         token,
         email,

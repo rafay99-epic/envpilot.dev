@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { targetOrganizationId } = validation.data;
 
     // Get the project
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Check admin in source org
     const sourceMembership = await authed.query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId: project.organizationId,
       }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Check membership in target org
     const targetMembership = await authed.query(
-      api.organizations.getMembership,
+      api.features.organizations.queries.getMembership,
       {
         organizationId: targetOrganizationId as Id<"organizations">,
       }
@@ -93,19 +93,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Execute the move (tier enforcement is handled server-side in the mutation)
-    await authed.mutation(api.projects.move, {
+    await authed.mutation(api.features.projects.mutations.move, {
       projectId: id as Id<"projects">,
       targetOrganizationId: targetOrganizationId as Id<"organizations">,
     });
 
     // Send notification email to target org admins (non-blocking)
     try {
-      const targetOrg = await convex.query(api.organizations.getById, {
-        organizationId: targetOrganizationId as Id<"organizations">,
-      });
-      const targetMembers = await convex.query(api.organizations.getMembers, {
-        organizationId: targetOrganizationId as Id<"organizations">,
-      });
+      const targetOrg = await convex.query(
+        api.features.organizations.queries.getById,
+        {
+          organizationId: targetOrganizationId as Id<"organizations">,
+        }
+      );
+      const targetMembers = await convex.query(
+        api.features.organizations.queries.getMembers,
+        {
+          organizationId: targetOrganizationId as Id<"organizations">,
+        }
+      );
 
       const adminMembers = targetMembers.filter(
         (m) => m && normalizeOrgRole(m.role) === "owner"
@@ -118,7 +124,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       for (const admin of adminMembers) {
         if (admin?.user?.email) {
           await convex
-            .action(api.emails.sendProjectTransferEmail, {
+            .action(api.features.emails.emails.sendProjectTransferEmail, {
               to: admin.user.email,
               projectName: project.name,
               organizationName: targetOrg?.name || "your organization",

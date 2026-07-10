@@ -39,7 +39,7 @@ export function useAccounts(
   userId: Id<"users"> | undefined
 ) {
   return useQuery(
-    convexApi.accounts.listWithAccess,
+    convexApi.features.accounts.queries.listWithAccess,
     projectId && userId ? { projectId, userId } : "skip"
   ) as Account[] | undefined;
 }
@@ -47,7 +47,7 @@ export function useAccounts(
 /** Active internal permission grants for an account (with revoke targets). */
 export function useAccountGrants(accountId: Id<"projectAccounts"> | undefined) {
   return useQuery(
-    convexApi.accountPermissions.getForAccount,
+    convexApi.features.permissions.accountPermissions.queries.getForAccount,
     accountId ? { accountId } : "skip"
   );
 }
@@ -58,7 +58,8 @@ export function useAssignableAccountMembers(
   requestingUserId: Id<"users"> | undefined
 ) {
   return useQuery(
-    convexApi.accountPermissions.getAssignableMembers,
+    convexApi.features.permissions.accountPermissions.queries
+      .getAssignableMembers,
     accountId && requestingUserId ? { accountId, requestingUserId } : "skip"
   );
 }
@@ -69,7 +70,8 @@ export function useCanManageAccountPermissions(
   userId: Id<"users"> | undefined
 ) {
   return useQuery(
-    convexApi.accountPermissions.canManageAccountPermissions,
+    convexApi.features.permissions.accountPermissions.queries
+      .canManageAccountPermissions,
     accountId && userId ? { accountId, userId } : "skip"
   );
 }
@@ -77,15 +79,21 @@ export function useCanManageAccountPermissions(
 /* ─── Permission mutations (direct Convex, no Vault) ────────────────── */
 
 export function useGrantAccountPermission() {
-  return useConvexMutation(convexApi.accountPermissions.grant);
+  return useConvexMutation(
+    convexApi.features.permissions.accountPermissions.mutations.grant
+  );
 }
 
 export function useUpdateAccountPermission() {
-  return useConvexMutation(convexApi.accountPermissions.update);
+  return useConvexMutation(
+    convexApi.features.permissions.accountPermissions.mutations.update
+  );
 }
 
 export function useRevokeAccountPermission() {
-  return useConvexMutation(convexApi.accountPermissions.revoke);
+  return useConvexMutation(
+    convexApi.features.permissions.accountPermissions.mutations.revoke
+  );
 }
 
 /* ─── CRUD mutations (API routes → WorkOS Vault) ────────────────────── */
@@ -157,7 +165,9 @@ interface RevealAccountArgs {
  * Resolves to `{ username, password }` or `null` on failure.
  */
 export function useRevealAccount() {
-  const logAccess = useConvexMutation(convexApi.accounts.logAccess);
+  const logAccess = useConvexMutation(
+    convexApi.features.accounts.mutations.logAccess
+  );
 
   return async ({
     accountId,

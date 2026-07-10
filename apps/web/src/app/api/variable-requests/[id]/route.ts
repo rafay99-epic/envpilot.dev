@@ -50,9 +50,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     const authed = createAuthedConvexClient(accessToken!);
     const requestId = id as Id<"environmentVariableRequests">;
 
-    const existingRequest = await authed.query(api.variableRequests.getById, {
-      requestId,
-    });
+    const existingRequest = await authed.query(
+      api.features.variables.requests.queries.getById,
+      {
+        requestId,
+      }
+    );
 
     if (!existingRequest) {
       return NextResponse.json(
@@ -62,11 +65,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (action === "cancel") {
-      await authed.mutation(api.variableRequests.cancel, {
+      await authed.mutation(api.features.variables.requests.mutations.cancel, {
         requestId,
       });
     } else {
-      await authed.mutation(api.variableRequests.review, {
+      await authed.mutation(api.features.variables.requests.mutations.review, {
         requestId,
         action,
         reviewReason,
@@ -74,9 +77,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
 
-    const updatedRequest = await authed.query(api.variableRequests.getById, {
-      requestId,
-    });
+    const updatedRequest = await authed.query(
+      api.features.variables.requests.queries.getById,
+      {
+        requestId,
+      }
+    );
 
     return NextResponse.json({ request: updatedRequest });
   } catch (error) {

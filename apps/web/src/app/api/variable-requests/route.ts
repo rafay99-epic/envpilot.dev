@@ -81,10 +81,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const requests = await authed.query(api.variableRequests.listForProject, {
-      projectId: projectId as Id<"projects">,
-      status,
-    });
+    const requests = await authed.query(
+      api.features.variables.requests.queries.listForProject,
+      {
+        projectId: projectId as Id<"projects">,
+        status,
+      }
+    );
 
     return NextResponse.json({ requests });
   } catch (error) {
@@ -155,18 +158,24 @@ export async function POST(request: Request) {
 
     // The composed Convex action encrypts the proposed value into WorkOS Vault
     // and files the request in one hop; vault crypto now lives in Convex.
-    const created = await authed.action(api.variableRequests.createWithValue, {
-      projectId: projectId as Id<"projects">,
-      key,
-      value,
-      description,
-      environments,
-      isSensitive,
-    });
+    const created = await authed.action(
+      api.features.variables.requests.actions.createWithValue,
+      {
+        projectId: projectId as Id<"projects">,
+        key,
+        value,
+        description,
+        environments,
+        isSensitive,
+      }
+    );
 
-    const createdRequest = await authed.query(api.variableRequests.getById, {
-      requestId: created._id,
-    });
+    const createdRequest = await authed.query(
+      api.features.variables.requests.queries.getById,
+      {
+        requestId: created._id,
+      }
+    );
 
     return NextResponse.json({ request: createdRequest }, { status: 201 });
   } catch (error) {

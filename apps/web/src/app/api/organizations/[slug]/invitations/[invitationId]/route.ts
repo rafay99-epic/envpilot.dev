@@ -41,7 +41,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
 
     // Verify invitation belongs to this organization before cancelling
     const invitations = await authed.query(
-      api.invitations.listPendingByOrganization,
+      api.features.organizations.invitations.listPendingByOrganization,
       {
         organizationId,
       }
@@ -56,7 +56,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       );
     }
 
-    await authed.mutation(api.invitations.cancel, {
+    await authed.mutation(api.features.organizations.invitations.cancel, {
       invitationId,
     });
 
@@ -98,9 +98,12 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const authed = createAuthedConvexClient(accessToken!);
 
     // Get organization details for the email
-    const organization = await convex.query(api.organizations.getById, {
-      organizationId,
-    });
+    const organization = await convex.query(
+      api.features.organizations.queries.getById,
+      {
+        organizationId,
+      }
+    );
 
     if (!organization) {
       return NextResponse.json(
@@ -111,7 +114,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     // Get invitation details before resending
     const invitations = await authed.query(
-      api.invitations.listPendingByOrganization,
+      api.features.organizations.invitations.listPendingByOrganization,
       {
         organizationId,
       }
@@ -126,22 +129,28 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const result = await authed.mutation(api.invitations.resend, {
-      invitationId,
-    });
+    const result = await authed.mutation(
+      api.features.organizations.invitations.resend,
+      {
+        invitationId,
+      }
+    );
 
     // Send the new invitation email
     const inviterName = convexUser.name || convexUser.email || "A team member";
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
 
-    const emailResult = await convex.action(api.emails.sendInvitationEmail, {
-      to: invitation.email,
-      inviterName,
-      organizationName: organization.name,
-      role: invitation.role,
-      token: result.token,
-      expiresAt,
-    });
+    const emailResult = await convex.action(
+      api.features.emails.emails.sendInvitationEmail,
+      {
+        to: invitation.email,
+        inviterName,
+        organizationName: organization.name,
+        role: invitation.role,
+        token: result.token,
+        expiresAt,
+      }
+    );
 
     if (!emailResult.success) {
       console.warn("Failed to send invitation email:", emailResult.error);

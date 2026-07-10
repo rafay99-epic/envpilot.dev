@@ -56,9 +56,12 @@ export async function POST(request: Request) {
     const data = validation.data;
 
     // Resolve Convex user
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    const convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
     if (!convexUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -71,7 +74,7 @@ export async function POST(request: Request) {
     // the ciphertext crypto now lives in Convex, never in the web app.
     const expiresAt = Date.now() + data.ttlMs;
     const result = await createAuthedConvexClient(accessToken!).action(
-      api.shareValues.createWithPayload,
+      api.features.variables.share.createWithPayload,
       {
         token,
         encryptedPayload: data.encryptedPayload,
@@ -159,15 +162,18 @@ export async function GET(request: Request) {
     }
 
     // Resolve Convex user to verify they have access
-    const convexUser = await convex.query(api.users.getByWorkosId, {
-      workosId: user.id,
-    });
+    const convexUser = await convex.query(
+      api.features.users.users.getByWorkosId,
+      {
+        workosId: user.id,
+      }
+    );
     if (!convexUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const shares = await createAuthedConvexClient(accessToken!).query(
-      api.sharedSecrets.listByVariable,
+      api.features.sharing.queries.listByVariable,
       {
         variableId: variableId as Id<"environmentVariables">,
       }

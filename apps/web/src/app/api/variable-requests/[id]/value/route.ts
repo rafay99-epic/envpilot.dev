@@ -15,7 +15,7 @@ interface RouteContext {
  *
  * Reveal the proposed secret value for a variable request.
  *
- * Authorization is delegated entirely to `api.variableRequests.getById`, which
+ * Authorization is delegated entirely to `api.features.variables.requests.queries.getById`, which
  * throws unless the caller is the requester OR a reviewer (owner / assigned
  * project manager / team lead) of the request's project. The plaintext value
  * is fetched on demand from WorkOS Vault and is NEVER logged.
@@ -36,7 +36,7 @@ export async function GET(_request: Request, context: RouteContext) {
     // via getById) and reads the plaintext from WorkOS Vault — the value never
     // leaves Convex except in this response and is never logged.
     const { value } = await createAuthedConvexClient(accessToken!).action(
-      api.variableRequests.revealValue,
+      api.features.variables.requests.actions.revealValue,
       {
         requestId,
       }

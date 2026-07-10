@@ -138,35 +138,79 @@ function hasErrors(errors: TierFormErrors): boolean {
 // ==========================================
 
 function TiersPage() {
-  const tierDefs = useAdminQuery(api.admin.listTierDefinitions, {});
-  const settings = useAdminQuery(api.admin.getAdminSettings, {});
-  const featureRegistry = useAdminQuery(api.admin.listFeatureRegistry, {});
-  const tierFeatures = useAdminQuery(api.admin.listTierFeatures, {});
-  const userTiers = useAdminQuery(api.admin.listUserTiers, {});
-
-  const createTier = useAdminMutation(api.admin.createTierDefinition);
-  const updateTier = useAdminMutation(api.admin.updateTierDefinition);
-  const deleteTier = useAdminMutation(api.admin.deleteTierDefinition);
-  const { confirm } = useConfirmStore();
-  const seedTiers = useAdminMutation(api.admin.seedDefaultTiers);
-  const updateSetting = useAdminMutation(api.admin.updateAdminSetting);
-  const setTierFeatureValue = useAdminMutation(api.admin.setTierFeatureValue);
-  const removeTierFeatureOverride = useAdminMutation(
-    api.admin.removeTierFeatureOverride
+  const tierDefs = useAdminQuery(
+    api.features.admin.tiers.listTierDefinitions,
+    {}
   );
-  const toggleFeatureActive = useAdminMutation(api.admin.toggleFeatureActive);
-  const updateUserTier = useAdminMutation(api.admin.updateUserTier);
+  const settings = useAdminQuery(
+    api.features.admin.settings.getAdminSettings,
+    {}
+  );
+  const featureRegistry = useAdminQuery(
+    api.features.admin.featureFlags.listFeatureRegistry,
+    {}
+  );
+  const tierFeatures = useAdminQuery(
+    api.features.admin.featureFlags.listTierFeatures,
+    {}
+  );
+  const userTiers = useAdminQuery(api.features.admin.users.listUserTiers, {});
 
-  const cronJobs = useAdminQuery(api.admin.listCronJobs, {});
-  const rotationVars = useAdminQuery(api.admin.listRotationVariables, {});
-  const toggleCronPause = useAdminMutation(api.admin.toggleCronPause);
-  const updateVariableExpiry = useAdminMutation(api.admin.updateVariableExpiry);
+  const createTier = useAdminMutation(
+    api.features.admin.tiers.createTierDefinition
+  );
+  const updateTier = useAdminMutation(
+    api.features.admin.tiers.updateTierDefinition
+  );
+  const deleteTier = useAdminMutation(
+    api.features.admin.tiers.deleteTierDefinition
+  );
+  const { confirm } = useConfirmStore();
+  const seedTiers = useAdminMutation(api.features.admin.tiers.seedDefaultTiers);
+  const updateSetting = useAdminMutation(
+    api.features.admin.settings.updateAdminSetting
+  );
+  const setTierFeatureValue = useAdminMutation(
+    api.features.admin.featureFlags.setTierFeatureValue
+  );
+  const removeTierFeatureOverride = useAdminMutation(
+    api.features.admin.featureFlags.removeTierFeatureOverride
+  );
+  const toggleFeatureActive = useAdminMutation(
+    api.features.admin.featureFlags.toggleFeatureActive
+  );
+  const updateUserTier = useAdminMutation(
+    api.features.admin.users.updateUserTier
+  );
 
-  const paymentProducts = useAdminQuery(api.admin.listPaymentProducts, {});
-  const createPaymentProduct = useAdminMutation(api.admin.createPaymentProduct);
-  const updatePaymentProduct = useAdminMutation(api.admin.updatePaymentProduct);
-  const deletePaymentProduct = useAdminMutation(api.admin.deletePaymentProduct);
-  const seedPaymentProducts = useAdminMutation(api.admin.seedPaymentProducts);
+  const cronJobs = useAdminQuery(api.features.admin.crons.listCronJobs, {});
+  const rotationVars = useAdminQuery(
+    api.features.admin.variables.listRotationVariables,
+    {}
+  );
+  const toggleCronPause = useAdminMutation(
+    api.features.admin.crons.toggleCronPause
+  );
+  const updateVariableExpiry = useAdminMutation(
+    api.features.admin.variables.updateVariableExpiry
+  );
+
+  const paymentProducts = useAdminQuery(
+    api.features.admin.tiers.listPaymentProducts,
+    {}
+  );
+  const createPaymentProduct = useAdminMutation(
+    api.features.admin.tiers.createPaymentProduct
+  );
+  const updatePaymentProduct = useAdminMutation(
+    api.features.admin.tiers.updatePaymentProduct
+  );
+  const deletePaymentProduct = useAdminMutation(
+    api.features.admin.tiers.deletePaymentProduct
+  );
+  const seedPaymentProducts = useAdminMutation(
+    api.features.admin.tiers.seedPaymentProducts
+  );
 
   const tierEnforcement = settings?.tierEnforcement === "true";
 

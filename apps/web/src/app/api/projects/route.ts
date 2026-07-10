@@ -66,13 +66,19 @@ export async function GET(request: Request) {
       }
 
       // List projects for a specific organization (filtered by membership for non-admins)
-      const projects = await authed.query(api.projects.listWithStats, {
-        organizationId: organizationId as Id<"organizations">,
-      });
+      const projects = await authed.query(
+        api.features.projects.queries.listWithStats,
+        {
+          organizationId: organizationId as Id<"organizations">,
+        }
+      );
       return NextResponse.json({ projects });
     } else {
       // List all projects for the user (across all their organizations)
-      const projects = await authed.query(api.projects.listForUser, {});
+      const projects = await authed.query(
+        api.features.projects.queries.listForUser,
+        {}
+      );
       return NextResponse.json({ projects });
     }
   } catch (error) {
@@ -114,7 +120,7 @@ export async function POST(request: Request) {
 
     // Authorization is enforced in the Convex mutation (assertOrgAction + team_lead setting check)
     const projectId = await createAuthedConvexClient(accessToken!).mutation(
-      api.projects.create,
+      api.features.projects.mutations.create,
       {
         name,
         slug,
@@ -125,7 +131,7 @@ export async function POST(request: Request) {
       }
     );
 
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId,
     });
 

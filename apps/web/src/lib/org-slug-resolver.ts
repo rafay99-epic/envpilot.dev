@@ -7,7 +7,9 @@ import type { Id } from "@convex/_generated/dataModel";
  * Returns null if the organization is not found.
  */
 export async function resolveOrgBySlug(convex: ConvexHttpClient, slug: string) {
-  const org = await convex.query(api.organizations.getBySlug, { slug });
+  const org = await convex.query(api.features.organizations.queries.getBySlug, {
+    slug,
+  });
   if (!org) return null;
   return { organization: org, organizationId: org._id as Id<"organizations"> };
 }

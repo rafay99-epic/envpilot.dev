@@ -17,12 +17,12 @@ export async function getOrCreateConvexUser(
   convex: ConvexHttpClient,
   workosUser: WorkOSUser
 ): Promise<Doc<"users">> {
-  let convexUser = await convex.query(api.users.getByWorkosId, {
+  let convexUser = await convex.query(api.features.users.users.getByWorkosId, {
     workosId: workosUser.id,
   });
 
   if (!convexUser) {
-    const userId = await convex.mutation(api.users.upsert, {
+    const userId = await convex.mutation(api.features.users.users.upsert, {
       workosId: workosUser.id,
       email: workosUser.email,
       name:
@@ -31,7 +31,9 @@ export async function getOrCreateConvexUser(
           : workosUser.firstName || workosUser.lastName || undefined,
       avatarUrl: workosUser.profilePictureUrl || undefined,
     });
-    convexUser = await convex.query(api.users.getById, { userId });
+    convexUser = await convex.query(api.features.users.users.getById, {
+      userId,
+    });
   }
 
   if (!convexUser) {
@@ -52,9 +54,12 @@ export async function checkOrganizationMembership(
   authedConvex: ConvexHttpClient,
   organizationId: Id<"organizations">
 ): Promise<Doc<"organizationMembers"> | null> {
-  return await authedConvex.query(api.organizations.getMembership, {
-    organizationId,
-  });
+  return await authedConvex.query(
+    api.features.organizations.queries.getMembership,
+    {
+      organizationId,
+    }
+  );
 }
 
 /**
@@ -67,7 +72,9 @@ export async function getProjectOrganization(
   project: Doc<"projects"> | null;
   organizationId: Id<"organizations"> | null;
 }> {
-  const project = await convex.query(api.projects.getById, { projectId });
+  const project = await convex.query(api.features.projects.queries.getById, {
+    projectId,
+  });
 
   if (!project) {
     return { project: null, organizationId: null };

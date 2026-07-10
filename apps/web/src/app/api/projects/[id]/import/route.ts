@@ -78,7 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get the project
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -91,9 +91,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const authed = createAuthedConvexClient(accessToken!);
 
     // Check org membership and role
-    const membership = await authed.query(api.organizations.getMembership, {
-      organizationId: project.organizationId,
-    });
+    const membership = await authed.query(
+      api.features.organizations.queries.getMembership,
+      {
+        organizationId: project.organizationId,
+      }
+    );
 
     if (!membership) {
       return NextResponse.json(
@@ -103,10 +106,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check bulk_import feature gate
-    const featureCheck = await convex.query(api.featureRegistry.checkFeature, {
-      organizationId: project.organizationId,
-      featureKey: "bulk_import",
-    });
+    const featureCheck = await convex.query(
+      api.features.featureRegistry.queries.checkFeature,
+      {
+        organizationId: project.organizationId,
+        featureKey: "bulk_import",
+      }
+    );
 
     if (featureCheck && !featureCheck.allowed) {
       return NextResponse.json(
@@ -157,13 +163,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       value,
     }));
 
-    const result = await authed.action(api.variableValues.importValues, {
-      projectId: id as Id<"projects">,
-      environment,
-      mode,
-      changeReason: `Updated via ${format} import`,
-      entries,
-    });
+    const result = await authed.action(
+      api.features.variables.values.importValues,
+      {
+        projectId: id as Id<"projects">,
+        environment,
+        mode,
+        changeReason: `Updated via ${format} import`,
+        entries,
+      }
+    );
 
     if (result.path === "requests") {
       return NextResponse.json(

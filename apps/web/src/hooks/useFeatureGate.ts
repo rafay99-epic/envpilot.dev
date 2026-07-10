@@ -28,7 +28,7 @@ export function useFeatureGate(
   options?: { currentCount?: number }
 ): FeatureGateResult {
   const data = useQuery(
-    api.featureRegistry.checkFeature,
+    api.features.featureRegistry.queries.checkFeature,
     organizationId
       ? {
           organizationId,
@@ -68,7 +68,7 @@ export function useFeatureGate(
  */
 export function useUserTier(userId: Id<"users"> | undefined) {
   const data = useQuery(
-    api.featureRegistry.getMyTierInfo,
+    api.features.featureRegistry.queries.getMyTierInfo,
     userId ? {} : "skip"
   );
 
@@ -89,7 +89,7 @@ export function useAllFeatures(
   organizationId: Id<"organizations"> | undefined
 ) {
   const data = useQuery(
-    api.featureRegistry.getResolvedFeatures,
+    api.features.featureRegistry.queries.getResolvedFeatures,
     organizationId ? { organizationId } : "skip"
   );
 

@@ -109,7 +109,7 @@ export default function RequestsPage() {
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
 
   const requestsResult = useQuery(
-    api.variableRequests.listForReviewer,
+    api.features.variables.requests.queries.listForReviewer,
     // Identity is derived server-side from the attached JWT; `convexUserId`
     // gates the query until the current user is known (auth ready).
     activeOrganizationId && convexUserId

@@ -43,7 +43,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { organizationId } = resolved;
 
     const sessions = await createAuthedConvexClient(accessToken!).query(
-      api.organizations.getMemberSessions,
+      api.features.organizations.memberSessions.getMemberSessions,
       {
         organizationId,
         targetUserId: userId as Id<"users">,
@@ -119,7 +119,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     if (type === "cli" && sessionId) {
       const result = await createAuthedConvexClient(accessToken!).mutation(
-        api.organizations.revokeMemberCliToken,
+        api.features.organizations.memberSessions.revokeMemberCliToken,
         {
           organizationId,
           tokenId: sessionId as Id<"cliTokens">,
@@ -129,7 +129,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       revokedCount = 1;
     } else if (type === "extension" && sessionId) {
       await createAuthedConvexClient(accessToken!).mutation(
-        api.organizations.revokeMemberExtensionSession,
+        api.features.organizations.memberSessions.revokeMemberExtensionSession,
         {
           organizationId,
           projectAccessId: sessionId as Id<"projectAccess">,
@@ -138,7 +138,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       revokedCount = 1;
     } else if (type === "all") {
       const result = await createAuthedConvexClient(accessToken!).mutation(
-        api.organizations.revokeAllMemberSessions,
+        api.features.organizations.memberSessions.revokeAllMemberSessions,
         {
           organizationId,
           targetUserId: userId as Id<"users">,
@@ -161,23 +161,32 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     if (revokedCount > 0) {
       try {
         // Get the target user's email
-        const targetUser = await convex.query(api.users.getById, {
-          userId: userId as Id<"users">,
-        });
-        const org = await convex.query(api.organizations.getById, {
-          organizationId,
-        });
+        const targetUser = await convex.query(
+          api.features.users.users.getById,
+          {
+            userId: userId as Id<"users">,
+          }
+        );
+        const org = await convex.query(
+          api.features.organizations.queries.getById,
+          {
+            organizationId,
+          }
+        );
 
         if (targetUser?.email && org) {
-          await convex.action(api.emails.sendSessionRevocationEmail, {
-            to: targetUser.email,
-            organizationName: org.name,
-            revokedByName: user.firstName
-              ? `${user.firstName} ${user.lastName || ""}`.trim()
-              : user.email || "An administrator",
-            revokedType: type,
-            revokedCount,
-          });
+          await convex.action(
+            api.features.emails.emails.sendSessionRevocationEmail,
+            {
+              to: targetUser.email,
+              organizationName: org.name,
+              revokedByName: user.firstName
+                ? `${user.firstName} ${user.lastName || ""}`.trim()
+                : user.email || "An administrator",
+              revokedType: type,
+              revokedCount,
+            }
+          );
         }
       } catch (emailErr) {
         reportApiError(

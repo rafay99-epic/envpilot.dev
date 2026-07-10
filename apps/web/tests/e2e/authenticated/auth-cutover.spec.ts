@@ -49,7 +49,10 @@ test.describe("convex auth cutover", () => {
   }) => {
     test.skip(!CONVEX_URL, "NEXT_PUBLIC_CONVEX_URL not set");
 
-    for (const path of ["organizations:listForUser", "subscriptions:getOwn"]) {
+    for (const path of [
+      "features/organizations/queries:listForUser",
+      "features/billing/queries:getOwn",
+    ]) {
       const result = await convexQuery(request, path, {});
       expect(result.status, `${path} must reject tokenless callers`).toBe(
         "error"
@@ -66,9 +69,13 @@ test.describe("convex auth cutover", () => {
     // The pre-cutover attack: call a public function with someone else's
     // userId. The arg no longer exists, so Convex must reject it at the
     // validator layer — before any handler code runs.
-    const result = await convexQuery(request, "organizations:listForUser", {
-      userId: "jd7f0000000000000000000000000000",
-    });
+    const result = await convexQuery(
+      request,
+      "features/organizations/queries:listForUser",
+      {
+        userId: "jd7f0000000000000000000000000000",
+      }
+    );
     expect(result.status).toBe("error");
     expect(result.errorMessage).toMatch(/Unauthenticated|ArgumentValidation/);
   });

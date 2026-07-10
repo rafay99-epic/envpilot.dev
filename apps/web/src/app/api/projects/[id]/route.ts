@@ -44,7 +44,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Get the project
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -69,7 +69,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     if (normalizeOrgRole(membership.role) !== "owner") {
       const projectMembership = await createAuthedConvexClient(
         accessToken!
-      ).query(api.projectMembers.getProjectMembership, {
+      ).query(api.features.projects.members.getProjectMembership, {
         projectId: id as Id<"projects">,
       });
 
@@ -115,9 +115,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     // Get the project first to check organization
-    const existingProject = await convex.query(api.projects.getById, {
-      projectId: id as Id<"projects">,
-    });
+    const existingProject = await convex.query(
+      api.features.projects.queries.getById,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     if (!existingProject) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -148,7 +151,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const { name, description, icon, color } = validation.data;
 
-    await authed.mutation(api.projects.update, {
+    await authed.mutation(api.features.projects.mutations.update, {
       projectId: id as Id<"projects">,
       name,
       description,
@@ -156,7 +159,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       color,
     });
 
-    const project = await convex.query(api.projects.getById, {
+    const project = await convex.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -180,9 +183,12 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     }
 
     // Get the project first to check organization
-    const existingProject = await convex.query(api.projects.getById, {
-      projectId: id as Id<"projects">,
-    });
+    const existingProject = await convex.query(
+      api.features.projects.queries.getById,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     if (!existingProject) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -210,7 +216,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       );
     }
 
-    await authed.mutation(api.projects.remove, {
+    await authed.mutation(api.features.projects.mutations.remove, {
       projectId: id as Id<"projects">,
     });
 

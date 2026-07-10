@@ -243,65 +243,65 @@ const fnRef = makeFunctionReference;
 
 const refs = {
   listOrganizations: fnRef<"query", Record<string, never>, OrgRow[]>(
-    "organizations:listForUser"
+    "features/organizations/queries:listForUser"
   ),
   getMembership: fnRef<"query", { organizationId: string }, MembershipRow>(
-    "organizations:getMembership"
+    "features/organizations/queries:getMembership"
   ),
   listProjectsWithStats: fnRef<
     "query",
     { organizationId: string },
     ProjectRow[]
-  >("projects:listWithStats"),
+  >("features/projects/queries:listWithStats"),
   getProject: fnRef<"query", { projectId: string }, ProjectRow | null>(
-    "projects:getById"
+    "features/projects/queries:getById"
   ),
   getProjectMembership: fnRef<
     "query",
     { projectId: string },
     ProjectMembershipRow
-  >("projectMembers:getProjectMembership"),
+  >("features/projects/members:getProjectMembership"),
   listVariablesWithAccess: fnRef<
     "query",
     { projectId: string; limit?: number },
     VariableAccessRow[]
-  >("variables:listWithAccess"),
+  >("features/variables/queries:listWithAccess"),
   listVariableRequests: fnRef<
     "query",
     { projectId: string; status?: VariableRequestStatus },
     VariableRequest[]
-  >("variableRequests:listForProject"),
+  >("features/variables/requests/queries:listForProject"),
   getResolvedFeatures: fnRef<
     "query",
     { organizationId: string },
     ResolvedFeatures
-  >("featureRegistry:getResolvedFeatures"),
+  >("features/featureRegistry/queries:getResolvedFeatures"),
   getResolvedFeaturesBatch: fnRef<
     "query",
     { organizationIds: string[] },
     ResolvedFeatures[]
-  >("featureRegistry:getResolvedFeaturesBatch"),
+  >("features/featureRegistry/queries:getResolvedFeaturesBatch"),
   getOrganizationUsage: fnRef<
     "query",
     { organizationId: string },
     OrganizationUsage
-  >("tierLimits:getOrganizationUsage"),
+  >("features/billing/tierLimits:getOrganizationUsage"),
   isEnforcementEnabled: fnRef<"query", Record<string, never>, boolean>(
-    "tierLimits:isEnforcementEnabled"
+    "features/billing/tierLimits:isEnforcementEnabled"
   ),
   deviceSessionRecord: fnRef<
     "mutation",
     { deviceName: string; clientType: "cli" | "extension"; sessionId: string },
     unknown
-  >("deviceSessions:record"),
+  >("features/users/deviceSessions:record"),
   deviceSessionRevoke: fnRef<"mutation", { sessionId: string }, unknown>(
-    "deviceSessions:revoke"
+    "features/users/deviceSessions:revoke"
   ),
   pullValues: fnRef<
     "action",
     { projectId: string; environment?: string; metadataOnly?: boolean },
     PullValuesResult
-  >("variableValues:pullValues"),
+  >("features/variables/values:pullValues"),
   pushBulk: fnRef<
     "action",
     {
@@ -311,7 +311,7 @@ const refs = {
       mode?: "merge" | "replace";
     },
     PushBulkResult
-  >("variableValues:pushBulk"),
+  >("features/variables/values:pushBulk"),
   createVariableRequest: fnRef<
     "action",
     {
@@ -323,7 +323,7 @@ const refs = {
       description?: string;
     },
     VariableRequest
-  >("variableRequests:createWithValue"),
+  >("features/variables/requests/actions:createWithValue"),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(

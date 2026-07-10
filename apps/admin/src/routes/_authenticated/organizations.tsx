@@ -12,7 +12,10 @@ export const Route = createFileRoute("/_authenticated/organizations")({
 });
 
 function OrganizationsPage() {
-  const organizations = useAdminQuery(api.admin.listOrganizations, {});
+  const organizations = useAdminQuery(
+    api.features.admin.organizations.listOrganizations,
+    {}
+  );
   const [search, setSearch] = useState("");
 
   const filteredOrgs = useMemo(() => {

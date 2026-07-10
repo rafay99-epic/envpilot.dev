@@ -53,18 +53,18 @@ export function RecentlyDeleted({ projectId, userId }: RecentlyDeletedProps) {
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const deletedVariables = useQuery(
-    api.variables.getDeleted,
+    api.features.variables.queries.getDeleted,
     // Identity is derived server-side from the attached JWT; `userId` gates the
     // query until the current user is known (auth ready).
     userId ? { projectId } : "skip"
   );
   const deletedAccounts = useQuery(
-    api.accounts.getDeleted,
+    api.features.accounts.queries.getDeleted,
     userId ? { projectId, userId } : "skip"
   );
 
-  const restoreVariable = useMutation(api.variables.restore);
-  const restoreAccount = useMutation(api.accounts.restore);
+  const restoreVariable = useMutation(api.features.variables.mutations.restore);
+  const restoreAccount = useMutation(api.features.accounts.mutations.restore);
 
   if (deletedVariables === undefined || deletedAccounts === undefined) {
     return null;

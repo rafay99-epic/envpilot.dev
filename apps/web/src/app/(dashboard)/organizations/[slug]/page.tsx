@@ -39,7 +39,7 @@ export default function OrganizationPage({
   const [error, setError] = useState<string | null>(null);
 
   const tierData = useQuery(
-    api.featureRegistry.getResolvedFeatures,
+    api.features.featureRegistry.queries.getResolvedFeatures,
     organization?._id
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"

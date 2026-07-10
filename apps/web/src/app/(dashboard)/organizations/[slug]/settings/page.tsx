@@ -87,7 +87,7 @@ function OrganizationSettingsPageContent({
 
   // Look up tier from organizationTiers table
   const tierData = useQuery(
-    api.featureRegistry.getResolvedFeatures,
+    api.features.featureRegistry.queries.getResolvedFeatures,
     organization?._id
       ? { organizationId: organization._id as Id<"organizations"> }
       : "skip"

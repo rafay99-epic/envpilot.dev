@@ -16,7 +16,7 @@ export async function POST() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const userId = await convex.mutation(api.users.upsert, {
+    const userId = await convex.mutation(api.features.users.users.upsert, {
       workosId: user.id,
       email: user.email,
       name:
