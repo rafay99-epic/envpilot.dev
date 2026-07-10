@@ -1018,12 +1018,23 @@ export const processWebhookEvent = action({
       }
     } catch (error) {
       // Release the dedup claim so Polar's redelivery of this id is
-      // processed instead of skipped as a duplicate.
+      // processed instead of skipped as a duplicate. The release gets its
+      // own try/catch: if it throws (transient write error), letting that
+      // propagate would mask the original billing error AND leave the claim
+      // in place — every redelivery would then be skipped as a duplicate,
+      // permanently dropping the payment event with no signal.
       if (args.webhookId) {
-        await ctx.runMutation(
-          internal.features.billing.webhooks._releaseWebhookClaim,
-          { webhookId: args.webhookId }
-        );
+        try {
+          await ctx.runMutation(
+            internal.features.billing.webhooks._releaseWebhookClaim,
+            { webhookId: args.webhookId }
+          );
+        } catch (releaseError) {
+          console.error(
+            `Polar: FAILED to release webhook claim ${args.webhookId} after a processing error — redeliveries of this event will be skipped as duplicates until the claim row is removed manually`,
+            releaseError
+          );
+        }
       }
       throw error;
     }
