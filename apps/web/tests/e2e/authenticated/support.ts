@@ -176,6 +176,12 @@ export async function createVariable(
   const addButton = page.getByRole("button", { name: "Add Variable" });
   const row = variableRow(page, opts.key);
 
+  // Set when the drawer shows the tier-limit Upgrade prompt instead of the
+  // form. That state is persistent (the project is genuinely at the cap), so
+  // retrying inside toPass would burn the whole 90s budget on every call —
+  // exit the loop and fail the spec immediately with an actionable message.
+  let tierLimitError: Error | null = null;
+
   await expect(async () => {
     // Already created on a prior attempt (the mutation landed but a remount
     // tore the drawer down before we observed it) — done.
@@ -191,6 +197,22 @@ export async function createVariable(
     if (!(await drawer.isVisible().catch(() => false))) {
       await addButton.click({ timeout: 8_000 });
       await expect(drawer).toBeVisible({ timeout: 10_000 });
+    }
+
+    if (
+      await drawer
+        .getByText(/reached the variables? limit/i)
+        .isVisible()
+        .catch(() => false)
+    ) {
+      tierLimitError = fixtureError(
+        "the fixture project is at the max_variables_per_project tier cap, " +
+          "so the Add Variable drawer shows the Upgrade prompt instead of " +
+          "the form. Stale E2E_* debris from failed runs is the usual cause " +
+          "— the cleanup.setup.ts sweep should have purged it; re-run the " +
+          "suite, or delete leftover E2E_* variables from the project"
+      );
+      return;
     }
 
     // Every interactive step below gets a short, explicit timeout instead of
@@ -234,6 +256,8 @@ export async function createVariable(
     await expect(drawer).toBeHidden({ timeout: 15_000 });
     await expect(row.first()).toBeVisible({ timeout: 15_000 });
   }).toPass({ timeout: 90_000 });
+
+  if (tierLimitError) throw tierLimitError;
 }
 
 /**

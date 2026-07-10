@@ -33,11 +33,24 @@ export default defineConfig({
       testMatch: /e2e\/auth\.setup\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
+    // Purges stale E2E_* variables / throwaway E2E projects left behind by
+    // failed or aborted runs (a failing spec skips its own cleanup, and the
+    // debris eventually hits the free-tier variable cap, blocking the Add
+    // Variable drawer for the whole suite). Uses the saved auth session.
+    {
+      name: "cleanup",
+      testMatch: /e2e\/cleanup\.setup\.ts/,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: hasE2ECredentials ? STORAGE_STATE_PATH : undefined,
+      },
+    },
     // Unauthenticated specs — must keep running WITHOUT any storage state.
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/e2e\/authenticated\//, /e2e\/auth\.setup\.ts/],
+      testIgnore: [/e2e\/authenticated\//, /e2e\/.*\.setup\.ts/],
     },
     // Authenticated specs — reuse the saved AuthKit session. When
     // credentials are absent the storage state file does not exist, so it
@@ -45,7 +58,7 @@ export default defineConfig({
     {
       name: "authenticated",
       testMatch: /e2e\/authenticated\/.*\.spec\.ts/,
-      dependencies: ["setup"],
+      dependencies: ["cleanup"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: hasE2ECredentials ? STORAGE_STATE_PATH : undefined,

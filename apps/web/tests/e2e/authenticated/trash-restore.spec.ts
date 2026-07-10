@@ -171,11 +171,29 @@ test.describe.serial("trash & restore", () => {
       await expect(variableTrashRow).toContainText(/deleted \d+ days? ago/i);
       await expect(variableTrashRow).toContainText(/\d+ days? left/i);
 
-      // ── Restore: sonner toast + item reappears in the normal list ──
+      // ── Restore: item leaves the trash list + reappears in the normal
+      // list. The sonner toast is ephemeral (~4s) and a dev-mode remount can
+      // unmount the toaster before the assertion samples it, so accept
+      // either success signal — the durable reappearance check follows.
       await variableTrashRow.getByRole("button", { name: "Restore" }).click();
-      await expect(
-        page.locator("[data-sonner-toaster]").getByText(`Restored ${key}`)
-      ).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(
+          async () => {
+            const toastVisible = await page
+              .locator("[data-sonner-toaster]")
+              .getByText(`Restored ${key}`)
+              .isVisible()
+              .catch(() => false);
+            const rowGone = (await variableTrashRow.count()) === 0;
+            return toastVisible || rowGone;
+          },
+          {
+            message:
+              "restore should surface the success toast or remove the row from the trash list",
+            timeout: 15_000,
+          }
+        )
+        .toBe(true);
 
       await expect(
         variableRow(page, key),
@@ -303,13 +321,28 @@ test.describe.serial("trash & restore", () => {
       await expect(accountTrashRow).toContainText(/deleted \d+ days? ago/i);
       await expect(accountTrashRow).toContainText(/\d+ days? left/i);
 
-      // ── Restore: sonner toast, then confirm it's back on /accounts ──
+      // ── Restore: row leaves the trash list, then confirm it's back on
+      // /accounts. Same ephemeral-toast tolerance as the variable round-trip
+      // above (a remount can unmount the toaster before we sample it).
       await accountTrashRow.getByRole("button", { name: "Restore" }).click();
-      await expect(
-        page
-          .locator("[data-sonner-toaster]")
-          .getByText(`Restored ${accountName}`)
-      ).toBeVisible({ timeout: 15_000 });
+      await expect
+        .poll(
+          async () => {
+            const toastVisible = await page
+              .locator("[data-sonner-toaster]")
+              .getByText(`Restored ${accountName}`)
+              .isVisible()
+              .catch(() => false);
+            const rowGone = (await accountTrashRow.count()) === 0;
+            return toastVisible || rowGone;
+          },
+          {
+            message:
+              "restore should surface the success toast or remove the row from the trash list",
+            timeout: 15_000,
+          }
+        )
+        .toBe(true);
 
       await page.goto(`/dashboard/projects/${slug}/accounts`, {
         waitUntil: "domcontentloaded",
