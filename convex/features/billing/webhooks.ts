@@ -619,7 +619,11 @@ export const processWebhookEvent = action({
           console.log(
             `Polar: subscription created (from update fallback) — user ${result.userId}`
           );
-          return;
+          // break (not return) so the successful fallback activation falls
+          // through to the record-processed step below — otherwise a Polar
+          // redelivery of this event would re-run the whole activation
+          // (tier sync, counter reset, billing log).
+          break;
         }
 
         const previousStatus = existingSubscription.status;
