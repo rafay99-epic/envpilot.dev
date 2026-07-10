@@ -1,0 +1,23 @@
+apps/web/tests/e2e/cleanup.setup.ts
+  s_f59315d63e71a6::t_bb1b9d60fc9d1e 89-93
+  s_f59315d63e71a6::t_fea0cafcf5c978 165-172
+  s_f59315d63e71a6::t_b231404bb08c4b 119-124
+  s_f59315d63e71a6::t_3ae1ff268fb59c 193-199
+  s_f59315d63e71a6::t_0e855aa9186c8e 64-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a02f5ade6908e29cc4460894132f26ff62ad4b70",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
