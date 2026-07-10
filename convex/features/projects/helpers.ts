@@ -58,17 +58,26 @@ export async function listWithStatsCore(
     projects = projects.filter((p) => assignedProjectIds.has(p._id.toString()));
   }
 
+  // Per-project variable count. This query is subscribed by three list
+  // pages and re-runs on every variable write, so the count read must stay
+  // small: the by_project_deleted index skips soft-deleted rows entirely
+  // (trash previously dominated the read — hundreds of dead docs per
+  // project), and the take() bounds pathological projects. Counts clamp at
+  // the cap; a project card reading "500" instead of its true 5-digit count
+  // is an acceptable display approximation for a bounded reactive read.
+  const VARIABLE_COUNT_CAP = 500;
   const projectsWithStats = await Promise.all(
     projects.map(async (project) => {
-      const variables = await ctx.db
+      const activeVariables = await ctx.db
         .query("environmentVariables")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect()
-        .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+        .withIndex("by_project_deleted", (q) =>
+          q.eq("projectId", project._id).eq("deletedAt", undefined)
+        )
+        .take(VARIABLE_COUNT_CAP);
 
       return {
         ...project,
-        variableCount: variables.length,
+        variableCount: activeVariables.length,
         userRole: userRole as string | null,
         // Legacy compatibility: derived from the unified org role + assignment
         projectRole: userRole

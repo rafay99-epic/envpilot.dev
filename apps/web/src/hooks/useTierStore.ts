@@ -20,11 +20,6 @@ export function useTierStoreSync() {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
 
-  const usageData = useQuery(
-    api.features.billing.tierLimits.getExtendedUsage,
-    orgId ? { organizationId: orgId } : "skip"
-  );
-
   const enforcementEnabled = useQuery(
     api.features.billing.tierLimits.isEnforcementEnabled
   );
@@ -76,26 +71,44 @@ export function useTierStoreSync() {
     }
   }, [resolvedFeatures, setFeatures]);
 
-  // Sync Convex data into Zustand store
+  // Org switch / sign-out — clear stale usage snapshot. The usage numbers
+  // themselves are populated ONLY by useExtendedUsageSync (mounted on the
+  // usage page), never here: getExtendedUsage scans up to ~2000 variable
+  // docs plus per-project share/rotation/account counts, and as a reactive
+  // subscription it re-ran on EVERY variable write in the org. Keeping it
+  // out of this app-wide sync hook is what keeps dashboard writes cheap.
   useEffect(() => {
-    if (!orgId) {
-      clearUsageData();
-      return;
-    }
-
-    // Organization changed — clear stale data
-    if (storedOrgId && storedOrgId !== orgId) {
+    if (!orgId || (storedOrgId && storedOrgId !== orgId)) {
       clearUsageData();
     }
+  }, [orgId, storedOrgId, clearUsageData]);
+}
 
-    if (usageData) {
+/**
+ * Heavyweight usage sync — mount ONLY on surfaces that display usage
+ * numbers (the /dashboard/usage page). See the comment in useTierStoreSync
+ * for why this must never ride along in the global layout/nav.
+ */
+export function useExtendedUsageSync() {
+  const { organization } = useAuth();
+  const orgId = organization?.id as Id<"organizations"> | undefined;
+
+  const usageData = useQuery(
+    api.features.billing.tierLimits.getExtendedUsage,
+    orgId ? { organizationId: orgId } : "skip"
+  );
+
+  const { setUsageData } = useTierStore();
+
+  useEffect(() => {
+    if (orgId && usageData) {
       setUsageData({
         organizationId: orgId,
         tier: usageData.tier,
         usage: usageData.usage,
       });
     }
-  }, [orgId, usageData, storedOrgId, setUsageData, clearUsageData]);
+  }, [orgId, usageData, setUsageData]);
 }
 
 /**

@@ -270,7 +270,21 @@ jobs:
   e2e:
     name: E2E gate (Playwright)
     needs: [changes, checks-passed]
+    # ── E2E GATE DISABLED (2026-07-11) ──────────────────────────────────
+    # Every gate run drives a cloud Convex dev deployment and the team's
+    # free-tier Database I/O quota is exhausted — CI runs were the main
+    # burner. Run the suite locally before merging instead
+    # (cd apps/web && bunx playwright test).
+    #
+    # TO RE-ENABLE: replace `false &&` below with nothing. The deploy jobs'
+    # `needs.e2e.result` conditions accept 'skipped' OR 'success', so they
+    # keep working while this is off, and a FAILING e2e still blocks
+    # deploys the moment it's turned back on.
+    #
+    # Planned replacement: run the suite against a self-hosted local Convex
+    # backend in CI (zero cloud quota) — see .frugal-fable/local-e2e/.
     if: |
+      false &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
@@ -425,7 +439,7 @@ jobs:
     if: |
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.e2e.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.deploy_convex == 'true'
     uses: ./.github/workflows/deploy-convex.yml
     secrets: inherit
@@ -436,7 +450,7 @@ jobs:
     if: |
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.e2e.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_cli == 'true'
     uses: ./.github/workflows/deploy-cli.yml
     with:
@@ -451,7 +465,7 @@ jobs:
     if: |
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.e2e.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_extension == 'true'
     uses: ./.github/workflows/deploy-extension.yml
     with:
@@ -498,7 +512,7 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.any == 'true' &&
-      needs.e2e.result == 'success' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.deploy-convex.result != 'failure' &&
       needs.deploy-convex.result != 'cancelled' &&
       needs.deploy-cli.result != 'failure' &&

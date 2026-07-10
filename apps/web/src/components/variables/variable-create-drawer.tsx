@@ -37,7 +37,13 @@ export function VariableCreateDrawer({
   const [activeTab, setActiveTab] = useState<TabMode>("single");
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
-  const orgId = organizationId as Id<"organizations"> | undefined;
+  // Subscribe to the gate/limit queries ONLY while the drawer is open. The
+  // drawer stays mounted (closed) on the project page, and checkTierLimit
+  // live-counts the project's variables — an always-on subscription re-ran
+  // that count on every variable write even with the drawer shut.
+  const orgId = isOpen
+    ? (organizationId as Id<"organizations"> | undefined)
+    : undefined;
   const projId = projectId as Id<"projects"> | undefined;
   const enforcing = useEnforcementEnabled();
 
