@@ -1,0 +1,291 @@
+convex/features/variables/requests/helpers.ts
+  s_655596e5f5983b::t_8f533b5222f562 1-49
+convex/features/community/changelog/publish.ts
+  s_655596e5f5983b::t_a54fae45f6c0c1 1-32
+convex/contactMessages.ts
+  s_655596e5f5983b::t_9e707ed7e746d5 2-3,5
+convex/features/users/users.ts
+  s_655596e5f5983b::t_2b7fa5d3b1e587 1-215
+convex/changelog.ts
+  s_655596e5f5983b::t_2d254126cc2bb4 2-13
+convex/tierLimits.ts
+  s_655596e5f5983b::t_17c864c80a3370 2-21
+convex/features/admin/migrations.ts
+  s_655596e5f5983b::t_06aa0c4d9ad698 1-829
+convex/accountPermissions.ts
+  s_655596e5f5983b::t_8fe67f97d66eeb 2-15
+convex/features/admin/analytics.ts
+  s_655596e5f5983b::t_144f0b9097a14c 1-169
+convex/features/variables/requests/actions.ts
+  s_655596e5f5983b::t_d6ead88ae86e4e 1-194
+convex/features/variables/requests/queries.ts
+  s_655596e5f5983b::t_d9510ad0a2de0e 1-326
+convex/variableValues.ts
+  s_655596e5f5983b::t_5ca4d3b4d109ba 2-12
+convex/projectAccess.ts
+  s_655596e5f5983b::t_426e39911230f0 2-13
+convex/projectMembers.ts
+  s_655596e5f5983b::t_54ba55959f3787 2-12
+convex/features/featureRegistry/resolver.ts
+  s_655596e5f5983b::t_06aa0c4d9ad698 3-6
+  s_655596e5f5983b::t_71e723b2a29c28 1-2,7-293
+convex/features/variables/queries.ts
+  s_655596e5f5983b::t_2c14ac8f24d9f7 1-1082
+convex/projects.ts
+  s_655596e5f5983b::t_2f5ac55b669251 2-3,5-12
+convex/features/vault/gc.ts
+  s_655596e5f5983b::t_7a9cd9a6cbed4a 1-376
+convex/auditLogs.ts
+  s_655596e5f5983b::t_4acb606d81b179 2-24
+convex/features/vault/reveal.ts
+  s_655596e5f5983b::t_f561ec0f58fdcf 1-90
+convex/features/community/featureRequests/queries.ts
+  s_655596e5f5983b::t_8be22bd8d1cb2b 1-154
+convex/features/community/changelog/seed.ts
+  s_655596e5f5983b::t_2d445c31c19233 1-805
+convex/variables.ts
+  s_655596e5f5983b::t_40593e83cb5471 2-30
+convex/features/community/featureRequests/seed.ts
+  s_655596e5f5983b::t_cd6d846775853e 1-186
+convex/featureRequests.ts
+  s_655596e5f5983b::t_d24a7e338755be 2-20
+convex/features/featureRegistry/gates.ts
+  s_655596e5f5983b::t_5b73db6dd0ee35 1-344
+convex/features/audit/queries.ts
+  s_655596e5f5983b::t_b62ba88903bd4e 1-279
+convex/features/community/changelog/queries.ts
+  s_655596e5f5983b::t_1d2f0d0ec2f519 1-143
+convex/organizations.ts
+  s_655596e5f5983b::t_f7fa1c611bf071 2-26
+convex/_generated/api.d.ts
+  s_655596e5f5983b::t_f3c6b46332f1cd 47-50,52-77,79-107,117,168-189,191-216,218-245
+  s_655596e5f5983b::t_c2db4d3bccceb6 44-46
+  s_655596e5f5983b::t_189aa8c9efb88f 246
+  s_655596e5f5983b::t_291b7d9fd5cc6a 29-43,256
+convex/features/billing/gracePeriods.ts
+  s_655596e5f5983b::t_dfebf9dbeff52f 1-159
+convex/features/organizations/mutations.ts
+  s_655596e5f5983b::t_4e9da1e2695dac 1-749
+convex/supportTickets.ts
+  s_655596e5f5983b::t_e6b984ffed3bcb 2-3,5
+convex/features/projects/mutations.ts
+  s_655596e5f5983b::t_4ddb7c2b7a63a4 1-509
+convex/sharedSecrets.ts
+  s_655596e5f5983b::t_ffac3a799a5812 2-22
+convex/subscriptions.ts
+  s_655596e5f5983b::t_fadb0786a2c368 2-47
+convex/tags.ts
+  s_655596e5f5983b::t_18580b9b770e30 2-12
+convex/features/permissions/variablePermissions/cleanup.ts
+  s_655596e5f5983b::t_1fa9c419eb61f8 1-90
+convex/features/emails/emails.ts
+  s_655596e5f5983b::t_4406a0e07b9c9c 1-558
+convex/features/permissions/variablePermissions/queries.ts
+  s_655596e5f5983b::t_45d68e050d5977 1-612
+convex/templates.ts
+  s_655596e5f5983b::t_0887a273a0cd52 2-13
+convex/vault.ts
+  s_655596e5f5983b::t_9032a8d9f61443 2-3,5-10
+convex/features/sharing/queries.ts
+  s_655596e5f5983b::t_c5ff885dccde8d 1-220
+convex/features/dashboard/dashboard.ts
+  s_655596e5f5983b::t_6ebe55d79a00a5 1-580
+convex/invitations.ts
+  s_655596e5f5983b::t_53c23cc70c0491 2-3,5-14
+convex/vaultGc.ts
+  s_655596e5f5983b::t_6864989f57aac8 2-3,5-11
+convex/features/billing/queries.ts
+  s_655596e5f5983b::t_35fa2104a4e313 1-285
+convex/featureRegistry.ts
+  s_655596e5f5983b::t_39bb8ad3976cae 2-40
+convex/features/users/preferences.ts
+  s_655596e5f5983b::t_868e645c840473 1-115
+convex/features/audit/helpers.ts
+  s_655596e5f5983b::t_ccc06a211fc5b0 1-20
+convex/features/users/deviceSessions.ts
+  s_655596e5f5983b::t_5569bd616a83cf 1-111
+convex/features/community/featureRequests/mutations.ts
+  s_655596e5f5983b::t_697d42c0deb297 1-437
+convex/variableRequests.ts
+  s_655596e5f5983b::t_038f45e282ac82 2-3,5-9,15-18
+  s_655596e5f5983b::t_06aa0c4d9ad698 10-14
+convex/features/variables/mutations.ts
+  s_655596e5f5983b::t_df6eb8560f75f2 1-14,19-918
+  s_655596e5f5983b::t_06aa0c4d9ad698 15-18
+convex/features/billing/checkout.ts
+  s_655596e5f5983b::t_f62196cac6b675 1-89
+convex/features/projects/helpers.ts
+  s_655596e5f5983b::t_dc76ff33574ca3 1-146
+convex/features/billing/tierLimits.ts
+  s_655596e5f5983b::t_8f3f592e30d44b 1-441
+convex/features/projects/templates.ts
+  s_655596e5f5983b::t_ee3feb376b72b4 1-466
+convex/permissions.ts
+  s_655596e5f5983b::t_d02b91dc65b143 2-14
+convex/features/variables/helpers.ts
+  s_655596e5f5983b::t_f5d020686aa130 1-209
+convex/features/admin/auth.ts
+  s_655596e5f5983b::t_d1fb749c55c6ee 7
+  s_655596e5f5983b::t_712c305480f2c6 4-6
+  s_655596e5f5983b::t_086f99b9c2d5b0 8-10
+  s_2bab72f494626d::t_3f3d99a01a1f66 1-3,11-53
+convex/features/projects/tags.ts
+  s_655596e5f5983b::t_2e67d6908607bc 1-413
+convex/admin.ts
+  s_655596e5f5983b::t_06aa0c4d9ad698 7-11,66-69
+  s_655596e5f5983b::t_6c0175d6337d78 2-3,5-6,12-65,70-74
+convex/features/permissions/accountPermissions/queries.ts
+  s_655596e5f5983b::t_9d44bcb658649c 1-327
+convex/userPreferences.ts
+  s_655596e5f5983b::t_c14dcf0455d0df 1-9
+convex/deviceSessions.ts
+  s_655596e5f5983b::t_6e6010256aa09a 2-3,5
+convex/features/variables/rotation.ts
+  s_655596e5f5983b::t_f19e4b00e9e05d 1-297
+convex/features/organizations/queries.ts
+  s_655596e5f5983b::t_f7a99a2b744787 1-157
+convex/emails.ts
+  s_655596e5f5983b::t_beaa0c0ef7f565 1-14
+convex/analytics.ts
+  s_655596e5f5983b::t_0e6f279c754912 1-9
+convex/features/sharing/helpers.ts
+  s_655596e5f5983b::t_667d9ecd689aa4 1-373
+convex/features/organizations/invitations.ts
+  s_655596e5f5983b::t_326e03435cc35b 1-544
+convex/vaultReveal.ts
+  s_655596e5f5983b::t_2d9ba0656be5bd 2-3,5
+convex/features/accounts/values.ts
+  s_655596e5f5983b::t_568776407a8643 1-193
+convex/features/permissions/accountPermissions/mutations.ts
+  s_655596e5f5983b::t_3f77876ea610b9 1-390
+convex/features/organizations/memberSessions.ts
+  s_655596e5f5983b::t_6045cdc86195a6 1-398
+convex/features/emails/templates.ts
+  s_655596e5f5983b::t_97e4cb69e7510f 1-136
+convex/lib/seedData.ts
+  s_655596e5f5983b::t_441ddc06bf73c9 1-259
+convex/features/users/projectAccess.ts
+  s_655596e5f5983b::t_cbcf9f5503ae34 1-501
+convex/features/audit/security.ts
+  s_655596e5f5983b::t_8fe2da7b2c44aa 1-397
+convex/features/vault/vault.ts
+  s_655596e5f5983b::t_9cae50b601d025 1-165
+convex/features/permissions/revocationEvents.ts
+  s_655596e5f5983b::t_5d8b22b22aae0e 1-135
+convex/features/projects/queries.ts
+  s_655596e5f5983b::t_2170b100fa46c9 1-73
+convex/features/audit/compliance.ts
+  s_655596e5f5983b::t_b972fd2770012e 1-340
+convex/features/variables/requests/mutations.ts
+  s_655596e5f5983b::t_afbd5e5dee1afe 1-5,7,11-414
+  s_655596e5f5983b::t_06aa0c4d9ad698 6,8-10
+convex/features/accounts/queries.ts
+  s_655596e5f5983b::t_06aa0c4d9ad698 4-7
+  s_655596e5f5983b::t_e5d9cee6120a23 1-3,8-264
+convex/features/sharing/cleanup.ts
+  s_655596e5f5983b::t_34ed6045eaeea5 1-86
+convex/features/featureRegistry/queries.ts
+  s_655596e5f5983b::t_3102a3f2334d54 1-454
+convex/accountValues.ts
+  s_655596e5f5983b::t_06aa0c4d9ad698 5-8
+  s_655596e5f5983b::t_00baefdff9d485 2-3
+convex/dashboard.ts
+  s_655596e5f5983b::t_f4e5635f057d90 2-12
+convex/features/accounts/mutations.ts
+  s_655596e5f5983b::t_0e9959a4e237a9 1-9,14-478
+  s_655596e5f5983b::t_06aa0c4d9ad698 10-13
+convex/features/billing/webhooks.ts
+  s_655596e5f5983b::t_374d0fb4af9cb0 1-891
+convex/shareValues.ts
+  s_655596e5f5983b::t_8f738ffced08ad 2-3,5-9
+convex/features/sharing/mutations.ts
+  s_655596e5f5983b::t_18abd9f7ac88ff 1-577
+convex/features/variables/share.ts
+  s_655596e5f5983b::t_38968fa1fb0e07 1-196
+convex/features/variables/values.ts
+  s_655596e5f5983b::t_95d4933fc3fb8a 1-808
+convex/permissionRevocationEvents.ts
+  s_655596e5f5983b::t_d2580873dd7533 2-3,5-9
+convex/features/support/supportTickets.ts
+  s_655596e5f5983b::t_81901ab440d2f9 1-68
+convex/features/admin/changelog.ts
+  s_655596e5f5983b::t_5bbaec6893d900 1-189
+convex/features/admin/crons.ts
+  s_655596e5f5983b::t_206af31f2fdb57 1-105
+convex/features/admin/featureFlags.ts
+  s_655596e5f5983b::t_4732afe668acf6 1-143
+convex/features/admin/featureRequests.ts
+  s_655596e5f5983b::t_02e6a547cfcc8a 1-139
+convex/features/admin/inbox.ts
+  s_655596e5f5983b::t_daab3d849df698 1-76
+convex/features/admin/organizations.ts
+  s_655596e5f5983b::t_7213b82ef28a0f 1-43
+convex/features/admin/settings.ts
+  s_655596e5f5983b::t_9bc25bc0c7b337 1-55
+convex/features/admin/stats.ts
+  s_655596e5f5983b::t_e9a32bd31bb617 1-274
+convex/features/admin/tables.ts
+  s_655596e5f5983b::t_5fe6bdfed0816e 1-79
+convex/features/admin/tiers.ts
+  s_655596e5f5983b::t_5465fe7635650a 1-423
+convex/features/admin/users.ts
+  s_655596e5f5983b::t_919bb6826880a3 1-170
+convex/features/admin/variables.ts
+  s_655596e5f5983b::t_5e4ed557a2c10a 1-77
+convex/accounts.ts
+  s_5acf18eb259295::t_bc1c9081c0c0b8 2-12
+convex/features/projects/members.ts
+  s_2bb82927e23d2e::t_718d847886e6c3 1-533
+convex/features/support/contactMessages.ts
+  s_2c55b41ff6ce38::t_7c760e6b9c452e 1-55
+convex/users.ts
+  s_655596e5f5983b::t_97deb04967c8b9 2-3,5-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7345999861cc7828a3c06fb69e0c72f41c08e1f7",
+  "prompts": {},
+  "sessions": {
+    "s_2bab72f494626d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a865b7895a0934021",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_2bb82927e23d2e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af0abe366d1f812b8",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_2c55b41ff6ce38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a358faf650ccb955c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_5acf18eb259295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa37feacc02f76a17",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
