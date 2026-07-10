@@ -1,0 +1,76 @@
+.github/workflows/ci.yml
+  s_f59315d63e71a6::t_f9acb4d67a7eeb 318-323,326-328
+  s_f59315d63e71a6::t_0fd5b5e7e0453c 343-346,351
+  s_f59315d63e71a6::t_06e72ad3da7e3a 324-325
+apps/web/tests/e2e/authenticated/sharing-tags-export.spec.ts
+  s_f59315d63e71a6::t_98d69f1291247d 285
+  s_f59315d63e71a6::t_8b331b70b46864 374
+  s_f59315d63e71a6::t_cdfae18d145dec 117
+  s_f59315d63e71a6::t_8c35c5e8c35e06 200-204
+  s_f59315d63e71a6::t_80d1d10869addc 9
+  s_f59315d63e71a6::t_e5dc90ccd05c49 241
+  s_f59315d63e71a6::t_030b3240a1c503 274-279,284,286-299
+apps/web/tests/e2e/authenticated/variables-lifecycle.spec.ts
+  s_f59315d63e71a6::t_1c0011334446a5 7
+  s_f59315d63e71a6::t_5b5af18687ebb3 34
+apps/web/tests/e2e/authenticated/accounts.spec.ts
+  s_f59315d63e71a6::t_623a74dc28b32d 4
+  s_f59315d63e71a6::t_9946c78d780e8c 38
+apps/web/tests/e2e/authenticated/project-members-drawer.spec.ts
+  s_f59315d63e71a6::t_c5aa600a709690 6
+  s_f59315d63e71a6::t_60c9827edeed94 25
+apps/web/playwright.config.ts
+  s_f59315d63e71a6::t_6e689cf66742e8 21-26
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_f59315d63e71a6::t_1a06cfbfb3346d 219
+  s_f59315d63e71a6::t_f3e7931d3576b3 7
+  s_f59315d63e71a6::t_1035896b650bc0 64
+  s_f59315d63e71a6::t_001958aba89499 101
+  s_f59315d63e71a6::t_ea2ea11334e8d3 14-18,20-26
+apps/web/tests/e2e/authenticated/invite-panel.spec.ts
+  s_f59315d63e71a6::t_49a7a96a58579c 60-66,68-73
+convex/_generated/api.d.ts
+  s_f59315d63e71a6::t_c0240ca89bbeca 21,127
+apps/web/tests/e2e/cleanup.setup.ts
+  s_f59315d63e71a6::t_2893c76d8bc74d 75,77-82
+  s_f59315d63e71a6::t_82b91d2d318a52 166-168
+  s_f59315d63e71a6::t_cb6beafcf9c8ed 68-74,76,83-87
+  s_f59315d63e71a6::t_10c8a754c6ee92 30-37
+  s_f59315d63e71a6::t_d1d87351ab4583 63
+  s_f59315d63e71a6::t_7b2534857b42f4 102-104,106-110
+  s_f59315d63e71a6::t_96d024b95b9bfa 124,128-132
+  s_f59315d63e71a6::t_f7ebd8d624ba6b 26-28
+  s_f59315d63e71a6::t_0447d1612cffb8 141-142,155
+  s_f59315d63e71a6::t_69c1816939e2aa 143-152
+  s_f59315d63e71a6::t_7dfcb73b3cb0ee 29
+convex/features/admin/e2e.ts
+  s_f59315d63e71a6::t_86541d9f73532b 18-21
+  s_f59315d63e71a6::t_9d60d674fdc4f2 52-53
+  s_f59315d63e71a6::t_70de97fece4d0b 1-17,22-51,54-69
+apps/web/tests/e2e/authenticated/history-rollback.spec.ts
+  s_f59315d63e71a6::t_ee1e0483ed9ef4 77
+  s_f59315d63e71a6::t_b1e48a8ea56efd 211-215,217-243
+  s_f59315d63e71a6::t_842f2b6cf34713 4
+apps/web/tests/e2e/authenticated/search-projects-org.spec.ts
+  s_f59315d63e71a6::t_e34ce6a9af4e64 9
+  s_f59315d63e71a6::t_13966fa7383a38 48
+apps/web/tests/e2e/authenticated/support.ts
+  s_f59315d63e71a6::t_1b55a048da561f 52-63,65-85,87-88,90-97,99-117,119-120
+  s_f59315d63e71a6::t_a280565518bfbd 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "66cefcf07f1c82e7eafd6ddce38396e5dac94032",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
