@@ -42,6 +42,10 @@ export default authkitMiddleware({
       "/api/auth/me",
       "/api/telemetry-envelope",
       "/api/webhooks/polar",
+      // CI/CD secret pulls authenticate with a Bearer service token, not a
+      // browser session — a WorkOS redirect here would hand the GitHub
+      // Action an HTML page instead of JSON.
+      "/api/v1/secrets",
       // The CLI now calls Convex directly for everything, including secret
       // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
       // CLI path needs an unauthenticated bypass anymore.

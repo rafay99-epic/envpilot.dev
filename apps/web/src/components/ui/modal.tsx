@@ -59,6 +59,9 @@ export function Modal({
       {/* Modal container */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
           className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-xl bg-white shadow-xl transition-all dark:bg-zinc-900`}
           onClick={(e) => e.stopPropagation()}
         >

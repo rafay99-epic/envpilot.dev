@@ -256,4 +256,15 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 0,
   },
+
+  // Integrations
+  {
+    key: "cicd_service_tokens",
+    displayName: "CI/CD Service Tokens",
+    valueType: "boolean" as const,
+    category: "Integrations",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 0,
+  },
 ];

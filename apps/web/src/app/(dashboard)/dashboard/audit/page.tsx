@@ -93,6 +93,7 @@ const actionCategories = [
   { value: "template", label: "Templates" },
   { value: "access", label: "Access" },
   { value: "billing", label: "Billing" },
+  { value: "cicd", label: "CI/CD" },
   { value: "audit", label: "Audit" },
   { value: "system", label: "System" },
   { value: "security", label: "Security" },

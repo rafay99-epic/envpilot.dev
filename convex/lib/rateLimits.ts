@@ -15,6 +15,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // AUTH ENDPOINTS (strict — prevent brute force)
   // ==========================================
 
+  // CI/CD secret pulls: 30 per minute per service token. Deploys are
+  // bursty (matrix builds fan out), so the full capacity is available as
+  // a burst while the sustained rate stays modest.
+  cicdPull: {
+    kind: "token bucket",
+    rate: 30,
+    period: 60_000,
+    capacity: 30,
+  },
+
   // CLI device code generation: 5 per minute per device
   cliAuthInitiate: {
     kind: "token bucket",

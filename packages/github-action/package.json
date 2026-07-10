@@ -1,0 +1,36 @@
+{
+  "name": "@envpilot/github-action",
+  "version": "1.0.0",
+  "description": "GitHub Action that pulls environment variables from Envpilot into a workflow job",
+  "private": true,
+  "license": "MIT",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "homepage": "https://www.envpilot.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafay99-epic/envpilot.dev"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1"
+  },
+  "devDependencies": {
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
+    "@types/node": "^22.10.10",
+    "esbuild": "^0.19.8",
+    "eslint": "^9",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8",
+    "vitest": "^3.0.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
