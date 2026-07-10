@@ -319,11 +319,23 @@ jobs:
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium
 
-      # playwright.config.ts already applies these when CI is set; the
-      # explicit flags pin the gate's serial-run + retry contract here so
+      # Test against a PRODUCTION build, not `next dev`: a cold dev server
+      # compiles every route on demand on the runner, stretching the suite
+      # ~7× (12m vs 1.7m) and widening every timing window — that's what
+      # failed the first gate run (transient pre-auth Convex queries +
+      # navigation timeouts). `next start` serves prebuilt pages instantly
+      # and matches what actually ships.
+      - name: Build web app (production)
+        working-directory: apps/web
+        run: bun run build
+
+      # playwright.config.ts already applies workers/retries when CI is set;
+      # the explicit flags pin the gate's serial-run + retry contract here so
       # a config refactor can't silently reintroduce the parallel flakes.
       - name: Run Playwright suite
         working-directory: apps/web
+        env:
+          PLAYWRIGHT_WEB_CMD: bun run start
         run: bunx playwright test --workers=1 --retries=2
 
       - name: Upload Playwright report

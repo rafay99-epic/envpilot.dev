@@ -61,7 +61,6 @@ const convexLogger = {
     });
   },
   error(...args: unknown[]) {
-    console.error(...args);
     const message = convexLogArgsToMessage(args);
     // Only mutation/action failures get a toast — the request manager tags
     // them "[CONVEX M(...)]" / "[CONVEX A(...)]". Other logger noise
@@ -78,6 +77,16 @@ const convexLogger = {
     // auto-retries past it, so treat it the same way.
     const isTransientAuthRace =
       /unauthenticated: no verified user identity/i.test(message);
+
+    // Console severity matches the classification above: the self-healing
+    // token-propagation race is expected auth-handshake behavior, not an
+    // app error — warn, don't error (a genuinely stuck auth still fails
+    // loudly through AuthErrorBoundary and the queries never resolving).
+    if (isTransientAuthRace) {
+      console.warn(...args);
+    } else {
+      console.error(...args);
+    }
     if (
       isTierLimitError(friendly) ||
       isAuthorizationError(friendly) ||

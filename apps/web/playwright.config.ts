@@ -4,6 +4,15 @@ import { defineConfig, devices } from "@playwright/test";
 // into process.env for the config, the auth setup and the test workers.
 import { hasE2ECredentials, STORAGE_STATE_PATH } from "./tests/e2e/env";
 
+// CI runs the suite against a PRODUCTION build: `next build` happens as a
+// prior workflow step, then PLAYWRIGHT_WEB_CMD="bun run start". A cold
+// `next dev` on a CI runner compiles every route on demand, stretching the
+// suite ~7× (12m vs 1.7m) and blowing open every timing window (Convex
+// auth-attach races, reveal timeouts). Locally the defaults are unchanged:
+// reuse the already-running dev server on :3000.
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const WEB_CMD = process.env.PLAYWRIGHT_WEB_CMD ?? "bun run dev";
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
@@ -12,7 +21,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: "html",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: BASE_URL,
     trace: "on-first-retry",
   },
   projects: [
@@ -44,10 +53,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // "dev" runs `next dev` for this workspace only (Convex functions live on
-    // the cloud dev deployment, so the Next.js server alone is sufficient).
-    command: "bun run dev",
-    url: "http://localhost:3000",
+    // Default "dev" runs `next dev` for this workspace only (Convex functions
+    // live on the cloud dev deployment, so the Next.js server alone is
+    // sufficient). CI overrides via PLAYWRIGHT_WEB_CMD to serve the
+    // production build instead.
+    command: WEB_CMD,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
