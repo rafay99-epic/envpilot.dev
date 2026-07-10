@@ -61,6 +61,10 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
   let deletedVariables = 0;
   let deletedProjects = 0;
   let deletedTags = 0;
+  // Best-effort deletes never fail the run, but they must not fail silently
+  // either — collected here and surfaced as a console warning + report
+  // annotation so leftover debris is traceable to its cause.
+  const warnings: string[] = [];
 
   // Only sweep orgs the test account owns — the fixture org. Never touch
   // orgs the account was merely invited into.
@@ -82,6 +86,11 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
       for (const tag of staleTags) {
         const res = await request.delete(`/api/tags/${tag._id}`);
         if (res.ok()) deletedTags += 1;
+        else {
+          warnings.push(
+            `tag "${tag.name}" not deleted (${res.status()}) — will retry next run`
+          );
+        }
       }
     }
 
@@ -107,6 +116,12 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
         if (createdAt < Date.now() - STALE_AGE_MS) {
           const res = await request.delete(`/api/projects/${project._id}`);
           if (res.ok()) deletedProjects += 1;
+          else {
+            warnings.push(
+              `stale project "${project.name}" not deleted ` +
+                `(${res.status()}) — will retry next run`
+            );
+          }
         }
         continue;
       }
@@ -147,6 +162,14 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
             for (const id of chunk) {
               const single = await request.delete(`/api/variables/${id}`);
               if (single.ok()) deletedVariables += 1;
+              else if (single.status() !== 404) {
+                // 404 = already gone (the goal); anything else is a real
+                // skip worth surfacing.
+                warnings.push(
+                  `variable ${id} in "${project.name}" not deleted ` +
+                    `(${single.status()}) — will retry next run`
+                );
+              }
             }
             continue;
           }
@@ -167,4 +190,11 @@ setup("purge stale E2E data from the fixture org", async ({ request }) => {
       `${deletedProjects} stale E2E project(s), and ` +
       `${deletedTags} stale e2e tag(s)`,
   });
+  if (warnings.length > 0) {
+    for (const warning of warnings) console.warn(`cleanup: ${warning}`);
+    setup.info().annotations.push({
+      type: "warning",
+      description: `cleanup skipped ${warnings.length} item(s): ${warnings.join("; ")}`,
+    });
+  }
 });
