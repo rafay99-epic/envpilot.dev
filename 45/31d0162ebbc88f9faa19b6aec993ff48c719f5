@@ -1,0 +1,30 @@
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_f59315d63e71a6::t_84cf849603ee11 174-177,179-196
+  s_f59315d63e71a6::t_4dfd9e437a4851 324-326,328-345
+apps/web/tests/e2e/cleanup.setup.ts
+  s_f59315d63e71a6::t_59c75b8bf2597a 1-115
+apps/web/playwright.config.ts
+  s_f59315d63e71a6::t_8e791975bf0576 36-48,53,61
+apps/web/tests/e2e/authenticated/audit-log.spec.ts
+  s_f59315d63e71a6::t_965f9cbc68a2c0 24-27,30-42
+apps/web/tests/e2e/authenticated/support.ts
+  s_f59315d63e71a6::t_9e822a967b9912 179-184,202-215
+  s_f59315d63e71a6::t_b8945733ee039f 259-260
+  s_f59315d63e71a6::t_221ca77fdfa8ee 216-217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "4531d0162ebbc88f9faa19b6aec993ff48c719f5",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
