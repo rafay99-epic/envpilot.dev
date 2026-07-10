@@ -1,0 +1,32 @@
+apps/web/src/components/ConvexClientProvider.tsx
+  s_655596e5f5983b::t_5245626d0d38a1 80-89
+apps/web/src/hooks/useConvexUser.ts
+  s_655596e5f5983b::t_f30cfccd9b8e7a 3,12-20,23
+apps/web/playwright.config.ts
+  s_655596e5f5983b::t_ae983d360f5d27 7-15,24,56-61
+.github/workflows/ci.yml
+  s_655596e5f5983b::t_27c01d6136695c 322-333,337-338
+apps/web/tests/e2e/authenticated/search-projects-org.spec.ts
+  s_655596e5f5983b::t_1040794b3108a4 171-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "505b1ca4256f2a8478835789e192685c9f03341e",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
