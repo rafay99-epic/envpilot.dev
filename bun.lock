@@ -111,9 +111,8 @@
     },
     "apps/web": {
       "name": "@envpilot/web",
-      "version": "1.33.1",
+      "version": "1.33.2",
       "dependencies": {
-        "@polar-sh/nextjs": "^0.9.5",
         "@polar-sh/sdk": "^0.46.6",
         "@sentry/nextjs": "^10",
         "@tanstack/react-hotkeys": "^0.4.1",
@@ -569,10 +568,6 @@
     "@opentelemetry/sql-common": ["@opentelemetry/sql-common@0.41.2", "", { "dependencies": { "@opentelemetry/core": "^2.0.0" }, "peerDependencies": { "@opentelemetry/api": "^1.1.0" } }, "sha512-4mhWm3Z8z+i508zQJ7r6Xi7y4mmoJpdvH0fZPFRkWrdp5fq7hhZ2HhYokEOLkfqSMgPR4Z9EyB3DBkbKGOqZiQ=="],
 
     "@playwright/test": ["@playwright/test@1.58.2", "", { "dependencies": { "playwright": "1.58.2" }, "bin": { "playwright": "cli.js" } }, "sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA=="],
-
-    "@polar-sh/adapter-utils": ["@polar-sh/adapter-utils@0.4.5", "", { "dependencies": { "@polar-sh/sdk": "^0.46.4" } }, "sha512-ar9u2BMmF/6h0KQ2gRQBLPF/fKMcFyicZo1EpJU6awx84cmytVepw1LX5xQa7kMBxPgo8AIxUIXG5OPGeefnWQ=="],
-
-    "@polar-sh/nextjs": ["@polar-sh/nextjs@0.9.5", "", { "dependencies": { "@polar-sh/adapter-utils": "0.4.5", "@polar-sh/sdk": "^0.46.4" }, "peerDependencies": { "next": "^15.0.0 || ^16.0.0" } }, "sha512-T0mnFswqCWCpB1UAF1b3rD4HajX3gwR7rCjBMx86J/xUNvp0TKjdBHubAThQZaMlToNuAzYFr5KOTb5oWRVqPA=="],
 
     "@polar-sh/sdk": ["@polar-sh/sdk@0.46.6", "", { "dependencies": { "standardwebhooks": "^1.0.0", "zod": "^3.25.65 || ^4.0.0" } }, "sha512-+ULxRCkGo74IbuVcVbnWEOY1Hu0EHRSJO9QNLKylllaQmhpGf/GeBnbb7l95lrKcjH1pJNdYVU/oA02+pGTluw=="],
 
