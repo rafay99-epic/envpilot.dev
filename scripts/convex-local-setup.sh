@@ -9,8 +9,9 @@ set -euo pipefail
 #
 # HOW TO SWITCH (two terminals):
 #
-#   Terminal 1:  bunx convex dev --local
-#       First run configures a LOCAL deployment and rewrites the root
+#   Terminal 1:  bunx convex dev --configure existing --dev-deployment local
+#       (On this CLI version, plain `--local` does NOT switch an already-
+#       configured project.) First run configures a LOCAL deployment and rewrites the root
 #       .env.local (CONVEX_DEPLOYMENT + NEXT_PUBLIC_CONVEX_URL) to point at
 #       it. Keep this running — the local backend only exists while
 #       `convex dev` is up. (A cloud-deployment backup of those two lines is
@@ -35,7 +36,7 @@ cd "$ROOT"
 DEPLOYMENT_LINE=$(grep -E "^CONVEX_DEPLOYMENT=" .env.local || true)
 if [[ "$DEPLOYMENT_LINE" != *"local"* && "$DEPLOYMENT_LINE" != *"anonymous"* ]]; then
   echo "✗ .env.local does not point at a local deployment yet."
-  echo "  Run 'bunx convex dev --local' in another terminal first (keep it running)."
+  echo "  Run 'bunx convex dev --configure existing --dev-deployment local' in another terminal first (keep it running)."
   exit 1
 fi
 
