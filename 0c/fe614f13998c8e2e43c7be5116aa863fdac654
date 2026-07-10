@@ -1,0 +1,26 @@
+apps/web/package.json
+  s_f59315d63e71a6::t_d71eca217fbcfd 3
+apps/web/src/app/(dashboard)/dashboard/usage/page.tsx
+  s_f59315d63e71a6::t_729beab9e7979e 30-32
+  s_f59315d63e71a6::t_647f40a47e9224 4
+apps/web/src/hooks/useTierStore.ts
+  s_f59315d63e71a6::t_506f172c0214be 74-79,81,84-85,87-94,96-104,111
+apps/web/src/lib/versions.ts
+  s_f59315d63e71a6::t_d71eca217fbcfd 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0cfe614f13998c8e2e43c7be5116aa863fdac654",
+  "prompts": {},
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
