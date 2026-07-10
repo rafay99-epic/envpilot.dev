@@ -200,7 +200,18 @@ export const runMigration = mutation({
       for (const tier of seedData) {
         const found = existingByName.get(tier.name);
         if (found) {
-          await ctx.db.patch(found._id, { ...tier, updatedAt: now });
+          // polarProductId is DEPLOYMENT-SPECIFIC billing config, entered
+          // per-environment through the admin panel (dev sandbox product vs
+          // production product). The seed value is only a dev-convenience
+          // default for brand-new rows — a blind patch here would clobber
+          // the production product id on every re-seed and break checkout/
+          // activation until re-entered.
+          const { polarProductId: _seedDefault, ...seedWithoutBillingConfig } =
+            tier;
+          await ctx.db.patch(found._id, {
+            ...seedWithoutBillingConfig,
+            updatedAt: now,
+          });
           updated++;
         } else {
           await ctx.db.insert("tierDefinitions", {
