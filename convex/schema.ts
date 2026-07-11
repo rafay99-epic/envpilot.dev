@@ -486,6 +486,33 @@ export default defineSchema({
     .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
+  // CI/CD SERVICE TOKENS (machine identities)
+  // ==========================================
+  // Long-lived, READ-ONLY credentials for CI pipelines (the GitHub Action).
+  // Only the SHA-256 hash is ever stored — the plaintext token is shown
+  // exactly once at creation. A token is scoped to one project and an
+  // explicit environment list; revocation is immediate (revokedAt set).
+  serviceTokens: defineTable({
+    organizationId: v.id("organizations"),
+    projectId: v.id("projects"),
+    // Human label ("Production deploys — frontend repo")
+    name: v.string(),
+    // SHA-256 hex of the plaintext token — the only stored credential form
+    tokenHash: v.string(),
+    // Environments this token may read (e.g. ["production"])
+    environments: v.array(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    // Set on every successful pull (observability: spot dead/leaked tokens)
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_project", ["projectId"])
+    .index("by_organization", ["organizationId"]),
+
+  // ==========================================
   // INVITATIONS
   // ==========================================
   invitations: defineTable({
@@ -730,6 +757,11 @@ export default defineSchema({
       v.literal("billing.payment_failed"),
       v.literal("billing.tier_upgraded"),
       v.literal("billing.tier_downgraded"),
+      // CI/CD service token actions
+      v.literal("cicd.token_created"),
+      v.literal("cicd.token_revoked"),
+      v.literal("cicd.secrets_pulled"),
+      v.literal("cicd.pull_denied"),
       // Audit log actions (meta)
       v.literal("audit.exported"),
       v.literal("audit.viewed"),

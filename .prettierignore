@@ -15,3 +15,4 @@ bun.lock
 .agents
 test-results
 playwright-report
+.convex/

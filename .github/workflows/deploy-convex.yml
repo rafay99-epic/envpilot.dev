@@ -27,3 +27,31 @@ jobs:
         run: bunx convex deploy
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+
+      # Feature-registry + tier-override seeds MUST follow every deploy so a
+      # release that introduces a new gated feature (e.g. cicd_service_tokens)
+      # is registered the moment its code is live — otherwise gates resolve
+      # to "denied" until someone remembers to seed manually. Both handlers
+      # are idempotent upserts, and seed-tier-definitions deliberately never
+      # overwrites deployment-specific billing config (polarProductId).
+      # ADMIN_SECRET is read from the deployment's own env via the deploy
+      # key — no extra GitHub secret to manage. Masked so it never appears
+      # in logs.
+      - name: Seed feature registry + tier overrides
+        run: |
+          # Command substitution strips the trailing newline; no tr — it
+          # would corrupt secrets containing spaces. jq encodes the value
+          # into JSON safely regardless of quotes/backslashes/newlines.
+          ADMIN_SECRET=$(bunx convex env get ADMIN_SECRET)
+          if [ -z "$ADMIN_SECRET" ]; then
+            echo "::error::ADMIN_SECRET is not set on the production Convex deployment — seeds cannot run"
+            exit 1
+          fi
+          echo "::add-mask::$ADMIN_SECRET"
+          for migration in seed-feature-registry seed-tier-features; do
+            echo "Running $migration..."
+            bunx convex run features/admin/migrations:runMigration \
+              "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')"
+          done
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}

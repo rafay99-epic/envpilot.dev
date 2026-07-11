@@ -1,0 +1,5 @@
+# dist/ is ignored globally at the repo root, but GitHub Actions run straight
+# from this package's committed dist/index.js (no install step) — un-ignore
+# it here.
+!dist/
+!dist/**

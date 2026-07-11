@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import {
   TerminalCard,
   TerminalInput,
@@ -23,6 +24,8 @@ import {
   toFrameworkIcon,
   FRAMEWORK_ICON_TYPES,
 } from "@/constants/framework-logos";
+import { CicdTokensSection } from "@/components/cicd/CicdTokensSection";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface ProjectSettingsPageProps {
   params: Promise<{ slug: string }>;
@@ -48,6 +51,12 @@ export default function ProjectSettingsPage({
   const { canDo, organization } = useAuthContext();
   const canUpdateProject = canDo("org:create_project");
   const canDeleteProject = canDo("org:delete_project");
+  // Mirrors the server's `project:manage_permissions` gate (owner/PM/team
+  // lead) — minting a CI/CD token grants read access, same bar as managing
+  // per-variable permissions elsewhere in the app.
+  const canManageCicdTokens =
+    !!organization?.role &&
+    roleLevel(normalizeOrgRole(organization.role)) >= ROLE_LEVEL.team_lead;
 
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,11 +84,14 @@ export default function ProjectSettingsPage({
   });
 
   // Tab state
-  type ProjectSettingsTab = "general" | "danger";
+  type ProjectSettingsTab = "general" | "cicd" | "danger";
   const [activeTab, setActiveTab] = useState<ProjectSettingsTab>("general");
 
   const tabs: { id: ProjectSettingsTab; label: string }[] = [
     { id: "general", label: "General" },
+    ...(canManageCicdTokens
+      ? [{ id: "cicd" as const, label: "CI/CD Tokens" }]
+      : []),
     ...(canDeleteProject
       ? [{ id: "danger" as const, label: "Danger Zone" }]
       : []),
@@ -324,6 +336,12 @@ export default function ProjectSettingsPage({
             handleSubmit={handleSubmit}
             error={error}
             successMessage={successMessage}
+          />
+        )}
+        {activeTab === "cicd" && canManageCicdTokens && project && (
+          <CicdTokensSection
+            projectId={project._id as Id<"projects">}
+            organizationId={organization?.id as Id<"organizations"> | undefined}
           />
         )}
         {activeTab === "danger" && canDeleteProject && (

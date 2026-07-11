@@ -40,6 +40,8 @@ import type * as features_billing_gracePeriods from "../features/billing/gracePe
 import type * as features_billing_queries from "../features/billing/queries.js";
 import type * as features_billing_tierLimits from "../features/billing/tierLimits.js";
 import type * as features_billing_webhooks from "../features/billing/webhooks.js";
+import type * as features_cicd_pull from "../features/cicd/pull.js";
+import type * as features_cicd_tokens from "../features/cicd/tokens.js";
 import type * as features_community_changelog_publish from "../features/community/changelog/publish.js";
 import type * as features_community_changelog_queries from "../features/community/changelog/queries.js";
 import type * as features_community_changelog_seed from "../features/community/changelog/seed.js";
@@ -146,6 +148,8 @@ declare const fullApi: ApiFromModules<{
   "features/billing/queries": typeof features_billing_queries;
   "features/billing/tierLimits": typeof features_billing_tierLimits;
   "features/billing/webhooks": typeof features_billing_webhooks;
+  "features/cicd/pull": typeof features_cicd_pull;
+  "features/cicd/tokens": typeof features_cicd_tokens;
   "features/community/changelog/publish": typeof features_community_changelog_publish;
   "features/community/changelog/queries": typeof features_community_changelog_queries;
   "features/community/changelog/seed": typeof features_community_changelog_seed;
