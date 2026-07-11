@@ -1,0 +1,103 @@
+apps/web/src/app/api/organizations/[slug]/members/[userId]/suspend/route.ts
+  s_0193e807073681::t_a3dc1fc81595ca 1-180
+convex/features/auth/queries.ts
+  s_0193e807073681::t_a3dc1fc81595ca 10-11,55-57,159
+convex/schema.ts
+  s_0193e807073681::t_a3dc1fc81595ca 112-120,126-149,763-764
+convex/features/users/projectAccess.ts
+  s_0193e807073681::t_a3dc1fc81595ca 5,78,163,242
+apps/cli/src/lib/errors.ts
+  s_0193e807073681::t_a3dc1fc81595ca 36-45,50-60,171-200
+  s_0193e807073681::t_04d2500f56a648 201-202
+apps/cli/src/commands/run.ts
+  s_0193e807073681::t_a3dc1fc81595ca 18,25,207-226
+convex/features/variables/queries.ts
+  s_0193e807073681::t_a3dc1fc81595ca 14-15,83-89,231-237,812-819
+convex/features/organizations/memberSessions.ts
+  s_0193e807073681::t_a3dc1fc81595ca 2-3,7-90,396-406
+apps/vscode-extension/src/services/api.ts
+  s_0193e807073681::t_a3dc1fc81595ca 170-176,251-268
+  s_0193e807073681::t_3e4231ce821f61 269
+.plans/offboarding-lifecycle/design.md
+  s_0193e807073681::t_a3dc1fc81595ca 1-240
+apps/web/src/lib/versions.ts
+  s_0193e807073681::t_a3dc1fc81595ca 18-19
+  s_0193e807073681::t_40a512e9405d93 17
+convex/features/projects/helpers.ts
+  s_0193e807073681::t_a3dc1fc81595ca 3-8,36-40,42-45,102-110
+convex/features/organizations/invitations.ts
+  s_0193e807073681::t_a3dc1fc81595ca 17,316-317
+  s_0193e807073681::t_c2baace00c70bb 318
+apps/web/tests/e2e/authenticated/security-hold.spec.ts
+  s_0193e807073681::t_a3dc1fc81595ca 1-74
+convex/features/sharing/helpers.ts
+  s_0193e807073681::t_a3dc1fc81595ca 4-8,77-83,218-224
+convex/features/accounts/queries.ts
+  s_0193e807073681::t_a3dc1fc81595ca 9,14,71-74,80-86,103,138
+apps/web/src/components/members/SuspendMemberDialog.tsx
+  s_0193e807073681::t_a3dc1fc81595ca 1-189
+apps/web/src/hooks/useAccounts.ts
+  s_0193e807073681::t_a3dc1fc81595ca 39-40,45
+convex/features/organizations/securityHold.ts
+  s_0193e807073681::t_a3dc1fc81595ca 1-333
+convex/features/sharing/queries.ts
+  s_0193e807073681::t_a3dc1fc81595ca 4,82-89,156-162
+convex/features/organizations/queries.ts
+  s_0193e807073681::t_a3dc1fc81595ca 5,72-78,89-91,94-101,159,165-171
+convex/features/admin/migrations.ts
+  s_0193e807073681::t_a3dc1fc81595ca 325,357
+apps/web/src/components/auth/AccessNotices.tsx
+  s_0193e807073681::t_a3dc1fc81595ca 1-165
+convex/features/organizations/tombstones.ts
+  s_0193e807073681::t_a3dc1fc81595ca 1-148
+apps/cli/package.json
+  s_0193e807073681::t_a3dc1fc81595ca 3
+apps/web/src/app/(dashboard)/organizations/[slug]/members/page.tsx
+  s_0193e807073681::t_a3dc1fc81595ca 20,107-108,136-141,310-337,756-760,819-855,1192-1202
+  s_0193e807073681::t_a14c814461a42b 1203-1204
+convex/crons.ts
+  s_0193e807073681::t_a3dc1fc81595ca 86-93
+convex/features/variables/rotation.ts
+  s_0193e807073681::t_a3dc1fc81595ca 9-13,33-38
+apps/vscode-extension/package.json
+  s_0193e807073681::t_a3dc1fc81595ca 5
+apps/web/src/app/(dashboard)/layout.tsx
+  s_0193e807073681::t_a3dc1fc81595ca 7,188-191
+convex/_generated/api.d.ts
+  s_0193e807073681::t_a3dc1fc81595ca 64-65,177-178
+convex/features/variables/helpers.ts
+  s_0193e807073681::t_a3dc1fc81595ca 7,94-101
+convex/lib/authz.ts
+  s_0193e807073681::t_a3dc1fc81595ca 1,228-282,309,363,422,575,687
+convex/lib/seedData.ts
+  s_0193e807073681::t_a3dc1fc81595ca 191-198
+  s_0193e807073681::t_f047b054d1fc7a 190
+convex/features/organizations/mutations.ts
+  s_0193e807073681::t_a3dc1fc81595ca 8,353-356,365-372,542-551
+  s_0193e807073681::t_3a71a0e111dbb5 552
+apps/web/package.json
+  s_0193e807073681::t_f2a67498ffc1ea 3
+package.json
+  s_0193e807073681::t_faeff3c33a5ae4 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "cb81f667fd2c812f4fa8f27d3c3ed7ed9d53edc7",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
