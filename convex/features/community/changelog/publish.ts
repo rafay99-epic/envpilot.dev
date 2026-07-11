@@ -2,8 +2,9 @@ import { internalMutation } from "../../../_generated/server";
 
 /**
  * Auto-publish scheduled changelog entries.
- * Called by cron every 5 minutes. Finds entries with publishStatus === "scheduled"
- * and scheduledFor <= now, then publishes them.
+ * Called by cron hourly (see crons.ts for the cadence rationale). Finds
+ * entries with publishStatus === "scheduled" and scheduledFor <= now,
+ * then publishes them.
  */
 export const publishScheduledEntries = internalMutation({
   handler: async (ctx) => {
