@@ -4,6 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Important Rules
 
+## Imortant Sub Agent
+
+On my machine I have installed the a agent called command code and it's all open source model your job is to alway use these model and hardness with commmand `cmd -p -yolo` to get the basic coding done and then cluade model witl verify the work and make sure that it is up to the standart and if not up to the standard then it will tell the model to be a better job and point out untill the task is complete and good as well.
+
+I am paying for this model too and I want them to be used as well, Claude will be the big reviwer and then absoult sole as well.
+
 ### Skills
 
 There are some important skills defined in the .claude file or .agent folders . Use them to enhance your work and make sure that the code you write is up to quality standard.
@@ -37,6 +43,25 @@ The developer has the **production `@envpilot/cli` installed globally** and uses
 1. **Playwright end-to-end tests are mandatory for every feature.** Cover the happy path and the reachable edge cases by driving the REAL UI (existing components, existing flows — never test-only shortcuts). New specs go in `apps/web/tests/e2e/authenticated/` and must follow the suite's existing conventions (`support.ts` helpers, unique test-data naming, cleanup so reruns stay green, self-skip when preconditions are unavailable). Playwright reuses the already-running dev server on :3000.
 2. **Smoke test before opening/finishing the PR:** run the FULL e2e suite (`cd apps/web && bunx playwright test`), not just the new spec — the point is catching regressions in existing flows. All tests must pass (self-skips are acceptable); a failing existing test is a blocker, and bending a test to pass instead of fixing the product is never acceptable.
 3. **Final testing is done by the developer** (the human) on the PR before merge — automated green is necessary but not sufficient; do not merge on the AI's say-so.
+
+#### E2E in CI is PAUSED (cost) — local suite is the gate of record
+
+The CI e2e gate in `ci.yml` is **hard-disabled** (`if: false &&` on the `e2e`
+job) because every run drove a cloud Convex dev deployment and exhausted the
+team's free-tier Database I/O quota. Consequences:
+
+- **The full local run before every merge is mandatory and is the only
+  gate** — nothing in CI runs Playwright. Never skip it.
+- The deploy/release jobs accept `needs.e2e.result == 'skipped'` alongside
+  `'success'`, so deploys flow while the gate is off; a FAILING gate still
+  blocks everything if re-enabled (restore = remove `false &&`).
+- Suite characteristics: fully parallel (per-worker fixture projects via
+  `support.ts getWorkerProjectSlug`), e2e account is PRO-tier, a `cleanup`
+  setup project purges stale `E2E_*` debris (age-gated 30 min) before runs.
+  Only ONE suite run at a time — concurrent runs share port 3000.
+- Planned replacement: run CI e2e against a self-hosted local Convex backend
+  (`ghcr.io/get-convex/convex-backend` — zero cloud quota); research in
+  `.frugal-fable/local-e2e/research.md`.
 
 ### Feature Registry & Tier Gating (CRITICAL)
 
@@ -90,6 +115,32 @@ if (!limit.allowed)
 ```
 
 Add a `count*` helper in `convex/features/featureRegistry/gates.ts` for each limited feature (e.g., `countRotationEnabledVariables`).
+
+### GitHub Action release flow (public repo from a private monorepo)
+
+Consumers use `uses: rafay99-epic/envpilot-action@v1`, which resolves against
+the PUBLIC repo `rafay99-epic/envpilot-action` — the monorepo stays private.
+Only the built surface is ever published: `action.yml`, `dist/index.js`
+(committed, esbuild bundle), `README.md`, `LICENSE`. Never monorepo source.
+
+- **Releasing**: bump `packages/github-action/package.json` version and merge
+  to main. `ci.yml`'s `deploy-action` job (via `deploy-action.yml`) publishes
+  to the public repo, tags the exact version (`vX.Y.Z`), and force-moves the
+  floating major tag (`v1`) — the GitHub convention that gives `@v1` pinners
+  non-breaking updates.
+- **Ordering is STRICT — backend first**: `deploy-action` `needs`
+  `deploy-convex` (same rule as CLI/extension: never ship a client before the
+  backend contract it calls). A skipped deploy-convex falls through; a failed
+  one blocks.
+- **Secret**: publishing needs the `ACTION_PUBLISH_TOKEN` repo secret — a
+  fine-grained PAT with Contents read/write on the public repo ONLY. The job
+  fails loudly with instructions if it is missing.
+- **Backend counterpart**: CI/CD service tokens (`convex/features/cicd/`) —
+  read-only, SHA-256-hash-stored, project+environment scoped, pro-gated
+  (`cicd_service_tokens`), managed in Project → Settings → CI/CD Tokens.
+  Every pull/denial is audit-logged; pulls fail LOUDLY (never partial data,
+  never sentinel values). Prod feature-registry seeding is automatic after
+  every convex deploy (`deploy-convex.yml` runs the seed migrations).
 
 ### Versioning
 
@@ -211,6 +262,7 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 - `apps/cli/` — CLI npm package (`@envpilot/cli`). Uses Commander.js, builds with tsup, tests with vitest.
 - `apps/vscode-extension/` — VS Code extension package. OAuth-based auth, real-time sync, esbuild bundled.
 - `packages/` — Shared config packages (tsconfig, eslint-config, prettier-config).
+- `packages/github-action/` — the Envpilot GitHub Action (`@envpilot/github-action`, private in this repo). Pulls variables from `/api/v1/secrets` with a service token and exports them to `$GITHUB_ENV` / a dotenv file. CRITICAL INVARIANT in `src/main.ts`: `core.setSecret(value)` runs BEFORE any export so values are masked in workflow logs; keys/values are never printed. Own MIT LICENSE (public distribution) unlike the proprietary monorepo.
 
 ### Roles & Permissions
 

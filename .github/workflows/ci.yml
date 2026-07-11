@@ -479,7 +479,12 @@ jobs:
 
   deploy-action:
     name: Deploy GitHub Action
-    needs: [changes, checks-passed, e2e]
+    # Backend FIRST (same strict ordering as deploy-cli/deploy-extension):
+    # the published action calls /api/v1/secrets → the Convex pull path, so
+    # a release that changes both must never ship the action before the
+    # backend it talks to. The !failure() guard lets a SKIPPED deploy-convex
+    # (no convex changes) fall through, while a FAILED one blocks.
+    needs: [changes, checks-passed, e2e, deploy-convex]
     if: |
       !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
