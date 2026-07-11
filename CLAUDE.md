@@ -156,6 +156,7 @@ Package versions to bump when making changes:
 - **Admin panel** (`apps/admin/`): bump `apps/admin/package.json`
 - **CLI** (`apps/cli/`): bump `apps/cli/package.json`
 - **VS Code extension** (`apps/vscode-extension/`): bump `apps/vscode-extension/package.json`
+- **GitHub Action** (`packages/github-action/`): bump `packages/github-action/package.json` — the bump IS the release trigger (deploy-action publishes it, tags `vX.Y.Z`, and moves the floating `v1` so `@v1` consumers always get the latest). Does NOT go in `versions.ts`/`APP_VERSIONS` — the action is tag-pinned, not a polling client.
 - **Root monorepo** (`package.json`): bump when features span multiple packages
 
 #### Release manifest — `package.json` is NOT the only file (CRITICAL)
