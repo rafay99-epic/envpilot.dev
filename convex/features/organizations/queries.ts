@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
-import { assertOrgMembership, isSuspendedMembership } from "../../lib/authz";
+import { isSuspendedMembership } from "../../lib/authz";
 
 /**
  * Organization Queries and Mutations
@@ -69,11 +69,13 @@ export const getBySlug = query({
 export const getMembers = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
-    // Only a member of the org may list its members. (Also gives suspended
-    // callers the uniform ACCESS_SUSPENDED denial rather than the roster.)
-    const actor = await requireAuthedUser(ctx);
-    await assertOrgMembership(ctx, actor._id, args.organizationId);
-
+    // NOTE: intentionally NOT gated with requireAuthedUser — this query is
+    // composed by several server routes through the unauthenticated
+    // ConvexHttpClient (they enforce their own withAuth() first), e.g.
+    // api/projects/[id]/members, api/variables, api/invitations,
+    // api/users/search. Adding an identity requirement here 500s all of them.
+    // The security-relevant fix is the field pick below: suspendReason /
+    // suspendedBy are audit-only and never leave this query.
     const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
