@@ -8,8 +8,6 @@ import { internal } from "../../_generated/api";
 import { rateLimiter } from "../../lib/rateLimits";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 
-const DECRYPTION_FAILED = "[DECRYPTION_FAILED]";
-
 /**
  * CI/CD secret pull — the GitHub Action's read path.
  *
@@ -121,12 +119,22 @@ export const _readScopedVariables = internalQuery({
     })
   ),
   handler: async (ctx, args) => {
+    // Hard product bound with a LOUD failure — a silent partial pull would
+    // let a CI run "succeed" while deploying with missing secrets. If a
+    // project legitimately outgrows this, raise the bound deliberately.
+    const MAX_PULL_VARIABLES = 1000;
     const variables = await ctx.db
       .query("environmentVariables")
       .withIndex("by_project_deleted", (q) =>
         q.eq("projectId", args.projectId).eq("deletedAt", undefined)
       )
-      .take(500);
+      .take(MAX_PULL_VARIABLES + 1);
+
+    if (variables.length > MAX_PULL_VARIABLES) {
+      throw new Error(
+        `Project has more than ${MAX_PULL_VARIABLES} active variables — refusing a partial pull. Contact support to raise the limit.`
+      );
+    }
 
     return variables
       .filter((variable) => variable.environments.includes(args.environment))
@@ -190,8 +198,18 @@ export const pullSecrets = action({
             internal.features.vault.vault.readSecret,
             { vaultRef: row.vaultRef }
           );
-        } catch {
-          value = DECRYPTION_FAILED;
+        } catch (error) {
+          // FAIL LOUDLY. Exporting a sentinel here would hand CI a broken
+          // secret value that gets masked by the Action (setSecret) and
+          // silently deployed. A failed decrypt must fail the pull — the
+          // Action surfaces it via setFailed and the pipeline stops.
+          console.error("cicd.pull.decryptFailed", {
+            projectId: scope.projectId,
+            key: row.key,
+          });
+          throw new Error(
+            `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
+          );
         }
       }
       variables.push({ key: row.key, value: value || "" });
