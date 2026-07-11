@@ -1,0 +1,47 @@
+convex/features/vault/gc.ts
+  s_0193e807073681::t_6320896d2fcd2c 387-541,543-592,595-630,635-649
+  s_0193e807073681::t_7ccb8560ed368b 631-634
+  s_0193e807073681::t_3c985962b63d03 542
+  s_0193e807073681::t_10bb69070db17a 593-594
+  s_0193e807073681::t_3767c5dcd73d4c 3,9-10
+apps/web/package.json
+  s_0193e807073681::t_667f64494ab006 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_0193e807073681::t_9bd20e4137e9f6 669-689
+apps/web/src/lib/versions.ts
+  s_0193e807073681::t_88022b8df7fc73 17
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_0193e807073681::t_02736944120436 1-52,54,56-357
+  s_0193e807073681::t_16909359a3de0a 53,55
+apps/web/tests/e2e/authenticated/trash-restore.spec.ts
+  s_0193e807073681::t_239f67932ddf04 289-290
+  s_0193e807073681::t_61ea6f0ed77881 177-180,183
+  s_0193e807073681::t_a630fb14f3a1b1 370-441
+  s_0193e807073681::t_c82bd323389550 36,38-42,48-55,58,62,65,67-68,70-73,76-79
+  s_0193e807073681::t_29312d96341799 146-147
+package.json
+  s_0193e807073681::t_667f64494ab006 3
+convex/schema.ts
+  s_0193e807073681::t_b236159b5cfd5d 741
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "f95d2646b2be482c281508b7606cef656eefaf72",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
