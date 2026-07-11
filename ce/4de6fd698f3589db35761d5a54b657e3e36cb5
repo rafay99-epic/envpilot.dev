@@ -1,0 +1,29 @@
+apps/web/src/app/(dashboard)/dashboard/usage/usage-layout.tsx
+  s_e5ca61c07a0c6b::t_60eac6cf1b9a68 359-377
+  s_e5ca61c07a0c6b::t_bae1e76afd580a 194-200,227,248-249,508
+  s_e5ca61c07a0c6b::t_3886a39b85962b 24,34-47,59-60,65-70,78,87,94-101,110-111,114-119,127,135,139-152,154-164,166-170,172-193,201,203-226,228-233,235-247,250-269,271-340,343-349,351-356,358,378-432,436-462,464,469,472,479-480,489-490,493-507,509-516,533-534,542,557,560-562,564-565,567,570-593
+apps/web/tests/e2e/authenticated/usage-page.spec.ts
+  s_e5ca61c07a0c6b::t_730103f3a0a075 104-110
+  s_e5ca61c07a0c6b::t_92264419b7959d 1-103,111-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "ce4de6fd698f3589db35761d5a54b657e3e36cb5",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
