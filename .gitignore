@@ -58,3 +58,6 @@ apps/web/tests/e2e/.auth/
 
 # commandcode tool config
 .commandcode/
+
+# Local Convex backend state (convex dev --dev-deployment local)
+.convex/

@@ -64,29 +64,36 @@ test.describe.serial("CI/CD service tokens", () => {
     await tokensTab.click();
 
     await page.getByRole("button", { name: /New Token/i }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: 10_000 });
 
-    await dialog.locator("input[type='text']").first().fill(tokenName);
-    // Production is the pre-checked recommended default — assert, don't click.
-    const productionBox = dialog.getByRole("checkbox", {
-      name: /production/i,
+    // The create panel is inline — no dialog. It expands in place above
+    // the token list.
+    const nameInput = page.locator("#cicd-token-name");
+    await expect(
+      nameInput,
+      "inline create panel should be visible"
+    ).toBeVisible({ timeout: 10_000 });
+    await nameInput.fill(tokenName);
+
+    // Production is the pre-selected recommended default chip — assert,
+    // don't click.
+    const productionChip = page.getByRole("button", {
+      name: /^production$/i,
+      pressed: true,
     });
-    if (await productionBox.isVisible().catch(() => false)) {
-      await expect(productionBox).toBeChecked();
-    }
+    await expect(productionChip).toBeVisible();
 
-    await dialog.getByRole("button", { name: /^Create/i }).click();
+    await page.getByRole("button", { name: /^Create Token$/i }).click();
 
-    // One-time reveal: the plaintext appears exactly once.
-    const tokenCode = dialog.locator("code", { hasText: /^envpk_[0-9a-f]+$/ });
+    // One-time reveal swaps the panel in place: the plaintext appears
+    // exactly once.
+    const tokenCode = page.locator("code", { hasText: /^envpk_[0-9a-f]+$/ });
     await expect(tokenCode, "plaintext token should be revealed").toBeVisible({
       timeout: 20_000,
     });
     plaintextToken = (await tokenCode.textContent())?.trim() ?? "";
     expect(plaintextToken).toMatch(/^envpk_[0-9a-f]{40}$/);
 
-    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Done$/i }).click();
 
     // The list shows the token with its scope; the hash never appears.
     await expect(page.getByText(tokenName)).toBeVisible({ timeout: 10_000 });
@@ -154,23 +161,18 @@ test.describe.serial("CI/CD service tokens", () => {
       .first()
       .click();
 
-    const row = page
-      .locator("div")
-      .filter({ hasText: tokenName })
-      .locator("visible=true");
-    await expect(row.first()).toBeVisible({ timeout: 15_000 });
+    const row = page.locator("li").filter({ hasText: tokenName });
+    await expect(row).toBeVisible({ timeout: 15_000 });
 
-    await page
-      .getByRole("button", { name: /^Revoke$/i })
-      .first()
-      .click();
-    // ConfirmDialog — confirm the revocation.
-    const confirm = page.getByRole("button", { name: /^Revoke( Token)?$/i });
-    await confirm.last().click();
+    await row.getByRole("button", { name: /^Revoke$/i }).click();
 
-    await expect(page.getByText(/Revoked/i).first()).toBeVisible({
-      timeout: 15_000,
-    });
+    // Inline confirm strip swaps in *within the row* — no ConfirmDialog.
+    await expect(
+      row.getByText(/Revoke this token\? CI using it will stop working/i)
+    ).toBeVisible({ timeout: 10_000 });
+    await row.getByRole("button", { name: /^Revoke$/i }).click();
+
+    await expect(row.getByText(/Revoked/i)).toBeVisible({ timeout: 15_000 });
 
     const afterRevoke = await page.request.get(
       "/api/v1/secrets?environment=production",

@@ -761,6 +761,7 @@ export default defineSchema({
       v.literal("cicd.token_created"),
       v.literal("cicd.token_revoked"),
       v.literal("cicd.secrets_pulled"),
+      v.literal("cicd.pull_denied"),
       // Audit log actions (meta)
       v.literal("audit.exported"),
       v.literal("audit.viewed"),

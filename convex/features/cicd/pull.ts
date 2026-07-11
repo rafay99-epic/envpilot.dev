@@ -32,14 +32,30 @@ export const _authorizePull = internalMutation({
     tokenHash: v.string(),
     environment: v.string(),
   },
-  returns: v.object({
-    projectId: v.id("projects"),
-    projectName: v.string(),
-    projectSlug: v.string(),
-  }),
+  // Denials are RETURNED, not thrown: a throwing mutation rolls back its own
+  // writes, which would erase the denial audit entry. The action maps
+  // `denied` back onto the thrown error the route expects.
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      projectId: v.id("projects"),
+      projectName: v.string(),
+      projectSlug: v.string(),
+    }),
+    v.object({
+      ok: v.literal(false),
+      denied: v.union(
+        v.literal("invalid_token"),
+        v.literal("environment_scope"),
+        v.literal("tier_gate")
+      ),
+    })
+  ),
   handler: async (ctx, args) => {
     // Rate limit keyed by the hash — throttles both real tokens and
-    // brute-force probing of invalid ones.
+    // brute-force probing of invalid ones. (Throws + rolls back: rate-limit
+    // hits are deliberately NOT audited — a rejected burst would flood the
+    // org's audit trail.)
     await rateLimiter.limit(ctx, "cicdPull", {
       key: args.tokenHash,
       throws: true,
@@ -50,20 +66,47 @@ export const _authorizePull = internalMutation({
       .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
       .first();
 
-    // One error message for missing AND revoked — don't leak which.
-    if (!token || token.revokedAt !== undefined) {
-      throw new Error("Invalid or revoked service token");
+    const now = Date.now();
+    const logDenied = async (
+      t: NonNullable<typeof token>,
+      reason: string
+    ): Promise<void> => {
+      await ctx.db.insert("auditLogs", {
+        organizationId: t.organizationId,
+        userId: t.createdBy,
+        action: "cicd.pull_denied",
+        details: JSON.stringify({
+          tokenId: t._id,
+          tokenName: t.name,
+          projectId: t.projectId,
+          environment: args.environment,
+          reason,
+        }),
+        createdAt: now,
+      });
+    };
+
+    // Unknown hash: nothing to attribute the attempt to — no audit possible.
+    if (!token) {
+      return { ok: false as const, denied: "invalid_token" as const };
+    }
+
+    // A REVOKED token being presented is the highest-signal denial: someone
+    // (or some pipeline) is still holding a credential that was cut off.
+    if (token.revokedAt !== undefined) {
+      await logDenied(token, "revoked_token_used");
+      return { ok: false as const, denied: "invalid_token" as const };
     }
 
     if (!token.environments.includes(args.environment)) {
-      throw new Error(
-        `This token is not scoped to the "${args.environment}" environment`
-      );
+      await logDenied(token, "environment_out_of_scope");
+      return { ok: false as const, denied: "environment_scope" as const };
     }
 
     const project = await ctx.db.get(token.projectId);
     if (!project || project.deletedAt !== undefined) {
-      throw new Error("Invalid or revoked service token");
+      await logDenied(token, "project_deleted");
+      return { ok: false as const, denied: "invalid_token" as const };
     }
 
     // Tier gate re-checked on every pull: a downgraded org's tokens stop
@@ -74,12 +117,10 @@ export const _authorizePull = internalMutation({
       "cicd_service_tokens"
     );
     if (!gate.allowed) {
-      throw new Error(
-        "CI/CD service tokens are available on the Pro plan — this organization's plan no longer includes them"
-      );
+      await logDenied(token, "tier_gate");
+      return { ok: false as const, denied: "tier_gate" as const };
     }
 
-    const now = Date.now();
     await ctx.db.patch(token._id, { lastUsedAt: now });
     await ctx.db.insert("auditLogs", {
       organizationId: token.organizationId,
@@ -95,6 +136,7 @@ export const _authorizePull = internalMutation({
     });
 
     return {
+      ok: true as const,
       projectId: token.projectId,
       projectName: project.name,
       projectSlug: project.slug,
@@ -175,14 +217,38 @@ export const pullSecrets = action({
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    const scope: {
-      projectId: import("../../_generated/dataModel").Id<"projects">;
-      projectName: string;
-      projectSlug: string;
-    } = await ctx.runMutation(internal.features.cicd.pull._authorizePull, {
+    const authorization:
+      | {
+          ok: true;
+          projectId: import("../../_generated/dataModel").Id<"projects">;
+          projectName: string;
+          projectSlug: string;
+        }
+      | {
+          ok: false;
+          denied: "invalid_token" | "environment_scope" | "tier_gate";
+        } = await ctx.runMutation(internal.features.cicd.pull._authorizePull, {
       tokenHash,
       environment: args.environment,
     });
+
+    // Denials come back as values (not throws) so their audit entries
+    // survive the mutation — re-raise them here with the exact messages the
+    // /api/v1/secrets route maps onto HTTP statuses.
+    if (!authorization.ok) {
+      if (authorization.denied === "environment_scope") {
+        throw new Error(
+          `This token is not scoped to the "${args.environment}" environment`
+        );
+      }
+      if (authorization.denied === "tier_gate") {
+        throw new Error(
+          "CI/CD service tokens are available on the Pro plan — this organization's plan no longer includes them"
+        );
+      }
+      throw new Error("Invalid or revoked service token");
+    }
+    const scope = authorization;
 
     const rows = await ctx.runQuery(
       internal.features.cicd.pull._readScopedVariables,
