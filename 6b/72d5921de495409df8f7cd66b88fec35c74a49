@@ -1,0 +1,54 @@
+convex/features/cicd/pull.ts
+  s_f59315d63e71a6::t_afce1e4026ed32 27-37,64,73-178
+convex/schema.ts
+  s_f59315d63e71a6::t_e6b19c356045bf 802-806
+  s_f59315d63e71a6::t_241d13f11e6129 515-551
+convex/features/api/keys.ts
+  s_f59315d63e71a6::t_0952069c1d4796 1-51,53-135,137-371
+  s_f59315d63e71a6::t_6e2018dfedbb3f 52,136
+convex/lib/seedData.ts
+  s_f59315d63e71a6::t_db3b78b4a0ea82 270-287
+convex/lib/rateLimits.ts
+  s_f59315d63e71a6::t_d894fb7b448f07 28-37
+convex/features/admin/migrations.ts
+  s_f59315d63e71a6::t_3b0b223ca91897 320-321
+  s_f59315d63e71a6::t_384096f4a98abe 852-870,872-901
+  s_f59315d63e71a6::t_6e2018dfedbb3f 871
+  s_f59315d63e71a6::t_259d721bce702d 351-352
+  s_f59315d63e71a6::t_acef795e9a759f 120-128
+convex/features/api/authorize.ts
+  s_f59315d63e71a6::t_f6534a5bbdb8d3 1-38,45-137,139-165
+  s_f59315d63e71a6::t_a4dcdb4f5410c9 138
+  s_f59315d63e71a6::t_a0dd11393fea20 39-44
+convex/_generated/api.d.ts
+  s_99eed7ea2a5227::t_8242b736c53910 33-34,143-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "6b72d5921de495409df8f7cd66b88fec35c74a49",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_99eed7ea2a5227": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a6951fd35b696d8f9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
