@@ -1,0 +1,24 @@
+.github/workflows/ci.yml
+  s_0193e807073681::t_f8491ccf8f3945 536-537,540,545,548-549,551-557,564,572
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "137bbecd341f3b9a82f1b4033c402b840c8ff55e",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
