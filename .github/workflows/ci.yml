@@ -51,6 +51,7 @@ jobs:
       run_admin: ${{ steps.flags.outputs.run_admin }}
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
+      run_action: ${{ steps.flags.outputs.run_action }}
       run_convex: ${{ steps.flags.outputs.run_convex }}
       deploy_convex: ${{ steps.flags.outputs.deploy_convex }}
       any: ${{ steps.flags.outputs.any }}
@@ -78,6 +79,8 @@ jobs:
               - 'apps/cli/**'
             extension:
               - 'apps/vscode-extension/**'
+            action:
+              - 'packages/github-action/**'
             convex:
               - 'convex/**'
             shared:
@@ -96,6 +99,7 @@ jobs:
           ADMIN: ${{ steps.filter.outputs.admin }}
           CLI: ${{ steps.filter.outputs.cli }}
           EXTENSION: ${{ steps.filter.outputs.extension }}
+          ACTION: ${{ steps.filter.outputs.action }}
           CONVEX: ${{ steps.filter.outputs.convex }}
           SHARED: ${{ steps.filter.outputs.shared }}
         run: |
@@ -105,6 +109,7 @@ jobs:
           run_admin=$(bool "$ADMIN" "$SHARED")
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
+          run_action=$(bool "$ACTION" "$SHARED")
           # Shared changes (lockfile, configs) can break convex typecheck,
           # so they re-run the convex CHECK — but only convex/** changes
           # trigger a convex DEPLOY.
@@ -112,7 +117,7 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_admin" "$run_cli" "$run_extension" "$run_convex"; do
+          for f in "$run_web" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action"; do
             [ "$f" = "true" ] && any=true
           done
 
@@ -121,6 +126,7 @@ jobs:
             echo "run_admin=$run_admin"
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
+            echo "run_action=$run_action"
             echo "run_convex=$run_convex"
             echo "deploy_convex=$deploy_convex"
             echo "any=$any"
@@ -205,6 +211,17 @@ jobs:
       - name: Build, lint, typecheck, test extension
         run: bunx turbo build lint typecheck test --filter=envpilot
 
+  check-action:
+    name: Check GitHub Action
+    needs: changes
+    if: needs.changes.outputs.run_action == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck, test GitHub Action
+        run: bunx turbo build lint typecheck test --filter=@envpilot/github-action
+
   check-convex:
     name: Check Convex
     needs: changes
@@ -242,6 +259,7 @@ jobs:
       - check-admin
       - check-cli
       - check-extension
+      - check-action
       - check-convex
     if: always()
     runs-on: ubuntu-latest
@@ -458,6 +476,19 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
+
+  deploy-action:
+    name: Deploy GitHub Action
+    needs: [changes, checks-passed, e2e]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.changes.outputs.run_action == 'true'
+    uses: ./.github/workflows/deploy-action.yml
+    secrets: inherit
+    permissions:
+      contents: read
 
   deploy-extension:
     name: Deploy extension

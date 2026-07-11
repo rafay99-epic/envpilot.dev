@@ -1,0 +1,87 @@
+name: Deploy GitHub Action
+
+# Publishes the built action (action.yml + dist/ + README + LICENSE — never
+# monorepo source) to the PUBLIC rafay99-epic/envpilot-action repo, which is
+# what `uses: rafay99-epic/envpilot-action@v1` resolves against.
+#
+# Requires the ACTION_PUBLISH_TOKEN repo secret: a fine-grained PAT with
+# Contents read/write on rafay99-epic/envpilot-action only (the default
+# GITHUB_TOKEN cannot push to a different repository).
+#
+# Tagging: every publish updates the exact tag (v1.2.3) and force-moves the
+# floating major tag (v1) — the GitHub Actions convention that lets
+# consumers pin `@v1` and receive non-breaking updates.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-action-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to envpilot-action
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Verify publish token is configured
+        env:
+          ACTION_PUBLISH_TOKEN: ${{ secrets.ACTION_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$ACTION_PUBLISH_TOKEN" ]; then
+            echo "::error::ACTION_PUBLISH_TOKEN is missing — create a fine-grained PAT with Contents read/write on rafay99-epic/envpilot-action and add it as a repo secret."
+            exit 1
+          fi
+
+      - name: Build the action bundle
+        run: bunx turbo build --filter=@envpilot/github-action
+
+      - name: Publish dist to the public repo
+        env:
+          ACTION_PUBLISH_TOKEN: ${{ secrets.ACTION_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(jq -r '.version' packages/github-action/package.json)
+          MAJOR="v${VERSION%%.*}"
+
+          git clone "https://x-access-token:${ACTION_PUBLISH_TOKEN}@github.com/rafay99-epic/envpilot-action.git" /tmp/public-action
+          cd /tmp/public-action
+          git config user.name "envpilot-release-bot"
+          git config user.email "hello@envpilot.dev"
+
+          # Sync ONLY the published surface — never monorepo source.
+          rm -rf dist action.yml README.md LICENSE
+          cp -R "$GITHUB_WORKSPACE/packages/github-action/dist" dist
+          cp "$GITHUB_WORKSPACE/packages/github-action/action.yml" action.yml
+          cp "$GITHUB_WORKSPACE/packages/github-action/README.md" README.md
+          cp "$GITHUB_WORKSPACE/packages/github-action/LICENSE" LICENSE
+
+          if git diff --quiet && git diff --cached --quiet && ! git status --porcelain | grep -q .; then
+            echo "No content changes to publish."
+          else
+            git add -A
+            git commit -m "release: v${VERSION}"
+            git push origin HEAD
+          fi
+
+          # Exact tag: only create if this version was never tagged.
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists — skipping."
+          else
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
+          # Floating major tag always moves to the newest release.
+          git tag -f "$MAJOR"
+          git push -f origin "$MAJOR"
+
+          echo "Published envpilot-action v${VERSION} (${MAJOR} moved)."
