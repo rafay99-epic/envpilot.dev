@@ -1,0 +1,26 @@
+apps/vscode-extension/src/services/sync.ts
+  s_0193e807073681::t_8e29c2a14c408e 737,739,745-750
+apps/vscode-extension/README.md
+  s_0193e807073681::t_83168ad026282d 155-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "217f948f8fd4d9b6fb17959f006dd95eb533e3e8",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
