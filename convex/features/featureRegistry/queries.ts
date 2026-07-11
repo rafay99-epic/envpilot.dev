@@ -112,7 +112,8 @@ export const getResolvedFeatures = query({
 
     const { tierName, ownerId } = await getOrgOwnerTier(
       ctx.db,
-      args.organizationId
+      args.organizationId,
+      org
     );
 
     // Check grace period
@@ -215,7 +216,8 @@ export const getResolvedFeaturesBatch = query({
 
         const { tierName, ownerId } = await getOrgOwnerTier(
           ctx.db,
-          organizationId
+          organizationId,
+          org
         );
 
         const grace = await ctx.db
@@ -276,6 +278,55 @@ export const getResolvedFeaturesBatch = query({
       }
       return { tierName: result.effectiveTier, features };
     });
+  },
+});
+
+/**
+ * Tier names only, for multiple organizations — the lean sibling of
+ * getResolvedFeaturesBatch. Callers that use ONLY tierName (/api/auth/me
+ * today; CLI listOrganizations and extension getOrganizations as they
+ * migrate — PUBLISHED builds still call getResolvedFeaturesBatch by
+ * baked-in path, so the fat batch must stay until minCli/minExtension
+ * pass the migration) resolve the same effective tier (owner tier +
+ * grace period) at ~4 docs per org instead of ~60.
+ *
+ * Returns results in input order; missing orgs return null in their slot.
+ */
+export const getOrgTiersBatch = query({
+  args: { organizationIds: v.array(v.id("organizations")) },
+  returns: v.array(v.union(v.null(), v.object({ tierName: v.string() }))),
+  handler: async (ctx, args) => {
+    if (args.organizationIds.length === 0) return [];
+
+    const enforced = await isEnforcementEnabledFromDb(ctx.db);
+    if (!enforced) {
+      return args.organizationIds.map(() => ({ tierName: "unlimited" }));
+    }
+
+    return await Promise.all(
+      args.organizationIds.map(async (organizationId) => {
+        const org = await ctx.db.get(organizationId);
+        if (!org) return null;
+
+        const { tierName, ownerId } = await getOrgOwnerTier(
+          ctx.db,
+          organizationId,
+          org
+        );
+
+        const grace = await ctx.db
+          .query("subscriptionGracePeriods")
+          .withIndex("by_user", (q) => q.eq("userId", ownerId))
+          .first();
+
+        const effectiveTier =
+          grace?.isActive && grace.gracePeriodEnd > Date.now()
+            ? grace.previousTier
+            : tierName;
+
+        return { tierName: effectiveTier };
+      })
+    );
   },
 });
 

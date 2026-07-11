@@ -9,6 +9,8 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import { useAuthContext } from "./auth-provider";
+import { useConvexUser } from "@/hooks/useConvexUser";
 
 interface Organization {
   _id: string;
@@ -18,14 +20,7 @@ interface Organization {
   role: string;
 }
 
-function OrgProBadge({ orgId }: { orgId: string }) {
-  const tierData = useQuery(
-    api.features.featureRegistry.queries.getResolvedFeatures,
-    {
-      organizationId: orgId as Id<"organizations">,
-    }
-  );
-  if (tierData?.tierName !== "pro") return null;
+function ProBadge() {
   return (
     <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
       Pro
@@ -50,39 +45,45 @@ export function OrganizationSwitcher({
 }: OrganizationSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Live org list over the existing Convex WebSocket — replaces the old
+  // fetch("/api/organizations") that re-ran on EVERY navigation (each hit
+  // cost a getByWorkosId + listForUser round-trip server-side). The
+  // subscription is established once, dedupes with the /organizations and
+  // usage pages (same query+args), and updates reactively on org changes.
+  const { user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
+  const orgDocs = useQuery(
+    api.features.organizations.queries.listForUser,
+    convexUserId ? {} : "skip"
+  );
+  const organizations: Organization[] = (orgDocs ?? []).filter(
+    (o): o is NonNullable<typeof o> => o !== null
+  );
+  const isLoading = orgDocs === undefined;
+
+  // One lean tiers query for ALL orgs (Pro badges) — replaces a ~64-doc
+  // getResolvedFeatures subscription PER dropdown row.
+  const orgTiers = useQuery(
+    api.features.featureRegistry.queries.getOrgTiersBatch,
+    organizations.length > 0
+      ? {
+          organizationIds: organizations.map(
+            (o) => o._id as Id<"organizations">
+          ),
+        }
+      : "skip"
+  );
+  const proOrgIds = new Set(
+    organizations
+      .filter((o, i) => orgTiers?.[i]?.tierName === "pro")
+      .map((o) => o._id)
+  );
+
   const currentOrg =
     organizations.find((org) => org._id === currentOrgId) || organizations[0];
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchOrganizations() {
-      try {
-        const response = await fetch("/api/organizations");
-        if (response.ok && !cancelled) {
-          const data = await response.json();
-          setOrganizations(data.organizations || []);
-        }
-      } catch {
-        // Silently fail - organizations will be empty
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    fetchOrganizations();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -261,7 +262,7 @@ export function OrganizationSwitcher({
                     <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       {org.name}
                     </p>
-                    <OrgProBadge orgId={org._id} />
+                    {proOrgIds.has(org._id) && <ProBadge />}
                   </div>
                   <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                     {formatRole(org.role)}

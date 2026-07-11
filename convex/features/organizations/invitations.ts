@@ -520,11 +520,14 @@ export const cleanupExpired = internalMutation({
 
     const now = Date.now();
 
+    // Compound index range reads only actually-expired pending invites,
+    // instead of collecting every pending invite platform-wide each run
     const expiredInvitations = await ctx.db
       .query("invitations")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.expiresAt < now));
+      .withIndex("by_status_and_expires", (q) =>
+        q.eq("status", "pending").lt("expiresAt", now)
+      )
+      .collect();
 
     for (const invitation of expiredInvitations) {
       await ctx.db.patch(invitation._id, {

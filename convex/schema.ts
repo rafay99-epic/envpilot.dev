@@ -630,7 +630,10 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_organization", ["organizationId"])
     .index("by_token", ["token"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    // Bounds the 6-hourly expired-invitation cleanup cron to actually-expired
+    // rows instead of collecting every pending invite on every run
+    .index("by_status_and_expires", ["status", "expiresAt"]),
 
   // ==========================================
   // FEATURE REQUESTS (Wishlist)
@@ -1039,7 +1042,10 @@ export default defineSchema({
     isActive: v.boolean(),
   })
     .index("by_user", ["userId"])
-    .index("by_active", ["isActive"]),
+    // Bounds the hourly grace-period expiry cron to periods whose end has
+    // actually passed instead of collecting every active grace period
+    // (prefix-covers any plain isActive-equality query)
+    .index("by_active_and_end", ["isActive", "gracePeriodEnd"]),
 
   // ==========================================
   // SUBSCRIPTIONS (Polar.sh Integration)
@@ -1257,7 +1263,10 @@ export default defineSchema({
     .index("by_access_token", ["accessToken"])
     .index("by_project", ["projectId"])
     .index("by_user", ["userId"])
-    .index("by_acknowledged", ["acknowledged"])
+    // Bounds the hourly ack-cleanup cron to rows old enough to delete,
+    // instead of collecting every acknowledged row on every run (also
+    // prefix-covers any plain acknowledged-equality query)
+    .index("by_acknowledged_and_ack_at", ["acknowledged", "acknowledgedAt"])
     .index("by_expires_at", ["expiresAt"]),
 
   // ==========================================
@@ -1483,7 +1492,11 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_name", ["name"]),
+  })
+    .index("by_name", ["name"])
+    // Point-reads the default tier (getDefaultTierName) instead of collecting
+    // the whole table on every free-user tier resolution
+    .index("by_default", ["isDefault"]),
 
   // ==========================================
   // PROCESSED WEBHOOK EVENTS (Deduplication)

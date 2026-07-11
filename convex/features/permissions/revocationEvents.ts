@@ -104,18 +104,20 @@ export const cleanup = internalMutation({
       .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
       .collect();
 
-    // Get all acknowledged events older than 1 hour
+    // Get acknowledged events older than 1 hour. The compound index range
+    // (with a `.gt(0)` floor to exclude undefined acknowledgedAt, which
+    // sorts below all numbers) reads only rows actually old enough to
+    // delete, instead of collecting every acknowledged row each run.
     const oneHourAgo = now - 60 * 60 * 1000;
     const acknowledgedEvents = await ctx.db
       .query("permissionRevocationEvents")
-      .withIndex("by_acknowledged", (q) => q.eq("acknowledged", true))
-      .collect()
-      .then((rows) =>
-        rows.filter(
-          (doc) =>
-            doc.acknowledgedAt !== undefined && doc.acknowledgedAt < oneHourAgo
-        )
-      );
+      .withIndex("by_acknowledged_and_ack_at", (q) =>
+        q
+          .eq("acknowledged", true)
+          .gt("acknowledgedAt", 0)
+          .lt("acknowledgedAt", oneHourAgo)
+      )
+      .collect();
 
     // Delete expired events
     for (const event of expiredEvents) {
