@@ -1,0 +1,25 @@
+convex/features/cicd/pull.ts
+  s_f59315d63e71a6::t_0415c073db9ecd 201-212
+  s_f59315d63e71a6::t_75803454d6e8ee 122-125,131-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "77d09b7bbed086b7de9bd8e9b3f7aea6ba8304e7",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
