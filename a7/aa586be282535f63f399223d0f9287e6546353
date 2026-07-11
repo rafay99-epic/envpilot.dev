@@ -1,0 +1,33 @@
+apps/vscode-extension/src/services/api.ts
+  s_0193e807073681::t_a78cdbc3a3fc4d 251-269
+convex/lib/authz.ts
+  s_0193e807073681::t_8e9fe890e3cbb6 1
+  s_0193e807073681::t_bdb558bd7631fb 248-252
+apps/cli/src/lib/errors.ts
+  s_0193e807073681::t_fe081427bb10a2 171-202
+  s_0193e807073681::t_f72f9685807df0 50-56
+apps/cli/src/commands/run.ts
+  s_0193e807073681::t_03d7d3ca11a036 18,25
+  s_0193e807073681::t_fd1bff9f46d27e 207-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "a7aa586be282535f63f399223d0f9287e6546353",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
