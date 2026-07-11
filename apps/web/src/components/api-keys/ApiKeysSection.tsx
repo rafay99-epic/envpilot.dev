@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 import {
   Copy,
   Check,
@@ -22,6 +23,7 @@ import {
   TerminalLoading,
   TerminalEmptyState,
 } from "@/components/dashboard/terminal-ui";
+import { TerminalDatePicker } from "@/components/dashboard/terminal-date-picker";
 import { useOrganizationProjects } from "@/hooks";
 import { ENVIRONMENTS, type Environment } from "@/constants/project";
 
@@ -178,7 +180,10 @@ function ApiKeysSectionInner({
               />
             )
           ) : (
-            <ul className="divide-y divide-zinc-800">
+            <ul
+              data-testid="api-keys-list"
+              className="divide-y divide-zinc-800"
+            >
               {keyList.map((key) => (
                 <KeyRow key={key._id} keyItem={key} />
               ))}
@@ -233,9 +238,13 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
     try {
       await revoke({ keyId: keyItem._id });
       setConfirming(false);
+      toast.success(`API key "${keyItem.name}" revoked`);
     } catch (err) {
       reportApiKeysUiError(err, "revoke");
-      setRowError(err instanceof Error ? err.message : "Failed to revoke key");
+      const message =
+        err instanceof Error ? err.message : "Failed to revoke key";
+      setRowError(message);
+      toast.error(message);
     } finally {
       setIsRevoking(false);
     }
@@ -489,9 +498,10 @@ function CreateKeyPanel({
       else if (expiryMode === "custom")
         expiresAt = new Date(customExpiry).getTime();
 
+      const trimmedName = name.trim();
       const result = await createKey({
         organizationId,
-        name: name.trim(),
+        name: trimmedName,
         scopeProjects,
         scopeEnvironments,
         scopeResources,
@@ -500,9 +510,13 @@ function CreateKeyPanel({
       // Held only in this panel's local state — never persisted, never
       // logged, cleared when the panel collapses (unmount on "Done").
       setCreatedToken(result.token);
+      toast.success(`API key "${trimmedName}" created`);
     } catch (err) {
       reportApiKeysUiError(err, "create");
-      setError(err instanceof Error ? err.message : "Failed to create key");
+      const message =
+        err instanceof Error ? err.message : "Failed to create key";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -803,14 +817,14 @@ function CreateKeyPanel({
               ))}
             </div>
             {expiryMode === "custom" && (
-              <TerminalInput
+              <TerminalDatePicker
                 id="api-key-expiry-custom"
-                type="date"
                 value={customExpiry}
-                onChange={(e) => setCustomExpiry(e.target.value)}
+                onChange={setCustomExpiry}
                 min={new Date(Date.now() + 24 * 60 * 60 * 1000)
                   .toISOString()
                   .slice(0, 10)}
+                placeholder="Pick an expiry date"
                 className="mt-2"
               />
             )}
