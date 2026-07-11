@@ -61,7 +61,12 @@ const FAQ_DATA = [
       {
         question: "Can I cancel my subscription?",
         answer:
-          "Yes, you can cancel at any time from Account Settings → Billing. When you cancel, your Pro access continues until the end of your current billing period. After that, a 7-day grace period begins where you retain Pro features while you decide. After the grace period, your account reverts to the Free tier.",
+          "Yes, you can cancel at any time from Settings → Billing (or via the Manage billing link on the Usage & Plan page). You'll be asked to select a short reason for canceling — this feedback helps us improve the product. When you cancel, your Pro access continues until the end of your current billing period. After that, a 7-day grace period begins where you retain Pro features while you decide. After the grace period, your account reverts to the Free tier.",
+      },
+      {
+        question: "Where can I see my invoices and billing history?",
+        answer:
+          "Settings → Billing → Open Portal (or View Invoices) takes you to your secure customer portal hosted by Polar.sh, our payment processor. There you can download invoices and receipts, view your full billing history, and update your payment method.",
       },
       {
         question: "Do you offer refunds?",

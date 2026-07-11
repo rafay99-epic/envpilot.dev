@@ -135,17 +135,6 @@ function Hero() {
         animate="visible"
         variants={staggerContainer}
       >
-        <motion.div variants={fadeUp}>
-          <Link
-            href="/changelog"
-            className="group inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/5 px-4 py-1.5 font-mono text-xs text-green-400 transition-colors hover:border-green-500/40"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-green-400 [animation:pulse-glow_2.4s_ease-in-out_infinite]" />
-            New: inject secrets at runtime — no .env file needed
-            <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </motion.div>
-
         <motion.h1
           variants={fadeUp}
           className="mx-auto mt-8 max-w-4xl font-sans text-4xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-5xl md:text-7xl"

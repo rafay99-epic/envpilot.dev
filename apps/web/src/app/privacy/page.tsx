@@ -146,7 +146,10 @@ export default function PrivacyPolicyPage() {
                   (Polar.sh) collects your payment method details. We store
                   subscription identifiers, plan tier, billing period dates, and
                   payment status. We do not store credit card numbers or bank
-                  account information on our servers.
+                  account information on our servers. If you cancel a
+                  subscription, the cancellation reason and any optional
+                  feedback you provide are recorded with the subscription at our
+                  payment processor and used solely to improve the Service.
                 </p>
               </Subsection>
 
