@@ -311,8 +311,16 @@ export const _readActiveAccounts = internalQuery({
 // PUBLIC ACTIONS
 // ==========================================
 
+// Which registry flag gates a call: the REST routes never pass this (default
+// "public_api" inside authorize.ts); the MCP server passes "mcp_server" for
+// every tool call so the SAME actions serve both surfaces without
+// duplicating the auth/scope/gate/rate-limit/audit logic (PLAN §0/§3).
+const gateFeatureArg = v.optional(
+  v.union(v.literal("public_api"), v.literal("mcp_server"))
+);
+
 export const getOrganization = action({
-  args: { token: v.string() },
+  args: { token: v.string(), gateFeature: gateFeatureArg },
   returns: v.object({
     name: v.string(),
     slug: v.string(),
@@ -334,7 +342,11 @@ export const getOrganization = action({
 
     const authorization: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
-      { tokenHash, requirement: { resource: "projects" } }
+      {
+        tokenHash,
+        requirement: { resource: "projects" },
+        gateFeature: args.gateFeature,
+      }
     );
     if (!authorization.ok) throwForDenial(authorization.denied);
 
@@ -348,7 +360,7 @@ export const getOrganization = action({
 });
 
 export const listProjects = action({
-  args: { token: v.string() },
+  args: { token: v.string(), gateFeature: gateFeatureArg },
   returns: v.array(
     v.object({
       name: v.string(),
@@ -366,7 +378,11 @@ export const listProjects = action({
 
     const authorization: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
-      { tokenHash, requirement: { resource: "projects" } }
+      {
+        tokenHash,
+        requirement: { resource: "projects" },
+        gateFeature: args.gateFeature,
+      }
     );
     if (!authorization.ok) throwForDenial(authorization.denied);
 
@@ -378,7 +394,11 @@ export const listProjects = action({
 });
 
 export const getProject = action({
-  args: { token: v.string(), projectSlug: v.string() },
+  args: {
+    token: v.string(),
+    projectSlug: v.string(),
+    gateFeature: gateFeatureArg,
+  },
   returns: v.object({
     name: v.string(),
     slug: v.string(),
@@ -394,7 +414,11 @@ export const getProject = action({
 
     const bootstrap: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
-      { tokenHash, requirement: { resource: "projects" } }
+      {
+        tokenHash,
+        requirement: { resource: "projects" },
+        gateFeature: args.gateFeature,
+      }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
 
@@ -412,6 +436,7 @@ export const getProject = action({
       {
         tokenHash,
         requirement: { resource: "projects", projectId: projectDoc._id },
+        gateFeature: args.gateFeature,
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
@@ -437,6 +462,7 @@ export const getProjectVariables = action({
     keys: v.optional(v.array(v.string())),
     prefix: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
+    gateFeature: gateFeatureArg,
   },
   returns: v.array(
     v.object({
@@ -480,6 +506,7 @@ export const getProjectVariables = action({
       {
         tokenHash,
         requirement: { resource: "variables", environment: args.environment },
+        gateFeature: args.gateFeature,
       }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
@@ -504,6 +531,7 @@ export const getProjectVariables = action({
           environment: args.environment,
           projectId: projectDoc._id,
         },
+        gateFeature: args.gateFeature,
         recordUse: metadataOnly
           ? undefined
           : {
@@ -590,6 +618,7 @@ export const getProjectAccounts = action({
     projectSlug: v.string(),
     environment: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
+    gateFeature: gateFeatureArg,
   },
   returns: v.array(
     v.object({
@@ -629,6 +658,7 @@ export const getProjectAccounts = action({
       {
         tokenHash,
         requirement: { resource: "accounts", environment: args.environment },
+        gateFeature: args.gateFeature,
       }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
@@ -651,6 +681,7 @@ export const getProjectAccounts = action({
           environment: args.environment,
           projectId: projectDoc._id,
         },
+        gateFeature: args.gateFeature,
         recordUse: metadataOnly
           ? undefined
           : {

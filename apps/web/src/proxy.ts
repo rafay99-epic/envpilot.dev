@@ -50,6 +50,11 @@ export default authkitMiddleware({
       // projects, projects/[slug], projects/[slug]/variables,
       // projects/[slug]/accounts) so new endpoints never need a proxy change.
       "/api/v1/(.*)",
+      // Remote MCP server (Streamable HTTP, stateless) — authenticates with
+      // the SAME Bearer envpk_ API keys as /api/v1/* via its own withMcpAuth
+      // wrapper, never a WorkOS session cookie. No sub-path variants: the
+      // route only lives at this exact path (SSE is disabled).
+      "/api/mcp",
       // The CLI now calls Convex directly for everything, including secret
       // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
       // CLI path needs an unauthenticated bypass anymore.
