@@ -1,0 +1,32 @@
+apps/web/src/app/api/mcp/route.ts
+  s_f59315d63e71a6::t_d61228c2b86ba5 319,357,359-361,368-369,373-376,378
+apps/web/src/lib/public-api.ts
+  s_f59315d63e71a6::t_2f57ccc23675b6 67-75
+apps/web/content/docs/api-reference.mdx
+  s_f59315d63e71a6::t_40d576a055db3d 17
+convex/features/api/authorize.ts
+  s_f59315d63e71a6::t_8269b52b8cc049 110-117
+convex/features/api/reads.ts
+  s_f59315d63e71a6::t_f4b6a5f0fefc55 347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "70cdda8ecb86d29df5e576d181b60cedfd0421b7",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
