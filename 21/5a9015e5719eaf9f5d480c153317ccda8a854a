@@ -1,0 +1,36 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_e5ca61c07a0c6b::t_fa78fbdaf8ced2 305-308,312-316,329-331
+apps/web/src/components/variables/variable-create-drawer.tsx
+  s_e5ca61c07a0c6b::t_99021e19c4f6ac 100-102,105-131
+  s_e5ca61c07a0c6b::t_0b6a9ebfdd6bf7 103
+  s_e5ca61c07a0c6b::t_72bf9f31aa710c 4
+apps/web/tests/e2e/authenticated/duplicate-variable-error.spec.ts
+  s_e5ca61c07a0c6b::t_e5f00797d1f6d5 1-60
+apps/web/package.json
+  s_e5ca61c07a0c6b::t_0b6a9ebfdd6bf7 3
+apps/web/src/lib/versions.ts
+  s_e5ca61c07a0c6b::t_0b6a9ebfdd6bf7 17
+apps/web/src/lib/error-messages.ts
+  s_e5ca61c07a0c6b::t_4b613d9b33695a 29-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "215a9015e5719eaf9f5d480c153317ccda8a854a",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
