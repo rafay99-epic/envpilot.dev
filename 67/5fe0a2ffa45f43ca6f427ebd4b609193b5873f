@@ -1,0 +1,59 @@
+convex/features/api/reads.ts
+  s_f59315d63e71a6::t_07e517b6aa066b 417,523,669
+  s_f59315d63e71a6::t_64c3286e043d7e 401-407,487-493,532-534,636-642,671-676,679-681,722-725
+  s_f59315d63e71a6::t_07f16e4b33e2ca 115-122,124,133-135
+  s_f59315d63e71a6::t_b46025642815d5 1-2,4-78,80-114,123,125-132,136-225,229-232,234-235,237-400,408-416,423,429-486,494-522,524-531,535-635,643-668,670,677-678,682-721,726-748
+  s_f59315d63e71a6::t_b80d5a2a158466 79
+  s_f59315d63e71a6::t_246d9473b74c8b 418-422,424-428
+  s_f59315d63e71a6::t_179f4d1ccd25b4 3
+  s_f59315d63e71a6::t_2b18f465b68417 226-228,233,236
+convex/_generated/api.d.ts
+  s_f59315d63e71a6::t_eda4551c9ae303 35,146
+apps/web/src/app/api/v1/projects/route.ts
+  s_f59315d63e71a6::t_905d34cd68b59b 1-5,11-26,31-70
+  s_f59315d63e71a6::t_64c3286e043d7e 6-10,27-30
+apps/web/tests/e2e/authenticated/public-api.spec.ts
+  s_f59315d63e71a6::t_64c3286e043d7e 128-129,132-134,229-232
+  s_f59315d63e71a6::t_a90d955f30b0c6 1-127,130-131,135-228,233-325
+apps/web/src/lib/public-api.ts
+  s_f59315d63e71a6::t_64c3286e043d7e 52-56,89-94
+  s_f59315d63e71a6::t_72d6c49f80811a 1-51,57-88,95-98
+apps/web/src/proxy.ts
+  s_f59315d63e71a6::t_a0f1f3c9b81a07 45-52
+apps/web/src/app/api/v1/projects/[slug]/variables/route.ts
+  s_f59315d63e71a6::t_64c3286e043d7e 7-11,42-45,71-72,81-82,108-113,122-124
+  s_f59315d63e71a6::t_c91acea270a2c4 78-80,83-87
+  s_f59315d63e71a6::t_c35de4c54aee84 1-6,12-41,46-70,73-77,88-107,114-121,125-154
+apps/web/src/lib/dotenv-format.ts
+  s_f59315d63e71a6::t_749b70f276700c 1-38
+apps/web/src/app/api/v1/projects/[slug]/route.ts
+  s_f59315d63e71a6::t_f94b5264359ca9 1-5,11-29,34-74
+  s_f59315d63e71a6::t_64c3286e043d7e 6-10,30-33
+apps/web/src/app/api/v1/projects/[slug]/accounts/route.ts
+  s_f59315d63e71a6::t_64c3286e043d7e 7-11,38-41
+  s_f59315d63e71a6::t_481230ba9c55ad 1-6,12-37,42-100
+apps/web/src/app/api/v1/organization/route.ts
+  s_f59315d63e71a6::t_64c3286e043d7e 6-10,29-32
+  s_f59315d63e71a6::t_1a0690fa2d6e26 1-5,11-28,33-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "675fe0a2ffa45f43ca6f427ebd4b609193b5873f",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
