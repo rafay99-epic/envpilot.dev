@@ -43,7 +43,7 @@ export default function TermsOfServicePage() {
       <PageHero eyebrow="terms" title="Terms of Service" align="left">
         <span className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400">
           <span className="text-green-500">&#10095;</span>
-          Effective: March 10, 2026 &middot; Last updated: March 23, 2026
+          Effective: March 10, 2026 &middot; Last updated: July 12, 2026
         </span>
       </PageHero>
 
