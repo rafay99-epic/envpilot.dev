@@ -1,0 +1,24 @@
+apps/web/src/app/faq/page.tsx
+  s_e5ca61c07a0c6b::t_d3eee32bce8083 64-69
+apps/web/src/app/terms/page.tsx
+  s_e5ca61c07a0c6b::t_a3415e5c21028f 257-260
+  s_e5ca61c07a0c6b::t_54642fb2b35f03 267-269
+apps/web/src/app/privacy/page.tsx
+  s_e5ca61c07a0c6b::t_b45023e9f52041 149-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "6369ee1a5343675742da7d2ea6719f12aa21211a",
+  "prompts": {},
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
