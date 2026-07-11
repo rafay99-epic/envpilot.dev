@@ -738,6 +738,7 @@ export default defineSchema({
       v.literal("project.member_environments_changed"),
       v.literal("project.moved"),
       v.literal("project.restored"),
+      v.literal("project.trash_emptied"),
       v.literal("project.favorited"),
       v.literal("project.unfavorited"),
       // Variable actions

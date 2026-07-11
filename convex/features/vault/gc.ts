@@ -1,10 +1,13 @@
 import { v } from "convex/values";
 import {
+  action,
   internalAction,
   internalMutation,
   internalQuery,
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
+import { requireAuthedUser } from "../../lib/identity";
+import { assertProjectAction } from "../../lib/authz";
 
 /**
  * Vault garbage collection — permanent purge of trashed secrets.
@@ -379,5 +382,268 @@ export const purgeExpiredBatch = internalAction({
       skipped,
       rescheduled,
     };
+  },
+});
+
+// ==========================================
+// EMPTY TRASH NOW — user-initiated, project-scoped
+// ==========================================
+//
+// The trash page's "Empty trash" button. Same non-negotiable destruction
+// ordering as the scheduled purge (Vault objects first, rows only after
+// every ref is confirmed gone), but scoped to ONE project and ignoring the
+// retention window — the user is explicitly choosing to skip the remaining
+// restore days. Authorization mirrors variable deletion (owner implicit,
+// assigned project_manager / team_lead).
+
+/** Caller authorization for emptyProjectTrash (actions can't touch the DB). */
+export const authorizeEmptyTrash = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.object({
+    userId: v.id("users"),
+    organizationId: v.id("organizations"),
+  }),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    await assertProjectAction(
+      ctx,
+      actor._id,
+      args.projectId,
+      "project:delete_variable"
+    );
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) throw new Error("Project not found");
+    return { userId: actor._id, organizationId: project.organizationId };
+  },
+});
+
+/**
+ * Next batch of ALL trashed docs in one project (no retention cutoff),
+ * with deduplicated Vault refs — same shape as listPurgeEligible.
+ */
+export const listProjectTrash = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.object({
+    variables: v.array(
+      v.object({
+        id: v.id("environmentVariables"),
+        vaultRefs: v.array(v.string()),
+      })
+    ),
+    accounts: v.array(
+      v.object({
+        id: v.id("projectAccounts"),
+        vaultRefs: v.array(v.string()),
+      })
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const variableDocs = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .take(PURGE_BATCH_SIZE);
+
+    const variables = [];
+    for (const variable of variableDocs) {
+      const refs = new Set<string>();
+      refs.add(variable.vaultRef);
+      const versions = await ctx.db
+        .query("variableVersions")
+        .withIndex("by_variable", (q) => q.eq("variableId", variable._id))
+        .collect();
+      for (const version of versions) {
+        refs.add(version.vaultRef);
+      }
+      variables.push({ id: variable._id, vaultRefs: [...refs] });
+    }
+
+    const accountDocs = await ctx.db
+      .query("projectAccounts")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).gt("deletedAt", 0)
+      )
+      .take(PURGE_BATCH_SIZE);
+
+    const accounts = accountDocs.map((account) => ({
+      id: account._id,
+      vaultRefs: [account.vaultRef],
+    }));
+
+    return { variables, accounts };
+  },
+});
+
+/**
+ * Hard-delete a TRASHED variable regardless of retention age. The
+ * still-trashed guard stays: a row restored between the snapshot and this
+ * call is never destroyed.
+ */
+export const hardDeleteTrashedVariable = internalMutation({
+  args: { variableId: v.id("environmentVariables") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable || variable.deletedAt === undefined) return false;
+
+    const versions = await ctx.db
+      .query("variableVersions")
+      .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
+      .collect();
+    for (const version of versions) {
+      await ctx.db.delete(version._id);
+    }
+    const permissions = await ctx.db
+      .query("variablePermissions")
+      .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
+      .collect();
+    for (const perm of permissions) {
+      await ctx.db.delete(perm._id);
+    }
+    await ctx.db.delete(args.variableId);
+    return true;
+  },
+});
+
+/** Account twin of hardDeleteTrashedVariable. */
+export const hardDeleteTrashedAccount = internalMutation({
+  args: { accountId: v.id("projectAccounts") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.accountId);
+    if (!account || account.deletedAt === undefined) return false;
+
+    const permissions = await ctx.db
+      .query("accountPermissions")
+      .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
+      .collect();
+    for (const perm of permissions) {
+      await ctx.db.delete(perm._id);
+    }
+    await ctx.db.delete(args.accountId);
+    return true;
+  },
+});
+
+/** Audit record for a user-initiated empty-trash run. */
+export const recordTrashEmptied = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+    purgedVariables: v.number(),
+    purgedAccounts: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.insert("auditLogs", {
+      organizationId: args.organizationId,
+      projectId: args.projectId,
+      userId: args.userId,
+      action: "project.trash_emptied",
+      details: JSON.stringify({
+        purgedVariables: args.purgedVariables,
+        purgedAccounts: args.purgedAccounts,
+      }),
+      createdAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * Permanently destroy EVERYTHING in a project's trash, now. Vault objects
+ * are deleted before rows; a Vault failure skips only that doc (it stays in
+ * trash and the scheduled GC retries it). Loops batches with the same
+ * runaway guard as the scheduled purge.
+ */
+export const emptyProjectTrash = action({
+  args: { projectId: v.id("projects") },
+  returns: v.object({
+    purgedVariables: v.number(),
+    purgedAccounts: v.number(),
+    skipped: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const authz = await ctx.runQuery(
+      internal.features.vault.gc.authorizeEmptyTrash,
+      { projectId: args.projectId }
+    );
+
+    const apiKey = process.env.WORKOS_API_KEY;
+    if (!apiKey) {
+      // Never destroy DB rows while the Vault copy survives.
+      throw new Error(
+        "Trash cannot be emptied right now — server configuration error."
+      );
+    }
+
+    let purgedVariables = 0;
+    let purgedAccounts = 0;
+    let skipped = 0;
+
+    for (let round = 0; round < MAX_RESCHEDULE_DEPTH; round++) {
+      const batch = await ctx.runQuery(
+        internal.features.vault.gc.listProjectTrash,
+        { projectId: args.projectId }
+      );
+      if (batch.variables.length === 0 && batch.accounts.length === 0) break;
+
+      const purgedBeforeRound = purgedVariables + purgedAccounts;
+
+      for (const variable of batch.variables) {
+        let allDeleted = true;
+        for (const ref of variable.vaultRefs) {
+          const ok = await deleteVaultObject(ref, apiKey);
+          if (!ok) allDeleted = false;
+        }
+        if (!allDeleted) {
+          skipped++;
+          continue;
+        }
+        const deleted = await ctx.runMutation(
+          internal.features.vault.gc.hardDeleteTrashedVariable,
+          { variableId: variable.id }
+        );
+        if (deleted) purgedVariables++;
+        else skipped++;
+      }
+
+      for (const account of batch.accounts) {
+        let allDeleted = true;
+        for (const ref of account.vaultRefs) {
+          const ok = await deleteVaultObject(ref, apiKey);
+          if (!ok) allDeleted = false;
+        }
+        if (!allDeleted) {
+          skipped++;
+          continue;
+        }
+        const deleted = await ctx.runMutation(
+          internal.features.vault.gc.hardDeleteTrashedAccount,
+          { accountId: account.id }
+        );
+        if (deleted) purgedAccounts++;
+        else skipped++;
+      }
+
+      // A round that purged nothing means every remaining doc is failing its
+      // Vault delete — stop instead of spinning on the same skips (the
+      // scheduled GC retries them).
+      if (purgedVariables + purgedAccounts === purgedBeforeRound) {
+        break;
+      }
+    }
+
+    await ctx.runMutation(internal.features.vault.gc.recordTrashEmptied, {
+      projectId: args.projectId,
+      organizationId: authz.organizationId,
+      userId: authz.userId,
+      purgedVariables,
+      purgedAccounts,
+    });
+
+    return { purgedVariables, purgedAccounts, skipped };
   },
 });
