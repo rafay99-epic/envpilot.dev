@@ -1,0 +1,94 @@
+package.json
+  s_e5ca61c07a0c6b::t_ec85f6f7e0a6ca 3
+apps/web/src/hooks/useTierStore.ts
+  s_e5ca61c07a0c6b::t_813c4fd3762da4 70-71,73-78,80
+  s_e5ca61c07a0c6b::t_8dd106bf3fbcea 8
+  s_e5ca61c07a0c6b::t_b6a93ab6ad2461 101
+  s_e5ca61c07a0c6b::t_3e1c392d16af62 19-22
+convex/features/featureRegistry/queries.ts
+  s_e5ca61c07a0c6b::t_8b7b8c2d0ec7cf 297
+  s_e5ca61c07a0c6b::t_c90bf9a9e375d5 285,292-296,298-332
+  s_e5ca61c07a0c6b::t_e064b85f4b931d 219-220
+  s_e5ca61c07a0c6b::t_ebd94c1810c5ef 115-116
+  s_e5ca61c07a0c6b::t_6c17db7cd986e1 286-291
+  s_e5ca61c07a0c6b::t_0be1c63f37222f 284
+convex/schema.ts
+  s_e5ca61c07a0c6b::t_b1d7a49d02baee 1045-1046,1048
+  s_e5ca61c07a0c6b::t_70d8ece58194e1 633-636
+  s_e5ca61c07a0c6b::t_e4e10e3c083ef0 1267-1268
+  s_e5ca61c07a0c6b::t_a1f83872507283 1266,1269
+  s_e5ca61c07a0c6b::t_00a5cfb24a07ca 1495-1499
+  s_e5ca61c07a0c6b::t_8cc8253265e933 1047
+convex/crons.ts
+  s_e5ca61c07a0c6b::t_9f68138fe1fb8d 94-97,100
+apps/web/src/app/(dashboard)/organizations/page.tsx
+  s_e5ca61c07a0c6b::t_d0ab766f5c8972 50-68
+  s_e5ca61c07a0c6b::t_89119aa6f010a9 163
+  s_e5ca61c07a0c6b::t_3c0f811bc2d941 27
+convex/features/billing/tierLimits.ts
+  s_e5ca61c07a0c6b::t_03d2fe44f64a36 110-113
+convex/features/permissions/revocationEvents.ts
+  s_e5ca61c07a0c6b::t_b3b7d411961a38 107-110,114-120
+apps/web/src/lib/convex-helpers.ts
+  s_e5ca61c07a0c6b::t_1ce098f28a3cc2 13-22,30-34
+  s_e5ca61c07a0c6b::t_6a77c7fa91cea0 58-62
+convex/features/featureRegistry/resolver.ts
+  s_e5ca61c07a0c6b::t_0c21397d83bb54 2
+  s_e5ca61c07a0c6b::t_43fd2703cb2eda 75-78,80-81,84
+convex/features/community/changelog/publish.ts
+  s_e5ca61c07a0c6b::t_dcb2d2ab2d1311 5-7
+apps/web/src/app/api/auth/me/route.ts
+  s_e5ca61c07a0c6b::t_91f0ac876c2aa4 73-75,78-82
+convex/features/billing/gracePeriods.ts
+  s_e5ca61c07a0c6b::t_ae62f409f4e783 125-129,131-133,138
+apps/web/src/components/auth/auth-provider.tsx
+  s_e5ca61c07a0c6b::t_03a4ec0eb25703 26-29,36,43
+convex/features/organizations/invitations.ts
+  s_e5ca61c07a0c6b::t_ffeca4e5a24418 523-524,527-530
+apps/web/src/stores/tier-store.ts
+  s_e5ca61c07a0c6b::t_8b5ae5ec890e8d 122-127
+  s_e5ca61c07a0c6b::t_9e1c6ec3d3a59f 46-50
+  s_e5ca61c07a0c6b::t_4038a6fe10c75d 66-70
+  s_e5ca61c07a0c6b::t_524c1c53be0834 86-87
+  s_e5ca61c07a0c6b::t_cf8c429579d654 109-110
+apps/web/src/hooks/useFeatureGate.ts
+  s_e5ca61c07a0c6b::t_bd4d350006f7d1 6,22-30,40-46,49,58-115
+  s_e5ca61c07a0c6b::t_bc786093f5b9d1 116
+convex/features/sharing/cleanup.ts
+  s_e5ca61c07a0c6b::t_3cf24e9cd02e93 65-69,72-74
+apps/web/package.json
+  s_e5ca61c07a0c6b::t_ec85f6f7e0a6ca 3
+apps/web/src/app/(dashboard)/layout.tsx
+  s_e5ca61c07a0c6b::t_b2d0be8b46c1d1 201-205
+  s_e5ca61c07a0c6b::t_8f7aad2a4b094d 107,111,116-118,120-127,132,134-142,154-163
+convex/features/api/authorize.ts
+  s_e5ca61c07a0c6b::t_f07254d755a2b2 153-160
+apps/web/src/lib/versions.ts
+  s_e5ca61c07a0c6b::t_ec85f6f7e0a6ca 17
+apps/web/src/components/auth/organization-switcher.tsx
+  s_e5ca61c07a0c6b::t_b9aa80d6cea52e 51-65,67-71,77-83,85-86
+  s_e5ca61c07a0c6b::t_d78de62b042cde 12-13,23
+  s_e5ca61c07a0c6b::t_8b7b8c2d0ec7cf 72-75
+  s_e5ca61c07a0c6b::t_bfa315fe5f1711 265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "b2eece9a478761b4cb7da79b8e694e03ad59a08b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
