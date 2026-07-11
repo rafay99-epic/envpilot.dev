@@ -14,6 +14,7 @@ import {
 } from "../utils/config";
 import { normalizePath, toPlatformPath, getDisplayPath } from "../utils/paths";
 import { envFileNamesFor } from "../utils/envFiles";
+import { recordManagedFile, forgetManagedFile } from "../utils/managedFiles";
 import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
@@ -413,6 +414,7 @@ export class SyncService {
 
     // Write file
     await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content);
 
     // Apply role-based file protection
     const protectionMode = this.resolveProtectionMode(
@@ -555,6 +557,7 @@ export class SyncService {
     } catch {
       // File doesn't exist, nothing to delete
     }
+    await forgetManagedFile(envFilePath);
   }
 
   /**
@@ -812,6 +815,7 @@ export class SyncService {
     }
 
     await fs.writeFile(envFilePath, mergedContent, "utf-8");
+    await recordManagedFile(envFilePath, mergedContent);
   }
 
   /**
@@ -1035,6 +1039,7 @@ export class SyncService {
     }
 
     await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content);
 
     // Apply role-based file protection
     const protectionMode = projectId
@@ -1181,6 +1186,7 @@ export class SyncService {
     } catch {
       // File doesn't exist.
     }
+    await forgetManagedFile(filePath);
   }
 
   /**

@@ -61,14 +61,27 @@ const sentryOptions = {
   external: ["vscode"],
 };
 
+/**
+ * `vscode:uninstall` hook bundle — plain node script (no vscode API) that
+ * purges synced .env files after the extension is removed.
+ * @type {import('esbuild').BuildOptions}
+ */
+const uninstallOptions = {
+  ...shared,
+  entryPoints: ["./src/uninstall.ts"],
+  outfile: "dist/uninstall.js",
+};
+
 if (isWatch) {
   const extCtx = await esbuild.context(extensionOptions);
   const sentryCtx = await esbuild.context(sentryOptions);
-  await Promise.all([extCtx.watch(), sentryCtx.watch()]);
+  const uninstallCtx = await esbuild.context(uninstallOptions);
+  await Promise.all([extCtx.watch(), sentryCtx.watch(), uninstallCtx.watch()]);
   console.log("Watching for changes...");
 } else {
   await Promise.all([
     esbuild.build(extensionOptions),
     esbuild.build(sentryOptions),
+    esbuild.build(uninstallOptions),
   ]);
 }
