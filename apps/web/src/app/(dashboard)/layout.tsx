@@ -15,6 +15,7 @@ import {
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
 import { createLogger } from "@/lib/logger";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const log = createLogger("app/dashboard/layout");
 
@@ -179,7 +180,9 @@ export default async function DashboardLayout({
     lastName: user.lastName ?? null,
     profilePictureUrl: user.profilePictureUrl ?? null,
     organizationId: activeOrganization?._id ?? null,
-    role: activeOrganization?.role ?? null,
+    // Normalized for parity with /api/auth/me — now that initialActions can
+    // suppress the client refetch, this role persists for the whole session
+    role: activeOrganization ? normalizeOrgRole(activeOrganization.role) : null,
     // permissions are computed from backend authz via /api/auth/me → actions[]
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
@@ -191,7 +194,7 @@ export default async function DashboardLayout({
         name: activeOrganization.name,
         slug: activeOrganization.slug,
         tier: orgTier,
-        role: activeOrganization.role,
+        role: normalizeOrgRole(activeOrganization.role),
         createdAt: new Date(activeOrganization.createdAt),
         updatedAt: new Date(activeOrganization.updatedAt),
       }
