@@ -513,6 +513,43 @@ export default defineSchema({
     .index("by_organization", ["organizationId"]),
 
   // ==========================================
+  // API KEYS (generalized token platform)
+  // ==========================================
+  // Evolves serviceTokens into a scoped platform serving the public REST API,
+  // the MCP server, AND (via a compat lookup in cicd/pull.ts) the legacy
+  // CI/CD pull surface. Only the SHA-256 hash is ever stored — the plaintext
+  // (`envpk_<40 hex>`) is returned exactly once from `create`. A key is
+  // scoped to project(s) ("all" = org-wide, owner-only to create), an
+  // environment list ("all" = every environment), and a subset of resource
+  // types. Revocation is immediate (revokedAt set); expiresAt is an optional
+  // absolute cutoff, checked identically to revocation at authorize time.
+  apiKeys: defineTable({
+    organizationId: v.id("organizations"),
+    // Human label ("Vercel deploy hook", "Terraform CI")
+    name: v.string(),
+    // SHA-256 hex of the plaintext key — the only stored credential form
+    tokenHash: v.string(),
+    // "all" = org-wide (owner-only to create); otherwise an explicit project list
+    scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
+    // "all" = every environment; otherwise an explicit environment list
+    scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
+    // Subset of ["variables", "accounts", "projects"]
+    scopeResources: v.array(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    // Set on every successful authorized use that opts into recording it
+    // (metadata reads skip this — see authorize.ts's `recordUse` arg)
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+    // Optional absolute expiry — expired keys get the same uniform "invalid
+    // or revoked" denial as a revoked key (never a distinct signal)
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_organization", ["organizationId"]),
+
+  // ==========================================
   // INVITATIONS
   // ==========================================
   invitations: defineTable({
@@ -762,6 +799,11 @@ export default defineSchema({
       v.literal("cicd.token_revoked"),
       v.literal("cicd.secrets_pulled"),
       v.literal("cicd.pull_denied"),
+      // Public API key actions (generalized token platform)
+      v.literal("api.key_created"),
+      v.literal("api.key_revoked"),
+      v.literal("api.secrets_pulled"),
+      v.literal("api.request_denied"),
       // Audit log actions (meta)
       v.literal("audit.exported"),
       v.literal("audit.viewed"),

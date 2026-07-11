@@ -267,4 +267,22 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 0,
   },
+  {
+    key: "public_api",
+    displayName: "Public REST API",
+    valueType: "boolean" as const,
+    category: "Integrations",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 1,
+  },
+  {
+    key: "mcp_server",
+    displayName: "MCP Server",
+    valueType: "boolean" as const,
+    category: "Integrations",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 2,
+  },
 ];
