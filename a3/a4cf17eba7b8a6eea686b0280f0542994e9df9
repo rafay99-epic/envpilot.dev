@@ -1,0 +1,28 @@
+convex/features/organizations/tombstones.ts
+  s_0193e807073681::t_8f491ca9a12e43 9
+  s_0193e807073681::t_ecdd772b3d7836 94-98
+convex/features/organizations/securityHold.ts
+  s_0193e807073681::t_879f102be40211 3
+  s_0193e807073681::t_8af7c26eb76f9a 216-220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "a3a4cf17eba7b8a6eea686b0280f0542994e9df9",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
