@@ -1,0 +1,26 @@
+convex/features/emails/emails.ts
+  s_3676ec1daf5202::t_a52d1e4037c58b 608-610
+  s_3676ec1daf5202::t_26f168fb3f78b8 570-607,611-617
+  s_3676ec1daf5202::t_9c973b32ca342e 559-569,618-635
+convex/features/users/users.ts
+  s_3676ec1daf5202::t_26f168fb3f78b8 113-120
+  s_3676ec1daf5202::t_bcedfecff3bbe5 2,121
+scripts/send-launch-email.mjs
+  s_3676ec1daf5202::t_740192d57e1396 58-60,62-64,72-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "9522b983b36c0b355ceb7313c40c8436ec832495",
+  "prompts": {},
+  "sessions": {
+    "s_3676ec1daf5202": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d471032b-dcda-462d-91b2-f61316f5d4ff",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
