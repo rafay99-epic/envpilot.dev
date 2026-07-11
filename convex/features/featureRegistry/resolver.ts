@@ -1,5 +1,5 @@
 import type { DatabaseReader } from "../../_generated/server";
-import { Id } from "../../_generated/dataModel";
+import { Doc, Id } from "../../_generated/dataModel";
 import {
   isEnforcementEnabledFromDb,
   getDefaultTierName,
@@ -72,13 +72,16 @@ export async function getUserTier(
  */
 export async function getOrgOwnerTier(
   db: DatabaseReader,
-  organizationId: Id<"organizations">
+  organizationId: Id<"organizations">,
+  // Pass the org doc when the caller already fetched it — skips a duplicate
+  // ctx.db.get on every resolution
+  org?: Doc<"organizations"> | null
 ): Promise<{ tierName: string; ownerId: Id<"users"> }> {
-  const org = await db.get(organizationId);
-  if (!org) {
+  const orgDoc = org ?? (await db.get(organizationId));
+  if (!orgDoc) {
     throw new Error("Organization not found");
   }
-  const ownerId = org.createdBy;
+  const ownerId = orgDoc.createdBy;
   const tierName = await getUserTier(db, ownerId);
   return { tierName, ownerId };
 }

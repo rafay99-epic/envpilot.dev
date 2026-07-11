@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { useTierStore } from "@/stores/tier-store";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthContext } from "@/components/auth";
 import { useConvexUser } from "@/hooks/useConvexUser";
 
 /**
@@ -16,7 +16,10 @@ import { useConvexUser } from "@/hooks/useConvexUser";
  * creating additional Convex WebSocket subscriptions.
  */
 export function useTierStoreSync() {
-  const { user, organization } = useAuth();
+  // useAuthContext (NOT useAuth): a bare useAuth() here instantiates a
+  // second independent auth state and fires its own /api/auth/me fetch on
+  // every mount — the context shares the AuthProvider's single fetch.
+  const { user, organization } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
 
@@ -64,12 +67,17 @@ export function useTierStoreSync() {
     }
   }, [userTierInfo, setUserTier]);
 
-  // Sync resolved features
+  // Sync resolved features (tagged with the org + tier they were resolved
+  // for, so store-backed gates never serve another org's values)
   useEffect(() => {
-    if (resolvedFeatures?.features) {
-      setFeatures(resolvedFeatures.features);
+    if (orgId && resolvedFeatures?.features) {
+      setFeatures({
+        organizationId: orgId,
+        tierName: resolvedFeatures.tierName,
+        features: resolvedFeatures.features,
+      });
     }
-  }, [resolvedFeatures, setFeatures]);
+  }, [orgId, resolvedFeatures, setFeatures]);
 
   // Org switch / sign-out — clear stale usage snapshot. The usage numbers
   // themselves are populated ONLY by useExtendedUsageSync (mounted on the
@@ -90,7 +98,7 @@ export function useTierStoreSync() {
  * for why this must never ride along in the global layout/nav.
  */
 export function useExtendedUsageSync() {
-  const { organization } = useAuth();
+  const { organization } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
 
   const usageData = useQuery(

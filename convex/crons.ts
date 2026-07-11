@@ -91,10 +91,13 @@ crons.daily(
   {}
 );
 
-// Clean up processed webhook events older than 7 days
+// Clean up processed webhook events older than 7 days. Pure table-bloat
+// prevention with a 7-day retention window — no user-facing timing
+// requirement, so daily is functionally identical to the previous 6h
+// cadence at a quarter of the runs.
 crons.interval(
   "cleanup processed webhook events",
-  { hours: 6 },
+  { hours: 24 },
   internal.features.billing.webhooks.cleanupProcessedWebhooks
 );
 

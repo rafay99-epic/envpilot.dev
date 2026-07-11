@@ -43,6 +43,11 @@ interface TierState {
   gracePeriodEnd: number | null;
   // New: dynamic features from feature registry
   features: Record<string, ResolvedFeature>;
+  /** Which org the `features` map was resolved for (store-backed gates
+   *  must not serve another org's values) */
+  featuresOrgId: string | null;
+  /** Effective tier name the `features` map was resolved against */
+  featuresTierName: string | null;
 }
 
 interface TierActions {
@@ -58,7 +63,11 @@ interface TierActions {
     graceActive: boolean;
     gracePeriodEnd: number | null;
   }) => void;
-  setFeatures: (features: Record<string, ResolvedFeature>) => void;
+  setFeatures: (data: {
+    organizationId: string;
+    tierName: string;
+    features: Record<string, ResolvedFeature>;
+  }) => void;
 }
 
 export type TierStore = TierState & TierActions;
@@ -74,6 +83,8 @@ export const useTierStore = create<TierStore>((set) => ({
   graceActive: false,
   gracePeriodEnd: null,
   features: {},
+  featuresOrgId: null,
+  featuresTierName: null,
 
   setUsageData: (data) =>
     set({
@@ -95,6 +106,8 @@ export const useTierStore = create<TierStore>((set) => ({
       graceActive: false,
       gracePeriodEnd: null,
       features: {},
+      featuresOrgId: null,
+      featuresTierName: null,
     }),
 
   setEnforcementEnabled: (enabled) => set({ enforcementEnabled: enabled }),
@@ -106,5 +119,10 @@ export const useTierStore = create<TierStore>((set) => ({
       gracePeriodEnd: data.gracePeriodEnd,
     }),
 
-  setFeatures: (features) => set({ features }),
+  setFeatures: (data) =>
+    set({
+      features: data.features,
+      featuresOrgId: data.organizationId,
+      featuresTierName: data.tierName,
+    }),
 }));

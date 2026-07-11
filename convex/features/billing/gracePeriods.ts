@@ -122,15 +122,20 @@ export const expireGracePeriods = internalMutation({
   handler: async (ctx) => {
     if (await isCronPaused(ctx.db, "cron_pause_expire_grace_periods")) return;
 
-    const active = await ctx.db
+    const now = Date.now();
+
+    // Compound index range reads only grace periods whose end has actually
+    // passed, instead of collecting every active grace period each run
+    const due = await ctx.db
       .query("subscriptionGracePeriods")
-      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .withIndex("by_active_and_end", (q) =>
+        q.eq("isActive", true).lte("gracePeriodEnd", now)
+      )
       .collect();
 
-    const now = Date.now();
     const defaultTier = await getDefaultTierName(ctx.db);
 
-    for (const g of active) {
+    for (const g of due) {
       if (g.gracePeriodEnd <= now) {
         // Grace period expired → downgrade to default tier
         await ctx.db.patch(g._id, { isActive: false });

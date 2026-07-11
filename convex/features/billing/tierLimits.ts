@@ -107,8 +107,10 @@ export async function isCronPaused(
  * Falls back to "free" if no default tier is defined.
  */
 export async function getDefaultTierName(db: DatabaseReader): Promise<string> {
-  const allTiers = await db.query("tierDefinitions").collect();
-  const defaultTier = allTiers.find((t) => t.isDefault);
+  const defaultTier = await db
+    .query("tierDefinitions")
+    .withIndex("by_default", (q) => q.eq("isDefault", true))
+    .first();
   return defaultTier?.name ?? "free";
 }
 

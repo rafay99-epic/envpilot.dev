@@ -24,12 +24,7 @@ interface Organization {
   createdAt: number;
 }
 
-function OrgProBadge({ orgId }: { orgId: string }) {
-  const { tierName } = useFeatureGate(
-    orgId as Id<"organizations">,
-    "max_projects"
-  );
-  if (tierName !== "pro") return null;
+function ProBadge() {
   return (
     <span className="flex-shrink-0 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-400">
       Pro
@@ -51,6 +46,25 @@ export default function OrganizationsPage() {
 
   const pagination = usePagination(organizations, { pageSize: 9 });
   const enforcing = useEnforcementEnabled();
+
+  // One lean tiers query for ALL orgs (Pro badges) — replaces a per-card
+  // useFeatureGate(checkFeature) subscription that resolved the full
+  // org→owner→tier chain once per rendered organization.
+  const orgTiers = useQuery(
+    api.features.featureRegistry.queries.getOrgTiersBatch,
+    organizations.length > 0
+      ? {
+          organizationIds: organizations.map(
+            (o) => o._id as Id<"organizations">
+          ),
+        }
+      : "skip"
+  );
+  const proOrgIds = new Set(
+    organizations
+      .filter((o, i) => orgTiers?.[i]?.tierName === "pro")
+      .map((o) => o._id)
+  );
 
   // Check if org creation is blocked based on tier limits.
   const ownedOrgs = organizations.filter(
@@ -146,7 +160,7 @@ export default function OrganizationsPage() {
                       <h3 className="truncate font-semibold text-zinc-100">
                         {org.name}
                       </h3>
-                      <OrgProBadge orgId={org._id} />
+                      {proOrgIds.has(org._id) && <ProBadge />}
                     </div>
                     <p className="mt-0.5 truncate text-sm text-zinc-500">
                       {org.slug}

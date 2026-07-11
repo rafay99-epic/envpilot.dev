@@ -10,6 +10,16 @@ interface WorkOSUser {
   profilePictureUrl: string | null;
 }
 
+// Short-TTL cache for workosId → user row. ~30 API route handlers call
+// getOrCreateConvexUser at the top of every request, each paying a
+// getByWorkosId query for a row that changes ~never (profile edits only).
+// 30s of per-server-instance staleness is harmless: ban/suspend enforcement
+// happens inside Convex on every authed call regardless of this cache.
+// ponytail: module-level Map, cleared by TTL only — the real fix is the
+// auth-cutover (Stage 2/3) deleting these per-route lookups entirely.
+const userCache = new Map<string, { user: Doc<"users">; expires: number }>();
+const USER_CACHE_TTL_MS = 30_000;
+
 /**
  * Get or create a Convex user from WorkOS user data
  */
@@ -17,6 +27,11 @@ export async function getOrCreateConvexUser(
   convex: ConvexHttpClient,
   workosUser: WorkOSUser
 ): Promise<Doc<"users">> {
+  const cached = userCache.get(workosUser.id);
+  if (cached && cached.expires > Date.now()) {
+    return cached.user;
+  }
+
   let convexUser = await convex.query(api.features.users.users.getByWorkosId, {
     workosId: workosUser.id,
   });
@@ -39,6 +54,11 @@ export async function getOrCreateConvexUser(
   if (!convexUser) {
     throw new Error("Failed to sync user");
   }
+
+  userCache.set(workosUser.id, {
+    user: convexUser,
+    expires: Date.now() + USER_CACHE_TTL_MS,
+  });
 
   return convexUser;
 }

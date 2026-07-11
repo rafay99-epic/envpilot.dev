@@ -70,18 +70,16 @@ export async function GET(request: Request) {
     };
 
     // Parallel: batch-fetch all org tiers (1 query instead of N), and fetch
-    // permissions for the active org. Previously this was sequential:
-    // active org tier → all tiers → permissions (waterfall of 3 round-trips).
+    // permissions for the active org. getOrgTiersBatch resolves tier names
+    // only (~4 docs/org) — this route never uses the full resolved-feature
+    // map that getResolvedFeaturesBatch used to compute (~60 docs/org).
     const [orgTiers, perms] = await Promise.all([
       organizations.length > 0
-        ? convex.query(
-            api.features.featureRegistry.queries.getResolvedFeaturesBatch,
-            {
-              organizationIds: organizations.map(
-                (o) => o._id as Id<"organizations">
-              ),
-            }
-          )
+        ? convex.query(api.features.featureRegistry.queries.getOrgTiersBatch, {
+            organizationIds: organizations.map(
+              (o) => o._id as Id<"organizations">
+            ),
+          })
         : Promise.resolve([]),
       activeOrganization && accessToken
         ? createAuthedConvexClient(accessToken).query(

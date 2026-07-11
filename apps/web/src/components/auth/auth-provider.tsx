@@ -23,18 +23,24 @@ interface AuthProviderProps {
   children: ReactNode;
   initialUser?: AuthUser | null;
   initialOrganization?: Organization | null;
+  /** Backend-authz actions computed by the server layout. When present
+   *  (together with an organization), use-auth skips its mount-time
+   *  /api/auth/me refetch entirely. */
+  initialActions?: string[];
 }
 
 export function AuthProvider({
   children,
   initialUser,
   initialOrganization,
+  initialActions,
 }: AuthProviderProps) {
   const auth = useAuth(
     initialUser
       ? {
           user: initialUser,
           organization: initialOrganization ?? null,
+          actions: initialActions,
           accessToken: null,
         }
       : undefined

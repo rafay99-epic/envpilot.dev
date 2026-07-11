@@ -150,7 +150,14 @@ export const _authorizeRequest = internalMutation({
     }
 
     if (args.recordUse) {
-      await ctx.db.patch(key._id, { lastUsedAt: now });
+      // lastUsedAt is a coarse "recently active" signal for the keys UI —
+      // sub-minute precision is worthless, and patching the key row on
+      // every pull makes parallel pulls with one key OCC-contend on it.
+      // Skip the write when it's already fresh; audit logging below is
+      // unconditional and unaffected.
+      if (!key.lastUsedAt || now - key.lastUsedAt >= 60_000) {
+        await ctx.db.patch(key._id, { lastUsedAt: now });
+      }
       await ctx.db.insert("auditLogs", {
         organizationId: key.organizationId,
         userId: key.createdBy,

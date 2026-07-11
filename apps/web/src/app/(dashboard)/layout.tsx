@@ -15,6 +15,7 @@ import {
   type OrganizationWithMembershipRole,
 } from "@/lib/organization-context";
 import { createLogger } from "@/lib/logger";
+import { normalizeOrgRole } from "@/lib/roles";
 
 const log = createLogger("app/dashboard/layout");
 
@@ -104,29 +105,42 @@ export default async function DashboardLayout({
     );
   }
 
-  // ─── STEP 3: Non-critical — org and tier data ────────────────────────
+  // ─── STEP 3: Non-critical — org, tier, and permission data ───────────
   let organizations: OrganizationWithMembershipRole[] = [];
   let activeOrganization: OrganizationWithMembershipRole | null = null;
   let orgTier = "free";
+  let initialActions: string[] | undefined;
 
   try {
     const cookieStore = await cookies();
     const preferredOrgId = cookieStore.get(ACTIVE_ORG_COOKIE_NAME)?.value;
+    const preferredOrgIdTyped = preferredOrgId as
+      | import("@convex/_generated/dataModel").Id<"organizations">
+      | undefined;
 
-    // Parallel fetch: org list + tier for the cookie-hinted active org.
-    // Previously these ran sequentially, adding a round-trip on every dashboard
-    // navigation. If the cookie matches the actual active org (the common case),
-    // we avoid a waterfall.
-    const [orgList, tierByGuess] = await Promise.all([
+    // Parallel fetch: org list + tier + permissions for the cookie-hinted
+    // active org. The tier/permission guesses are used only when the cookie
+    // matches the resolved active org (the common case); on a miss the
+    // client falls back to /api/auth/me. Passing `actions` into the
+    // AuthProvider is what lets the client SKIP its mount-time
+    // /api/auth/me refetch — without it, every hard load duplicated this
+    // entire chain (getByWorkosId + listForUser + tiers + permissions).
+    const [orgList, tierByGuess, permsByGuess] = await Promise.all([
       createAuthedConvexClient(accessToken!).query(
         api.features.organizations.queries.listForUser,
         {}
       ) as Promise<OrganizationWithMembershipRole[]>,
-      preferredOrgId
+      preferredOrgIdTyped
         ? convex
-            .query(api.features.featureRegistry.queries.getResolvedFeatures, {
-              organizationId:
-                preferredOrgId as unknown as import("@convex/_generated/dataModel").Id<"organizations">,
+            .query(api.features.featureRegistry.queries.getOrgTiersBatch, {
+              organizationIds: [preferredOrgIdTyped],
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+      preferredOrgIdTyped
+        ? createAuthedConvexClient(accessToken!)
+            .query(api.features.auth.queries.getMyPermissions, {
+              organizationId: preferredOrgIdTyped,
             })
             .catch(() => null)
         : Promise.resolve(null),
@@ -138,15 +152,16 @@ export default async function DashboardLayout({
       preferredOrgId
     );
 
-    // Use the parallel-fetched tier only if the cookie matched the resolved
-    // active org. Otherwise fall back to "free" and let the client fetch via
-    // /api/auth/me — avoids another server round-trip on the layout.
-    if (
-      activeOrganization &&
-      tierByGuess &&
-      activeOrganization._id === preferredOrgId
-    ) {
-      orgTier = tierByGuess.tierName ?? "free";
+    // Use the parallel-fetched tier/permissions only if the cookie matched
+    // the resolved active org. Otherwise fall back and let the client fetch
+    // via /api/auth/me — avoids another server round-trip on the layout.
+    if (activeOrganization && activeOrganization._id === preferredOrgId) {
+      if (tierByGuess?.[0]) {
+        orgTier = tierByGuess[0].tierName ?? "free";
+      }
+      if (permsByGuess) {
+        initialActions = permsByGuess.actions;
+      }
     }
   } catch (err) {
     // Log but don't crash — client-side auth hook will fetch the data
@@ -165,7 +180,9 @@ export default async function DashboardLayout({
     lastName: user.lastName ?? null,
     profilePictureUrl: user.profilePictureUrl ?? null,
     organizationId: activeOrganization?._id ?? null,
-    role: activeOrganization?.role ?? null,
+    // Normalized for parity with /api/auth/me — now that initialActions can
+    // suppress the client refetch, this role persists for the whole session
+    role: activeOrganization ? normalizeOrgRole(activeOrganization.role) : null,
     // permissions are computed from backend authz via /api/auth/me → actions[]
     createdAt: new Date(user.createdAt),
     updatedAt: new Date(user.updatedAt),
@@ -177,14 +194,18 @@ export default async function DashboardLayout({
         name: activeOrganization.name,
         slug: activeOrganization.slug,
         tier: orgTier,
-        role: activeOrganization.role,
+        role: normalizeOrgRole(activeOrganization.role),
         createdAt: new Date(activeOrganization.createdAt),
         updatedAt: new Date(activeOrganization.updatedAt),
       }
     : null;
 
   return (
-    <AuthProvider initialUser={authUser} initialOrganization={organization}>
+    <AuthProvider
+      initialUser={authUser}
+      initialOrganization={organization}
+      initialActions={initialActions}
+    >
       <AccessNotices
         activeOrganizationId={activeOrganization?._id ?? null}
         hasOtherOrganizations={organizations.length > 1}
