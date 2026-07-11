@@ -188,8 +188,8 @@ export function UsageLayout(props: UsageLayoutProps) {
             : "border-green-500/30 ring-1 ring-green-500/10"
         }`}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <TierBadge tier={tier} size="md" />
             <span
               className={`text-[10px] font-medium rounded px-1.5 py-0.5 ${
@@ -241,14 +241,14 @@ export function UsageLayout(props: UsageLayoutProps) {
               : "border-amber-500/20 bg-amber-500/5"
           }`}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p
               className={`text-sm font-medium ${
                 alertVariant === "red" ? "text-red-400" : "text-amber-400"
               }`}
             >
               {alertVariant === "red"
-                ? `${atLimitRows.length} resource${atLimitRows.length !== 1 ? "s" : ""} at their limit: ${atLimitRows.map((r) => r.label).join(", ")}`
+                ? `${atLimitRows.length} resource${atLimitRows.length !== 1 ? "s" : ""} at ${atLimitRows.length === 1 ? "its" : "their"} limit: ${atLimitRows.map((r) => r.label).join(", ")}`
                 : `Approaching limits: ${alertRows.map((r) => r.label).join(", ")}`}
             </p>
             {alertVariant === "red" &&
@@ -436,7 +436,7 @@ export function UsageLayout(props: UsageLayoutProps) {
       </TerminalWindow>
 
       {/* ── 5. Info bar ───────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/20 px-4 py-3 flex items-center justify-between">
+      <div className="rounded-lg border border-zinc-700/30 bg-zinc-800/20 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <HelpCircle className="h-4 w-4 text-zinc-500 shrink-0" />
           <p className="text-xs text-zinc-500">
@@ -444,7 +444,7 @@ export function UsageLayout(props: UsageLayoutProps) {
             per resource &mdash; existing data is never deleted.
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0 ml-4">
+        <div className="flex items-center gap-3 shrink-0 ml-auto">
           <Link
             href="/faq#usage-limits"
             className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
