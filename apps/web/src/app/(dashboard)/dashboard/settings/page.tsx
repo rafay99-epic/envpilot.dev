@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuthContext } from "@/components/auth";
 import {
   TerminalWindow,
@@ -52,9 +53,28 @@ type SettingsTab =
   | "customization"
   | "billing";
 
+const SETTINGS_TABS: SettingsTab[] = [
+  "general",
+  "notifications",
+  "integrations",
+  "security",
+  "customization",
+  "billing",
+];
+
 export default function SettingsPage() {
   const { user, organization } = useAuthContext();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  // Deep-linkable via ?tab=<id> (e.g. the usage page's "Manage billing"
+  // link). The URL provides the initial tab; clicking a tab overrides it.
+  // Derived — no effect, no hydration mismatch (searchParams resolve the
+  // same on server and client).
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get("tab") as SettingsTab | null;
+  const [selectedTab, setSelectedTab] = useState<SettingsTab | null>(null);
+  const activeTab: SettingsTab =
+    selectedTab ??
+    (urlTab && SETTINGS_TABS.includes(urlTab) ? urlTab : "general");
+  const setActiveTab = setSelectedTab;
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: "general", label: "General" },
@@ -1621,6 +1641,15 @@ function BillingSettings({
 
   async function handleConfirmCancel() {
     if (!organizationId) return;
+    // Feedback is required before a cancellation goes through — the reason
+    // lands on the Polar subscription and is what the team reviews.
+    if (!cancelReason) {
+      setCancelMessage({
+        type: "error",
+        text: "Please select a reason for canceling — this feedback is required.",
+      });
+      return;
+    }
     setIsCanceling(true);
     setCancelMessage(null);
 
@@ -1630,7 +1659,7 @@ function BillingSettings({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           organizationId,
-          reason: cancelReason || undefined,
+          reason: cancelReason,
           comment: cancelComment || undefined,
         }),
       });
@@ -1956,15 +1985,16 @@ function BillingSettings({
                 htmlFor="cancelReason"
                 className="block text-sm font-medium text-zinc-300"
               >
-                Reason for canceling
+                Reason for canceling <span className="text-red-400">*</span>
               </label>
               <select
                 id="cancelReason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
+                required
                 className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100"
               >
-                <option value="">Select a reason (optional)</option>
+                <option value="">Select a reason (required)</option>
                 {CANCEL_REASONS.map((r) => (
                   <option key={r.value} value={r.value}>
                     {r.label}
@@ -2006,7 +2036,10 @@ function BillingSettings({
             <TerminalButton
               variant="danger"
               onClick={handleConfirmCancel}
-              disabled={isCanceling}
+              disabled={isCanceling || !cancelReason}
+              title={
+                !cancelReason ? "Select a cancellation reason first" : undefined
+              }
             >
               {isCanceling ? "Canceling..." : "Confirm Cancellation"}
             </TerminalButton>
