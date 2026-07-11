@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
+import * as Sentry from "@sentry/nextjs";
 import { api } from "@convex/_generated/api";
 import { reportApiError } from "@/lib/api-errors";
 
@@ -40,6 +41,11 @@ export async function GET(request: Request) {
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexUrl) {
+    // Config failure = every CI pull on this deployment is down. Alert.
+    Sentry.captureMessage(
+      "cicd-pull: NEXT_PUBLIC_CONVEX_URL is not configured — all secret pulls failing",
+      { level: "error", tags: { source: "cicd-pull", failure: "config" } }
+    );
     return NextResponse.json(
       { error: "Service is not configured" },
       { status: 503 }
@@ -87,7 +93,35 @@ export async function GET(request: Request) {
       );
     }
 
-    reportApiError(error, "GET /api/v1/secrets");
+    // The two loud-failure classes from the pull action: both mean a
+    // customer's CI pipeline is broken RIGHT NOW — distinct tags so alerts
+    // are triageable without log digging. (The 4xx branches above are
+    // expected client errors and deliberately never reach Sentry.)
+    if (/failed to decrypt/i.test(message)) {
+      Sentry.captureException(error, {
+        tags: { source: "cicd-pull", failure: "vault-decrypt" },
+        extra: { environment },
+      });
+      return NextResponse.json(
+        {
+          error:
+            "A variable could not be decrypted — pull aborted. Retry; if it persists, re-save the variable in Envpilot.",
+        },
+        { status: 503 }
+      );
+    }
+    if (/refusing a partial pull/i.test(message)) {
+      Sentry.captureException(error, {
+        tags: { source: "cicd-pull", failure: "variable-overflow" },
+        extra: { environment },
+      });
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
+
+    reportApiError(error, "GET /api/v1/secrets", {
+      environment,
+      failure: "unknown",
+    });
     return NextResponse.json(
       { error: "Failed to fetch secrets" },
       { status: 500 }
