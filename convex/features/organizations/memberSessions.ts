@@ -1,7 +1,92 @@
 import { v } from "convex/values";
-import { mutation, query } from "../../_generated/server";
+import { mutation, query, type MutationCtx } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { assertOrgAction, assertCanManageUser } from "../../lib/authz";
+
+/**
+ * Deactivate every active device session (CLI tokens + extension project
+ * links) a member holds in an org, emitting the revocation events that make
+ * the extension unlink and delete its synced .env files. Shared by
+ * `revokeAllMemberSessions` (admin action) and the security-hold suspend
+ * path (securityHold.ts). Returns the WorkOS session ids the CALLING
+ * Next.js route must revoke server-side — Convex cannot call WorkOS.
+ */
+export async function revokeAllSessionsForMember(
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  targetUserId: Id<"users">,
+  actorId: Id<"users">,
+  reason: string
+): Promise<{
+  revokedCliTokens: number;
+  revokedExtensionSessions: number;
+  sessionIds: string[];
+}> {
+  const now = Date.now();
+  const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
+
+  let revokedCliCount = 0;
+  let revokedExtensionCount = 0;
+  const sessionIds: string[] = [];
+
+  // Revoke active CLI/extension device-sessions (cliTokens backs both).
+  // Tokens carrying a DIFFERENT organizationId are skipped; org-matching and
+  // legacy (unset) tokens are revoked.
+  const activeCliTokens = await ctx.db
+    .query("cliTokens")
+    .withIndex("by_user_active", (q) =>
+      q.eq("userId", targetUserId).eq("isActive", true)
+    )
+    .collect();
+
+  for (const token of activeCliTokens) {
+    if (token.organizationId && token.organizationId !== organizationId) {
+      continue;
+    }
+    await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
+    if (token.sessionId) sessionIds.push(token.sessionId);
+    revokedCliCount++;
+  }
+
+  // Revoke all active extension sessions across org projects.
+  const projects = await ctx.db
+    .query("projects")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect()
+    .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
+
+  for (const project of projects) {
+    const activeTokens = await ctx.db
+      .query("projectAccess")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", project._id).eq("userId", targetUserId)
+      )
+      .collect()
+      .then((rows) => rows.filter((doc) => doc.isActive === true));
+
+    for (const token of activeTokens) {
+      await ctx.db.patch(token._id, { isActive: false });
+      await ctx.db.insert("permissionRevocationEvents", {
+        accessToken: token.accessToken,
+        projectId: project._id,
+        userId: targetUserId,
+        reason,
+        revokedBy: actorId,
+        revokedAt: now,
+        acknowledged: false,
+        expiresAt: revocationExpiresAt,
+      });
+      revokedExtensionCount++;
+    }
+  }
+
+  return {
+    revokedCliTokens: revokedCliCount,
+    revokedExtensionSessions: revokedExtensionCount,
+    sessionIds,
+  };
+}
 
 // ==========================================
 // SESSION MANAGEMENT
@@ -285,7 +370,6 @@ export const revokeAllMemberSessions = mutation({
     );
 
     const now = Date.now();
-    const revocationExpiresAt = now + 24 * 60 * 60 * 1000;
 
     // Verify target is a member
     const targetMembership = await ctx.db
@@ -309,71 +393,17 @@ export const revokeAllMemberSessions = mutation({
       "revoke session"
     );
 
-    let revokedCliCount = 0;
-    let revokedExtensionCount = 0;
-    // WorkOS session ids to revoke server-side in the calling Next.js route.
-    const sessionIds: string[] = [];
-
-    // Revoke active CLI/extension device-sessions (cliTokens backs both).
-    // cliTokens now carry an OPTIONAL organizationId. When a token records this
-    // org we scope the revocation to it. Legacy tokens with no organizationId
-    // remain un-scoped and are still revoked here (we cannot attribute them to
-    // a single org), preserving the previous behavior for old rows. The
-    // hierarchy check above still guards WHO may trigger this.
-    const activeCliTokens = await ctx.db
-      .query("cliTokens")
-      .withIndex("by_user_active", (q) =>
-        q.eq("userId", args.targetUserId).eq("isActive", true)
-      )
-      .collect();
-
-    for (const token of activeCliTokens) {
-      // Skip tokens explicitly scoped to a DIFFERENT org; revoke org-matching
-      // tokens and legacy (unset) tokens.
-      if (
-        token.organizationId &&
-        token.organizationId !== args.organizationId
-      ) {
-        continue;
-      }
-      await ctx.db.patch(token._id, { isActive: false, revokedAt: now });
-      if (token.sessionId) sessionIds.push(token.sessionId);
-      revokedCliCount++;
-    }
-
-    // Revoke all active extension sessions across org projects
-    const projects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect()
-      .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
-
-    for (const project of projects) {
-      const activeTokens = await ctx.db
-        .query("projectAccess")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", project._id).eq("userId", args.targetUserId)
-        )
-        .collect()
-        .then((rows) => rows.filter((doc) => doc.isActive === true));
-
-      for (const token of activeTokens) {
-        await ctx.db.patch(token._id, { isActive: false });
-        await ctx.db.insert("permissionRevocationEvents", {
-          accessToken: token.accessToken,
-          projectId: project._id,
-          userId: args.targetUserId,
-          reason: "All sessions revoked by administrator",
-          revokedBy: actor._id,
-          revokedAt: now,
-          acknowledged: false,
-          expiresAt: revocationExpiresAt,
-        });
-        revokedExtensionCount++;
-      }
-    }
+    const {
+      revokedCliTokens: revokedCliCount,
+      revokedExtensionSessions: revokedExtensionCount,
+      sessionIds,
+    } = await revokeAllSessionsForMember(
+      ctx,
+      args.organizationId,
+      args.targetUserId,
+      actor._id,
+      "All sessions revoked by administrator"
+    );
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,

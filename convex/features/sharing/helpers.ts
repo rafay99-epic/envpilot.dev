@@ -1,7 +1,11 @@
 import type { DatabaseReader, QueryCtx } from "../../_generated/server";
 import type { Doc } from "../../_generated/dataModel";
 import { Id } from "../../_generated/dataModel";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
+import {
+  isEnvironmentScopeAllowed,
+  normalizeOrgRole,
+  getActiveMembership,
+} from "../../lib/authz";
 
 /**
  * Normalize a share's resource type. Legacy rows created before shared
@@ -70,14 +74,13 @@ async function buildVariableAccessMap(
   const membershipMap = new Map<string, Doc<"organizationMembers"> | null>();
   await Promise.all(
     orgIds.map(async (orgId) => {
-      const membership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q
-            .eq("organizationId", orgId as Id<"organizations">)
-            .eq("userId", userId)
-        )
-        .first();
+      // Suspended members map to null → share access maps deny them, same as
+      // a non-member.
+      const membership = await getActiveMembership(
+        ctx,
+        orgId as Id<"organizations">,
+        userId
+      );
       membershipMap.set(orgId, membership);
     })
   );
@@ -212,14 +215,13 @@ async function buildAccountAccessMap(
   const membershipMap = new Map<string, Doc<"organizationMembers"> | null>();
   await Promise.all(
     orgIds.map(async (orgId) => {
-      const membership = await ctx.db
-        .query("organizationMembers")
-        .withIndex("by_org_and_user", (q) =>
-          q
-            .eq("organizationId", orgId as Id<"organizations">)
-            .eq("userId", userId)
-        )
-        .first();
+      // Suspended members map to null → share access maps deny them, same as
+      // a non-member.
+      const membership = await getActiveMembership(
+        ctx,
+        orgId as Id<"organizations">,
+        userId
+      );
       membershipMap.set(orgId, membership);
     })
   );

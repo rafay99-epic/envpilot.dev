@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
+import { isSuspendedMembership } from "../../lib/authz";
 
 /**
  * Organization Queries and Mutations
@@ -68,6 +69,13 @@ export const getBySlug = query({
 export const getMembers = query({
   args: { organizationId: v.id("organizations") },
   handler: async (ctx, args) => {
+    // NOTE: intentionally NOT gated with requireAuthedUser — this query is
+    // composed by several server routes through the unauthenticated
+    // ConvexHttpClient (they enforce their own withAuth() first), e.g.
+    // api/projects/[id]/members, api/variables, api/invitations,
+    // api/users/search. Adding an identity requirement here 500s all of them.
+    // The security-relevant fix is the field pick below: suspendReason /
+    // suspendedBy are audit-only and never leave this query.
     const memberships = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
@@ -78,9 +86,19 @@ export const getMembers = query({
     const members = await Promise.all(
       memberships.map(async (membership) => {
         const user = await ctx.db.get(membership.userId);
+        // Expose only what the members UI needs. `status`/`suspendedAt` drive
+        // the "Suspended" badge; suspendReason + suspendedBy are audit-only
+        // and MUST NOT leak to members (least of all the suspended one).
         return user
           ? {
-              ...membership,
+              _id: membership._id,
+              organizationId: membership.organizationId,
+              userId: membership.userId,
+              role: membership.role,
+              joinedAt: membership.joinedAt,
+              invitedBy: membership.invitedBy,
+              status: membership.status,
+              suspendedAt: membership.suspendedAt,
               user: {
                 _id: user._id,
                 email: user.email,
@@ -138,12 +156,19 @@ async function getMembershipCore(
   organizationId: Id<"organizations">,
   userId: Id<"users">
 ) {
-  return await ctx.db
+  const membership = await ctx.db
     .query("organizationMembers")
     .withIndex("by_org_and_user", (q) =>
       q.eq("organizationId", organizationId).eq("userId", userId)
     )
     .first();
+  // A suspended member is denied everywhere this "am I a member / what's my
+  // role" helper gates access (vault value reads in variables/values.ts, role
+  // checks). They surface as a non-member; the hold screen learns their state
+  // via securityHold.getMyMembershipStatus instead. This also means the
+  // audit-only suspendReason/suspendedBy fields never reach the target.
+  if (!membership || isSuspendedMembership(membership)) return null;
+  return membership;
 }
 
 export const getMembership = query({

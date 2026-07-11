@@ -17,6 +17,7 @@ import { RequireRole, useAuthContext } from "@/components/auth";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { LimitWarning } from "@/components/tier/FeatureGate";
+import { SuspendMemberDialog } from "@/components/members/SuspendMemberDialog";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   normalizeOrgRole,
@@ -103,6 +104,8 @@ function OrganizationMembersPageContent({
     userId: string;
     role: string;
     joinedAt: number;
+    status?: "active" | "suspended";
+    suspendedAt?: number;
     user: { _id: string; email: string; name?: string; avatarUrl?: string };
   }>;
   const invitations = (invitationsData ?? []) as Array<{
@@ -129,6 +132,12 @@ function OrganizationMembersPageContent({
 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Security hold: which member the suspend dialog targets (null = closed).
+  const [suspendTarget, setSuspendTarget] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -296,6 +305,34 @@ function OrganizationMembersPageContent({
       );
       setError(err instanceof Error ? err.message : "An error occurred");
     }
+  }
+
+  function handleReinstateMember(userId: string) {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Reinstate Access",
+      message:
+        "Restore this member's access? Their role, projects, and permissions were kept during the hold, so everything returns exactly as it was. They will need to sign in again.",
+      onConfirm: async () => {
+        try {
+          const response = await fetch(
+            `/api/organizations/${slug}/members/${userId}/suspend`,
+            { method: "DELETE" }
+          );
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Failed to reinstate member");
+          }
+        } catch (err) {
+          log.error(
+            "member_reinstate_failed",
+            { slug, userId, organizationId: orgId },
+            err
+          );
+          setError(err instanceof Error ? err.message : "An error occurred");
+        }
+      },
+    });
   }
 
   function handleRemoveMember(userId: string) {
@@ -716,6 +753,11 @@ function OrganizationMembersPageContent({
                   <div>
                     <p className="font-medium text-zinc-900 dark:text-zinc-100">
                       {member.user.name || "Unnamed User"}
+                      {member.status === "suspended" && (
+                        <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          Suspended
+                        </span>
+                      )}
                     </p>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
                       {member.user.email}
@@ -774,6 +816,43 @@ function OrganizationMembersPageContent({
                       </svg>
                     </button>
                   )}
+                  {canRemoveMembers &&
+                    member.userId !== (convexUserId as string) &&
+                    normalizeOrgRole(member.role) !== "owner" &&
+                    (member.status === "suspended" ? (
+                      <button
+                        onClick={() => handleReinstateMember(member.user._id)}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                        title="Reinstate access"
+                      >
+                        Reinstate
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          setSuspendTarget({
+                            userId: member.user._id,
+                            name: member.user.name || member.user.email,
+                          })
+                        }
+                        className="text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400"
+                        title="Suspend access (security hold)"
+                      >
+                        <svg
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                          />
+                        </svg>
+                      </button>
+                    ))}
                   {canRemoveMembers && (
                     <button
                       onClick={() => handleRemoveMember(member.user._id)}
@@ -1108,6 +1187,19 @@ function OrganizationMembersPageContent({
             totalItems={invitationsPagination.totalItems}
           />
         </div>
+      )}
+
+      {/* Security-hold (suspend) dialog */}
+      {suspendTarget && orgId && (
+        <SuspendMemberDialog
+          open={!!suspendTarget}
+          onClose={() => setSuspendTarget(null)}
+          organizationId={orgId as string}
+          slug={slug}
+          targetUserId={suspendTarget.userId}
+          targetName={suspendTarget.name}
+          onError={setError}
+        />
       )}
 
       {/* Confirm Dialog */}

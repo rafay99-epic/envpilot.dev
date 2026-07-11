@@ -6,7 +6,11 @@ import { requireAuthedUser } from "../../lib/identity";
 import { isCronPaused } from "../billing/tierLimits";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
+import {
+  isEnvironmentScopeAllowed,
+  normalizeOrgRole,
+  getActiveMembership,
+} from "../../lib/authz";
 
 /**
  * Environment Variable Secret Rotation & Expiry
@@ -26,13 +30,12 @@ export const listExpiringVariables = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    // Verify caller is a member of the organization
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
-      )
-      .first();
+    // Verify caller is an ACTIVE member of the organization (suspended → none).
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
     if (!membership) return [];
 
     const rotationCheck = await checkBooleanFeature(

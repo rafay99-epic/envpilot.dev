@@ -1,6 +1,11 @@
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { normalizeOrgRole, toLegacyProjectRole } from "../../lib/authz";
+import {
+  normalizeOrgRole,
+  toLegacyProjectRole,
+  getActiveMembership,
+  isSuspendedMembership,
+} from "../../lib/authz";
 
 /**
  * Shared private helpers for projects queries/mutations.
@@ -28,16 +33,16 @@ export async function listWithStatsCore(
   const assignedProjectIds = new Set<string>();
 
   const userId = args.userId;
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", args.organizationId).eq("userId", userId)
-    )
-    .first();
+  const membership = await getActiveMembership(
+    ctx,
+    args.organizationId,
+    userId
+  );
 
-  // Fail closed: a non-member of this org sees nothing. Previously the
-  // visibility filter was skipped when membership was absent, which returned
-  // the ENTIRE org project list to any authenticated non-member.
+  // Fail closed: a non-member of this org sees nothing (and a suspended
+  // member resolves to null here too). Previously the visibility filter was
+  // skipped when membership was absent, which returned the ENTIRE org project
+  // list to any authenticated non-member.
   if (!membership) {
     return [];
   }
@@ -94,10 +99,15 @@ export async function listWithStatsCore(
 }
 
 export async function listForUserCore(ctx: QueryCtx, userId: Id<"users">) {
-  const memberships = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
+  // Suspended orgs contribute no projects — the user is frozen there. The org
+  // itself still appears in the switcher (organizations.listForUser) so the
+  // hold screen can render.
+  const memberships = (
+    await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect()
+  ).filter((m) => !isSuspendedMembership(m));
 
   const allProjects = await Promise.all(
     memberships.map(async (membership) => {

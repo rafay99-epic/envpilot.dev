@@ -14,6 +14,7 @@ import {
   normalizeOrgRole,
 } from "../../lib/authz";
 import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
+import { voidTombstones } from "./tombstones";
 
 /**
  * Invitation Queries and Mutations
@@ -311,6 +312,9 @@ export const accept = mutation({
       joinedAt: now,
       invitedBy: invitation.invitedBy,
     });
+
+    // Re-joining voids any "your access was revoked" exit notice for this org.
+    await voidTombstones(ctx, invitation.organizationId, actor._id);
 
     // Create project assignments if projects were specified in the invitation.
     // Owners have implicit access to every project, so no assignments needed.

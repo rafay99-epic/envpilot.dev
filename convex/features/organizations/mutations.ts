@@ -5,6 +5,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
 import { resolveFeatureForUser } from "../featureRegistry/resolver";
 import { getDefaultTierName } from "../billing/tierLimits";
 import { rateLimiter } from "../../lib/rateLimits";
+import { writeTombstone } from "./tombstones";
 import {
   assertOrgAction,
   assertCanManageUser,
@@ -349,7 +350,10 @@ export const remove = mutation({
     // Note: userTiers records are kept even when orgs are deleted
     // (the user may own other orgs or re-create one later)
 
-    // Delete org members
+    // Delete org members. Everyone except the deleting actor gets an exit
+    // notice — the actor chose the deletion, the rest would otherwise watch
+    // the org silently vanish.
+    const orgForName = await ctx.db.get(args.organizationId);
     const members = await ctx.db
       .query("organizationMembers")
       .withIndex("by_organization", (q) =>
@@ -358,6 +362,14 @@ export const remove = mutation({
       .collect();
     for (const member of members) {
       await ctx.db.delete(member._id);
+      if (member.userId !== actor._id) {
+        await writeTombstone(ctx, {
+          userId: member.userId,
+          organizationId: args.organizationId,
+          organizationName: orgForName?.name ?? "your organization",
+          kind: "org_deleted",
+        });
+      }
     }
 
     // Delete the organization
@@ -526,6 +538,17 @@ export const removeMember = mutation({
     }
 
     await ctx.db.delete(membership._id);
+
+    // Exit notice: the user's next sign-in shows "your access to X has been
+    // revoked — contact your organization" instead of the org silently
+    // vanishing (self-leave gets "left" wording).
+    const org = await ctx.db.get(args.organizationId);
+    await writeTombstone(ctx, {
+      userId: args.userId,
+      organizationId: args.organizationId,
+      organizationName: org?.name ?? "your organization",
+      kind: isSelfRemoval ? "left" : "removed",
+    });
 
     await ctx.db.insert("auditLogs", {
       organizationId: args.organizationId,
