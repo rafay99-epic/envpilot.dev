@@ -1,0 +1,26 @@
+apps/web/src/app/api/v1/secrets/route.ts
+  s_f59315d63e71a6::t_a36d8f9e1b3f12 44-48
+  s_f59315d63e71a6::t_1a841bab245831 96-124
+  s_f59315d63e71a6::t_0a8e326441226a 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "9573c6d576cf204287755a4c125cd8f636920c2b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
