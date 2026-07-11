@@ -1,0 +1,41 @@
+apps/web/src/components/docs/DocsSidebar.tsx
+  s_f59315d63e71a6::t_9c8ef74e6cfef1 10-13,30-33
+apps/web/content/docs/mcp-server.mdx
+  s_f59315d63e71a6::t_9e09346c41b60e 1-28,36-75
+  s_f59315d63e71a6::t_c8e98b72d8673d 29-35
+apps/web/content/docs/api-quickstart.mdx
+  s_f59315d63e71a6::t_c8e98b72d8673d 44-48
+  s_f59315d63e71a6::t_82cb9c11ce0d59 1-43,49-92
+apps/web/content/docs/api-reference.mdx
+  s_f59315d63e71a6::t_e5535d2918d941 1-48,56-80,88-97,103-114,118-136,140,145-149,154-159
+  s_f59315d63e71a6::t_c8e98b72d8673d 49-55,81-87,98-102,115-117,137-139,141-144,150-153
+apps/web/src/lib/docs/content.ts
+  s_f59315d63e71a6::t_9c9df66af5d882 71-76
+apps/web/content/docs/api-security.mdx
+  s_f59315d63e71a6::t_7fd814f71b611a 1-15,17-23,25-62
+  s_f59315d63e71a6::t_c8e98b72d8673d 16,24
+apps/web/content/docs/github-action.mdx
+  s_f59315d63e71a6::t_4e9c6052aa7f9a 1-24,32-77
+  s_f59315d63e71a6::t_c8e98b72d8673d 25-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "c3423c7f0774975aa021188c71fc8e8e27d6e169",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
