@@ -1,0 +1,45 @@
+.prettierignore
+  s_f59315d63e71a6::t_d33094192a4677 18
+convex/features/cicd/pull.ts
+  s_f59315d63e71a6::t_e32f784f1aeee5 220-230,235-251
+  s_f59315d63e71a6::t_3ed4340d03fe67 35-53,56-58,69-98,102-103,108-109,120-121,139
+  s_f59315d63e71a6::t_b1197c9ce70974 252
+apps/web/src/components/cicd/CicdTokensSection.tsx
+  s_f59315d63e71a6::t_9e5d9e989f7bea 198-200
+  s_f59315d63e71a6::t_0bb0062a06441f 15,27-45,197,366
+  s_f59315d63e71a6::t_11aff9735dbe07 207-213
+  s_f59315d63e71a6::t_4e4a9db8ddf82e 214-227,229-259,263-264,267-269,271,273-306
+  s_f59315d63e71a6::t_aa815947a128d9 5,7-12,52-59,70-73,112-118,122-140,146-155,159,179-180,183-196,201-204,261,265-266,270,272,307-309,316,319,321,324,329,336,338,352,362-363,385-390,394-400,404,415,422,434-439,442-459,463-473,477-479,484-487,495-498,502,517-535,537-539,542,546-547,560
+  s_f59315d63e71a6::t_ebe21088f29ad7 330
+  s_f59315d63e71a6::t_d8dc7a66ac8035 205
+apps/web/tests/e2e/authenticated/cicd-tokens.spec.ts
+  s_f59315d63e71a6::t_7c2315acd15a33 71-74
+  s_f59315d63e71a6::t_ad4b1ff6928989 70
+  s_f59315d63e71a6::t_2427e7bbedfd9a 68-69,75-81,83,85,87-89,96
+  s_f59315d63e71a6::t_413fb88cb5d296 164-165,167,169-175
+convex/schema.ts
+  s_f59315d63e71a6::t_907351d9d077c2 764
+.gitignore
+  s_f59315d63e71a6::t_d33094192a4677 61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0f4f41e9fe9bc983002f474043ece02635eefa31",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
