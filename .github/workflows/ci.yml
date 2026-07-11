@@ -4,9 +4,12 @@ name: CI
 #   changes (path detection) → parallel scoped checks → checks-passed gate
 #   → artifact builds → deploys (main only, via reusable workflows) → release
 #
-# Web + Admin are deployed by Vercel's GitHub integration — CI only verifies
-# them. Build artifacts (CLI tarball, VSIX) are available in the run's
-# Artifacts panel; nothing is commented on PRs.
+# Web + Admin production deploys happen from here (deploy-vercel job) via
+# the Vercel CLI pinned to the run's SHA — auto-deploy for main is disabled
+# in each app's vercel.json so the backend always ships first. Builds still
+# run on Vercel's infra (source upload only). PR previews still come from
+# Vercel's GitHub integration. Build artifacts (CLI tarball, VSIX) are
+# available in the run's Artifacts panel; nothing is commented on PRs.
 
 on:
   push:
@@ -509,6 +512,67 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
+
+  deploy-vercel:
+    name: Deploy web + admin (Vercel)
+    # Backend FIRST (same strict ordering as deploy-cli/deploy-extension):
+    # web/admin ship only after the Convex functions they call are live.
+    # Auto-deploy for main is disabled in each app's vercel.json; this job
+    # deploys via the Vercel CLI pinned to THIS run's SHA — `vercel deploy`
+    # without --prebuilt only uploads source, the build runs on Vercel's
+    # infra (nothing is built here). SHA-pinning (vs. Deploy Hooks, which
+    # build branch HEAD at trigger time) means back-to-back merges can
+    # never ship a newer frontend before its own convex deploy. The
+    # !failure() guard lets a SKIPPED deploy-convex (no convex changes)
+    # fall through, while a FAILED one blocks.
+    needs: [changes, checks-passed, e2e, deploy-convex]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      (needs.changes.outputs.run_web == 'true' || needs.changes.outputs.run_admin == 'true')
+    runs-on: ubuntu-latest
+    env:
+      # VERCEL_ORG_ID + VERCEL_PROJECT_ID let the CLI deploy without a
+      # `vercel link` step. Root Directory (apps/web / apps/admin) is
+      # applied by Vercel from each project's settings — deploy from repo
+      # root so workspace packages and convex/ are included in the upload.
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require Vercel secrets
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRJ_WEB: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+          PRJ_ADMIN: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+        run: |
+          missing=""
+          [ -z "$TOKEN" ] && missing="$missing VERCEL_TOKEN"
+          [ -z "$VERCEL_ORG_ID" ] && missing="$missing VERCEL_ORG_ID"
+          [ -z "$PRJ_WEB" ] && missing="$missing VERCEL_PROJECT_ID_WEB"
+          [ -z "$PRJ_ADMIN" ] && missing="$missing VERCEL_PROJECT_ID_ADMIN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secret(s):$missing. Token: Vercel → Account Settings → Tokens (team scope). Org/project ids: Vercel project → Settings → General. Add with: gh secret set <NAME>"
+            exit 1
+          fi
+
+      - name: Deploy web (build runs on Vercel)
+        if: needs.changes.outputs.run_web == 'true'
+        env:
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+        run: |
+          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+          echo "Web deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy admin (build runs on Vercel)
+        if: needs.changes.outputs.run_admin == 'true'
+        env:
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+        run: |
+          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+          echo "Admin deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-homebrew:
     name: Deploy Homebrew formula
