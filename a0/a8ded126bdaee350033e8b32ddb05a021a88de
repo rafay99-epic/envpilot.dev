@@ -1,0 +1,23 @@
+scripts/send-launch-email.mjs
+  s_3676ec1daf5202::t_0ad0a4d4b70d79 1-93
+package.json
+  s_3676ec1daf5202::t_1d806d7028b31c 42
+bun.lock
+  s_3676ec1daf5202::t_0b2314a8d5b008 17,59,93,115,2176-2177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "a0a8ded126bdaee350033e8b32ddb05a021a88de",
+  "prompts": {},
+  "sessions": {
+    "s_3676ec1daf5202": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d471032b-dcda-462d-91b2-f61316f5d4ff",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
