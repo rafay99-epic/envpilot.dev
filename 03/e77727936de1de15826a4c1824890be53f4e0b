@@ -1,0 +1,27 @@
+.github/workflows/ci.yml
+  s_f59315d63e71a6::t_df4bb3e94b6abc 54,82-83,102,112,120,129,214-224,262,480-491
+  s_f59315d63e71a6::t_6218d9709e3aae 492
+.github/workflows/deploy-action.yml
+  s_f59315d63e71a6::t_d386348a5fb012 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "03e77727936de1de15826a4c1824890be53f4e0b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
