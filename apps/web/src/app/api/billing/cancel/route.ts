@@ -10,8 +10,12 @@ import { reportApiError } from "@/lib/api-errors";
 
 const cancelSchema = z.object({
   organizationId: z.string().min(1, "Organization ID is required"),
-  reason: z
-    .enum([
+  // Reason is REQUIRED — cancellation feedback is the product signal the
+  // team reviews. It is stored on the Polar subscription itself
+  // (customerCancellationReason/-Comment) and read in the Polar dashboard,
+  // so no separate feedback store is needed.
+  reason: z.enum(
+    [
       "too_expensive",
       "missing_features",
       "switched_service",
@@ -20,8 +24,9 @@ const cancelSchema = z.object({
       "low_quality",
       "too_complex",
       "other",
-    ])
-    .optional(),
+    ],
+    { message: "A cancellation reason is required" }
+  ),
   comment: z.string().max(1000).optional(),
 });
 
@@ -135,7 +140,7 @@ export async function POST(request: Request) {
       id: subscription.polarSubscriptionId,
       subscriptionUpdate: {
         cancelAtPeriodEnd: true,
-        ...(reason && { customerCancellationReason: reason }),
+        customerCancellationReason: reason,
         ...(comment && { customerCancellationComment: comment }),
       },
     });

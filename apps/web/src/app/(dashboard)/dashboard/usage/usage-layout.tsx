@@ -222,6 +222,13 @@ export function UsageLayout(props: UsageLayoutProps) {
               </button>
             )}
             <Link
+              href="/dashboard/settings?tab=billing"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
+            >
+              Manage billing
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+            <Link
               href="/pricing"
               className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400/80 hover:text-green-400 transition-colors"
             >
