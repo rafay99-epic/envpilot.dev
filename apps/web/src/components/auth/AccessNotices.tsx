@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import {
+  TerminalWindow,
+  TerminalButton,
+  TerminalButtonLink,
+} from "@/components/dashboard/terminal-ui";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("access-notices");
@@ -12,11 +17,13 @@ const log = createLogger("access-notices");
 /**
  * Full-screen access notices, mounted inside the dashboard shell:
  *
- * 1. Exit notices (membership tombstones) — "your access to X has been
+ * 1. Security hold — the ACTIVE org's membership is suspended: hard block
+ *    on the org's content until reinstated. The `/organizations` routes are
+ *    exempt — that's the escape hatch where the user switches to another
+ *    org (or creates one); without the exemption the overlay would brick
+ *    the whole app, including the switcher itself.
+ * 2. Exit notices (membership tombstones) — "your access to X has been
  *    revoked, contact your organization" — shown once, acknowledged away.
- * 2. Security hold — the ACTIVE org's membership is suspended: hard block
- *    on the org's content until reinstated (other orgs stay reachable via
- *    the link to the organizations list).
  *
  * Both are deliberately information-poor toward the affected user: org
  * name + date only, never who/why (that lives in the admin audit log).
@@ -28,6 +35,7 @@ export function AccessNotices({
   activeOrganizationId: string | null;
   hasOtherOrganizations: boolean;
 }) {
+  const pathname = usePathname();
   const tombstones = useQuery(
     api.features.organizations.tombstones.myTombstones
   );
@@ -42,45 +50,54 @@ export function AccessNotices({
   );
   const [acknowledging, setAcknowledging] = useState(false);
 
+  // The organizations list/create pages are the escape route out of a
+  // suspended org — never cover them.
+  const onEscapeRoute = pathname?.startsWith("/organizations");
+
   // ── Security hold on the active org ─────────────────────────────────
-  if (membershipStatus?.status === "suspended") {
+  if (membershipStatus?.status === "suspended" && !onEscapeRoute) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white p-6 dark:bg-zinc-950">
-        <div className="w-full max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-            <svg
-              className="h-6 w-6 text-red-600 dark:text-red-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
+      <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] px-4">
+        {/* Subtle grid background (matches auth-error-page) */}
+        <div
+          className="pointer-events-none fixed inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(34,197,94,1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,1) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <TerminalWindow
+          title="access_revoked"
+          className="relative z-10 w-full max-w-md shadow-2xl"
+        >
+          <div className="p-8 font-mono text-sm">
+            <p className="text-red-400">
+              ERROR: access revoked [exit code 403]
+            </p>
+            <p className="mt-3 text-zinc-400">
+              Your access to this organization has been revoked
+              {membershipStatus.suspendedAt
+                ? ` on ${new Date(membershipStatus.suspendedAt).toLocaleDateString()}`
+                : ""}
+              .
+            </p>
+            <p className="mt-2 text-zinc-400">
+              Please contact your organization.
+            </p>
+            <p className="mt-4 text-xs text-zinc-600">
+              Your role and project assignments are preserved — if an
+              administrator reinstates you, everything returns as it was.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <TerminalButtonLink href="/organizations" variant="primary">
+                {hasOtherOrganizations
+                  ? "Switch organization"
+                  : "Go to organizations"}
+              </TerminalButtonLink>
+            </div>
           </div>
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Your access has been revoked
-          </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Your access to this organization has been revoked
-            {membershipStatus.suspendedAt
-              ? ` on ${new Date(membershipStatus.suspendedAt).toLocaleDateString()}`
-              : ""}
-            . Please contact your organization.
-          </p>
-          <Link
-            href="/organizations"
-            className="mt-6 inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {hasOtherOrganizations
-              ? "Switch organization"
-              : "Go to organizations"}
-          </Link>
-        </div>
+        </TerminalWindow>
       </div>
     );
   }
@@ -91,10 +108,10 @@ export function AccessNotices({
 
   const heading =
     notice.kind === "org_deleted"
-      ? "An organization was deleted"
+      ? "organization deleted"
       : notice.kind === "left"
-        ? "You left an organization"
-        : "Your access has been revoked";
+        ? "organization left"
+        : "access revoked";
 
   const message =
     notice.kind === "org_deleted"
@@ -119,47 +136,30 @@ export function AccessNotices({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 text-center shadow-xl dark:bg-zinc-900">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-          <svg
-            className="h-6 w-6 text-amber-600 dark:text-amber-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-          {heading}
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          {message}
-        </p>
-        <div className="mt-6 flex flex-col gap-2">
-          <button
-            onClick={handleAcknowledge}
-            disabled={acknowledging}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {acknowledging ? "Dismissing…" : "Got it"}
-          </button>
-          {!hasOtherOrganizations && (
-            <Link
-              href="/organizations/new"
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+    <div className="dark fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <TerminalWindow
+        title="notice"
+        className="relative z-10 w-full max-w-md shadow-2xl"
+      >
+        <div className="p-8 font-mono text-sm">
+          <p className="text-amber-400">NOTICE: {heading}</p>
+          <p className="mt-3 text-zinc-400">{message}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <TerminalButton
+              variant="primary"
+              onClick={handleAcknowledge}
+              disabled={acknowledging}
             >
-              Create your own workspace
-            </Link>
-          )}
+              {acknowledging ? "Dismissing…" : "Got it"}
+            </TerminalButton>
+            {!hasOtherOrganizations && (
+              <TerminalButtonLink href="/organizations/new" variant="secondary">
+                Create your own workspace
+              </TerminalButtonLink>
+            )}
+          </div>
         </div>
-      </div>
+      </TerminalWindow>
     </div>
   );
 }
