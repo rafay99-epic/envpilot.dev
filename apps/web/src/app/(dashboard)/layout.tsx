@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { AuthProvider } from "@/components/auth";
+import { AccessNotices } from "@/components/auth/AccessNotices";
 import { AuthErrorPage } from "@/components/auth/auth-error-page";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import type { AuthUser, Organization } from "@/lib/auth";
@@ -184,6 +185,10 @@ export default async function DashboardLayout({
 
   return (
     <AuthProvider initialUser={authUser} initialOrganization={organization}>
+      <AccessNotices
+        activeOrganizationId={activeOrganization?._id ?? null}
+        hasOtherOrganizations={organizations.length > 1}
+      />
       <DashboardShell>{children}</DashboardShell>
     </AuthProvider>
   );

@@ -109,10 +109,43 @@ export default defineSchema({
     joinedAt: v.number(),
     // Who invited them (null if they created the org)
     invitedBy: v.optional(v.id("users")),
+    // Security hold: "suspended" freezes ALL access org-wide (enforced at the
+    // authz choke points in convex/lib/authz.ts) while keeping the membership,
+    // role, project assignments, and grants intact for later reinstatement.
+    // Absent means "active" (additive — no migration needed).
+    status: v.optional(v.union(v.literal("active"), v.literal("suspended"))),
+    suspendedAt: v.optional(v.number()),
+    suspendedBy: v.optional(v.id("users")),
+    // Admin-facing reason, shown in the audit log — never to the target.
+    suspendReason: v.optional(v.string()),
   })
     .index("by_organization", ["organizationId"])
     .index("by_user", ["userId"])
     .index("by_org_and_user", ["organizationId", "userId"]),
+
+  // Exit records for users whose membership ended (removed / left / org
+  // deleted) so the next sign-in can show "your access to X was revoked —
+  // contact your organization" instead of the org silently vanishing. The
+  // removed user learns org name + date + kind only; who/why stays in the
+  // admin audit log. Voided (acknowledged) when the user acknowledges the
+  // notice or accepts a new invitation to the same org; a cron deletes
+  // acknowledged rows after 30 days.
+  membershipTombstones: defineTable({
+    userId: v.id("users"),
+    organizationId: v.id("organizations"),
+    // Snapshot — the organization may be renamed or deleted later.
+    organizationName: v.string(),
+    kind: v.union(
+      v.literal("removed"),
+      v.literal("left"),
+      v.literal("org_deleted")
+    ),
+    createdAt: v.number(),
+    acknowledged: v.boolean(),
+  })
+    .index("by_user", ["userId", "acknowledged"])
+    .index("by_org_and_user", ["organizationId", "userId"])
+    .index("by_acknowledged", ["acknowledged", "createdAt"]),
 
   // ==========================================
   // PROJECTS
@@ -727,6 +760,8 @@ export default defineSchema({
       v.literal("org.member_added"),
       v.literal("org.member_removed"),
       v.literal("org.member_role_changed"),
+      v.literal("org.member_suspended"),
+      v.literal("org.member_reinstated"),
       v.literal("org.transferred"),
       // Project actions
       v.literal("project.created"),

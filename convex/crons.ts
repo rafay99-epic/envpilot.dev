@@ -83,6 +83,14 @@ crons.interval(
   internal.features.community.changelog.publish.publishScheduledEntries
 );
 
+// Clean up acknowledged membership tombstones (exit notices) after 30 days
+crons.daily(
+  "cleanup membership tombstones",
+  { hourUTC: 3, minuteUTC: 20 },
+  internal.features.organizations.tombstones.cleanupAcknowledged,
+  {}
+);
+
 // Clean up processed webhook events older than 7 days
 crons.interval(
   "cleanup processed webhook events",

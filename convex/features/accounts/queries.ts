@@ -6,10 +6,12 @@ import {
   authorizeAccountAccess,
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
+import { requireAuthedUser } from "../../lib/identity";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
+  getActiveMembership,
 } from "../../lib/authz";
 
 /**
@@ -63,22 +65,25 @@ function buildActiveAccountGrantMap(
 export const listWithAccess = query({
   args: {
     projectId: v.id("projects"),
-    userId: v.id("users"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Identity comes from the verified JWT — never a client-supplied userId
+    // (that let any caller compute another member's access, vaultRefs
+    // included, and would have made the suspension guard here spoofable).
+    const actor = await requireAuthedUser(ctx);
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) {
       return [];
     }
 
-    // Get user's org membership to determine their unified role
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", args.userId)
-      )
-      .first();
+    // Get user's org membership to determine their unified role. A suspended
+    // member is treated as a non-member here (no vaultRefs surface).
+    const membership = await getActiveMembership(
+      ctx,
+      project.organizationId,
+      actor._id
+    );
 
     if (!membership) {
       return [];
@@ -95,7 +100,7 @@ export const listWithAccess = query({
       const projectMembership = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", args.projectId).eq("userId", args.userId)
+          q.eq("projectId", args.projectId).eq("userId", actor._id)
         )
         .first();
       assigned = !!projectMembership;
@@ -130,7 +135,7 @@ export const listWithAccess = query({
       await ctx.db
         .query("accountPermissions")
         .withIndex("by_user_active", (q) =>
-          q.eq("userId", args.userId).eq("isActive", true)
+          q.eq("userId", actor._id).eq("isActive", true)
         )
         .collect()
     );
