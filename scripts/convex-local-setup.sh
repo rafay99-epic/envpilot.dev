@@ -71,14 +71,14 @@ if ! bunx convex env get ADMIN_SECRET >/dev/null 2>&1; then
   bunx convex env set ADMIN_SECRET "$ADMIN_SECRET" >/dev/null
   echo "   ✓ ADMIN_SECRET (generated: $ADMIN_SECRET — needed for the admin panel)"
 else
-  ADMIN_SECRET=$(bunx convex env get ADMIN_SECRET | tr -d '[:space:]')
+  ADMIN_SECRET=$(bunx convex env get ADMIN_SECRET)
   echo "   ✓ ADMIN_SECRET (already set)"
 fi
 
 echo "→ seeding tiers, feature registry, and tier overrides"
 for migration in seed-tier-definitions seed-feature-registry seed-tier-features; do
   bunx convex run features/admin/migrations:runMigration \
-    "{\"secret\":\"$ADMIN_SECRET\",\"name\":\"$migration\"}" >/dev/null
+    "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')" >/dev/null
   echo "   ✓ $migration"
 done
 
