@@ -1,0 +1,37 @@
+CLAUDE.md
+  s_f59315d63e71a6::t_39291c146ea7d1 47-65
+  s_f59315d63e71a6::t_4fc815062aed28 119-144,265
+  s_655596e5f5983b::t_72b5f8b02e6f2e 9-11
+  s_f59315d63e71a6::t_36184e12345e2f 7-8,12
+.github/workflows/ci.yml
+  s_f59315d63e71a6::t_4c9ac97c064c19 482-487
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "874ea73e00ee8f56c2fa36572ac28658a5c41a0a",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_655596e5f5983b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc578867-344b-4a63-9b5f-de9065dcf4d3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
