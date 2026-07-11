@@ -344,7 +344,7 @@ export const getOrganization = action({
       internal.features.api.authorize._authorizeRequest,
       {
         tokenHash,
-        requirement: { resource: "projects" },
+        requirement: { resource: "organization" },
         gateFeature: args.gateFeature,
       }
     );

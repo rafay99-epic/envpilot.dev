@@ -107,7 +107,14 @@ export const _authorizeRequest = internalMutation({
       return { ok: false as const, denied: "invalid_key" as const };
     }
 
-    if (!key.scopeResources.includes(args.requirement.resource)) {
+    // "organization" is a PSEUDO-RESOURCE: org-level metadata (name, slug,
+    // plan, bounded counts) is readable by ANY valid key of the org — the
+    // key holder inherently knows which org their key belongs to, and the
+    // discovery endpoint must work for narrowly-scoped keys.
+    if (
+      args.requirement.resource !== "organization" &&
+      !key.scopeResources.includes(args.requirement.resource)
+    ) {
       await logDenied(key, "resource_out_of_scope");
       return { ok: false as const, denied: "resource_scope" as const };
     }

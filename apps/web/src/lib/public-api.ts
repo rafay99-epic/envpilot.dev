@@ -64,6 +64,15 @@ export function mapPublicApiError(error: unknown): MappedPublicApiError {
   if (/project not found/i.test(message)) {
     return { status: 404, code: "NOT_FOUND", message: "Project not found" };
   }
+  // Rare but real: the org was deleted while a key survived — a clear 404,
+  // not an opaque INTERNAL_ERROR 500.
+  if (/organization not found/i.test(message)) {
+    return {
+      status: 404,
+      code: "NOT_FOUND",
+      message: "Organization not found",
+    };
+  }
   if (/missing required param/i.test(message)) {
     return { status: 400, code: "VALIDATION_ERROR", message };
   }

@@ -14,7 +14,7 @@ Every response is JSON unless `format=env` is passed. Every error response is `{
 
 ### `GET /v1/organization`
 
-Returns metadata for the key's organization.
+Returns metadata for the key's organization. Works with **any** valid API key of the organization regardless of its resource scope — org metadata is discovery-level information the key holder already has.
 
 ```bash
 curl https://www.envpilot.dev/api/v1/organization \

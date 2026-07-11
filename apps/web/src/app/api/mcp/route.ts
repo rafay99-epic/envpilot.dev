@@ -316,6 +316,7 @@ const baseHandler = createMcpHandler(
             key?: string;
           }> = [];
           const scanned = projects.slice(0, SEARCH_MAX_PROJECTS);
+          let skippedProjects = 0;
 
           for (const project of scanned) {
             if (
@@ -353,21 +354,28 @@ const baseHandler = createMcpHandler(
               }
             } catch {
               // A project this key can list but that denies the "variables"
-              // resource/environment (out-of-scope) is silently skipped for
+              // resource/environment (out-of-scope) is skipped for
               // key-matching — the project-name match above (if any) stands.
+              // Counted so `truncated`/`skippedProjects` never report a
+              // false "complete" search to the client.
+              skippedProjects += 1;
             }
             if (results.length >= SEARCH_MAX_RESULTS) break;
           }
 
           const truncated =
             projects.length > SEARCH_MAX_PROJECTS ||
-            results.length >= SEARCH_MAX_RESULTS;
+            results.length >= SEARCH_MAX_RESULTS ||
+            skippedProjects > 0;
 
           return {
             content: [
-              { type: "text", text: JSON.stringify({ results, truncated }) },
+              {
+                type: "text",
+                text: JSON.stringify({ results, truncated, skippedProjects }),
+              },
             ],
-            structuredContent: { results, truncated },
+            structuredContent: { results, truncated, skippedProjects },
           };
         } catch (err) {
           return toolError(err);
