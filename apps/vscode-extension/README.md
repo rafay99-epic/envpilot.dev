@@ -152,6 +152,17 @@ If the browser fails to open, the sign-in URL is automatically copied to your cl
 3. Try manually pulling variables with `Envpilot: Pull Variables`
 4. Check the Output panel (Envpilot) for error messages
 
+## Uninstalling
+
+When you uninstall the extension, a cleanup hook runs on the next VS Code
+launch and deletes every synced `.env` file that hasn't been modified since
+its last sync (locally edited files are never touched). For a complete
+offboarding — especially on shared or organization machines — run
+`Envpilot: Sign Out` **before** uninstalling: VS Code does not let extensions
+clear their secure token storage during uninstall, so signing out first is
+what removes the stored credentials. Organization admins can additionally
+revoke a machine's access at any time from the dashboard (device sessions).
+
 ## Privacy
 
 - The extension only accesses environment variables for linked projects

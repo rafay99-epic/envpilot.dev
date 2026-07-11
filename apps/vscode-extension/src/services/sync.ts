@@ -734,13 +734,20 @@ export class SyncService {
     const backups: string[] = [];
     for (const filename of filenames) {
       const envFilePath = path.resolve(platformPath, filename);
+      let existingContent: string;
       try {
-        await fs.access(envFilePath);
+        existingContent = await fs.readFile(envFilePath, "utf-8");
       } catch {
         continue; // Nothing to back up.
       }
       const backupPath = `${envFilePath}.backup-${timestamp}`;
       await fs.copyFile(envFilePath, backupPath);
+      // A backup of an Envpilot-synced file carries live secrets, so track it
+      // for the uninstall purge. A user-authored file (no header) is their
+      // data — never track, never delete.
+      if (existingContent.startsWith(ENV_FILE_MARKER)) {
+        await recordManagedFile(backupPath, existingContent);
+      }
       backups.push(backupPath);
     }
     return backups;
