@@ -1,0 +1,43 @@
+apps/vscode-extension/src/uninstall.ts
+  s_0193e807073681::t_08bd23bf1342f6 1-21
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_0193e807073681::t_adcf0380c6d5e2 1-135
+apps/web/src/lib/versions.ts
+  s_0193e807073681::t_602b9240ccf897 19
+apps/vscode-extension/src/utils/managedFiles.test.ts
+  s_0193e807073681::t_19e337bbd8f2a6 18-175
+  s_0193e807073681::t_c16e098d04564f 1-17,176-179
+apps/vscode-extension/src/services/sync.ts
+  s_0193e807073681::t_93e7b92daf049a 560
+  s_0193e807073681::t_a76ce1cda77dba 417
+  s_0193e807073681::t_abf24c43f8d967 17
+  s_0193e807073681::t_5e31d05a577cc8 818
+  s_0193e807073681::t_079e537ebffb17 1042
+  s_0193e807073681::t_cdec3ba34ed56d 1189
+apps/vscode-extension/package.json
+  s_0193e807073681::t_58c5977804b344 375
+  s_0193e807073681::t_7ea828faa49285 5
+apps/vscode-extension/scripts/build.mjs
+  s_0193e807073681::t_8212d22228b7b5 64-74,78-79,85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "d81b0fdf77ce9c3411bee2dde51b79b66127599f",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
