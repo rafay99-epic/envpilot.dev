@@ -556,3 +556,80 @@ export const sendRotationReminderEmail = internalAction({
     }
   },
 });
+
+// ============================================================
+// Welcome Email
+// ============================================================
+
+export const sendWelcomeEmail = internalAction({
+  args: {
+    to: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const firstName = (args.name ?? "").trim().split(/\s+/)[0] || "there";
+    const config = getEmailConfig();
+    const appUrl = config?.appUrl || "http://localhost:3000";
+
+    const subject =
+      firstName === "there"
+        ? "Welcome to Envpilot"
+        : `Welcome to Envpilot, ${firstName}`;
+
+    const greeting =
+      firstName !== "there"
+        ? `<strong style="color:#e4e4e7;">Hi ${escapeHtml(firstName)}</strong> —`
+        : "Hi there —";
+
+    const html = emailWrapper(
+      "Welcome to Envpilot",
+      [
+        iconRow(
+          firstName === "there" ? "E" : firstName.charAt(0).toUpperCase()
+        ),
+        headingRow("Welcome to Envpilot"),
+        paragraphRow(
+          `${greeting} Abdul Rafay here, CEO of Syntax Lab Technology. Thanks for signing up for Envpilot — really appreciate you giving it a try.`
+        ),
+        paragraphRow(
+          "Envpilot is a secure environment variable management platform for teams. It keeps your secrets encrypted with WorkOS Vault, syncs them across your team, and makes them available in your terminal or editor.<br><br>Here's how to get started:<br>①  Create your first project<br>②  Add environment variables — encrypted with WorkOS Vault<br>③  Invite your team<br>④  Install the CLI (<code style=\"" +
+            CODE_STYLE +
+            '">npm i -g @envpilot/cli</code>) or the VS Code extension'
+        ),
+        paragraphRow(
+          "The free tier is generous — enough for most small teams. Pro is there when you need more, no pressure.",
+          "font-size: 14px; line-height: 1.6; color: #71717a;"
+        ),
+        paragraphRow(
+          "Questions or feedback? Just reply to this email — it reaches a real human.",
+          "font-size: 14px; line-height: 1.6; color: #71717a;"
+        ),
+        buttonRow(appUrl, "Open Envpilot"),
+        footerRow(
+          `You're receiving this because you created an Envpilot account.<br>Need help? <a href="mailto:support@envpilot.dev" style="color: #22c55e;">support@envpilot.dev</a>`
+        ),
+      ].join(""),
+      "Thanks for signing up — here is how to get started."
+    );
+
+    const text = `Welcome to Envpilot
+
+${firstName !== "there" ? `Hi ${firstName} — ` : "Hi there — "}Abdul Rafay here, CEO of Syntax Lab Technology. Thanks for signing up for Envpilot — really appreciate you giving it a try.
+
+Envpilot is a secure environment variable management platform for teams. It keeps your secrets encrypted with WorkOS Vault, syncs them across your team, and makes them available in your terminal or editor.
+
+Here's how to get started:
+1) Create your first project
+2) Add environment variables — encrypted with WorkOS Vault
+3) Invite your team
+4) Install the CLI (npm i -g @envpilot/cli) or the VS Code extension
+
+The free tier is generous — enough for most small teams. Pro is there when you need more, no pressure.
+
+Questions or feedback? Just reply to this email — it reaches a real human.
+
+Open Envpilot: ${appUrl}`;
+
+    return sendEmail(args.to, subject, html, text);
+  },
+});
