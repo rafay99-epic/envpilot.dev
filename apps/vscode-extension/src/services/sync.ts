@@ -14,6 +14,7 @@ import {
 } from "../utils/config";
 import { normalizePath, toPlatformPath, getDisplayPath } from "../utils/paths";
 import { envFileNamesFor } from "../utils/envFiles";
+import { recordManagedFile, forgetManagedFile } from "../utils/managedFiles";
 import { captureError } from "../utils/sentry";
 import {
   normalizeOrgRole,
@@ -413,6 +414,7 @@ export class SyncService {
 
     // Write file
     await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content);
 
     // Apply role-based file protection
     const protectionMode = this.resolveProtectionMode(
@@ -555,6 +557,7 @@ export class SyncService {
     } catch {
       // File doesn't exist, nothing to delete
     }
+    await forgetManagedFile(envFilePath);
   }
 
   /**
@@ -731,13 +734,20 @@ export class SyncService {
     const backups: string[] = [];
     for (const filename of filenames) {
       const envFilePath = path.resolve(platformPath, filename);
+      let existingContent: string;
       try {
-        await fs.access(envFilePath);
+        existingContent = await fs.readFile(envFilePath, "utf-8");
       } catch {
         continue; // Nothing to back up.
       }
       const backupPath = `${envFilePath}.backup-${timestamp}`;
       await fs.copyFile(envFilePath, backupPath);
+      // A backup of an Envpilot-synced file carries live secrets, so track it
+      // for the uninstall purge. A user-authored file (no header) is their
+      // data — never track, never delete.
+      if (existingContent.startsWith(ENV_FILE_MARKER)) {
+        await recordManagedFile(backupPath, existingContent);
+      }
       backups.push(backupPath);
     }
     return backups;
@@ -812,6 +822,7 @@ export class SyncService {
     }
 
     await fs.writeFile(envFilePath, mergedContent, "utf-8");
+    await recordManagedFile(envFilePath, mergedContent);
   }
 
   /**
@@ -1035,6 +1046,7 @@ export class SyncService {
     }
 
     await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content);
 
     // Apply role-based file protection
     const protectionMode = projectId
@@ -1181,6 +1193,7 @@ export class SyncService {
     } catch {
       // File doesn't exist.
     }
+    await forgetManagedFile(filePath);
   }
 
   /**
