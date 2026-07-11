@@ -1,0 +1,25 @@
+.github/workflows/version-tracker.yml
+  s_f59315d63e71a6::t_2be7f4d35e869a 40,52,80,122-130
+  s_f59315d63e71a6::t_e996bf482dd1c2 131-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "4f94ef573300a88d3ba49266b9a39f2976a5c193",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
