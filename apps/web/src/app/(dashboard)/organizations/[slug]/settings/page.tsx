@@ -26,7 +26,8 @@ import {
   useConvexUser,
 } from "@/hooks";
 import { useFeatureGate, usePagination } from "@/hooks";
-import { normalizeOrgRole } from "@/lib/roles";
+import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
+import { ApiKeysSection } from "@/components/api-keys/ApiKeysSection";
 
 interface Organization {
   _id: string;
@@ -37,13 +38,16 @@ interface Organization {
   role: string;
 }
 
-type OrgSettingsTab = "general" | "tags" | "danger";
+type OrgSettingsTab = "general" | "tags" | "apiKeys" | "danger";
 
 export default function OrganizationSettingsPage(props: {
   params: Promise<{ slug: string }>;
 }) {
   return (
-    <RequireRole minimum="owner">
+    // Page-level floor is team_lead — owner-only sections (General, Tags,
+    // Danger Zone) are additionally gated per-tab below so a team_lead/PM
+    // can reach the API Keys tab without seeing the rest of the page.
+    <RequireRole minimum="team_lead">
       <OrganizationSettingsPageContent {...props} />
     </RequireRole>
   );
@@ -94,11 +98,27 @@ function OrganizationSettingsPageContent({
   );
   const orgTier = (tierData?.tierName as string) ?? "free";
 
+  // Owner-only sections stay owner-only; API Keys additionally opens up to
+  // project managers and team leads (minting a project-scoped key is the
+  // same bar as minting a CI/CD service token elsewhere in the app).
+  const isOwner = normalizeOrgRole(organization?.role) === "owner";
+  const canManageApiKeys =
+    roleLevel(normalizeOrgRole(organization?.role)) >= ROLE_LEVEL.team_lead;
+
   const tabs: { id: OrgSettingsTab; label: string }[] = [
-    { id: "general", label: "General" },
-    ...(showTags ? [{ id: "tags" as const, label: "Tags" }] : []),
-    { id: "danger", label: "Danger Zone" },
+    ...(isOwner ? [{ id: "general" as const, label: "General" }] : []),
+    ...(isOwner && showTags ? [{ id: "tags" as const, label: "Tags" }] : []),
+    ...(canManageApiKeys
+      ? [{ id: "apiKeys" as const, label: "API Keys" }]
+      : []),
+    ...(isOwner ? [{ id: "danger" as const, label: "Danger Zone" }] : []),
   ];
+  // If the deep-linked/previous tab isn't in this user's visible set (e.g. a
+  // team_lead landing on the default "general" tab), fall back to the first
+  // tab they can actually see.
+  const effectiveTab: OrgSettingsTab = tabs.some((t) => t.id === activeTab)
+    ? activeTab
+    : (tabs[0]?.id ?? "general");
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -221,13 +241,17 @@ function OrganizationSettingsPageContent({
     );
   }
 
-  if (!organization || normalizeOrgRole(organization.role) !== "owner") {
+  if (
+    !organization ||
+    roleLevel(normalizeOrgRole(organization.role)) < ROLE_LEVEL.team_lead
+  ) {
     return (
       <div className="mx-auto max-w-2xl">
         <TerminalCard className="border-amber-500/30">
           <h3 className="font-semibold text-amber-400">Permission Denied</h3>
           <p className="mt-1 text-sm text-amber-400/80">
-            Only organization owners can access settings.
+            Only organization owners, project managers, and team leads can
+            access settings.
           </p>
           <Link
             href={`/organizations/${slug}`}
@@ -260,7 +284,7 @@ function OrganizationSettingsPageContent({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`border-b-2 py-3 text-sm font-medium transition-colors ${
-                activeTab === tab.id
+                effectiveTab === tab.id
                   ? "border-green-400 text-green-400"
                   : "border-transparent text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
               }`}
@@ -273,7 +297,7 @@ function OrganizationSettingsPageContent({
 
       {/* Tab Content */}
       <div className="max-w-2xl">
-        {activeTab === "general" && (
+        {effectiveTab === "general" && isOwner && (
           <GeneralOrgSettings
             organization={organization!}
             orgTier={orgTier}
@@ -287,10 +311,16 @@ function OrganizationSettingsPageContent({
             successMessage={successMessage}
           />
         )}
-        {activeTab === "tags" && showTags && organization && (
+        {effectiveTab === "tags" && isOwner && showTags && organization && (
           <TagSettingsTab organizationId={organization._id as string} />
         )}
-        {activeTab === "danger" && (
+        {effectiveTab === "apiKeys" && canManageApiKeys && organization && (
+          <ApiKeysSection
+            organizationId={organization._id as Id<"organizations">}
+            isOwner={isOwner}
+          />
+        )}
+        {effectiveTab === "danger" && isOwner && (
           <DangerZoneSettings
             organization={organization!}
             transferEmail={transferEmail}

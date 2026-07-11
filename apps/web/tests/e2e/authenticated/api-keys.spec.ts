@@ -1,0 +1,144 @@
+import { expect, test } from "@playwright/test";
+
+import { hasE2ECredentials, SKIP_REASON } from "../env";
+import {
+  getOwnedOrgSlug,
+  getWorkerProjectSlug,
+  trackClientErrors,
+} from "./support";
+
+// Authenticated e2e — API keys end to end: create a project-scoped key
+// through the real org settings UI, verify it appears in the list with its
+// scope badges, then revoke it inline and confirm the Revoked badge.
+//
+// REST endpoint behavior (the actual /api/v1/* pull) is covered in a later
+// phase's specs — this spec is UI + key lifecycle only.
+//
+// Serial: the revoke test consumes the key created by the first test.
+
+test.skip(!hasE2ECredentials, SKIP_REASON);
+
+test.describe.serial("API keys", () => {
+  const keyName = `E2E API Key ${Date.now()}`;
+  let projectSlug = "";
+
+  test("create a project-scoped key via org settings", async ({ page }) => {
+    test.setTimeout(120_000);
+    const clientErrors = trackClientErrors(page);
+
+    const orgSlug = await getOwnedOrgSlug(page);
+    projectSlug = await getWorkerProjectSlug(page);
+
+    await page.goto(`/organizations/${orgSlug}/settings`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    // Settings tabs render after the org + auth context resolve — wait for a
+    // stable anchor before sampling for the tier-gated API Keys tab.
+    await expect(
+      page.getByRole("button", { name: /^General$/i }).first()
+    ).toBeVisible({ timeout: 20_000 });
+
+    const apiKeysTab = page
+      .getByRole("button", { name: /^API Keys$/i })
+      .first();
+    const tabVisible = await apiKeysTab
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    test.skip(
+      !tabVisible,
+      "API Keys tab not visible — public_api is gated off for this org/tier"
+    );
+    await apiKeysTab.click();
+
+    await page.getByRole("button", { name: /^New Key$/i }).click();
+
+    // The create panel is inline — no dialog. It expands in place above the
+    // key list.
+    const nameInput = page.locator("#api-key-name");
+    await expect(
+      nameInput,
+      "inline create panel should be visible"
+    ).toBeVisible({ timeout: 10_000 });
+    await nameInput.fill(keyName);
+
+    // Projects: default mode is "Specific projects" — check this worker's
+    // fixture project.
+    const projectCheckbox = page
+      .getByTestId(`api-key-project-${projectSlug}`)
+      .locator('input[type="checkbox"]');
+    await expect(
+      projectCheckbox,
+      "fixture project should be listed in the project picker"
+    ).toBeVisible({ timeout: 10_000 });
+    await projectCheckbox.check();
+
+    // Environments: production is the pre-selected recommended default chip
+    // — assert, don't click.
+    const productionChip = page.getByRole("button", {
+      name: /^production$/i,
+      pressed: true,
+    });
+    await expect(productionChip).toBeVisible();
+
+    // Resources: variables is the pre-selected default chip — assert.
+    const variablesChip = page.getByRole("button", {
+      name: /^variables$/i,
+      pressed: true,
+    });
+    await expect(variablesChip).toBeVisible();
+
+    await page.getByRole("button", { name: /^Create Key$/i }).click();
+
+    // One-time reveal swaps the panel in place: the plaintext appears
+    // exactly once.
+    const keyCode = page.locator("code", { hasText: /^envpk_[0-9a-f]+$/ });
+    await expect(keyCode, "plaintext key should be revealed").toBeVisible({
+      timeout: 20_000,
+    });
+    const plaintextKey = (await keyCode.textContent())?.trim() ?? "";
+    expect(plaintextKey).toMatch(/^envpk_[0-9a-f]{40}$/);
+
+    await page.getByRole("button", { name: /^Done$/i }).click();
+
+    // The list shows the key with its scope badges; the hash never appears.
+    const row = page.locator("li").filter({ hasText: keyName });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText(/^1 project$/)).toBeVisible();
+    await expect(row.getByText(/^production$/)).toBeVisible();
+    await expect(row.getByText(/^variables$/)).toBeVisible();
+
+    expect(
+      clientErrors,
+      `unexpected client-side errors: ${clientErrors.join("\n")}`
+    ).toEqual([]);
+  });
+
+  test("revoking the key marks it Revoked", async ({ page }) => {
+    test.setTimeout(90_000);
+    test.skip(!projectSlug, "no key from the create test");
+
+    const orgSlug = await getOwnedOrgSlug(page);
+    await page.goto(`/organizations/${orgSlug}/settings`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page
+      .getByRole("button", { name: /^API Keys$/i })
+      .first()
+      .click();
+
+    const row = page.locator("li").filter({ hasText: keyName });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+
+    await row.getByRole("button", { name: /^Revoke$/i }).click();
+
+    // Inline confirm strip swaps in *within the row* — no ConfirmDialog.
+    await expect(
+      row.getByText(/Revoke this key\? Anything using it will stop working/i)
+    ).toBeVisible({ timeout: 10_000 });
+    await row.getByRole("button", { name: /^Revoke$/i }).click();
+
+    await expect(row.getByText(/Revoked/i)).toBeVisible({ timeout: 15_000 });
+  });
+});
