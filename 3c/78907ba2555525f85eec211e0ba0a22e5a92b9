@@ -1,0 +1,29 @@
+CLAUDE.md
+  s_e5ca61c07a0c6b::t_11b13a7002f90b 44
+apps/web/src/app/(dashboard)/dashboard/usage/usage-layout.tsx
+  s_e5ca61c07a0c6b::t_5e094dadce3c0f 244
+  s_e5ca61c07a0c6b::t_a08c2403fff3ad 251
+  s_e5ca61c07a0c6b::t_f19f8793b19559 191-192
+  s_e5ca61c07a0c6b::t_e5c5c342f674e8 439,447
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3c78907ba2555525f85eec211e0ba0a22e5a92b9",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
