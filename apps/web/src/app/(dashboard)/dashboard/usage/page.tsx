@@ -10,7 +10,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import type { Id } from "@convex/_generated/dataModel";
 import type { UsageLayoutProps } from "./usage-data";
-import { LayoutC } from "./layout-c";
+import { UsageLayout } from "./usage-layout";
 import { usePaymentsEnabled } from "@/hooks/usePaymentsEnabled";
 import { normalizeOrgRole } from "@/lib/roles";
 
@@ -167,7 +167,7 @@ function UsagePageContent() {
         </p>
       </div>
 
-      <LayoutC {...layoutProps} />
+      <UsageLayout {...layoutProps} />
     </div>
   );
 }
