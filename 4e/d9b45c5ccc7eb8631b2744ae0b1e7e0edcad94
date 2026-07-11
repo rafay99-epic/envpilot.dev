@@ -1,0 +1,21 @@
+apps/web/package.json
+  s_e5ca61c07a0c6b::t_56e188d1b5bae4 3
+apps/web/src/lib/versions.ts
+  s_e5ca61c07a0c6b::t_56e188d1b5bae4 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "4ed9b45c5ccc7eb8631b2744ae0b1e7e0edcad94",
+  "prompts": {},
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
