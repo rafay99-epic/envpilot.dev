@@ -533,28 +533,35 @@ jobs:
       (needs.changes.outputs.run_web == 'true' || needs.changes.outputs.run_admin == 'true')
     runs-on: ubuntu-latest
     env:
-      # Team + project ids are not secrets; they let the CLI deploy without
-      # a `vercel link` step. Root Directory (apps/web / apps/admin) is
+      # VERCEL_ORG_ID + VERCEL_PROJECT_ID let the CLI deploy without a
+      # `vercel link` step. Root Directory (apps/web / apps/admin) is
       # applied by Vercel from each project's settings — deploy from repo
       # root so workspace packages and convex/ are included in the upload.
-      VERCEL_ORG_ID: team_9iHBcsQMI40u0MJNS764RGKy
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Require Vercel token
+      - name: Require Vercel secrets
         env:
           TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRJ_WEB: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+          PRJ_ADMIN: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::VERCEL_TOKEN secret is missing. Create a token in Vercel → Account Settings → Tokens (team scope) and add it with: gh secret set VERCEL_TOKEN"
+          missing=""
+          [ -z "$TOKEN" ] && missing="$missing VERCEL_TOKEN"
+          [ -z "$VERCEL_ORG_ID" ] && missing="$missing VERCEL_ORG_ID"
+          [ -z "$PRJ_WEB" ] && missing="$missing VERCEL_PROJECT_ID_WEB"
+          [ -z "$PRJ_ADMIN" ] && missing="$missing VERCEL_PROJECT_ID_ADMIN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secret(s):$missing. Token: Vercel → Account Settings → Tokens (team scope). Org/project ids: Vercel project → Settings → General. Add with: gh secret set <NAME>"
             exit 1
           fi
 
       - name: Deploy web (build runs on Vercel)
         if: needs.changes.outputs.run_web == 'true'
         env:
-          VERCEL_PROJECT_ID: prj_H8zQVaG9Sl99LCIaO3Fu6HTGmiAH
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
         run: |
           npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
           echo "Web deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
@@ -562,7 +569,7 @@ jobs:
       - name: Deploy admin (build runs on Vercel)
         if: needs.changes.outputs.run_admin == 'true'
         env:
-          VERCEL_PROJECT_ID: prj_Lk4FLHkbRXDLA8Cirl03qBruwbxM
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
         run: |
           npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
           echo "Admin deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
