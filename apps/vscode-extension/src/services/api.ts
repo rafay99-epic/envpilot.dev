@@ -248,6 +248,25 @@ export class ApiService {
       if (this.isSessionExpired(err)) {
         void this.promptReauth();
       }
+      // Org-wide revocation (security hold / membership removed): the
+      // backend throws a ConvexError whose payload rides on `.data` (the
+      // message body is redacted in prod deployments). Translate to the
+      // plain "contact your organization" message here — the single choke
+      // point for every direct Convex call — so sync results and
+      // notifications never show a raw guard string or a generic
+      // "Server Error".
+      const data = (err as { data?: unknown })?.data;
+      const raw = `${err instanceof Error ? err.message : String(err)} ${
+        typeof data === "string" ? data : ""
+      }`;
+      if (raw.includes("ACCESS_SUSPENDED")) {
+        throw Object.assign(
+          new Error(
+            "Your access to this organization has been revoked. Please contact your organization."
+          ),
+          { status: 403 }
+        );
+      }
       throw err;
     }
   }

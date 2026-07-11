@@ -15,12 +15,14 @@ import {
   notInitialized,
   invalidInput,
   handleError,
+  isConnectivityError,
 } from "../lib/errors.js";
 import type { Variable } from "../types/index.js";
 import {
   probeCache,
   writeCache,
   extendCacheFreshness,
+  deleteCache,
   formatAge,
 } from "../lib/variables-cache.js";
 
@@ -202,17 +204,26 @@ export const runCommand = new Command("run")
                 serverFingerprint
               );
             }
-          } catch {
-            // Fingerprint check failed (e.g. offline) — fall back to stale
-            // cache, but say so out loud. readCache already refuses to return
-            // entries past the hard max-age, so we never serve indefinitely.
-            variables = probe.entry.variables;
-            cacheHit = true;
-            cacheAge = formatAge(probe.entry.fetchedAt);
-            if (!options.quiet) {
-              warning(
-                `Using offline cache (age ${cacheAge}) — could not reach the server to verify freshness.`
-              );
+          } catch (err) {
+            // Fail OPEN only for genuine connectivity failures. A server-side
+            // DENIAL (access suspended/revoked, membership gone, permission
+            // lost) must fail CLOSED: purge the cached secrets and surface the
+            // error — otherwise a suspended/removed user keeps being served
+            // decrypted secrets from disk for up to the hard max-age.
+            if (isConnectivityError(err)) {
+              // Offline — fall back to stale cache, but say so out loud.
+              // readCache already refuses entries past the hard max-age.
+              variables = probe.entry.variables;
+              cacheHit = true;
+              cacheAge = formatAge(probe.entry.fetchedAt);
+              if (!options.quiet) {
+                warning(
+                  `Using offline cache (age ${cacheAge}) — could not reach the server to verify freshness.`
+                );
+              }
+            } else {
+              deleteCache(project.projectId, environment, organizationId);
+              throw err;
             }
           }
         } else {

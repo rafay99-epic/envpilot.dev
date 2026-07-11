@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -244,7 +245,11 @@ export function assertNotSuspended(
   membership: Pick<Doc<"organizationMembers">, "status">
 ): void {
   if (isSuspendedMembership(membership)) {
-    throw new Error(
+    // ConvexError, NOT a plain Error: production deployments redact plain
+    // application error messages to "Server Error", which would strip the
+    // token and leave the CLI/extension showing a useless generic failure.
+    // ConvexError data crosses to clients verbatim in prod.
+    throw new ConvexError(
       `${ACCESS_SUSPENDED_TOKEN}: Your access to this organization has been revoked. Please contact your organization.`
     );
   }

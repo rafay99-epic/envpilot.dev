@@ -47,8 +47,13 @@ const ACCESS_REVOKED_MESSAGE =
  * Format an error for display
  */
 export function formatError(error: unknown): string {
-  const raw =
-    error instanceof Error ? error.message : error ? String(error) : "";
+  // ConvexError carries its payload on `.data` (the message body is redacted
+  // in prod deployments) — check both.
+  const data = (error as { data?: unknown })?.data;
+  const raw = [
+    error instanceof Error ? error.message : error ? String(error) : "",
+    typeof data === "string" ? data : "",
+  ].join(" ");
   if (raw.includes(ACCESS_SUSPENDED_TOKEN)) {
     return chalk.red(`Error: ${ACCESS_REVOKED_MESSAGE}`);
   }
@@ -161,6 +166,38 @@ export function fileNotFound(path: string): CLIError {
 
 export function invalidInput(message: string): CLIError {
   return new CLIError(message, ErrorCodes.INVALID_INPUT);
+}
+
+/**
+ * True when an error is a CONNECTIVITY failure (offline, DNS, timeout) as
+ * opposed to a server-side response (denial, 4xx/5xx). Used to decide
+ * fail-open vs fail-closed: offline caches may be served on connectivity
+ * failures, but NEVER when the server answered with a denial (access
+ * suspended/revoked, membership gone).
+ */
+export function isConnectivityError(error: unknown): boolean {
+  const code = (error as { code?: string })?.code ?? "";
+  if (
+    [
+      "ECONNREFUSED",
+      "ECONNRESET",
+      "ENOTFOUND",
+      "ETIMEDOUT",
+      "EAI_AGAIN",
+      "ENETUNREACH",
+      "EHOSTUNREACH",
+      "UND_ERR_CONNECT_TIMEOUT",
+    ].includes(code)
+  ) {
+    return true;
+  }
+  // An error that carries an HTTP status is a server RESPONSE, not a
+  // connectivity failure.
+  if ((error as { status?: number })?.status !== undefined) return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|network|socket hang up|getaddrinfo|connect timeout/i.test(
+    message
+  );
 }
 
 export function networkError(message: string): CLIError {
