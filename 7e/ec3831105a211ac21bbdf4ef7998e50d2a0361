@@ -1,0 +1,29 @@
+apps/admin/vercel.json
+  s_0193e807073681::t_57d23ed30fc7a1 1-8
+.github/workflows/ci.yml
+  s_0193e807073681::t_90c7e43e3e4883 7-11
+  s_0193e807073681::t_a9279ed3e38b95 515-557
+apps/web/vercel.json
+  s_0193e807073681::t_54d434207816bc 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "7eec3831105a211ac21bbdf4ef7998e50d2a0361",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0193e807073681": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "670eaad1-a8ee-4ff5-ae7c-84cf43bf3c96",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
