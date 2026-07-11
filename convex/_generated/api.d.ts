@@ -32,6 +32,7 @@ import type * as features_admin_users from "../features/admin/users.js";
 import type * as features_admin_variables from "../features/admin/variables.js";
 import type * as features_api_authorize from "../features/api/authorize.js";
 import type * as features_api_keys from "../features/api/keys.js";
+import type * as features_api_reads from "../features/api/reads.js";
 import type * as features_audit_compliance from "../features/audit/compliance.js";
 import type * as features_audit_helpers from "../features/audit/helpers.js";
 import type * as features_audit_queries from "../features/audit/queries.js";
@@ -142,6 +143,7 @@ declare const fullApi: ApiFromModules<{
   "features/admin/variables": typeof features_admin_variables;
   "features/api/authorize": typeof features_api_authorize;
   "features/api/keys": typeof features_api_keys;
+  "features/api/reads": typeof features_api_reads;
   "features/audit/compliance": typeof features_audit_compliance;
   "features/audit/helpers": typeof features_audit_helpers;
   "features/audit/queries": typeof features_audit_queries;

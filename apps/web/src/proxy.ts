@@ -42,10 +42,14 @@ export default authkitMiddleware({
       "/api/auth/me",
       "/api/telemetry-envelope",
       "/api/webhooks/polar",
-      // CI/CD secret pulls authenticate with a Bearer service token, not a
-      // browser session — a WorkOS redirect here would hand the GitHub
-      // Action an HTML page instead of JSON.
-      "/api/v1/secrets",
+      // Public REST API v1 (organization/projects/variables/accounts) AND the
+      // legacy CI/CD secrets pull all authenticate with a Bearer API key, not
+      // a browser session — a WorkOS redirect here would hand a machine
+      // client an HTML sign-in page instead of JSON. The wildcard covers
+      // every current and future /api/v1/* route (secrets, organization,
+      // projects, projects/[slug], projects/[slug]/variables,
+      // projects/[slug]/accounts) so new endpoints never need a proxy change.
+      "/api/v1/(.*)",
       // The CLI now calls Convex directly for everything, including secret
       // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
       // CLI path needs an unauthenticated bypass anymore.
