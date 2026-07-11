@@ -6,7 +6,7 @@ import {
   type MutationCtx,
 } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { requireAuthedUser } from "../../lib/identity";
+import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 
 /**
  * Membership tombstones — exit records shown to a user whose membership
@@ -91,7 +91,11 @@ export const myTombstones = query({
     })
   ),
   handler: async (ctx) => {
-    const actor = await requireAuthedUser(ctx);
+    // Mounted on every dashboard page (AccessNotices) — it races the JWT
+    // being attached to the Convex client on load. No identity yet is a
+    // normal transient state, not an error: return empty, never throw.
+    const actor = await getAuthedUser(ctx);
+    if (!actor) return [];
     const rows = await ctx.db
       .query("membershipTombstones")
       .withIndex("by_user", (q) =>

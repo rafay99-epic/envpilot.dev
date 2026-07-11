@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { requireAuthedUser } from "../../lib/identity";
+import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
   assertCanManageUser,
@@ -213,7 +213,11 @@ export const getMyMembershipStatus = query({
     })
   ),
   handler: async (ctx, args) => {
-    const actor = await requireAuthedUser(ctx);
+    // Mounted on every dashboard page (AccessNotices) — it races the JWT
+    // being attached to the Convex client on load. No identity yet is a
+    // normal transient state, not an error: return null, never throw.
+    const actor = await getAuthedUser(ctx);
+    if (!actor) return null;
     const membership = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org_and_user", (q) =>
