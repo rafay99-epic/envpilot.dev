@@ -167,7 +167,13 @@ export class ApiService {
           void this.promptReauth();
         }
 
-        const message = error.response?.data?.error || error.message;
+        const rawMessage = error.response?.data?.error || error.message;
+        // Translate the backend's org-wide revocation marker (security hold /
+        // membership removed) into a plain "contact your organization"
+        // message instead of leaking the raw guard string.
+        const message = rawMessage?.includes("ACCESS_SUSPENDED")
+          ? "Your access to this organization has been revoked. Please contact your organization."
+          : rawMessage;
         throw Object.assign(new Error(message), { status });
       }
     );

@@ -11,6 +11,8 @@ import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
+  getActiveMembership,
+  isSuspendedMembership,
 } from "../../lib/authz";
 import {
   buildActiveGrantMap,
@@ -78,13 +80,13 @@ export const listOrgVariablesWithAccess = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    // Resolve the caller's org role — non-members get nothing.
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
-      )
-      .first();
+    // Resolve the caller's org role — non-members (and suspended members) get
+    // nothing.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
     if (!membership) return [];
 
     const orgRole = normalizeOrgRole(membership.role);
@@ -226,13 +228,13 @@ export const listOrgVariablesWithAccessPaginated = query({
     const actor = await requireAuthedUser(ctx);
     const empty = { page: [], isDone: true, continueCursor: "" };
 
-    // Resolve the caller's org role — non-members get nothing.
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
-      )
-      .first();
+    // Resolve the caller's org role — non-members (and suspended members) get
+    // nothing.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
     if (!membership) return empty;
 
     const orgRole = normalizeOrgRole(membership.role);
@@ -807,11 +809,14 @@ export const globalSearchWithAccess = query({
       );
     };
 
-    // Get all org memberships for this user
-    const memberships = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_user", (q) => q.eq("userId", actor._id))
-      .collect();
+    // Get all ACTIVE org memberships for this user — a suspended org is
+    // excluded so its variables never surface in cross-org search.
+    const memberships = (
+      await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_user", (q) => q.eq("userId", actor._id))
+        .collect()
+    ).filter((m) => !isSuspendedMembership(m));
 
     // Pre-fetch project assignments once. projectMembers is a pure scope
     // assignment — its legacy role field is never consulted.

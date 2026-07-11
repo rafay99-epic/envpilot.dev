@@ -188,6 +188,15 @@ export const SEED_FEATURES = [
     sortOrder: 5,
   },
   {
+    key: "security_hold",
+    displayName: "Security Hold (Suspend Member Access)",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 6,
+  },
+  {
     key: "max_active_shares",
     displayName: "Max Active Shares",
     valueType: "numeric" as const,

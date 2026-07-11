@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
-import { getVariableAccess } from "../../lib/authz";
+import { getVariableAccess, getActiveMembership } from "../../lib/authz";
 import {
   MAX_SHARE_SCAN,
   normalizeResourceType,
@@ -79,14 +79,14 @@ export const listActiveByOrg = query({
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
-    // Require org membership; each share also exposes a variableKey, so it is
-    // only surfaced when the caller has access to the underlying variable.
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", args.organizationId).eq("userId", actor._id)
-      )
-      .first();
+    // Require ACTIVE org membership; each share also exposes a variableKey, so
+    // it is only surfaced when the caller has access to the underlying
+    // variable. A suspended member resolves to null → no shares.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
     if (!membership) return [];
 
     const shares = (
@@ -153,13 +153,13 @@ export const listByProject = query({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) return [];
 
-    // Require org membership before surfacing share metadata.
-    const membership = await ctx.db
-      .query("organizationMembers")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("organizationId", project.organizationId).eq("userId", actor._id)
-      )
-      .first();
+    // Require ACTIVE org membership before surfacing share metadata (a
+    // suspended member resolves to null).
+    const membership = await getActiveMembership(
+      ctx,
+      project.organizationId,
+      actor._id
+    );
     if (!membership) return [];
 
     const shares = await ctx.db

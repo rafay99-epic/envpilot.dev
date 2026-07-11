@@ -36,11 +36,13 @@ export interface Account {
 /** List accounts in a project with per-row access annotations. */
 export function useAccounts(
   projectId: Id<"projects"> | undefined,
+  // Retained as a readiness gate only — the query derives identity from the
+  // authed JWT server-side, never from a client-supplied userId.
   userId: Id<"users"> | undefined
 ) {
   return useQuery(
     convexApi.features.accounts.queries.listWithAccess,
-    projectId && userId ? { projectId, userId } : "skip"
+    projectId && userId ? { projectId } : "skip"
   ) as Account[] | undefined;
 }
 

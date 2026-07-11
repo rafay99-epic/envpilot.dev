@@ -34,9 +34,25 @@ export const ErrorCodes = {
 } as const;
 
 /**
+ * Server token marking an org-wide access revocation (security hold /
+ * membership removed). The backend throws it from the authz choke point; we
+ * translate it to a plain "contact your organization" message rather than
+ * leaking the raw guard string. See convex/lib/authz.ts.
+ */
+const ACCESS_SUSPENDED_TOKEN = "ACCESS_SUSPENDED";
+const ACCESS_REVOKED_MESSAGE =
+  "Your access to this organization has been revoked. Please contact your organization administrator.";
+
+/**
  * Format an error for display
  */
 export function formatError(error: unknown): string {
+  const raw =
+    error instanceof Error ? error.message : error ? String(error) : "";
+  if (raw.includes(ACCESS_SUSPENDED_TOKEN)) {
+    return chalk.red(`Error: ${ACCESS_REVOKED_MESSAGE}`);
+  }
+
   if (error instanceof CLIError) {
     let message = chalk.red(`Error: ${error.message}`);
     if (error.suggestion) {

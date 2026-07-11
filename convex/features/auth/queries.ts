@@ -7,6 +7,8 @@ import {
   toLegacyProjectRole,
   ORG_ACTIONS,
   PROJECT_ACTIONS,
+  assertNotSuspended,
+  isSuspendedMembership,
 } from "../../lib/authz";
 import {
   orgRoleValidator,
@@ -50,7 +52,9 @@ export const getMyPermissions = query({
       )
       .first();
 
-    if (!membership) {
+    if (!membership || isSuspendedMembership(membership)) {
+      // Suspended members present exactly like non-members: no role, no
+      // actions. The web hold screen reads status via its own query.
       return {
         orgRole: null,
         assigned: false,
@@ -152,6 +156,7 @@ export const resolveLegacyRoles = query({
     if (!membership) {
       throw new Error("You are not a member of this organization");
     }
+    assertNotSuspended(membership);
 
     const role = normalizeOrgRole(membership.role);
 

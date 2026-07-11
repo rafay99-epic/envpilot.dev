@@ -224,6 +224,57 @@ export function isEnvironmentScopeAllowed(
   return variableEnvironments.every((env) => scope.includes(env));
 }
 
+// ─── Security hold (suspension) ───────────────────────────────────────────────
+//
+// A suspended membership keeps its role/assignments/grants but is denied at
+// EVERY authz decision below — web, CLI, extension, REST API, and MCP all
+// route through these helpers, so this is the single enforcement point.
+// Clients match on the ACCESS_SUSPENDED token to render the org-contact
+// message instead of a generic permission error.
+
+export const ACCESS_SUSPENDED_TOKEN = "ACCESS_SUSPENDED";
+
+export function isSuspendedMembership(
+  membership: Pick<Doc<"organizationMembers">, "status">
+): boolean {
+  return membership.status === "suspended";
+}
+
+export function assertNotSuspended(
+  membership: Pick<Doc<"organizationMembers">, "status">
+): void {
+  if (isSuspendedMembership(membership)) {
+    throw new Error(
+      `${ACCESS_SUSPENDED_TOKEN}: Your access to this organization has been revoked. Please contact your organization.`
+    );
+  }
+}
+
+/**
+ * Resolve a user's org membership, treating a SUSPENDED membership as no
+ * membership at all. Use this in the many read paths that gate on "is the
+ * caller a member of this org" by reading `organizationMembers` inline
+ * (variable/account/share list queries, project-access validation, vault
+ * value reads) — a suspended member must be indistinguishable from a
+ * non-member there, so their secrets/vaultRefs never surface. Returns null
+ * for both "not a member" and "suspended", so callers keep their existing
+ * `if (!membership) return <empty>` behavior unchanged.
+ */
+export async function getActiveMembership(
+  ctx: MutationCtx | QueryCtx,
+  organizationId: Id<"organizations">,
+  userId: Id<"users">
+): Promise<Doc<"organizationMembers"> | null> {
+  const membership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", organizationId).eq("userId", userId)
+    )
+    .first();
+  if (!membership || isSuspendedMembership(membership)) return null;
+  return membership;
+}
+
 // ─── Core assertion helpers ───────────────────────────────────────────────────
 
 /**
@@ -250,6 +301,7 @@ export async function assertOrgAction(
   if (!membership) {
     throw new Error("Not a member of this organization");
   }
+  assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
   const allowedRoles = ORG_ACTIONS[action];
@@ -303,6 +355,7 @@ export async function assertProjectAction(
   if (!membership) {
     throw new Error("Not a member of this organization");
   }
+  assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
 
@@ -361,6 +414,7 @@ export async function assertOrgMembership(
   if (!membership) {
     throw new Error("Not a member of this organization");
   }
+  assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
 
@@ -513,6 +567,7 @@ export async function getVariableAccess(
     .first();
 
   if (!membership) return null;
+  if (isSuspendedMembership(membership)) return null;
 
   const role = normalizeOrgRole(membership.role);
   if (role === "owner") return "write";
@@ -624,6 +679,7 @@ export async function getAccountAccess(
     .first();
 
   if (!membership) return null;
+  if (isSuspendedMembership(membership)) return null;
 
   const role = normalizeOrgRole(membership.role);
   if (role === "owner") return "write";

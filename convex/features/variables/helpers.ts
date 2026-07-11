@@ -4,6 +4,7 @@ import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   toLegacyProjectRole,
+  getActiveMembership,
 } from "../../lib/authz";
 
 /**
@@ -90,13 +91,14 @@ export async function resolveProjectAccessContext(
     return null;
   }
 
-  // Get user's org membership to determine their unified role
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId)
-    )
-    .first();
+  // Get user's org membership to determine their unified role. A suspended
+  // member resolves to null here — the security-hold denial for the highest
+  // -traffic variable read paths (listWithAccess and its paginated sibling).
+  const membership = await getActiveMembership(
+    ctx,
+    project.organizationId,
+    userId
+  );
 
   if (!membership) {
     return null;

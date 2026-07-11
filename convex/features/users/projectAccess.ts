@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "../../_generated/server";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isCronPaused } from "../billing/tierLimits";
-import { assertOrgAction } from "../../lib/authz";
+import { assertOrgAction, isSuspendedMembership } from "../../lib/authz";
 import { requireAuthedUser } from "../../lib/identity";
 
 /**
@@ -75,7 +75,7 @@ export const validateToken = query({
       )
       .first();
 
-    if (!membership) {
+    if (!membership || isSuspendedMembership(membership)) {
       return {
         valid: false,
         reason: "Organization membership no longer active",
@@ -160,7 +160,7 @@ export const updateLastUsed = mutation({
       )
       .first();
 
-    if (!membership) {
+    if (!membership || isSuspendedMembership(membership)) {
       await ctx.db.patch(access._id, { isActive: false });
 
       const pendingRevocation = await ctx.db
@@ -239,7 +239,7 @@ export const refresh = mutation({
       )
       .first();
 
-    if (!membership) {
+    if (!membership || isSuspendedMembership(membership)) {
       await ctx.db.patch(access._id, { isActive: false });
 
       const pendingRevocation = await ctx.db
