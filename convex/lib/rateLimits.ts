@@ -25,6 +25,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 30,
   },
 
+  // Public API metadata reads (REST + MCP): 120 per minute per key. No
+  // vault decrypt, so a much higher ceiling than value/account pulls
+  // (which reuse cicdPull's per-key semantics — see PLAN §2).
+  apiMetadata: {
+    kind: "token bucket",
+    rate: 120,
+    period: 60_000,
+    capacity: 120,
+  },
+
   // CLI device code generation: 5 per minute per device
   cliAuthInitiate: {
     kind: "token bucket",

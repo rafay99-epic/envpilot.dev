@@ -117,6 +117,15 @@ export const listMigrations = query({
         destructive: false,
         runOnce: true,
       },
+      {
+        name: "migrate-service-tokens",
+        description:
+          "Copies every serviceTokens row into the generalized apiKeys table (scope = [projectId], environments, resources ['variables']), preserving tokenHash/createdBy/createdAt/lastUsedAt/revoked*. Idempotent — skips rows whose tokenHash already exists in apiKeys. serviceTokens is NOT dropped; cicd/pull.ts's _authorizePull looks up apiKeys first and falls back to serviceTokens for any row not yet migrated.",
+        category: "One-Time Migrations",
+        priority: 4,
+        destructive: false,
+        runOnce: true,
+      },
     ] as Array<{
       name: string;
       description: string;
@@ -308,6 +317,8 @@ export const runMigration = mutation({
           audit_log_retention_days: "7",
           sso_enabled: "false",
           cicd_service_tokens: "false",
+          public_api: "false",
+          mcp_server: "false",
           secret_rotation: "false",
           secret_rotation_limit: "7",
           secret_sharing: "false",
@@ -337,6 +348,8 @@ export const runMigration = mutation({
           audit_log_retention_days: "365",
           sso_enabled: "false",
           cicd_service_tokens: "true",
+          public_api: "true",
+          mcp_server: "true",
           secret_rotation: "true",
           secret_rotation_limit: "null",
           secret_sharing: "true",
@@ -833,6 +846,56 @@ export const runMigration = mutation({
         orgSettingsRemaining,
         usageCountersDeleted: counters.length,
         usageCountersMayHaveMore: counters.length === BATCH,
+      };
+    }
+
+    // Copies every serviceTokens row into the generalized apiKeys table:
+    // scope = [projectId] (single project — serviceTokens were never
+    // org-wide), environments preserved as-is, resources fixed to
+    // ["variables"] (the only thing serviceTokens ever granted). Preserves
+    // tokenHash/createdBy/createdAt/lastUsedAt/revoked* exactly so the
+    // migrated row authenticates identically to the original.
+    // Idempotent: skips any serviceTokens row whose tokenHash already has a
+    // matching apiKeys row (by_token_hash is unique in practice — tokenHash
+    // is a SHA-256 digest). serviceTokens is never dropped —
+    // cicd/pull.ts's _authorizePull checks apiKeys first, then falls back
+    // to serviceTokens for any row this migration hasn't reached yet.
+    if (args.name === "migrate-service-tokens") {
+      const serviceTokens = await ctx.db.query("serviceTokens").collect();
+      let migrated = 0;
+      let skipped = 0;
+
+      for (const token of serviceTokens) {
+        const existing = await ctx.db
+          .query("apiKeys")
+          .withIndex("by_token_hash", (q) => q.eq("tokenHash", token.tokenHash))
+          .first();
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        await ctx.db.insert("apiKeys", {
+          organizationId: token.organizationId,
+          name: token.name,
+          tokenHash: token.tokenHash,
+          scopeProjects: [token.projectId],
+          scopeEnvironments: token.environments,
+          scopeResources: ["variables"],
+          createdBy: token.createdBy,
+          createdAt: token.createdAt,
+          lastUsedAt: token.lastUsedAt,
+          revokedAt: token.revokedAt,
+          revokedBy: token.revokedBy,
+        });
+        migrated++;
+      }
+
+      return {
+        success: true,
+        total: serviceTokens.length,
+        migrated,
+        skipped,
       };
     }
 

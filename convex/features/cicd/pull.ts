@@ -24,8 +24,17 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
 
 /**
  * Authorize a pull and record it. Single mutation so the rate-limit check,
- * token validation, tier gate, audit entry, and lastUsedAt update are one
- * atomic, cheap write — the action then only reads/decrypts.
+ * credential validation, tier gate, audit entry, and lastUsedAt update are
+ * one atomic, cheap write — the action then only reads/decrypts.
+ *
+ * COMPAT LAYER: the generalized `apiKeys` table (features/api/keys.ts)
+ * supersedes `serviceTokens` as the token platform, and `migrate-service-
+ * tokens` copies every serviceTokens row into apiKeys. This looks up
+ * apiKeys FIRST by hash so a migrated (or freshly minted) apiKeys row
+ * always wins; serviceTokens is checked as a fallback for any row the
+ * migration hasn't reached yet (it is never dropped). Both branches
+ * preserve the EXACT same return shape and denial semantics so
+ * /api/v1/secrets and the GitHub Action keep working unchanged either way.
  */
 export const _authorizePull = internalMutation({
   args: {
@@ -52,7 +61,7 @@ export const _authorizePull = internalMutation({
     })
   ),
   handler: async (ctx, args) => {
-    // Rate limit keyed by the hash — throttles both real tokens and
+    // Rate limit keyed by the hash — throttles both real credentials and
     // brute-force probing of invalid ones. (Throws + rolls back: rate-limit
     // hits are deliberately NOT audited — a rejected burst would flood the
     // org's audit trail.)
@@ -61,12 +70,117 @@ export const _authorizePull = internalMutation({
       throws: true,
     });
 
+    const now = Date.now();
+
+    // ── apiKeys path (generalized platform) ──────────────────────────────
+    const apiKey = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
+      .first();
+
+    if (apiKey) {
+      const logApiKeyDenied = async (reason: string): Promise<void> => {
+        await ctx.db.insert("auditLogs", {
+          organizationId: apiKey.organizationId,
+          userId: apiKey.createdBy,
+          action: "api.request_denied",
+          details: JSON.stringify({
+            keyId: apiKey._id,
+            keyName: apiKey.name,
+            environment: args.environment,
+            reason,
+            source: "cicd_pull_compat",
+          }),
+          createdAt: now,
+        });
+      };
+
+      // A REVOKED key being presented is the highest-signal denial.
+      if (apiKey.revokedAt !== undefined) {
+        await logApiKeyDenied("revoked_key_used");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+
+      // Expiry gets the same uniform "invalid" answer as revocation.
+      if (apiKey.expiresAt !== undefined && apiKey.expiresAt <= now) {
+        await logApiKeyDenied("expired_key_used");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+
+      // This legacy surface has no projectId argument — the project comes
+      // entirely from the credential's scope, and it can only ever act on
+      // ONE project's variables. Keys scoped to "all"/multiple projects, or
+      // without "variables" in their resource scope, aren't shaped for it.
+      if (apiKey.scopeProjects === "all") {
+        await logApiKeyDenied("scope_not_single_project_variables");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+      if (
+        !apiKey.scopeResources.includes("variables") ||
+        apiKey.scopeProjects.length !== 1
+      ) {
+        await logApiKeyDenied("scope_not_single_project_variables");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+      const projectId = apiKey.scopeProjects[0];
+
+      if (
+        apiKey.scopeEnvironments !== "all" &&
+        !apiKey.scopeEnvironments.includes(args.environment)
+      ) {
+        await logApiKeyDenied("environment_out_of_scope");
+        return { ok: false as const, denied: "environment_scope" as const };
+      }
+
+      const project = await ctx.db.get(projectId);
+      if (!project || project.deletedAt !== undefined) {
+        await logApiKeyDenied("project_deleted");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+
+      // Same tier gate as the serviceTokens path below — this compat surface
+      // stays gated by `cicd_service_tokens` regardless of which table the
+      // underlying credential lives in; `public_api` gates the new REST/MCP
+      // surfaces, not this one.
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        apiKey.organizationId,
+        "cicd_service_tokens"
+      );
+      if (!gate.allowed) {
+        await logApiKeyDenied("tier_gate");
+        return { ok: false as const, denied: "tier_gate" as const };
+      }
+
+      await ctx.db.patch(apiKey._id, { lastUsedAt: now });
+      await ctx.db.insert("auditLogs", {
+        organizationId: apiKey.organizationId,
+        userId: apiKey.createdBy,
+        action: "api.secrets_pulled",
+        details: JSON.stringify({
+          keyId: apiKey._id,
+          keyName: apiKey.name,
+          projectId,
+          environment: args.environment,
+          source: "cicd_pull_compat",
+        }),
+        createdAt: now,
+      });
+
+      return {
+        ok: true as const,
+        projectId,
+        projectName: project.name,
+        projectSlug: project.slug,
+      };
+    }
+
+    // ── serviceTokens fallback (rows not yet migrated) ───────────────────
     const token = await ctx.db
       .query("serviceTokens")
       .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
       .first();
 
-    const now = Date.now();
     const logDenied = async (
       t: NonNullable<typeof token>,
       reason: string

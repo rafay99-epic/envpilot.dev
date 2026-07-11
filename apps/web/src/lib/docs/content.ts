@@ -68,6 +68,12 @@ export function getAllDocs(): Omit<DocPage, "content">[] {
     // Guides — SEO entry points targeting problem-first searches
     "share-environment-variables-securely",
     "nextjs-environment-variables",
+    // Public API, MCP server, and CI/CD integrations
+    "api-quickstart",
+    "api-reference",
+    "mcp-server",
+    "github-action",
+    "api-security",
   ];
 
   const files = readdirSync(CONTENT_DIR)

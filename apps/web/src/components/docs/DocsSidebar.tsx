@@ -7,6 +7,10 @@ import {
   Shield,
   Users,
   FileText,
+  Zap,
+  BookOpen,
+  Plug,
+  Github,
   ExternalLink,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +27,10 @@ export const DOC_ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   users: Users,
   "file-text": FileText,
+  zap: Zap,
+  book: BookOpen,
+  plug: Plug,
+  github: Github,
 };
 
 const RESOURCES = [

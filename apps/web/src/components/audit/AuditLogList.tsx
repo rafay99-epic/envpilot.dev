@@ -79,6 +79,14 @@ const actionLabels: Record<string, string> = {
   "access.token_used": "Used access token",
   "access.extension_linked": "Linked extension",
   "access.extension_unlinked": "Unlinked extension",
+  "api.key_created": "Created API key",
+  "api.key_revoked": "Revoked API key",
+  "api.secrets_pulled": "Pulled API secrets",
+  "api.request_denied": "API request denied",
+  "cicd.token_created": "Created CI/CD token",
+  "cicd.token_revoked": "Revoked CI/CD token",
+  "cicd.secrets_pulled": "Pulled CI/CD secrets",
+  "cicd.pull_denied": "CI/CD pull denied",
   "billing.subscription_created": "Created subscription",
   "billing.subscription_updated": "Updated subscription",
   "billing.subscription_canceled": "Canceled subscription",
@@ -237,6 +245,36 @@ const actionIcons: Record<string, React.ReactNode> = {
       />
     </svg>
   ),
+  api: (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.909c0-.7.279-1.372.776-1.869l8.14-8.14c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+      />
+    </svg>
+  ),
+  cicd: (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"
+      />
+    </svg>
+  ),
 };
 
 function getActionCategory(action: string): string {
@@ -248,6 +286,8 @@ function getActionCategory(action: string): string {
   if (action.startsWith("project.")) return "project";
   if (action.startsWith("invitation.")) return "invitation";
   if (action.startsWith("billing.")) return "billing";
+  if (action.startsWith("api.")) return "api";
+  if (action.startsWith("cicd.")) return "cicd";
   return "organization";
 }
 

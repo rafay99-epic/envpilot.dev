@@ -116,6 +116,24 @@ if (!limit.allowed)
 
 Add a `count*` helper in `convex/features/featureRegistry/gates.ts` for each limited feature (e.g., `countRotationEnabledVariables`).
 
+### Public API & MCP server (pro features)
+
+One enforcement core, three faces: the REST API (`/api/v1/*`), the MCP
+server (`/api/mcp`), and the GitHub Action all authenticate with `apiKeys`
+(org-scoped, dynamic scope: projects all|list, environments, resources,
+optional expiry; SHA-256 hash only) and route EVERY request through
+`convex/features/api/authorize.ts::_authorizeRequest` — never re-implement
+authorization for a new surface. Denials are returned (not thrown) so audit
+writes survive; unknown/revoked/expired keys get one uniform answer; the
+tier gate (`public_api` / `mcp_server` per surface) re-checks on every
+request. Read paths live in `convex/features/api/reads.ts` (bounded
+active-only reads, refuse-partial >1000, loud decrypt aborts — never
+partial data or sentinel values). Keys are managed in Organization →
+Settings → API Keys (org-wide creation is owner-only). Legacy
+`serviceTokens` (CI/CD tab) still work via a compat fallback in
+`cicd/pull.ts`; `migrate-service-tokens` copies them into `apiKeys`.
+Docs are MDX files in `apps/web/content/docs/` (never Convex-stored).
+
 ### GitHub Action release flow (public repo from a private monorepo)
 
 Consumers use `uses: rafay99-epic/envpilot-action@v1`, which resolves against
