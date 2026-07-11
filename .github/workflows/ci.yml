@@ -4,9 +4,11 @@ name: CI
 #   changes (path detection) → parallel scoped checks → checks-passed gate
 #   → artifact builds → deploys (main only, via reusable workflows) → release
 #
-# Web + Admin are deployed by Vercel's GitHub integration — CI only verifies
-# them. Build artifacts (CLI tarball, VSIX) are available in the run's
-# Artifacts panel; nothing is commented on PRs.
+# Web + Admin production deploys are TRIGGERED from here via Vercel Deploy
+# Hooks (deploy-vercel job) — auto-deploy for main is disabled in each app's
+# vercel.json so the backend always ships first. PR previews still come from
+# Vercel's GitHub integration. Build artifacts (CLI tarball, VSIX) are
+# available in the run's Artifacts panel; nothing is commented on PRs.
 
 on:
   push:
@@ -509,6 +511,49 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
+
+  deploy-vercel:
+    name: Trigger Vercel deploys
+    # Backend FIRST (same strict ordering as deploy-cli/deploy-extension):
+    # web/admin builds are only triggered after the Convex functions they
+    # call are live. Auto-deploy for main is disabled in each app's
+    # vercel.json; this job fires the Deploy Hooks instead, and Vercel
+    # builds on its own infra (nothing is built here). The !failure()
+    # guard lets a SKIPPED deploy-convex (no convex changes) fall through,
+    # while a FAILED one blocks. The hook builds main's HEAD at trigger
+    # time, not this run's SHA — back-to-back merges just rebuild the
+    # newer HEAD, which is safe.
+    needs: [changes, checks-passed, e2e, deploy-convex]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      (needs.changes.outputs.run_web == 'true' || needs.changes.outputs.run_admin == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger web deploy
+        if: needs.changes.outputs.run_web == 'true'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_WEB }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_WEB secret is missing. Create a Deploy Hook in the web project (Vercel → Settings → Git → Deploy Hooks, branch main) and add its URL as a repo secret."
+            exit 1
+          fi
+          curl -sfS -X POST "$HOOK" -o /dev/null
+          echo "Web deploy triggered." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trigger admin deploy
+        if: needs.changes.outputs.run_admin == 'true'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_ADMIN }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_ADMIN secret is missing. Create a Deploy Hook in the admin project (Vercel → Settings → Git → Deploy Hooks, branch main) and add its URL as a repo secret."
+            exit 1
+          fi
+          curl -sfS -X POST "$HOOK" -o /dev/null
+          echo "Admin deploy triggered." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-homebrew:
     name: Deploy Homebrew formula
