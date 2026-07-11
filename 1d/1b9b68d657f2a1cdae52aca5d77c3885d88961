@@ -1,0 +1,26 @@
+CLAUDE.md
+  s_f59315d63e71a6::t_d9d0f6b3514fe1 159
+packages/github-action/package.json
+  s_f59315d63e71a6::t_02009dc5f20f1d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "1d1b9b68d657f2a1cdae52aca5d77c3885d88961",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f59315d63e71a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45cfde4e-acfe-4326-b0a3-7eb8599ff995",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
