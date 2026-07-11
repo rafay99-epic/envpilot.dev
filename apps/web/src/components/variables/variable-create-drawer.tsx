@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { DrawerPanel } from "@/components/ui";
 import { VariableForm, type VariableFormData } from "./variable-form";
 import { BulkPasteForm } from "./bulk-paste-form";
@@ -96,9 +97,38 @@ export function VariableCreateDrawer({
       }
     }
 
-    if (failures.length > 0 && failures.length < entries.length) {
+    const created = entries.length - failures.length;
+
+    if (failures.length === 0) {
+      toast.success(`${created} variable${created === 1 ? "" : "s"} created.`);
       handleClose();
-    } else if (failures.length === 0) {
+      return;
+    }
+
+    // Summarize failures in user terms — duplicate keys are the common,
+    // user-correctable case and get their own line instead of raw errors.
+    const duplicateKeys = failures
+      .filter((f) => /already exists/i.test(f.error))
+      .map((f) => f.key);
+    const otherFailures = failures.filter(
+      (f) => !/already exists/i.test(f.error)
+    );
+    const parts: string[] = [];
+    if (duplicateKeys.length > 0) {
+      parts.push(`Already exist in this project: ${duplicateKeys.join(", ")}`);
+    }
+    for (const f of otherFailures) {
+      parts.push(`${f.key}: ${f.error}`);
+    }
+
+    toast.error(
+      created > 0
+        ? `${created} created, ${failures.length} skipped`
+        : `No variables created (${failures.length} failed)`,
+      { description: parts.join(" · "), duration: 8000 }
+    );
+
+    if (created > 0) {
       handleClose();
     }
   }
