@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { internal } from "../../_generated/api";
 import { mutation, query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
 
@@ -108,6 +109,15 @@ export const upsert = mutation({
       createdAt: now,
       lastActiveAt: now,
     });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.emails.emails.sendWelcomeEmail,
+      {
+        to: args.email,
+        name: args.name,
+      }
+    );
 
     return userId;
   },

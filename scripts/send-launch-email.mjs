@@ -55,9 +55,13 @@ https://www.envpilot.dev · support@envpilot.dev
 const send = process.argv.includes("--send");
 
 if (!send) {
-  console.log(`DRY RUN — nothing will be sent. Re-run with --send to send for real.\n`);
+  console.log(
+    `DRY RUN — nothing will be sent. Re-run with --send to send for real.\n`
+  );
   for (const u of USERS) {
-    console.log(`To: ${u.email}\nSubject: ${SUBJECT}\n${body(u.greeting).slice(0, 120)}...\n---`);
+    console.log(
+      `To: ${u.email}\nSubject: ${SUBJECT}\n${body(u.greeting).slice(0, 120)}...\n---`
+    );
   }
   console.log(`\n${USERS.length} emails ready.`);
   process.exit(0);
@@ -65,7 +69,9 @@ if (!send) {
 
 const pass = process.env.GMAIL_APP_PASSWORD;
 if (!pass) {
-  console.error("Set GMAIL_APP_PASSWORD env var (the 16-char Gmail app password).");
+  console.error(
+    "Set GMAIL_APP_PASSWORD env var (the 16-char Gmail app password)."
+  );
   process.exit(1);
 }
 
