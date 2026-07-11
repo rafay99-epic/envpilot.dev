@@ -302,12 +302,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         setNotice("Variable created successfully.");
       }
     } catch (err) {
+      const isDuplicateKey =
+        err instanceof ApiError &&
+        err.status === 409 &&
+        /already exists/i.test(err.message);
       const message =
         err instanceof ApiError && err.code === "TIER_LIMIT_REACHED"
           ? "Variable limit reached. Upgrade to Pro for unlimited variables."
-          : err instanceof Error
-            ? err.message
-            : "Failed to create variable";
+          : isDuplicateKey
+            ? `A variable named "${data.key}" already exists in this project. Edit the existing variable or choose a different key.`
+            : err instanceof Error
+              ? err.message
+              : "Failed to create variable";
       log.error(
         "project_variable_create_failed",
         {
@@ -320,7 +326,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         err
       );
       setError(message);
-      throw err;
+      // Re-throw with the friendly message — the create drawer's form shows
+      // err.message in its inline banner, never the raw backend text.
+      throw new Error(message);
     }
   };
 

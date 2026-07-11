@@ -26,8 +26,11 @@ export function sanitizeConvexError(error: unknown): string {
       .replace(/\s*at handler \([^)]*\)/g, "")
       // Strip "at ... (file:line:col)" patterns anywhere in the message
       .replace(/\s*at\s+\S+\s+\([^)]*\)/g, "")
-      // Strip "Server Error Uncaught Error:" prefix
-      .replace(/^(Server Error\s*)?Uncaught Error:\s*/i, "")
+      // Strip "Server Error Uncaught Error:" prefixes. `+` matters: an action
+      // that re-throws a mutation's error double-wraps it ("Uncaught Error:
+      // Uncaught Error: ..."), and stripping only one layer leaked the inner
+      // prefix into user-facing error banners.
+      .replace(/^(Server Error\s*)?(Uncaught Error:\s*)+/i, "")
       // Strip file paths (Unix and Windows)
       .replace(/\/[\w./-]+\.(ts|js|tsx|jsx)(:\d+:\d+)?/g, "")
       .replace(/\.\.\//g, "")
