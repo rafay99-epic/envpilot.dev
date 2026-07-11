@@ -1,0 +1,40 @@
+convex/features/admin/migrations.ts
+  s_e5ca61c07a0c6b::t_1b1ee35add4091 163-164
+convex/features/admin/tiers.ts
+  s_e5ca61c07a0c6b::t_d2f412e4eed023 332-333
+apps/web/src/app/(dashboard)/dashboard/usage/usage-layout.tsx
+  s_e5ca61c07a0c6b::t_1958e7d6d1562b 225-230
+  s_e5ca61c07a0c6b::t_3124b618c9f587 224
+apps/web/src/lib/versions.ts
+  s_e5ca61c07a0c6b::t_4faa18f53d0aee 17
+apps/web/tests/e2e/authenticated/billing-management.spec.ts
+  s_e5ca61c07a0c6b::t_49583cc5729749 1-95
+apps/web/src/app/(dashboard)/dashboard/settings/page.tsx
+  s_e5ca61c07a0c6b::t_b798c5ff982521 2039-2042
+  s_e5ca61c07a0c6b::t_95d79975fb7de0 1988,1994,1997
+  s_e5ca61c07a0c6b::t_8a70ea5d780d14 4
+  s_e5ca61c07a0c6b::t_df485cf423d1bf 56-64,67
+  s_e5ca61c07a0c6b::t_b0e611ad962b92 68-77
+  s_e5ca61c07a0c6b::t_a07436be7436e6 1644-1652,1662
+apps/web/src/app/api/billing/cancel/route.ts
+  s_e5ca61c07a0c6b::t_7bbe63f2ee0eae 13-18,27-29
+  s_e5ca61c07a0c6b::t_772e5c162daed6 143
+apps/web/package.json
+  s_e5ca61c07a0c6b::t_4faa18f53d0aee 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "7d9d8fcda49fb373d20c175384748ca7555637f4",
+  "prompts": {},
+  "sessions": {
+    "s_e5ca61c07a0c6b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79f33d65-6de1-40c9-876d-59c144983c8d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
