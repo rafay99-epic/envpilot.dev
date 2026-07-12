@@ -53,6 +53,7 @@ import type * as features_community_featureRequests_queries from "../features/co
 import type * as features_community_featureRequests_seed from "../features/community/featureRequests/seed.js";
 import type * as features_dashboard_dashboard from "../features/dashboard/dashboard.js";
 import type * as features_emails_emails from "../features/emails/emails.js";
+import type * as features_emails_loops from "../features/emails/loops.js";
 import type * as features_emails_templates from "../features/emails/templates.js";
 import type * as features_featureRegistry_gates from "../features/featureRegistry/gates.js";
 import type * as features_featureRegistry_queries from "../features/featureRegistry/queries.js";
@@ -166,6 +167,7 @@ declare const fullApi: ApiFromModules<{
   "features/community/featureRequests/seed": typeof features_community_featureRequests_seed;
   "features/dashboard/dashboard": typeof features_dashboard_dashboard;
   "features/emails/emails": typeof features_emails_emails;
+  "features/emails/loops": typeof features_emails_loops;
   "features/emails/templates": typeof features_emails_templates;
   "features/featureRegistry/gates": typeof features_featureRegistry_gates;
   "features/featureRegistry/queries": typeof features_featureRegistry_queries;
