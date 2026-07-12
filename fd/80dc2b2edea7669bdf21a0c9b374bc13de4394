@@ -1,0 +1,20 @@
+convex/features/emails/loops.ts
+  s_3676ec1daf5202::t_d044f80d30f653 17
+  s_3676ec1daf5202::t_155e23a91c30f1 1-16,18-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "fd80dc2b2edea7669bdf21a0c9b374bc13de4394",
+  "prompts": {},
+  "sessions": {
+    "s_3676ec1daf5202": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d471032b-dcda-462d-91b2-f61316f5d4ff",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
