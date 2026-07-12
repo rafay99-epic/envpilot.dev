@@ -1,0 +1,24 @@
+convex/features/admin/migrations.ts
+  s_3676ec1daf5202::t_2f9d251cc33daa 56
+.github/workflows/deploy-convex.yml
+  s_3676ec1daf5202::t_8af22fc64b7042 40-43
+  s_3676ec1daf5202::t_155e4fc24a90ad 55
+convex/features/community/changelog/seed.ts
+  s_3676ec1daf5202::t_ee3806156c73ac 805-1082
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "375d0f991904584a5b9540f301758ecc5e60047a",
+  "prompts": {},
+  "sessions": {
+    "s_3676ec1daf5202": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d471032b-dcda-462d-91b2-f61316f5d4ff",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
