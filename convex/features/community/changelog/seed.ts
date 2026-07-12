@@ -802,4 +802,282 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
 - Actions that fail (permission errors, tier limits, unexpected failures) now surface a toast notification instead of failing silently
 - Covers rollback, variable edits, and other mutation flows across the dashboard`,
   },
+
+  // ============================================================
+  // v1.28.0 — Deletion Becomes Real (2026-07-04)
+  // ============================================================
+  {
+    title: "Deletion Becomes Real: 7-Day Trash, Then Permanent Purge",
+    version: "v1.28.0",
+    type: "feature",
+    publishedAt: ts("2026-07-04T15:00:00Z"),
+    content: `When you delete a secret, it is now actually destroyed — a 7-day trash window, then a permanent purge that removes the encrypted value from the vault itself.
+
+### The New Deletion Model
+- Deleting a variable or shared account moves it to trash for 7 days
+- After 7 days, a daily purge permanently destroys both the database record **and** every backing vault object — including full version history
+- Delete dialogs now tell you exactly what will happen: "restorable for 7 days, then permanently deleted, including the stored secret value"
+
+### Restore From Trash
+- New "Recently deleted" section on the project page shows trashed variables and accounts with a days-left countdown
+- One-click Restore brings an item back — shared accounts gain a restore path for the first time
+- Items past the 7-day window can never be restored, so a purge can never race a restore
+
+### Cascade Fixes
+- Deleting a project or organization now correctly sweeps its shared accounts too
+- A project restored within 7 days keeps its full variable version history
+
+### Performance
+- Faster dashboard and search: global search, usage stats, and permission checks now use bounded, indexed reads instead of full-table scans`,
+  },
+
+  // ============================================================
+  // v1.30.0 — Server-Verified Identity Everywhere (2026-07-06)
+  // ============================================================
+  {
+    title: "Auth Overhaul: Server-Verified Identity on Every Surface",
+    version: "v1.30.0",
+    type: "security",
+    publishedAt: ts("2026-07-06T08:00:00Z"),
+    content: `The biggest security release in Envpilot's history — every request from the web app, CLI, and VS Code extension now carries a cryptographically verified identity, and all secret encryption happens inside the backend.
+
+### Verified Identity Everywhere
+- The backend no longer trusts any client-supplied user identity — every operation derives who you are from a verified WorkOS AuthKit JWT
+- Impersonation by crafted requests is now impossible: the server resolves the actor itself, on every call
+- Billing, subscription, and tier information can only be read by the account that owns it
+
+### New CLI & Extension Login: Device Flow
+- \`envpilot login\` now uses the industry-standard device authorization flow — a code appears in your terminal, you approve it in the browser, done
+- The CLI and extension hold short-lived access tokens with automatic refresh, instead of long-lived custom tokens
+- Signing out a device from the web dashboard now revokes the session remotely — the device's tokens stop working immediately
+- All CLI and extension traffic runs over the same authenticated real-time connection as the web app
+
+### Vault Crypto Moved Into the Backend
+- Secret encryption and decryption now happen entirely inside the backend — the web server no longer handles vault cryptography
+- Revealing a value (the eye icon, diffs) is authorized by reverse-looking-up who owns that exact secret before anything is decrypted — unknown or inaccessible references fail closed
+- Zero data migration required: every existing secret keeps resolving byte-for-byte`,
+  },
+  {
+    title: "Smarter Client Version Enforcement",
+    version: "v1.30.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-06T10:00:00Z"),
+    content: `The CLI and VS Code extension now know when they're outdated — and tell you before anything breaks.
+
+### Two-Tier Enforcement
+- **Behind the latest version** → a soft "update available" notice; your command still runs
+- **Below the minimum supported version** → a clear upgrade prompt before anything runs, instead of a confusing failure against a changed backend
+- Version checks fail open on network errors — a flaky connection never locks you out
+
+### Under the Hood
+- The CLI checks before your command runs, not after
+- The extension shows an update prompt and pauses commands until you're current`,
+  },
+
+  // ============================================================
+  // v1.31.0 — Homebrew & Polish (2026-07-09)
+  // ============================================================
+  {
+    title: "Install the CLI with Homebrew",
+    version: "v1.31.0",
+    type: "feature",
+    publishedAt: ts("2026-07-09T19:45:00Z"),
+    content: `The Envpilot CLI is now available via Homebrew — plus a friendlier experience when authentication goes wrong.
+
+### Homebrew Distribution
+- \`brew install rafay99-epic/apps/envpilot\` — one command, no npm required
+- The formula updates automatically with every CLI release
+
+### Dedicated Auth Error Page
+- Session or token problems in the dashboard now land on a clear, terminal-styled error page with Try Again and Sign In actions — instead of a crash
+- Transient sign-in races retry themselves automatically before you ever see an error
+- Raw server error details are never shown in production`,
+  },
+
+  // ============================================================
+  // v1.33.0 — Pro Plans Are Live (2026-07-10)
+  // ============================================================
+  {
+    title: "Pro Plans Are Live",
+    version: "v1.33.0",
+    type: "feature",
+    publishedAt: ts("2026-07-10T22:15:00Z"),
+    content: `You can now subscribe to Envpilot Pro with a card — real payments, powered by Polar.
+
+### Subscribe to Pro
+- Upgrade from the pricing page or your usage page; checkout is handled securely by Polar
+- Your plan activates the moment payment completes, and Pro features unlock instantly across web, CLI, and extension
+
+### Hardened for Real Money
+- The entire billing pipeline was audited and production-hardened before go-live
+- Payment events can never be silently dropped — if activation hits a hiccup, the payment provider automatically retries until your tier is granted
+- Webhook processing is verified end-to-end so tier grants can only come from genuine payment events
+- Plan changes, cancellations, and grace periods all resolve to the correct tier, even with out-of-order events`,
+  },
+
+  // ============================================================
+  // v1.34.0 — CI/CD Service Tokens & GitHub Action (2026-07-11)
+  // ============================================================
+  {
+    title: "GitHub Action & CI/CD Service Tokens",
+    version: "v1.34.0",
+    type: "feature",
+    publishedAt: ts("2026-07-11T00:30:00Z"),
+    content: `Pull your environment variables straight into CI — one revocable Envpilot token in GitHub instead of dozens of copy-pasted secrets.
+
+### The Official GitHub Action
+\`\`\`yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: \${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+\`\`\`
+- Exports your variables to the workflow environment or a dotenv file
+- Every value is masked in workflow logs before it is ever exported — keys and values are never printed
+
+### Service Tokens (Pro)
+- Read-only machine tokens scoped to one project and explicit environments — created in Project → Settings → CI/CD Tokens
+- The token is shown exactly once at creation; only a hash is ever stored
+- Revocation is immediate, every pull is audit-logged, and tokens can't be repointed to another project
+- Hand a production token to a DevOps engineer or CI system without creating an Envpilot account for it`,
+  },
+
+  // ============================================================
+  // v1.35.0 — Public API & MCP Server (2026-07-11)
+  // ============================================================
+  {
+    title: "Envpilot Becomes a Platform: Public REST API & MCP Server",
+    version: "v1.35.0",
+    type: "feature",
+    publishedAt: ts("2026-07-11T08:15:00Z"),
+    content: `A public REST API, a remote MCP server for AI assistants, and a unified API-key system to power them both — Envpilot is now a platform you can build on. Both surfaces are Pro features.
+
+### API Keys
+- Create org-scoped API keys in Organization → Settings → API Keys
+- Fine-grained scopes: all projects or a specific list, chosen environments, chosen resources (variables, accounts, projects), optional expiry with countdown badges
+- One-time reveal at creation, instant revocation, every denial audited
+- Existing CI/CD service tokens keep working unchanged
+
+### REST API v1
+- \`/api/v1/organization\`, \`/api/v1/projects\`, \`/api/v1/projects/{slug}/variables\`, \`/api/v1/projects/{slug}/accounts\`
+- Filter by environment, key list, or prefix; fetch metadata-only or ready-to-use \`format=env\` output
+- Fail-loud by design: you get complete, correct data or a clear error — never partial results or placeholder values
+- Per-key rate limits, uniform errors that never leak whether a resource exists outside your scope
+
+### MCP Server for AI Assistants
+- Point Claude Code, Claude Desktop, or Cursor at \`/api/mcp\` with an Envpilot API key
+- Five read-only tools let your AI list projects, read variables, and search your scoped configuration
+- Every tool call passes through the exact same authorization core as the REST API
+
+### Documentation
+- Five new docs pages: API quickstart, full API reference, MCP server setup, GitHub Action guide, and API security model`,
+  },
+
+  // ============================================================
+  // v1.36.0 — Security Hold & Offboarding (2026-07-11)
+  // ============================================================
+  {
+    title: "Security Hold: Freeze a Member's Access Instantly",
+    version: "v1.36.0",
+    type: "security",
+    publishedAt: ts("2026-07-11T19:00:00Z"),
+    content: `For "their laptop just leaked" moments — suspend a member's access org-wide without removing them, and reinstate them exactly as they were.
+
+### Security Hold (Pro)
+- Suspend any member from the members page: every access path is denied immediately — web, CLI, extension, API, and MCP
+- All of their sessions are killed, and their extension deletes synced \`.env\` files from the compromised machine
+- Membership, role, project assignments, and per-variable grants stay intact — reinstating restores the exact prior state with nothing to rebuild
+- Every suspend and reinstate is audit-logged
+
+### Better Removal Experience
+- Removed members now see a clear "your access to this organization has been revoked" screen instead of the org silently vanishing
+- Users with no organizations left get a path to create their own workspace
+
+### Extension Cleans Up After Itself
+- Uninstalling the VS Code extension now deletes the \`.env\` files it synced — plaintext secrets no longer linger on offboarded machines
+- Files you hand-edited since the last sync are always spared, and updates/reloads never trigger a purge`,
+  },
+
+  // ============================================================
+  // v1.37.0 — Project Trash Page (2026-07-11)
+  // ============================================================
+  {
+    title: "Dedicated Project Trash Page with Empty Trash",
+    version: "v1.37.0",
+    type: "feature",
+    publishedAt: ts("2026-07-11T19:30:00Z"),
+    content: `Trash gets a real home — a dedicated page per project, with the power to purge early.
+
+### The Trash Page
+- New **Trash** link in the project header, next to Compare and Members
+- Deleted variables and shared accounts in separate sections, rendered dimmed and struck-through — they are genuinely disabled while trashed
+- Per-item Restore and a days-left countdown that turns red on the last day
+
+### Empty Trash
+- Permanently destroy everything in the project's trash right now, skipping the remaining retention days — with a confirmation dialog
+- Vault objects are destroyed first, records only after every secret is confirmed gone; anything that can't be purged safely stays in trash and is retried automatically
+- The action is audit-logged with purge counts`,
+  },
+
+  // ============================================================
+  // v1.38.0 — Usage Page Revamp (2026-07-11)
+  // ============================================================
+  {
+    title: "Usage Page Revamp",
+    version: "v1.38.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-11T21:15:00Z"),
+    content: `The organization usage page has been rebuilt around clarity — see your plan, your limits, and what needs attention at a glance.
+
+### New Layout
+- **Plan strip** up top: your tier, price, an Upgrade CTA, and a "Compare plans" link
+- **Alert zone**: a red/amber banner calls out any resource at or above 80% of its limit — no more surprises
+- **Every quota meter is always visible**, grouped by Resources, Variables & secrets, Sharing & collaboration, and Data retention — nothing hidden behind collapsibles
+- **Plan features grid** shows what your current plan includes; locked features carry a Pro chip with an Unlock CTA
+- Per-project variable breakdown lives under a compact "By project" toggle
+
+### Polish
+- Creating a variable with a key that already exists now shows a friendly, actionable message in the drawer instead of a raw backend error — and the drawer stays open so you can correct it
+- Bulk paste now reports exactly what happened: how many were created, which keys were skipped as duplicates, and any other failures — nothing is silently swallowed`,
+  },
+
+  // ============================================================
+  // v1.39.0 — Billing Management UX (2026-07-11)
+  // ============================================================
+  {
+    title: "Better Billing Management",
+    version: "v1.39.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-11T22:30:00Z"),
+    content: `Now that real payments flow, managing your subscription got a polish pass.
+
+### Invoices & Billing History
+- New **Manage billing** link on the usage page plan strip takes you straight to the Billing tab
+- From there, open Polar's hosted customer portal for invoices, receipts, and payment methods
+- Settings tabs are now deep-linkable — share a URL that opens directly on Billing
+
+### Cancellation Feedback
+- Cancelling now asks why (required) — your feedback goes straight to us and shapes what we build next
+- The flow is otherwise unchanged: Pro access continues until the end of your billing period, followed by a 7-day grace period
+
+### Free Forever
+- The "Alpha · Free during early access" badge is retired — the free tier is now simply **Free forever**
+- FAQ, Terms, and Privacy updated to reflect the live billing flow and where to find your invoices`,
+  },
+
+  // ============================================================
+  // v1.40.0 — Launch & Welcome (2026-07-12)
+  // ============================================================
+  {
+    title: "Envpilot Is Officially Launched — Plus a Proper Welcome",
+    version: "v1.40.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-12"),
+    content: `Envpilot is out of early access and officially launched — and new users now get a proper hello.
+
+### Welcome Email
+- Every new signup receives a personalized welcome email introducing the platform
+- Greets you by name, sent exactly once when your account is first created
+- A failed email can never interfere with your signup`,
+  },
 ];
