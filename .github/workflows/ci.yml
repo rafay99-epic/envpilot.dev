@@ -160,81 +160,35 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # ------------------------------------------------------------------
-  # Stage 1: quality checks — parallel, scoped to what changed
+  # Stage 1: quality checks — ONE consolidated job (minutes diet, 2026-07-12).
+  #
+  # Previously 8 parallel jobs (format + 6 per-package checks + react-doctor),
+  # each billing a rounded-up minute AND paying its own checkout + bun install
+  # (~15 billed min per PR push). Consolidated: one job pays setup once and
+  # lets Turborepo parallelize internally; the .turbo cache (keyed per-SHA,
+  # restored from any prior run) makes unchanged packages replay instantly on
+  # re-pushes. Turbo's own hashing provides the change-scoping the per-package
+  # `if:` conditions used to — a docs-only push rebuilds nothing.
   # ------------------------------------------------------------------
-  format:
-    name: Format check
+  checks:
+    name: Checks (format, lint, typecheck, build, test)
     needs: changes
+    if: needs.changes.outputs.any == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
       - name: Prettier check
         run: bunx prettier --check .
-
-  check-web:
-    name: Check web
-    needs: changes
-    if: needs.changes.outputs.run_web == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Build, lint, typecheck web
-        run: bunx turbo build lint typecheck --filter=@envpilot/web
-
-  check-admin:
-    name: Check admin
-    needs: changes
-    if: needs.changes.outputs.run_admin == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Build, lint, typecheck admin
-        run: bunx turbo build lint typecheck --filter=@envpilot/admin
-
-  check-cli:
-    name: Check CLI
-    needs: changes
-    if: needs.changes.outputs.run_cli == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Build, lint, typecheck, test CLI
-        run: bunx turbo build lint typecheck test --filter=@envpilot/cli
-
-  check-extension:
-    name: Check extension
-    needs: changes
-    if: needs.changes.outputs.run_extension == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Build, lint, typecheck, test extension
-        run: bunx turbo build lint typecheck test --filter=envpilot
-
-  check-action:
-    name: Check GitHub Action
-    needs: changes
-    if: needs.changes.outputs.run_action == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Build, lint, typecheck, test GitHub Action
-        run: bunx turbo build lint typecheck test --filter=@envpilot/github-action
-
-  check-convex:
-    name: Check Convex
-    needs: changes
-    if: needs.changes.outputs.run_convex == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
+      - name: Build, lint, typecheck, test (turbo)
+        run: bunx turbo build lint typecheck test --cache-dir=.turbo
       - name: Typecheck Convex functions
         # CI config adds Node type roots so process.env usage resolves without
         # a Convex deployment. See convex/tsconfig.ci.json.
@@ -243,7 +197,10 @@ jobs:
   react-doctor:
     name: React Doctor (advisory)
     needs: changes
-    if: needs.changes.outputs.run_web == 'true'
+    # Advisory-only → main pushes only (was every PR push; pure minutes burn).
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_web == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -259,13 +216,7 @@ jobs:
     name: All checks passed
     needs:
       - changes
-      - format
-      - check-web
-      - check-admin
-      - check-cli
-      - check-extension
-      - check-action
-      - check-convex
+      - checks
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -401,7 +352,11 @@ jobs:
   build-cli:
     name: Build CLI tarball
     needs: [changes, checks-passed]
-    if: needs.changes.outputs.run_cli == 'true'
+    # main-only (minutes diet): deploys are the only consumer of the artifact;
+    # PR compile breakage is already caught by the consolidated checks job.
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_cli == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -423,7 +378,10 @@ jobs:
   build-extension:
     name: Build VSIX
     needs: [changes, checks-passed]
-    if: needs.changes.outputs.run_extension == 'true'
+    # main-only (minutes diet): see build-cli.
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.run_extension == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
