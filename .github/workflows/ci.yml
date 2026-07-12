@@ -4,12 +4,14 @@ name: CI
 #   changes (path detection) → parallel scoped checks → checks-passed gate
 #   → artifact builds → deploys (main only, via reusable workflows) → release
 #
-# Web + Admin production deploys happen from here (deploy-vercel job) via
-# the Vercel CLI pinned to the run's SHA — auto-deploy for main is disabled
-# in each app's vercel.json so the backend always ships first. Builds still
-# run on Vercel's infra (source upload only). PR previews still come from
-# Vercel's GitHub integration. Build artifacts (CLI tarball, VSIX) are
-# available in the run's Artifacts panel; nothing is commented on PRs.
+# Web + Admin production deploys: the deploy-vercel job below is
+# HARD-DISABLED (if: false &&) — web/admin auto-deploy on merge to main via
+# Vercel's git integration instead (re-enabled in the Vercel dashboard,
+# 2026-07-12). The job is kept intact for potential re-enable; restoring it
+# requires turning git auto-deploy back off or merges deploy twice.
+# PR previews still come from Vercel's GitHub integration. Build artifacts
+# (CLI tarball, VSIX) are available in the run's Artifacts panel; nothing is
+# commented on PRs.
 
 on:
   push:
@@ -525,9 +527,15 @@ jobs:
     # never ship a newer frontend before its own convex deploy. The
     # !failure() guard lets a SKIPPED deploy-convex (no convex changes)
     # fall through, while a FAILED one blocks.
+    # HARD-DISABLED (false &&): web/admin now auto-deploy on merge to main
+    # via Vercel's git integration (re-enabled in the Vercel dashboard).
+    # Kept for potential re-enable — restore by removing `false &&` AND
+    # turning git auto-deploy back off in Vercel, or every merge deploys twice.
+    # NOTE: git auto-deploy loses the strict backend-first ordering this job
+    # guaranteed (web can go live before deploy-convex finishes).
     needs: [changes, checks-passed, e2e, deploy-convex]
     if: |
-      !failure() && !cancelled() &&
+      false && !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       (needs.changes.outputs.run_web == 'true' || needs.changes.outputs.run_admin == 'true')

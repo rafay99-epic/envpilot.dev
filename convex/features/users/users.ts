@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { mutation, query } from "../../_generated/server";
+import { internalQuery, mutation, query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
 
 /**
@@ -67,6 +67,18 @@ export const search = query({
   },
 });
 
+export const listAllForLoopsBackfill = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    return users.map((u) => ({
+      email: u.email,
+      name: u.name,
+      id: u._id,
+    }));
+  },
+});
+
 export const upsert = mutation({
   args: {
     workosId: v.string(),
@@ -116,6 +128,16 @@ export const upsert = mutation({
       {
         to: args.email,
         name: args.name,
+      }
+    );
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.emails.loops.syncContactToLoops,
+      {
+        email: args.email,
+        name: args.name,
+        userId: userId,
       }
     );
 
