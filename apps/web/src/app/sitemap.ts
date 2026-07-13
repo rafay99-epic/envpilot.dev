@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllDocs } from "@/lib/docs/content";
+import { getAllPosts } from "@/lib/blog/content";
 import { COMPARISONS } from "@/lib/comparisons";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -32,6 +33,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/blog`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
     },
     {
       url: `${baseUrl}/faq`,
@@ -80,6 +87,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
+  // ── Blog pages (auto-discovered from MDX files) ──────────────────────
+
+  const blogPages: MetadataRoute.Sitemap = getAllPosts().map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.date),
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+  }));
+
   // ── Competitor comparison pages ───────────────────────────────────────
 
   const comparisonPages: MetadataRoute.Sitemap = COMPARISONS.map((c) => ({
@@ -89,5 +105,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...docsPages, ...comparisonPages];
+  return [...staticPages, ...docsPages, ...blogPages, ...comparisonPages];
 }

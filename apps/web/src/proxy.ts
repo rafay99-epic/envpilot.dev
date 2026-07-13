@@ -15,6 +15,8 @@ export default authkitMiddleware({
       "/sign-up",
       "/callback",
       "/changelog",
+      "/blog",
+      "/blog/(.*)",
       "/docs",
       "/docs/(.*)",
       "/faq",
