@@ -34,6 +34,9 @@ jobs:
       RESEND_API_KEY: re_placeholder
       ENVPILOT_SERVER_URL: https://www.envpilot.dev
       TURBO_TELEMETRY_DISABLED: "1"
+      # CircleCI attaches a TTY that crashes Turborepo's terminal UI —
+      # required per turbo's CircleCI guide.
+      TURBO_UI: "false"
     steps:
       - checkout
 
