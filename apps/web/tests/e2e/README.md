@@ -20,7 +20,12 @@ to `tests/e2e/.auth/user.json` (gitignored — it contains live cookies).
 If `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are not set, the `setup` project
 and every authenticated spec **skip** with an explanatory message — they
 never fail. The unauthenticated `chromium` project always runs. The suite
-therefore stays green on machines without credentials (including CI).
+therefore stays green on machines without credentials.
+
+> **This suite is not run in CI.** Playwright is disabled in the pipeline by
+> design (it drove a cloud Convex dev deployment and exhausted the free-tier
+> quota). The **full local run before every merge is the gate of record** —
+> run it yourself; nothing in CI runs Playwright.
 
 ## Enabling authenticated runs
 

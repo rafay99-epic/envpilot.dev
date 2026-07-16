@@ -1,63 +1,67 @@
 # CI / CD
 
-## Pipeline Overview
+CI/CD runs on **CircleCI** ("pipeline v2"), a dynamic config split across
+`.circleci/config.yml` (setup) and `.circleci/jobs.yml` (job definitions).
 
-All CI/CD runs through a single unified workflow (`.github/workflows/ci-deploy.yml`).
+## How the pipeline is built
 
-### On Pull Requests
+Every push starts with a tiny setup job, `detect` (`.circleci/config.yml`),
+that diffs the push, maps changed paths to **surfaces**, and _generates_ the
+workflow so only the relevant jobs exist:
+
+| Changed path                                           | Surface(s) built            |
+| ------------------------------------------------------ | --------------------------- |
+| `convex/`                                              | convex                      |
+| `apps/web/`, `apps/blog/`, `apps/docs/`, `apps/admin/` | web / blog / docs / admin   |
+| `apps/cli/`, `apps/vscode-extension/`                  | cli / extension             |
+| `packages/github-action/`                              | action                      |
+| `packages/ui/`                                         | web + blog + docs (fan-out) |
+| root manifests, shared configs, `.circleci/`           | all surfaces                |
+
+Branch pushes diff against the fork point with `main`; `main` pushes diff the
+merge itself.
+
+## Quality gate first
+
+Every generated pipeline starts with a single **quality** job (prettier, lint,
+typecheck via `next typegen`, convex `tsc` — no builds). Per-surface **build**
+jobs `require: [quality]`. CLI and extension build DIRECT via `bun run build`
+(never turbo).
+
+## Deploys (main pipelines only)
+
+Deploy jobs are added only when the branch is `main`. Ordering is strict —
+**backend first**: client publishes and web/blog/docs/admin deploys that need
+the backend contract `require` `deploy-convex` when it exists.
 
 ```
-quality ──→ build ──→ (stop, no deploys)
-   │
-   └──→ react-doctor (advisory)
+deploy-convex (+ feature-registry / changelog seeds)
+  → publish-cli (npm) + publish-extension (Open VSX) + publish-action (public envpilot-action repo)
+  → deploy-homebrew
+  → deploy-web / deploy-blog / deploy-docs / deploy-admin (CI-gated `vercel deploy --prod`)
+  → release (GitHub release with .tgz / .vsix artifacts)
 ```
 
-| Stage            | What it does                                                  |
-| ---------------- | ------------------------------------------------------------- |
-| **Quality**      | Lint + Typecheck + Format check                               |
-| **Build**        | Builds all packages + packages VSIX and CLI tarball artifacts |
-| **React Doctor** | Advisory React audit (non-blocking)                           |
+Vercel prod deploys run through the CircleCI `deploy-*` jobs — Vercel's own git
+integration is disabled (see `vercel.json` in each app).
 
-A separate `version-tracker.yml` runs on PRs to compare package versions and auto-label PRs with `semver:*` and `scope:*` labels.
+## Manual control
 
-### On Push to Main
+From the CircleCI UI (**Trigger Pipeline**) or API, pass parameters to force
+surfaces: `force-<surface>: true` runs that surface's jobs even if unchanged;
+`run-everything: true` runs all of them. Forcing on a branch runs builds only —
+deploys still happen only on `main`.
 
-```
-quality ──→ build ──→ detect ──→ deploy-convex
-                               ──→ deploy-extension
-                               ──→ deploy-cli
-                               ──→ release
-```
+## GitHub Actions — dormant
 
-| Stage       | What it does                                                                                                      |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Quality** | Same as PR                                                                                                        |
-| **Build**   | Same as PR                                                                                                        |
-| **Detect**  | Checks what changed (convex, extension, CLI, web, admin)                                                          |
-| **Deploy**  | Deploys only what changed (parallel)                                                                              |
-| **Release** | Creates unified GitHub Release with deployment summary + build artifacts (VSIX, CLI tarball) for changed packages |
+The workflow files under `.github/workflows/` (`ci.yml`, `deploy-*.yml`,
+`version-tracker.yml`) are kept for reference but their triggers are
+**`workflow_dispatch`-only** — nothing runs there and GitHub Actions billing is
+not used. To move CI back to GitHub Actions, restore the original triggers on
+those files.
 
-### Deploy Targets
+## E2E
 
-| Package       | Where                          | Trigger                                          |
-| ------------- | ------------------------------ | ------------------------------------------------ |
-| **Convex**    | Convex Cloud                   | Files in `convex/` changed                       |
-| **Extension** | VS Code Marketplace + Open VSX | Version bumped in `package.json`                 |
-| **CLI**       | npm Registry                   | Version bumped in `package.json`                 |
-| **Web**       | Vercel                         | Automatic (managed by Vercel, not this pipeline) |
-
-## Required GitHub Secrets
-
-| Secret                     | Purpose                                                   |
-| -------------------------- | --------------------------------------------------------- |
-| `CONVEX_DEPLOY_KEY`        | Convex production deploy (environment secret: Production) |
-| `NPM_TOKEN`                | npm publish for CLI                                       |
-| `OPEN_VSX_TOKEN`           | Open VSX Registry publish                                 |
-| `VSCODE_MARKETPLACE_TOKEN` | VS Code Marketplace publish                               |
-
-## Workflow Files
-
-| File                  | Purpose                               |
-| --------------------- | ------------------------------------- |
-| `ci-deploy.yml`       | Unified CI/CD pipeline                |
-| `version-tracker.yml` | PR version comparison + auto-labeling |
+Playwright is **not** run in CI (disabled by design — it drove a cloud Convex
+dev deployment and burned the free-tier quota). The full local suite is the
+gate of record; see [`apps/web/tests/e2e/README.md`](../apps/web/tests/e2e/README.md).

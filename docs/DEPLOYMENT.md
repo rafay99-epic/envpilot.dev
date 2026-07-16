@@ -2,14 +2,22 @@
 
 ## Overview
 
-Envpilot deploys to multiple platforms. The CI/CD pipeline (`.github/workflows/ci-deploy.yml`) handles all deployments automatically on push to `main`.
+Envpilot deploys to multiple platforms. The **CircleCI** pipeline
+(`.circleci/config.yml` + `.circleci/jobs.yml`) handles all deployments on push
+to `main` — see [CI docs](ci.md) for how the workflow is generated. Deploy jobs
+run only on `main`, backend first (clients require `deploy-convex`).
 
-| Component         | Platform                       | Trigger                      |
-| ----------------- | ------------------------------ | ---------------------------- |
-| Web App           | Vercel                         | Automatic on push to `main`  |
-| Convex Backend    | Convex Cloud                   | CI detects `convex/` changes |
-| VS Code Extension | VS Code Marketplace + Open VSX | CI detects version bump      |
-| CLI               | npm Registry                   | CI detects version bump      |
+| Component                 | Platform                        | Trigger                                        |
+| ------------------------- | ------------------------------- | ---------------------------------------------- |
+| Web / Blog / Docs / Admin | Vercel (`vercel deploy --prod`) | CircleCI `deploy-*` job when the app changed   |
+| Convex Backend            | Convex Cloud                    | CircleCI detects `convex/` changes             |
+| VS Code Extension         | Open VSX                        | CircleCI `publish-extension` on a version bump |
+| CLI                       | npm Registry                    | CircleCI `publish-cli` on a version bump       |
+| GitHub Action             | public `envpilot-action` repo   | CircleCI `publish-action` on a version bump    |
+
+> Vercel's own git integration (including previews) is **disabled** in every
+> app's `vercel.json` — prod deploys happen only through the CircleCI jobs,
+> which run `vercel deploy --prod` on Vercel infra.
 
 ## Web App (Vercel)
 
@@ -41,7 +49,10 @@ Set these in Vercel's project settings:
 
 ### Deploy
 
-Vercel auto-deploys on push to `main`. For manual deploy:
+Production deploys run through the CircleCI `deploy-web` job (`vercel deploy
+--prod`) — Vercel's git integration is disabled, so pushes do not auto-deploy.
+The blog, docs, and admin apps deploy the same way via their own `deploy-*`
+jobs. For a manual deploy:
 
 ```bash
 cd apps/web && bunx vercel --prod
@@ -145,22 +156,20 @@ After installation (`bun install -g @envpilot/cli`), the CLI is available as `en
 
 ## CI/CD
 
-The unified CI/CD pipeline (`.github/workflows/ci-deploy.yml`) handles everything:
+The CircleCI pipeline (`.circleci/config.yml` + `.circleci/jobs.yml`) handles
+everything on push to `main`:
 
 ```
-quality → build → detect → deploy (convex, extension, CLI) → release
+quality → per-surface build → deploy-convex → publish-cli / publish-extension /
+publish-action → deploy-homebrew → deploy-web / -blog / -docs / -admin → release
 ```
 
-See [CI docs](ci.md) for full details.
+See [CI docs](ci.md) for how the workflow is generated and for the dormant
+GitHub Actions files.
 
-### Required GitHub Secrets
-
-| Secret                     | Purpose                     |
-| -------------------------- | --------------------------- |
-| `CONVEX_DEPLOY_KEY`        | Convex production deploy    |
-| `NPM_TOKEN`                | npm publish for CLI         |
-| `OPEN_VSX_TOKEN`           | Open VSX Registry publish   |
-| `VSCODE_MARKETPLACE_TOKEN` | VS Code Marketplace publish |
+Publish/deploy credentials are stored as **CircleCI project environment
+variables** (Convex deploy key, npm token, Open VSX token, Vercel token, the
+`ACTION_PUBLISH_TOKEN` for the public action repo, Homebrew tap token).
 
 ## Monitoring
 

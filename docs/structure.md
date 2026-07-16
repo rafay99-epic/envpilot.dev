@@ -17,6 +17,11 @@ envpilot/
 │   │   │   └── stores/            # Zustand state stores
 │   │   └── tests/e2e/             # Playwright test specs
 │   │
+│   ├── blog/                      # Blog — blog.envpilot.dev, port 3001 (@envpilot/blog)
+│   │
+│   ├── docs/                      # Docs site — docs.envpilot.dev, port 3002 (@envpilot/docs)
+│   │                              #   serves feed.xml, llms.txt, llms-full.txt, /md/[slug]
+│   │
 │   ├── cli/                       # CLI npm package (@envpilot/cli)
 │   │   └── src/
 │   │       ├── commands/          # CLI commands
@@ -31,7 +36,9 @@ envpilot/
 │           ├── services/          # Extension services
 │           └── ui/                # VS Code UI components
 │
-├── packages/                      # Shared configuration
+├── packages/                      # Shared packages
+│   ├── ui/                        # Shared React UI components (@envpilot/ui, TS source)
+│   ├── github-action/             # Envpilot GitHub Action (@envpilot/github-action)
 │   ├── tsconfig/                  # TypeScript base configs
 │   ├── eslint-config/             # ESLint shared config
 │   └── prettier-config/           # Prettier shared config

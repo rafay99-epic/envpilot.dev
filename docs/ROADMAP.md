@@ -1,5 +1,8 @@
 # Envpilot Roadmap
 
+> **Status (2026-07-16): live planning doc.** Items marked **(DONE)** have
+> shipped and are kept for context; the rest remain planned.
+
 Planned features and enhancements for future development.
 
 ---

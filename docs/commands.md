@@ -6,8 +6,10 @@ All commands are run from the monorepo root with `bun run`.
 
 | Command                 | Description                                          |
 | ----------------------- | ---------------------------------------------------- |
-| `bun run dev`           | Start web app + Convex + admin dashboard in parallel |
+| `bun run dev`           | Start web + Convex + admin + blog + docs in parallel |
 | `bun run dev:admin`     | Admin dashboard dev server only                      |
+| `bun run dev:blog`      | Blog dev server only (port 3001)                     |
+| `bun run dev:docs`      | Docs site dev server only (port 3002)                |
 | `bun run dev:cli`       | CLI watch mode                                       |
 | `bun run dev:extension` | VS Code extension watch mode                         |
 
@@ -17,6 +19,8 @@ All commands are run from the monorepo root with `bun run`.
 | ------------------------- | ------------------------------ |
 | `bun run build`           | Build all apps                 |
 | `bun run build:web`       | Build web app only             |
+| `bun run build:blog`      | Build blog only                |
+| `bun run build:docs`      | Build docs site only           |
 | `bun run build:cli`       | Build CLI only                 |
 | `bun run build:admin`     | Build admin dashboard only     |
 | `bun run build:extension` | Build & package extension VSIX |
