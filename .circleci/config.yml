@@ -234,17 +234,27 @@ jobs:
             API="https://api.github.com/repos/rafay99-epic/envpilot.dev"
             AUTH="Authorization: Bearer ${GITHUB_TOKEN}"
 
-            # Upsert: find our previous comment by its heading.
-            EXISTING=$(curl -sf -H "$AUTH" "$API/issues/$PR_NUMBER/comments?per_page=100" \
-              | jq -r '[.[] | select(.body | startswith("## Version Tracker"))][0].id // empty')
+            # Upsert: find our previous comment by its heading. This job is
+            # ADVISORY — any GitHub API refusal (e.g. the PAT missing
+            # Pull-requests RW) warns and skips instead of failing the
+            # pipeline, but prints the status so it's diagnosable.
+            EXISTING=$(curl -s -H "$AUTH" "$API/issues/$PR_NUMBER/comments?per_page=100" \
+              | jq -r '[.[] | select(.body // "" | startswith("## Version Tracker"))][0].id // empty' 2>/dev/null || true)
             PAYLOAD=$(jq -cn --arg body "$BODY" '{body: $body}')
             if [ -n "$EXISTING" ]; then
-              curl -sf -X PATCH -H "$AUTH" -d "$PAYLOAD" "$API/issues/comments/$EXISTING" > /dev/null
-              echo "Updated existing Version Tracker comment."
+              CODE=$(curl -s -o /tmp/gh-resp -w '%{http_code}' -X PATCH -H "$AUTH" -d "$PAYLOAD" "$API/issues/comments/$EXISTING")
             else
-              curl -sf -X POST -H "$AUTH" -d "$PAYLOAD" "$API/issues/$PR_NUMBER/comments" > /dev/null
-              echo "Posted Version Tracker comment."
+              CODE=$(curl -s -o /tmp/gh-resp -w '%{http_code}' -X POST -H "$AUTH" -d "$PAYLOAD" "$API/issues/$PR_NUMBER/comments")
             fi
+            case "$CODE" in
+              2*) echo "Version Tracker comment upserted (HTTP $CODE)." ;;
+              *)
+                echo "WARNING: GitHub comment API returned HTTP $CODE — check that the GITHUB_TOKEN PAT has 'Pull requests: Read and write'."
+                head -c 300 /tmp/gh-resp; echo
+                circleci-agent step halt
+                exit 0
+                ;;
+            esac
 
   # ────────────────────────────────────────────────────────────────────
   # Deploys — main only. Backend FIRST, then clients, then release.
