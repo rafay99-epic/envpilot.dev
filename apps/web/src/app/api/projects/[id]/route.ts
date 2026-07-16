@@ -25,6 +25,7 @@ const updateProjectSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, "Color must be a valid hex code")
     .optional(),
+  vscodeAutoUnsyncOnClose: z.boolean().optional(),
 });
 
 interface RouteParams {
@@ -149,7 +150,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { name, description, icon, color } = validation.data;
+    const { name, description, icon, color, vscodeAutoUnsyncOnClose } =
+      validation.data;
 
     await authed.mutation(api.features.projects.mutations.update, {
       projectId: id as Id<"projects">,
@@ -157,6 +159,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       description,
       icon,
       color,
+      vscodeAutoUnsyncOnClose,
     });
 
     const project = await convex.query(api.features.projects.queries.getById, {
