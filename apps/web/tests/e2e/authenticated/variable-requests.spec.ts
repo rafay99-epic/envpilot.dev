@@ -477,3 +477,58 @@ test.describe("variable requests — reviewer approvals page", () => {
     }
   });
 });
+
+test.describe("variable requests — project-level requests page", () => {
+  test("D: the sidebar Requests item navigates to the project requests page and lists the seeded request", async ({
+    page,
+  }) => {
+    test.skip(!DEVELOPER_CLI_TOKEN, DEVELOPER_TOKEN_SKIP);
+    test.setTimeout(60_000);
+    const clientErrors = trackClientErrors(page);
+
+    const key = uniqueKey("D");
+    await seedRequest(key, ["development"]);
+    await pinActiveOrg(page.context());
+
+    await page.goto(`/dashboard/projects/${FIXTURE_PROJECT_SLUG}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(
+      page.getByRole("heading", { name: "Environment Variables" })
+    ).toBeVisible({ timeout: 20_000 });
+
+    // Project context swaps the sidebar to project-level items — "Requests"
+    // is unambiguous here (the org-wide "Requests" item only shows outside
+    // project context). Scope to the desktop sidebar to avoid the hidden
+    // mobile-menu duplicate.
+    const requestsLink = page
+      .locator("aside")
+      .getByRole("link", { name: /Requests/ });
+    await expect(requestsLink).toBeVisible({ timeout: 20_000 });
+    await requestsLink.click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/dashboard/projects/${FIXTURE_PROJECT_SLUG}/requests$`)
+    );
+    await expect(
+      page.getByRole("heading", { name: "Requests", level: 1 })
+    ).toBeVisible({ timeout: 20_000 });
+
+    // The seeded pending request is reactive (Convex WebSocket) — give it
+    // room to arrive rather than reloading in a loop.
+    await expect(
+      page.getByText(key),
+      "seeded pending request should appear on the project requests page"
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("pending").first()).toBeVisible();
+
+    // The e2e owner is a reviewer (team_lead+), so the row links out to the
+    // org-wide review page rather than exposing inline actions here.
+    await expect(page.getByRole("link", { name: "Review →" })).toBeVisible();
+
+    expect(
+      clientErrors,
+      `unexpected client-side errors on the project requests page: ${clientErrors.join("\n")}`
+    ).toEqual([]);
+  });
+});
