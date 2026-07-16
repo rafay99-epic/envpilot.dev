@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useHotkey, useHotkeySequence } from "@tanstack/react-hotkeys";
@@ -13,7 +13,10 @@ import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
-import { TerminalLoading } from "@/components/dashboard/terminal-ui";
+import {
+  TerminalLoading,
+  TerminalInput,
+} from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {
   useProjectBySlug,
@@ -189,6 +192,33 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedEnvironment, setSelectedEnvironment] = useState<string>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Per-project search: 300ms debounce (useGlobalSearch pattern). A non-empty
+  // term switches the list source to the server-side searchInProject query
+  // (COMPLETE — every active variable, not just loaded pages); empty term
+  // falls back to the paginated list exactly as before.
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+  const trimmedSearch = debouncedSearch.trim();
+  const isSearching = trimmedSearch.length >= 1;
+  const searchData = useQuery(
+    api.features.variables.queries.searchInProject,
+    // Identity is derived server-side; gate until user + project known and a
+    // term is present. The env tab composes as the `environment` arg.
+    projectId && convexUserId && isSearching
+      ? {
+          projectId,
+          searchTerm: trimmedSearch,
+          environment:
+            selectedEnvironment === "all" ? undefined : selectedEnvironment,
+        }
+      : "skip"
+  );
+  const isSearchLoading = isSearching && searchData === undefined;
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -502,7 +532,13 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
-  const filteredVariables = variables.filter((v) => {
+  // Search mode swaps the source to server results (already env-filtered by
+  // the `environment` arg); the paginated list keeps client-side env filtering.
+  // Tag filtering stays client-side in both modes.
+  const baseVariables = isSearching
+    ? ((searchData?.results ?? []) as Variable[])
+    : variables;
+  const filteredVariables = baseVariables.filter((v) => {
     // Environment filter
     if (
       selectedEnvironment !== "all" &&
@@ -518,6 +554,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
     return true;
   });
+  const showListLoading = isSearching ? isSearchLoading : isLoadingVariables;
 
   if (isLoading) {
     return <TerminalLoading fullPage />;
@@ -702,6 +739,75 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         )}
       </div>
 
+      <div className="relative">
+        <svg
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+        <TerminalInput
+          type="text"
+          placeholder="Search this project's variables..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSearchTerm("");
+          }}
+          aria-label="Search variables"
+          className="pl-10 pr-10"
+        />
+        {isSearchLoading ? (
+          <svg
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-500"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth={4}
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+        ) : searchTerm ? (
+          <button
+            type="button"
+            onClick={() => setSearchTerm("")}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors hover:text-zinc-300"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        ) : null}
+      </div>
+
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <div>
@@ -709,10 +815,18 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
               Environment Variables
             </h2>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {filteredVariables.length} variable
+              {filteredVariables.length}
+              {isSearching ? " result" : " variable"}
               {filteredVariables.length !== 1 ? "s" : ""}
-              {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
+              {isSearching
+                ? ` for "${trimmedSearch}"`
+                : selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
             </p>
+            {isSearching && searchData?.truncated && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                Showing the first 100 matches — narrow your search to see more.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* Export Button */}
@@ -788,7 +902,7 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         </div>
 
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {isLoadingVariables ? (
+          {showListLoading ? (
             <TerminalLoading />
           ) : filteredVariables.length === 0 ? (
             <div className="px-6 py-12 text-center">
@@ -808,12 +922,14 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                 </svg>
               </div>
               <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                No variables yet
+                {isSearching ? "No matching variables" : "No variables yet"}
               </h3>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                {canCreateVariable
-                  ? "Add your first environment variable to get started."
-                  : "No variables available for this environment."}
+                {isSearching
+                  ? `No variables match "${trimmedSearch}". Try a different term.`
+                  : canCreateVariable
+                    ? "Add your first environment variable to get started."
+                    : "No variables available for this environment."}
               </p>
             </div>
           ) : (
@@ -850,20 +966,21 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   />
                 ))}
               </AnimatedList>
-              {(variablesStatus === "CanLoadMore" ||
-                variablesStatus === "LoadingMore") && (
-                <div className="flex justify-center border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
-                  <button
-                    onClick={() => loadMoreVariables(50)}
-                    disabled={variablesStatus === "LoadingMore"}
-                    className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                  >
-                    {variablesStatus === "LoadingMore"
-                      ? "Loading..."
-                      : "Load more"}
-                  </button>
-                </div>
-              )}
+              {!isSearching &&
+                (variablesStatus === "CanLoadMore" ||
+                  variablesStatus === "LoadingMore") && (
+                  <div className="flex justify-center border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                    <button
+                      onClick={() => loadMoreVariables(50)}
+                      disabled={variablesStatus === "LoadingMore"}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    >
+                      {variablesStatus === "LoadingMore"
+                        ? "Loading..."
+                        : "Load more"}
+                    </button>
+                  </div>
+                )}
             </>
           )}
         </div>

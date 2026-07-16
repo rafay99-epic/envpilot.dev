@@ -20,7 +20,6 @@ export {
   useVariable,
   useVariableHistory,
   useVariablesWithAccess,
-  useVariableSearch,
 } from "./useVariables";
 
 // Permission hooks
