@@ -65,9 +65,7 @@ export const resolveUnsyncOnClose = query({
       .first();
 
     return (
-      member?.vscodeAutoUnsyncOnClose ??
-      project.vscodeAutoUnsyncOnClose ??
-      true
+      member?.vscodeAutoUnsyncOnClose ?? project.vscodeAutoUnsyncOnClose ?? true
     );
   },
 });
