@@ -1,0 +1,104 @@
+---
+title: Roles & Permissions
+description: Two-tier RBAC with organization roles, project roles, and per-variable access grants.
+icon: users
+---
+
+# Roles & Permissions
+
+Envpilot uses a two-tier role-based access control system. Organization roles set the baseline, project roles can restrict access further, and per-variable permissions provide fine-grained control.
+
+## Organization roles
+
+Every team member has one organization-level role.
+
+### Admin
+
+- Full access to every project and variable in the organization
+- Create, edit, and delete projects
+- Roll back variable versions
+- Manage all team members and their roles
+- Grant and revoke per-variable permissions
+- Approve or deny variable access requests
+- Export audit logs
+- Manage billing, plan upgrades, and organization settings
+- Delete the organization
+
+### Team Lead
+
+- Create and manage projects
+- Create, edit, and delete variables
+- Grant and revoke per-variable access for Members
+- Approve variable access requests
+- View project-scoped audit logs
+- Cannot manage billing or delete the organization
+
+### Member
+
+- Read-only access to projects they are assigned to
+- Can only view variables they have explicit per-variable permission for
+- Submit new variables for approval (creates a pending request)
+- Request access to variables they need
+- Cannot directly create, edit, or delete variables
+- Cannot manage other team members
+
+## Project roles
+
+Projects support an additional layer of access control. These roles can restrict (but never expand) the access granted by the organization role.
+
+| Role          | Pull variables           | Push directly | Push for approval | Manage project members |
+| ------------- | ------------------------ | ------------- | ----------------- | ---------------------- |
+| **Manager**   | All variables            | Yes           | —                 | Yes                    |
+| **Developer** | All variables            | No            | Yes               | No                     |
+| **Viewer**    | Permitted variables only | No            | No                | No                     |
+
+When a Developer pushes via the CLI, the changes are saved as pending requests that a Manager, Team Lead, or Admin must approve.
+
+When a Viewer runs `envpilot pull`, they only receive variables they have been explicitly granted access to. All other variables are omitted from the response.
+
+## Per-variable permissions
+
+Beyond roles, access can be granted on individual variables. This is how Members and Viewers get access to specific secrets they need for their work.
+
+A permission grant includes:
+
+- **Target variable** — the specific variable being shared
+- **Permission level** — `read` or `write`
+- **Expiration date** (optional) — automatically revokes access after the date passes
+- **Granted by** — the Admin or Team Lead who approved the access
+
+### Requesting access
+
+When a Member or Viewer needs a variable they cannot see:
+
+1. They run `envpilot list variables` and see the variable is access-restricted
+2. They submit a request from the dashboard, CLI, or VS Code extension (`Envpilot: Request Variable`)
+3. A Team Lead or Admin receives the request and approves or denies it
+4. If approved, the variable appears in the user's next `pull`
+
+All requests and approvals are recorded in the audit log.
+
+## How push behavior changes by role
+
+```bash
+# Admin or Team Lead — push succeeds immediately
+envpilot push
+# ✓ 3 variables created, 2 updated
+
+# Developer — push creates pending requests
+envpilot push
+# ⚠ You have Developer access. Push will create pending requests
+# that require Manager/Admin approval.
+# ✓ 5 variable requests submitted for approval
+
+# Viewer — push is blocked entirely
+envpilot push
+# ✗ Error: You have Viewer access. Push is not available.
+```
+
+## Permission inheritance
+
+1. **Organization role** sets the maximum access level
+2. **Project role** can restrict access within a project (a Member with Developer project role can push for approval, but a Member with Viewer project role can only read permitted variables)
+3. **Per-variable permissions** override project-level defaults (a Viewer can be granted write access to a specific variable)
+4. When **tier enforcement is disabled** (pre-alpha mode), all feature gates return allowed — but RBAC roles are always enforced
