@@ -1,0 +1,23 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_47513e23e74e62::t_5827f84b5b862d 313-315
+apps/web/src/components/variables/variable-create-drawer.tsx
+  s_47513e23e74e62::t_2732937263b71e 118-120
+convex/features/variables/mutations.ts
+  s_47513e23e74e62::t_3f6eb532b460b8 775-789
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e6914699209320269ac6a83c24bafb66d8d9c9dd",
+  "prompts": {},
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
