@@ -1,610 +1,197 @@
 version: 2.1
 
 # ═══════════════════════════════════════════════════════════════════════
-# FULL CI/CD — migrated from GitHub Actions 2026-07-16 (GHA billing dead;
-# CircleCI free 30k credits/mo). GHA workflows are kept dormant
-# (workflow_dispatch-only) for reference/revert.
+# PIPELINE v2 — SETUP PHASE (dynamic config)
 #
-# Pipeline shape (mirrors ci.yml's staged design):
-#   checks (every branch, incl. main)
-#     └─ main only: deploy-convex (backend FIRST)
-#                     ├─ deploy-cli ──── deploy-homebrew
-#                     ├─ deploy-extension
-#                     └─ deploy-action
-#                     └─ release (aggregate tag + GitHub Release)
+# This tiny config runs first on every push (~15s, `small` class). It
+# detects WHICH surfaces changed, merges in any manual force parameters,
+# and continues into .circleci/continue.yml with one boolean per surface.
+# Jobs for unchanged surfaces are never created — no more 22s ghost jobs.
 #
-# Skip semantics: a deploy job whose paths didn't change halts (then
-# `exit 0`s — halt is asynchronous) — that counts as SUCCESS, so downstream
-# `requires` fall through (same as GHA's `!failure()` + skipped). A real
-# failure blocks everything downstream.
+# Surfaces: convex, web, blog, docs, admin, cli, extension, action.
+# ADDING A SURFACE (e.g. the planned Android app):
+#   1. add a `force-<name>` parameter below AND in continue.yml
+#   2. add a path rule in the detect script below
+#   3. add build/deploy jobs + a workflow gate in continue.yml
 #
-# Change detection: `git diff HEAD^ HEAD` — merges to main are squash/merge
-# commits, so first-parent diff covers the whole PR.
-#
-# E2E: DISABLED (Convex quota) — the local Playwright suite is the gate of
-# record (cd apps/web && bunx playwright test). Not ported on purpose.
-#
-# Required project environment variables (Project Settings → Environment
-# Variables; each deploy job fails loudly if its own are missing):
-#   CONVEX_DEPLOY_KEY        — prod Convex deploy key (deploy-convex)
-#   WORKOS_CLIENT_ID         — prod client id baked into CLI/extension builds
-#   NEXT_PUBLIC_CONVEX_URL   — prod Convex URL baked into CLI/extension builds
-#   NPM_TOKEN                — npm publish (deploy-cli)
-#   OPEN_VSX_TOKEN           — Open VSX publish (deploy-extension)
-#   VSCODE_MARKETPLACE_TOKEN — optional; VS Code Marketplace publish
-#   ACTION_PUBLISH_TOKEN     — fine-grained PAT, Contents RW on
-#                              rafay99-epic/envpilot-action (deploy-action)
-#   HOMEBREW_TAP_PAT         — PAT, Contents RW on rafay99-epic/homebrew-apps
-#   GITHUB_TOKEN             — fine-grained PAT on THIS repo: Contents RW
-#                              (tags, releases)
+# MANUAL CONTROL — trigger from the CircleCI UI ("Trigger Pipeline" on
+# the project, pick branch, add parameters) or the API:
+#   curl -X POST https://circleci.com/api/v2/project/<slug>/pipeline \
+#     -H "Circle-Token: $TOKEN" -H "Content-Type: application/json" \
+#     -d '{"branch":"main","parameters":{"force-cli":true}}'
+#   force-<surface>: true  → run that surface's jobs even if unchanged
+#   run-everything: true   → run all surfaces
+# Deploys still ONLY happen on main — forcing on a branch runs builds only.
 # ═══════════════════════════════════════════════════════════════════════
 
-commands:
-  setup-bun:
-    description: Install pinned Bun + restore/install workspace deps
-    steps:
-      - run:
-          name: Install Bun (pinned via packageManager)
-          # sudo REQUIRED: cimg runs as `circleci`, npm -g writes /usr/local.
-          # The npm package ships both `bun` and `bunx` onto PATH.
-          command: |
-            BUN_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1]")
-            sudo npm install -g "bun@${BUN_VERSION}"
-            bun --version && bunx --version
-      - restore_cache:
-          name: Restore Bun dependency cache
-          keys:
-            - bun-cache-v1-{{ checksum "bun.lock" }}
-            - bun-cache-v1-
-      - run:
-          name: Install dependencies
-          command: bun install --frozen-lockfile
-      - save_cache:
-          name: Save Bun dependency cache
-          key: bun-cache-v1-{{ checksum "bun.lock" }}
-          paths:
-            - ~/.bun/install/cache
+setup: true
 
-  halt-unless-changed:
-    description: End the job successfully when none of the paths changed
-    parameters:
-      paths:
-        type: string
-      surface:
-        type: string
-    steps:
-      - run:
-          name: "Change gate: << parameters.surface >>"
-          command: |
-            if git diff --quiet HEAD^ HEAD -- << parameters.paths >>; then
-              echo "No changes in: << parameters.paths >> — skipping << parameters.surface >> deploy."
-              circleci-agent step halt
-              exit 0
-            fi
-            echo "Changes detected — deploying << parameters.surface >>."
+orbs:
+  continuation: circleci/continuation@1.1.0
 
-  require-env:
-    description: Fail loudly when a required secret is missing
-    parameters:
-      names:
-        type: string
-    steps:
-      - run:
-          name: Verify required secrets exist
-          command: |
-            missing=""
-            for name in << parameters.names >>; do
-              eval "val=\${$name:-}"
-              [ -z "$val" ] && missing="$missing $name"
-            done
-            if [ -n "$missing" ]; then
-              echo "ERROR: missing CircleCI project environment variables:$missing"
-              echo "Add them in Project Settings → Environment Variables."
-              exit 1
-            fi
-            echo "All required secrets present ✓"
-
-  git-push-auth:
-    description: Point origin at an authenticated remote for tag pushes
-    steps:
-      - run:
-          name: Configure git push auth (GITHUB_TOKEN)
-          command: |
-            git config user.name "envpilot-release-bot"
-            git config user.email "hello@envpilot.dev"
-            git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/rafay99-epic/envpilot.dev.git"
+parameters:
+  run-everything:
+    type: boolean
+    default: false
+  force-convex:
+    type: boolean
+    default: false
+  force-web:
+    type: boolean
+    default: false
+  force-blog:
+    type: boolean
+    default: false
+  force-docs:
+    type: boolean
+    default: false
+  force-admin:
+    type: boolean
+    default: false
+  force-cli:
+    type: boolean
+    default: false
+  force-extension:
+    type: boolean
+    default: false
+  force-action:
+    type: boolean
+    default: false
 
 jobs:
-  # ────────────────────────────────────────────────────────────────────
-  # Quality gate — every branch (main included: it gates the deploys).
-  # ────────────────────────────────────────────────────────────────────
-  checks:
+  detect:
     docker:
-      - image: cimg/node:22.17
-    # large (4 vCPU / 8 GB): medium OOMed — the container reports the
-    # host's cores so each Next build spawns ~35 workers (exit 137).
-    resource_class: large
-    environment:
-      # Literal stubs (not secrets) so branch builds compile without
-      # credentials. Job-level env OUTRANKS project env vars, so the real
-      # prod values configured for the deploy jobs never leak in here.
-      CI: "true"
-      NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
-      WORKOS_CLIENT_ID: ci-workos-client-id
-      WORKOS_API_KEY: ci-workos-api-key
-      WORKOS_COOKIE_PASSWORD: "01234567890123456789012345678901"
-      WORKOS_REDIRECT_URI: http://localhost:3000/callback
-      POLAR_ACCESS_TOKEN: pat_placeholder
-      POLAR_WEBHOOK_SECRET: whsec_placeholder
-      POLAR_SERVER: sandbox
-      RESEND_API_KEY: re_placeholder
-      ENVPILOT_SERVER_URL: https://www.envpilot.dev
-      TURBO_TELEMETRY_DISABLED: "1"
-      # CircleCI attaches a TTY that crashes Turborepo's terminal UI.
-      TURBO_UI: "false"
-    steps:
-      - checkout
-      - setup-bun
-      - restore_cache:
-          name: Restore Turborepo cache
-          keys:
-            - turbo-v1-{{ .Branch }}-
-            - turbo-v1-main-
-            - turbo-v1-
-      - run:
-          name: Prettier check
-          command: bunx prettier --check .
-      - run:
-          name: Build (turbo, serialized)
-          # Builds one at a time: co-running Next builds OOM (each spawns
-          # workers per detected host core). Light tasks parallelize next.
-          command: bunx turbo build --cache-dir=.turbo --concurrency=1
-      - run:
-          name: Lint, typecheck, test (turbo)
-          command: bunx turbo lint typecheck test --cache-dir=.turbo --concurrency=4
-      - run:
-          name: Typecheck Convex functions
-          # convex/tsconfig.ci.json adds Node type roots so process.env
-          # resolves without a Convex deployment.
-          command: bunx tsc --noEmit -p convex/tsconfig.ci.json
-      - save_cache:
-          name: Save Turborepo cache
-          key: turbo-v1-{{ .Branch }}-{{ .Revision }}
-          paths:
-            - .turbo
-
-  # ────────────────────────────────────────────────────────────────────
-  # Deploys — main only. Backend FIRST, then clients, then release.
-  # ────────────────────────────────────────────────────────────────────
-  deploy-convex:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: medium
-    steps:
-      - checkout
-      # STRICT (matches GHA): only convex/** changes deploy the backend;
-      # shared-config changes re-run checks but never redeploy.
-      - halt-unless-changed:
-          paths: convex/
-          surface: convex
-      - require-env:
-          names: CONVEX_DEPLOY_KEY
-      - setup-bun
-      - run:
-          name: Deploy Convex functions
-          command: bunx convex deploy
-      - run:
-          name: Seed feature registry + tier overrides + changelog
-          # Seeds MUST follow every deploy so a release introducing a gated
-          # feature is registered the moment its code is live. Idempotent
-          # upserts. ADMIN_SECRET comes from the deployment's own env via
-          # the deploy key — never echoed.
-          command: |
-            ADMIN_SECRET=$(bunx convex env get ADMIN_SECRET)
-            if [ -z "$ADMIN_SECRET" ]; then
-              echo "ERROR: ADMIN_SECRET is not set on the production Convex deployment — seeds cannot run"
-              exit 1
-            fi
-            for migration in seed-feature-registry seed-tier-features seed-changelog; do
-              echo "Running $migration..."
-              bunx convex run features/admin/migrations:runMigration \
-                "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')"
-            done
-
-  deploy-cli:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: medium
-    steps:
-      - checkout
-      - halt-unless-changed:
-          paths: apps/cli/ package.json bun.lock turbo.json packages/ .circleci/
-          surface: cli
-      - setup-bun
-      - run:
-          name: Compare local version against npm
-          command: |
-            mkdir -p /tmp/ws
-            LOCAL=$(jq -r '.version' apps/cli/package.json)
-            echo "$LOCAL" > /tmp/ws/cli-version
-
-            # Distinguish 404 (never published → publish) from network errors
-            # (fail loudly — never blind-publish or silently skip).
-            if REMOTE=$(npm view @envpilot/cli version 2> /tmp/npm-err); then
-              :
-            elif grep -q 'E404' /tmp/npm-err; then
-              REMOTE=""
-            else
-              echo "ERROR: npm registry lookup failed:"; cat /tmp/npm-err; exit 1
-            fi
-
-            if [ -z "$REMOTE" ] || { [ "$LOCAL" != "$REMOTE" ] && [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; }; then
-              echo "Publishing $LOCAL (npm has: ${REMOTE:-nothing})."
-              echo "true" > /tmp/ws/cli-published
-            else
-              echo "Local $LOCAL is not ahead of npm $REMOTE — skipping publish."
-              echo "false" > /tmp/ws/cli-published
-            fi
-      - run:
-          name: Maybe halt (nothing to publish)
-          command: |
-            if [ "$(cat /tmp/ws/cli-published)" = "false" ]; then
-              # Persist the skip flag for homebrew/release BEFORE halting.
-              circleci-agent step halt
-              exit 0
-            fi
-      # Secrets are only demanded once there is actually something to
-      # publish — an unchanged version halts above without needing any.
-      - require-env:
-          names: NPM_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
-      - run:
-          name: Build CLI (direct, NOT via turbo)
-          # Turbo did not propagate these env vars into tsup in CI — every
-          # turbo-built publish shipped an EMPTY client id. Direct build
-          # embeds them reliably (verified below).
-          working_directory: apps/cli
-          environment:
-            SENTRY_CLI_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
-          command: bun run build
-      - run:
-          name: Verify build-time secrets are embedded
-          # A broken build must NEVER reach npm: empty client id breaks auth,
-          # empty Convex URL breaks every backend call.
-          working_directory: apps/cli
-          command: |
-            grep -rqF "$WORKOS_CLIENT_ID" dist || { echo "ERROR: WorkOS client id not embedded — refusing to publish."; exit 1; }
-            grep -rqF "$NEXT_PUBLIC_CONVEX_URL" dist || { echo "ERROR: Convex URL not embedded — refusing to publish."; exit 1; }
-            echo "WorkOS client id + Convex URL embedded ✓"
-      - run:
-          name: Pack tarball for the GitHub Release
-          working_directory: apps/cli
-          command: npm pack && cp ./*.tgz /tmp/ws/
-      - run:
-          name: Publish to npm
-          # --ignore-scripts is CRITICAL: prepublishOnly would re-run tsup
-          # without the embed env, overwriting the just-verified bundle.
-          working_directory: apps/cli
-          command: NPM_CONFIG_TOKEN="$NPM_TOKEN" bun publish --ignore-scripts --access public
-      - git-push-auth
-      - run:
-          name: Tag CLI release
-          command: |
-            TAG="cli-v$(cat /tmp/ws/cli-version)"
-            if git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "Tag $TAG already exists — skipping."
-            else
-              git tag "$TAG" && git push origin "$TAG"
-            fi
-      - persist_to_workspace:
-          root: /tmp/ws
-          paths: [.]
-
-  deploy-extension:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: medium
-    steps:
-      - checkout
-      - halt-unless-changed:
-          paths: apps/vscode-extension/ package.json bun.lock turbo.json packages/ .circleci/
-          surface: extension
-      - setup-bun
-      - run:
-          name: Compare local version against Open VSX
-          command: |
-            mkdir -p /tmp/ws
-            LOCAL=$(jq -r '.version' apps/vscode-extension/package.json)
-            echo "$LOCAL" > /tmp/ws/ext-version
-
-            CODE=$(curl -s -o /tmp/ovsx-body -w '%{http_code}' \
-              https://open-vsx.org/api/envpilot/envpilot || echo "000")
-            case "$CODE" in
-              200) REMOTE=$(jq -r '.version // empty' /tmp/ovsx-body) ;;
-              404) REMOTE="" ;;
-              *) echo "ERROR: Open VSX lookup failed (HTTP $CODE)."; exit 1 ;;
-            esac
-
-            if [ -z "$REMOTE" ] || { [ "$LOCAL" != "$REMOTE" ] && [ "$(printf '%s\n%s\n' "$REMOTE" "$LOCAL" | sort -V | tail -1)" = "$LOCAL" ]; }; then
-              echo "Publishing $LOCAL (Open VSX has: ${REMOTE:-nothing})."
-              echo "true" > /tmp/ws/ext-published
-            else
-              echo "Local $LOCAL is not ahead of Open VSX $REMOTE — skipping publish."
-              echo "false" > /tmp/ws/ext-published
-            fi
-      - run:
-          name: Maybe halt (nothing to publish)
-          command: |
-            if [ "$(cat /tmp/ws/ext-published)" = "false" ]; then
-              circleci-agent step halt
-              exit 0
-            fi
-      # Secrets are only demanded once there is actually something to
-      # publish — an unchanged version halts above without needing any.
-      - require-env:
-          names: OPEN_VSX_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
-      - run:
-          name: Package VSIX
-          # Env MUST be on THIS step: vsce's "vscode:prepublish" re-builds
-          # the bundle, wiping any earlier dist. Without these at package
-          # time the VSIX ships an EMPTY client id.
-          working_directory: apps/vscode-extension
-          environment:
-            ENVPILOT_SERVER_URL: https://www.envpilot.dev
-            SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
-          command: bunx @vscode/vsce package --no-dependencies
-      - run:
-          name: Verify build-time secrets are embedded in the VSIX
-          working_directory: apps/vscode-extension
-          command: |
-            command -v unzip >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq unzip; }
-            VSIX="envpilot-$(jq -r '.version' package.json).vsix"
-            [ -f "$VSIX" ] || { echo "ERROR: expected package $VSIX not found."; exit 1; }
-            BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
-            printf '%s' "$BUNDLE" | grep -qF "$WORKOS_CLIENT_ID" || { echo "ERROR: client id not in $VSIX — refusing to publish."; exit 1; }
-            printf '%s' "$BUNDLE" | grep -qF "$NEXT_PUBLIC_CONVEX_URL" || { echo "ERROR: Convex URL not in $VSIX — refusing to publish."; exit 1; }
-            cp "$VSIX" /tmp/ws/
-            echo "WorkOS client id + Convex URL embedded in $VSIX ✓"
-      - run:
-          name: Publish to Open VSX
-          working_directory: apps/vscode-extension
-          command: bunx ovsx publish envpilot-*.vsix -p "$OPEN_VSX_TOKEN"
-      - run:
-          name: Publish to VS Code Marketplace (optional, non-blocking)
-          working_directory: apps/vscode-extension
-          command: |
-            if [ -z "${VSCODE_MARKETPLACE_TOKEN:-}" ]; then
-              echo "VSCODE_MARKETPLACE_TOKEN not set — skipping Marketplace publish."
-              exit 0
-            fi
-            set +e
-            bunx @vscode/vsce publish --no-dependencies \
-              --packagePath envpilot-*.vsix -p "$VSCODE_MARKETPLACE_TOKEN"
-            [ $? -ne 0 ] && echo "WARNING: Marketplace publish failed (non-blocking; Open VSX succeeded)."
-            exit 0
-      - git-push-auth
-      - run:
-          name: Tag extension release
-          command: |
-            TAG="extension-v$(cat /tmp/ws/ext-version)"
-            if git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "Tag $TAG already exists — skipping."
-            else
-              git tag "$TAG" && git push origin "$TAG"
-            fi
-      - persist_to_workspace:
-          root: /tmp/ws
-          paths: [.]
-
-  deploy-action:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: medium
-    steps:
-      - checkout
-      - halt-unless-changed:
-          paths: packages/github-action/ package.json bun.lock turbo.json .circleci/
-          surface: github-action
-      - require-env:
-          names: ACTION_PUBLISH_TOKEN
-      - setup-bun
-      - run:
-          name: Build the action bundle
-          environment:
-            TURBO_UI: "false"
-            TURBO_TELEMETRY_DISABLED: "1"
-          command: bunx turbo build --filter=@envpilot/github-action
-      - run:
-          name: Publish dist to the public envpilot-action repo
-          # Sync ONLY the published surface (action.yml, dist, README,
-          # LICENSE) — never monorepo source. Exact tag vX.Y.Z is created
-          # once; floating major tag (v1) always force-moves.
-          command: |
-            set -euo pipefail
-            WORKSPACE="$PWD"
-            VERSION=$(jq -r '.version' packages/github-action/package.json)
-            MAJOR="v${VERSION%%.*}"
-
-            git clone "https://x-access-token:${ACTION_PUBLISH_TOKEN}@github.com/rafay99-epic/envpilot-action.git" /tmp/public-action
-            cd /tmp/public-action
-            git config user.name "envpilot-release-bot"
-            git config user.email "hello@envpilot.dev"
-
-            rm -rf dist action.yml README.md LICENSE
-            cp -R "$WORKSPACE/packages/github-action/dist" dist
-            cp "$WORKSPACE/packages/github-action/action.yml" action.yml
-            cp "$WORKSPACE/packages/github-action/README.md" README.md
-            cp "$WORKSPACE/packages/github-action/LICENSE" LICENSE
-
-            if git diff --quiet && git diff --cached --quiet && ! git status --porcelain | grep -q .; then
-              echo "No content changes to publish."
-            else
-              git add -A
-              git commit -m "release: v${VERSION}"
-              git push origin HEAD
-            fi
-
-            if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-              echo "Tag v${VERSION} already exists — skipping."
-            else
-              git tag "v${VERSION}" && git push origin "v${VERSION}"
-            fi
-
-            git tag -f "$MAJOR"
-            git push -f origin "$MAJOR"
-            echo "Published envpilot-action v${VERSION} (${MAJOR} moved)."
-
-  deploy-homebrew:
-    docker:
-      - image: cimg/node:22.17
+      - image: cimg/base:current
     resource_class: small
     steps:
       - checkout
-      - attach_workspace:
-          at: /tmp/ws
       - run:
-          name: Halt unless the CLI actually published
-          command: |
-            if [ ! -f /tmp/ws/cli-published ] || [ "$(cat /tmp/ws/cli-published)" != "true" ]; then
-              echo "CLI publish skipped this run — no formula update needed."
-              circleci-agent step halt
-              exit 0
-            fi
-      - require-env:
-          names: HOMEBREW_TAP_PAT
-      - run:
-          name: Update Formula/envpilot.rb in the public tap
+          name: Detect changed surfaces
           command: |
             set -euo pipefail
-            VERSION=$(cat /tmp/ws/cli-version)
-            echo "$VERSION" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' || { echo "ERROR: invalid version '$VERSION'"; exit 1; }
 
-            git clone "https://github.com/rafay99-epic/homebrew-apps.git" /tmp/homebrew-apps
-            cd /tmp/homebrew-apps
-            git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_PAT}@github.com/rafay99-epic/homebrew-apps.git"
-            git config user.name "envpilot-release-bot"
-            git config user.email "hello@envpilot.dev"
-            cd -
-
-            apps/cli/scripts/update-homebrew-formula.sh "$VERSION" --tap-dir /tmp/homebrew-apps
-
-            cd /tmp/homebrew-apps
-            UNTRACKED=$(git ls-files --others --exclude-standard Formula/)
-            if git diff --quiet && git diff --cached --quiet && [ -z "$UNTRACKED" ]; then
-              echo "No changes to formula — skipping push."
-              exit 0
+            # ── What are we diffing against? ─────────────────────────
+            # main: the merge itself (squash merges → first-parent diff
+            # covers the whole PR). branches: everything vs the fork
+            # point with main, so re-pushes keep the same surface set.
+            if [ "$CIRCLE_BRANCH" = "main" ]; then
+              RANGE="HEAD^..HEAD"
+              IS_MAIN=true
+            else
+              git fetch origin main --quiet
+              BASE=$(git merge-base origin/main HEAD)
+              RANGE="$BASE..HEAD"
+              IS_MAIN=false
             fi
-            git add Formula/envpilot.rb
-            git commit -m "chore: update envpilot to v${VERSION}"
-            TAG="envpilot-v${VERSION}"
-            git rev-parse "$TAG" >/dev/null 2>&1 || git tag "$TAG"
-            git push origin main --tags
-            echo "Formula updated to v${VERSION}."
+            CHANGED=$(git diff --name-only "$RANGE")
+            printf 'Changed files vs %s:\n%s\n\n' "$RANGE" "$CHANGED"
 
-  # ────────────────────────────────────────────────────────────────────
-  # Release — aggregate tag + GitHub Release with artifacts.
-  # Requires cli+extension+convex (halted = success = fine); Homebrew is
-  # deliberately NOT required — a failed formula push must not block the
-  # release (retry it by rerunning the job).
-  # ────────────────────────────────────────────────────────────────────
-  release:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: small
-    steps:
-      - checkout
-      - attach_workspace:
-          at: /tmp/ws
-      - run:
-          name: Halt on empty pushes
-          command: |
-            git diff --quiet HEAD^ HEAD || exit 0
-            echo "Empty diff — nothing to release."
-            circleci-agent step halt
-              exit 0
-      - require-env:
-          names: GITHUB_TOKEN
-      - run:
-          name: Create GitHub Release (tag, notes, artifacts)
-          command: |
-            set -euo pipefail
-            API="https://api.github.com/repos/rafay99-epic/envpilot.dev"
-            AUTH="Authorization: Bearer ${GITHUB_TOKEN}"
+            hit() { echo "$CHANGED" | grep -qE "$1" && echo true || echo false; }
 
-            ROOT=$(jq -r '.version' package.json)
-            TAG="v${ROOT}"
-            if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-              TAG="${TAG}+$(git rev-parse --short HEAD)"
+            CONVEX=$(hit '^convex/')
+            WEB=$(hit '^apps/web/')
+            BLOG=$(hit '^apps/blog/')
+            DOCS=$(hit '^apps/docs/')
+            ADMIN=$(hit '^apps/admin/')
+            CLI=$(hit '^apps/cli/')
+            EXTENSION=$(hit '^apps/vscode-extension/')
+            ACTION=$(hit '^packages/github-action/')
+
+            # packages/ui feeds the three Next sites + web.
+            if [ "$(hit '^packages/ui/')" = "true" ]; then
+              WEB=true; BLOG=true; DOCS=true
             fi
 
-            ver() { jq -r '.version' "$1"; }
-            pub() { [ -f "/tmp/ws/$1" ] && cat "/tmp/ws/$1" || echo "unchanged"; }
-            status() { case "$(pub "$1")" in true) echo "✅ deployed" ;; false) echo "⏭️ not ahead of registry" ;; *) echo "⏭️ no changes" ;; esac; }
+            # Root manifests / shared configs / this pipeline → everything.
+            if [ "$(hit '^(package\.json|bun\.lock|turbo\.json|\.circleci/|packages/(tsconfig|eslint-config|prettier-config)/)')" = "true" ]; then
+              CONVEX=true; WEB=true; BLOG=true; DOCS=true; ADMIN=true
+              CLI=true; EXTENSION=true; ACTION=true
+            fi
 
+            # Manual overrides.
+            if [ "<< pipeline.parameters.run-everything >>" = "true" ]; then
+              CONVEX=true; WEB=true; BLOG=true; DOCS=true; ADMIN=true
+              CLI=true; EXTENSION=true; ACTION=true
+            fi
+            if [ "<< pipeline.parameters.force-convex >>" = "true" ]; then CONVEX=true; fi
+            if [ "<< pipeline.parameters.force-web >>" = "true" ]; then WEB=true; fi
+            if [ "<< pipeline.parameters.force-blog >>" = "true" ]; then BLOG=true; fi
+            if [ "<< pipeline.parameters.force-docs >>" = "true" ]; then DOCS=true; fi
+            if [ "<< pipeline.parameters.force-admin >>" = "true" ]; then ADMIN=true; fi
+            if [ "<< pipeline.parameters.force-cli >>" = "true" ]; then CLI=true; fi
+            if [ "<< pipeline.parameters.force-extension >>" = "true" ]; then EXTENSION=true; fi
+            if [ "<< pipeline.parameters.force-action >>" = "true" ]; then ACTION=true; fi
+
+            # ── Generate the continuation config ─────────────────────
+            # Job definitions come verbatim from .circleci/jobs.yml; the
+            # workflow below contains ONLY the jobs that matter, with
+            # `requires` chains computed so any failure blocks everything
+            # downstream (quality gates all; convex before clients).
+            cp .circleci/jobs.yml /tmp/continue.yml
             {
-              echo "## Envpilot ${TAG}"
               echo ""
-              echo "| Surface | Version | Status |"
-              echo "|---------|---------|--------|"
-              echo "| Web | $(ver apps/web/package.json) | 🌐 Vercel |"
-              echo "| Blog | $(ver apps/blog/package.json) | 🌐 Vercel |"
-              echo "| Docs | $(ver apps/docs/package.json) | 🌐 Vercel |"
-              echo "| Admin | $(ver apps/admin/package.json) | 🌐 Vercel |"
-              echo "| CLI | $(ver apps/cli/package.json) | $(status cli-published) |"
-              echo "| Extension | $(ver apps/vscode-extension/package.json) | $(status ext-published) |"
-              echo ""
-              echo "**Install:** \`npm i -g @envpilot/cli\` · \`brew install rafay99-epic/apps/envpilot\` · [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)"
-            } > /tmp/release-body.md
-            cat /tmp/release-body.md
+              echo "workflows:"
+              echo "  pipeline:"
+              echo "    jobs:"
+              echo "      - quality"
 
-            RELEASE=$(jq -cn --arg tag "$TAG" --arg name "Envpilot $TAG" \
-              --rawfile body /tmp/release-body.md \
-              '{tag_name: $tag, name: $name, body: $body, generate_release_notes: true}')
-            RESP=$(curl -sf -X POST -H "$AUTH" -d "$RELEASE" "$API/releases")
-            RELEASE_ID=$(echo "$RESP" | jq -r '.id')
-            echo "Created release $TAG (id $RELEASE_ID)."
+              if [ "$WEB" = "true" ]; then echo "      - build-web:       { requires: [quality] }"; fi
+              if [ "$BLOG" = "true" ]; then echo "      - build-blog:      { requires: [quality] }"; fi
+              if [ "$DOCS" = "true" ]; then echo "      - build-docs:      { requires: [quality] }"; fi
+              if [ "$ADMIN" = "true" ]; then echo "      - build-admin:     { requires: [quality] }"; fi
+              if [ "$CLI" = "true" ]; then echo "      - build-cli:       { requires: [quality] }"; fi
+              if [ "$EXTENSION" = "true" ]; then echo "      - build-extension: { requires: [quality] }"; fi
+              if [ "$ACTION" = "true" ]; then echo "      - build-action:    { requires: [quality] }"; fi
 
-            # Attach any artifacts the deploy jobs persisted.
-            for f in /tmp/ws/*.tgz /tmp/ws/*.vsix; do
-              [ -e "$f" ] || continue
-              NAME=$(basename "$f")
-              curl -sf -X POST -H "$AUTH" -H "Content-Type: application/octet-stream" \
-                --data-binary @"$f" \
-                "https://uploads.github.com/repos/rafay99-epic/envpilot.dev/releases/${RELEASE_ID}/assets?name=${NAME}" > /dev/null
-              echo "Attached $NAME."
-            done
+              if [ "$IS_MAIN" = "true" ]; then
+                # Backend first: clients require deploy-convex when it exists.
+                AFTER_CONVEX=""
+                if [ "$CONVEX" = "true" ]; then
+                  echo "      - deploy-convex:   { requires: [quality] }"
+                  AFTER_CONVEX=", deploy-convex"
+                fi
+                RELEASE_REQS=""
+                if [ "$CONVEX" = "true" ]; then RELEASE_REQS="deploy-convex"; fi
+                if [ "$CLI" = "true" ]; then
+                  echo "      - publish-cli:     { requires: [build-cli${AFTER_CONVEX}] }"
+                  echo "      - deploy-homebrew: { requires: [publish-cli] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }publish-cli"
+                fi
+                if [ "$EXTENSION" = "true" ]; then
+                  echo "      - publish-extension: { requires: [build-extension${AFTER_CONVEX}] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }publish-extension"
+                fi
+                if [ "$ACTION" = "true" ]; then
+                  echo "      - publish-action:  { requires: [build-action${AFTER_CONVEX}] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }publish-action"
+                fi
+                if [ "$WEB" = "true" ]; then
+                  echo "      - deploy-web:      { requires: [build-web${AFTER_CONVEX}] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }deploy-web"
+                fi
+                if [ "$BLOG" = "true" ]; then
+                  echo "      - deploy-blog:     { requires: [build-blog] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }deploy-blog"
+                fi
+                if [ "$DOCS" = "true" ]; then
+                  echo "      - deploy-docs:     { requires: [build-docs] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }deploy-docs"
+                fi
+                if [ "$ADMIN" = "true" ]; then
+                  echo "      - deploy-admin:    { requires: [build-admin] }"
+                  RELEASE_REQS="${RELEASE_REQS:+$RELEASE_REQS, }deploy-admin"
+                fi
+                if [ -n "$RELEASE_REQS" ]; then
+                  echo "      - release:         { requires: [$RELEASE_REQS] }"
+                fi
+              fi
+            } >> /tmp/continue.yml
+            echo "── Generated continuation ──"
+            tail -40 /tmp/continue.yml
+      - continuation/continue:
+          configuration_path: /tmp/continue.yml
 
 workflows:
-  build-and-deploy:
+  setup:
     jobs:
-      - checks
-      - deploy-convex:
-          requires: [checks]
-          filters:
-            branches:
-              only: main
-      - deploy-cli:
-          requires: [deploy-convex]
-          filters:
-            branches:
-              only: main
-      - deploy-extension:
-          requires: [deploy-convex]
-          filters:
-            branches:
-              only: main
-      - deploy-action:
-          requires: [deploy-convex]
-          filters:
-            branches:
-              only: main
-      - deploy-homebrew:
-          requires: [deploy-cli]
-          filters:
-            branches:
-              only: main
-      - release:
-          requires: [deploy-convex, deploy-cli, deploy-extension]
-          filters:
-            branches:
-              only: main
+      - detect
