@@ -17,9 +17,7 @@ jobs:
   checks:
     docker:
       - image: cimg/node:22.17
-    # large (4 vCPU / 8 GB): the turbo step runs three `next build`s plus
-    # vite/tsup/tsc — medium's 4 GB OOMs. Concurrency is capped below too.
-    resource_class: large
+    resource_class: medium
     environment:
       # Literal stubs (not secrets) so branch builds compile without
       # credentials — kept in sync with the env block in ci.yml.
@@ -41,11 +39,12 @@ jobs:
 
       - run:
           name: Install Bun (version pinned via packageManager)
+          # npm -g instead of the curl installer: no unzip dependency, no
+          # $BASH_ENV PATH juggling — bun lands on PATH via npm's bin dir.
           command: |
             BUN_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1]")
-            curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
-            echo 'export BUN_INSTALL="$HOME/.bun"' >> "$BASH_ENV"
-            echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> "$BASH_ENV"
+            npm install -g "bun@${BUN_VERSION}"
+            bun --version
 
       - restore_cache:
           name: Restore Bun dependency cache
