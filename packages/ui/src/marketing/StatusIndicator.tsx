@@ -43,12 +43,16 @@ const STATUS_CONFIG: Record<
  * Live uptime pill for the marketing footer. Reads the cached /api/status
  * proxy (UptimeRobot) and links to the public status page.
  */
-export function StatusIndicator() {
+export function StatusIndicator({
+  statusUrl = "https://www.envpilot.dev/api/status",
+}: {
+  statusUrl?: string;
+} = {}) {
   const [status, setStatus] = useState<ServiceStatus>("unknown");
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/status")
+    fetch(statusUrl)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { status?: ServiceStatus } | null) => {
         if (!cancelled && data?.status && data.status in STATUS_CONFIG) {
@@ -61,7 +65,7 @@ export function StatusIndicator() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [statusUrl]);
 
   const config = STATUS_CONFIG[status];
 

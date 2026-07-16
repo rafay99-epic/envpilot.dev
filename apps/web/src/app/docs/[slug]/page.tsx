@@ -4,8 +4,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
 import { getDocBySlug, getAllDocs } from "@/lib/docs/content";
-import { docsComponents } from "@/components/docs/mdx-components";
-import { DocsSidebar, DOC_ICONS } from "@/components/docs/DocsSidebar";
+import { docsComponents, DocsSidebar, DOC_ICONS } from "@envpilot/ui";
 import {
   MarketingShell,
   GlowCard,

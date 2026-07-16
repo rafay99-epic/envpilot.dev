@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import rehypePrettyCode from "rehype-pretty-code";
 import { format, parseISO } from "date-fns";
 import { getPostBySlug, getAllPosts } from "@/lib/blog/content";
-import { docsComponents } from "@/components/docs/mdx-components";
+import { docsComponents } from "@envpilot/ui";
 import {
   MarketingShell,
   GlowDivider,

@@ -48,7 +48,7 @@ const RESOURCES = [
   },
 ];
 
-interface SidebarItem {
+export interface SidebarItem {
   slug: string;
   title: string;
   icon: string;

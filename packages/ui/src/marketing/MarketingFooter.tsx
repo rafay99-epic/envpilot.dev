@@ -2,58 +2,28 @@ import Link from "next/link";
 import { GlowDivider } from "./backgrounds";
 import { StatusIndicator } from "./StatusIndicator";
 
-const FOOTER_COLUMNS = [
-  {
-    title: "product",
-    links: [
-      { label: "Features", href: "/#features" },
-      { label: "Pricing", href: "/pricing" },
-      { label: "Changelog", href: "/changelog" },
-      { label: "Wishlist", href: "/wishlist" },
-    ],
-  },
-  {
-    title: "resources",
-    links: [
-      { label: "Getting Started", href: "/docs/getting-started" },
-      { label: "CLI Reference", href: "/docs/cli" },
-      { label: "VS Code Extension", href: "/docs/extension" },
-      { label: "Security", href: "/docs/security" },
-    ],
-  },
-  {
-    title: "compare",
-    links: [
-      { label: "vs Doppler", href: "/vs/doppler" },
-      { label: "vs Infisical", href: "/vs/infisical" },
-      { label: "vs .env files", href: "/vs/dotenv" },
-    ],
-  },
-  {
-    title: "support",
-    links: [
-      { label: "FAQ", href: "/faq" },
-      { label: "Support", href: "/support" },
-      { label: "Contact", href: "/contact" },
-      { label: "Docs", href: "/docs" },
-      {
-        label: "Status",
-        href: "https://stats.uptimerobot.com/FxXv9XmG1h",
-        external: true,
-      },
-    ],
-  },
-  {
-    title: "legal",
-    links: [
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Terms of Service", href: "/terms" },
-    ],
-  },
-];
+export interface FooterLink {
+  label: string;
+  href: string;
+  external?: boolean;
+}
 
-/** Shared marketing footer: link columns, install snippet, watermark wordmark. */
-export function MarketingFooter() {
+export interface FooterColumn {
+  title: string;
+  links: FooterLink[];
+}
+
+/**
+ * Shared marketing footer: link columns, install snippet, watermark wordmark.
+ * Link destinations are app-specific, so the caller supplies `columns`.
+ */
+export function MarketingFooter({
+  columns,
+  statusUrl,
+}: {
+  columns: FooterColumn[];
+  statusUrl?: string;
+}) {
   return (
     <footer className="relative overflow-hidden border-t border-zinc-800/60 bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 pt-16 pb-8 sm:px-6">
@@ -77,7 +47,7 @@ export function MarketingFooter() {
             </div>
           </div>
 
-          {FOOTER_COLUMNS.map((column) => (
+          {columns.map((column) => (
             <div key={column.title}>
               <p className="font-mono text-[11px] uppercase tracking-widest text-green-500/80">
                 {`// ${column.title}`}
@@ -112,7 +82,7 @@ export function MarketingFooter() {
         <GlowDivider className="mt-12" />
 
         <div className="flex flex-col items-center justify-between gap-4 pt-6 sm:flex-row">
-          <StatusIndicator />
+          <StatusIndicator statusUrl={statusUrl} />
           <p className="font-mono text-xs text-zinc-700">
             &copy; {new Date().getFullYear()} Envpilot &middot; Built at{" "}
             <a

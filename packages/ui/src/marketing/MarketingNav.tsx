@@ -2,26 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import { PublicHeaderButtons } from "@/components/landing/PublicHeaderButtons";
 
-const NAV_LINKS = [
-  { label: "features", href: "/#features" },
-  { label: "pricing", href: "/pricing" },
-  { label: "docs", href: "/docs" },
-  { label: "blog", href: "/blog" },
-  { label: "changelog", href: "/changelog" },
-  { label: "wishlist", href: "/wishlist" },
-  { label: "faq", href: "/faq" },
-];
+export interface NavLink {
+  label: string;
+  href: string;
+}
 
 /**
  * Shared marketing navigation: transparent over the hero, condenses into a
  * glass bar after scroll. Active route gets the green prompt caret.
+ *
+ * Auth-aware controls are injected via `actions` (the web app supplies its
+ * auth header buttons), and the nav destinations via `links`, so this
+ * component stays free of app-specific auth/routing coupling.
  */
-export function MarketingNav() {
+export function MarketingNav({
+  links,
+  actions,
+}: {
+  links: NavLink[];
+  actions?: ReactNode;
+}) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,7 +59,7 @@ export function MarketingNav() {
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((item) => {
+          {links.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
@@ -74,9 +78,7 @@ export function MarketingNav() {
           })}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
-          <PublicHeaderButtons />
-        </div>
+        <div className="hidden items-center gap-3 md:flex">{actions}</div>
 
         <button
           type="button"
@@ -99,7 +101,7 @@ export function MarketingNav() {
             className="overflow-hidden border-t border-zinc-800/80 md:hidden"
           >
             <div className="space-y-1 px-4 py-4">
-              {NAV_LINKS.map((item) => (
+              {links.map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
@@ -115,7 +117,7 @@ export function MarketingNav() {
                 </Link>
               ))}
               <div className="flex items-center gap-3 border-t border-zinc-800/60 px-3 pt-4">
-                <PublicHeaderButtons />
+                {actions}
               </div>
             </div>
           </motion.nav>

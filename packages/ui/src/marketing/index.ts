@@ -1,6 +1,10 @@
 export { MarketingShell } from "./MarketingShell";
-export { MarketingNav } from "./MarketingNav";
-export { MarketingFooter } from "./MarketingFooter";
+export { MarketingNav, type NavLink } from "./MarketingNav";
+export {
+  MarketingFooter,
+  type FooterColumn,
+  type FooterLink,
+} from "./MarketingFooter";
 export { StatusIndicator } from "./StatusIndicator";
 export { PageHero } from "./PageHero";
 export { SectionHeading } from "./SectionHeading";

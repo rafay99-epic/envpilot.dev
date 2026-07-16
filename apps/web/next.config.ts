@@ -12,6 +12,7 @@ const withAnalyzer = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  transpilePackages: ["@envpilot/ui"],
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSIONS.web,
   },
