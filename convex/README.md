@@ -10,7 +10,7 @@ convex/
 ├── crons.ts             # scheduled jobs (must stay at root)
 ├── auth.config.ts       # WorkOS AuthKit JWT providers (must stay at root)
 ├── convex.config.ts     # installed components (rate-limiter, workflow, workpool)
-├── <module>.ts          # ★ 9 legacy client compat shims (see below) — nothing else
+├── <module>.ts          # ★ 11 legacy client compat shims (see below) — nothing else
 ├── lib/                 # shared pure helpers — NO registered functions
 │   ├── identity.ts      #   verified-JWT actor resolution (requireAuthedUser)
 │   ├── authz.ts         #   unified RBAC: roles, actions, assert*/get*Access
@@ -50,17 +50,28 @@ convex/
   `import { rateLimiter } from "../../lib/rateLimits"`,
   `import { MAX_BULK_IMPORT_SIZE } from "../billing/tierLimits"`).
 
-## Legacy client compat shims (the 9 root `<module>.ts` files)
+## Legacy client compat shims (the 11 root `<module>.ts` files)
 
 Convex function paths are the wire contract for **published CLI
-(>= 1.14.0) and VS Code extension (>= 1.7.2) builds**, which call exactly 16
+(>= 1.14.0) and VS Code extension (>= 1.7.2) builds**, which call exactly 23
 functions by baked-in string refs like `"variables:listWithAccess"`. Each shim
-re-exports only those functions to keep the old path registered. Rules:
+re-exports only those functions to keep the old path registered.
 
-- Do not add exports to a shim, and never import from one.
-- CLI/extension source already uses the `features/*` paths, so releases after
-  this refactor don't depend on the shims.
+History: the original PR #95 shim set covered 16 functions; it missed 7 that
+published extension builds (1.7.2 – 1.13.0) also call
+(`projectAccess:{linkExtension,unlinkExtension,listForCaller}`,
+`permissionRevocationEvents:{listMine,acknowledgeMine}`,
+`variables:listMetadataByProject`, `projects:listForUser`,
+`featureRegistry:checkFeature`), silently breaking extension link/unlink and
+real-time sync in production. Those shims were added after the fact. Rules:
+
+- Do not add exports to a shim, and never import from one — unless a published
+  client build provably calls the path (verify with
+  `bunx convex run <path>` before assuming).
+- CLI source already uses the `features/*` paths; extension source does as of
+  the unsync-on-close release, so releases after that don't depend on the
+  shims.
 - **Removal:** once `minCli`/`minExtension` (apps/web/src/lib/versions.ts) are
-  bumped past the last release using old paths, delete all 9 shim files.
+  bumped past the last release using old paths, delete all 11 shim files.
 
 See https://docs.convex.dev/functions for Convex function basics.
