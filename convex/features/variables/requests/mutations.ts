@@ -1,10 +1,11 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, MutationCtx } from "../../../_generated/server";
+import { internal } from "../../../_generated/api";
 import {
   findEnvironmentConflicts,
   environmentConflictMessage,
 } from "../helpers";
-import { Id } from "../../../_generated/dataModel";
+import { Id, Doc } from "../../../_generated/dataModel";
 import { createAuditLog } from "../../../lib/audit";
 import { requireAuthedUser } from "../../../lib/identity";
 import {
@@ -25,7 +26,7 @@ const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;
  */
 function assertValidEnvironmentOverride(environments: string[]): void {
   if (environments.length === 0) {
-    throw new Error(
+    throw new ConvexError(
       "environments override must contain at least one environment"
     );
   }
@@ -33,12 +34,14 @@ function assertValidEnvironmentOverride(environments: string[]): void {
   const seen = new Set<string>();
   for (const environment of environments) {
     if (!(VALID_ENVIRONMENTS as readonly string[]).includes(environment)) {
-      throw new Error(
+      throw new ConvexError(
         `Invalid environment "${environment}". Allowed: ${VALID_ENVIRONMENTS.join(", ")}`
       );
     }
     if (seen.has(environment)) {
-      throw new Error(`Duplicate environment "${environment}" in override`);
+      throw new ConvexError(
+        `Duplicate environment "${environment}" in override`
+      );
     }
     seen.add(environment);
   }
@@ -69,7 +72,7 @@ async function createCore(
 
   const project = await ctx.db.get(args.projectId);
   if (!project || project.deletedAt) {
-    throw new Error("Project not found");
+    throw new ConvexError("Project not found");
   }
 
   // Requester must be assigned to the project (owners bypass assignment)
@@ -81,7 +84,7 @@ async function createCore(
   );
 
   if (orgRole !== "developer") {
-    throw new Error(
+    throw new ConvexError(
       "Only developers can create variable requests — owners, project managers, and team leads can create variables directly"
     );
   }
@@ -89,7 +92,7 @@ async function createCore(
   // Environment scope: scoped developers may only request variables whose
   // environments all fall inside their assignment scope
   if (!isEnvironmentScopeAllowed(environmentScope, args.environments)) {
-    throw new Error(
+    throw new ConvexError(
       `Your access is limited to these environments: ${(environmentScope ?? []).join(", ")}`
     );
   }
@@ -123,7 +126,7 @@ async function createCore(
   if (hasPendingDuplicate) {
     // Keep the phrase "pending request" — the CLI/extension/web API routes
     // match on it to map this rejection to HTTP 409.
-    throw new Error(
+    throw new ConvexError(
       `You already have a pending request for "${args.key}". Wait for it to be reviewed, or cancel it from the dashboard before requesting again.`
     );
   }
@@ -157,6 +160,23 @@ async function createCore(
     involvesSensitiveData: args.isSensitive ?? false,
   });
 
+  // Notify the project's reviewers (owner + assigned PMs/team leads) that a
+  // request arrived. Scheduled + best-effort — a send failure must never block
+  // or undo the request.
+  const requester = await ctx.db.get(args.requestedBy);
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.emails.emails.sendVariableRequestCreatedEmail,
+    {
+      projectId: args.projectId,
+      projectName: project.name,
+      projectSlug: project.slug,
+      requesterName: requester?.name || requester?.email || "A developer",
+      key: args.key,
+      environments: args.environments,
+    }
+  );
+
   return requestId;
 }
 
@@ -182,16 +202,16 @@ export const review = mutation({
 
     const request = await ctx.db.get(args.requestId);
     if (!request) {
-      throw new Error("Variable request not found");
+      throw new ConvexError("Variable request not found");
     }
 
     if (request.status !== "pending") {
-      throw new Error(`Request has already been ${request.status}`);
+      throw new ConvexError(`Request has already been ${request.status}`);
     }
 
     // An environment override is only meaningful when approving.
     if (args.environments !== undefined && args.action !== "approve") {
-      throw new Error(
+      throw new ConvexError(
         "environments override is only allowed when approving a request"
       );
     }
@@ -209,7 +229,7 @@ export const review = mutation({
       request.projectId
     );
     if (!canReview) {
-      throw new Error(
+      throw new ConvexError(
         "Only owners, project managers, and team leads can review variable requests"
       );
     }
@@ -238,6 +258,14 @@ export const review = mutation({
         involvesSensitiveData: request.isSensitive,
       });
 
+      await notifyRequesterOfVerdict(ctx, {
+        request,
+        project,
+        actor,
+        verdict: "rejected",
+        reviewReason: args.reviewReason,
+      });
+
       return {
         requestId: args.requestId,
         status: "rejected" as const,
@@ -263,7 +291,7 @@ export const review = mutation({
       (limit) => countActiveVariables(ctx.db, request.projectId, limit)
     );
     if (!varCheck.allowed) {
-      throw new Error(varCheck.reason!);
+      throw new ConvexError(varCheck.reason!);
     }
 
     // Per-environment uniqueness against the environments actually approved
@@ -361,6 +389,14 @@ export const review = mutation({
       involvesSensitiveData: request.isSensitive,
     });
 
+    await notifyRequesterOfVerdict(ctx, {
+      request,
+      project,
+      actor,
+      verdict: "approved",
+      reviewReason: args.reviewReason,
+    });
+
     return {
       requestId: args.requestId,
       status: "approved" as const,
@@ -368,6 +404,37 @@ export const review = mutation({
     };
   },
 });
+
+/**
+ * Email the requester the approve/reject verdict. Best-effort + scheduled — a
+ * send failure must never block or roll back the review mutation.
+ */
+async function notifyRequesterOfVerdict(
+  ctx: MutationCtx,
+  args: {
+    request: Doc<"environmentVariableRequests">;
+    project: Doc<"projects">;
+    actor: Doc<"users">;
+    verdict: "approved" | "rejected";
+    reviewReason?: string;
+  }
+) {
+  const requester = await ctx.db.get(args.request.requestedBy);
+  if (!requester?.email) return;
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.emails.emails.sendVariableRequestReviewedEmail,
+    {
+      to: requester.email,
+      requesterName: requester.name,
+      key: args.request.key,
+      projectName: args.project.name,
+      verdict: args.verdict,
+      reviewerName: args.actor.name || args.actor.email,
+      reviewReason: args.reviewReason,
+    }
+  );
+}
 
 export const cancel = mutation({
   args: {
@@ -379,11 +446,11 @@ export const cancel = mutation({
 
     const request = await ctx.db.get(args.requestId);
     if (!request) {
-      throw new Error("Variable request not found");
+      throw new ConvexError("Variable request not found");
     }
 
     if (request.status !== "pending") {
-      throw new Error(
+      throw new ConvexError(
         `Only pending requests can be canceled (current: ${request.status})`
       );
     }
@@ -397,7 +464,7 @@ export const cancel = mutation({
       (await canReviewRequests(ctx, actor._id, request.projectId));
 
     if (!canCancel) {
-      throw new Error("Not authorized to cancel this request");
+      throw new ConvexError("Not authorized to cancel this request");
     }
 
     await ctx.db.patch(args.requestId, {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
 import { sendShareOtpEmail } from "@/lib/share-emails";
+import { isRateLimitError } from "@/lib/error-messages";
 
 const verifyEmailSchema = z.object({
   email: z.string().email(),
@@ -68,9 +69,10 @@ export async function POST(
     // Always return success (anti-enumeration)
     return NextResponse.json({ success: true });
   } catch (error) {
-    // Rate limit errors should be surfaced
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("rate limit") || message.includes("Rate limit")) {
+    // Rate limit errors should be surfaced. The limiter throws a structured
+    // ConvexError (data.kind === "RateLimited"); its message is redacted in
+    // prod, so detect it by data shape rather than a substring match.
+    if (isRateLimitError(error)) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         { status: 429 }

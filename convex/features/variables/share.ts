@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -50,7 +50,9 @@ export const createWithPayload = action({
     // objects. A public action is reachable without the withAuth'd route.
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Unauthenticated: sign-in required to create a share");
+      throw new ConvexError(
+        "Unauthenticated: sign-in required to create a share"
+      );
     }
 
     // Store the client-encrypted ciphertext in WorkOS Vault first.
@@ -118,6 +120,7 @@ export const verifyOtpAndReveal = action({
     encryptedPayload: v.string(),
     hasPassphrase: v.boolean(),
     resourceType: v.union(v.literal("variable"), v.literal("account")),
+    mode: v.union(v.literal("one_time"), v.literal("time_limited")),
   }),
   handler: async (
     ctx,
@@ -126,6 +129,7 @@ export const verifyOtpAndReveal = action({
     encryptedPayload: string;
     hasPassphrase: boolean;
     resourceType: "variable" | "account";
+    mode: "one_time" | "time_limited";
   }> => {
     const result = await ctx.runMutation(
       api.features.sharing.mutations.verifyOtp,
@@ -162,7 +166,9 @@ export const verifyOtpAndReveal = action({
           // Best-effort — the reveal error below is what the recipient sees.
         }
       }
-      throw new Error("SHARE_VAULT_READ_FAILED");
+      // ConvexError so the string survives prod redaction — the route matches
+      // "SHARE_VAULT_READ_FAILED" via sanitizeConvexError to return a 502.
+      throw new ConvexError("SHARE_VAULT_READ_FAILED");
     }
 
     // For one-time shares, delete the vault entry (best-effort) after reading.
@@ -180,6 +186,7 @@ export const verifyOtpAndReveal = action({
       encryptedPayload,
       hasPassphrase: result.hasPassphrase,
       resourceType: result.resourceType,
+      mode: result.mode,
     };
   },
 });

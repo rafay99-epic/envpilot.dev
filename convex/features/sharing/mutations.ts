@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
 import { createAuditLog } from "../../lib/audit";
@@ -67,11 +67,11 @@ export const createShare = mutation({
 
     if (resourceType === "account") {
       if (!args.accountId) {
-        throw new Error("accountId is required for account shares");
+        throw new ConvexError("accountId is required for account shares");
       }
       const account = await ctx.db.get(args.accountId);
       if (!account || account.deletedAt) {
-        throw new Error("Account not found");
+        throw new ConvexError("Account not found");
       }
       // The share row's org/project context must match where the account
       // actually lives — a member of two orgs must not be able to file a
@@ -81,19 +81,19 @@ export const createShare = mutation({
         account.projectId !== args.projectId ||
         accountProject?.organizationId !== args.organizationId
       ) {
-        throw new Error("Account not found");
+        throw new ConvexError("Account not found");
       }
       const access = await getAccountAccess(ctx, actor._id, account);
       if (!access) {
-        throw new Error("You do not have access to this account");
+        throw new ConvexError("You do not have access to this account");
       }
     } else {
       if (!args.variableId) {
-        throw new Error("variableId is required for variable shares");
+        throw new ConvexError("variableId is required for variable shares");
       }
       const variable = await ctx.db.get(args.variableId);
       if (!variable || variable.deletedAt) {
-        throw new Error("Variable not found");
+        throw new ConvexError("Variable not found");
       }
       // Same org/project consistency guard as the account branch
       const variableProject = await ctx.db.get(variable.projectId);
@@ -101,11 +101,11 @@ export const createShare = mutation({
         variable.projectId !== args.projectId ||
         variableProject?.organizationId !== args.organizationId
       ) {
-        throw new Error("Variable not found");
+        throw new ConvexError("Variable not found");
       }
       const access = await getVariableAccess(ctx, actor._id, variable);
       if (!access) {
-        throw new Error("You do not have access to this variable");
+        throw new ConvexError("You do not have access to this variable");
       }
     }
 
@@ -119,7 +119,7 @@ export const createShare = mutation({
       creatorEmail &&
       args.recipientEmails.some((e) => e.toLowerCase().trim() === creatorEmail)
     ) {
-      throw new Error("You cannot share with your own email address.");
+      throw new ConvexError("You cannot share with your own email address.");
     }
 
     // 1. Feature gate: secret_sharing boolean
@@ -129,7 +129,7 @@ export const createShare = mutation({
       "secret_sharing"
     );
     if (!boolGate.allowed) {
-      throw new Error(
+      throw new ConvexError(
         boolGate.reason ?? "Secret sharing is not enabled for your tier."
       );
     }
@@ -143,7 +143,7 @@ export const createShare = mutation({
       activeCount
     );
     if (!numGate.allowed) {
-      throw new Error(numGate.reason ?? "Active share limit reached.");
+      throw new ConvexError(numGate.reason ?? "Active share limit reached.");
     }
 
     // 3. Rate limit
@@ -355,19 +355,40 @@ export const verifyOtp = mutation({
       .first();
 
     if (!share) {
-      throw new Error("Share not found.");
+      throw new ConvexError("Share not found.");
     }
 
     if (share.status === "burned") {
-      throw new Error("This secret was already viewed and destroyed.");
+      throw new ConvexError("This secret was already viewed and destroyed.");
     }
 
     if (share.status === "revoked") {
-      throw new Error("This share link was revoked by the owner.");
+      throw new ConvexError("This share link was revoked by the owner.");
     }
 
     if (share.status === "expired" || share.expiresAt < now) {
-      throw new Error("This secret has expired.");
+      throw new ConvexError("This secret has expired.");
+    }
+
+    // Belt-and-braces: even if the delete-cascade missed this row (or raced),
+    // never reveal a share whose underlying resource was soft-deleted. The
+    // "revoked" phrase maps the route to 410 and the viewer to a terminal state.
+    if (normalizeResourceType(share) === "account") {
+      if (share.accountId) {
+        const account = await ctx.db.get(share.accountId);
+        if (!account || account.deletedAt) {
+          throw new ConvexError(
+            "This share was revoked because the shared account was deleted."
+          );
+        }
+      }
+    } else if (share.variableId) {
+      const variable = await ctx.db.get(share.variableId);
+      if (!variable || variable.deletedAt) {
+        throw new ConvexError(
+          "This share was revoked because the shared secret was deleted."
+        );
+      }
     }
 
     // Find the recipient
@@ -379,23 +400,25 @@ export const verifyOtp = mutation({
       .first();
 
     if (!recipient) {
-      throw new Error("Email not authorized for this share.");
+      throw new ConvexError("Email not authorized for this share.");
     }
 
     // Check lockout
     if (recipient.otpAttempts >= 5) {
-      throw new Error(
+      throw new ConvexError(
         "Too many failed attempts. This email has been locked out."
       );
     }
 
     // Check OTP exists and hasn't expired
     if (!recipient.otpCode || !recipient.otpExpiresAt) {
-      throw new Error("No verification code found. Please request a new one.");
+      throw new ConvexError(
+        "No verification code found. Please request a new one."
+      );
     }
 
     if (recipient.otpExpiresAt < now) {
-      throw new Error(
+      throw new ConvexError(
         "Verification code has expired. Please request a new one."
       );
     }
@@ -430,7 +453,7 @@ export const verifyOtp = mutation({
       });
 
       const remaining = 5 - newAttempts;
-      throw new Error(
+      throw new ConvexError(
         remaining > 0
           ? `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`
           : "Too many failed attempts. This email has been locked out."
@@ -524,7 +547,7 @@ export const revokeShare = mutation({
     const actor = await requireAuthedUser(ctx);
     const share = await ctx.db.get(args.shareId);
     if (!share) {
-      throw new Error("Share not found.");
+      throw new ConvexError("Share not found.");
     }
 
     // Check if user is creator OR at least a team lead in the org
@@ -544,12 +567,14 @@ export const revokeShare = mutation({
           organizationId: share.organizationId,
           error: String(err),
         });
-        throw new Error("Not authorized to revoke this share.");
+        throw new ConvexError("Not authorized to revoke this share.");
       }
     }
 
     if (share.status !== "active") {
-      throw new Error(`Cannot revoke a share with status "${share.status}".`);
+      throw new ConvexError(
+        `Cannot revoke a share with status "${share.status}".`
+      );
     }
 
     await ctx.db.patch(share._id, {

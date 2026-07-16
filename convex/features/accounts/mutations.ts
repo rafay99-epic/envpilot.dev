@@ -13,6 +13,7 @@ import {
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
+import { revokeSharesForResource } from "../sharing/helpers";
 
 /**
  * Shared Account Mutations
@@ -324,6 +325,14 @@ export const remove = mutation({
         revokedBy: args.deletedBy,
       });
     }
+
+    // Revoke any active share links pointing at this account (parity with
+    // variables.remove — a deleted account must not leave a live share link).
+    await revokeSharesForResource(ctx, {
+      resourceType: "account",
+      accountId: args.accountId,
+      actorId: args.deletedBy,
+    });
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,

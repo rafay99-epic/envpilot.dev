@@ -18,6 +18,7 @@ import {
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { assertOrgAction, normalizeOrgRole } from "../../lib/authz";
+import { revokeSharesForResource } from "../sharing/helpers";
 import {
   assertWithinEnvironmentScope,
   findEnvironmentConflicts,
@@ -602,6 +603,15 @@ async function removeCore(
     });
   }
 
+  // Revoke any active share links pointing at this variable — otherwise the
+  // deleted variable's share stays live in Vault yet vanishes from the owner's
+  // dashboard (list queries hide shares whose resource is gone).
+  await revokeSharesForResource(ctx, {
+    resourceType: "variable",
+    variableId: args.variableId,
+    actorId: args.deletedBy,
+  });
+
   await createAuditLog(ctx, {
     organizationId: project.organizationId,
     projectId: variable.projectId,
@@ -710,6 +720,14 @@ export const bulkDelete = mutation({
           revokedBy: actor._id,
         });
       }
+
+      // Revoke active share links for each deleted variable (same reasoning as
+      // the single-delete path in removeCore).
+      await revokeSharesForResource(ctx, {
+        resourceType: "variable",
+        variableId,
+        actorId: actor._id,
+      });
 
       deletedKeys.push(variable.key);
       deletedCount++;

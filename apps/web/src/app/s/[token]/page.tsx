@@ -44,6 +44,11 @@ export default function ShareViewerPage() {
   const [showAccountPassword, setShowAccountPassword] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes
   const [hasPassphrase, setHasPassphrase] = useState(false);
+  // one-time shares are destroyed on view; time-limited shares stay available
+  // until they expire — drives the reveal-screen copy so it isn't misleading.
+  const [shareMode, setShareMode] = useState<"one_time" | "time_limited">(
+    "one_time"
+  );
 
   // Store encrypted payload in memory only (not sessionStorage) to prevent XSS exposure
   const encryptedPayloadRef = useRef<string | null>(null);
@@ -143,6 +148,7 @@ export default function ShareViewerPage() {
       });
 
       setHasPassphrase(result.hasPassphrase);
+      if (result.mode) setShareMode(result.mode);
 
       if (result.hasPassphrase) {
         // Need passphrase before decrypting — keep in memory only
@@ -176,6 +182,7 @@ export default function ShareViewerPage() {
         message.includes("expired") ||
         message.includes("destroyed") ||
         message.includes("revoked") ||
+        message.includes("locked out") ||
         message.includes("invalid")
       ) {
         setStep("error");
@@ -587,8 +594,9 @@ export default function ShareViewerPage() {
                     <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                       <p className="text-xs text-amber-400">
-                        These credentials have been permanently destroyed. Close
-                        this tab when done.
+                        {shareMode === "one_time"
+                          ? "These credentials have been permanently destroyed. Close this tab when done."
+                          : "These credentials remain accessible from this link until it expires. Close this tab when done."}
                       </p>
                     </div>
                   </div>
@@ -644,8 +652,9 @@ export default function ShareViewerPage() {
                   <div className="flex items-start gap-2 rounded-lg bg-amber-900/20 px-3 py-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
                     <p className="text-xs text-amber-400">
-                      This secret has been permanently destroyed. Close this tab
-                      when done.
+                      {shareMode === "one_time"
+                        ? "This secret has been permanently destroyed. Close this tab when done."
+                        : "This secret remains accessible from this link until it expires. Close this tab when done."}
                     </p>
                   </div>
                 </div>

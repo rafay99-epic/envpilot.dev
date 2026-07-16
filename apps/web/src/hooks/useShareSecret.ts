@@ -54,6 +54,9 @@ interface VerifyOtpResponse {
   encryptedPayload: string;
   hasPassphrase: boolean;
   resourceType?: "variable" | "account";
+  // Present so the reveal screen can show accurate copy: one-time shares are
+  // destroyed on view; time-limited shares stay available until they expire.
+  mode?: "one_time" | "time_limited";
 }
 
 /**

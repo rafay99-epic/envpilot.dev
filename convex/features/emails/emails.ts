@@ -633,3 +633,124 @@ Open Envpilot: ${appUrl}`;
     return sendEmail(args.to, subject, html, text);
   },
 });
+
+// ============================================================
+// Variable Request Notifications
+// ============================================================
+
+export const sendVariableRequestCreatedEmail = internalAction({
+  args: {
+    projectId: v.id("projects"),
+    projectName: v.string(),
+    projectSlug: v.string(),
+    requesterName: v.string(),
+    key: v.string(),
+    environments: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Recipients = org owner(s) + PMs/team leads assigned to the project.
+    // Resolved (and bounded/deduped) by the query; [] short-circuits the send.
+    const recipients = await ctx.runQuery(
+      internal.features.variables.requests.queries.getRequestReviewerRecipients,
+      { projectId: args.projectId }
+    );
+    if (recipients.length === 0) return;
+
+    const appUrl = getEmailConfig()?.appUrl || "https://www.envpilot.dev";
+    const link = `${appUrl}/dashboard/projects/${args.projectSlug}`;
+    const envText = args.environments.join(", ");
+
+    const safeKey = escapeHtml(args.key);
+    const safeProject = escapeHtml(args.projectName);
+    const safeRequester = escapeHtml(args.requesterName);
+    const safeEnv = escapeHtml(envText);
+
+    const subject = `New variable request: ${args.key} for ${envText} in ${args.projectName} by ${args.requesterName}`;
+
+    const html = emailWrapper(
+      "New Variable Request",
+      [
+        iconRow(args.projectName.charAt(0).toUpperCase()),
+        headingRow("New Variable Request"),
+        paragraphRow(
+          `<strong>${safeRequester}</strong> requested the variable <code style="${CODE_STYLE}">${safeKey}</code> for <strong>${safeEnv}</strong> in <strong>${safeProject}</strong>.`
+        ),
+        buttonRow(link, "Review Request"),
+        footerRow(
+          `You received this because you can review variable requests for this project.<br><br>Link not working? Copy this:<br><a href="${link}" style="color: #22c55e; word-break: break-all;">${link}</a>`
+        ),
+      ].join(""),
+      `${args.requesterName} requested ${args.key} for ${envText} in ${args.projectName}.`
+    );
+
+    const text = `New Variable Request\n\n${args.requesterName} requested the variable ${args.key} for ${envText} in ${args.projectName}.\n\nReview it: ${link}`;
+
+    for (const recipient of recipients) {
+      await sendEmail(recipient.email, subject, html, text).catch((err) =>
+        console.error("emails.sendVariableRequestCreatedEmail.sendFailed", {
+          projectId: args.projectId,
+          key: args.key,
+          recipient: recipient.email,
+          error: String(err),
+        })
+      );
+    }
+  },
+});
+
+export const sendVariableRequestReviewedEmail = internalAction({
+  args: {
+    to: v.string(),
+    requesterName: v.optional(v.string()),
+    key: v.string(),
+    projectName: v.string(),
+    verdict: v.union(v.literal("approved"), v.literal("rejected")),
+    reviewerName: v.string(),
+    reviewReason: v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const approved = args.verdict === "approved";
+    const safeKey = escapeHtml(args.key);
+    const safeProject = escapeHtml(args.projectName);
+    const safeReviewer = escapeHtml(args.reviewerName);
+
+    const heading = approved
+      ? "Variable Request Approved"
+      : "Variable Request Rejected";
+    const subject = `Your variable request ${args.key} was ${args.verdict}`;
+
+    const verdictLine = approved
+      ? `Your request for <code style="${CODE_STYLE}">${safeKey}</code> in <strong>${safeProject}</strong> was <strong style="color:#4ade80;">approved</strong> by ${safeReviewer}. The variable is now available.`
+      : `Your request for <code style="${CODE_STYLE}">${safeKey}</code> in <strong>${safeProject}</strong> was <strong style="color:#f87171;">rejected</strong> by ${safeReviewer}.`;
+
+    const rows = [
+      iconRow(
+        args.projectName.charAt(0).toUpperCase(),
+        approved ? undefined : "#dc2626"
+      ),
+      headingRow(heading),
+      paragraphRow(verdictLine),
+    ];
+    if (args.reviewReason) {
+      rows.push(
+        paragraphRow(
+          `Note: ${escapeHtml(args.reviewReason)}`,
+          "font-size: 14px; line-height: 1.5; color: #71717a;"
+        )
+      );
+    }
+    rows.push(
+      footerRow(
+        "You received this because you submitted this variable request."
+      )
+    );
+
+    const html = emailWrapper(heading, rows.join(""));
+
+    const text = `${heading}\n\nYour request for ${args.key} in ${args.projectName} was ${args.verdict} by ${args.reviewerName}.${
+      args.reviewReason ? `\n\nNote: ${args.reviewReason}` : ""
+    }`;
+
+    return sendEmail(args.to, subject, html, text);
+  },
+});

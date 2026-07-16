@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "../../../_generated/server";
 import { api, internal } from "../../../_generated/api";
 import { Id } from "../../../_generated/dataModel";
@@ -75,7 +75,7 @@ export const createWithValue = action({
       projectId: args.projectId,
     });
     if (!project) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     const membership = await ctx.runQuery(
@@ -85,7 +85,7 @@ export const createWithValue = action({
       }
     );
     if (!membership) {
-      throw new Error("You are not a member of this organization");
+      throw new ConvexError("You are not a member of this organization");
     }
 
     const legacy = await ctx.runQuery(
@@ -97,18 +97,18 @@ export const createWithValue = action({
 
     if (!legacy.assigned) {
       if (legacy.grantOnly) {
-        throw new Error(
+        throw new ConvexError(
           "You have Viewer access to this project. Variable requests are not allowed."
         );
       }
-      throw new Error(
+      throw new ConvexError(
         "You are not assigned to this project. Variable requests are not allowed."
       );
     }
 
     // Owners, project managers, and team leads should create directly.
     if (legacy.role !== "developer") {
-      throw new Error(
+      throw new ConvexError(
         "You have direct write access. Use direct variable creation instead of submitting a request."
       );
     }
@@ -158,7 +158,7 @@ export const createWithValue = action({
       }
     );
     if (!created) {
-      throw new Error("Failed to load the created variable request");
+      throw new ConvexError("Failed to load the created variable request");
     }
 
     // Trim to the fields the CLI/extension parse (drops vaultRef / _creationTime
@@ -200,7 +200,7 @@ export const revealValue = action({
       }
     );
     if (!request) {
-      throw new Error("Variable request not found");
+      throw new ConvexError("Variable request not found");
     }
 
     const value = await ctx.runAction(
