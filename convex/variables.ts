@@ -12,3 +12,6 @@
  */
 
 export { listWithAccess } from "./features/variables/queries";
+// Called by published extension builds (1.7.2 – 1.13.0); missed in the PR #95
+// shim set, which broke the extension's real-time metadata subscription.
+export { listMetadataByProject } from "./features/variables/queries";
