@@ -1,0 +1,38 @@
+apps/web/package.json
+  s_47513e23e74e62::t_d557f190a081e6 3
+apps/web/src/lib/versions.ts
+  s_47513e23e74e62::t_837a840e6c325a 17
+apps/web/tests/e2e/authenticated/duplicate-variable-error.spec.ts
+  s_47513e23e74e62::t_cd436d16962c70 10-11,13-14,60-102
+convex/features/variables/helpers.ts
+  s_47513e23e74e62::t_f29c379301bdea 212-259
+convex/features/variables/mutations.ts
+  s_47513e23e74e62::t_13723f89acbb6f 21-25,158-168,335-348
+convex/features/variables/queries.ts
+  s_47513e23e74e62::t_29002fbac5c786 21,1108-1113,1115-1119,1121-1127
+convex/features/variables/requests/mutations.ts
+  s_47513e23e74e62::t_d22ac8820966f0 1,3-6,97-105,117-120,269-279
+convex/features/variables/values.ts
+  s_47513e23e74e62::t_c20b2ee7d3a299 330-340,342-345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "eab31bad802e5830fafb562f0e8693c86d6dac68",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
