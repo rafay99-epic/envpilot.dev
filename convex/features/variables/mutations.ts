@@ -772,6 +772,21 @@ export const restore = mutation({
       action: "project:delete_variable",
     });
 
+    // Restoring must not break per-environment key uniqueness: a variable
+    // with the same key may have been (re)created for these environments
+    // while this one sat in the trash — resurrecting it would make pulls
+    // nondeterministic for the clashing environment(s).
+    const envClashes = await findEnvironmentConflicts(ctx, {
+      projectId: variable.projectId,
+      key: variable.key,
+      environments: variable.environments,
+    });
+    if (envClashes.length > 0) {
+      throw new ConvexError(
+        `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
+      );
+    }
+
     await ctx.db.patch(args.variableId, {
       deletedAt: undefined,
       updatedAt: now,

@@ -115,7 +115,9 @@ export function VariableCreateDrawer({
     );
     const parts: string[] = [];
     if (duplicateKeys.length > 0) {
-      parts.push(`Already exist in this project: ${duplicateKeys.join(", ")}`);
+      parts.push(
+        `Already exist in the selected environment(s): ${duplicateKeys.join(", ")} — the same key is allowed in a different environment`
+      );
     }
     for (const f of otherFailures) {
       parts.push(`${f.key}: ${f.error}`);
