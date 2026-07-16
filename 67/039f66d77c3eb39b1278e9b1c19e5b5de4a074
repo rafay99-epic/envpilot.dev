@@ -1,0 +1,35 @@
+apps/vscode-extension/src/extension.ts
+  s_c0d41f513c83f7::t_f7217d1ed4ca1e 2,45-52,223-234,426-434,470,1612-1703,1705-1708,1710-1711
+apps/vscode-extension/src/services/auth.ts
+  s_c0d41f513c83f7::t_edf1a0ca96b205 281,304
+apps/vscode-extension/src/services/convex.ts
+  s_c0d41f513c83f7::t_f055c89e628921 66,92,125,151
+apps/vscode-extension/src/services/sync.ts
+  s_c0d41f513c83f7::t_3cce7ddbf80a41 312-315,934-937,1407-1423
+apps/vscode-extension/src/types.ts
+  s_c0d41f513c83f7::t_bbf30a0e0fa7b3 132-137,262-267
+apps/vscode-extension/src/utils/managedFiles.test.ts
+  s_c0d41f513c83f7::t_7a1ab9c16a9aba 10,180-269
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_c0d41f513c83f7::t_f3657dea29dfbb 101-155
+apps/vscode-extension/src/utils/storage.ts
+  s_c0d41f513c83f7::t_0167e1790c6dcc 51-52,680-694
+apps/vscode-extension/src/utils/unsyncState.ts
+  s_c0d41f513c83f7::t_c8e6e9edb8da15 1-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "67039f66d77c3eb39b1278e9b1c19e5b5de4a074",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
