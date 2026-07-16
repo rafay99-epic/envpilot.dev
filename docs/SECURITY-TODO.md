@@ -1,5 +1,9 @@
 # Security TODO — Payments & Billing
 
+> **Status (2026-07-16): live pre-launch checklist.** The critical trust-boundary
+> item is fixed; the unchecked items below are still open and must be verified
+> before enabling Polar.sh payments in production.
+
 Items to address before enabling Polar.sh payments in production.
 
 ## Critical

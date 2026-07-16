@@ -30,7 +30,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the web dashboard.
 
 ## Environment Variables
 
-All env vars live in a single `.env.local` at the **monorepo root**. The web app reads it via a symlink (`apps/web/.env.local → ../../.env.local`). Run `bun run setup` to create both files automatically, then fill in the values.
+All env vars live in a single `.env.local` at the **monorepo root**. The web, blog, and docs apps read it via symlinks (e.g. `apps/web/.env.local → ../../.env.local`). Run `bun run setup` to create the file and symlinks automatically, then fill in the values.
 
 See `.env.example` for the full template with descriptions.
 

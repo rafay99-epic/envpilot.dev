@@ -4,7 +4,7 @@
 
 <h1 align="center">Envpilot</h1>
 
-<p align="center">Secure environment variable management for teams. Bun + Turborepo monorepo powering the web dashboard, CLI, and VS Code extension.</p>
+<p align="center">Secure environment variable management for teams. Bun + Turborepo monorepo powering the web dashboard, blog, docs site, CLI, and VS Code extension.</p>
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-proprietary-a855f7?style=flat-square" alt="License" /></a>
@@ -35,9 +35,9 @@
 - [Commands](docs/commands.md) (dev, build, test, deploy)
 - [Architecture](docs/architecture.md) (data flow, auth, RBAC)
 - [Project Structure](docs/structure.md) (folder layout)
-- [CI / CD](docs/ci.md) (GitHub Actions pipeline)
+- [CI / CD](docs/ci.md) (CircleCI pipeline v2)
 - [Development Guide](docs/DEVELOPMENT.md) (conventions, Convex, TypeScript)
-- [Deployment Guide](docs/DEPLOYMENT.md) (Vercel, Convex, npm, VS Code Marketplace)
+- [Deployment Guide](docs/DEPLOYMENT.md) (Vercel, Convex, npm, Open VSX)
 - [Features](docs/FEATURES.md) (full feature inventory)
 - [Roadmap](docs/ROADMAP.md) (planned features)
 - [Security TODO](docs/SECURITY-TODO.md) (pre-launch security checklist)
@@ -56,11 +56,14 @@ bun run dev
 ```
 apps/
   web/                # Next.js web dashboard (@envpilot/web)
+  blog/               # Blog — blog.envpilot.dev (@envpilot/blog)
+  docs/               # Docs site — docs.envpilot.dev (@envpilot/docs)
   cli/                # CLI npm package (@envpilot/cli)
   admin/              # Admin dashboard (@envpilot/admin)
   vscode-extension/   # VS Code extension (envpilot)
 convex/               # Shared Convex backend
 packages/
+  ui/                 # Shared React UI components (@envpilot/ui)
   tsconfig/           # Shared TypeScript configs
   eslint-config/      # Shared ESLint config
   prettier-config/    # Shared Prettier config

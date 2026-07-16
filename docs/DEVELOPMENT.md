@@ -11,11 +11,11 @@
 # Install all dependencies (single command, all workspaces)
 bun install
 
-# Set up environment (copies .env.example → .env.local, symlinks to apps/web)
+# Set up environment (copies .env.example → .env.local, symlinks to web/blog/docs)
 bun run setup
 # Then edit .env.local with your values
 
-# Start development (Next.js + Convex + Admin in parallel)
+# Start development (web + Convex + admin + blog + docs in parallel)
 bun run dev
 ```
 
@@ -35,11 +35,16 @@ envpilot/
 │   │   ├── src/components/   # React components
 │   │   ├── src/hooks/        # Custom hooks (Convex query wrappers)
 │   │   └── src/lib/          # Utilities (auth, vault, polar, email)
+│   ├── blog/                 # Blog — blog.envpilot.dev, port 3001 (@envpilot/blog)
+│   ├── docs/                 # Docs site — docs.envpilot.dev, port 3002 (@envpilot/docs)
+│   ├── admin/                # Admin dashboard (@envpilot/admin)
 │   ├── cli/                  # CLI tool (@envpilot/cli)
 │   │   └── src/              # Commands, lib, types
 │   └── vscode-extension/     # VS Code extension (envpilot)
 │       └── src/              # Extension, services, providers
 ├── packages/
+│   ├── ui/                   # Shared React UI components (@envpilot/ui, TS via transpilePackages)
+│   ├── github-action/        # Envpilot GitHub Action (@envpilot/github-action)
 │   ├── tsconfig/             # Shared TypeScript configs
 │   ├── eslint-config/        # Shared ESLint rules
 │   └── prettier-config/      # Shared Prettier config
@@ -48,25 +53,29 @@ envpilot/
 
 ## Development Commands
 
-| Command                   | Description                                       |
-| ------------------------- | ------------------------------------------------- |
-| `bun run dev`             | Start web app + Convex + admin in parallel        |
-| `bun run dev:admin`       | Admin dashboard dev server only                   |
-| `bun run dev:cli`         | CLI watch mode (tsup)                             |
-| `bun run dev:extension`   | Extension watch mode (esbuild + tsc)              |
-| `bun run build`           | Build all apps                                    |
-| `bun run build:web`       | Build web app only                                |
-| `bun run build:cli`       | Build CLI only                                    |
-| `bun run build:admin`     | Build admin dashboard only                        |
-| `bun run build:extension` | Build & package extension VSIX                    |
-| `bun run lint`            | Lint all apps                                     |
-| `bun run typecheck`       | Typecheck all apps                                |
-| `bunx prettier --check .` | Check formatting (no standalone script)           |
-| `bun run format:fix`      | Auto-format all files                             |
-| `bun run check:all`       | Full CI check (lint + typecheck + build + format) |
-| `bun run test:e2e`        | Playwright E2E tests (web)                        |
-| `bun run test:cli`        | CLI unit tests (vitest)                           |
-| `bunx convex deploy`      | Deploy Convex to production                       |
+| Command                   | Description                                          |
+| ------------------------- | ---------------------------------------------------- |
+| `bun run dev`             | Start web + Convex + admin + blog + docs in parallel |
+| `bun run dev:admin`       | Admin dashboard dev server only                      |
+| `bun run dev:blog`        | Blog dev server only (port 3001)                     |
+| `bun run dev:docs`        | Docs site dev server only (port 3002)                |
+| `bun run dev:cli`         | CLI watch mode (tsup)                                |
+| `bun run dev:extension`   | Extension watch mode (esbuild + tsc)                 |
+| `bun run build`           | Build all apps                                       |
+| `bun run build:web`       | Build web app only                                   |
+| `bun run build:blog`      | Build blog only                                      |
+| `bun run build:docs`      | Build docs site only                                 |
+| `bun run build:cli`       | Build CLI only                                       |
+| `bun run build:admin`     | Build admin dashboard only                           |
+| `bun run build:extension` | Build & package extension VSIX                       |
+| `bun run lint`            | Lint all apps                                        |
+| `bun run typecheck`       | Typecheck all apps                                   |
+| `bunx prettier --check .` | Check formatting (no standalone script)              |
+| `bun run format:fix`      | Auto-format all files                                |
+| `bun run check:all`       | Full CI check (lint + typecheck + build + format)    |
+| `bun run test:e2e`        | Playwright E2E tests (web)                           |
+| `bun run test:cli`        | CLI unit tests (vitest)                              |
+| `bunx convex deploy`      | Deploy Convex to production                          |
 
 ### Targeting Specific Apps
 
@@ -80,7 +89,7 @@ bunx turbo build --filter=envpilot           # extension
 
 ## Environment Variables
 
-All env vars live in a single `.env.local` at the **monorepo root**. The web app reads it via a symlink (`apps/web/.env.local → ../../.env.local`). Run `bun run setup` to create both files automatically, then fill in the values.
+All env vars live in a single `.env.local` at the **monorepo root**. The web, blog, and docs apps read it via symlinks (e.g. `apps/web/.env.local → ../../.env.local`). Run `bun run setup` to create the file and symlinks automatically, then fill in the values.
 
 See `.env.example` for the full template with descriptions.
 
@@ -160,6 +169,7 @@ Shared base configs in `packages/tsconfig/`:
 - **React Compiler**: enabled — avoid manual `useMemo`/`useCallback`
 - **Zod v4**: used for input validation in API routes and CLI
 - **Convex validators** (`v.*`): used for backend function args (separate from Zod)
+- **User-facing Convex errors must be `ConvexError`**: plain `Error` messages are redacted to `"Server Error"` on production deployments, so anything the client should read (validation failures, conflict messages) must be thrown as `ConvexError`
 - **Tailwind CSS v4**: via PostCSS plugin
 - **Authentication**: WorkOS AuthKit (session cookies for browser, bearer tokens for CLI/extension)
 - **Secrets storage**: WorkOS Vault (Convex stores vault reference IDs, never plaintext)

@@ -26,6 +26,7 @@
 
 - Create, read, update, delete environment variables
 - Multi-environment support (development, staging, production)
+- Per-environment key uniqueness: the same key may exist on multiple variables in a project as long as their `environments` arrays are disjoint (e.g. separate dev/staging/prod `DATABASE_URL` variables). Overlap is rejected, naming the clashing environment — enforced at create/update/import/request/approve/restore via `findEnvironmentConflicts` (`convex/features/variables/helpers.ts`).
 - End-to-end encryption via WorkOS Vault (plaintext never stored in DB)
 - Variable descriptions and sensitive/encrypted flag
 - Version history with full change tracking
@@ -339,7 +340,7 @@ These are the lowest-effort, highest-impact items because the schema already exi
     - GCP Secret Manager
     - Azure Key Vault
     - Kubernetes secrets (operator)
-    - GitHub Actions secrets (your deferred `packages/github-action/` plan)
+    - GitHub Actions secrets (the shipped `packages/github-action/` action pulls into a job; pushing back to Actions secrets is still a future sync destination)
     - CircleCI, GitLab CI
   - One-way sync with webhook retry.
 
