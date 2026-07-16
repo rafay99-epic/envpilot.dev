@@ -1,0 +1,28 @@
+.circleci/config.yml
+  s_47513e23e74e62::t_6de4ed5273b1f3 3-116,119-121,125-126,130-131,145,149,161-162,178-636,638,640-641,645-674
+.github/workflows/ci.yml
+  s_47513e23e74e62::t_e47fdb63b781e8 16-22
+.github/workflows/version-tracker.yml
+  s_47513e23e74e62::t_29b8688b5c5bfb 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "296077a1a1d5b3beaa67c151c4454bc361eb83de",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
