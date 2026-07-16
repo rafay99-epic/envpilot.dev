@@ -1,0 +1,62 @@
+.github/workflows/ci.yml
+  s_47513e23e74e62::t_9fb1b4dc81b116 56-57,83,85,110-111,122-125,137,143-144,442-493
+.github/workflows/deploy-vercel.yml
+  s_47513e23e74e62::t_68c05bd5d29c75 1-63
+.github/workflows/version-tracker.yml
+  s_47513e23e74e62::t_2954abcade60fe 44-45,58-59,88-89,111-126
+apps/blog/package.json
+  s_47513e23e74e62::t_8c2f1a673f198f 3
+apps/blog/src/app/[slug]/page.tsx
+  s_92cb56d5abc1dc::t_06b7d3b81adf08 67-72
+apps/blog/src/app/layout.tsx
+  s_92cb56d5abc1dc::t_a872dd52932c17 24-46
+apps/blog/src/app/llms.txt/route.ts
+  s_92cb56d5abc1dc::t_6a505ed774aa52 1-45
+apps/blog/vercel.json
+  s_47513e23e74e62::t_6531a62578f49f 5
+apps/docs/package.json
+  s_47513e23e74e62::t_013f5d393e7773 3
+apps/docs/src/app/[slug]/page.tsx
+  s_92cb56d5abc1dc::t_e5d290a0fdb992 19,158-161
+apps/docs/src/app/layout.tsx
+  s_92cb56d5abc1dc::t_117f43417f6c22 26-48
+apps/docs/src/app/md/[slug]/route.ts
+  s_92cb56d5abc1dc::t_5da9606be64f81 1-37
+apps/docs/src/components/LLMActions.tsx
+  s_92cb56d5abc1dc::t_f6340da0aab3b3 1-79
+apps/docs/vercel.json
+  s_47513e23e74e62::t_f83489c45a0eb0 5
+apps/web/vercel.json
+  s_47513e23e74e62::t_11c3baac956df4 5
+package.json
+  s_47513e23e74e62::t_db54104dba937d 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "1206672d24fef8d8d2990478aa86ef2b66316ba2",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_92cb56d5abc1dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8128884fac24c805",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
