@@ -1,0 +1,108 @@
+---
+title: Next.js Environment Variables Best Practices
+description: How Next.js loads .env files, what NEXT_PUBLIC_ really means, build-time inlining, runtime variables, and how to keep secrets out of the client bundle.
+icon: file-text
+---
+
+# Next.js Environment Variables: Best Practices
+
+Next.js has more environment variable behavior than almost any other framework — load order across multiple `.env` files, build-time inlining, the `NEXT_PUBLIC_` prefix, and different rules for server and client code. Most leaked frontend secrets trace back to misunderstanding one of these. This guide covers how it actually works and the practices that keep secrets safe.
+
+## How Next.js loads .env files
+
+Next.js loads environment files in a strict order, where earlier files win:
+
+1. `process.env` (already-set variables always win)
+2. `.env.$(NODE_ENV).local` — e.g. `.env.development.local`
+3. `.env.local` (skipped when `NODE_ENV` is `test`)
+4. `.env.$(NODE_ENV)` — e.g. `.env.production`
+5. `.env`
+
+Practical conventions that follow from this:
+
+- **`.env`** — defaults safe to commit (feature flags, public URLs).
+- **`.env.local`** — secrets and machine-specific overrides. Never commit it; Next.js's own `create-next-app` gitignores it for a reason.
+- **`.env.production` / `.env.development`** — committed, environment-specific _non-secrets_.
+
+If a variable mysteriously won't change, check the higher-priority files — a stale value in `.env.development.local` silently overrides everything below it.
+
+## NEXT*PUBLIC* means "published to the world"
+
+This is the single most important rule:
+
+> Any variable prefixed with `NEXT_PUBLIC_` is **inlined into the JavaScript bundle at build time** and shipped to every visitor's browser.
+
+It is not "available on the client" in some managed, scoped sense — it is plain text in your public JS files, visible to anyone who opens DevTools. Treat the prefix as a publish button:
+
+```bash
+# Fine — these are meant to be public
+NEXT_PUBLIC_APP_URL=https://www.envpilot.dev
+NEXT_PUBLIC_ANALYTICS_ID=abc123
+
+# NEVER — this ships your key to every visitor
+NEXT_PUBLIC_STRIPE_SECRET_KEY=sk_live_...   # ✗
+```
+
+If a third-party SDK asks for a `NEXT_PUBLIC_` key, make sure it's the _publishable_ key, not the secret one. Server-only variables (no prefix) are stripped from client bundles automatically — accessing them in client components just yields `undefined`.
+
+## Build time vs runtime
+
+`NEXT_PUBLIC_` values are frozen **at build time**. Two consequences trip teams up:
+
+- **Changing the variable later does nothing** until you rebuild. Updating it in your hosting dashboard and restarting is not enough.
+- **One Docker image can't serve multiple environments** with different `NEXT_PUBLIC_` values — the values are baked in. If you need "build once, deploy anywhere", read public config at runtime instead: fetch it from an API route, or read server-side variables in a Server Component and pass them down as props.
+
+Server-side variables (no prefix) are read at **runtime** from `process.env`, so they can differ per deployment without rebuilding.
+
+## Keeping secrets server-side in the App Router
+
+With the App Router, the server/client boundary is a file-level concern, and it's easy to drag a secret across it accidentally:
+
+- Read secrets in **Server Components, Route Handlers, and Server Actions** only.
+- Never pass a secret as a prop from a Server Component into a `"use client"` component — props are serialized into the HTML payload.
+- For belt-and-suspenders enforcement, use the `server-only` package: importing a module that contains secrets from client code then fails the build instead of leaking.
+
+```ts
+// lib/payments.ts
+import "server-only"; // build error if a client component imports this
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+```
+
+## Validate variables at startup, not at first use
+
+A missing variable should fail the build or boot — not throw at 2 a.m. when the code path finally runs. Validate once with a schema:
+
+```ts
+// env.ts
+import { z } from "zod";
+
+const schema = z.object({
+  DATABASE_URL: z.string().url(),
+  STRIPE_SECRET_KEY: z.string().startsWith("sk_"),
+  NEXT_PUBLIC_APP_URL: z.string().url(),
+});
+
+export const env = schema.parse(process.env);
+```
+
+Import `env` instead of touching `process.env` directly and typos become type errors.
+
+## Stop distributing .env files to the team
+
+Everything above keeps secrets out of the _bundle_ — but most leaks happen earlier, in how teams pass `.env.local` files around (Slack, email, Notion). The fix is a managed source of truth that injects variables at runtime instead of living in files:
+
+```bash
+envpilot run -- next dev    # variables injected into the process, no .env.local on disk
+```
+
+With [Envpilot](/) the values are AES-256 encrypted, access is [role-scoped](/rbac), every read is audited, and a rotated key reaches the whole team on their next run. See [How to Share Environment Variables Securely](/share-environment-variables-securely) for the full migration checklist.
+
+## Quick checklist
+
+1. `.env*.local` in `.gitignore`; only non-secret defaults committed.
+2. `NEXT_PUBLIC_` only on values you'd happily print on a billboard.
+3. Secrets read in server code only; `server-only` package on secret-bearing modules.
+4. Remember `NEXT_PUBLIC_` is baked at build time — rebuild to change it.
+5. Validate `process.env` with a schema at boot.
+6. Distribute team secrets through a secrets manager with runtime injection, not files in chat.

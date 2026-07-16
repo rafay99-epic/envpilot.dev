@@ -10,10 +10,50 @@ const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+const blogUrl = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.envpilot.dev";
+const docsUrl = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.envpilot.dev";
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  transpilePackages: ["@envpilot/ui"],
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSIONS.web,
+  },
+
+  // ── Blog + docs moved to their own apps/subdomains ─────────────────
+  // Permanent redirects preserve inbound links and SEO equity. These run
+  // BEFORE middleware, so proxy.ts never sees these paths.
+  async redirects() {
+    return [
+      { source: "/blog", destination: blogUrl, permanent: true },
+      {
+        source: "/blog/:path*",
+        destination: `${blogUrl}/:path*`,
+        permanent: true,
+      },
+      { source: "/docs", destination: docsUrl, permanent: true },
+      {
+        source: "/docs/:path*",
+        destination: `${docsUrl}/:path*`,
+        permanent: true,
+      },
+      // Docs-content meta routes that used to be served from this app
+      {
+        source: "/feed.xml",
+        destination: `${docsUrl}/feed.xml`,
+        permanent: true,
+      },
+      {
+        source: "/llms.txt",
+        destination: `${docsUrl}/llms.txt`,
+        permanent: true,
+      },
+      {
+        source: "/llms-full.txt",
+        destination: `${docsUrl}/llms-full.txt`,
+        permanent: true,
+      },
+    ];
   },
 
   // ── Performance: optimizePackageImports ──────────────────────────────

@@ -1,0 +1,75 @@
+---
+title: MCP Server
+description: Connect Claude, Cursor, or any MCP client directly to your Envpilot projects and variables.
+icon: plug
+---
+
+# MCP Server
+
+MCP (Model Context Protocol) is an open standard that lets AI assistants like Claude call tools against your real data instead of guessing. Envpilot runs a remote MCP server so an assistant can look up your projects and pull variable values on your behalf, using the exact same auth, scoping, and audit trail as the REST API — nothing is duplicated or re-implemented.
+
+Requires the **Pro** plan (`mcp_server` feature) and an [API key](/api-quickstart).
+
+## Endpoint
+
+```
+https://www.envpilot.dev/api/mcp
+```
+
+Transport is Streamable HTTP (the current MCP spec transport for remote servers). Auth is a plain bearer token — the same `envpk_...` API key you'd use for the REST API:
+
+```
+Authorization: Bearer envpk_your_key_here
+```
+
+## Tools
+
+All tools are read-only and share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited.
+
+| Tool                     | Description                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `envpilot_list_projects` | List every project in the key's scope                                                            |
+| `envpilot_get_variables` | Get variables for a project + environment, with optional `keys`/`prefix`/`metadata_only` filters |
+| `envpilot_get_variable`  | Get a single variable by exact key                                                               |
+| `envpilot_list_accounts` | List shared accounts for a project, optionally filtered by environment                           |
+| `envpilot_search`        | Search across the key's projects for a matching variable or account                              |
+
+## Connect a client
+
+### Claude Code
+
+```bash
+claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp \
+  --header "Authorization: Bearer <your-api-key>"
+```
+
+### Claude Desktop
+
+Open **Settings → Connectors → Add custom connector**, set the URL to `https://www.envpilot.dev/api/mcp`, and add a request header:
+
+```
+Authorization: Bearer <your-api-key>
+```
+
+### Cursor
+
+Add a remote server entry to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "envpilot": {
+      "url": "https://www.envpilot.dev/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-api-key>"
+      }
+    }
+  }
+}
+```
+
+## Rate limits and scope
+
+MCP tool calls draw from the **same rate-limit buckets** as the REST API for that key — `envpilot_get_variables` and `envpilot_list_accounts` count against the 30/min value-pull bucket, everything else against the 120/min metadata bucket. A key's project/environment/resource scope applies identically: a tool call for a project outside the key's scope behaves as if it doesn't exist.
+
+See [API Reference](/api-reference) for the underlying limits and error semantics, and [API Security](/api-security) for the auth and audit model shared across the REST API, MCP server, and GitHub Action.
