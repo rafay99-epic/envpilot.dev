@@ -14,16 +14,12 @@ import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
-import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import {
-  usePagination,
   useProjectBySlug,
   useConvexUser,
   useOrganizationTags,
   useCreateTag,
-  useVariableRequests,
-  useResolveVariableRequest,
 } from "@/hooks";
 import { useVariableHistory as useConvexVariableHistory } from "@/hooks";
 import { ENVIRONMENTS, DEFAULT_PROJECT_COLOR } from "@/constants/project";
@@ -99,7 +95,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const canUpdateVariable =
     hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
   const canDeleteVariable = canUpdateVariable;
-  const canReviewRequests = canUpdateVariable;
   const canRequestVariable = hasOrgRole && orgRole === "developer";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
@@ -182,15 +177,12 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const isLoadingVariables = variablesStatus === "LoadingFirstPage";
   const variables = rawVariables as Variable[];
 
-  const { requests } = useVariableRequests(projectId, convexUserId);
-
   // --- TanStack Query: mutations ---
   const createVariable = useCreateVariable();
   const updateVariable = useUpdateVariable();
   const deleteVariable = useDeleteVariable();
   const bulkDelete = useBulkDeleteVariables();
   const rollbackVariable = useRollbackVariable();
-  const resolveRequest = useResolveVariableRequest();
 
   // --- Local UI state ---
   const [notice, setNotice] = useState<string | null>(null);
@@ -457,45 +449,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
   };
 
-  const updateRequestStatus = async (
-    requestId: Id<"environmentVariableRequests">,
-    action: "approve" | "reject" | "cancel"
-  ) => {
-    if (!projectId || !convexUserId) return;
-    setNotice(null);
-    setError(null);
-    try {
-      await resolveRequest.mutateAsync({
-        requestId,
-        action,
-        reviewedBy: convexUserId as string,
-      });
-
-      setNotice(
-        action === "approve"
-          ? "Request approved and variable created."
-          : action === "reject"
-            ? "Request rejected."
-            : "Request canceled."
-      );
-    } catch (err) {
-      log.error(
-        "project_request_resolution_failed",
-        {
-          projectId,
-          requestId,
-          action,
-          reviewedBy: convexUserId,
-          organizationId: organization?.id,
-        },
-        err
-      );
-      setError(
-        err instanceof Error ? err.message : `Failed to ${action} request`
-      );
-    }
-  };
-
   const handleRevealValue = async (variable: Variable) => {
     if (revealedValues[variable._id]) return;
     if (!variable.vaultRef || !organization?.id) return;
@@ -565,14 +518,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
     }
     return true;
   });
-
-  const requestPagination = usePagination(requests, { pageSize: 5 });
-
-  const formatDate = (timestamp: number) =>
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(new Date(timestamp));
 
   if (isLoading) {
     return <TerminalLoading fullPage />;
@@ -919,129 +864,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
                   </button>
                 </div>
               )}
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-            Variable Requests
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Member-submitted variable changes with approval history.
-          </p>
-        </div>
-
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {requests.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              No requests yet.
-            </div>
-          ) : (
-            <>
-              <AnimatedList
-                className="divide-y divide-zinc-200 dark:divide-zinc-800"
-                pageKey={requestPagination.currentPage}
-              >
-                {requestPagination.pageItems.map((request) => (
-                  <div key={request._id} className="px-6 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                            {request.key}
-                          </code>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                              request.status === "approved"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                : request.status === "rejected"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                  : request.status === "canceled"
-                                    ? "bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
-                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                            }`}
-                          >
-                            {request.status}
-                          </span>
-                          {request.environments?.map((env: string) => (
-                            <span
-                              key={env}
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                                env === "production"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                                  : env === "staging"
-                                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              }`}
-                            >
-                              {env}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                          Requested by{" "}
-                          {request.requester?.name ??
-                            request.requester?.email ??
-                            "Unknown"}
-                          {" · "}
-                          {formatDate(request.createdAt)}
-                        </p>
-                        {request.description && (
-                          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-                            {request.description}
-                          </p>
-                        )}
-                        {request.reviewReason && (
-                          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                            Review note: {request.reviewReason}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {canReviewRequests && request.status === "pending" && (
-                          <Link
-                            href="/dashboard/requests"
-                            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          >
-                            Review →
-                          </Link>
-                        )}
-                        {!canReviewRequests &&
-                          convexUserId &&
-                          request.status === "pending" &&
-                          request.requestedBy === convexUserId && (
-                            <button
-                              onClick={() =>
-                                updateRequestStatus(
-                                  request._id as Id<"environmentVariableRequests">,
-                                  "cancel"
-                                )
-                              }
-                              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </AnimatedList>
-              <Pagination
-                currentPage={requestPagination.currentPage}
-                totalPages={requestPagination.totalPages}
-                hasNextPage={requestPagination.hasNextPage}
-                hasPrevPage={requestPagination.hasPrevPage}
-                onNextPage={requestPagination.nextPage}
-                onPrevPage={requestPagination.prevPage}
-                onGoToPage={requestPagination.goToPage}
-                startIndex={requestPagination.startIndex}
-                endIndex={requestPagination.endIndex}
-                totalItems={requestPagination.totalItems}
-              />
             </>
           )}
         </div>

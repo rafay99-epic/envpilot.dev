@@ -133,6 +133,7 @@ export {
 export {
   useVariableRequests,
   useResolveVariableRequest,
+  usePendingRequestCount,
 } from "./useVariableRequests";
 
 // Audit log hooks

@@ -29,6 +29,21 @@ export function useVariableRequests(
 }
 
 /**
+ * Pending request count for a project — powers the sidebar badge. Same
+ * gating as useVariableRequests: skipped until identity is known.
+ */
+export function usePendingRequestCount(
+  projectId: Id<"projects"> | string | undefined,
+  userId: Id<"users"> | string | undefined
+) {
+  const count = useQuery(
+    api.features.variables.requests.queries.pendingCountForProject,
+    projectId && userId ? { projectId: projectId as Id<"projects"> } : "skip"
+  );
+  return count ?? 0;
+}
+
+/**
  * Resolve (approve/reject) a variable request directly via Convex.
  */
 export function useResolveVariableRequest() {

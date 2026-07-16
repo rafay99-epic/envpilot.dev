@@ -13,6 +13,7 @@ import {
   Share2,
   Users,
   Inbox,
+  GitPullRequest,
   ClipboardList,
   BarChart3,
   Gauge,
@@ -27,11 +28,18 @@ import {
 import { ROLE_LEVEL, roleLevel } from "@/lib/roles";
 import { useTierStoreSync } from "@/hooks/useTierStore";
 import { OPEN_COMMAND_PALETTE_EVENT } from "@/components/command-palette";
+import {
+  useConvexUser,
+  useProjectBySlug,
+  usePendingRequestCount,
+} from "@/hooks";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  /** Small count pill next to the label — only shown when > 0. */
+  badge?: number;
 }
 
 function NavLink({
@@ -68,7 +76,16 @@ function NavLink({
       }`}
     >
       {item.icon}
-      {!collapsed && <span>{item.label}</span>}
+      {!collapsed && (
+        <>
+          <span className="flex-1">{item.label}</span>
+          {!!item.badge && (
+            <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-green-400">
+              {item.badge}
+            </span>
+          )}
+        </>
+      )}
     </Link>
   );
 }
@@ -77,7 +94,8 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization } = useAuthContext();
+  const { organization, user } = useAuthContext();
+  const { convexUserId } = useConvexUser(user?.id);
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
   useTierStoreSync();
@@ -96,6 +114,17 @@ export function DashboardNav() {
       ? projectSlugMatch[1]
       : null;
   const isProjectContext = !!projectSlug;
+
+  // Pending request count for the project-level "Requests" badge — resolved
+  // by slug (the nav only has the slug, not the project id from the page).
+  const navProject = useProjectBySlug(
+    organization?.id ?? undefined,
+    projectSlug ?? undefined
+  );
+  const pendingRequestCount = usePendingRequestCount(
+    navProject?._id,
+    convexUserId
+  );
 
   // Org-level settings href
   const orgSettingsHref = organization?.slug
@@ -184,6 +213,12 @@ export function DashboardNav() {
           href: `/dashboard/projects/${projectSlug}`,
           label: "Variables",
           icon: <Key className="h-4 w-4" />,
+        },
+        {
+          href: `/dashboard/projects/${projectSlug}/requests`,
+          label: "Requests",
+          icon: <GitPullRequest className="h-4 w-4" />,
+          badge: pendingRequestCount,
         },
         {
           href: `/dashboard/projects/${projectSlug}/accounts`,

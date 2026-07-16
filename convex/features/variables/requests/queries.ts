@@ -116,6 +116,42 @@ export const listForProject = query({
   },
 });
 
+/**
+ * Pending request count for a project's sidebar badge. Same access guard AND
+ * visibility scoping as listForProject: org membership via
+ * getProjectAndOrgRole, then reviewers (owner / assigned PM / team lead) see
+ * every pending request while everyone else only counts their own — nobody
+ * gets a badge number that reveals more than the list page would show them.
+ */
+export const pendingCountForProject = query({
+  args: {
+    projectId: v.id("projects"),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const { project } = await getProjectAndOrgRole(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+
+    const pending = await ctx.db
+      .query("environmentVariableRequests")
+      .withIndex("by_project_and_status", (q) =>
+        q.eq("projectId", project._id).eq("status", "pending")
+      )
+      .collect();
+
+    const canReview = await canReviewRequests(ctx, actor._id, project._id);
+    const visible = canReview
+      ? pending
+      : pending.filter((request) => request.requestedBy === actor._id);
+
+    return visible.length;
+  },
+});
+
 async function getByIdCore(
   ctx: QueryCtx,
   args: {
