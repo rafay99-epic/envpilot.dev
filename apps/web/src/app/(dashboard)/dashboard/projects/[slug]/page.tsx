@@ -310,7 +310,9 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
         err instanceof ApiError && err.code === "TIER_LIMIT_REACHED"
           ? "Variable limit reached. Upgrade to Pro for unlimited variables."
           : isDuplicateKey
-            ? `A variable named "${data.key}" already exists in this project. Edit the existing variable or choose a different key.`
+            ? // The backend names the clashing environment(s) — surface it
+              // verbatim (same key across DIFFERENT environments is legal).
+              err.message
             : err instanceof Error
               ? err.message
               : "Failed to create variable";
