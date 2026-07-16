@@ -17,7 +17,10 @@ jobs:
   checks:
     docker:
       - image: cimg/node:22.17
-    resource_class: medium
+    # large (4 vCPU / 8 GB): confirmed OOM on medium — web's build was
+    # SIGKILLed (exit 137) with three Next builds co-running; the container
+    # reports the host's 36 cores so each build spawns ~35 workers.
+    resource_class: large
     environment:
       # Literal stubs (not secrets) so branch builds compile without
       # credentials — kept in sync with the env block in ci.yml.
@@ -80,10 +83,16 @@ jobs:
           command: bunx prettier --check .
 
       - run:
-          name: Build, lint, typecheck, test (turbo)
-          # Concurrency capped: uncapped turbo co-runs every Next/vite build
-          # and OOMs the container. 3 keeps peak memory under the 8 GB class.
-          command: bunx turbo build lint typecheck test --cache-dir=.turbo --concurrency=3
+          name: Build (turbo, serialized)
+          # Builds run one at a time: co-running Next builds OOM even with
+          # a cap (each spawns workers per detected host core). Lint/
+          # typecheck/test are memory-light and parallelize in the next step
+          # off the same turbo cache.
+          command: bunx turbo build --cache-dir=.turbo --concurrency=1
+
+      - run:
+          name: Lint, typecheck, test (turbo)
+          command: bunx turbo lint typecheck test --cache-dir=.turbo --concurrency=4
 
       - run:
           name: Typecheck Convex functions
