@@ -1,0 +1,40 @@
+apps/docs/content/api-quickstart.mdx
+  s_47513e23e74e62::t_201d01686bd197 29,90-92
+apps/docs/content/api-reference.mdx
+  s_47513e23e74e62::t_b88a196dac2496 9,131,159
+apps/docs/content/api-security.mdx
+  s_47513e23e74e62::t_412b6ad2f46274 50,58
+apps/docs/content/github-action.mdx
+  s_47513e23e74e62::t_f04019b61dc56b 77
+apps/docs/content/mcp-server.mdx
+  s_47513e23e74e62::t_93e76c13b89fd3 11,75
+apps/docs/content/nextjs-environment-variables.mdx
+  s_47513e23e74e62::t_51a2f39b7aae6a 99
+apps/docs/content/security.mdx
+  s_47513e23e74e62::t_881b8a75d06a57 43
+apps/docs/content/share-environment-variables-securely.mdx
+  s_47513e23e74e62::t_187a96f8552dcb 47,61
+apps/docs/content/web-dashboard.mdx
+  s_47513e23e74e62::t_09d4bc6681eb45 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4ed31aba076558a3397949c09f1059b834230f25",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
