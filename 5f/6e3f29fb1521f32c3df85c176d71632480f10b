@@ -1,0 +1,40 @@
+.github/workflows/ci.yml
+  s_47513e23e74e62::t_f44cf3e1be512f 81-84
+apps/docs/src/app/feed.xml/route.ts
+  s_47513e23e74e62::t_ae4f23c7c82e90 4-6
+apps/docs/src/app/llms-full.txt/route.ts
+  s_47513e23e74e62::t_6f06e3ccefd070 4-6
+apps/docs/src/app/llms.txt/route.ts
+  s_47513e23e74e62::t_38c5b4e044f944 4-6
+apps/web/src/app/sitemap.ts
+  s_47513e23e74e62::t_2cd4471e2a4194 67-68,79
+apps/web/src/proxy.ts
+  s_47513e23e74e62::t_7b37c24ea8bd26 18-19
+package.json
+  s_47513e23e74e62::t_a27a7a44390c98 3,23-24,30-31
+apps/web/next.config.ts
+  s_47513e23e74e62::t_7d444d64465bca 13-15,23-58
+apps/web/tests/e2e/blog-docs-redirects.spec.ts
+  s_47513e23e74e62::t_14af296822fa6b 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5f6e3f29fb1521f32c3df85c176d71632480f10b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
