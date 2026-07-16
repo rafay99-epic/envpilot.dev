@@ -6,6 +6,7 @@ import {
   writeSessionMarker,
   clearSessionMarker,
   reapDeadSessionMarkers,
+  getLiveSessionFolders,
   appendUnsyncReport,
   drainUnsyncReports,
   type UnsyncReport,
@@ -28,7 +29,7 @@ describe("unsyncState", () => {
 
   describe("session markers", () => {
     it("write + clear round-trips", async () => {
-      await writeSessionMarker(12345, sessionsDir);
+      await writeSessionMarker(12345, ["/ws/a"], sessionsDir);
       await expect(
         fs.access(path.join(sessionsDir, "12345"))
       ).resolves.toBeUndefined();
@@ -45,44 +46,74 @@ describe("unsyncState", () => {
       ).resolves.toBeUndefined();
     });
 
-    it("reap detects and removes dead-pid markers, keeps live ones", async () => {
-      await writeSessionMarker(111, sessionsDir);
-      await writeSessionMarker(222, sessionsDir);
+    it("reap removes dead-pid markers, returns their folders, keeps live ones", async () => {
+      await writeSessionMarker(111, ["/ws/crashed"], sessionsDir);
+      await writeSessionMarker(222, ["/ws/live"], sessionsDir);
 
-      const crashed = await reapDeadSessionMarkers(
+      const result = await reapDeadSessionMarkers(
         sessionsDir,
         (pid) => pid === 222 // only 222 is "alive"
       );
 
-      expect(crashed).toBe(true);
+      expect(result.crashed).toBe(true);
+      expect(result.deadFolders).toEqual(["/ws/crashed"]);
       await expect(fs.access(path.join(sessionsDir, "111"))).rejects.toThrow();
       await expect(
         fs.access(path.join(sessionsDir, "222"))
       ).resolves.toBeUndefined();
     });
 
-    it("reap returns false when every marker is alive", async () => {
-      await writeSessionMarker(111, sessionsDir);
-      const crashed = await reapDeadSessionMarkers(sessionsDir, () => true);
-      expect(crashed).toBe(false);
+    it("reap reports no crash when every marker is alive", async () => {
+      await writeSessionMarker(111, ["/ws/a"], sessionsDir);
+      const result = await reapDeadSessionMarkers(sessionsDir, () => true);
+      expect(result.crashed).toBe(false);
+      expect(result.deadFolders).toEqual([]);
     });
 
-    it("reap returns false when the sessions dir does not exist", async () => {
-      const crashed = await reapDeadSessionMarkers(
+    it("reap reports no crash when the sessions dir does not exist", async () => {
+      const result = await reapDeadSessionMarkers(
         path.join(tmpDir, "missing"),
         () => true
       );
-      expect(crashed).toBe(false);
+      expect(result.crashed).toBe(false);
     });
 
-    it("reap removes garbage (non-pid) marker names", async () => {
+    it("reap IGNORES non-pid filenames (.DS_Store must not fake a crash)", async () => {
       await fs.mkdir(sessionsDir, { recursive: true });
-      await fs.writeFile(path.join(sessionsDir, "not-a-pid"), "");
-      const crashed = await reapDeadSessionMarkers(sessionsDir, () => true);
-      expect(crashed).toBe(true);
+      await fs.writeFile(path.join(sessionsDir, ".DS_Store"), "junk");
+      const result = await reapDeadSessionMarkers(sessionsDir, () => true);
+      expect(result.crashed).toBe(false);
       await expect(
-        fs.access(path.join(sessionsDir, "not-a-pid"))
-      ).rejects.toThrow();
+        fs.access(path.join(sessionsDir, ".DS_Store"))
+      ).resolves.toBeUndefined();
+    });
+
+    it("reap tolerates a legacy empty-content marker (no folders recorded)", async () => {
+      await fs.mkdir(sessionsDir, { recursive: true });
+      await fs.writeFile(path.join(sessionsDir, "333"), "");
+      const result = await reapDeadSessionMarkers(sessionsDir, () => false);
+      expect(result.crashed).toBe(true);
+      expect(result.deadFolders).toEqual([]);
+    });
+
+    it("getLiveSessionFolders returns other live sessions' folders only", async () => {
+      await writeSessionMarker(100, ["/ws/mine"], sessionsDir);
+      await writeSessionMarker(200, ["/ws/other-live"], sessionsDir);
+      await writeSessionMarker(300, ["/ws/other-dead"], sessionsDir);
+
+      const folders = await getLiveSessionFolders(
+        100,
+        sessionsDir,
+        (pid) => pid !== 300
+      );
+
+      expect(folders).toEqual(["/ws/other-live"]);
+    });
+
+    it("getLiveSessionFolders returns [] when the dir is missing", async () => {
+      expect(
+        await getLiveSessionFolders(1, path.join(tmpDir, "missing"), () => true)
+      ).toEqual([]);
     });
   });
 

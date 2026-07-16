@@ -50,6 +50,17 @@ export const resolveUnsyncOnClose = query({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.deletedAt) return true;
 
+    // Non-members get the platform default — the same answer as a missing
+    // project, so this public query neither confirms a project exists nor
+    // leaks its settings across org boundaries.
+    const orgMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", actor._id)
+      )
+      .first();
+    if (!orgMembership) return true;
+
     const gate = await checkBooleanFeature(
       ctx.db,
       project.organizationId,

@@ -8,11 +8,18 @@ import * as path from "path";
  * Code's storage). Two concerns, both best-effort — a failure here must never
  * break activation or deactivation:
  *
- * 1. SESSION MARKERS (~/.envpilot/vscode-sessions/<pid>): one file per live
- *    extension host, written on activate and removed on clean deactivate.
- *    A marker whose pid is no longer running means that session crashed or
- *    was force-killed before deactivate() could purge — the next activation
- *    detects this and runs a crash sweep.
+ * 1. SESSION MARKERS (~/.envpilot/vscode-sessions/<pid>): one JSON file per
+ *    live extension host, written on activate and removed on clean
+ *    deactivate. The file records the session's workspace folders so that
+ *    (a) a crash sweep can target the CRASHED session's folders, whatever
+ *    workspace the next activation opens, and (b) a closing window can spare
+ *    files that another still-live window is using. A marker whose pid is no
+ *    longer running means that session crashed or was force-killed before
+ *    deactivate() could purge.
+ *
+ *    PID liveness is a heuristic: a recycled pid makes a dead session look
+ *    alive, so its sweep is skipped until that pid dies too. Rare, and it
+ *    fails toward NOT deleting — acceptable.
  *
  * 2. PENDING UNSYNC REPORTS (~/.envpilot/vscode-unsync-reports.json): purge
  *    summaries (counts only — never paths or values) queued at shutdown,
@@ -48,16 +55,34 @@ function defaultIsPidAlive(pid: number): boolean {
   }
 }
 
-/** Record this extension host as live. Best-effort. */
+function isPidName(name: string): boolean {
+  return /^[0-9]+$/.test(name);
+}
+
+async function readMarkerFolders(markerPath: string): Promise<string[]> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(markerPath, "utf-8"));
+    const folders = parsed?.folders;
+    if (!Array.isArray(folders)) return [];
+    return folders.filter((f): f is string => typeof f === "string");
+  } catch {
+    return []; // Legacy empty marker or corrupt JSON — no folder info.
+  }
+}
+
+/** Record this extension host (and its workspace folders) as live. */
 export async function writeSessionMarker(
   pid: number,
+  folders: string[],
   sessionsDir: string = getSessionsDir()
 ): Promise<void> {
   try {
     await fs.mkdir(sessionsDir, { recursive: true });
-    await fs.writeFile(path.join(sessionsDir, String(pid)), "", {
-      mode: 0o600,
-    });
+    await fs.writeFile(
+      path.join(sessionsDir, String(pid)),
+      JSON.stringify({ folders }),
+      { mode: 0o600 }
+    );
   } catch {
     // Never block activation.
   }
@@ -76,32 +101,62 @@ export async function clearSessionMarker(
 }
 
 /**
- * Remove markers of dead extension hosts and report whether any existed —
- * true means at least one prior session ended without a clean deactivate
- * (crash, force-quit, power loss) and a crash sweep is warranted.
+ * Remove markers of dead extension hosts and return their recorded workspace
+ * folders — a non-empty `crashed` means at least one prior session ended
+ * without a clean deactivate (crash, force-quit, power loss) and a crash
+ * sweep over `deadFolders` is warranted. Non-pid filenames (.DS_Store and
+ * friends) are ignored entirely — they are not session markers.
  */
 export async function reapDeadSessionMarkers(
   sessionsDir: string = getSessionsDir(),
   isPidAlive: (pid: number) => boolean = defaultIsPidAlive
-): Promise<boolean> {
-  let foundDead = false;
+): Promise<{ crashed: boolean; deadFolders: string[] }> {
+  let crashed = false;
+  const deadFolders: string[] = [];
   try {
     const names = await fs.readdir(sessionsDir);
     for (const name of names) {
+      if (!isPidName(name)) continue;
       const pid = Number(name);
-      if (!Number.isInteger(pid) || pid <= 0 || !isPidAlive(pid)) {
-        foundDead = true;
-        try {
-          await fs.unlink(path.join(sessionsDir, name));
-        } catch {
-          // Already reaped by a concurrent window.
-        }
+      if (isPidAlive(pid)) continue;
+      crashed = true;
+      const markerPath = path.join(sessionsDir, name);
+      deadFolders.push(...(await readMarkerFolders(markerPath)));
+      try {
+        await fs.unlink(markerPath);
+      } catch {
+        // Already reaped by a concurrent window.
       }
     }
   } catch {
     // Missing dir = no prior sessions.
   }
-  return foundDead;
+  return { crashed, deadFolders };
+}
+
+/**
+ * Workspace folders of OTHER live extension hosts. A closing window must
+ * never purge files that a still-running window is using — its purge
+ * excludes anything under these folders.
+ */
+export async function getLiveSessionFolders(
+  excludePid: number,
+  sessionsDir: string = getSessionsDir(),
+  isPidAlive: (pid: number) => boolean = defaultIsPidAlive
+): Promise<string[]> {
+  const folders: string[] = [];
+  try {
+    const names = await fs.readdir(sessionsDir);
+    for (const name of names) {
+      if (!isPidName(name)) continue;
+      const pid = Number(name);
+      if (pid === excludePid || !isPidAlive(pid)) continue;
+      folders.push(...(await readMarkerFolders(path.join(sessionsDir, name))));
+    }
+  } catch {
+    // Missing dir = no other sessions.
+  }
+  return folders;
 }
 
 /** Queue a purge summary for the next-activation audit report. Best-effort. */

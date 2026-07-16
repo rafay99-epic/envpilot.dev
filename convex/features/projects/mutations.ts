@@ -118,7 +118,7 @@ export const update = mutation({
 
     const project = await ctx.db.get(projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
     }
 
     if (updates.vscodeAutoUnsyncOnClose !== undefined) {

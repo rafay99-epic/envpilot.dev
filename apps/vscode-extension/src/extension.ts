@@ -47,6 +47,7 @@ import {
   writeSessionMarker,
   clearSessionMarker,
   reapDeadSessionMarkers,
+  getLiveSessionFolders,
   appendUnsyncReport,
   drainUnsyncReports,
 } from "./utils/unsyncState";
@@ -222,14 +223,21 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Unsync-on-close crash detection: a session marker left by a dead
   // extension host means that session never ran its deactivate() purge
-  // (crash, force-quit, power loss) — sweep its stale synced files NOW,
-  // before anything can trigger a fresh sync, so the purge never races a
-  // new write (the sweep would otherwise delete a just-written file whose
-  // hash matches the manifest).
-  const hadCrashedSession = await reapDeadSessionMarkers();
-  await writeSessionMarker(process.pid);
-  if (hadCrashedSession) {
-    await runUnsyncPurge("crash-sweep");
+  // (crash, force-quit, power loss) — sweep the CRASHED session's recorded
+  // workspace folders NOW, before anything can trigger a fresh sync, so the
+  // purge never races a new write (the sweep would otherwise delete a
+  // just-written file whose hash matches the manifest). The sweep targets
+  // the dead session's folders, not this window's — a crash in project X
+  // must be cleaned up even when the next launch opens project Y.
+  const { crashed, deadFolders } = await reapDeadSessionMarkers();
+  await writeSessionMarker(
+    process.pid,
+    vscode.workspace.workspaceFolders?.map((folder) =>
+      path.resolve(folder.uri.fsPath)
+    ) ?? []
+  );
+  if (crashed && deadFolders.length > 0) {
+    await runUnsyncPurge("crash-sweep", deadFolders);
   }
 
   // Initialize services. The TokenManager owns WorkOS access-token freshness
@@ -1619,26 +1627,53 @@ async function handleRemoveCommitGuard(): Promise<void> {
  * reintroducing it safe):
  *  - HASH GUARD: only files whose on-disk sha256 still matches the managed-
  *    files manifest are deleted; hand-edited files are always spared.
- *  - OPT-OUT: projects whose cached server flag is false are skipped
- *    (flag = member override ?? project default ?? true, resolved
- *    server-side, cached at sync time so this works offline).
- *  - WINDOW SCOPE: only files under THIS window's workspace folders are
- *    touched — closing one window never deletes files another window uses.
+ *  - OPT-OUT: projects whose cached server flag is false are skipped, and
+ *    their directories are EXCLUDED from every other project's purge — a
+ *    linked directory of an opted-out project nested inside an opted-in
+ *    project's tree keeps its files (flag = member override ?? project
+ *    default ?? true, resolved server-side, cached at sync time so this
+ *    works offline).
+ *  - SCOPE: "close" purges only under THIS window's workspace folders;
+ *    "crash-sweep" purges only under the crashed session's recorded folders.
+ *  - LIVE-WINDOW GUARD: folders recorded by other still-running extension
+ *    hosts (session markers) are excluded — closing one window never
+ *    deletes files another live window is using, even for overlapping
+ *    workspaces (/repo open in A, /repo/apps/web open in B).
  * Purge outcomes are queued as counts-only audit reports, sent on the next
  * activation (network at shutdown is unreliable).
  */
-async function runUnsyncPurge(trigger: "close" | "crash-sweep"): Promise<void> {
+async function runUnsyncPurge(
+  trigger: "close" | "crash-sweep",
+  scopeFolders?: string[]
+): Promise<void> {
   try {
-    const folders =
-      vscode.workspace.workspaceFolders?.map((folder) =>
-        path.resolve(folder.uri.fsPath)
-      ) ?? [];
+    const folders = (
+      scopeFolders ??
+      vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ??
+      []
+    ).map((folder) => path.resolve(folder));
     if (folders.length === 0) return;
 
     const isInside = (child: string, parent: string) =>
       child === parent || child.startsWith(parent + path.sep);
 
-    for (const project of storageService.getLinkedProjectsMetadataV2()) {
+    const projects = storageService.getLinkedProjectsMetadataV2();
+
+    // Exclusions: opted-out projects' directories (their opt-out must win
+    // even when nested inside an opted-in project's tree) and any folder a
+    // still-live extension host has claimed.
+    const excludedDirs = projects
+      .filter((project) => project.autoUnsyncOnClose === false)
+      .flatMap((project) =>
+        project.directories.map((dir) => path.resolve(dir.directoryPath))
+      );
+    excludedDirs.push(
+      ...(await getLiveSessionFolders(process.pid)).map((folder) =>
+        path.resolve(folder)
+      )
+    );
+
+    for (const project of projects) {
       if (project.autoUnsyncOnClose === false) continue;
 
       const eligibleDirs = project.directories
@@ -1646,8 +1681,10 @@ async function runUnsyncPurge(trigger: "close" | "crash-sweep"): Promise<void> {
         .filter((dir) => folders.some((folder) => isInside(dir, folder)));
       if (eligibleDirs.length === 0) continue;
 
-      const result = await purgeManagedFilesFiltered((filePath) =>
-        eligibleDirs.some((dir) => isInside(filePath, dir))
+      const result = await purgeManagedFilesFiltered(
+        (filePath) =>
+          eligibleDirs.some((dir) => isInside(filePath, dir)) &&
+          !excludedDirs.some((dir) => isInside(filePath, dir))
       );
 
       if (result.deleted > 0 || result.spared > 0 || result.failed > 0) {
@@ -1702,11 +1739,18 @@ async function maybeShowUnsyncNotice(
 }
 
 export async function deactivate() {
-  // Unsync-on-close purge — hash-guarded, opt-out aware, window-scoped (see
-  // runUnsyncPurge above; the PR #73 data-loss incident is why deletion here
-  // must never be unconditional). Sign-out / explicit unlink still delete
-  // through their own gated paths (shouldPreventCopyOnRevoke in sync.ts).
-  // Remaining resource cleanup is handled by dispose subscriptions.
+  // Unsync-on-close purge — hash-guarded, opt-out aware, window-scoped, and
+  // live-window aware (see runUnsyncPurge above; the PR #73 data-loss
+  // incident is why deletion here must never be unconditional). Note this
+  // fires on EVERY extension-host shutdown — window close, Reload Window,
+  // extension update — which is the intended security semantics: files never
+  // outlive the session, and the next activation's auto-sync restores them.
+  // Sign-out / explicit unlink still delete through their own gated paths
+  // (shouldPreventCopyOnRevoke in sync.ts). Remaining resource cleanup is
+  // handled by dispose subscriptions.
+  // Marker is cleared LAST: if the purge dies mid-shutdown the marker
+  // survives, so the next activation's crash sweep retries the cleanup
+  // (sweeping an already-purged folder is a no-op).
   await runUnsyncPurge("close");
   await clearSessionMarker(process.pid);
   await closeSentry();

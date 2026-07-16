@@ -108,6 +108,13 @@ export async function forgetManagedFile(
  *
  * Used by unsync-on-close (deactivate + crash sweep), where only files for
  * opted-in projects under the closing window's workspace may be removed.
+ *
+ * ponytail: the read-modify-write of the shared manifest is unlocked, so a
+ * concurrent writer in another extension host (sync's recordManagedFile, a
+ * second window's purge) can be clobbered by a stale `kept` write. The
+ * damage is bounded — a lost entry is re-recorded on that project's next
+ * sync, and a resurrected entry for a deleted file drops itself on the next
+ * purge (readFile fails). Add proper-lockfile if this ever bites for real.
  */
 export async function purgeManagedFilesFiltered(
   shouldPurge: (filePath: string) => boolean,
