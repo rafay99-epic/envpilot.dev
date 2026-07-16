@@ -25,6 +25,11 @@ import {
   FRAMEWORK_ICON_TYPES,
 } from "@/constants/framework-logos";
 import { CicdTokensSection } from "@/components/cicd/CicdTokensSection";
+import { FeatureGate } from "@/components/tier/FeatureGate";
+import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { sanitizeConvexError } from "@/lib/error-messages";
+import { useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 
 interface ProjectSettingsPageProps {
@@ -38,6 +43,7 @@ interface Project {
   description?: string;
   icon?: string;
   color?: string;
+  vscodeAutoUnsyncOnClose?: boolean;
   organizationId: string;
   createdAt: number;
   updatedAt: number;
@@ -328,15 +334,21 @@ export default function ProjectSettingsPage({
       {/* Tab Content */}
       <div className="max-w-2xl">
         {activeTab === "general" && (
-          <GeneralProjectSettings
-            project={project!}
-            formData={formData}
-            setFormData={setFormData}
-            isSubmitting={isSubmitting}
-            handleSubmit={handleSubmit}
-            error={error}
-            successMessage={successMessage}
-          />
+          <div className="space-y-6">
+            <GeneralProjectSettings
+              project={project!}
+              formData={formData}
+              setFormData={setFormData}
+              isSubmitting={isSubmitting}
+              handleSubmit={handleSubmit}
+              error={error}
+              successMessage={successMessage}
+            />
+            <VscodeSyncSection
+              project={project!}
+              onProjectUpdated={setProject}
+            />
+          </div>
         )}
         {activeTab === "cicd" && canManageCicdTokens && project && (
           <CicdTokensSection
@@ -623,6 +635,195 @@ function GeneralProjectSettings({
         </TerminalCard>
       </form>
     </div>
+  );
+}
+
+// ============================================================
+// VS Code Sync (unsync-on-close) — pro-gated
+// ============================================================
+
+function VscodeSyncSection({
+  project,
+  onProjectUpdated,
+}: {
+  project: Project;
+  onProjectUpdated: (project: Project) => void;
+}) {
+  const { organization } = useAuthContext();
+
+  return (
+    <FeatureGate
+      organizationId={organization?.id as Id<"organizations"> | undefined}
+      featureKey="vscode_unsync_customization"
+      featureName="VS Code Unsync Customization"
+      fallbackVariant="card"
+    >
+      <VscodeSyncSectionInner
+        project={project}
+        onProjectUpdated={onProjectUpdated}
+      />
+    </FeatureGate>
+  );
+}
+
+function VscodeSyncSectionInner({
+  project,
+  onProjectUpdated,
+}: {
+  project: Project;
+  onProjectUpdated: (project: Project) => void;
+}) {
+  const projectId = project._id as Id<"projects">;
+  const { members, isLoading: membersLoading } = useProjectMembers(projectId);
+  const setMemberOverride = useMutation(
+    api.features.projects.mutations.setMemberUnsyncOverride
+  );
+
+  const [enabled, setEnabled] = useState(
+    project.vscodeAutoUnsyncOnClose ?? true
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [sectionError, setSectionError] = useState<string | null>(null);
+
+  const handleToggle = async () => {
+    const next = !enabled;
+    setEnabled(next);
+    setIsSaving(true);
+    setSectionError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vscodeAutoUnsyncOnClose: next }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update setting");
+      }
+      onProjectUpdated(data.project);
+    } catch (err) {
+      // Revert on error
+      setEnabled(!next);
+      setSectionError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleOverrideChange = async (
+    userId: Id<"users">,
+    raw: string // "inherit" | "on" | "off"
+  ) => {
+    setSavingUserId(userId);
+    setSectionError(null);
+    try {
+      await setMemberOverride({
+        projectId,
+        userId,
+        value: raw === "inherit" ? null : raw === "on",
+      });
+    } catch (err) {
+      setSectionError(sanitizeConvexError(err));
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  return (
+    <TerminalCard>
+      <h2 className="text-base font-semibold text-zinc-100">VS Code Sync</h2>
+
+      {sectionError && (
+        <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{sectionError}</p>
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-zinc-700/50 bg-zinc-800/50 px-5 py-4">
+        <div>
+          <p className="text-sm font-medium text-zinc-100">Unsync on close</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            When VS Code closes, synced .env files for this project are removed
+            from the developer&apos;s machine. Hand-edited files are never
+            deleted.
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="Unsync on close"
+          aria-pressed={enabled}
+          onClick={handleToggle}
+          disabled={isSaving}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+            enabled ? "bg-green-500" : "bg-zinc-600"
+          } ${isSaving ? "opacity-50" : ""}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+              enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm font-medium text-zinc-300">Member overrides</p>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Override the project default for individual members.
+        </p>
+
+        {membersLoading ? (
+          <p className="mt-3 text-xs text-zinc-600">Loading members...</p>
+        ) : members.length === 0 ? (
+          <p className="mt-3 text-xs text-zinc-600">
+            No members assigned to this project.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-zinc-800">
+            {members.map((member) => {
+              const memberName =
+                member.user?.name || member.user?.email || "Unknown member";
+              const resolved = member.vscodeAutoUnsyncOnClose ?? enabled;
+              return (
+                <li
+                  key={member._id}
+                  className="flex items-center justify-between gap-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-zinc-100">
+                      {memberName}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {resolved ? "unsyncs" : "keeps files"}
+                    </p>
+                  </div>
+                  <TerminalSelect
+                    aria-label={`Unsync override for ${memberName}`}
+                    value={
+                      member.vscodeAutoUnsyncOnClose === undefined
+                        ? "inherit"
+                        : member.vscodeAutoUnsyncOnClose
+                          ? "on"
+                          : "off"
+                    }
+                    onChange={(e) =>
+                      handleOverrideChange(member.userId, e.target.value)
+                    }
+                    disabled={savingUserId === member.userId}
+                  >
+                    <option value="inherit">Inherit</option>
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </TerminalSelect>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </TerminalCard>
   );
 }
 
