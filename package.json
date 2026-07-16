@@ -16,7 +16,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently --names web,convex,admin --prefix-colors blue,green,magenta \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\"",
+    "dev": "concurrently --names web,convex,admin,blog,docs --prefix-colors blue,green,magenta,cyan,yellow \"turbo dev --filter=@envpilot/web\" \"convex dev\" \"turbo dev --filter=@envpilot/admin\" \"turbo dev --filter=@envpilot/blog\" \"turbo dev --filter=@envpilot/docs\"",
     "dev:local": "./scripts/dev-local.sh",
     "dev:cli": "turbo dev --filter=@envpilot/cli",
     "dev:admin": "turbo dev --filter=@envpilot/admin",

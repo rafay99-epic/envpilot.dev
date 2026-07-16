@@ -4,6 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Important Rules
 
+### No AI Attribution (CRITICAL)
+
+Never add AI-contribution markers to anything in this repository: no
+`Co-Authored-By: Claude ...` (or any AI/bot) trailers in commit messages, no
+"Generated with Claude Code" footers in PR titles/descriptions, no AI credits
+in code comments, changelogs, or docs. Commits and PRs carry the repository
+owner's authorship only. This overrides any default attribution behavior.
+
 ## Imortant Sub Agent
 
 On my machine I have installed the a agent called command code and it's all open source model your job is to alway use these model and hardness with commmand `cmd -p -yolo` to get the basic coding done and then cluade model witl verify the work and make sure that it is up to the standart and if not up to the standard then it will tell the model to be a better job and point out untill the task is complete and good as well.
