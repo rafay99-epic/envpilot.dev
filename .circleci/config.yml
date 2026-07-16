@@ -14,8 +14,8 @@ version: 2.1
 #                     └─ release (aggregate tag + GitHub Release)
 #   version-tracker (non-main branches, PR comment)
 #
-# Skip semantics: a deploy job whose paths didn't change halts via
-# `circleci-agent step halt` — that counts as SUCCESS, so downstream
+# Skip semantics: a deploy job whose paths didn't change halts (then
+# `exit 0`s — halt is asynchronous) — that counts as SUCCESS, so downstream
 # `requires` fall through (same as GHA's `!failure()` + skipped). A real
 # failure blocks everything downstream.
 #
@@ -81,6 +81,7 @@ commands:
             if git diff --quiet HEAD^ HEAD -- << parameters.paths >>; then
               echo "No changes in: << parameters.paths >> — skipping << parameters.surface >> deploy."
               circleci-agent step halt
+              exit 0
             fi
             echo "Changes detected — deploying << parameters.surface >>."
 
@@ -193,16 +194,19 @@ jobs:
             if [ -z "${CIRCLE_PULL_REQUEST:-}" ]; then
               echo "No associated PR — skipping."
               circleci-agent step halt
+              exit 0
             fi
             git fetch origin main --quiet
             if git diff --quiet origin/main...HEAD -- package.json 'apps/*/package.json' 'packages/*/package.json' apps/web/src/lib/versions.ts; then
               echo "No version manifests changed — skipping."
               circleci-agent step halt
+              exit 0
             fi
             if [ -z "${GITHUB_TOKEN:-}" ]; then
               # Advisory job: warn-and-skip (deploy jobs fail loudly instead).
               echo "WARNING: GITHUB_TOKEN project env var not set — cannot post the version comment."
               circleci-agent step halt
+              exit 0
             fi
 
             PR_NUMBER="${CIRCLE_PULL_REQUEST##*/}"
@@ -322,6 +326,7 @@ jobs:
             if [ "$(cat /tmp/ws/cli-published)" = "false" ]; then
               # Persist the skip flag for homebrew/release BEFORE halting.
               circleci-agent step halt
+              exit 0
             fi
       - run:
           name: Build CLI (direct, NOT via turbo)
@@ -404,6 +409,7 @@ jobs:
           command: |
             if [ "$(cat /tmp/ws/ext-published)" = "false" ]; then
               circleci-agent step halt
+              exit 0
             fi
       - run:
           name: Package VSIX
@@ -530,6 +536,7 @@ jobs:
             if [ ! -f /tmp/ws/cli-published ] || [ "$(cat /tmp/ws/cli-published)" != "true" ]; then
               echo "CLI publish skipped this run — no formula update needed."
               circleci-agent step halt
+              exit 0
             fi
       - require-env:
           names: HOMEBREW_TAP_PAT
@@ -582,6 +589,7 @@ jobs:
             git diff --quiet HEAD^ HEAD || exit 0
             echo "Empty diff — nothing to release."
             circleci-agent step halt
+              exit 0
       - require-env:
           names: GITHUB_TOKEN
       - run:
