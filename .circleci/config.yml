@@ -42,12 +42,15 @@ jobs:
 
       - run:
           name: Install Bun (version pinned via packageManager)
-          # npm -g instead of the curl installer: no unzip dependency, no
-          # $BASH_ENV PATH juggling — bun lands on PATH via npm's bin dir.
+          # sudo REQUIRED: cimg images run as the `circleci` user and npm -g
+          # writes to /usr/local/lib (run 3 failed EACCES without it). The
+          # npm package ships both `bun` and `bunx` bins onto PATH — no
+          # curl-installer $BASH_ENV juggling (that PATH never reached later
+          # steps in run 1: `bunx: command not found`).
           command: |
             BUN_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1]")
-            npm install -g "bun@${BUN_VERSION}"
-            bun --version
+            sudo npm install -g "bun@${BUN_VERSION}"
+            bun --version && bunx --version
 
       - restore_cache:
           name: Restore Bun dependency cache
