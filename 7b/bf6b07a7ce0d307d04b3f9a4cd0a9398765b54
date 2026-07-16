@@ -1,0 +1,136 @@
+apps/blog/content/introducing-the-envpilot-blog.mdx
+  s_c73020b67d2a14::t_e4665df0d789c0 1-21
+apps/blog/eslint.config.mjs
+  s_c73020b67d2a14::t_2f431bcb9791f5 1-19
+apps/blog/next.config.ts
+  s_c73020b67d2a14::t_d8895db2da7307 1-7
+apps/blog/package.json
+  s_c73020b67d2a14::t_f070141eb77f5a 1-42
+apps/blog/postcss.config.mjs
+  s_c73020b67d2a14::t_985695a045d7ad 1-7
+apps/blog/src/app/[slug]/page.tsx
+  s_c73020b67d2a14::t_58346c29bdd2dd 1-207
+apps/blog/src/app/globals.css
+  s_c73020b67d2a14::t_b8f64302883245 1-226
+apps/blog/src/app/layout.tsx
+  s_c73020b67d2a14::t_1c29bd4f227cb1 1-41
+apps/blog/src/app/page.tsx
+  s_c73020b67d2a14::t_dbfc6be3985d4f 1-62
+apps/blog/src/app/robots.ts
+  s_c73020b67d2a14::t_d50e82ccb866bd 1-14
+apps/blog/src/app/sitemap.ts
+  s_c73020b67d2a14::t_c526cc5b5a94ab 1-23
+apps/blog/src/components/BlogListClient.tsx
+  s_b4022ad6b16025::t_b6120ed7684191 1-276
+apps/blog/src/components/shell.tsx
+  s_c73020b67d2a14::t_805d0da8afc135 1-112
+apps/blog/src/lib/content.ts
+  s_c73020b67d2a14::t_d52f60e7ed0334 1-117
+apps/blog/src/lib/schema.ts
+  s_c73020b67d2a14::t_5995924ad0cc5f 1-56
+apps/blog/tsconfig.json
+  s_c73020b67d2a14::t_f54a20e25662b7 1-22
+apps/blog/vercel.json
+  s_c73020b67d2a14::t_be2b47a24d6711 1-8
+apps/docs/content/api-quickstart.mdx
+  s_b4022ad6b16025::t_9ded599edebbc2 1-92
+apps/docs/content/api-reference.mdx
+  s_b4022ad6b16025::t_27ce490b0b49e3 1-159
+apps/docs/content/api-security.mdx
+  s_b4022ad6b16025::t_9e02b0c7e08977 1-62
+apps/docs/content/cli.mdx
+  s_b4022ad6b16025::t_d80c77c7c6a7d9 1-385
+apps/docs/content/extension.mdx
+  s_b4022ad6b16025::t_95d9f0a100fdf8 1-113
+apps/docs/content/getting-started.mdx
+  s_b4022ad6b16025::t_8cc447b1110507 1-81
+apps/docs/content/github-action.mdx
+  s_b4022ad6b16025::t_7e3c4f83c0c430 1-77
+apps/docs/content/mcp-server.mdx
+  s_b4022ad6b16025::t_5c39982044aedf 1-75
+apps/docs/content/nextjs-environment-variables.mdx
+  s_b4022ad6b16025::t_814871768d76bc 1-108
+apps/docs/content/rbac.mdx
+  s_b4022ad6b16025::t_0e859b3f366859 1-104
+apps/docs/content/security.mdx
+  s_b4022ad6b16025::t_0845ed44162b92 1-78
+apps/docs/content/share-environment-variables-securely.mdx
+  s_b4022ad6b16025::t_7d97645c95172a 1-72
+apps/docs/content/web-dashboard.mdx
+  s_b4022ad6b16025::t_37605d4a8249d9 1-89
+apps/docs/eslint.config.mjs
+  s_b4022ad6b16025::t_2368bad3e12336 1-19
+apps/docs/next.config.ts
+  s_b4022ad6b16025::t_61af60ad9c011b 1-7
+apps/docs/package.json
+  s_b4022ad6b16025::t_caa8a54f5b11dd 1-40
+apps/docs/postcss.config.mjs
+  s_b4022ad6b16025::t_71e11d69fdeb40 1-7
+apps/docs/src/app/[slug]/page.tsx
+  s_b4022ad6b16025::t_6089ff51ee76ed 1-244
+apps/docs/src/app/feed.xml/route.ts
+  s_b4022ad6b16025::t_4cb34c9aef9595 1-54
+apps/docs/src/app/globals.css
+  s_b4022ad6b16025::t_5a362faab6d840 1-226
+apps/docs/src/app/layout.tsx
+  s_b4022ad6b16025::t_2b1e4612b8895e 1-43
+apps/docs/src/app/llms-full.txt/route.ts
+  s_b4022ad6b16025::t_cac0fab579f576 1-62
+apps/docs/src/app/llms.txt/route.ts
+  s_b4022ad6b16025::t_ad296db656cf9a 1-78
+apps/docs/src/app/page.tsx
+  s_b4022ad6b16025::t_7311dc92c30035 1-12
+apps/docs/src/app/robots.ts
+  s_b4022ad6b16025::t_30a101238049e2 1-14
+apps/docs/src/app/sitemap.ts
+  s_b4022ad6b16025::t_ace9d5f6b09fc7 1-24
+apps/docs/src/components/DocsSidebar.tsx
+  s_b4022ad6b16025::t_847a0542bc661b 1-156
+apps/docs/src/components/shell.tsx
+  s_b4022ad6b16025::t_c4fec920325ebb 1-109
+apps/docs/src/lib/content.ts
+  s_b4022ad6b16025::t_4896e30920777c 1-97
+apps/docs/tsconfig.json
+  s_b4022ad6b16025::t_604f88df4ce5e3 1-22
+apps/docs/vercel.json
+  s_b4022ad6b16025::t_09da3f77fc8758 1-8
+bun.lock
+  s_47513e23e74e62::t_3f0a656c1aa009 57-86,121-148,393-394,397-398,1519,3203-3204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7bbf6b07a7ce0d307d04b3f9a4cd0a9398765b54",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_b4022ad6b16025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae9fa4c0d52fd52bc",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_c73020b67d2a14": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac7531fa5052afd39",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
