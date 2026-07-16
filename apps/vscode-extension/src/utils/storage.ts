@@ -48,6 +48,8 @@ interface LinkedProjectMetadataV2 {
   defaultEnvironment: string;
   createdAt: number;
   updatedAt: number;
+  /** Cached server-resolved unsync-on-close; absent = true (secure default). */
+  autoUnsyncOnClose?: boolean;
 }
 
 /**
@@ -673,6 +675,21 @@ export class StorageService {
     projects: LinkedProjectMetadataV2[]
   ): Promise<void> {
     await this.context.globalState.update(LINKED_PROJECTS_V2_KEY, projects);
+  }
+
+  /**
+   * Cache the server-resolved unsync-on-close flag for a project. No-op when
+   * the project isn't linked or the value is unchanged (avoids globalState
+   * churn on every sync).
+   */
+  async setProjectUnsyncFlag(projectId: string, value: boolean): Promise<void> {
+    const metadata = this.getLinkedProjectsMetadataV2();
+    const index = metadata.findIndex((p) => p.projectId === projectId);
+    if (index === -1 || metadata[index].autoUnsyncOnClose === value) {
+      return;
+    }
+    metadata[index] = { ...metadata[index], autoUnsyncOnClose: value };
+    await this.setLinkedProjectsMetadataV2(metadata);
   }
 
   /**

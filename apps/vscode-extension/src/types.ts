@@ -129,6 +129,12 @@ export interface VariablesResponseMeta {
   environmentScope?: string[] | null;
   hasWriteAccess?: boolean;
   scopeRestricted?: boolean;
+  /**
+   * Server-resolved unsync-on-close for the caller (member override ??
+   * project default ?? true). Cached locally on every sync so deactivate()
+   * can act on it offline.
+   */
+  autoUnsyncOnClose?: boolean;
 }
 
 export interface ProjectAccess {
@@ -253,6 +259,12 @@ export interface LinkedProjectV2 {
   createdAt: number;
   /** Last updated timestamp */
   updatedAt: number;
+  /**
+   * Last server-resolved unsync-on-close value for this project (cached at
+   * sync time; see VariablesResponseMeta.autoUnsyncOnClose). Absent = treat
+   * as true — the secure default.
+   */
+  autoUnsyncOnClose?: boolean;
 }
 
 /**
