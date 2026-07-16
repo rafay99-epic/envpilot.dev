@@ -165,6 +165,11 @@ export default defineSchema({
     color: v.optional(v.string()),
     // User who created the project
     createdBy: v.id("users"),
+    // Delete synced .env files when VS Code closes (project default).
+    // Absent = true (secure default). Customizing it is pro-gated
+    // (vscode_unsync_customization); pullValues re-checks the gate at read
+    // time, so free/downgraded orgs always resolve to true.
+    vscodeAutoUnsyncOnClose: v.optional(v.boolean()),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -209,6 +214,9 @@ export default defineSchema({
     addedBy: v.id("users"),
     // When the member was added
     addedAt: v.number(),
+    // Per-member override of the project's vscodeAutoUnsyncOnClose default.
+    // Absent = inherit project setting. Pro-gated like the project flag.
+    vscodeAutoUnsyncOnClose: v.optional(v.boolean()),
   })
     .index("by_project", ["projectId"])
     .index("by_user", ["userId"])
@@ -825,6 +833,7 @@ export default defineSchema({
       v.literal("access.token_used"),
       v.literal("access.extension_linked"),
       v.literal("access.extension_unlinked"),
+      v.literal("access.extension_unsync"),
       // Billing actions
       v.literal("billing.subscription_created"),
       v.literal("billing.subscription_updated"),
