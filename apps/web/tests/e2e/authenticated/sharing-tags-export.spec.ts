@@ -443,6 +443,111 @@ test.describe("sharing, tags, export — post-cleanup survival", () => {
     ).toEqual([]);
   });
 
+  test("E: delete cascade — deleting a shared variable revokes its share link", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const clientErrors = trackClientErrors(page);
+
+    const slug = await getWorkerProjectSlug(page);
+    await page.goto(`/dashboard/projects/${slug}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    const addButton = page.getByRole("button", { name: /^Add Variable/ });
+    test.skip(
+      !(await isReachable(addButton)),
+      "Add Variable button not visible — the signed-in role may not have direct create permission"
+    );
+
+    const key = uniqueKey("SHARE_DEL");
+    const recipient = `share-target-${Date.now()}@example-e2e.test`;
+    let created = false;
+    let shareToken: string | null = null;
+
+    try {
+      await createVariable(page, { key, value: `share-del-${Date.now()}` });
+      created = true;
+
+      const row = variableRow(page, key);
+      await expect(row).toBeVisible({ timeout: 20_000 });
+
+      const shareButton = row.getByTitle("Share via secure link");
+      test.skip(
+        !(await isReachable(shareButton)),
+        "Share button not visible — secret_sharing feature may be gated off for this org/tier"
+      );
+
+      await shareButton.click();
+      const shareDrawer = page.getByRole("dialog");
+      await expect(shareDrawer).toBeVisible({ timeout: 10_000 });
+      const emailInput = shareDrawer.locator('input[type="email"]');
+      await emailInput.fill(recipient);
+      await emailInput.press("Enter");
+      await shareDrawer
+        .getByRole("button", { name: "Generate & Send" })
+        .click();
+
+      // Same tier race as test A: max_active_shares can reject the mutation
+      // even when the Share button is visible.
+      const successText = shareDrawer.getByText(/Share link created/);
+      const limitError = shareDrawer.getByText(/Limit reached/i);
+      await Promise.race([
+        successText.waitFor({ state: "visible", timeout: 20_000 }),
+        limitError.waitFor({ state: "visible", timeout: 20_000 }),
+      ]);
+      if (await limitError.isVisible().catch(() => false)) {
+        test.skip(
+          true,
+          "max_active_shares limits usage to zero for this org/tier — cannot generate a share to delete"
+        );
+      }
+      await expect(successText).toBeVisible();
+
+      const shareUrlCode = shareDrawer
+        .locator("code")
+        .filter({ hasText: /\/s\// });
+      const shareUrl = (await shareUrlCode.textContent())?.trim() ?? "";
+      shareToken = shareUrl.match(/\/s\/([^#]+)#/)?.[1] ?? null;
+      expect(shareToken, "should extract the shr_ token from the URL").toMatch(
+        /^shr_/
+      );
+
+      await shareDrawer.getByRole("button", { name: "Done" }).click();
+      await expect(shareDrawer).toBeHidden({ timeout: 10_000 });
+
+      // Delete the shared variable — the backend must cascade-revoke its share.
+      await deleteVariable(page, key);
+      created = false;
+      await expect(variableRow(page, key)).toHaveCount(0, { timeout: 20_000 });
+
+      // Drive the REAL public reveal endpoint (unauthenticated). The share's
+      // status is now "revoked", so verifyOtp rejects at the status check —
+      // BEFORE any OTP is even considered — with a 410. A non-deleted share
+      // could never return this, so it proves the delete-cascade fired.
+      const res = await page.request.post(
+        `/api/shares/${shareToken}/verify-otp`,
+        { data: { email: recipient, otp: "000000" } }
+      );
+      expect(
+        res.status(),
+        "revoked share should reject the reveal with 410 Gone"
+      ).toBe(410);
+      const body = (await res.json()) as { error?: string };
+      expect(
+        body.error ?? "",
+        "reveal error should say the share was revoked"
+      ).toMatch(/revoked/i);
+    } finally {
+      if (created) await deleteVariable(page, key);
+    }
+
+    expect(
+      clientErrors,
+      `unexpected client-side errors on the delete-cascade flow: ${clientErrors.join("\n")}`
+    ).toEqual([]);
+  });
+
   test("D: audit trail — recent entries reference the test artifacts", async ({
     page,
   }) => {

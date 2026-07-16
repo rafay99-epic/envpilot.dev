@@ -2,7 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import { success, error, info, warning, withSpinner } from "../lib/ui.js";
-import { createAPIClient, APIClient, APIError } from "../lib/api.js";
+import { createAPIClient, APIClient } from "../lib/api.js";
 import { isAuthenticated, getUser } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
 import {
@@ -225,12 +225,9 @@ export const requestCommand = new Command("request")
       );
       info(`Status: ${created.status} · Id: ${created._id}`);
     } catch (err) {
-      // The server is the source of truth for authorization — surface its
-      // 403 message directly instead of a generic stack trace.
-      if (err instanceof APIError && err.statusCode === 403) {
-        error(err.message);
-        return;
-      }
+      // createVariableRequest goes DIRECT to Convex, so it never throws an
+      // APIError with a statusCode — handleError renders the ConvexError
+      // payload (env conflict, pending-duplicate, tier limit) as-is.
       await handleError(err);
     }
   });

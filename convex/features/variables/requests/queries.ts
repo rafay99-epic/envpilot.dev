@@ -1,9 +1,9 @@
-import { v } from "convex/values";
-import { query, QueryCtx } from "../../../_generated/server";
+import { v, ConvexError } from "convex/values";
+import { query, internalQuery, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
 import { batchGetUsers } from "../../../lib/users";
 import { requireAuthedUser } from "../../../lib/identity";
-import { assertOrgMembership } from "../../../lib/authz";
+import { assertOrgMembership, normalizeOrgRole } from "../../../lib/authz";
 import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 
 async function listForProjectCore(
@@ -135,7 +135,7 @@ async function getByIdCore(
     request.requestedBy !== args.userId &&
     !(await canReviewRequests(ctx, args.userId, request.projectId))
   ) {
-    throw new Error("Not authorized to view this request");
+    throw new ConvexError("Not authorized to view this request");
   }
 
   const requester = await ctx.db.get(request.requestedBy);
@@ -230,6 +230,16 @@ export const listForReviewer = query({
         }),
         v.null()
       ),
+      // Who reviewed a resolved request — the org page shows "by <reviewer>"
+      // on the Approved/Rejected/Canceled tabs.
+      reviewer: v.union(
+        v.object({
+          _id: v.id("users"),
+          email: v.string(),
+          name: v.optional(v.string()),
+        }),
+        v.null()
+      ),
       projectName: v.string(),
     })
   ),
@@ -275,10 +285,16 @@ export const listForReviewer = query({
       );
     }
 
-    // Joins without N+1 on duplicates: dedupe requester + project ids, then
-    // ctx.db.get each UNIQUE id exactly once.
+    // Joins without N+1 on duplicates: dedupe requester + reviewer + project
+    // ids, then ctx.db.get each UNIQUE id exactly once.
     const uniqueUserIds = [
-      ...new Set(scopedRequests.map((request) => request.requestedBy)),
+      ...new Set(
+        scopedRequests.flatMap((request) =>
+          request.reviewedBy
+            ? [request.requestedBy, request.reviewedBy]
+            : [request.requestedBy]
+        )
+      ),
     ];
     const uniqueProjectIds = [
       ...new Set(scopedRequests.map((request) => request.projectId)),
@@ -304,6 +320,9 @@ export const listForReviewer = query({
 
     return scopedRequests.map((request) => {
       const requester = userById.get(request.requestedBy) ?? null;
+      const reviewer = request.reviewedBy
+        ? (userById.get(request.reviewedBy) ?? null)
+        : null;
       const project = projectById.get(request.projectId) ?? null;
 
       // Strip vaultRef — the proposed secret ref is fetched only through a
@@ -319,8 +338,67 @@ export const listForReviewer = query({
               name: requester.name,
             }
           : null,
+        reviewer: reviewer
+          ? {
+              _id: reviewer._id,
+              email: reviewer.email,
+              name: reviewer.name,
+            }
+          : null,
         projectName: project?.name ?? "Unknown project",
       };
     });
+  },
+});
+
+/**
+ * Internal: resolve the email recipients who can review requests for a project
+ * — the org owner(s) plus project managers / team leads ASSIGNED to the
+ * project (mirrors canReviewRequests' role model). Deduped by email and bounded
+ * so a huge org can't fan out an unbounded send. Used by the request-created
+ * notification action; returns [] for a missing/deleted project.
+ */
+export const getRequestReviewerRecipients = internalQuery({
+  args: { projectId: v.id("projects") },
+  returns: v.array(
+    v.object({ email: v.string(), name: v.optional(v.string()) })
+  ),
+  handler: async (ctx, args) => {
+    const MAX_RECIPIENTS = 25;
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) return [];
+
+    const members = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", project.organizationId)
+      )
+      .collect();
+
+    const assigned = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const assignedUserIds = new Set(assigned.map((m) => m.userId.toString()));
+
+    const recipients: { email: string; name?: string }[] = [];
+    const seenEmails = new Set<string>();
+    for (const member of members) {
+      const role = normalizeOrgRole(member.role);
+      const isReviewer =
+        role === "owner" ||
+        ((role === "project_manager" || role === "team_lead") &&
+          assignedUserIds.has(member.userId.toString()));
+      if (!isReviewer) continue;
+
+      const user = await ctx.db.get(member.userId);
+      if (!user?.email) continue;
+      const key = user.email.toLowerCase();
+      if (seenEmails.has(key)) continue;
+      seenEmails.add(key);
+      recipients.push({ email: user.email, name: user.name });
+      if (recipients.length >= MAX_RECIPIENTS) break;
+    }
+    return recipients;
   },
 });

@@ -1,4 +1,8 @@
-import type { DatabaseReader, QueryCtx } from "../../_generated/server";
+import type {
+  DatabaseReader,
+  QueryCtx,
+  MutationCtx,
+} from "../../_generated/server";
 import type { Doc } from "../../_generated/dataModel";
 import { Id } from "../../_generated/dataModel";
 import {
@@ -6,6 +10,7 @@ import {
   normalizeOrgRole,
   getActiveMembership,
 } from "../../lib/authz";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * Normalize a share's resource type. Legacy rows created before shared
@@ -363,6 +368,10 @@ export async function countActiveShares(
   db: DatabaseReader,
   organizationId: Id<"organizations">
 ): Promise<number> {
+  // Exclude rows already past their TTL: the hourly cleanup cron only flips
+  // expired→"expired" once an hour, so an "active" row can be effectively dead
+  // for up to an hour. Counting it would wrongly block new shares at the cap.
+  const now = Date.now();
   const shares = (
     await db
       .query("sharedSecrets")
@@ -370,6 +379,70 @@ export async function countActiveShares(
         q.eq("organizationId", organizationId)
       )
       .collect()
-  ).filter((share) => share.status === "active");
+  ).filter((share) => share.status === "active" && share.expiresAt > now);
   return shares.length;
+}
+
+/**
+ * Revoke every active share pointing at a resource that is being (soft-)deleted.
+ * Called from the variable / account delete mutations so a deleted resource's
+ * share links stop working AND disappear from the owner's dashboard (the list
+ * queries hide shares whose resource is gone, which would otherwise strand a
+ * live, un-revokable link). Patches status→"revoked" + audit; the vault
+ * ciphertext is left for the same GC path that non-purged expired shares use,
+ * and verifyOtp independently rejects deleted resources as a backstop.
+ */
+export async function revokeSharesForResource(
+  ctx: MutationCtx,
+  args:
+    | {
+        resourceType: "variable";
+        variableId: Id<"environmentVariables">;
+        actorId: Id<"users">;
+      }
+    | {
+        resourceType: "account";
+        accountId: Id<"projectAccounts">;
+        actorId: Id<"users">;
+      }
+): Promise<number> {
+  const now = Date.now();
+  const shares =
+    args.resourceType === "account"
+      ? await ctx.db
+          .query("sharedSecrets")
+          .withIndex("by_account", (q) => q.eq("accountId", args.accountId))
+          .collect()
+      : await ctx.db
+          .query("sharedSecrets")
+          .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
+          .collect();
+
+  let revoked = 0;
+  for (const share of shares) {
+    if (share.status !== "active") continue;
+    await ctx.db.patch(share._id, {
+      status: "revoked",
+      revokedAt: now,
+      revokedBy: args.actorId,
+    });
+    await createAuditLog(ctx, {
+      organizationId: share.organizationId,
+      projectId: share.projectId,
+      variableId: share.variableId,
+      userId: args.actorId,
+      action: "share.revoked",
+      details: {
+        resourceType: normalizeResourceType(share),
+        accountId: share.accountId,
+        variableKey: share.variableKey,
+        mode: share.mode,
+        reason: "resource_deleted",
+      },
+      involvesSensitiveData: true,
+      resourceType: "security",
+    });
+    revoked++;
+  }
+  return revoked;
 }

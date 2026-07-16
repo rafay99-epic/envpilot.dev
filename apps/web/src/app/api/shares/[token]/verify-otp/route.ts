@@ -4,6 +4,7 @@ import { api } from "@convex/_generated/api";
 import { z } from "zod";
 import crypto from "crypto";
 import * as Sentry from "@sentry/nextjs";
+import { sanitizeConvexError, isRateLimitError } from "@/lib/error-messages";
 
 const verifyOtpSchema = z.object({
   email: z.string().email(),
@@ -65,10 +66,21 @@ export async function POST(
       encryptedPayload: result.encryptedPayload,
       hasPassphrase: result.hasPassphrase,
       resourceType: result.resourceType,
+      mode: result.mode,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Verification failed";
+    // Rate-limit ConvexError is structured (data.kind === "RateLimited") — its
+    // message doesn't survive prod redaction, so detect it before classifying.
+    if (isRateLimitError(error)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
+    // Classify on the ConvexError PAYLOAD (sanitizeConvexError unwraps .data),
+    // not error.message — plain messages are redacted to "Server Error" in prod.
+    const message = sanitizeConvexError(error);
 
     // The OTP verified but the Vault read failed inside the composed action —
     // surface as 502, distinct from OTP/validation errors (matches prior route).
@@ -126,12 +138,6 @@ export async function POST(
       message.includes("Invalid verification")
     ) {
       return NextResponse.json({ error: message }, { status: 401 });
-    }
-    if (message.includes("rate limit") || message.includes("Rate limit")) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        { status: 429 }
-      );
     }
 
     // Unexpected errors → Sentry + generic message

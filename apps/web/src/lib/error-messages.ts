@@ -74,6 +74,21 @@ export function isTierLimitError(message: string): boolean {
 }
 
 /**
+ * Returns true when the error is the rate limiter's ConvexError. The
+ * @convex-dev/rate-limiter component throws `new ConvexError({ kind:
+ * "RateLimited", ... })`, whose structured `.data` survives prod redaction
+ * (the `.message` does not). Detect it by the data shape, not a substring.
+ */
+export function isRateLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "data" in error &&
+    typeof (error as Error & { data: unknown }).data === "object" &&
+    (error as Error & { data: { kind?: unknown } }).data?.kind === "RateLimited"
+  );
+}
+
+/**
  * Returns true for uniqueness/duplicate validation conflicts (e.g.
  * "Variable key already exists in this project") — user-correctable input
  * the UI surfaces inline, not a defect worth a Sentry issue.

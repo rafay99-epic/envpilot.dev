@@ -4,7 +4,7 @@ import { convex, createAuthedConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { reportApiError } from "@/lib/api-errors";
+import { reportApiError, sanitizeConvexError } from "@/lib/api-errors";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -44,8 +44,10 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return NextResponse.json({ data: { value } });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to read request value";
+    // Classify on the ConvexError PAYLOAD (sanitizeConvexError unwraps .data) —
+    // getById / revealValue throw ConvexError, whose plain .message is redacted
+    // to "Server Error" in prod so the substrings would never match.
+    const message = sanitizeConvexError(error);
 
     if (message.includes("Not authorized")) {
       return NextResponse.json({ error: message }, { status: 403 });
