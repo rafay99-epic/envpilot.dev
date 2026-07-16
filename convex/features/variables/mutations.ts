@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, type MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
@@ -159,7 +159,10 @@ async function createCore(
     .first();
 
   if (existingVariable && !existingVariable.deletedAt) {
-    throw new Error("Variable key already exists in this project");
+    // ConvexError: plain Error messages are redacted to "Server Error" on
+    // production deployments, which broke the client's duplicate-key
+    // handling (bulk import showed "Server Error" per row).
+    throw new ConvexError("Variable key already exists in this project");
   }
 
   // Build rotation fields if rotation is enabled

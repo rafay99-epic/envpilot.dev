@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query, type QueryCtx } from "../../_generated/server";
+import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { checkBooleanFeature } from "../featureRegistry/gates";
@@ -1100,5 +1100,25 @@ export const getDeleted = query({
       deletedAt: variable.deletedAt as number,
       environments: variable.environments,
     }));
+  },
+});
+
+/**
+ * Internal: does an ACTIVE (non-deleted) variable with this key already
+ * exist in the project? Used by actions (createWithValue) to reject
+ * duplicates BEFORE writing the secret value to the vault — checking only
+ * inside the create mutation leaked an orphaned vault secret per duplicate.
+ */
+export const getActiveByKeyInternal = internalQuery({
+  args: { projectId: v.id("projects"), key: v.string() },
+  returns: v.union(v.id("environmentVariables"), v.null()),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_and_key", (q) =>
+        q.eq("projectId", args.projectId).eq("key", args.key)
+      )
+      .first();
+    return existing && !existing.deletedAt ? existing._id : null;
   },
 });
