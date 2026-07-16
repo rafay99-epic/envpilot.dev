@@ -1,0 +1,37 @@
+{
+  "name": "@envpilot/ui",
+  "version": "1.0.0",
+  "description": "Shared marketing + docs UI components for Envpilot",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
+  "homepage": "https://www.envpilot.dev",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.35.2",
+    "lucide-react": "^0.577.0"
+  },
+  "peerDependencies": {
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@envpilot/eslint-config": "workspace:*",
+    "@envpilot/tsconfig": "workspace:*",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "typescript": "^5"
+  }
+}

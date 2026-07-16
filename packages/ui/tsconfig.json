@@ -1,0 +1,4 @@
+{
+  "extends": "@envpilot/tsconfig/next.json",
+  "include": ["src"]
+}

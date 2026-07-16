@@ -1,0 +1,21 @@
+---
+title: "Introducing the Envpilot Blog"
+description: "Why we're starting a blog, what Envpilot does, and what we'll be writing about — engineering, security, and building in public."
+date: "2026-07-16"
+tags: ["announcement"]
+keywords: ["envpilot", "environment variables", "secrets management", "blog"]
+author:
+  name: "Envpilot Team"
+---
+
+Welcome to the Envpilot blog. Envpilot is a secure environment variable management platform — a CLI, a VS Code extension, and a web dashboard that let teams store, share, and sync secrets without pasting them into Slack or committing them to a `.env` file that ends up in git history.
+
+Under the hood, secret values live in an encrypted vault and never touch our database in plaintext. The CLI and extension talk to that vault directly, so pulling variables into a local environment is a single command instead of a round of "can someone send me the API keys."
+
+```bash
+npm install -g @envpilot/cli
+```
+
+This blog is where we'll write about the things that come up while building that: engineering decisions and the trade-offs behind them, the security model and why it's built the way it is, and general notes from building a small startup in the open — what worked, what didn't, and what we'd do differently.
+
+If you're evaluating environment variable tooling for your team, or just curious how a project like this gets built, stick around. New posts will show up here as we ship.
