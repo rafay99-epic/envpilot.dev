@@ -1,0 +1,70 @@
+apps/web/next.config.ts
+  s_ad9fc0c4362c18::t_770b2ef7efe215 15
+apps/web/package.json
+  s_ad9fc0c4362c18::t_6bf473f2fb76ea 21
+apps/web/src/app/blog/[slug]/page.tsx
+  s_ad9fc0c4362c18::t_691f4d656d6964 8
+apps/web/src/app/docs/[slug]/page.tsx
+  s_ad9fc0c4362c18::t_8f764434c79aa4 7
+apps/web/src/app/globals.css
+  s_ad9fc0c4362c18::t_57fce5aff05c7f 2-3
+apps/web/src/components/marketing/index.tsx
+  s_47513e23e74e62::t_6ed9ffd4eaa518 1-106
+bun.lock
+  s_ad9fc0c4362c18::t_8efceeccb5ea2f 115,117,205-228,345-346
+packages/ui/eslint.config.mjs
+  s_ad9fc0c4362c18::t_5f9d68d467a56a 1-19
+packages/ui/package.json
+  s_ad9fc0c4362c18::t_422ef5e5d40c10 1-37
+packages/ui/src/docs/DocsSidebar.tsx
+  s_ad9fc0c4362c18::t_3444ea1726fb50 51
+packages/ui/src/docs/index.ts
+  s_ad9fc0c4362c18::t_641375d8eb5dec 1-3
+packages/ui/src/index.ts
+  s_ad9fc0c4362c18::t_0b57b1dc497d03 1-3
+packages/ui/src/marketing/MarketingFooter.tsx
+  s_47513e23e74e62::t_2c5e91ade1e489 5-9,11-26,50,85
+packages/ui/src/marketing/MarketingNav.tsx
+  s_ad9fc0c4362c18::t_617f14e514bc7a 5,9-12,17-20,22-28,62,81,104,120
+packages/ui/src/marketing/MarketingShell.tsx
+  s_47513e23e74e62::t_fd1934baa7306d 2-3,8-10,15-18,22-25,31,33
+packages/ui/src/marketing/StatusIndicator.tsx
+  s_ad9fc0c4362c18::t_25a7825e21ac15 46-50,55,68
+packages/ui/src/marketing/index.ts
+  s_ad9fc0c4362c18::t_4d1d401dd39176 2-7
+packages/ui/src/site-urls.ts
+  s_ad9fc0c4362c18::t_881753039ca18b 1-5
+packages/ui/src/styles.css
+  s_ad9fc0c4362c18::t_9973d98dd93bca 1-145
+packages/ui/tsconfig.json
+  s_ad9fc0c4362c18::t_29e503fb6871b2 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6e9eaa4bef77cb4c74308a68f2017c9b1c8a979b",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_ad9fc0c4362c18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac748023a1375aff0",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
