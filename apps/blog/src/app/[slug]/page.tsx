@@ -64,6 +64,12 @@ export async function generateMetadata({
       authors: [post.author.name],
       url: `${SITE_URLS.blog}/${slug}`,
     },
+    twitter: {
+      card: "summary_large_image",
+      title: `${post.title} — Envpilot Blog`,
+      description: post.description,
+      images: ["/og-image.jpg"],
+    },
   };
 }
 

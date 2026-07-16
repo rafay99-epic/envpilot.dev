@@ -37,7 +37,7 @@
     "test:e2e": "turbo test:e2e --filter=@envpilot/web",
     "test:unit": "turbo test:unit --filter=@envpilot/web",
     "test:cli": "turbo test --filter=@envpilot/cli",
-    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && echo 'Environment ready — edit .env.local with your values'"
+    "setup": "cp -n .env.example .env.local 2>/dev/null; ln -sf ../../.env.local apps/web/.env.local && ln -sf ../../.env.local apps/blog/.env.local && ln -sf ../../.env.local apps/docs/.env.local && echo 'Environment ready — edit .env.local with your values'"
   },
   "devDependencies": {
     "@envpilot/prettier-config": "workspace:*",

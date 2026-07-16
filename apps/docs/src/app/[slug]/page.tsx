@@ -16,6 +16,7 @@ import {
 } from "@envpilot/ui";
 import { DocsSidebar, DOC_ICONS } from "@/components/DocsSidebar";
 import { DocsShell } from "@/components/shell";
+import { LLMActions } from "@/components/LLMActions";
 import Link from "next/link";
 
 const mdxOptions = {
@@ -152,6 +153,10 @@ export default async function DocPage({ params }: PageProps) {
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <LLMActions slug={slug} title={doc.title} />
                   </div>
 
                   <GlowDivider className="mt-8" />

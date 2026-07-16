@@ -53,6 +53,8 @@ jobs:
       pull-requests: read
     outputs:
       run_web: ${{ steps.flags.outputs.run_web }}
+      run_blog: ${{ steps.flags.outputs.run_blog }}
+      run_docs: ${{ steps.flags.outputs.run_docs }}
       run_admin: ${{ steps.flags.outputs.run_admin }}
       run_cli: ${{ steps.flags.outputs.run_cli }}
       run_extension: ${{ steps.flags.outputs.run_extension }}
@@ -78,9 +80,9 @@ jobs:
           filters: |
             web:
               - 'apps/web/**'
-              # blog + docs ride the web flag: the consolidated `checks` job
-              # runs turbo repo-wide, so any of the three triggers it.
+            blog:
               - 'apps/blog/**'
+            docs:
               - 'apps/docs/**'
             admin:
               - 'apps/admin/**'
@@ -105,6 +107,8 @@ jobs:
         id: flags
         env:
           WEB: ${{ steps.filter.outputs.web }}
+          BLOG: ${{ steps.filter.outputs.blog }}
+          DOCS: ${{ steps.filter.outputs.docs }}
           ADMIN: ${{ steps.filter.outputs.admin }}
           CLI: ${{ steps.filter.outputs.cli }}
           EXTENSION: ${{ steps.filter.outputs.extension }}
@@ -115,6 +119,10 @@ jobs:
           bool() { if [ "$1" = "true" ] || [ "$2" = "true" ]; then echo true; else echo false; fi; }
 
           run_web=$(bool "$WEB" "$SHARED")
+          # blog + docs deploy independently; shared changes (packages/ui,
+          # lockfile, configs) rebuild all three Vercel apps.
+          run_blog=$(bool "$BLOG" "$SHARED")
+          run_docs=$(bool "$DOCS" "$SHARED")
           run_admin=$(bool "$ADMIN" "$SHARED")
           run_cli=$(bool "$CLI" "$SHARED")
           run_extension=$(bool "$EXTENSION" "$SHARED")
@@ -126,12 +134,14 @@ jobs:
           deploy_convex="$CONVEX"
 
           any=false
-          for f in "$run_web" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action"; do
+          for f in "$run_web" "$run_blog" "$run_docs" "$run_admin" "$run_cli" "$run_extension" "$run_convex" "$run_action"; do
             [ "$f" = "true" ] && any=true
           done
 
           {
             echo "run_web=$run_web"
+            echo "run_blog=$run_blog"
+            echo "run_docs=$run_docs"
             echo "run_admin=$run_admin"
             echo "run_cli=$run_cli"
             echo "run_extension=$run_extension"
@@ -428,6 +438,58 @@ jobs:
       needs.changes.outputs.deploy_convex == 'true'
     uses: ./.github/workflows/deploy-convex.yml
     secrets: inherit
+
+  # Vercel prod deploys — git auto-deploy for main is OFF in each app's
+  # vercel.json (PR previews still auto-deploy). Change detection gates
+  # prod: no app/shared change → no prod deploy. Backend FIRST for web
+  # (it calls the Convex contract); blog/docs are static and independent.
+  deploy-web:
+    name: Deploy web (Vercel)
+    needs: [changes, checks-passed, e2e, deploy-convex]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.changes.outputs.run_web == 'true'
+    uses: ./.github/workflows/deploy-vercel.yml
+    with:
+      app: web
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+
+  deploy-blog:
+    name: Deploy blog (Vercel)
+    needs: [changes, checks-passed, e2e]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.changes.outputs.run_blog == 'true'
+    uses: ./.github/workflows/deploy-vercel.yml
+    with:
+      app: blog
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BLOG }}
+
+  deploy-docs:
+    name: Deploy docs (Vercel)
+    needs: [changes, checks-passed, e2e]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.changes.outputs.run_docs == 'true'
+    uses: ./.github/workflows/deploy-vercel.yml
+    with:
+      app: docs
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
 
   deploy-cli:
     name: Deploy CLI

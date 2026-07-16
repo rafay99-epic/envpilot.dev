@@ -41,6 +41,8 @@ jobs:
           {
             echo "root=$(jq -r '.version' package.json)"
             echo "web=$(jq -r '.version' apps/web/package.json)"
+            echo "blog=$(jq -r '.version // "0.0.0"' apps/blog/package.json 2>/dev/null || echo '0.0.0')"
+            echo "docs=$(jq -r '.version // "0.0.0"' apps/docs/package.json 2>/dev/null || echo '0.0.0')"
             echo "cli=$(jq -r '.version' apps/cli/package.json)"
             echo "extension=$(jq -r '.version' apps/vscode-extension/package.json)"
             echo "admin=$(jq -r '.version' apps/admin/package.json)"
@@ -53,6 +55,8 @@ jobs:
           {
             echo "root=$(jq -r '.version' base/package.json)"
             echo "web=$(jq -r '.version' base/apps/web/package.json)"
+            echo "blog=$(jq -r '.version // "0.0.0"' base/apps/blog/package.json 2>/dev/null || echo '0.0.0')"
+            echo "docs=$(jq -r '.version // "0.0.0"' base/apps/docs/package.json 2>/dev/null || echo '0.0.0')"
             echo "cli=$(jq -r '.version' base/apps/cli/package.json)"
             echo "extension=$(jq -r '.version' base/apps/vscode-extension/package.json)"
             echo "admin=$(jq -r '.version // "0.0.0"' base/apps/admin/package.json 2>/dev/null || echo '0.0.0')"
@@ -81,6 +85,8 @@ jobs:
 
           root_bump=$(classify_bump "${{ steps.base.outputs.root }}" "${{ steps.current.outputs.root }}")
           web_bump=$(classify_bump "${{ steps.base.outputs.web }}" "${{ steps.current.outputs.web }}")
+          blog_bump=$(classify_bump "${{ steps.base.outputs.blog }}" "${{ steps.current.outputs.blog }}")
+          docs_bump=$(classify_bump "${{ steps.base.outputs.docs }}" "${{ steps.current.outputs.docs }}")
           cli_bump=$(classify_bump "${{ steps.base.outputs.cli }}" "${{ steps.current.outputs.cli }}")
           ext_bump=$(classify_bump "${{ steps.base.outputs.extension }}" "${{ steps.current.outputs.extension }}")
           admin_bump=$(classify_bump "${{ steps.base.outputs.admin }}" "${{ steps.current.outputs.admin }}")
@@ -100,6 +106,22 @@ jobs:
             summary="${summary}| **Web App** | \`${{ steps.base.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | :arrow_up: ${web_bump} |\n"
           else
             summary="${summary}| **Web App** | \`${{ steps.current.outputs.web }}\` | \`${{ steps.current.outputs.web }}\` | -- |\n"
+          fi
+
+          if [ "$blog_bump" != "none" ]; then
+            changed="${changed}blog,"
+            bump_types="${bump_types}${blog_bump},"
+            summary="${summary}| **Blog** | \`${{ steps.base.outputs.blog }}\` | \`${{ steps.current.outputs.blog }}\` | :arrow_up: ${blog_bump} |\n"
+          else
+            summary="${summary}| **Blog** | \`${{ steps.current.outputs.blog }}\` | \`${{ steps.current.outputs.blog }}\` | -- |\n"
+          fi
+
+          if [ "$docs_bump" != "none" ]; then
+            changed="${changed}docs,"
+            bump_types="${bump_types}${docs_bump},"
+            summary="${summary}| **Docs** | \`${{ steps.base.outputs.docs }}\` | \`${{ steps.current.outputs.docs }}\` | :arrow_up: ${docs_bump} |\n"
+          else
+            summary="${summary}| **Docs** | \`${{ steps.current.outputs.docs }}\` | \`${{ steps.current.outputs.docs }}\` | -- |\n"
           fi
 
           if [ "$cli_bump" != "none" ]; then

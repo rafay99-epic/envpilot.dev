@@ -23,6 +23,29 @@ export const metadata: Metadata = {
       "application/rss+xml": "/feed.xml",
     },
   },
+  keywords: [
+    "envpilot docs",
+    "CLI",
+    "VS Code extension",
+    "API reference",
+    "MCP server",
+    "secrets management",
+    "environment variables",
+    "environment variable management",
+    "devops",
+  ],
+  openGraph: {
+    siteName: "Envpilot Docs",
+    type: "website",
+    images: ["/og-image.jpg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Envpilot Docs",
+    description:
+      "Documentation for Envpilot — secure environment variable management for teams.",
+    images: ["/og-image.jpg"],
+  },
 };
 
 export default function RootLayout({
