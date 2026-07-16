@@ -278,7 +278,7 @@ export class AuthService {
     try {
       const client = this.buildConvexClient(accessToken);
       if (!client) return;
-      await client.mutation(anyApi.deviceSessions.record, {
+      await client.mutation(anyApi.features.users.deviceSessions.record, {
         deviceName: getDeviceName(),
         clientType: "extension",
         sessionId: session.sessionId,
@@ -301,7 +301,7 @@ export class AuthService {
       const token = await this.tokenManager.getFreshTokenForAccount(session);
       const client = this.buildConvexClient(token);
       if (!client) return;
-      await client.mutation(anyApi.deviceSessions.revoke, {
+      await client.mutation(anyApi.features.users.deviceSessions.revoke, {
         sessionId: session.sessionId,
       });
     } catch (err) {

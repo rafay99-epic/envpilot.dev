@@ -99,6 +99,61 @@ export async function forgetManagedFile(
 }
 
 /**
+ * Purge the manifest-listed files selected by `shouldPurge` whose on-disk
+ * content still matches the last-synced hash. Hand-edited files (hash
+ * mismatch) are ALWAYS spared — the sha256 guard is the non-negotiable
+ * data-loss protection (see deactivate() in extension.ts). Unlike
+ * purgeManagedFiles, the manifest survives: deleted files are forgotten,
+ * spared/unselected/failed entries are kept. Never throws; returns counts.
+ *
+ * Used by unsync-on-close (deactivate + crash sweep), where only files for
+ * opted-in projects under the closing window's workspace may be removed.
+ */
+export async function purgeManagedFilesFiltered(
+  shouldPurge: (filePath: string) => boolean,
+  manifestPath: string = getManifestPath()
+): Promise<{ deleted: number; spared: number; failed: number }> {
+  let deleted = 0;
+  let spared = 0;
+  let failed = 0;
+  const entries = await readManifest(manifestPath);
+  const kept: ManagedFileEntry[] = [];
+  for (const entry of entries) {
+    if (!shouldPurge(entry.path)) {
+      kept.push(entry);
+      continue;
+    }
+    let content: string;
+    try {
+      content = await fs.readFile(entry.path, "utf-8");
+    } catch {
+      // Already gone — drop the stale manifest entry.
+      continue;
+    }
+    if (hashContent(content) !== entry.sha256) {
+      spared++; // Hand-edited since last sync — never delete user data.
+      kept.push(entry);
+      continue;
+    }
+    try {
+      // Synced files are often chmod 0o444 by file protection.
+      await fs.chmod(entry.path, 0o644);
+      await fs.unlink(entry.path);
+      deleted++;
+    } catch {
+      failed++;
+      kept.push(entry); // Keep the entry so a later purge can retry.
+    }
+  }
+  try {
+    await writeManifest(manifestPath, kept);
+  } catch {
+    // Manifest bookkeeping must never break a purge.
+  }
+  return { deleted, spared, failed };
+}
+
+/**
  * Purge every manifest-listed file whose on-disk content still matches the
  * last-synced hash, then remove the manifest itself. Hand-edited files
  * (hash mismatch) are left in place. Never throws — this runs during the

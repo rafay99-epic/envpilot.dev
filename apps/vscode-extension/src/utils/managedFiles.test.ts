@@ -7,6 +7,7 @@ import {
   forgetManagedFile,
   readManifest,
   purgeManagedFiles,
+  purgeManagedFilesFiltered,
   hashContent,
 } from "./managedFiles";
 
@@ -174,6 +175,96 @@ describe("managedFiles", () => {
         path.join(tmpDir, "no-manifest.json")
       );
       expect(result).toEqual({ deleted: 0, spared: 0 });
+    });
+  });
+
+  describe("purgeManagedFilesFiltered", () => {
+    it("deletes only files selected by the filter, keeps the rest listed", async () => {
+      const inScope = path.join(tmpDir, "workspace", "a.env");
+      const outOfScope = path.join(tmpDir, "elsewhere", "b.env");
+      await fs.mkdir(path.dirname(inScope), { recursive: true });
+      await fs.mkdir(path.dirname(outOfScope), { recursive: true });
+      const content = "KEY=value";
+      await fs.writeFile(inScope, content);
+      await fs.writeFile(outOfScope, content);
+      await recordManagedFile(inScope, content, manifestPath);
+      await recordManagedFile(outOfScope, content, manifestPath);
+
+      const result = await purgeManagedFilesFiltered(
+        (p) => p.startsWith(path.join(tmpDir, "workspace") + path.sep),
+        manifestPath
+      );
+
+      expect(result).toEqual({ deleted: 1, spared: 0, failed: 0 });
+      await expect(fs.access(inScope)).rejects.toThrow();
+      await expect(fs.access(outOfScope)).resolves.toBeUndefined();
+
+      const entries = await readManifest(manifestPath);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].path).toBe(path.resolve(outOfScope));
+    });
+
+    it("spares hand-edited files and keeps their manifest entries", async () => {
+      const filePath = path.join(tmpDir, "edited.env");
+      const content = "KEY=original";
+      await fs.writeFile(filePath, content);
+      await recordManagedFile(filePath, content, manifestPath);
+      await fs.writeFile(filePath, "KEY=hand-edited");
+
+      const result = await purgeManagedFilesFiltered(() => true, manifestPath);
+
+      expect(result).toEqual({ deleted: 0, spared: 1, failed: 0 });
+      await expect(fs.access(filePath)).resolves.toBeUndefined();
+      const entries = await readManifest(manifestPath);
+      expect(entries).toHaveLength(1);
+    });
+
+    it("keeps the manifest file itself (unlike purgeManagedFiles)", async () => {
+      const filePath = path.join(tmpDir, "synced.env");
+      const content = "KEY=value";
+      await fs.writeFile(filePath, content);
+      await recordManagedFile(filePath, content, manifestPath);
+
+      await purgeManagedFilesFiltered(() => true, manifestPath);
+
+      await expect(fs.access(manifestPath)).resolves.toBeUndefined();
+      const entries = await readManifest(manifestPath);
+      expect(entries).toHaveLength(0);
+    });
+
+    it("drops stale entries for files already deleted from disk", async () => {
+      const filePath = path.join(tmpDir, "ghost.env");
+      const content = "KEY=value";
+      await fs.writeFile(filePath, content);
+      await recordManagedFile(filePath, content, manifestPath);
+      await fs.unlink(filePath);
+
+      const result = await purgeManagedFilesFiltered(() => true, manifestPath);
+
+      expect(result).toEqual({ deleted: 0, spared: 0, failed: 0 });
+      const entries = await readManifest(manifestPath);
+      expect(entries).toHaveLength(0);
+    });
+
+    it("purges read-only (0o444) files", async () => {
+      const filePath = path.join(tmpDir, "readonly.env");
+      const content = "KEY=secret";
+      await fs.writeFile(filePath, content);
+      await fs.chmod(filePath, 0o444);
+      await recordManagedFile(filePath, content, manifestPath);
+
+      const result = await purgeManagedFilesFiltered(() => true, manifestPath);
+
+      expect(result.deleted).toBe(1);
+      await expect(fs.access(filePath)).rejects.toThrow();
+    });
+
+    it("returns zeros for a missing manifest", async () => {
+      const result = await purgeManagedFilesFiltered(
+        () => true,
+        path.join(tmpDir, "no-manifest.json")
+      );
+      expect(result).toEqual({ deleted: 0, spared: 0, failed: 0 });
     });
   });
 });

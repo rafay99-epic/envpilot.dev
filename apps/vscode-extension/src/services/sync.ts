@@ -309,6 +309,10 @@ export class SyncService {
         }
       );
 
+      // Cache the server-resolved unsync-on-close flag so deactivate() can
+      // act on it offline.
+      await this.persistUnsyncFlag(project.projectId);
+
       const result: SyncResult = {
         success: true,
         variablesCount: variables.length,
@@ -927,6 +931,10 @@ export class SyncService {
         directory.directoryPath
       );
 
+      // Cache the server-resolved unsync-on-close flag so deactivate() can
+      // act on it offline.
+      await this.persistUnsyncFlag(project.projectId);
+
       return {
         success: true,
         variablesCount: totalVars,
@@ -1394,6 +1402,23 @@ export class SyncService {
     }
 
     return this.syncAllDirectories(linkedProject);
+  }
+
+  /**
+   * Persist the unsync-on-close flag the last getVariables() call resolved
+   * for this project (cacheAccessMeta populates it on the same request).
+   * Best-effort — never fails a sync.
+   */
+  private async persistUnsyncFlag(projectId: string): Promise<void> {
+    try {
+      const flag = this.api.getAccessMeta(projectId)?.autoUnsyncOnClose;
+      if (flag !== undefined) {
+        await this.storage.setProjectUnsyncFlag(projectId, flag);
+      }
+    } catch {
+      // Flag caching must never break a sync; deactivate() falls back to
+      // the secure default (true) when no cached value exists.
+    }
   }
 
   dispose(): void {
