@@ -15,10 +15,8 @@ export default authkitMiddleware({
       "/sign-up",
       "/callback",
       "/changelog",
-      "/blog",
-      "/blog/(.*)",
-      "/docs",
-      "/docs/(.*)",
+      // /blog and /docs moved to blog.envpilot.dev / docs.envpilot.dev —
+      // next.config redirects() 301s them before this middleware runs.
       "/faq",
       "/vs/(.*)",
       "/wishlist",
@@ -29,9 +27,6 @@ export default authkitMiddleware({
       "/pricing",
       "/sitemap.xml",
       "/robots.txt",
-      "/feed.xml",
-      "/llms.txt",
-      "/llms-full.txt",
       "/api/health",
       "/api/config",
       "/api/status",

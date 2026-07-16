@@ -1,6 +1,9 @@
 import { getAllDocs, getDocBySlug } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
 
+// Disk-based content only changes at deploy time — render at build, serve from CDN.
+export const dynamic = "force-static";
+
 /**
  * /llms-full.txt — complete documentation dump for LLM consumption.
  *

@@ -78,6 +78,10 @@ jobs:
           filters: |
             web:
               - 'apps/web/**'
+              # blog + docs ride the web flag: the consolidated `checks` job
+              # runs turbo repo-wide, so any of the three triggers it.
+              - 'apps/blog/**'
+              - 'apps/docs/**'
             admin:
               - 'apps/admin/**'
             cli:
