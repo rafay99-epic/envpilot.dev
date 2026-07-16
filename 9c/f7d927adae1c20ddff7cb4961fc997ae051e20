@@ -1,0 +1,23 @@
+apps/web/package.json
+  s_881ba47ef64cf7::t_fa6d92722da474 3
+apps/web/src/app/api/projects/[id]/route.ts
+  s_881ba47ef64cf7::t_7367c0a489d6aa 28,153-154,162
+apps/web/src/lib/versions.ts
+  s_881ba47ef64cf7::t_31579ad1d4f5c3 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9cf7d927adae1c20ddff7cb4961fc997ae051e20",
+  "prompts": {},
+  "sessions": {
+    "s_881ba47ef64cf7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3568beef9c53292d",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
