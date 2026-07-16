@@ -1,0 +1,88 @@
+apps/cli/src/commands/request.ts
+  s_36e5825e56d739::t_b27c7e9a89a420 5,228-230
+apps/web/src/app/api/shares/[token]/verify-email/route.ts
+  s_36e5825e56d739::t_eb3fb158c1b92b 8,72-75
+apps/web/src/app/api/shares/[token]/verify-otp/route.ts
+  s_36e5825e56d739::t_96cbbe717b971f 7,69,72-83
+apps/web/src/app/api/variable-requests/[id]/value/route.ts
+  s_36e5825e56d739::t_87538be49aef72 7,47-50
+apps/web/src/app/s/[token]/page.tsx
+  s_36e5825e56d739::t_6a7a7ae42b3830 47-51,151,185,597-599,655-657
+apps/web/src/hooks/useShareSecret.ts
+  s_36e5825e56d739::t_805881f304964d 57-59
+apps/web/src/lib/error-messages.ts
+  s_36e5825e56d739::t_aa176d580e1920 76-90
+convex/features/accounts/mutations.ts
+  s_36e5825e56d739::t_201f8c01ef3908 16,329-336
+convex/features/emails/emails.ts
+  s_36e5825e56d739::t_1871edd1af83cc 636-756
+convex/features/sharing/helpers.ts
+  s_36e5825e56d739::t_23c08bdf2e9e11 1-5,13,371-374,382,385-448
+convex/features/sharing/mutations.ts
+  s_36e5825e56d739::t_cdaa093be6a47c 1,70,74,84,88,92,96,104,108,122,132,146,358,362,366,370-391,403,408,415-417,421,456,550,570,575-577
+convex/features/variables/mutations.ts
+  s_36e5825e56d739::t_00a92a0174dd16 21,606-614,724-731
+convex/features/variables/requests/actions.ts
+  s_36e5825e56d739::t_ac65e45f77407b 1,78,88,100,104,111,161,203
+convex/features/variables/requests/mutations.ts
+  s_36e5825e56d739::t_b0ea5f710b0ede 3,8,29,37,42-44,75,87,95,129,163-179,205,209,214,232,261-268,294,392-399,408-438,449,453,467
+convex/features/variables/requests/queries.ts
+  s_36e5825e56d739::t_77a2b19a7f49b3 1-2,6,174,269-278,324-325,327-333,359-361,377-383,389-440
+  s_36e5825e56d739::t_08171d77174d5c 119-154
+convex/features/variables/share.ts
+  s_36e5825e56d739::t_00d257117f873b 1,53-55,123,132,169-171,189
+package.json
+  s_36e5825e56d739::t_ad50ec9df331d9 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/requests/page.tsx
+  s_36e5825e56d739::t_b27c32eaa4fd48 1-257
+apps/web/src/components/dashboard/dashboard-nav.tsx
+  s_ede1af66be0a1d::t_b83f26971e848a 16,31-35,41-42,79-88,97-98,118-128,217-222
+apps/web/src/hooks/index.ts
+  s_ede1af66be0a1d::t_bd4b07417f309f 135
+apps/web/src/hooks/useVariableRequests.ts
+  s_36e5825e56d739::t_d4864d1ac690b6 31-45
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_ede1af66be0a1d::t_b0682f35689833 480-534
+apps/web/package.json
+  s_9c29926be8ba5b::t_80fc77b113db08 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_9c29926be8ba5b::t_7a6f5f89f75c89 5,16-19,196-222,535-541,557,742-810,818-819,821-823,825-829,905,925,928-932,969-983
+apps/web/src/lib/versions.ts
+  s_9c29926be8ba5b::t_3798502b7b7544 17
+apps/web/tests/e2e/authenticated/project-variable-search.spec.ts
+  s_9c29926be8ba5b::t_e9fc7ec8ea1a97 1-101
+convex/features/variables/queries.ts
+  s_9c29926be8ba5b::t_51d1d615033252 625-725
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2f39a862b3d91a412ab90c49935b844f8e989b6d",
+  "prompts": {},
+  "sessions": {
+    "s_36e5825e56d739": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9c3e513b5ac95136",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_9c29926be8ba5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01825dfd3e783889",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_ede1af66be0a1d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a91807fec1ddcb630",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
