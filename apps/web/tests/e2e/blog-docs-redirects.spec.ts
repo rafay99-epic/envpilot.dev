@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+// Load root .env.local so the expected hosts match what the dev server sees.
+import "./env";
 
 // Unauthenticated e2e — /blog and /docs moved to standalone apps on
 // blog.envpilot.dev / docs.envpilot.dev. The web app must permanently
@@ -30,7 +32,11 @@ test.describe("blog/docs subdomain redirects", () => {
       const response = await request.get(source, { maxRedirects: 0 });
       // next.config redirects() with permanent: true issues a 308.
       expect([301, 308]).toContain(response.status());
-      expect(response.headers()["location"]).toBe(destination);
+      // Next URL-normalizes root destinations to a trailing slash.
+      const strip = (u: string) => u.replace(/\/(?=$|\?)/, "");
+      expect(strip(response.headers()["location"] ?? "")).toBe(
+        strip(destination)
+      );
     });
   }
 
