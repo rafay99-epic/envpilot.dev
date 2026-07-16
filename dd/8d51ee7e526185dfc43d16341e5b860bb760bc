@@ -1,0 +1,19 @@
+.circleci/config.yml
+  s_47513e23e74e62::t_1b11598b8d3dca 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "dd8d51ee7e526185dfc43d16341e5b860bb760bc",
+  "prompts": {},
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
