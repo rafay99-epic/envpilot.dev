@@ -293,8 +293,6 @@ jobs:
       - halt-unless-changed:
           paths: apps/cli/ package.json bun.lock turbo.json packages/ .circleci/
           surface: cli
-      - require-env:
-          names: NPM_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
       - setup-bun
       - run:
           name: Compare local version against npm
@@ -328,6 +326,10 @@ jobs:
               circleci-agent step halt
               exit 0
             fi
+      # Secrets are only demanded once there is actually something to
+      # publish — an unchanged version halts above without needing any.
+      - require-env:
+          names: NPM_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
       - run:
           name: Build CLI (direct, NOT via turbo)
           # Turbo did not propagate these env vars into tsup in CI — every
@@ -379,8 +381,6 @@ jobs:
       - halt-unless-changed:
           paths: apps/vscode-extension/ package.json bun.lock turbo.json packages/ .circleci/
           surface: extension
-      - require-env:
-          names: OPEN_VSX_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
       - setup-bun
       - run:
           name: Compare local version against Open VSX
@@ -411,6 +411,10 @@ jobs:
               circleci-agent step halt
               exit 0
             fi
+      # Secrets are only demanded once there is actually something to
+      # publish — an unchanged version halts above without needing any.
+      - require-env:
+          names: OPEN_VSX_TOKEN WORKOS_CLIENT_ID NEXT_PUBLIC_CONVEX_URL GITHUB_TOKEN
       - run:
           name: Package VSIX
           # Env MUST be on THIS step: vsce's "vscode:prepublish" re-builds
