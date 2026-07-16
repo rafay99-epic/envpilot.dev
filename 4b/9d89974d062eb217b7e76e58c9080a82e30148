@@ -1,0 +1,23 @@
+apps/web/package.json
+  s_47513e23e74e62::t_23eb6cb7ae4811 3
+apps/web/src/lib/versions.ts
+  s_47513e23e74e62::t_7760935aabf648 17
+package.json
+  s_47513e23e74e62::t_dd1647b2193a61 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4b9d89974d062eb217b7e76e58c9080a82e30148",
+  "prompts": {},
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
