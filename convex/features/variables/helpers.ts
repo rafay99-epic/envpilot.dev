@@ -209,3 +209,51 @@ export function mapVariableRow(
     canManagePermissions,
   };
 }
+
+/**
+ * Per-environment key uniqueness: the same key MAY exist on multiple active
+ * variables in a project as long as their `environments` arrays are disjoint
+ * (e.g. DATABASE_URL for [development] and DATABASE_URL for [production] are
+ * two variables with independent values). This helper returns the list of
+ * environments that would clash for a proposed (key, environments) pair —
+ * empty result means the create/update is allowed. The invariant this
+ * preserves: every (key, environment) pair resolves to AT MOST ONE active
+ * variable, which keeps CLI pull/push, extension sync, and the public API
+ * deterministic without any client changes.
+ */
+export async function findEnvironmentConflicts(
+  ctx: QueryCtx,
+  args: {
+    projectId: Id<"projects">;
+    key: string;
+    environments: string[];
+    excludeVariableId?: Id<"environmentVariables">;
+  }
+): Promise<string[]> {
+  const sameKey = await ctx.db
+    .query("environmentVariables")
+    .withIndex("by_project_and_key", (q) =>
+      q.eq("projectId", args.projectId).eq("key", args.key)
+    )
+    .collect();
+
+  const clashes = new Set<string>();
+  for (const existing of sameKey) {
+    if (existing.deletedAt) continue;
+    if (args.excludeVariableId && existing._id === args.excludeVariableId) {
+      continue;
+    }
+    for (const env of existing.environments) {
+      if (args.environments.includes(env)) clashes.add(env);
+    }
+  }
+  return [...clashes];
+}
+
+/** Standard user-facing message for a per-environment key clash. */
+export function environmentConflictMessage(
+  key: string,
+  clashes: string[]
+): string {
+  return `Variable "${key}" already exists in environment(s): ${clashes.join(", ")}. The same key is allowed only across non-overlapping environments.`;
+}

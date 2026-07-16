@@ -327,15 +327,22 @@ export const createWithValue = action({
       );
     }
 
-    // Reject duplicates BEFORE writing the value to the vault — the create
-    // mutation re-checks (race-safe backstop), but failing only there left
-    // an orphaned vault secret behind for every duplicate key.
-    const duplicate = await ctx.runQuery(
-      internal.features.variables.queries.getActiveByKeyInternal,
-      { projectId: args.projectId, key: args.key }
+    // Reject environment clashes BEFORE writing the value to the vault — the
+    // create mutation re-checks (race-safe backstop), but failing only there
+    // left an orphaned vault secret behind for every clash. Same key across
+    // DISJOINT environments is legal (per-environment uniqueness).
+    const envClashes: string[] = await ctx.runQuery(
+      internal.features.variables.queries.getEnvironmentConflictsInternal,
+      {
+        projectId: args.projectId,
+        key: args.key,
+        environments: args.environments,
+      }
     );
-    if (duplicate) {
-      throw new ConvexError("Variable key already exists in this project");
+    if (envClashes.length > 0) {
+      throw new ConvexError(
+        `Variable "${args.key}" already exists in environment(s): ${envClashes.join(", ")}. The same key is allowed only across non-overlapping environments.`
+      );
     }
 
     const vault = await ctx.runAction(

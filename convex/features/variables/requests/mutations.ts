@@ -1,5 +1,9 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, MutationCtx } from "../../../_generated/server";
+import {
+  findEnvironmentConflicts,
+  environmentConflictMessage,
+} from "../helpers";
 import { Id } from "../../../_generated/dataModel";
 import { createAuditLog } from "../../../lib/audit";
 import { requireAuthedUser } from "../../../lib/identity";
@@ -90,15 +94,15 @@ async function createCore(
     );
   }
 
-  const existingVariable = await ctx.db
-    .query("environmentVariables")
-    .withIndex("by_project_and_key", (q) =>
-      q.eq("projectId", args.projectId).eq("key", args.key)
-    )
-    .first();
-
-  if (existingVariable && !existingVariable.deletedAt) {
-    throw new Error("Variable key already exists in this project");
+  // Per-environment uniqueness (same rule as direct creation): the key may
+  // exist for other environments, but not for any of the requested ones.
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: args.projectId,
+    key: args.key,
+    environments: args.environments,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(environmentConflictMessage(args.key, envClashes));
   }
 
   const pendingForKey = await ctx.db
@@ -110,7 +114,10 @@ async function createCore(
 
   const hasPendingDuplicate = pendingForKey.some(
     (request) =>
-      request.requestedBy === args.requestedBy && request.status === "pending"
+      request.requestedBy === args.requestedBy &&
+      request.status === "pending" &&
+      // A pending request for DISJOINT environments is a different variable.
+      request.environments.some((env) => args.environments.includes(env))
   );
 
   if (hasPendingDuplicate) {
@@ -259,15 +266,17 @@ export const review = mutation({
       throw new Error(varCheck.reason!);
     }
 
-    const existingVariable = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", request.projectId).eq("key", request.key)
-      )
-      .first();
-
-    if (existingVariable && !existingVariable.deletedAt) {
-      throw new Error("Variable key already exists in this project");
+    // Per-environment uniqueness against the environments actually approved
+    // (a reviewer can approve a subset of the requested environments).
+    const envClashes = await findEnvironmentConflicts(ctx, {
+      projectId: request.projectId,
+      key: request.key,
+      environments: approvedEnvironments,
+    });
+    if (envClashes.length > 0) {
+      throw new ConvexError(
+        environmentConflictMessage(request.key, envClashes)
+      );
     }
 
     const variableId = await ctx.db.insert("environmentVariables", {

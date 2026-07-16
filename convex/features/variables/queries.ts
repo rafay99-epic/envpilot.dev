@@ -18,6 +18,7 @@ import {
   buildActiveGrantMap,
   mapVariableRow,
   resolveProjectAccessContext,
+  findEnvironmentConflicts,
 } from "./helpers";
 
 /**
@@ -1104,21 +1105,24 @@ export const getDeleted = query({
 });
 
 /**
- * Internal: does an ACTIVE (non-deleted) variable with this key already
- * exist in the project? Used by actions (createWithValue) to reject
- * duplicates BEFORE writing the secret value to the vault — checking only
- * inside the create mutation leaked an orphaned vault secret per duplicate.
+ * Internal: which of the proposed environments already carry an ACTIVE
+ * variable with this key? Used by actions (createWithValue) to reject
+ * clashes BEFORE writing the secret value to the vault — checking only
+ * inside the create mutation leaked an orphaned vault secret per clash.
+ * Empty array = the create is allowed (same key across disjoint
+ * environments is legal).
  */
-export const getActiveByKeyInternal = internalQuery({
-  args: { projectId: v.id("projects"), key: v.string() },
-  returns: v.union(v.id("environmentVariables"), v.null()),
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("environmentVariables")
-      .withIndex("by_project_and_key", (q) =>
-        q.eq("projectId", args.projectId).eq("key", args.key)
-      )
-      .first();
-    return existing && !existing.deletedAt ? existing._id : null;
+export const getEnvironmentConflictsInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    key: v.string(),
+    environments: v.array(v.string()),
   },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) =>
+    findEnvironmentConflicts(ctx, {
+      projectId: args.projectId,
+      key: args.key,
+      environments: args.environments,
+    }),
 });

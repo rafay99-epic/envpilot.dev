@@ -18,7 +18,11 @@ import {
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { assertOrgAction, normalizeOrgRole } from "../../lib/authz";
-import { assertWithinEnvironmentScope } from "./helpers";
+import {
+  assertWithinEnvironmentScope,
+  findEnvironmentConflicts,
+  environmentConflictMessage,
+} from "./helpers";
 
 /**
  * Environment Variable Mutations
@@ -151,18 +155,17 @@ async function createCore(
     }
   }
 
-  const existingVariable = await ctx.db
-    .query("environmentVariables")
-    .withIndex("by_project_and_key", (q) =>
-      q.eq("projectId", args.projectId).eq("key", args.key)
-    )
-    .first();
-
-  if (existingVariable && !existingVariable.deletedAt) {
-    // ConvexError: plain Error messages are redacted to "Server Error" on
-    // production deployments, which broke the client's duplicate-key
-    // handling (bulk import showed "Server Error" per row).
-    throw new ConvexError("Variable key already exists in this project");
+  // Per-environment uniqueness: same key allowed across DISJOINT environment
+  // sets (dev/staging/prod copies of the same key are separate variables).
+  // ConvexError: plain Error messages are redacted to "Server Error" on
+  // production deployments, which broke the client's duplicate-key handling.
+  const envClashes = await findEnvironmentConflicts(ctx, {
+    projectId: args.projectId,
+    key: args.key,
+    environments: args.environments,
+  });
+  if (envClashes.length > 0) {
+    throw new ConvexError(environmentConflictMessage(args.key, envClashes));
   }
 
   // Build rotation fields if rotation is enabled
@@ -327,6 +330,20 @@ async function updateCore(
       assertWithinEnvironmentScope(
         editorAssignment?.environments,
         updates.environments
+      );
+    }
+
+    // Re-validate per-environment key uniqueness: expanding this variable's
+    // environments must not collide with a sibling variable of the same key.
+    const envClashes = await findEnvironmentConflicts(ctx, {
+      projectId: variable.projectId,
+      key: variable.key,
+      environments: updates.environments,
+      excludeVariableId: variable._id,
+    });
+    if (envClashes.length > 0) {
+      throw new ConvexError(
+        environmentConflictMessage(variable.key, envClashes)
       );
     }
   }
