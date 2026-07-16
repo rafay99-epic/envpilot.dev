@@ -16,7 +16,7 @@
 export const APP_VERSIONS = {
   web: "1.46.0",
   cli: "1.17.0",
-  extension: "1.13.0",
+  extension: "1.14.0",
   // First CLI build on the Stage 3 vault path: ≤1.13.x fetch secret values
   // via GET/POST /api/cli/variables{,/bulk}, REST routes DELETED when vault
   // crypto moved into Convex (PR #86). On those builds auth/identity commands
