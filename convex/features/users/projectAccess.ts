@@ -507,6 +507,16 @@ export const reportUnsync = mutation({
       const project = await ctx.db.get(report.projectId);
       if (!project) continue;
 
+      // Only org members may write audit rows into an org — a stale link on
+      // a device whose membership ended is skipped, not an error.
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("organizationId", project.organizationId).eq("userId", actor._id)
+        )
+        .first();
+      if (!membership) continue;
+
       await ctx.db.insert("auditLogs", {
         organizationId: project.organizationId,
         projectId: report.projectId,
