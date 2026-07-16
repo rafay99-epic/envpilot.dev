@@ -1,0 +1,27 @@
+apps/web/package.json
+  s_9c29926be8ba5b::t_80fc77b113db08 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_9c29926be8ba5b::t_7a6f5f89f75c89 5,16-19,196-222,535-541,557,742-810,818-819,821-823,825-829,905,925,928-932,969-983
+apps/web/src/lib/versions.ts
+  s_9c29926be8ba5b::t_3798502b7b7544 17
+apps/web/tests/e2e/authenticated/project-variable-search.spec.ts
+  s_9c29926be8ba5b::t_e9fc7ec8ea1a97 1-101
+convex/features/variables/queries.ts
+  s_9c29926be8ba5b::t_51d1d615033252 625-725
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "cc86d796cbf0f960b5eb3c9cbaff572ce757f395",
+  "prompts": {},
+  "sessions": {
+    "s_9c29926be8ba5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01825dfd3e783889",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
