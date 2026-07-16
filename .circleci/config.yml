@@ -1,0 +1,99 @@
+version: 2.1
+
+# ── Temporary CI home (2026-07-16) ─────────────────────────────────────
+# Branch/PR checks moved here from GitHub Actions to use CircleCI's free
+# 6000 min/mo. Division of labor:
+#   - CircleCI: every branch EXCEPT main → this consolidated checks job
+#     (mirror of ci.yml's `checks`: prettier, turbo build/lint/typecheck/
+#     test, convex typecheck).
+#   - GitHub Actions (ci.yml): main pushes only — same checks + the
+#     deploy pipeline (convex/cli/extension/action), which stays there.
+#   - E2E: DISABLED everywhere (Convex quota) — run the Playwright suite
+#     locally before merging (cd apps/web && bunx playwright test).
+# Moving back: restore `pull_request:` in ci.yml's `on:` block and delete
+# this file.
+
+jobs:
+  checks:
+    docker:
+      - image: cimg/node:22.17
+    resource_class: medium
+    environment:
+      # Literal stubs (not secrets) so branch builds compile without
+      # credentials — kept in sync with the env block in ci.yml.
+      CI: "true"
+      NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      WORKOS_CLIENT_ID: ci-workos-client-id
+      WORKOS_API_KEY: ci-workos-api-key
+      WORKOS_COOKIE_PASSWORD: "01234567890123456789012345678901"
+      WORKOS_REDIRECT_URI: http://localhost:3000/callback
+      POLAR_ACCESS_TOKEN: pat_placeholder
+      POLAR_WEBHOOK_SECRET: whsec_placeholder
+      POLAR_SERVER: sandbox
+      RESEND_API_KEY: re_placeholder
+      ENVPILOT_SERVER_URL: https://www.envpilot.dev
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - checkout
+
+      - run:
+          name: Install Bun (version pinned via packageManager)
+          command: |
+            BUN_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1]")
+            curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+            echo 'export BUN_INSTALL="$HOME/.bun"' >> "$BASH_ENV"
+            echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> "$BASH_ENV"
+
+      - restore_cache:
+          name: Restore Bun dependency cache
+          keys:
+            - bun-cache-v1-{{ checksum "bun.lock" }}
+            - bun-cache-v1-
+
+      - run:
+          name: Install dependencies
+          command: bun install --frozen-lockfile
+
+      - save_cache:
+          name: Save Bun dependency cache
+          key: bun-cache-v1-{{ checksum "bun.lock" }}
+          paths:
+            - ~/.bun/install/cache
+
+      - restore_cache:
+          name: Restore Turborepo cache
+          keys:
+            - turbo-v1-{{ .Branch }}-
+            - turbo-v1-main-
+            - turbo-v1-
+
+      - run:
+          name: Prettier check
+          command: bunx prettier --check .
+
+      - run:
+          name: Build, lint, typecheck, test (turbo)
+          command: bunx turbo build lint typecheck test --cache-dir=.turbo
+
+      - run:
+          name: Typecheck Convex functions
+          # convex/tsconfig.ci.json adds Node type roots so process.env
+          # resolves without a Convex deployment.
+          command: bunx tsc --noEmit -p convex/tsconfig.ci.json
+
+      - save_cache:
+          name: Save Turborepo cache
+          key: turbo-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - .turbo
+
+workflows:
+  ci:
+    jobs:
+      - checks:
+          filters:
+            branches:
+              # main stays on GitHub Actions (checks + deploy pipeline) —
+              # running it here too would double-spend minutes.
+              ignore: main

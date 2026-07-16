@@ -13,10 +13,14 @@ name: CI
 # (CLI tarball, VSIX) are available in the run's Artifacts panel; nothing is
 # commented on PRs.
 
+# TEMP CI MIGRATION (2026-07-16): `pull_request` trigger removed — branch/PR
+# checks run on CircleCI (.circleci/config.yml, free 6000 min/mo). This
+# workflow now covers main pushes only: the same consolidated checks (deploy
+# gating) plus the deploy pipeline. Moving back: re-add `pull_request:` here
+# and delete .circleci/config.yml.
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
