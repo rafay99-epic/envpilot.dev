@@ -47,7 +47,7 @@ Revoked-key reuse is treated as the highest-signal event in this set — it's th
 
 ## Rate limiting
 
-Rate limits are enforced per key with a token-bucket limiter — 120/min for metadata reads, 30/min for value pulls (see [API Reference](/docs/api-reference) for the full table). Requests using a key hash that doesn't match anything on file are rate-limited separately, per hash, to slow down brute-force key guessing.
+Rate limits are enforced per key with a token-bucket limiter — 120/min for metadata reads, 30/min for value pulls (see [API Reference](/api-reference) for the full table). Requests using a key hash that doesn't match anything on file are rate-limited separately, per hash, to slow down brute-force key guessing.
 
 ## Why there's no CORS
 
@@ -55,7 +55,7 @@ The API and MCP endpoint deliberately do not send CORS headers, so browsers refu
 
 ## CI runners are ephemeral
 
-GitHub-hosted (and most self-hosted) runners are torn down after each job. A pulled variable only exists in that job's process environment for the duration of the run — it isn't persisted anywhere by Envpilot's side, and the [GitHub Action](/docs/github-action) additionally masks every value in the job log before it's exported.
+GitHub-hosted (and most self-hosted) runners are torn down after each job. A pulled variable only exists in that job's process environment for the duration of the run — it isn't persisted anywhere by Envpilot's side, and the [GitHub Action](/github-action) additionally masks every value in the job log before it's exported.
 
 ## Tier downgrades
 

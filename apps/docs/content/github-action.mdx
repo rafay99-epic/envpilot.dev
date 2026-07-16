@@ -74,4 +74,4 @@ Every pulled value is registered with GitHub Actions' log masking (`core.setSecr
 - **Rate limited.** Pulls are rate-limited per token; a workflow that hammers this action in a tight loop will start getting `429` responses.
 - **Ephemeral by design.** GitHub-hosted runners are destroyed after the job finishes, so pulled values never persist beyond the job's lifetime unless you explicitly write them to an artifact.
 
-See [API Security](/docs/api-security) for the full key model shared across the GitHub Action, REST API, and MCP server.
+See [API Security](/api-security) for the full key model shared across the GitHub Action, REST API, and MCP server.

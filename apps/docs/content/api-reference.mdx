@@ -6,7 +6,7 @@ icon: book
 
 # API Reference
 
-Base URL: `https://www.envpilot.dev/api/v1`. All endpoints require the `Authorization: Bearer <api key>` header and are read-only. Requires the **Pro** plan (`public_api` feature). See [API Quickstart](/docs/api-quickstart) to create a key and [API Security](/docs/api-security) for the auth and audit model.
+Base URL: `https://www.envpilot.dev/api/v1`. All endpoints require the `Authorization: Bearer <api key>` header and are read-only. Requires the **Pro** plan (`public_api` feature). See [API Quickstart](/api-quickstart) to create a key and [API Security](/api-security) for the auth and audit model.
 
 Every response is JSON unless `format=env` is passed. Every error response is `{ "error": string, "code": string }` plus an `x-request-id` header for support.
 
@@ -128,7 +128,7 @@ curl "https://www.envpilot.dev/api/v1/projects/backend/accounts?environment=prod
 
 ### `GET /api/v1/secrets`
 
-Unchanged legacy endpoint used by the [GitHub Action](/docs/github-action) — pulls variables for a single project + environment service token. Kept for backward compatibility; new integrations should use `GET /v1/projects/{slug}/variables` instead.
+Unchanged legacy endpoint used by the [GitHub Action](/github-action) — pulls variables for a single project + environment service token. Kept for backward compatibility; new integrations should use `GET /v1/projects/{slug}/variables` instead.
 
 ## Errors
 
@@ -156,4 +156,4 @@ A `429` response includes a `Retry-After` header with the number of seconds to w
 
 ## CORS
 
-The API does not send CORS headers and is not intended to be called from a browser — API keys must never be embedded in client-side code. See [API Security](/docs/api-security).
+The API does not send CORS headers and is not intended to be called from a browser — API keys must never be embedded in client-side code. See [API Security](/api-security).

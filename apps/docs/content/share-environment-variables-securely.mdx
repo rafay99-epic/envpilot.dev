@@ -44,7 +44,7 @@ Whatever tool you use, secure team secret sharing has five properties:
 
 ## The workflow with Envpilot
 
-[Envpilot](/) stores secrets AES-256-encrypted in an isolated vault, with [role-based access control](/docs/rbac) down to the individual variable. The day-to-day workflow looks like this:
+[Envpilot](/) stores secrets AES-256-encrypted in an isolated vault, with [role-based access control](/rbac) down to the individual variable. The day-to-day workflow looks like this:
 
 ```bash
 # One-time setup
@@ -58,7 +58,7 @@ envpilot run -- npm run dev
 
 When a teammate joins, you add them to the project in the dashboard and they run the same three commands. When someone leaves, you remove them — every secret stays where it is, and their access is gone. When a key rotates, everyone gets the new value on their next run automatically.
 
-For the full setup walkthrough, see [Getting Started](/docs/getting-started).
+For the full setup walkthrough, see [Getting Started](/getting-started).
 
 ## Checklist: migrating off shared .env files
 

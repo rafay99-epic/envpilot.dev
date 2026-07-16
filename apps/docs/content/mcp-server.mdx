@@ -8,7 +8,7 @@ icon: plug
 
 MCP (Model Context Protocol) is an open standard that lets AI assistants like Claude call tools against your real data instead of guessing. Envpilot runs a remote MCP server so an assistant can look up your projects and pull variable values on your behalf, using the exact same auth, scoping, and audit trail as the REST API — nothing is duplicated or re-implemented.
 
-Requires the **Pro** plan (`mcp_server` feature) and an [API key](/docs/api-quickstart).
+Requires the **Pro** plan (`mcp_server` feature) and an [API key](/api-quickstart).
 
 ## Endpoint
 
@@ -72,4 +72,4 @@ Add a remote server entry to `.cursor/mcp.json`:
 
 MCP tool calls draw from the **same rate-limit buckets** as the REST API for that key — `envpilot_get_variables` and `envpilot_list_accounts` count against the 30/min value-pull bucket, everything else against the 120/min metadata bucket. A key's project/environment/resource scope applies identically: a tool call for a project outside the key's scope behaves as if it doesn't exist.
 
-See [API Reference](/docs/api-reference) for the underlying limits and error semantics, and [API Security](/docs/api-security) for the auth and audit model shared across the REST API, MCP server, and GitHub Action.
+See [API Reference](/api-reference) for the underlying limits and error semantics, and [API Security](/api-security) for the auth and audit model shared across the REST API, MCP server, and GitHub Action.
