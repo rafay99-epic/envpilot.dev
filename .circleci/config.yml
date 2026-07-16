@@ -17,7 +17,9 @@ jobs:
   checks:
     docker:
       - image: cimg/node:22.17
-    resource_class: medium
+    # large (4 vCPU / 8 GB): the turbo step runs three `next build`s plus
+    # vite/tsup/tsc — medium's 4 GB OOMs. Concurrency is capped below too.
+    resource_class: large
     environment:
       # Literal stubs (not secrets) so branch builds compile without
       # credentials — kept in sync with the env block in ci.yml.
@@ -74,7 +76,9 @@ jobs:
 
       - run:
           name: Build, lint, typecheck, test (turbo)
-          command: bunx turbo build lint typecheck test --cache-dir=.turbo
+          # Concurrency capped: uncapped turbo co-runs every Next/vite build
+          # and OOMs the container. 3 keeps peak memory under the 8 GB class.
+          command: bunx turbo build lint typecheck test --cache-dir=.turbo --concurrency=3
 
       - run:
           name: Typecheck Convex functions
