@@ -12,7 +12,6 @@ version: 2.1
 #                     ├─ deploy-extension
 #                     └─ deploy-action
 #                     └─ release (aggregate tag + GitHub Release)
-#   version-tracker (non-main branches, PR comment)
 #
 # Skip semantics: a deploy job whose paths didn't change halts (then
 # `exit 0`s — halt is asynchronous) — that counts as SUCCESS, so downstream
@@ -37,8 +36,7 @@ version: 2.1
 #                              rafay99-epic/envpilot-action (deploy-action)
 #   HOMEBREW_TAP_PAT         — PAT, Contents RW on rafay99-epic/homebrew-apps
 #   GITHUB_TOKEN             — fine-grained PAT on THIS repo: Contents RW
-#                              (tags, releases) + Pull requests RW
-#                              (version-tracker comments)
+#                              (tags, releases)
 # ═══════════════════════════════════════════════════════════════════════
 
 commands:
@@ -175,86 +173,6 @@ jobs:
           key: turbo-v1-{{ .Branch }}-{{ .Revision }}
           paths:
             - .turbo
-
-  # ────────────────────────────────────────────────────────────────────
-  # Version tracker — PR comment with version-bump table (non-main).
-  # No bun needed; halts fast when no manifest changed. Ports
-  # version-tracker.yml (GHA original kept dormant).
-  # ────────────────────────────────────────────────────────────────────
-  version-tracker:
-    docker:
-      - image: cimg/node:22.17
-    resource_class: small
-    steps:
-      - checkout
-      - run:
-          name: Compare versions vs main and upsert PR comment
-          command: |
-            # Only meaningful when this branch has an open PR CircleCI knows of.
-            if [ -z "${CIRCLE_PULL_REQUEST:-}" ]; then
-              echo "No associated PR — skipping."
-              circleci-agent step halt
-              exit 0
-            fi
-            git fetch origin main --quiet
-            if git diff --quiet origin/main...HEAD -- package.json 'apps/*/package.json' 'packages/*/package.json' apps/web/src/lib/versions.ts; then
-              echo "No version manifests changed — skipping."
-              circleci-agent step halt
-              exit 0
-            fi
-            if [ -z "${GITHUB_TOKEN:-}" ]; then
-              # Advisory job: warn-and-skip (deploy jobs fail loudly instead).
-              echo "WARNING: GITHUB_TOKEN project env var not set — cannot post the version comment."
-              circleci-agent step halt
-              exit 0
-            fi
-
-            PR_NUMBER="${CIRCLE_PULL_REQUEST##*/}"
-            ver() { jq -r '.version // "0.0.0"' "$1" 2>/dev/null || echo "0.0.0"; }
-            base_ver() { git show "origin/main:$1" 2>/dev/null | jq -r '.version // "0.0.0"' || echo "0.0.0"; }
-
-            ROWS=""
-            CHANGED=""
-            for entry in "Monorepo:package.json" "Web App:apps/web/package.json" \
-                         "Blog:apps/blog/package.json" "Docs:apps/docs/package.json" \
-                         "CLI:apps/cli/package.json" "VS Code Extension:apps/vscode-extension/package.json" \
-                         "Admin Dashboard:apps/admin/package.json" "GitHub Action:packages/github-action/package.json"; do
-              LABEL="${entry%%:*}"; FILE="${entry#*:}"
-              CUR=$(ver "$FILE"); BASE=$(base_ver "$FILE")
-              if [ "$CUR" != "$BASE" ]; then
-                ROWS="$ROWS| **$LABEL** | \`$BASE\` | \`$CUR\` | :arrow_up: |\n"
-                CHANGED="$CHANGED$LABEL, "
-              else
-                ROWS="$ROWS| **$LABEL** | \`$CUR\` | \`$CUR\` | -- |\n"
-              fi
-            done
-            if [ -n "$CHANGED" ]; then STATUS="Version bumped: **${CHANGED%, }**"; else STATUS="No version bumps detected in this PR."; fi
-
-            BODY=$(printf '## Version Tracker\n\n| Package | Base | PR | Status |\n|---------|------|-----|--------|\n%b\n%s' "$ROWS" "$STATUS")
-            API="https://api.github.com/repos/rafay99-epic/envpilot.dev"
-            AUTH="Authorization: Bearer ${GITHUB_TOKEN}"
-
-            # Upsert: find our previous comment by its heading. This job is
-            # ADVISORY — any GitHub API refusal (e.g. the PAT missing
-            # Pull-requests RW) warns and skips instead of failing the
-            # pipeline, but prints the status so it's diagnosable.
-            EXISTING=$(curl -s -H "$AUTH" "$API/issues/$PR_NUMBER/comments?per_page=100" \
-              | jq -r '[.[] | select(.body // "" | startswith("## Version Tracker"))][0].id // empty' 2>/dev/null || true)
-            PAYLOAD=$(jq -cn --arg body "$BODY" '{body: $body}')
-            if [ -n "$EXISTING" ]; then
-              CODE=$(curl -s -o /tmp/gh-resp -w '%{http_code}' -X PATCH -H "$AUTH" -d "$PAYLOAD" "$API/issues/comments/$EXISTING")
-            else
-              CODE=$(curl -s -o /tmp/gh-resp -w '%{http_code}' -X POST -H "$AUTH" -d "$PAYLOAD" "$API/issues/$PR_NUMBER/comments")
-            fi
-            case "$CODE" in
-              2*) echo "Version Tracker comment upserted (HTTP $CODE)." ;;
-              *)
-                echo "WARNING: GitHub comment API returned HTTP $CODE — check that the GITHUB_TOKEN PAT has 'Pull requests: Read and write'."
-                head -c 300 /tmp/gh-resp; echo
-                circleci-agent step halt
-                exit 0
-                ;;
-            esac
 
   # ────────────────────────────────────────────────────────────────────
   # Deploys — main only. Backend FIRST, then clients, then release.
@@ -660,10 +578,6 @@ workflows:
   build-and-deploy:
     jobs:
       - checks
-      - version-tracker:
-          filters:
-            branches:
-              ignore: main
       - deploy-convex:
           requires: [checks]
           filters:
