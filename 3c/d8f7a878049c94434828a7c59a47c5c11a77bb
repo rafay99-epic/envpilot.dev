@@ -1,0 +1,36 @@
+.gitignore
+  s_47513e23e74e62::t_895f71828749f0 64
+apps/web/package.json
+  s_47513e23e74e62::t_e9bd439e9fe788 3
+apps/web/src/lib/error-messages.ts
+  s_47513e23e74e62::t_98163379dda436 13-23,44
+apps/web/src/lib/versions.ts
+  s_47513e23e74e62::t_a798548b922126 17
+convex/features/variables/mutations.ts
+  s_47513e23e74e62::t_9605306a8b41e7 1,162-165
+convex/features/variables/queries.ts
+  s_47513e23e74e62::t_925dec1e2404e0 3,1105-1124
+convex/features/variables/values.ts
+  s_47513e23e74e62::t_6e2a9a05122b1b 1,330-340,351-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3cd8f7a878049c94434828a7c59a47c5c11a77bb",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
