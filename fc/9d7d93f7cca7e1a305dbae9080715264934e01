@@ -1,0 +1,31 @@
+convex/README.md
+  s_c0d41f513c83f7::t_bb27cc3e9defd2 13,53,56,58,60-73,75
+convex/_generated/api.d.ts
+  s_c0d41f513c83f7::t_97096fd071c9bb 111-112,227-228
+convex/featureRegistry.ts
+  s_c0d41f513c83f7::t_1df80908e166d2 16-18
+convex/permissionRevocationEvents.ts
+  s_c0d41f513c83f7::t_33c34981f927e1 1-16
+convex/projectAccess.ts
+  s_c0d41f513c83f7::t_693d437b245509 1-17
+convex/projects.ts
+  s_c0d41f513c83f7::t_b55078ecf4a1fe 16-18
+convex/variables.ts
+  s_c0d41f513c83f7::t_7f14393e8622f2 15-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "fc9d7d93f7cca7e1a305dbae9080715264934e01",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
