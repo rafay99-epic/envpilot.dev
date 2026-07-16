@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -327,6 +327,24 @@ export const createWithValue = action({
       );
     }
 
+    // Reject environment clashes BEFORE writing the value to the vault — the
+    // create mutation re-checks (race-safe backstop), but failing only there
+    // left an orphaned vault secret behind for every clash. Same key across
+    // DISJOINT environments is legal (per-environment uniqueness).
+    const envClashes: string[] = await ctx.runQuery(
+      internal.features.variables.queries.getEnvironmentConflictsInternal,
+      {
+        projectId: args.projectId,
+        key: args.key,
+        environments: args.environments,
+      }
+    );
+    if (envClashes.length > 0) {
+      throw new ConvexError(
+        `Variable "${args.key}" already exists in environment(s): ${envClashes.join(", ")}. The same key is allowed only across non-overlapping environments.`
+      );
+    }
+
     const vault = await ctx.runAction(
       internal.features.vault.vault.createSecret,
       {
@@ -337,19 +355,30 @@ export const createWithValue = action({
       }
     );
 
-    const variableId = await ctx.runMutation(
-      api.features.variables.mutations.create,
-      {
-        key: args.key,
-        vaultRef: vault.id,
-        description: args.description,
-        environments: args.environments,
-        projectId: args.projectId,
-        isSensitive: args.isSensitive ?? false,
-        rotationFrequencyDays: args.rotationFrequencyDays,
-        tagIds: args.tagIds,
-      }
-    );
+    let variableId: Id<"environmentVariables">;
+    try {
+      variableId = await ctx.runMutation(
+        api.features.variables.mutations.create,
+        {
+          key: args.key,
+          vaultRef: vault.id,
+          description: args.description,
+          environments: args.environments,
+          projectId: args.projectId,
+          isSensitive: args.isSensitive ?? false,
+          rotationFrequencyDays: args.rotationFrequencyDays,
+          tagIds: args.tagIds,
+        }
+      );
+    } catch (error) {
+      // The DB row never materialized — don't leave the secret orphaned.
+      await ctx
+        .runAction(internal.features.vault.vault.deleteSecret, {
+          vaultRef: vault.id,
+        })
+        .catch(() => {});
+      throw error;
+    }
 
     return { _id: variableId };
   },

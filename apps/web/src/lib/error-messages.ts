@@ -10,6 +10,17 @@
  * from error messages so users see clean, human-readable errors.
  */
 export function sanitizeConvexError(error: unknown): string {
+  // ConvexError application payloads survive prod redaction (plain Error
+  // messages become "Server Error" on production deployments). The payload
+  // is already a clean user-facing string — return it directly.
+  if (
+    error instanceof Error &&
+    "data" in error &&
+    typeof (error as Error & { data: unknown }).data === "string"
+  ) {
+    return (error as Error & { data: string }).data;
+  }
+
   const raw =
     error instanceof Error
       ? error.message
@@ -30,7 +41,7 @@ export function sanitizeConvexError(error: unknown): string {
       // that re-throws a mutation's error double-wraps it ("Uncaught Error:
       // Uncaught Error: ..."), and stripping only one layer leaked the inner
       // prefix into user-facing error banners.
-      .replace(/^(Server Error\s*)?(Uncaught Error:\s*)+/i, "")
+      .replace(/^(Server Error\s*)?(Uncaught (Convex)?Error:\s*)+/i, "")
       // Strip file paths (Unix and Windows)
       .replace(/\/[\w./-]+\.(ts|js|tsx|jsx)(:\d+:\d+)?/g, "")
       .replace(/\.\.\//g, "")

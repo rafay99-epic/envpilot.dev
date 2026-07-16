@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { query, type QueryCtx } from "../../_generated/server";
+import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { checkBooleanFeature } from "../featureRegistry/gates";
@@ -18,6 +18,7 @@ import {
   buildActiveGrantMap,
   mapVariableRow,
   resolveProjectAccessContext,
+  findEnvironmentConflicts,
 } from "./helpers";
 
 /**
@@ -1101,4 +1102,27 @@ export const getDeleted = query({
       environments: variable.environments,
     }));
   },
+});
+
+/**
+ * Internal: which of the proposed environments already carry an ACTIVE
+ * variable with this key? Used by actions (createWithValue) to reject
+ * clashes BEFORE writing the secret value to the vault — checking only
+ * inside the create mutation leaked an orphaned vault secret per clash.
+ * Empty array = the create is allowed (same key across disjoint
+ * environments is legal).
+ */
+export const getEnvironmentConflictsInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+    key: v.string(),
+    environments: v.array(v.string()),
+  },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) =>
+    findEnvironmentConflicts(ctx, {
+      projectId: args.projectId,
+      key: args.key,
+      environments: args.environments,
+    }),
 });
