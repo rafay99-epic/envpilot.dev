@@ -1,0 +1,51 @@
+AGENTS.md
+  s_2e2d925e6d98b5::t_e082f693724333 3-13
+CLAUDE.md
+  s_47513e23e74e62::t_8a8c10c10afc10 21-25,51,53-55,58,64,145-153,159,175-176,226-227,253,256-287,311-313,317-321,325-330,341-364,382-385
+README.md
+  s_2e2d925e6d98b5::t_b5290f987db911 7,38,40,59-60,66
+apps/web/tests/e2e/README.md
+  s_2e2d925e6d98b5::t_e0fb558f5d6665 23-28
+docs/DEPLOYMENT.md
+  s_2e2d925e6d98b5::t_a6a2241970af7c 5-20,52-55,159-160,163-164,167-168,170-172
+docs/DEVELOPMENT.md
+  s_2e2d925e6d98b5::t_30a43b06635754 14,18,38-40,46-47,56-78,92,172
+docs/FEATURES.md
+  s_2e2d925e6d98b5::t_4a14c1c3f827f3 29,343
+docs/ROADMAP.md
+  s_2e2d925e6d98b5::t_fae5fa1019bf20 3-5
+docs/SECURITY-TODO.md
+  s_2e2d925e6d98b5::t_1b9fb27dbae5a0 3-6
+docs/ci.md
+  s_2e2d925e6d98b5::t_21c8c7e36e5e18 3-4,6,8-10,12-22,24,26-29,31-35,38-42,45-67
+docs/commands.md
+  s_2e2d925e6d98b5::t_0e70d63ddef296 9,11-12,22-23
+docs/setup.md
+  s_2e2d925e6d98b5::t_db198b36550425 33
+docs/structure.md
+  s_2e2d925e6d98b5::t_8a5af8afe1bb78 20-24,39-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bfb6fbdc405acfd8d23877da98c52b9bd4fc401f",
+  "prompts": {},
+  "sessions": {
+    "s_2e2d925e6d98b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a87d3d0c1c4621ab2",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
