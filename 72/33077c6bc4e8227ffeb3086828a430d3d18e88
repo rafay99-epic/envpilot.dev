@@ -1,0 +1,31 @@
+convex/features/admin/migrations.ts
+  s_c0d41f513c83f7::t_561f1fe1c2e056 316,349
+convex/features/projects/mutations.ts
+  s_c0d41f513c83f7::t_cedbdaeb0b709c 1,4,108,124-136,143-144,161-226
+convex/features/projects/queries.ts
+  s_c0d41f513c83f7::t_772d2deeb76809 4,37-74
+convex/features/users/projectAccess.ts
+  s_c0d41f513c83f7::t_42f7bada0493e1 479-529
+convex/features/variables/values.ts
+  s_c0d41f513c83f7::t_5455bef10c74e3 41,135-138,171-176,283
+convex/lib/seedData.ts
+  s_c0d41f513c83f7::t_cbe94aac12d341 134-142
+convex/schema.ts
+  s_c0d41f513c83f7::t_e75bf82dbdf115 168-172,217-219,836
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7233077c6bc4e8227ffeb3086828a430d3d18e88",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
