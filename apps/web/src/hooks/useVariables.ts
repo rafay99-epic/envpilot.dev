@@ -73,18 +73,3 @@ export function useVariablesWithAccess(
     projectId && userId ? { projectId } : "skip"
   );
 }
-
-/**
- * Hook for searching variables across an organization
- */
-export function useVariableSearch(
-  organizationId: Id<"organizations"> | undefined,
-  searchTerm: string
-) {
-  return useQuery(
-    api.features.variables.queries.search,
-    organizationId && searchTerm.length > 0
-      ? { organizationId, searchTerm }
-      : "skip"
-  );
-}

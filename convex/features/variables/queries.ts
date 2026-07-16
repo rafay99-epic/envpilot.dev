@@ -623,6 +623,107 @@ export const listWithAccessPaginated = query({
 });
 
 /**
+ * Per-project variable search — access-aware and COMPLETE.
+ *
+ * Reuses listWithAccessPaginated's exact access model
+ * (resolveProjectAccessContext + mapVariableRow) so a hit can never surface a
+ * variable the caller couldn't see in the list: env-scoped developers only
+ * match in-scope variables, and grant-only viewers only see variables shared
+ * with them. Unlike the paginated list this walks the project's ENTIRE active
+ * variable set (bounded — hundreds at most) and matches in memory on
+ * key/description substring plus tag NAMES, so a hit is never hidden behind an
+ * unloaded page. Deliberately NO Convex searchIndex — the candidate set is
+ * small enough that collect + predicate is the right tool.
+ *
+ * Returns the same row shape as the list (mapVariableRow) so the existing row
+ * component renders results unchanged (env badges / tags / updated-at per hit).
+ * Capped at 100 rows sorted by key; `truncated` tells the UI to suggest
+ * narrowing. `environment` (the selected env tab) narrows to that env's copy.
+ */
+export const searchInProject = query({
+  args: {
+    projectId: v.id("projects"),
+    searchTerm: v.string(),
+    environment: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const resolved = await resolveProjectAccessContext(
+      ctx,
+      args.projectId,
+      actor._id
+    );
+    if (!resolved) return { results: [], truncated: false };
+    const { access } = resolved;
+
+    const searchLower = args.searchTerm.trim().toLowerCase();
+    if (searchLower === "") return { results: [], truncated: false };
+
+    const variables = await ctx.db
+      .query("environmentVariables")
+      .withIndex("by_project_deleted", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+      )
+      .collect();
+
+    // Resolve every tag referenced by this project's variables ONCE, so tag-name
+    // matching is a map lookup rather than a db.get per (variable, tag).
+    const tagIds = new Set<string>();
+    for (const variable of variables) {
+      for (const id of variable.tagIds ?? []) tagIds.add(id as string);
+    }
+    const tagNameById = new Map<string, string>();
+    await Promise.all(
+      [...tagIds].map(async (id) => {
+        const tag = await ctx.db.get(id as Id<"variableTags">);
+        if (tag && !tag.deletedAt) tagNameById.set(id, tag.name.toLowerCase());
+      })
+    );
+
+    const matches = variables.filter((variable) => {
+      // Same env-scope gate as listWithAccessPaginated: scoped developers never
+      // even see out-of-scope keys.
+      if (
+        !isEnvironmentScopeAllowed(
+          access.environmentScope,
+          variable.environments
+        )
+      ) {
+        return false;
+      }
+      // Env tab narrows to variables holding that environment's copy.
+      if (
+        args.environment &&
+        !variable.environments.includes(args.environment)
+      ) {
+        return false;
+      }
+      const tagMatch = (variable.tagIds ?? []).some((id) =>
+        tagNameById.get(id as string)?.includes(searchLower)
+      );
+      return (
+        variable.key.toLowerCase().includes(searchLower) ||
+        variable.description?.toLowerCase().includes(searchLower) ||
+        tagMatch
+      );
+    });
+
+    const mapped = matches
+      .map((variable) => mapVariableRow(variable, access))
+      // Grant-only viewers see only variables shared with them — identical to
+      // listWithAccessPaginated's page filter.
+      .filter((v) => access.isOwner || access.assigned || v.hasAccess)
+      .sort((a, b) => a.key.localeCompare(b.key));
+
+    const RESULT_LIMIT = 100;
+    return {
+      results: mapped.slice(0, RESULT_LIMIT),
+      truncated: mapped.length > RESULT_LIMIT,
+    };
+  },
+});
+
+/**
  * List variable metadata (keys, versions, environments) WITHOUT vault refs.
  * Used by the VS Code extension via WebSocket subscription to detect changes
  * reactively, then fetch decrypted values via HTTP only when needed.
@@ -657,61 +758,6 @@ export const listMetadataByProject = query({
       updatedAt: v.updatedAt,
       description: v.description,
     }));
-  },
-});
-
-export const search = query({
-  args: {
-    organizationId: v.id("organizations"),
-    searchTerm: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const resultLimit = args.limit ?? 100;
-    const allProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect();
-    const projects = allProjects.filter(
-      (project) => project.deletedAt === undefined
-    );
-
-    const searchLower = args.searchTerm.toLowerCase();
-    const results = [];
-
-    for (const project of projects) {
-      // Cap the per-project read and stop scanning projects once the result
-      // budget is filled, so a large org never reads its entire variable set.
-      const allVariables = await ctx.db
-        .query("environmentVariables")
-        .withIndex("by_project_deleted", (q) =>
-          q.eq("projectId", project._id).eq("deletedAt", undefined)
-        )
-        .take(resultLimit);
-      const variables = allVariables.filter(
-        (variable) => variable.deletedAt === undefined
-      );
-
-      const matches = variables.filter(
-        (v) =>
-          v.key.toLowerCase().includes(searchLower) ||
-          v.description?.toLowerCase().includes(searchLower)
-      );
-
-      results.push(
-        ...matches.map((v) => ({
-          ...v,
-          projectName: project.name,
-          projectSlug: project.slug,
-        }))
-      );
-
-      if (results.length >= resultLimit) break;
-    }
-
-    return results.slice(0, resultLimit);
   },
 });
 
