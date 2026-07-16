@@ -1,11 +1,12 @@
 name: Deploy Vercel app
 
 # Reusable prod deployer for the three Vercel apps (web, blog, docs).
-# Called by ci.yml on main pushes when the app's paths changed. Git
-# auto-deploys for main are DISABLED in each app's vercel.json
-# (git.deploymentEnabled.main: false) so this workflow is the only prod
-# path — PR preview deployments still come from the Vercel git
-# integration. workflow_dispatch is the manual escape hatch.
+# CURRENTLY DORMANT: the calling jobs in ci.yml are hard-disabled
+# (false &&) because web/blog/docs auto-deploy on merge to main via
+# Vercel's git integration, with `ignoreCommand: npx turbo-ignore` in
+# each vercel.json skipping builds for unchanged apps. Kept intact for
+# re-enable (remove the `false &&`s AND turn git.deploymentEnabled.main
+# off in the three vercel.json files, or every merge deploys twice).
 
 on:
   workflow_call:

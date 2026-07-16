@@ -439,15 +439,19 @@ jobs:
     uses: ./.github/workflows/deploy-convex.yml
     secrets: inherit
 
-  # Vercel prod deploys — git auto-deploy for main is OFF in each app's
-  # vercel.json (PR previews still auto-deploy). Change detection gates
-  # prod: no app/shared change → no prod deploy. Backend FIRST for web
-  # (it calls the Convex contract); blog/docs are static and independent.
+  # Vercel prod deploys via CI — HARD-DISABLED (false &&): web/blog/docs
+  # auto-deploy on merge to main via Vercel's git integration, with
+  # `ignoreCommand: npx turbo-ignore` in each app's vercel.json doing the
+  # change detection (unchanged app → Vercel skips the build entirely).
+  # Kept for potential re-enable — restore by removing `false &&` from all
+  # three jobs AND setting git.deploymentEnabled.main back to false in the
+  # three vercel.json files, or every merge deploys twice. Backend-first
+  # ordering (web after deploy-convex) only exists on this CI path.
   deploy-web:
     name: Deploy web (Vercel)
     needs: [changes, checks-passed, e2e, deploy-convex]
     if: |
-      !failure() && !cancelled() &&
+      false && !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_web == 'true'
@@ -462,8 +466,9 @@ jobs:
   deploy-blog:
     name: Deploy blog (Vercel)
     needs: [changes, checks-passed, e2e]
+    # HARD-DISABLED (false &&) — see deploy-web note above.
     if: |
-      !failure() && !cancelled() &&
+      false && !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_blog == 'true'
@@ -478,8 +483,9 @@ jobs:
   deploy-docs:
     name: Deploy docs (Vercel)
     needs: [changes, checks-passed, e2e]
+    # HARD-DISABLED (false &&) — see deploy-web note above.
     if: |
-      !failure() && !cancelled() &&
+      false && !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_docs == 'true'
