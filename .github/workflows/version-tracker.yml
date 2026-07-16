@@ -1,14 +1,8 @@
 name: Version Tracker
 
+# ⛔ DORMANT — moved to CircleCI (version-tracker job in .circleci/config.yml,
+# 2026-07-16). Kept for reference/revert; workflow_dispatch is the escape hatch.
 on:
-  pull_request:
-    # Minutes diet (2026-07-12): only run when a version can actually have
-    # changed — package manifests or the release manifest. Was every PR push.
-    paths:
-      - "package.json"
-      - "apps/*/package.json"
-      - "packages/*/package.json"
-      - "apps/web/src/lib/versions.ts"
   workflow_dispatch:
 
 permissions:

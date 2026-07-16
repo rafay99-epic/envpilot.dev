@@ -13,14 +13,14 @@ name: CI
 # (CLI tarball, VSIX) are available in the run's Artifacts panel; nothing is
 # commented on PRs.
 
-# TEMP CI MIGRATION (2026-07-16): `pull_request` trigger removed — branch/PR
-# checks run on CircleCI (.circleci/config.yml, free 6000 min/mo). This
-# workflow now covers main pushes only: the same consolidated checks (deploy
-# gating) plus the deploy pipeline. Moving back: re-add `pull_request:` here
-# and delete .circleci/config.yml.
+# ⛔ DORMANT — FULL CI/CD MOVED TO CIRCLECI (2026-07-16). GitHub Actions
+# billing is unpaid, so nothing here runs; the entire pipeline (checks +
+# every deploy + release) now lives in .circleci/config.yml. This file is
+# kept verbatim for reference/revert. Moving back: restore
+#   on: { push: { branches: [main] }, pull_request: }
+# and retire the CircleCI deploy workflow (or every merge deploys twice).
+# workflow_dispatch remains as a manual escape hatch if billing is fixed.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
