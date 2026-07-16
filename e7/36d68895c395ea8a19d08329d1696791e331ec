@@ -1,0 +1,29 @@
+.circleci/config.yml
+  s_47513e23e74e62::t_8f3c1ba7dd2fb6 4,6-9,11-15,17-24,27-59,62,64,69,73-130,133-192,195,197
+.circleci/jobs.yml
+  s_47513e23e74e62::t_55ee202a063585 1-650
+apps/admin/vercel.json
+  s_47513e23e74e62::t_03633fac4dd2d3 4
+apps/blog/vercel.json
+  s_47513e23e74e62::t_4a1158c89b3b4e 4-5
+apps/docs/vercel.json
+  s_47513e23e74e62::t_97e2eced433aa5 4-5
+apps/web/vercel.json
+  s_47513e23e74e62::t_6e4d596c51c728 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e736d68895c395ea8a19d08329d1696791e331ec",
+  "prompts": {},
+  "sessions": {
+    "s_47513e23e74e62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1af77183-e29b-4b36-bd33-45ce60636e1c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
