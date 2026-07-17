@@ -62,3 +62,6 @@ apps/web/tests/e2e/.auth/
 # Local Convex backend state (convex dev --dev-deployment local)
 .convex/
 .env*.local
+
+# Editor settings
+.vscode/
