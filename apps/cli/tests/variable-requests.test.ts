@@ -178,8 +178,14 @@ describe("isRequestEligibleProject", () => {
     expect(isRequestEligibleProject({ unifiedRole: "developer" })).toBe(false);
   });
 
-  it("rejects owners, project managers, and team leads even when assigned", () => {
-    for (const role of ["owner", "project_manager", "team_lead"]) {
+  it("rejects every non-developer role even when assigned", () => {
+    for (const role of [
+      "owner",
+      "project_manager",
+      "team_lead",
+      "editor",
+      "viewer",
+    ]) {
       expect(
         isRequestEligibleProject({ unifiedRole: role, assigned: true })
       ).toBe(false);

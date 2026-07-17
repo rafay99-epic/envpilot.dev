@@ -201,23 +201,27 @@ export function formatRole(role: string | null | undefined): string {
       return chalk.magenta(label);
     case "team_lead":
       return chalk.blue(label);
+    case "editor":
+      return chalk.cyan(label);
     case "developer":
       return chalk.yellow(label);
+    case "viewer":
+      return chalk.gray(label);
   }
 }
 
 /**
  * Print a role-based access notice for developers.
  *
- * Under the unified model there are no pending approval requests: a developer
- * simply needs a per-variable write grant to change a value, and an
- * environment-scoped assignment may withhold production entirely.
+ * Developers are read + request-only: variables pull read-only and changes go
+ * through `envpilot request` for review. An environment-scoped assignment may
+ * withhold production entirely.
  */
 export function roleNotice(role: string | null | undefined): void {
   if (normalizeOrgRole(role) === "developer") {
     console.log(
       chalk.yellow(
-        "  You have Developer access. You can read the variables assigned to you and write only those you hold a write grant for; keys without a grant are skipped, not queued for approval."
+        "  You have Developer access. Variables are read-only; propose changes with `envpilot request` for review."
       )
     );
   }

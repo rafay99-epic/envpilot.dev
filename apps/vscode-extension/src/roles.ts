@@ -1,15 +1,22 @@
 // Unified role model — VS Code extension mirror of apps/cli/src/lib/roles.ts /
 // convex/authz.ts. Keep in sync with those.
 //
-// ONE org role per user: owner > project_manager > team_lead > developer.
-// What a user can do in a project follows from this role plus whether they are
-// assigned to it; per-variable access is grant-based (read/write) and a
+// ONE org role per user: owner > project_manager > team_lead > editor >
+// developer > viewer. What a user can do in a project follows from this role
+// plus whether they are assigned to it; editors get blanket write in assigned
+// projects, developers are read + request-only, viewers are read-only, and a
 // developer's assignment can be scoped to specific environments.
 //
 // Legacy extensions/servers use "admin"/"team_lead"/"member" (org) and
 // "manager"/"developer"/"viewer" (project). Always normalize before comparing.
 
-export type OrgRole = "owner" | "project_manager" | "team_lead" | "developer";
+export type OrgRole =
+  | "owner"
+  | "project_manager"
+  | "team_lead"
+  | "editor"
+  | "developer"
+  | "viewer";
 export type VariablePermission = "read" | "write";
 export type LegacyOrgRole = "admin" | "team_lead" | "member";
 export type LegacyProjectRole = "manager" | "developer" | "viewer";
@@ -21,17 +28,21 @@ export type ProtectionMode =
   | "strict-readonly";
 
 export const ROLE_LEVEL: Record<OrgRole, number> = {
-  owner: 4,
-  project_manager: 3,
-  team_lead: 2,
-  developer: 1,
+  owner: 6,
+  project_manager: 5,
+  team_lead: 4,
+  editor: 3,
+  developer: 2,
+  viewer: 1,
 };
 
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   owner: "Owner",
   project_manager: "Project Manager",
   team_lead: "Team Lead",
+  editor: "Editor",
   developer: "Developer",
+  viewer: "Viewer",
 };
 
 /** Map any legacy or unified role string onto the unified model. */
@@ -44,7 +55,9 @@ export function normalizeOrgRole(role: string | null | undefined): OrgRole {
     case "owner":
     case "project_manager":
     case "team_lead":
+    case "editor":
     case "developer":
+    case "viewer":
       return role;
     default:
       return "developer";
@@ -87,8 +100,10 @@ export interface ProjectAccess {
  *
  * Owners have implicit access to every project and are always writable (the
  * legacy server sends no assignment info for owners, so gating on `assigned`
- * here would wrongly lock an owner's file read-only). Project managers and team
- * leads need assignment; developers additionally need a write grant.
+ * here would wrongly lock an owner's file read-only). Project managers and
+ * team leads need assignment; editors, developers, and viewers ride the
+ * server's hasWriteAccess meta boolean (editors get true, developers and
+ * viewers get false under the request-only model).
  */
 export function isFileWritable(access: ProjectAccess): boolean {
   if (access.role === "owner") return true;
@@ -97,7 +112,9 @@ export function isFileWritable(access: ProjectAccess): boolean {
     case "project_manager":
     case "team_lead":
       return true;
+    case "editor":
     case "developer":
+    case "viewer":
       return access.hasWriteAccess;
   }
 }
@@ -105,12 +122,13 @@ export function isFileWritable(access: ProjectAccess): boolean {
 /**
  * Map a ProjectAccess to a VS Code file-protection mode.
  *
- *   writable              — can edit the .env in place (owner/PM/TL, or a
- *                           developer with write access)
+ *   writable              — can edit the .env in place (owner/PM/TL, an editor
+ *                           with hasWriteAccess, or a developer with write
+ *                           access)
  *   readonly-with-request — assigned developer without write access; can
- *                           request access from the request dialog
- *   strict-readonly       — no project assignment (grant-only viewer / not a
- *                           member of the project)
+ *                           request a variable from the request dialog
+ *   strict-readonly       — everyone else: viewers (cannot request), no
+ *                           project assignment, not a member of the project
  */
 export function fileProtectionMode(access: ProjectAccess): ProtectionMode {
   if (isFileWritable(access)) return "writable";
