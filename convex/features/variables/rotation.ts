@@ -10,6 +10,9 @@ import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  hasCapability,
 } from "../../lib/authz";
 
 /**
@@ -46,7 +49,8 @@ export const listExpiringVariables = query({
     if (!rotationCheck.allowed) return [];
 
     const orgRole = normalizeOrgRole(membership.role);
-    const isOwner = orgRole === "owner";
+    const rotationProfile = await getRoleProfile(ctx, orgRole);
+    const isOwner = bypassesAssignment(rotationProfile);
 
     // Non-owners only see expiring variables in projects they're assigned to,
     // and developers are further constrained by their environment scope.
@@ -112,10 +116,12 @@ export const listExpiringVariables = query({
       if (!project) continue;
 
       // Scoped developers never receive out-of-scope variables.
-      const environmentScope =
-        orgRole === "developer"
-          ? scopeByProject.get(variable.projectId as string)
-          : undefined;
+      const environmentScope = hasCapability(
+        rotationProfile,
+        "access.env_scoped"
+      )
+        ? scopeByProject.get(variable.projectId as string)
+        : undefined;
       if (!isEnvironmentScopeAllowed(environmentScope, variable.environments)) {
         continue;
       }

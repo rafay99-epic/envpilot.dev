@@ -83,7 +83,7 @@ function envBadgeColor(env: string): "green" | "amber" | "red" | "zinc" {
 }
 
 export default function RequestsPage() {
-  const { organization, user } = useAuthContext();
+  const { organization, roleMeta, user } = useAuthContext();
   const activeOrganizationId = organization?.id as
     | Id<"organizations">
     | undefined;
@@ -93,7 +93,8 @@ export default function RequestsPage() {
   // Developers get an empty result from listForReviewer — mirror that here so
   // the nav-gated page also renders a friendly notice for them.
   const canReview =
-    roleLevel(normalizeOrgRole(organization?.role)) >= ROLE_LEVEL.team_lead;
+    (roleMeta?.level ?? roleLevel(normalizeOrgRole(organization?.role))) >=
+    ROLE_LEVEL.team_lead;
 
   const [status, setStatus] = useState<RequestStatus>("pending");
   const [error, setError] = useState<string | null>(null);

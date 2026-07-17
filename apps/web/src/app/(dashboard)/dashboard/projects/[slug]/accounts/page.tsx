@@ -5,7 +5,6 @@ import Link from "next/link";
 import { KeyRound } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAuthContext } from "@/components/auth";
-import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { ConfirmDialog } from "@/components/ui";
@@ -40,14 +39,15 @@ interface AccountsPageProps {
 
 export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   const { slug } = use(params);
-  const { organization, user } = useAuthContext();
+  const { organization, user, capabilities } = useAuthContext();
 
-  const orgRole = normalizeOrgRole(organization?.role);
-  const hasOrgRole = !!organization?.role;
-  const canCreate = hasOrgRole;
-  const canUpdate = hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
-  const canDelete = canUpdate;
-  const canManagePermissions = canUpdate;
+  // Registry capability gates (getMyPermissions) — work for custom roles;
+  // the server re-checks every mutation.
+  const canCreate = capabilities["project.accounts.create"] === true;
+  const canUpdate = capabilities["project.accounts.update"] === true;
+  const canDelete = capabilities["project.accounts.delete"] === true;
+  const canManagePermissions =
+    capabilities["project.permissions.manage"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);

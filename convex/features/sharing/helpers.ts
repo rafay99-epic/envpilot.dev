@@ -9,6 +9,10 @@ import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
   getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  hasCapability,
+  type RoleProfile,
 } from "../../lib/authz";
 import { createAuditLog } from "../../lib/audit";
 
@@ -120,6 +124,7 @@ async function buildVariableAccessMap(
   }
 
   const accessMap = new Map<string, "read" | "write">();
+  const profileMemo = new Map<string, RoleProfile>();
   for (const variable of varMap.values()) {
     const project = projMap.get(variable.projectId.toString());
     if (!project) continue; // missing/deleted project → no access
@@ -128,7 +133,14 @@ async function buildVariableAccessMap(
     if (!membership) continue; // not an org member → no access
 
     const role = normalizeOrgRole(membership.role);
-    if (role === "owner") {
+    // Memoized per role slug — one registry read per distinct role in the
+    // batch, never per row (cost rule).
+    let profile = profileMemo.get(role);
+    if (!profile) {
+      profile = await getRoleProfile(ctx, role);
+      profileMemo.set(role, profile);
+    }
+    if (bypassesAssignment(profile)) {
       accessMap.set(variable._id.toString(), "write");
       continue;
     }
@@ -137,21 +149,27 @@ async function buildVariableAccessMap(
 
     if (
       projectMembership &&
-      (role === "project_manager" || role === "team_lead")
+      hasCapability(profile, "project.variables.update")
     ) {
       accessMap.set(variable._id.toString(), "write");
       continue;
     }
 
-    // Developers scoped to specific environments never see out-of-scope vars.
+    // Env-scopeable roles never see out-of-scope vars.
     if (
       projectMembership &&
-      role === "developer" &&
+      hasCapability(profile, "access.env_scoped") &&
       !isEnvironmentScopeAllowed(
         projectMembership.environments,
         variable.environments
       )
     ) {
+      continue;
+    }
+
+    // Auditor class: blanket read on in-scope resources.
+    if (projectMembership && hasCapability(profile, "access.blanket_read")) {
+      accessMap.set(variable._id.toString(), "read");
       continue;
     }
 
@@ -166,7 +184,11 @@ async function buildVariableAccessMap(
 
     accessMap.set(
       variable._id.toString(),
-      grant.permission === "read" ? "read" : "write"
+      grant.permission === "read"
+        ? "read"
+        : hasCapability(profile, "access.grant_fallback")
+          ? "write"
+          : "read"
     );
   }
 
@@ -261,6 +283,7 @@ async function buildAccountAccessMap(
   }
 
   const accessMap = new Map<string, "read" | "write">();
+  const profileMemo = new Map<string, RoleProfile>();
   for (const account of acctMap.values()) {
     const project = projMap.get(account.projectId.toString());
     if (!project) continue; // missing/deleted project → no access
@@ -269,7 +292,14 @@ async function buildAccountAccessMap(
     if (!membership) continue; // not an org member → no access
 
     const role = normalizeOrgRole(membership.role);
-    if (role === "owner") {
+    // Memoized per role slug — one registry read per distinct role in the
+    // batch, never per row (cost rule).
+    let profile = profileMemo.get(role);
+    if (!profile) {
+      profile = await getRoleProfile(ctx, role);
+      profileMemo.set(role, profile);
+    }
+    if (bypassesAssignment(profile)) {
       accessMap.set(account._id.toString(), "write");
       continue;
     }
@@ -278,21 +308,27 @@ async function buildAccountAccessMap(
 
     if (
       projectMembership &&
-      (role === "project_manager" || role === "team_lead")
+      hasCapability(profile, "project.accounts.update")
     ) {
       accessMap.set(account._id.toString(), "write");
       continue;
     }
 
-    // Developers scoped to specific environments never see out-of-scope accounts.
+    // Env-scopeable roles never see out-of-scope accounts.
     if (
       projectMembership &&
-      role === "developer" &&
+      hasCapability(profile, "access.env_scoped") &&
       !isEnvironmentScopeAllowed(
         projectMembership.environments,
         account.environments
       )
     ) {
+      continue;
+    }
+
+    // Auditor class: blanket read on in-scope resources.
+    if (projectMembership && hasCapability(profile, "access.blanket_read")) {
+      accessMap.set(account._id.toString(), "read");
       continue;
     }
 
@@ -307,7 +343,11 @@ async function buildAccountAccessMap(
 
     accessMap.set(
       account._id.toString(),
-      grant.permission === "read" ? "read" : "write"
+      grant.permission === "read"
+        ? "read"
+        : hasCapability(profile, "access.grant_fallback")
+          ? "write"
+          : "read"
     );
   }
 

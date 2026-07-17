@@ -1,7 +1,36 @@
 import { v } from "convex/values";
 import { mutation } from "../../../_generated/server";
-import { normalizeOrgRole } from "../../../lib/authz";
+import {
+  normalizeOrgRole,
+  getRoleProfile,
+  hasCapability,
+} from "../../../lib/authz";
 import { getAuthedUser, requireAuthedUser } from "../../../lib/identity";
+
+/**
+ * Find the caller's first membership whose role holds
+ * org.community.represent (owner class by default) — the authority for
+ * org-attributed community actions. Profiles memoized per slug.
+ */
+async function findRepresentingMembership(
+  ctx: Parameters<typeof getRoleProfile>[0],
+  memberships: Array<{ role: string; organizationId: unknown }>
+) {
+  const memo = new Map<string, boolean>();
+  for (const m of memberships) {
+    const slug = normalizeOrgRole(m.role);
+    let ok: boolean | undefined = memo.get(slug);
+    if (ok === undefined) {
+      ok = hasCapability(
+        await getRoleProfile(ctx, slug),
+        "org.community.represent"
+      );
+      memo.set(slug, ok);
+    }
+    if (ok === true) return m;
+  }
+  return undefined;
+}
 
 /**
  * Feature Requests (Wishlist) Mutations
@@ -285,9 +314,7 @@ export const updateStatus = mutation({
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
-    const ownerMembership = memberships.find(
-      (m) => normalizeOrgRole(m.role) === "owner"
-    );
+    const ownerMembership = await findRepresentingMembership(ctx, memberships);
 
     if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");
@@ -331,9 +358,7 @@ export const update = mutation({
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
-    const ownerMembership = memberships.find(
-      (m) => normalizeOrgRole(m.role) === "owner"
-    );
+    const ownerMembership = await findRepresentingMembership(ctx, memberships);
 
     if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");
@@ -404,9 +429,7 @@ export const remove = mutation({
       .query("organizationMembers")
       .withIndex("by_user", (q) => q.eq("userId", actor._id))
       .collect();
-    const ownerMembership = memberships.find(
-      (m) => normalizeOrgRole(m.role) === "owner"
-    );
+    const ownerMembership = await findRepresentingMembership(ctx, memberships);
 
     if (!ownerMembership) {
       throw new Error("Unauthorized: Admin access required");

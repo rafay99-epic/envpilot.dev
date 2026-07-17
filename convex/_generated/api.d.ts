@@ -24,6 +24,7 @@ import type * as features_admin_featureRequests from "../features/admin/featureR
 import type * as features_admin_inbox from "../features/admin/inbox.js";
 import type * as features_admin_migrations from "../features/admin/migrations.js";
 import type * as features_admin_organizations from "../features/admin/organizations.js";
+import type * as features_admin_roles from "../features/admin/roles.js";
 import type * as features_admin_settings from "../features/admin/settings.js";
 import type * as features_admin_stats from "../features/admin/stats.js";
 import type * as features_admin_tables from "../features/admin/tables.js";
@@ -62,6 +63,7 @@ import type * as features_organizations_invitations from "../features/organizati
 import type * as features_organizations_memberSessions from "../features/organizations/memberSessions.js";
 import type * as features_organizations_mutations from "../features/organizations/mutations.js";
 import type * as features_organizations_queries from "../features/organizations/queries.js";
+import type * as features_organizations_roleOptions from "../features/organizations/roleOptions.js";
 import type * as features_organizations_securityHold from "../features/organizations/securityHold.js";
 import type * as features_organizations_tombstones from "../features/organizations/tombstones.js";
 import type * as features_permissions_accountPermissions_mutations from "../features/permissions/accountPermissions/mutations.js";
@@ -102,9 +104,11 @@ import type * as features_vault_vault from "../features/vault/vault.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_authz from "../lib/authz.js";
+import type * as lib_capabilities from "../lib/capabilities.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_roleCompat from "../lib/roleCompat.js";
+import type * as lib_roleProfiles from "../lib/roleProfiles.js";
 import type * as lib_seedData from "../lib/seedData.js";
 import type * as lib_users from "../lib/users.js";
 import type * as organizations from "../organizations.js";
@@ -140,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   "features/admin/inbox": typeof features_admin_inbox;
   "features/admin/migrations": typeof features_admin_migrations;
   "features/admin/organizations": typeof features_admin_organizations;
+  "features/admin/roles": typeof features_admin_roles;
   "features/admin/settings": typeof features_admin_settings;
   "features/admin/stats": typeof features_admin_stats;
   "features/admin/tables": typeof features_admin_tables;
@@ -178,6 +183,7 @@ declare const fullApi: ApiFromModules<{
   "features/organizations/memberSessions": typeof features_organizations_memberSessions;
   "features/organizations/mutations": typeof features_organizations_mutations;
   "features/organizations/queries": typeof features_organizations_queries;
+  "features/organizations/roleOptions": typeof features_organizations_roleOptions;
   "features/organizations/securityHold": typeof features_organizations_securityHold;
   "features/organizations/tombstones": typeof features_organizations_tombstones;
   "features/permissions/accountPermissions/mutations": typeof features_permissions_accountPermissions_mutations;
@@ -218,9 +224,11 @@ declare const fullApi: ApiFromModules<{
   "lib/audit": typeof lib_audit;
   "lib/authHelpers": typeof lib_authHelpers;
   "lib/authz": typeof lib_authz;
+  "lib/capabilities": typeof lib_capabilities;
   "lib/identity": typeof lib_identity;
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/roleCompat": typeof lib_roleCompat;
+  "lib/roleProfiles": typeof lib_roleProfiles;
   "lib/seedData": typeof lib_seedData;
   "lib/users": typeof lib_users;
   organizations: typeof organizations;

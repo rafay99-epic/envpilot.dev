@@ -17,7 +17,12 @@ import {
   requireVariableAccess,
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
-import { assertOrgAction, normalizeOrgRole } from "../../lib/authz";
+import {
+  assertOrgAction,
+  normalizeOrgRole,
+  getRoleProfile,
+  hasCapability,
+} from "../../lib/authz";
 import { revokeSharesForResource } from "../sharing/helpers";
 import {
   assertWithinEnvironmentScope,
@@ -55,12 +60,13 @@ async function createCore(
   }
 
   // Authorization: owner, or assigned PM / team lead / developer
-  const { orgRole, environmentScope } = await authorizeVariableAccess(ctx, {
-    userId: args.createdBy,
-    projectId: args.projectId,
-    action: "project:create_variable",
-    preloadedProject: project,
-  });
+  const { environmentScope, profile: creatorProfile } =
+    await authorizeVariableAccess(ctx, {
+      userId: args.createdBy,
+      projectId: args.projectId,
+      action: "project:create_variable",
+      preloadedProject: project,
+    });
 
   // Environment scope: scoped developers may only create variables whose
   // environments all fall inside their assignment scope
@@ -216,9 +222,10 @@ async function createCore(
     createdAt: now,
   });
 
-  // Developers have no blanket write access — an automatic grant keeps
-  // write access to the variables they create.
-  if (orgRole === "developer") {
+  // Creators WITHOUT blanket write (grant-fallback roles like developer)
+  // get an automatic write grant so they keep editing what they created —
+  // main parity, generalized to any create-capable non-blanket role.
+  if (!hasCapability(creatorProfile, "project.variables.update")) {
     await ctx.db.insert("variablePermissions", {
       variableId,
       userId: args.createdBy,
@@ -317,10 +324,10 @@ async function updateCore(
       )
       .first();
 
-    if (
-      editorMembership &&
-      normalizeOrgRole(editorMembership.role) === "developer"
-    ) {
+    const updaterProfile = editorMembership
+      ? await getRoleProfile(ctx, editorMembership.role)
+      : null;
+    if (updaterProfile && hasCapability(updaterProfile, "access.env_scoped")) {
       const editorAssignment = await ctx.db
         .query("projectMembers")
         .withIndex("by_project_and_user", (q) =>

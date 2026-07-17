@@ -5,11 +5,13 @@ import {
   normalizeOrgRole,
   toLegacyOrgRole,
   toLegacyProjectRole,
-  ORG_ACTIONS,
-  PROJECT_ACTIONS,
+  getRoleProfile,
+  bypassesAssignment,
   assertNotSuspended,
   isSuspendedMembership,
+  hasCapability,
 } from "../../lib/authz";
+import { expandActions } from "../../lib/roleProfiles";
 import {
   orgRoleValidator,
   legacyOrgRoleValidator,
@@ -29,15 +31,21 @@ export const getMyPermissions = query({
     projectId: v.optional(v.id("projects")),
   },
   returns: v.object({
-    orgRole: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer"),
-      v.null()
-    ),
+    // Registry-driven role slug (open set — see lib/roleCompat.ts)
+    orgRole: v.union(v.string(), v.null()),
     assigned: v.boolean(),
     actions: v.array(v.string()),
+    // Full capability map + display metadata so the web renders roles
+    // dynamically (badges, gates) without hardcoded slug knowledge.
+    capabilities: v.record(v.string(), v.boolean()),
+    roleMeta: v.union(
+      v.object({
+        displayName: v.string(),
+        color: v.string(),
+        level: v.number(),
+      }),
+      v.null()
+    ),
   }),
   handler: async (ctx, args) => {
     // Actor comes from the verified AuthKit JWT, never from an arg — a caller
@@ -59,17 +67,19 @@ export const getMyPermissions = query({
         orgRole: null,
         assigned: false,
         actions: [] as string[],
+        capabilities: {} as Record<string, boolean>,
+        roleMeta: null,
       };
     }
 
     const orgRole = normalizeOrgRole(membership.role);
+    // ONE profile resolution per request (cost rule) — everything below
+    // derives from it.
+    const profile = await getRoleProfile(ctx, orgRole);
+    const expanded = expandActions(profile);
+    const orgActions: string[] = expanded.orgActions;
 
-    // 2. Compute org-level actions for this role
-    const orgActions = Object.entries(ORG_ACTIONS)
-      .filter(([, roles]) => (roles as readonly string[]).includes(orgRole))
-      .map(([action]) => action);
-
-    // 3. Compute project-level actions (if projectId provided)
+    // Project-level actions (if projectId provided)
     let assigned = false;
     let projectActions: string[] = [];
 
@@ -77,12 +87,22 @@ export const getMyPermissions = query({
       // Verify project exists and is not soft-deleted
       const project = await ctx.db.get(args.projectId);
       if (!project || (project as Record<string, unknown>).deletedAt) {
-        return { orgRole, assigned: false, actions: orgActions };
+        return {
+          orgRole,
+          assigned: false,
+          actions: orgActions,
+          capabilities: profile.capabilities as Record<string, boolean>,
+          roleMeta: {
+            displayName: profile.displayName,
+            color: profile.color,
+            level: profile.level,
+          },
+        };
       }
 
-      if (orgRole === "owner") {
-        // Owners get all project actions implicitly
-        projectActions = Object.keys(PROJECT_ACTIONS);
+      if (bypassesAssignment(profile)) {
+        // The owner class gets its project actions implicitly
+        projectActions = expanded.projectActions;
       } else {
         const pm = await ctx.db
           .query("projectMembers")
@@ -93,11 +113,7 @@ export const getMyPermissions = query({
 
         if (pm) {
           assigned = true;
-          projectActions = Object.entries(PROJECT_ACTIONS)
-            .filter(([, roles]) =>
-              (roles as readonly string[]).includes(orgRole)
-            )
-            .map(([action]) => action);
+          projectActions = expanded.projectActions;
         }
       }
     }
@@ -106,6 +122,12 @@ export const getMyPermissions = query({
       orgRole,
       assigned,
       actions: [...orgActions, ...projectActions],
+      capabilities: profile.capabilities as Record<string, boolean>,
+      roleMeta: {
+        displayName: profile.displayName,
+        color: profile.color,
+        level: profile.level,
+      },
     };
   },
 });
@@ -138,6 +160,9 @@ export const resolveLegacyRoles = query({
     grantOnly: v.boolean(),
     legacyProjectRole: legacyProjectRoleValidator,
     environmentScope: v.union(v.array(v.string()), v.null()),
+    // Resolved capability map (additive) — the value actions consume these
+    // instead of comparing role slugs.
+    capabilities: v.record(v.string(), v.boolean()),
   }),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -160,8 +185,9 @@ export const resolveLegacyRoles = query({
 
     const role = normalizeOrgRole(membership.role);
 
-    // Owners are implicitly assigned to every project.
-    let assigned = role === "owner";
+    // The owner class is implicitly assigned to every project.
+    const legacyProfile = await getRoleProfile(ctx, role);
+    let assigned = bypassesAssignment(legacyProfile);
     // A scoped developer's environment restriction (subset semantics). Only
     // populated for an assigned developer whose projectMembers row sets it.
     let environmentScope: string[] | null = null;
@@ -173,7 +199,7 @@ export const resolveLegacyRoles = query({
         )
         .first();
       assigned = projectMembership !== null;
-      if (role === "developer") {
+      if (hasCapability(legacyProfile, "access.env_scoped")) {
         environmentScope = projectMembership?.environments ?? null;
       }
     }
@@ -213,6 +239,7 @@ export const resolveLegacyRoles = query({
       grantOnly,
       legacyProjectRole,
       environmentScope,
+      capabilities: legacyProfile.capabilities as Record<string, boolean>,
     };
   },
 });

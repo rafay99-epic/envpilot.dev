@@ -10,8 +10,10 @@ import { isCronPaused } from "../../billing/tierLimits";
 import { checkBooleanFeature } from "../../featureRegistry/gates";
 import { createAuditLog } from "../../../lib/audit";
 import {
+  assertCanManageUserAsync,
   assertProjectAction,
-  assertCanManageUser,
+  bypassesAssignment,
+  getRoleProfile,
   type OrgRole,
 } from "../../../lib/authz";
 
@@ -75,8 +77,15 @@ async function assertGrantTarget(
     throw new Error("Target user is not a member of the organization");
   }
 
-  if (actorRole !== "owner") {
-    assertCanManageUser(actorRole, targetMembership.role, action);
+  // Owner-class actors (org.manage) may grant to anyone, peers included.
+  const actorProfile = await getRoleProfile(ctx, actorRole);
+  if (!bypassesAssignment(actorProfile)) {
+    await assertCanManageUserAsync(
+      ctx,
+      actorRole,
+      targetMembership.role,
+      action
+    );
   }
 }
 

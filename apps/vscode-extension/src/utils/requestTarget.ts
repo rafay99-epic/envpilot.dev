@@ -28,15 +28,22 @@ export interface PickerProjectRow {
 export type PickerRow = PickerSeparatorRow | PickerProjectRow;
 
 /**
- * Whether a project is a valid target for a variable request. Requests are the
- * developer path — owners, project managers, and team leads write directly —
- * and a grant-only project the user is not assigned to can never be requested
- * against. `assigned` is treated as eligible unless it is explicitly `false`,
- * so a legacy server that omits the field does not silently hide projects.
+ * Whether a project is a valid target for a variable request. Capability-driven
+ * when the server sent a capability map (registry roles, including custom
+ * ones); otherwise the legacy rule — requests are the developer path (owners,
+ * project managers, and team leads write directly). A grant-only project the
+ * user is not assigned to can never be requested against; `assigned` is
+ * treated as eligible unless it is explicitly `false`, so a legacy server that
+ * omits the field does not silently hide projects.
  */
 export function isRequestEligible(project: Project): boolean {
-  const role = normalizeOrgRole(project.unifiedRole ?? project.userRole);
-  return role === "developer" && project.assigned !== false;
+  if (project.assigned === false) return false;
+  if (project.capabilities) {
+    return project.capabilities["project.requests.submit"] === true;
+  }
+  return (
+    normalizeOrgRole(project.unifiedRole ?? project.userRole) === "developer"
+  );
 }
 
 /** Role label plus, for scoped developers, the accessible environments. */

@@ -4,7 +4,6 @@ import { action, internalAction } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import {
   CODE_STYLE,
   emailWrapper,
@@ -92,15 +91,9 @@ export const sendInvitationEmail = action({
     to: v.string(),
     inviterName: v.string(),
     organizationName: v.string(),
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer"),
-      // Legacy values (pre unified-roles migration)
-      v.literal("admin"),
-      v.literal("member")
-    ),
+    // Registry-driven role slug (open set); ROLE_DISPLAY falls back to the
+    // slug itself for custom roles.
+    role: v.string(),
     token: v.string(),
     expiresAt: v.number(),
   },
@@ -124,7 +117,9 @@ export const sendInvitationEmail = action({
       admin: "Owner",
       member: "Developer",
     };
-    const roleDisplay = ROLE_DISPLAY[args.role] ?? "Developer";
+    const roleDisplay =
+      ROLE_DISPLAY[args.role] ??
+      args.role.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
     const safeInviter = escapeHtml(args.inviterName);
     const safeOrg = escapeHtml(args.organizationName);
@@ -532,9 +527,9 @@ export const sendRotationReminderEmail = internalAction({
 
     for (const member of members) {
       if (!member?.user?.email) continue;
-      // Only notify members with at least the team_lead role
-      // (owner / project_manager / team_lead) — they can act on rotation
-      if (roleLevel(member.role) < ROLE_LEVEL.team_lead) continue;
+      // Only notify roles holding notify.variable_changes — resolved by
+      // getMembersInternal (registry-aware, custom roles included).
+      if (!member.notifyVariableChanges) continue;
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(

@@ -12,7 +12,6 @@ import { useVariableSelectionStore } from "@/stores/variable-selection-store";
 import { useKeyboardStore } from "@/stores/keyboard-store";
 import { SHORTCUTS, parseBinding } from "@/hooks/useKeyboardShortcuts";
 import { useAuthContext } from "@/components/auth";
-import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import {
   TerminalLoading,
   TerminalInput,
@@ -87,18 +86,14 @@ interface VersionRecord {
 
 export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
-  const { canDo, organization, user } = useAuthContext();
-  // Project-scoped gates follow from the unified org role (assignment is
-  // enforced server-side): every assigned member can create variables;
-  // team leads and above have full variable CRUD; developers edit only
-  // variables they hold a write grant on and can submit requests.
-  const orgRole = normalizeOrgRole(organization?.role);
-  const hasOrgRole = !!organization?.role;
-  const canCreateVariable = hasOrgRole;
-  const canUpdateVariable =
-    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
-  const canDeleteVariable = canUpdateVariable;
-  const canRequestVariable = hasOrgRole && orgRole === "developer";
+  const { canDo, organization, user, capabilities } = useAuthContext();
+  // Project-scoped gates come from the caller's resolved registry capability
+  // profile (getMyPermissions). Assignment is enforced server-side; these
+  // only shape the UI and work for custom roles too.
+  const canCreateVariable = capabilities["project.variables.create"] === true;
+  const canUpdateVariable = capabilities["project.variables.update"] === true;
+  const canDeleteVariable = capabilities["project.variables.delete"] === true;
+  const canRequestVariable = capabilities["project.requests.submit"] === true;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: showRotation } = useFeatureGate(orgId, "secret_rotation");

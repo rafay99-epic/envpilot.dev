@@ -31,7 +31,7 @@ type PullResult = {
   meta: {
     role: "admin" | "team_lead" | "member";
     projectRole: "manager" | "developer" | "viewer" | null;
-    unifiedRole: "owner" | "project_manager" | "team_lead" | "developer";
+    unifiedRole: string;
     assigned: boolean;
     grantOnly: boolean;
     environmentScope: string[] | null;
@@ -39,6 +39,8 @@ type PullResult = {
     scopeRestricted: boolean;
     decryptionFailures?: string[];
     autoUnsyncOnClose?: boolean;
+    /** Resolved capability map — capability-aware clients prefer this. */
+    capabilities: Record<string, boolean>;
   };
 };
 
@@ -136,6 +138,9 @@ export const pullValues = action({
       // project default ?? true; pro gate re-checked at read time).
       // Optional so older payload consumers stay valid.
       autoUnsyncOnClose: v.optional(v.boolean()),
+      // Resolved capability map — capability-aware clients prefer this over
+      // role-slug comparisons (custom registry roles).
+      capabilities: v.record(v.string(), v.boolean()),
     }),
   }),
   handler: async (ctx, args): Promise<PullResult> => {
@@ -255,15 +260,13 @@ export const pullValues = action({
     }
 
     const roleHasBlanketWrite =
-      (legacy.role === "owner" ||
-        legacy.role === "project_manager" ||
-        legacy.role === "team_lead") &&
+      legacy.capabilities["project.variables.update"] === true &&
       legacy.assigned;
     const hasWriteAccess =
       roleHasBlanketWrite ||
       variables.some((entry) => entry.access === "write");
     const scopeRestricted =
-      legacy.role === "developer" &&
+      legacy.capabilities["access.env_scoped"] === true &&
       legacy.assigned &&
       legacy.environmentScope !== null;
 
@@ -271,7 +274,8 @@ export const pullValues = action({
       variables,
       meta: {
         role: legacy.legacyRole,
-        projectRole: legacy.role === "owner" ? null : legacy.legacyProjectRole,
+        projectRole:
+          legacy.legacyRole === "admin" ? null : legacy.legacyProjectRole,
         unifiedRole: legacy.role,
         assigned: legacy.assigned,
         grantOnly: legacy.grantOnly,
@@ -281,6 +285,7 @@ export const pullValues = action({
         decryptionFailures:
           decryptionFailures.length > 0 ? decryptionFailures : undefined,
         autoUnsyncOnClose,
+        capabilities: legacy.capabilities,
       },
     };
   },
@@ -810,7 +815,24 @@ export const importValues = action({
       throw new Error("You are not a member of this organization");
     }
 
-    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.team_lead;
+    // Route by capability, not level: blanket-write roles import directly;
+    // request-capable roles go through the request flow; everything else is
+    // rejected before any vault write. Per-key enforcement still happens in
+    // the mutations either way.
+    const importLegacy = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      { projectId: args.projectId }
+    );
+    const canWriteDirectly =
+      importLegacy.capabilities["project.variables.update"] === true;
+    if (
+      !canWriteDirectly &&
+      importLegacy.capabilities["project.requests.submit"] !== true
+    ) {
+      throw new ConvexError(
+        "You do not have permission to import variables into this project."
+      );
+    }
 
     let created = 0;
     let updated = 0;

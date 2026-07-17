@@ -11,6 +11,7 @@ import {
   assertOrgMembership,
   getVariableAccess,
   getAccountAccess,
+  hasCapability,
 } from "../../lib/authz";
 import { normalizeResourceType, countActiveShares } from "./helpers";
 
@@ -63,7 +64,20 @@ export const createShare = mutation({
     // 0. Authorization: the caller must be a member of the org AND have at
     // least read access to the resource being shared. Without this a member
     // could mint a share link for a resource they cannot see.
-    await assertOrgMembership(ctx, actor._id, args.organizationId);
+    const { profile: sharerProfile } = await assertOrgMembership(
+      ctx,
+      actor._id,
+      args.organizationId
+    );
+    // ENFORCE project.share: sharing a secret externally is the highest-risk
+    // action in the product — the capability everyone sees in the admin
+    // matrix must actually gate it. Seeded parity: all four system roles
+    // hold it; viewer/editor and any custom role without the box do not.
+    if (!hasCapability(sharerProfile, "project.share")) {
+      throw new ConvexError(
+        "Your role cannot create share links. Ask a team lead or project manager."
+      );
+    }
 
     if (resourceType === "account") {
       if (!args.accountId) {

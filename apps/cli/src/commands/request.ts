@@ -10,10 +10,10 @@ import {
   notInitialized,
   handleError,
 } from "../lib/errors.js";
-import { normalizeOrgRole } from "../lib/roles.js";
 import {
   allowedRequestEnvironments,
   buildCreateVariableRequestBody,
+  canSubmitRequests,
   buildEligibleRequestTargets,
   buildProjectChoices,
   formatRequestContextBanner,
@@ -90,8 +90,11 @@ export const requestCommand = new Command("request")
 
         if (useDefault) {
           const meta = await fetchProjectMeta(api, defaultEntry);
-          const role = normalizeOrgRole(meta?.unifiedRole ?? meta?.role);
-          if (role !== "developer") {
+          const eligible = canSubmitRequests({
+            capabilities: meta?.capabilities,
+            role: meta?.unifiedRole ?? meta?.role,
+          });
+          if (!eligible) {
             warning(
               "You have direct write access to this project. Use `envpilot push` or create the variable directly instead of submitting a request."
             );

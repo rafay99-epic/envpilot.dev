@@ -203,6 +203,9 @@ export function formatRole(role: string | null | undefined): string {
       return chalk.blue(label);
     case "developer":
       return chalk.yellow(label);
+    default:
+      // Custom registry roles (open slug set) — plain label, never crash.
+      return label;
   }
 }
 

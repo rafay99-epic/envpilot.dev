@@ -7,12 +7,7 @@ import {
   TerminalButtonLink,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
-import {
-  ORG_ROLE_LABELS,
-  ROLE_LEVEL,
-  roleLevel,
-  type OrgRole,
-} from "@/lib/roles";
+import { ROLE_LEVEL, roleLabel, roleLevel, type OrgRole } from "@/lib/roles";
 
 interface RequireRoleProps {
   /** Minimum unified org role required to view the page. */
@@ -29,11 +24,13 @@ export function useRequireRole(minimum: OrgRole): {
   isLoading: boolean;
   allowed: boolean;
 } {
-  const { organization, isLoading } = useAuthContext();
+  const { organization, roleMeta, isLoading } = useAuthContext();
+  // Prefer the server-resolved registry level (covers custom roles); the
+  // static map only knows seeded slugs and scores custom roles 0, which
+  // would lock them out of every gated page.
+  const effectiveLevel = roleMeta?.level ?? roleLevel(organization?.role ?? "");
   const allowed =
-    !isLoading &&
-    !!organization &&
-    roleLevel(organization.role) >= ROLE_LEVEL[minimum];
+    !isLoading && !!organization && effectiveLevel >= ROLE_LEVEL[minimum];
   return { isLoading, allowed };
 }
 
@@ -62,8 +59,8 @@ export function RequireRole({ minimum, children }: RequireRoleProps) {
           You don&apos;t have access to this page
         </h2>
         <p className="mt-2 max-w-sm text-sm text-zinc-400">
-          This page requires the {ORG_ROLE_LABELS[minimum]} role or higher in
-          your organization. Ask an owner if you think you need access.
+          This page requires the {roleLabel(minimum)} role or higher in your
+          organization. Ask an owner if you think you need access.
         </p>
         <div className="mt-6">
           <TerminalButtonLink href="/dashboard" variant="primary">

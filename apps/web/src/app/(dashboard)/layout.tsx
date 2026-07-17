@@ -7,7 +7,7 @@ import { AuthProvider } from "@/components/auth";
 import { AccessNotices } from "@/components/auth/AccessNotices";
 import { AuthErrorPage } from "@/components/auth/auth-error-page";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import type { AuthUser, Organization } from "@/lib/auth";
+import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import {
   ACTIVE_ORG_COOKIE_NAME,
@@ -110,6 +110,8 @@ export default async function DashboardLayout({
   let activeOrganization: OrganizationWithMembershipRole | null = null;
   let orgTier = "free";
   let initialActions: string[] | undefined;
+  let initialCapabilities: Record<string, boolean> | undefined;
+  let initialRoleMeta: RoleMeta | null | undefined;
 
   try {
     const cookieStore = await cookies();
@@ -161,6 +163,8 @@ export default async function DashboardLayout({
       }
       if (permsByGuess) {
         initialActions = permsByGuess.actions;
+        initialCapabilities = permsByGuess.capabilities;
+        initialRoleMeta = permsByGuess.roleMeta;
       }
     }
   } catch (err) {
@@ -205,6 +209,8 @@ export default async function DashboardLayout({
       initialUser={authUser}
       initialOrganization={organization}
       initialActions={initialActions}
+      initialCapabilities={initialCapabilities}
+      initialRoleMeta={initialRoleMeta}
     >
       <AccessNotices
         activeOrganizationId={activeOrganization?._id ?? null}

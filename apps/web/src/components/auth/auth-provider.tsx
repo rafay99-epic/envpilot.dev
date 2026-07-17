@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import type { AuthUser, Organization } from "@/lib/auth";
+import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -13,6 +13,10 @@ interface AuthContextValue {
   impersonator?: { email: string; reason: string | null };
   canDo: (action: string) => boolean;
   actions: string[];
+  /** Registry capability map for the active org role. */
+  capabilities: Record<string, boolean>;
+  /** Registry display metadata for the active org role. */
+  roleMeta: RoleMeta | null;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -27,6 +31,10 @@ interface AuthProviderProps {
    *  (together with an organization), use-auth skips its mount-time
    *  /api/auth/me refetch entirely. */
   initialActions?: string[];
+  /** Registry capability map computed alongside initialActions. */
+  initialCapabilities?: Record<string, boolean>;
+  /** Registry role metadata computed alongside initialActions. */
+  initialRoleMeta?: RoleMeta | null;
 }
 
 export function AuthProvider({
@@ -34,6 +42,8 @@ export function AuthProvider({
   initialUser,
   initialOrganization,
   initialActions,
+  initialCapabilities,
+  initialRoleMeta,
 }: AuthProviderProps) {
   const auth = useAuth(
     initialUser
@@ -41,6 +51,8 @@ export function AuthProvider({
           user: initialUser,
           organization: initialOrganization ?? null,
           actions: initialActions,
+          capabilities: initialCapabilities,
+          roleMeta: initialRoleMeta,
           accessToken: null,
         }
       : undefined

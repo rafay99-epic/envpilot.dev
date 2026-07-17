@@ -28,6 +28,32 @@ export function useOrganization(
   );
 }
 
+/** A registry role the caller may assign — see listAssignableRoles. */
+export interface AssignableRole {
+  slug: string;
+  displayName: string;
+  description: string;
+  color: string;
+  level: number;
+  envScoped: boolean;
+}
+
+/**
+ * Registry roles the current user may assign in this org (invite / role
+ * change pickers). Sorted by level desc, strictly below the caller's own
+ * level (owner class sees all). undefined while loading.
+ */
+export function useAssignableRoles(
+  organizationId: Id<"organizations"> | string | undefined
+): AssignableRole[] | undefined {
+  return useQuery(
+    api.features.organizations.roleOptions.listAssignableRoles,
+    organizationId
+      ? { organizationId: organizationId as Id<"organizations"> }
+      : "skip"
+  );
+}
+
 /**
  * Hook for getting organization members
  */

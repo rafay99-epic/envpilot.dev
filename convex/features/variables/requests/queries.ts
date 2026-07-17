@@ -3,7 +3,13 @@ import { query, internalQuery, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
 import { batchGetUsers } from "../../../lib/users";
 import { requireAuthedUser } from "../../../lib/identity";
-import { assertOrgMembership, normalizeOrgRole } from "../../../lib/authz";
+import {
+  assertOrgMembership,
+  normalizeOrgRole,
+  getRoleProfile,
+  hasCapability,
+  bypassesAssignment,
+} from "../../../lib/authz";
 import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 
 async function listForProjectCore(
@@ -291,7 +297,8 @@ export const listForReviewer = query({
     );
 
     // Developers are never reviewers — bail before touching the request table.
-    if (membership.role === "developer") {
+    const reviewerProfile = await getRoleProfile(ctx, membership.role);
+    if (!hasCapability(reviewerProfile, "project.requests.review")) {
       return [];
     }
 
@@ -305,12 +312,12 @@ export const listForReviewer = query({
       .order("desc")
       .take(100);
 
-    // Reviewer scoping. Owners see every org request. project_manager /
-    // team_lead only see requests from projects they are ASSIGNED to. Fetch
+    // Reviewer scoping. The owner class sees every org request; every other
+    // reviewer only sees requests from projects they are ASSIGNED to. Fetch
     // the caller's project memberships ONCE and build a Set of allowed
     // projectIds, then filter in memory — NOT one assertProjectAction per row.
     let scopedRequests = requests;
-    if (membership.role !== "owner") {
+    if (!bypassesAssignment(reviewerProfile)) {
       const memberships = await ctx.db
         .query("projectMembers")
         .withIndex("by_user", (q) => q.eq("userId", actor._id))
@@ -419,11 +426,20 @@ export const getRequestReviewerRecipients = internalQuery({
 
     const recipients: { email: string; name?: string }[] = [];
     const seenEmails = new Set<string>();
+    const recipientProfileMemo = new Map<
+      string,
+      Awaited<ReturnType<typeof getRoleProfile>>
+    >();
     for (const member of members) {
       const role = normalizeOrgRole(member.role);
+      let recipientProfile = recipientProfileMemo.get(role);
+      if (!recipientProfile) {
+        recipientProfile = await getRoleProfile(ctx, role);
+        recipientProfileMemo.set(role, recipientProfile);
+      }
       const isReviewer =
-        role === "owner" ||
-        ((role === "project_manager" || role === "team_lead") &&
+        bypassesAssignment(recipientProfile) ||
+        (hasCapability(recipientProfile, "project.requests.review") &&
           assignedUserIds.has(member.userId.toString()));
       if (!isReviewer) continue;
 

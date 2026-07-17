@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
-import { assertOrgAction, assertCanManageUser } from "../../lib/authz";
+import { assertOrgAction, assertCanManageUserAsync } from "../../lib/authz";
 
 /**
  * Deactivate every active device session (CLI tokens + extension project
@@ -236,7 +236,8 @@ export const revokeMemberCliToken = mutation({
 
     // Hierarchy: cannot revoke sessions of someone at or above your own level
     // (e.g. a project_manager must not revoke an owner's session).
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       targetMembership.role,
       "revoke session"
@@ -311,7 +312,8 @@ export const revokeMemberExtensionSession = mutation({
       );
     }
 
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       targetMembership.role,
       "revoke session"
@@ -387,7 +389,8 @@ export const revokeAllMemberSessions = mutation({
 
     // Hierarchy: cannot revoke sessions of someone at or above your own level
     // (e.g. a project_manager must not revoke an owner's sessions).
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       targetMembership.role,
       "revoke session"

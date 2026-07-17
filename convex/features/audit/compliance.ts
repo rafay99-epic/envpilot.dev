@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers, userDisplay } from "../../lib/users";
-import { getRetentionCutoff } from "./helpers";
+import { getRetentionCutoff, assertAuditAccess } from "./helpers";
 
 // Read caps. auditLogs is the fastest-growing table (one row per mutation), and
 // Convex has no O(1) count, so every org-wide read must be bounded by an index
@@ -21,6 +21,7 @@ export const getSummary = query({
     daysBack: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const daysBack = args.daysBack ?? 30;
     const rawStartTime = Date.now() - daysBack * 24 * 60 * 60 * 1000;
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
@@ -126,6 +127,7 @@ export const getComplianceReport = query({
     endTime: v.number(),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const effectiveStartTime = cutoff
       ? Math.max(args.startTime, cutoff)
@@ -234,6 +236,7 @@ export const getForExport = query({
     includeDetails: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const effectiveStartTime = cutoff
       ? Math.max(args.startTime, cutoff)

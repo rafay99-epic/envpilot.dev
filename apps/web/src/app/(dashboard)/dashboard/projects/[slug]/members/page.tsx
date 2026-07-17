@@ -16,8 +16,9 @@ import {
 import {
   normalizeOrgRole,
   roleLevel,
+  roleLabel,
   ROLE_LEVEL,
-  ORG_ROLE_LABELS,
+  ENV_SCOPED_ROLE_FALLBACK,
   type OrgRole,
 } from "@/lib/roles";
 
@@ -76,9 +77,18 @@ function roleBadgeClasses(role: OrgRole): string {
       return "border-amber-500/20 bg-amber-500/10 text-amber-400";
     case "team_lead":
       return "border-blue-500/20 bg-blue-500/10 text-blue-400";
-    case "developer":
+    case "editor":
+      return "border-teal-500/20 bg-teal-500/10 text-teal-400";
+    default:
+      // developer, viewer, and custom registry roles
       return "border-zinc-500/20 bg-zinc-500/10 text-zinc-400";
   }
+}
+
+/** Env scoping applies to registry roles holding access.env_scoped —
+ *  seeded fallback here since the members API only carries the slug. */
+function isEnvScopedRole(role: OrgRole): boolean {
+  return ENV_SCOPED_ROLE_FALLBACK.has(role);
 }
 
 export default function ProjectMembersPage({
@@ -87,7 +97,7 @@ export default function ProjectMembersPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
-  const { organization } = useAuthContext();
+  const { organization, roleMeta } = useAuthContext();
 
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -111,29 +121,29 @@ export default function ProjectMembersPage({
   const [editEnvScope, setEditEnvScope] = useState<string[]>(allEnvironments());
   const [isSavingScope, setIsSavingScope] = useState(false);
 
-  // Gates from the actor's org role: owners and project managers manage
-  // anyone below them; team leads manage developers only.
-  const myRole = normalizeOrgRole(organization?.role);
+  // Gates from the actor's org role: strictly-below management. The caller's
+  // level comes from the registry (getMyPermissions roleMeta) so custom roles
+  // gate correctly; the seeded ROLE_LEVEL map is the fallback.
+  const myLevel = roleMeta?.level ?? roleLevel(organization?.role);
   const canManageMembers =
-    !!organization?.role && roleLevel(myRole) >= ROLE_LEVEL.team_lead;
+    !!organization?.role && myLevel >= ROLE_LEVEL.team_lead;
   const canManageTarget = (targetRole: OrgRole): boolean => {
     if (!canManageMembers) return false;
-    if (myRole === "team_lead") return targetRole === "developer";
-    return roleLevel(targetRole) < roleLevel(myRole);
+    return roleLevel(targetRole) < myLevel;
   };
 
-  // Team leads can only add developers to their projects.
+  // Only roles strictly below the caller can be added to the project.
   const addableMembers = assignableMembers.filter((m) =>
     canManageTarget(normalizeOrgRole(m.orgRole))
   );
 
-  // Environment scoping only applies to developer targets.
+  // Environment scoping only applies to env-scopeable roles.
   const selectedAddTarget = addableMembers.find(
     (m) => m._id === selectedUserId
   );
   const addEnvScopeApplies =
     !!selectedAddTarget &&
-    normalizeOrgRole(selectedAddTarget.orgRole) === "developer";
+    isEnvScopedRole(normalizeOrgRole(selectedAddTarget.orgRole));
 
   async function fetchData() {
     try {
@@ -404,11 +414,11 @@ export default function ProjectMembersPage({
                           targetRole
                         )}`}
                       >
-                        {ORG_ROLE_LABELS[targetRole]}
+                        {roleLabel(targetRole)}
                       </span>
 
-                      {/* Environment scope — only meaningful for developers */}
-                      {targetRole === "developer" && (
+                      {/* Environment scope — env-scopeable roles only */}
+                      {isEnvScopedRole(targetRole) && (
                         <span
                           className="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/10 px-2 py-0.5 text-xs font-medium text-zinc-400"
                           title="Environment access"
@@ -417,7 +427,7 @@ export default function ProjectMembersPage({
                         </span>
                       )}
 
-                      {targetRole === "developer" &&
+                      {isEnvScopedRole(targetRole) &&
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => openScopeEditor(member)}
@@ -517,7 +527,7 @@ export default function ProjectMembersPage({
               {addableMembers.map((m) => (
                 <option key={m._id} value={m._id}>
                   {m.name || m.email} {m.name ? `(${m.email})` : ""} -{" "}
-                  {ORG_ROLE_LABELS[normalizeOrgRole(m.orgRole)]}
+                  {roleLabel(m.orgRole)}
                 </option>
               ))}
             </select>

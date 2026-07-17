@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers, userDisplay } from "../../lib/users";
-import { getRetentionCutoff } from "./helpers";
+import { getRetentionCutoff, assertAuditAccess } from "./helpers";
 
 /**
  * Comprehensive Audit Log Queries
@@ -32,6 +32,7 @@ export const listByOrganization = query({
     offset: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const limit = args.limit ?? 50;
 
     // Push the retention cutoff into the index range so the DB never scans rows
@@ -81,6 +82,7 @@ export const listByOrganizationPaginated = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
     const result = await ctx.db
@@ -118,6 +120,7 @@ export const countByOrganization = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
     // Push the retention cutoff into the index range so only in-range rows are
@@ -141,6 +144,9 @@ export const listByProject = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const projectForAuth = await ctx.db.get(args.projectId);
+    if (!projectForAuth) return [];
+    await assertAuditAccess(ctx, projectForAuth.organizationId);
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -178,6 +184,11 @@ export const listByVariable = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const variableForAuth = await ctx.db.get(args.variableId);
+    if (!variableForAuth) return [];
+    const projectForAuth = await ctx.db.get(variableForAuth.projectId);
+    if (!projectForAuth) return [];
+    await assertAuditAccess(ctx, projectForAuth.organizationId);
     const logs = await ctx.db
       .query("auditLogs")
       .withIndex("by_variable", (q) => q.eq("variableId", args.variableId))
@@ -222,6 +233,7 @@ export const listByTimeRange = query({
     resourceTypeFilter: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const effectiveStartTime = cutoff
       ? Math.max(args.startTime, cutoff)

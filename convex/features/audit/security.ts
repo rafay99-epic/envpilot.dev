@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers, userDisplay } from "../../lib/users";
-import { getRetentionCutoff } from "./helpers";
+import { getRetentionCutoff, assertAuditAccess } from "./helpers";
 
 // Read caps. auditLogs is the fastest-growing table (one row per mutation), and
 // Convex has no O(1) count, so every org-wide read must be bounded by an index
@@ -21,6 +21,7 @@ export const listSecurityEvents = query({
     includeSeverity: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const securityActions = [
       "variable.accessed",
       "variable.exported",
@@ -100,6 +101,7 @@ export const listSensitiveDataAccess = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const accessActions = [
       "variable.accessed",
       "variable.exported",
@@ -213,6 +215,7 @@ export const listPermissionChanges = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const permissionActions = [
       "permission.granted",
       "permission.revoked",
@@ -316,6 +319,7 @@ export const getRecentAlerts = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const limit = args.limit ?? 10;
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
 
@@ -360,6 +364,7 @@ export const getAlertCount = query({
     since: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await assertAuditAccess(ctx, args.organizationId);
     const sinceTime = args.since ?? Date.now() - 24 * 60 * 60 * 1000; // Last 24 hours by default
     const cutoff = await getRetentionCutoff(ctx.db, args.organizationId);
     const effectiveSince = cutoff ? Math.max(sinceTime, cutoff) : sinceTime;

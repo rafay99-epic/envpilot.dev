@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from "./routes/_authenticated/
 import { Route as AuthenticatedWebTrafficRouteImport } from "./routes/_authenticated/web-traffic"
 import { Route as AuthenticatedUsersRouteImport } from "./routes/_authenticated/users"
 import { Route as AuthenticatedTiersRouteImport } from "./routes/_authenticated/tiers"
+import { Route as AuthenticatedRolesRouteImport } from "./routes/_authenticated/roles"
 import { Route as AuthenticatedTicketsRouteImport } from "./routes/_authenticated/tickets"
 import { Route as AuthenticatedOrganizationsRouteImport } from "./routes/_authenticated/organizations"
 import { Route as AuthenticatedMigrationsRouteImport } from "./routes/_authenticated/migrations"
@@ -55,6 +56,11 @@ const AuthenticatedTiersRoute = AuthenticatedTiersRouteImport.update({
 const AuthenticatedTicketsRoute = AuthenticatedTicketsRouteImport.update({
   id: "/tickets",
   path: "/tickets",
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRolesRoute = AuthenticatedRolesRouteImport.update({
+  id: "/roles",
+  path: "/roles",
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOrganizationsRoute =
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   "/messages": typeof AuthenticatedMessagesRoute
   "/migrations": typeof AuthenticatedMigrationsRoute
   "/organizations": typeof AuthenticatedOrganizationsRoute
+  "/roles": typeof AuthenticatedRolesRoute
   "/tickets": typeof AuthenticatedTicketsRoute
   "/tiers": typeof AuthenticatedTiersRoute
   "/users": typeof AuthenticatedUsersRoute
@@ -128,6 +135,7 @@ export interface FileRoutesById {
   "/_authenticated/messages": typeof AuthenticatedMessagesRoute
   "/_authenticated/migrations": typeof AuthenticatedMigrationsRoute
   "/_authenticated/organizations": typeof AuthenticatedOrganizationsRoute
+  "/_authenticated/roles": typeof AuthenticatedRolesRoute
   "/_authenticated/tickets": typeof AuthenticatedTicketsRoute
   "/_authenticated/tiers": typeof AuthenticatedTiersRoute
   "/_authenticated/users": typeof AuthenticatedUsersRoute
@@ -145,6 +153,7 @@ export interface FileRouteTypes {
     | "/messages"
     | "/migrations"
     | "/organizations"
+    | "/roles"
     | "/tickets"
     | "/tiers"
     | "/users"
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | "/messages"
     | "/migrations"
     | "/organizations"
+    | "/roles"
     | "/tickets"
     | "/tiers"
     | "/users"
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | "/_authenticated/messages"
     | "/_authenticated/migrations"
     | "/_authenticated/organizations"
+    | "/_authenticated/roles"
     | "/_authenticated/tickets"
     | "/_authenticated/tiers"
     | "/_authenticated/users"
@@ -227,6 +238,13 @@ declare module "@tanstack/react-router" {
       path: "/tiers"
       fullPath: "/tiers"
       preLoaderRoute: typeof AuthenticatedTiersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    "/_authenticated/roles": {
+      id: "/_authenticated/roles"
+      path: "/roles"
+      fullPath: "/roles"
+      preLoaderRoute: typeof AuthenticatedRolesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     "/_authenticated/tickets": {
@@ -288,6 +306,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedMigrationsRoute: typeof AuthenticatedMigrationsRoute
   AuthenticatedOrganizationsRoute: typeof AuthenticatedOrganizationsRoute
+  AuthenticatedRolesRoute: typeof AuthenticatedRolesRoute
   AuthenticatedTicketsRoute: typeof AuthenticatedTicketsRoute
   AuthenticatedTiersRoute: typeof AuthenticatedTiersRoute
   AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
@@ -302,6 +321,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
   AuthenticatedMigrationsRoute: AuthenticatedMigrationsRoute,
   AuthenticatedOrganizationsRoute: AuthenticatedOrganizationsRoute,
+  AuthenticatedRolesRoute: AuthenticatedRolesRoute,
   AuthenticatedTicketsRoute: AuthenticatedTicketsRoute,
   AuthenticatedTiersRoute: AuthenticatedTiersRoute,
   AuthenticatedUsersRoute: AuthenticatedUsersRoute,

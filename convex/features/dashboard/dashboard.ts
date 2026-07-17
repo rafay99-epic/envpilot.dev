@@ -3,7 +3,13 @@ import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers } from "../../lib/users";
 import { resolveFeatureValue } from "../featureRegistry/resolver";
-import { normalizeOrgRole } from "../../lib/authz";
+import {
+  normalizeOrgRole,
+  getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  hasCapability,
+} from "../../lib/authz";
 import { requireAuthedUser } from "../../lib/identity";
 
 /**
@@ -148,10 +154,14 @@ export const getRecentActivity = query({
 
     const orgRole = normalizeOrgRole(membership.role);
 
-    // Developers are scoped to the projects they're assigned to. Resolve the
-    // assigned project set once so we can drop out-of-scope entries.
+    // Non-owner-class roles without the org-wide audit capability are scoped
+    // to their assigned projects. Resolve the assigned set once.
+    const activityProfile = await getRoleProfile(ctx, orgRole);
     let assignedProjectIds: Set<string> | null = null;
-    if (orgRole === "developer") {
+    if (
+      !bypassesAssignment(activityProfile) &&
+      !hasCapability(activityProfile, "org.audit.view")
+    ) {
       const assignments = await ctx.db
         .query("projectMembers")
         .withIndex("by_user", (q) => q.eq("userId", actor._id))

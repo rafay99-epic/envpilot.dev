@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
-import { isSuspendedMembership } from "../../lib/authz";
+import {
+  getRoleProfile,
+  hasCapability,
+  isSuspendedMembership,
+  normalizeOrgRole,
+} from "../../lib/authz";
 
 /**
  * Organization Queries and Mutations
@@ -127,20 +132,32 @@ export const getMembersInternal = internalQuery({
       )
       .collect();
 
+    // Resolve notify eligibility here (queries have ctx.db; the consuming
+    // email ACTION does not). Resolve each distinct slug ONCE before the
+    // fan-out — a memo inside Promise.all would race past its own cache.
+    const notifyMemo = new Map<string, boolean>();
+    for (const membership of memberships) {
+      const slug = normalizeOrgRole(membership.role);
+      if (!notifyMemo.has(slug)) {
+        const profile = await getRoleProfile(ctx, slug);
+        notifyMemo.set(slug, hasCapability(profile, "notify.variable_changes"));
+      }
+    }
     const members = await Promise.all(
       memberships.map(async (membership) => {
         const user = await ctx.db.get(membership.userId);
-        return user
-          ? {
-              ...membership,
-              user: {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-                avatarUrl: user.avatarUrl,
-              },
-            }
-          : null;
+        if (!user) return null;
+        const slug = normalizeOrgRole(membership.role);
+        return {
+          ...membership,
+          notifyVariableChanges: notifyMemo.get(slug) === true,
+          user: {
+            _id: user._id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+          },
+        };
       })
     );
 

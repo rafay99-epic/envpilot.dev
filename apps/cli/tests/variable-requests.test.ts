@@ -5,6 +5,7 @@ import {
   buildCreateVariableRequestBody,
   buildEligibleRequestTargets,
   buildProjectChoices,
+  canSubmitRequests,
   formatProjectChoiceLabel,
   formatRequestContextBanner,
   formatRequestRow,
@@ -157,6 +158,36 @@ describe("buildCreateVariableRequestBody", () => {
   });
 });
 
+describe("canSubmitRequests", () => {
+  it("is capability-driven when a capability map is present", () => {
+    expect(
+      canSubmitRequests({
+        capabilities: { "project.requests.submit": true },
+        role: "owner", // role slug is ignored when capabilities are present
+      })
+    ).toBe(true);
+    expect(
+      canSubmitRequests({
+        capabilities: { "project.requests.submit": false },
+        role: "developer",
+      })
+    ).toBe(false);
+    // A map without the key fails closed.
+    expect(canSubmitRequests({ capabilities: {}, role: "developer" })).toBe(
+      false
+    );
+  });
+
+  it("falls back to the developer-role rule without capabilities", () => {
+    expect(canSubmitRequests({ role: "developer" })).toBe(true);
+    expect(canSubmitRequests({ role: "member" })).toBe(true);
+    expect(canSubmitRequests({ role: "owner" })).toBe(false);
+    expect(canSubmitRequests({ capabilities: null, role: "developer" })).toBe(
+      true
+    );
+  });
+});
+
 describe("isRequestEligibleProject", () => {
   it("accepts an assigned developer (unified role)", () => {
     expect(
@@ -188,6 +219,33 @@ describe("isRequestEligibleProject", () => {
     expect(isRequestEligibleProject({ role: "admin", assigned: true })).toBe(
       false
     );
+  });
+
+  it("uses capabilities over the role slug when present (custom roles)", () => {
+    // A custom role that may submit requests is eligible…
+    expect(
+      isRequestEligibleProject({
+        unifiedRole: "release_captain",
+        assigned: true,
+        capabilities: { "project.requests.submit": true },
+      })
+    ).toBe(true);
+    // …and a developer whose registry role lost the capability is not.
+    expect(
+      isRequestEligibleProject({
+        unifiedRole: "developer",
+        assigned: true,
+        capabilities: { "project.requests.submit": false },
+      })
+    ).toBe(false);
+    // Assignment is still required even with the capability.
+    expect(
+      isRequestEligibleProject({
+        unifiedRole: "release_captain",
+        assigned: false,
+        capabilities: { "project.requests.submit": true },
+      })
+    ).toBe(false);
   });
 });
 

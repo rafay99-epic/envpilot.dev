@@ -4,15 +4,16 @@ import { hasE2ECredentials, SKIP_REASON } from "../env";
 import { getOwnedOrgSlug, trackClientErrors } from "./support";
 
 // Authenticated e2e — org members invite panel role dropdown. Confirms the
-// role <select> is driven by assignableRoles(actorRole) (lib/roles.ts) and,
-// since the E2E user is an org OWNER, lists all four unified roles. This
-// spec never submits the invite — it only opens the panel and inspects the
-// dropdown, so nothing is written.
+// role <select> is populated from the role registry (listAssignableRoles)
+// and, since the E2E user is an org OWNER, lists every seeded registry role
+// sorted by level (owner 100 … viewer 20). This spec never submits the
+// invite — it only opens the panel and inspects the dropdown, so nothing is
+// written.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
 test.describe("org members invite panel — role dropdown", () => {
-  test("lists the unified roles for an owner (Owner/Project Manager/Team Lead/Developer)", async ({
+  test("lists the registry roles for an owner (incl. Editor and Viewer)", async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -33,16 +34,29 @@ test.describe("org members invite panel — role dropdown", () => {
 
     const roleSelect = drawer.locator("select#role");
     await expect(roleSelect).toBeVisible();
+
+    // The options arrive from the listAssignableRoles Convex query — wait
+    // until the registry roles have populated the select.
+    await expect(roleSelect.locator("option")).toHaveCount(6, {
+      timeout: 15_000,
+    });
     const roleLabels = (
       await roleSelect.locator("option").allTextContents()
     ).map((t) => t.trim());
 
-    // assignableRoles(owner) returns the full ORG_ROLES list in declared
-    // order: owner, project_manager, team_lead, developer.
+    // Registry roles sorted by level desc: owner 100, project_manager 80,
+    // team_lead 60, editor 50, developer 40, viewer 20.
     expect(
       roleLabels,
-      `expected all four unified role labels for an owner invite, got ${JSON.stringify(roleLabels)}`
-    ).toEqual(["Owner", "Project Manager", "Team Lead", "Developer"]);
+      `expected the six registry role labels for an owner invite, got ${JSON.stringify(roleLabels)}`
+    ).toEqual([
+      "Owner",
+      "Project Manager",
+      "Team Lead",
+      "Editor",
+      "Developer",
+      "Viewer",
+    ]);
 
     // Close without inviting anyone — read-only spec.
     await page.keyboard.press("Escape");

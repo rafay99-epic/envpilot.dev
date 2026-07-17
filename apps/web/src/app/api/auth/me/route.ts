@@ -86,7 +86,11 @@ export async function GET(request: Request) {
             api.features.auth.queries.getMyPermissions,
             { organizationId: activeOrganization._id as Id<"organizations"> }
           )
-        : Promise.resolve({ actions: [] }),
+        : Promise.resolve({
+            actions: [],
+            capabilities: {} as Record<string, boolean>,
+            roleMeta: null,
+          }),
     ]);
 
     const activeTierIndex = activeOrganization
@@ -112,6 +116,8 @@ export async function GET(request: Request) {
         user: authUser,
         organization,
         actions: perms.actions,
+        capabilities: perms.capabilities,
+        roleMeta: perms.roleMeta,
         organizations: organizations.map((org, index) => ({
           id: org._id,
           name: org.name,

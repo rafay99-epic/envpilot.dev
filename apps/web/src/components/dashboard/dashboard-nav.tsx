@@ -94,7 +94,7 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization, user } = useAuthContext();
+  const { organization, roleMeta, user } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
@@ -102,7 +102,8 @@ export function DashboardNav() {
 
   // Mirror the per-page <RequireRole> guards so the nav only shows pages the
   // current role can actually open (unknown/loading role → developer level).
-  const level = roleLevel(organization?.role);
+  // Server-resolved registry level first — static map scores custom roles 0.
+  const level = roleMeta?.level ?? roleLevel(organization?.role);
   const isOwner = level >= ROLE_LEVEL.owner;
   const isProjectManagerPlus = level >= ROLE_LEVEL.project_manager;
   const isTeamLeadPlus = level >= ROLE_LEVEL.team_lead;
