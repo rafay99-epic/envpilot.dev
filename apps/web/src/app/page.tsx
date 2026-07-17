@@ -3,6 +3,7 @@ import LandingPage from "@/components/landing/LandingPage";
 import { convex } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import type { PricingData } from "@/components/pricing/PricingContent";
+import { FAQ_ITEMS } from "@/components/landing/faq-data";
 
 export const revalidate = 300; // refresh pricing data every 5 minutes
 
@@ -22,7 +23,7 @@ const softwareAppSchema = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows, Web",
   description:
-    "Securely manage, share, and sync environment variables across your team. CLI, VS Code extension, and web dashboard with role-based access control.",
+    "Stop pasting .env files into Slack. Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard with role-based access control.",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -30,6 +31,18 @@ const softwareAppSchema = {
     description: "Free plan — no credit card required",
   },
   publisher: { "@id": `${baseUrl}/#organization` },
+};
+
+// Rich-result eligibility for the questions buyers actually search — content
+// is shared with the visible landing FAQ section so the two never drift.
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: { "@type": "Answer", text: item.answer },
+  })),
 };
 
 export default async function HomePage() {
@@ -52,6 +65,10 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
       <LandingPage
         pricingData={pricingData}

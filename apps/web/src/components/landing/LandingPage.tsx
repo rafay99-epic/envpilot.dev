@@ -35,9 +35,12 @@ import {
   StaggerItem,
   fadeUp,
   staggerContainer,
+  SITE_URLS,
   type TerminalScene,
 } from "@/components/marketing";
 import type { PricingData } from "@/components/pricing/PricingContent";
+import { APP_VERSIONS } from "@/lib/versions";
+import { FAQ_ITEMS } from "./faq-data";
 
 /* ────────────────────────────── hero ────────────────────────────── */
 
@@ -46,7 +49,7 @@ const HERO_SCENES: TerminalScene[] = [
     command: "envpilot run -- bun dev",
     output: [
       { text: "✓ Injected 47 variables from backend-api/staging", tone: "ok" },
-      { text: "⚡ fingerprint cache hit — ready in 0.3s", tone: "dim" },
+      { text: "↻ fingerprint cache hit — ready in 0.3s", tone: "dim" },
       { text: "$ bun dev — server listening on :3000", tone: "out" },
     ],
   },
@@ -54,7 +57,7 @@ const HERO_SCENES: TerminalScene[] = [
     command: "envpilot pull --env production",
     output: [
       { text: "✓ Pulled 32 variables from backend-api/production", tone: "ok" },
-      { text: "🔒 decrypted in memory — nothing written to disk", tone: "dim" },
+      { text: "✓ decrypted in memory — nothing written to disk", tone: "dim" },
     ],
   },
   {
@@ -76,10 +79,10 @@ const HERO_SCENES: TerminalScene[] = [
 ];
 
 const HERO_STATS = [
-  { value: "AES-256", label: "encryption at rest" },
-  { value: "40+", label: "audit event types" },
-  { value: "3", label: "synced surfaces" },
+  { value: "AES-256", label: "encrypted in vault" },
   { value: "0", label: "plaintext secrets stored" },
+  { value: "< 2 min", label: "to first injected secret" },
+  { value: "$0", label: "for small teams · no card" },
 ];
 
 function InstallChip() {
@@ -139,10 +142,10 @@ function Hero() {
           variants={fadeUp}
           className="mx-auto mt-8 max-w-4xl font-sans text-4xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-5xl md:text-7xl"
         >
-          Secrets management
+          Stop pasting .env files
           <br />
           <span className="gradient-text-green text-glow-green">
-            from your terminal.
+            into Slack.
           </span>
         </motion.h1>
 
@@ -150,9 +153,9 @@ function Hero() {
           variants={fadeUp}
           className="mx-auto mt-6 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500 md:text-base"
         >
-          Stop sharing .env files over Slack. AES-256 encrypted storage,
-          role-based access, and runtime injection — for teams that live in the
-          terminal.
+          Envpilot keeps your team&apos;s environment variables in sync — CLI,
+          VS Code extension, and web dashboard. Encrypted end to end. Free for
+          small teams, no credit card.
         </motion.p>
 
         <motion.div
@@ -208,44 +211,54 @@ function Hero() {
   );
 }
 
-/* ─────────────────────────── command marquee ─────────────────────────── */
+/* ─────────────────────────── proof bar ─────────────────────────── */
 
-const MARQUEE_COMMANDS = [
-  "envpilot run -- bun dev",
-  "envpilot pull --env production",
-  "envpilot push --env staging --dry-run",
-  "envpilot switch production",
-  "envpilot list variables --show-values",
-  "envpilot audit --days 90 --format json",
-  "envpilot run --print",
-  "envpilot login",
-  "envpilot init",
+const PROOF_BADGES = [
+  {
+    strong: "npm",
+    label: `@envpilot/cli · v${APP_VERSIONS.cli}`,
+    href: "https://www.npmjs.com/package/@envpilot/cli",
+  },
+  {
+    strong: "VS Code",
+    label: `Marketplace · v${APP_VERSIONS.extension}`,
+    href: "https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot",
+  },
+  {
+    strong: "GitHub Action",
+    label: "envpilot-action@v1",
+    href: "https://github.com/rafay99-epic/envpilot-action",
+  },
+  {
+    strong: "MCP",
+    label: "server for AI agents",
+    href: `${SITE_URLS.docs}/mcp-server`,
+  },
+  {
+    strong: "changelog",
+    label: "shipping weekly",
+    href: "/changelog",
+  },
 ];
 
-function CommandMarquee() {
-  const items = [...MARQUEE_COMMANDS, ...MARQUEE_COMMANDS];
+function ProofBar() {
   return (
     <div className="relative border-y border-zinc-800/60 bg-zinc-900/30 py-5">
-      <div
-        className="overflow-hidden"
-        style={{
-          maskImage:
-            "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-          WebkitMaskImage:
-            "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-        }}
-      >
-        <div className="animate-marquee flex w-max gap-10">
-          {items.map((cmd, i) => (
-            <span
-              key={`${cmd}-${i}`}
-              className="whitespace-nowrap font-mono text-xs text-zinc-600"
-            >
-              <span className="mr-2 text-green-500/70">❯</span>
-              {cmd}
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 sm:px-6">
+        {PROOF_BADGES.map((badge) => (
+          <a
+            key={badge.strong}
+            href={badge.href}
+            target={badge.href.startsWith("/") ? undefined : "_blank"}
+            rel={badge.href.startsWith("/") ? undefined : "noopener noreferrer"}
+            className="group inline-flex items-center gap-2 font-mono text-xs text-zinc-500 transition-colors hover:text-zinc-200"
+          >
+            <span className="font-semibold text-green-400/90">
+              {badge.strong}
             </span>
-          ))}
-        </div>
+            {badge.label}
+          </a>
+        ))}
       </div>
     </div>
   );
@@ -547,7 +560,7 @@ function BeforeAfter() {
                 </p>
                 <p className="text-green-400/80">
                   ✓ Injected 12 vars from backend/staging{" "}
-                  <span className="text-zinc-600">⚡ cache (4s ago)</span>
+                  <span className="text-zinc-600">↻ cache (4s ago)</span>
                 </p>
                 <p className="text-zinc-500">
                   <span className="text-amber-400">DATABASE_URL</span>
@@ -892,6 +905,188 @@ function Pricing({
   );
 }
 
+/* ────────────────────────────── trust ────────────────────────────── */
+
+// Real, permissioned quotes ONLY — never invent people. When the first real
+// quote lands (name + role + link to the actual tweet/profile), add it here
+// and the tweet-style grid appears automatically. Research note: for dev
+// tools, ONE verifiable quote with a face beats a wall of anonymous praise.
+const TESTIMONIALS: {
+  quote: string;
+  name: string;
+  role: string;
+  href?: string;
+}[] = [];
+
+function TrustSection() {
+  return (
+    <section className="relative py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <SectionHeading
+          eyebrow="community"
+          title={
+            <>
+              Built in the <span className="text-green-400">open</span>
+            </>
+          }
+          description="No logo wall, no invented praise — a real product, a reachable founder, and a public changelog you can hold us to."
+        />
+
+        <Reveal className="mt-14">
+          <GlowCard>
+            <div className="grid gap-8 p-8 lg:grid-cols-[1fr_260px] lg:gap-12">
+              {/* Founder */}
+              <div>
+                <div className="flex items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 font-sans text-sm font-bold text-green-400">
+                    AR
+                  </span>
+                  <div>
+                    <p className="font-sans text-sm font-semibold text-zinc-100">
+                      Abdul Rafay
+                    </p>
+                    <p className="font-mono text-[11px] text-zinc-500">
+                      founder &amp; the person answering your support email
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-5 max-w-xl font-sans text-base leading-relaxed text-zinc-300">
+                  &ldquo;I built Envpilot after watching one too many production
+                  keys get pasted into Slack channels half the company could
+                  scroll. It&apos;s the tool I wanted: encrypted, synced, and
+                  boring to use.&rdquo;
+                </p>
+              </div>
+
+              {/* Live links + feedback CTA */}
+              <div className="flex flex-col gap-3 border-zinc-800/80 font-mono text-xs lg:border-l lg:pl-10">
+                <Link
+                  href="/changelog"
+                  className="inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
+                >
+                  <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                  changelog — shipping weekly
+                </Link>
+                <Link
+                  href="/wishlist"
+                  className="inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                  public roadmap
+                </Link>
+                <p className="mt-3 text-zinc-600">
+                  Using Envpilot? The best lines end up here with your name on
+                  them.
+                </p>
+                <a
+                  href="mailto:ceo@envpilot.dev?subject=Envpilot%20feedback"
+                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 font-semibold text-green-400 transition-colors hover:bg-green-500/20"
+                >
+                  ceo@envpilot.dev
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+          </GlowCard>
+        </Reveal>
+
+        {TESTIMONIALS.length > 0 && (
+          <Stagger className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <StaggerItem key={t.quote}>
+                <GlowCard className="h-full">
+                  <div className="flex h-full flex-col p-6">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-sans text-xs font-bold text-zinc-300">
+                        {t.name
+                          .split(" ")
+                          .map((w) => w[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        {t.href ? (
+                          <a
+                            href={t.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block truncate font-sans text-xs font-semibold text-zinc-100 transition-colors hover:text-green-400"
+                          >
+                            {t.name}
+                          </a>
+                        ) : (
+                          <p className="truncate font-sans text-xs font-semibold text-zinc-100">
+                            {t.name}
+                          </p>
+                        )}
+                        <p className="truncate font-mono text-[11px] text-zinc-500">
+                          {t.role}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-4 font-sans text-sm leading-relaxed text-zinc-300">
+                      {t.quote}
+                    </p>
+                  </div>
+                </GlowCard>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────── faq ────────────────────────────── */
+
+function Faq() {
+  return (
+    <section id="faq" className="relative scroll-mt-20 py-28">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <SectionHeading
+          eyebrow="faq"
+          title={
+            <>
+              Before you <span className="text-green-400">ask</span>
+            </>
+          }
+          align="center"
+          className="items-center"
+        />
+        <div className="mt-12 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
+          {FAQ_ITEMS.map((item) => (
+            <details key={item.question} className="group py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-sans text-sm font-medium text-zinc-200 [&::-webkit-details-marker]:hidden">
+                {item.question}
+                <span
+                  aria-hidden
+                  className="font-mono text-green-500 transition-transform group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <p className="mt-3 max-w-2xl font-mono text-xs leading-relaxed text-zinc-500">
+                {item.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+        <Reveal className="mt-8 text-center">
+          <Link
+            href="/faq"
+            className="inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 transition-colors hover:text-green-400"
+          >
+            More questions answered
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ────────────────────────────── final CTA ────────────────────────────── */
 
 function FinalCTA() {
@@ -907,9 +1102,9 @@ function FinalCTA() {
             {"// ready when you are"}
           </span>
           <h2 className="mt-6 font-sans text-3xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-4xl md:text-6xl">
-            Stop pasting secrets
+            The last .env file
             <br />
-            <span className="gradient-text-green">into Slack.</span>
+            <span className="gradient-text-green">you&apos;ll ever paste.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-mono text-sm leading-relaxed text-zinc-500">
             Set up your first project in under two minutes. Free plan, no credit
@@ -956,7 +1151,7 @@ function FinalCTA() {
             </Link>
           </motion.div>
           <Link
-            href="/docs"
+            href={SITE_URLS.docs}
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-7 py-3.5 font-mono text-sm text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-200"
           >
             <GitBranch className="h-4 w-4" />
@@ -987,12 +1182,14 @@ export default function LandingPage({
         style={{ scaleX: scrollYProgress }}
       />
       <Hero />
-      <CommandMarquee />
-      <FeaturesBento />
-      <Workflow />
+      <ProofBar />
       <BeforeAfter />
+      <Workflow />
+      <FeaturesBento />
       <Platform />
+      <TrustSection />
       <Pricing pricingData={pricingData} paymentsEnabled={paymentsEnabled} />
+      <Faq />
       <FinalCTA />
     </MarketingShell>
   );

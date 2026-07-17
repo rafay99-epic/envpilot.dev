@@ -22,11 +22,11 @@ const ogImageJpg = `${baseUrl}/og-image.jpg`;
 
 export const metadata: Metadata = {
   title: {
-    default: "Envpilot — Secure Environment Variable Management",
+    default: "Envpilot — Stop Pasting .env Files Into Slack",
     template: "%s | Envpilot",
   },
   description:
-    "Securely manage, share, and sync environment variables across your team. CLI, VS Code extension, and web dashboard with role-based access control.",
+    "Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard with role-based access control.",
   metadataBase: new URL(baseUrl),
   // NOTE: no root-level `alternates.canonical` — it would be inherited by
   // every page that doesn't override it, telling crawlers all subpages are
@@ -35,9 +35,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Envpilot",
-    title: "Envpilot — Secure Environment Variable Management",
+    title: "Envpilot — Stop Pasting .env Files Into Slack",
     description:
-      "Securely manage, share, and sync environment variables across your team with CLI, VS Code extension, and web dashboard.",
+      "Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard.",
     url: baseUrl,
     locale: "en_US",
     images: [
@@ -47,22 +47,21 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         type: "image/png",
-        alt: "Envpilot — Secure Environment Variable Management",
+        alt: "Envpilot — Stop Pasting .env Files Into Slack",
       },
     ],
   },
   // Twitter / X — uses JPEG for faster crawler fetching (123KB vs 852KB PNG)
   twitter: {
     card: "summary_large_image",
-    title: "Envpilot — Secure Environment Variable Management",
-    description:
-      "Securely manage, share, and sync environment variables across your team.",
+    title: "Envpilot — Stop Pasting .env Files Into Slack",
+    description: "Envpilot keeps your team's environment variables in sync.",
     images: [
       {
         url: ogImageJpg,
         width: 1200,
         height: 630,
-        alt: "Envpilot — Secure Environment Variable Management",
+        alt: "Envpilot — Stop Pasting .env Files Into Slack",
       },
     ],
     site: "@envpilot",
