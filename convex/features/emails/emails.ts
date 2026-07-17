@@ -96,7 +96,9 @@ export const sendInvitationEmail = action({
       v.literal("owner"),
       v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("editor"),
       v.literal("developer"),
+      v.literal("viewer"),
       // Legacy values (pre unified-roles migration)
       v.literal("admin"),
       v.literal("member")
@@ -120,7 +122,9 @@ export const sendInvitationEmail = action({
       owner: "Owner",
       project_manager: "Project Manager",
       team_lead: "Team Lead",
+      editor: "Editor",
       developer: "Developer",
+      viewer: "Viewer",
       admin: "Owner",
       member: "Developer",
     };

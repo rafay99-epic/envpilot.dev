@@ -123,7 +123,11 @@ export const listOrgVariablesWithAccess = query({
     // Owners and assigned PMs/TLs have blanket write; developers depend on
     // per-variable grants (resolved below).
     const roleWrite =
-      isOwner || orgRole === "project_manager" || orgRole === "team_lead";
+      isOwner ||
+      orgRole === "project_manager" ||
+      orgRole === "team_lead" ||
+      orgRole === "editor";
+    const roleRead = orgRole === "viewer";
 
     // Prefetch the caller's active grants ONCE (only developers consult them,
     // but a single indexed query is far cheaper than one per variable).
@@ -150,7 +154,7 @@ export const listOrgVariablesWithAccess = query({
 
     for (const project of accessibleProjects) {
       const environmentScope =
-        orgRole === "developer"
+        orgRole === "developer" || orgRole === "editor" || orgRole === "viewer"
           ? scopeByProject.get(project._id as string)
           : undefined;
 
@@ -172,11 +176,14 @@ export const listOrgVariablesWithAccess = query({
         let access: "write" | "read" | null = null;
         if (roleWrite) {
           access = "write";
+        } else if (roleRead) {
+          // Viewer — blanket read in assigned projects, no grants involved
+          access = "read";
         } else {
-          // Developer — resolve per-variable grant from the prefetched map
+          // Developer — grants cap at read (LOCKDOWN: read+request-only)
           const grant = grantByVariable.get(variable._id as string) ?? null;
           if (grant) {
-            access = grant.permission === "read" ? "read" : "write";
+            access = "read";
           }
         }
 
@@ -283,8 +290,14 @@ export const listOrgVariablesWithAccessPaginated = query({
     const assigned = !isOwner;
     const roleAccess =
       isOwner ||
+      (assigned &&
+        (orgRole === "project_manager" ||
+          orgRole === "team_lead" ||
+          orgRole === "editor"));
+    const roleRead = assigned && orgRole === "viewer";
+    const canManagePermissions =
+      isOwner ||
       (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-    const canManagePermissions = roleAccess;
     const projectRole = toLegacyProjectRole(orgRole, assigned);
 
     // Prefetch the caller's active grants ONCE (only developers consult them).
@@ -355,7 +368,7 @@ export const listOrgVariablesWithAccessPaginated = query({
     } else {
       const project = accessibleProjects[pi];
       const environmentScope =
-        orgRole === "developer"
+        orgRole === "developer" || orgRole === "editor" || orgRole === "viewer"
           ? scopeByProject.get(project._id as string)
           : undefined;
 
@@ -379,14 +392,18 @@ export const listOrgVariablesWithAccessPaginated = query({
         let access: "write" | "read" | null = null;
         if (roleAccess) {
           access = "write";
+        } else if (roleRead) {
+          // Viewer — blanket read, no grants involved
+          access = "read";
         } else if (grant) {
-          access = !assigned || grant.permission === "read" ? "read" : "write";
+          // LOCKDOWN: grants cap at read (developers are read+request-only)
+          access = "read";
         }
 
         // Not accessible → skip entirely (identical to the non-paginated list).
         if (access === null) continue;
 
-        const effectivePermission = roleAccess ? "admin" : access;
+        const effectivePermission = canManagePermissions ? "admin" : access;
         const { vaultRef, ...metadata } = variable;
         page.push({
           ...metadata,
@@ -996,10 +1013,12 @@ export const globalSearchWithAccess = query({
         // Resolve tags for variables in this project batch (one batched fetch)
         await preloadTags(variables);
 
-        // Scoped developers never receive out-of-scope variables at all —
-        // not even their metadata/keys
+        // Scoped developers/editors/viewers never receive out-of-scope
+        // variables at all — not even their metadata/keys
         const environmentScope =
-          orgRole === "developer"
+          orgRole === "developer" ||
+          orgRole === "editor" ||
+          orgRole === "viewer"
             ? scopeByProject.get(project._id as string)
             : undefined;
 

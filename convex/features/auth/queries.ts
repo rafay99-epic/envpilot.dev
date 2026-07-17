@@ -33,7 +33,9 @@ export const getMyPermissions = query({
       v.literal("owner"),
       v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("editor"),
       v.literal("developer"),
+      v.literal("viewer"),
       v.null()
     ),
     assigned: v.boolean(),
@@ -173,7 +175,7 @@ export const resolveLegacyRoles = query({
         )
         .first();
       assigned = projectMembership !== null;
-      if (role === "developer") {
+      if (role === "developer" || role === "editor" || role === "viewer") {
         environmentScope = projectMembership?.environments ?? null;
       }
     }

@@ -110,7 +110,9 @@ const orgRoleValidator = v.union(
   v.literal("owner"),
   v.literal("project_manager"),
   v.literal("team_lead"),
-  v.literal("developer")
+  v.literal("editor"),
+  v.literal("developer"),
+  v.literal("viewer")
 );
 
 // ==========================================

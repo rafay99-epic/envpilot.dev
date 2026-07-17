@@ -119,17 +119,29 @@ export async function resolveProjectAccessContext(
       )
       .first();
     assigned = !!projectMembership;
-    // Environment scope only constrains assigned developers
-    if (orgRole === "developer") {
+    // Environment scope constrains assigned developers / editors / viewers
+    if (
+      orgRole === "developer" ||
+      orgRole === "editor" ||
+      orgRole === "viewer"
+    ) {
       environmentScope = projectMembership?.environments;
     }
   }
 
-  // Owners and assigned PMs/team leads have blanket write access
+  // Owners, assigned PMs/team leads, and assigned editors have blanket write
+  // access. Assigned viewers get blanket READ (auditor role, resolved in
+  // mapVariableRow). Permission management stays a people-power: editors
+  // write variables but never manage grants.
   const roleAccess =
     isOwner ||
+    (assigned &&
+      (orgRole === "project_manager" ||
+        orgRole === "team_lead" ||
+        orgRole === "editor"));
+  const canManagePermissions =
+    isOwner ||
     (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-  const canManagePermissions = roleAccess;
   const projectRole = toLegacyProjectRole(orgRole, assigned);
 
   // Prefetch the caller's active grants ONCE instead of one indexed query
@@ -188,13 +200,24 @@ export function mapVariableRow(
   let effectiveAccess: "write" | "read" | null = null;
   if (roleAccess) {
     effectiveAccess = "write";
+  } else if (assigned && orgRole === "viewer") {
+    // Viewer: blanket read in assigned projects — no grants involved.
+    effectiveAccess = "read";
   } else if (grant) {
-    effectiveAccess =
-      !assigned || grant.permission === "read" ? "read" : "write";
+    // LOCKDOWN: grants cap at read — assigned developers are read+request-
+    // only (mirrors getVariableAccess), unassigned grant holders were
+    // already read-capped.
+    effectiveAccess = "read";
   }
 
   const hasAccess = effectiveAccess !== null;
-  const effectivePermission = roleAccess ? "admin" : effectiveAccess;
+  // "admin" marks rows whose holder may manage permissions (PM/TL/owner) —
+  // editors have write access but must not surface management UI.
+  const effectivePermission = canManagePermissions
+    ? "admin"
+    : roleAccess
+      ? "write"
+      : effectiveAccess;
 
   const { vaultRef, ...metadata } = variable;
 

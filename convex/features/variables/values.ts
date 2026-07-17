@@ -31,7 +31,13 @@ type PullResult = {
   meta: {
     role: "admin" | "team_lead" | "member";
     projectRole: "manager" | "developer" | "viewer" | null;
-    unifiedRole: "owner" | "project_manager" | "team_lead" | "developer";
+    unifiedRole:
+      | "owner"
+      | "project_manager"
+      | "team_lead"
+      | "editor"
+      | "developer"
+      | "viewer";
     assigned: boolean;
     grantOnly: boolean;
     environmentScope: string[] | null;
@@ -257,13 +263,16 @@ export const pullValues = action({
     const roleHasBlanketWrite =
       (legacy.role === "owner" ||
         legacy.role === "project_manager" ||
-        legacy.role === "team_lead") &&
+        legacy.role === "team_lead" ||
+        legacy.role === "editor") &&
       legacy.assigned;
     const hasWriteAccess =
       roleHasBlanketWrite ||
       variables.some((entry) => entry.access === "write");
     const scopeRestricted =
-      legacy.role === "developer" &&
+      (legacy.role === "developer" ||
+        legacy.role === "editor" ||
+        legacy.role === "viewer") &&
       legacy.assigned &&
       legacy.environmentScope !== null;
 
@@ -810,7 +819,9 @@ export const importValues = action({
       throw new Error("You are not a member of this organization");
     }
 
-    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.team_lead;
+    // Editors import directly (blanket write); developers go through
+    // requests; viewers can do neither (request creation rejects them).
+    const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.editor;
 
     let created = 0;
     let updated = 0;

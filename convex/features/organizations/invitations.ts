@@ -103,7 +103,9 @@ export const create = mutation({
       v.literal("owner"),
       v.literal("project_manager"),
       v.literal("team_lead"),
-      v.literal("developer")
+      v.literal("editor"),
+      v.literal("developer"),
+      v.literal("viewer")
     ),
     projectIds: v.optional(v.array(v.id("projects"))),
     // Environment scope applied to the created project assignments on
@@ -323,10 +325,15 @@ export const accept = mutation({
       invitation.projectIds.length > 0 &&
       invitedRole !== "owner"
     ) {
-      // Environment scope only constrains developers — owners, PMs, and team
-      // leads are always unrestricted, so a scope on the invitation is ignored
+      // Environment scope constrains developers/editors/viewers — owners,
+      // PMs, and team leads are always unrestricted, so a scope on the
+      // invitation is ignored for them
       const environmentScope =
-        invitedRole === "developer" ? invitation.environments : undefined;
+        invitedRole === "developer" ||
+        invitedRole === "editor" ||
+        invitedRole === "viewer"
+          ? invitation.environments
+          : undefined;
 
       for (const projectId of invitation.projectIds) {
         const project = await ctx.db.get(projectId);
@@ -357,7 +364,9 @@ export const accept = mutation({
         role: invitedRole,
         projectIds: invitation.projectIds,
         environments:
-          invitedRole === "developer"
+          invitedRole === "developer" ||
+          invitedRole === "editor" ||
+          invitedRole === "viewer"
             ? (invitation.environments ?? "all")
             : "all",
       }),

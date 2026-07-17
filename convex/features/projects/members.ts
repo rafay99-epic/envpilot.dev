@@ -258,10 +258,14 @@ export const addMember = mutation({
       );
     }
 
-    // Environment scope only constrains developers — owners, PMs, and team
-    // leads are always unrestricted, so a scope on their assignment is ignored
+    // Environment scope constrains developers/editors/viewers — owners,
+    // PMs, and team leads are always unrestricted, so a scope on their
+    // assignment is ignored
+    const scopedRole = normalizeOrgRole(targetOrgMembership.role);
     const environmentScope =
-      normalizeOrgRole(targetOrgMembership.role) === "developer"
+      scopedRole === "developer" ||
+      scopedRole === "editor" ||
+      scopedRole === "viewer"
         ? args.environments
         : undefined;
 
@@ -481,11 +485,16 @@ export const setMemberEnvironments = mutation({
       throw new Error("Target user is not a member of the organization");
     }
 
-    // Environment scopes only constrain developers — everyone else always
-    // has access to all environments
-    if (normalizeOrgRole(targetOrgMembership.role) !== "developer") {
+    // Environment scopes only constrain developers, editors, and viewers —
+    // owners/PMs/team leads always have access to all environments
+    const targetRole = normalizeOrgRole(targetOrgMembership.role);
+    if (
+      targetRole !== "developer" &&
+      targetRole !== "editor" &&
+      targetRole !== "viewer"
+    ) {
       throw new Error(
-        "Environment scopes only apply to developers — owners, project managers, and team leads always have access to all environments"
+        "Environment scopes only apply to developers, editors, and viewers — owners, project managers, and team leads always have access to all environments"
       );
     }
 

@@ -104,17 +104,28 @@ export const listWithAccess = query({
         )
         .first();
       assigned = !!projectMembership;
-      // Environment scope only constrains assigned developers
-      if (orgRole === "developer") {
+      // Environment scope constrains assigned developers/editors/viewers
+      if (
+        orgRole === "developer" ||
+        orgRole === "editor" ||
+        orgRole === "viewer"
+      ) {
         environmentScope = projectMembership?.environments;
       }
     }
 
-    // Owners and assigned PMs/team leads have blanket write access
+    // Owners, assigned PMs/team leads, and assigned editors have blanket
+    // write access; permission management stays PM/TL/owner (people-power).
     const roleAccess =
       isOwner ||
+      (assigned &&
+        (orgRole === "project_manager" ||
+          orgRole === "team_lead" ||
+          orgRole === "editor"));
+    const roleRead = assigned && orgRole === "viewer";
+    const canManagePermissions =
+      isOwner ||
       (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-    const canManagePermissions = roleAccess;
     const projectRole = toLegacyProjectRole(orgRole, assigned);
 
     const allAccounts = await ctx.db
@@ -143,17 +154,20 @@ export const listWithAccess = query({
     const accountsWithAccess = accounts.map((account) => {
       const grant = grantByAccount.get(account._id as string) ?? null;
 
-      // Mirrors getAccountAccess: owner → write; assigned PM/TL → write;
-      // developers per grant; unassigned grant holders capped at read.
+      // Mirrors getAccountAccess: owner → write; assigned PM/TL/editor →
+      // write; assigned viewer → read; grants cap at read (LOCKDOWN:
+      // developers are read+request-only).
       let access: "write" | "read" | null = null;
       if (roleAccess) {
         access = "write";
+      } else if (roleRead) {
+        access = "read";
       } else if (grant) {
-        access = !assigned || grant.permission === "read" ? "read" : "write";
+        access = "read";
       }
 
       const hasAccess = access !== null;
-      const effectivePermission = roleAccess ? "admin" : access;
+      const effectivePermission = canManagePermissions ? "admin" : access;
 
       // Vault refs are only returned for accounts the user can access;
       // assigned members still see metadata for the rest.
