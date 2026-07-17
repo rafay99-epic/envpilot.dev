@@ -1,0 +1,23 @@
+.circleci/jobs.yml
+  s_c0d41f513c83f7::t_c12a3eeff84195 298
+convex/_generated/api.d.ts
+  s_c0d41f513c83f7::t_5b56b2f857e0e9 105,109,223,227
+convex/features/admin/migrations.ts
+  s_c0d41f513c83f7::t_1c0b1049fde112 6,42-59,318-458
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a5ff2a7c6eb809f0061010f0a5fa043d8ac11902",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
