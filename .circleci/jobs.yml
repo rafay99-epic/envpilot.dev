@@ -431,23 +431,31 @@ jobs:
           command: |
             [ -n "$WORKOS_CLIENT_ID" ] || { echo "ERROR: WORKOS_CLIENT_ID empty in step shell"; exit 1; }
             [ -n "$NEXT_PUBLIC_CONVEX_URL" ] || { echo "ERROR: NEXT_PUBLIC_CONVEX_URL empty in step shell"; exit 1; }
+            command -v unzip >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq unzip; }
             bun run package
             grep -rqF "$WORKOS_CLIENT_ID" dist || { echo "ERROR: client id missing from dist straight after the step-shell build."; exit 1; }
+            grep -rqF "$NEXT_PUBLIC_CONVEX_URL" dist || { echo "ERROR: Convex URL missing from dist straight after the step-shell build."; exit 1; }
             shasum dist/extension.js > /tmp/dist-checksum
             touch .prebuilt
             bunx @vscode/vsce package --no-dependencies
-            unzip -p envpilot-*.vsix extension/dist/extension.js | shasum | awk '{print $1}' > /tmp/vsix-checksum
-            [ "$(awk '{print $1}' /tmp/dist-checksum)" = "$(cat /tmp/vsix-checksum)" ] || { echo "ERROR: VSIX bundle differs from the step-shell build — prepublish rebuilt despite the marker."; exit 1; }
-      - run:
-          name: Verify credentials embedded in the packaged VSIX
-          working_directory: apps/vscode-extension
-          command: |
-            command -v unzip >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq unzip; }
             VSIX="envpilot-$(jq -r '.version' package.json).vsix"
-            [ -f "$VSIX" ] || { echo "ERROR: expected package $VSIX not found."; exit 1; }
+            [ -f "$VSIX" ] || { echo "ERROR: expected package $VSIX not found."; ls ./*.vsix || true; exit 1; }
+            unzip -p "$VSIX" extension/dist/extension.js | shasum | awk '{print $1}' > /tmp/vsix-checksum
+            [ "$(awk '{print $1}' /tmp/dist-checksum)" = "$(cat /tmp/vsix-checksum)" ] || { echo "ERROR: VSIX bundle differs from the step-shell build — prepublish rebuilt despite the marker."; exit 1; }
+            # Embed check in THIS shell — the standalone verify step read a
+            # DIFFERENT env value than the one baked here (that mismatch was
+            # the recurring "client id not in vsix"). Forensics print lengths
+            # and hash prefixes only, never values.
             BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
-            printf '%s' "$BUNDLE" | grep -qF "$WORKOS_CLIENT_ID" || { echo "ERROR: client id not in $VSIX — refusing to publish."; exit 1; }
-            printf '%s' "$BUNDLE" | grep -qF "$NEXT_PUBLIC_CONVEX_URL" || { echo "ERROR: Convex URL not in $VSIX — refusing to publish."; exit 1; }
+            for pair in "WORKOS_CLIENT_ID:$WORKOS_CLIENT_ID" "NEXT_PUBLIC_CONVEX_URL:$NEXT_PUBLIC_CONVEX_URL"; do
+              name="${pair%%:*}"; val="${pair#*:}"
+              if ! printf '%s' "$BUNDLE" | grep -qF "$val"; then
+                echo "ERROR: $name not in $VSIX — refusing to publish."
+                echo "diag: len=${#val} sha8=$(printf '%s' "$val" | shasum | cut -c1-8)"
+                echo "diag: dist files containing it:"; grep -rlF "$val" dist || echo "  (none)"
+                exit 1
+              fi
+            done
             cp "$VSIX" /tmp/ws/
             echo "Embedded prod credentials verified in $VSIX ✓"
       - run:
