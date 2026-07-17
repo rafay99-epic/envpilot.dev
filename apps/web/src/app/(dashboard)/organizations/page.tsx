@@ -11,7 +11,7 @@ import { usePagination, useConvexUser } from "@/hooks";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
-import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { Plus, Building2, ChevronRight } from "lucide-react";
 
 interface Organization {
@@ -184,7 +184,7 @@ export default function OrganizationsPage() {
                             : "border border-zinc-700 bg-zinc-800 text-zinc-400"
                     }`}
                   >
-                    {ORG_ROLE_LABELS[normalizeOrgRole(org.role)]}
+                    {roleLabel(org.role)}
                   </span>
                   <ChevronRight className="h-4 w-4 text-zinc-600 transition-transform group-hover:translate-x-1 group-hover:text-zinc-400" />
                 </div>

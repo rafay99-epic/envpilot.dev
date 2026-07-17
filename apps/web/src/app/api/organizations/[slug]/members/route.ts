@@ -13,7 +13,7 @@ import { z } from "zod";
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
 import { createLogger } from "@/lib/logger";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
-import { ORG_ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 
 const log = createLogger("api/organizations/members");
 
@@ -22,7 +22,9 @@ const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
-  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
+  // Open registry slug — Convex validates it against the role registry
+  // (invitations.create rejects unknown/inactive slugs with a ConvexError).
+  role: z.string().min(1),
   // Project assignments only — project-level roles no longer exist.
   projectIds: z.array(z.string()).optional(),
   // Developer environment scope — omitted means unrestricted access.
@@ -34,7 +36,9 @@ const inviteMemberSchema = z.object({
 
 const updateRoleSchema = z.object({
   userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
-  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
+  // Open registry slug — Convex validates it against the role registry
+  // (updateMemberRole rejects unknown/inactive slugs with a ConvexError).
+  role: z.string().min(1),
 });
 
 type RouteParams = { params: Promise<{ slug: string }> };
@@ -305,7 +309,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     );
 
     // Notify org members about the role change (non-blocking)
-    const roleDisplay = ORG_ROLE_LABELS[role];
+    const roleDisplay = roleLabel(role);
     notifyMemberUpdate(
       targetUserId as Id<"users">,
       targetUser?.name || targetUser?.email || "A member",

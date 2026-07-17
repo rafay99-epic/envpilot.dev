@@ -7,12 +7,7 @@ import {
   TerminalButtonLink,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
-import {
-  ORG_ROLE_LABELS,
-  ROLE_LEVEL,
-  roleLevel,
-  type OrgRole,
-} from "@/lib/roles";
+import { ROLE_LEVEL, roleLabel, roleLevel, type OrgRole } from "@/lib/roles";
 
 interface RequireRoleProps {
   /** Minimum unified org role required to view the page. */
@@ -62,8 +57,8 @@ export function RequireRole({ minimum, children }: RequireRoleProps) {
           You don&apos;t have access to this page
         </h2>
         <p className="mt-2 max-w-sm text-sm text-zinc-400">
-          This page requires the {ORG_ROLE_LABELS[minimum]} role or higher in
-          your organization. Ask an owner if you think you need access.
+          This page requires the {roleLabel(minimum)} role or higher in your
+          organization. Ask an owner if you think you need access.
         </p>
         <div className="mt-6">
           <TerminalButtonLink href="/dashboard" variant="primary">

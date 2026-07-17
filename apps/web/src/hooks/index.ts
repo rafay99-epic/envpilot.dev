@@ -3,6 +3,8 @@ export {
   useUserOrganizations,
   useOrganization,
   useOrganizationMembers,
+  useAssignableRoles,
+  type AssignableRole,
 } from "./useOrganizations";
 
 // Project hooks

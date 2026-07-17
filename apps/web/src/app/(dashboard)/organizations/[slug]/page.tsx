@@ -10,7 +10,9 @@ import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
 import {
   normalizeOrgRole,
-  ORG_ROLE_LABELS,
+  roleLabel,
+  roleBadgeColor,
+  ROLE_FALLBACK_COLOR,
   ROLE_LEVEL,
   roleLevel,
 } from "@/lib/roles";
@@ -166,17 +168,11 @@ export default function OrganizationPage({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              role === "owner"
-                ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                : role === "project_manager"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  : role === "team_lead"
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${roleBadgeColor(
+              ROLE_FALLBACK_COLOR[role] ?? "zinc"
+            )}`}
           >
-            {ORG_ROLE_LABELS[role]}
+            {roleLabel(role)}
           </span>
         </div>
       </div>

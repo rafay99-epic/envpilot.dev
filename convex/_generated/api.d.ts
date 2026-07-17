@@ -63,6 +63,7 @@ import type * as features_organizations_invitations from "../features/organizati
 import type * as features_organizations_memberSessions from "../features/organizations/memberSessions.js";
 import type * as features_organizations_mutations from "../features/organizations/mutations.js";
 import type * as features_organizations_queries from "../features/organizations/queries.js";
+import type * as features_organizations_roleOptions from "../features/organizations/roleOptions.js";
 import type * as features_organizations_securityHold from "../features/organizations/securityHold.js";
 import type * as features_organizations_tombstones from "../features/organizations/tombstones.js";
 import type * as features_permissions_accountPermissions_mutations from "../features/permissions/accountPermissions/mutations.js";
@@ -182,6 +183,7 @@ declare const fullApi: ApiFromModules<{
   "features/organizations/memberSessions": typeof features_organizations_memberSessions;
   "features/organizations/mutations": typeof features_organizations_mutations;
   "features/organizations/queries": typeof features_organizations_queries;
+  "features/organizations/roleOptions": typeof features_organizations_roleOptions;
   "features/organizations/securityHold": typeof features_organizations_securityHold;
   "features/organizations/tombstones": typeof features_organizations_tombstones;
   "features/permissions/accountPermissions/mutations": typeof features_permissions_accountPermissions_mutations;
