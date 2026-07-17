@@ -148,10 +148,15 @@ export const getRecentActivity = query({
 
     const orgRole = normalizeOrgRole(membership.role);
 
-    // Developers are scoped to the projects they're assigned to. Resolve the
-    // assigned project set once so we can drop out-of-scope entries.
+    // Non-manager roles are scoped to the projects they're assigned to.
+    // Resolve the assigned project set once so we can drop out-of-scope
+    // entries.
     let assignedProjectIds: Set<string> | null = null;
-    if (orgRole === "developer") {
+    if (
+      orgRole === "developer" ||
+      orgRole === "editor" ||
+      orgRole === "viewer"
+    ) {
       const assignments = await ctx.db
         .query("projectMembers")
         .withIndex("by_user", (q) => q.eq("userId", actor._id))

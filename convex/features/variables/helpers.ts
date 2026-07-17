@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import {
@@ -20,7 +21,9 @@ export function assertWithinEnvironmentScope(
   environments: string[]
 ): void {
   if (!isEnvironmentScopeAllowed(scope, environments)) {
-    throw new Error(
+    // ConvexError: this is user-facing — plain Error is redacted to
+    // "Server Error" on production deployments.
+    throw new ConvexError(
       `Your access is limited to these environments: ${(scope ?? []).join(", ")}`
     );
   }

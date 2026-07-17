@@ -13,6 +13,7 @@ import {
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
 import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
+import { requireAuthedUser } from "../../lib/identity";
 import { revokeSharesForResource } from "../sharing/helpers";
 
 /**
@@ -47,7 +48,9 @@ function assertWithinEnvironmentScope(
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
-    createdBy: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    // Kept optional so existing callers that still send it don't break.
+    createdBy: v.optional(v.id("users")),
     name: v.string(),
     websiteUrl: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -55,6 +58,8 @@ export const create = mutation({
     vaultRef: v.string(),
   },
   handler: async (ctx, args) => {
+    // Identity is server-derived — client-supplied actor ids are ignored.
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const project = await ctx.db.get(args.projectId);
@@ -64,7 +69,7 @@ export const create = mutation({
 
     // Authorization: owner, or assigned PM / team lead / developer
     const { environmentScope } = await authorizeAccountAccess(ctx, {
-      userId: args.createdBy,
+      userId: actor._id,
       projectId: args.projectId,
       action: "project:create_account",
       preloadedProject: project,
@@ -120,8 +125,8 @@ export const create = mutation({
       description: args.description,
       environments: args.environments,
       projectId: args.projectId,
-      createdBy: args.createdBy,
-      lastModifiedBy: args.createdBy,
+      createdBy: actor._id,
+      lastModifiedBy: actor._id,
       version: 1,
       createdAt: now,
       updatedAt: now,
@@ -135,7 +140,7 @@ export const create = mutation({
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: args.projectId,
-      userId: args.createdBy,
+      userId: actor._id,
       action: "account.created",
       details: {
         accountId,
@@ -153,7 +158,8 @@ export const create = mutation({
 export const update = mutation({
   args: {
     accountId: v.id("projectAccounts"),
-    userId: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    userId: v.optional(v.id("users")),
     name: v.optional(v.string()),
     websiteUrl: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -164,8 +170,16 @@ export const update = mutation({
     credentialsChanged: v.boolean(),
   },
   handler: async (ctx, args) => {
+    // Identity is server-derived — client-supplied actor ids are ignored.
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
-    const { accountId, userId, credentialsChanged, ...updates } = args;
+    const {
+      accountId,
+      userId: _clientUserId,
+      credentialsChanged,
+      ...updates
+    } = args;
+    void _clientUserId;
 
     const account = await ctx.db.get(accountId);
     if (!account || account.deletedAt) {
@@ -179,7 +193,7 @@ export const update = mutation({
 
     // Authorization: effective write access — owner, assigned PM/team lead,
     // or a developer holding a write grant on this account
-    await requireAccountAccess(ctx, userId, account, "write", project);
+    await requireAccountAccess(ctx, actor._id, account, "write", project);
 
     // Environment scope: getAccountAccess already blocks scoped developers
     // from touching out-of-scope accounts, but the NEW environments must also
@@ -193,18 +207,22 @@ export const update = mutation({
       const editorMembership = await ctx.db
         .query("organizationMembers")
         .withIndex("by_org_and_user", (q) =>
-          q.eq("organizationId", project.organizationId).eq("userId", userId)
+          q.eq("organizationId", project.organizationId).eq("userId", actor._id)
         )
         .first();
 
+      const updaterRole = editorMembership
+        ? normalizeOrgRole(editorMembership.role)
+        : null;
       if (
-        editorMembership &&
-        normalizeOrgRole(editorMembership.role) === "developer"
+        updaterRole === "developer" ||
+        updaterRole === "editor" ||
+        updaterRole === "viewer"
       ) {
         const editorAssignment = await ctx.db
           .query("projectMembers")
           .withIndex("by_project_and_user", (q) =>
-            q.eq("projectId", account.projectId).eq("userId", userId)
+            q.eq("projectId", account.projectId).eq("userId", actor._id)
           )
           .first();
 
@@ -219,7 +237,7 @@ export const update = mutation({
 
     const updateData: Record<string, unknown> = {
       updatedAt: now,
-      lastModifiedBy: userId,
+      lastModifiedBy: actor._id,
       version: newVersion,
     };
 
@@ -246,7 +264,7 @@ export const update = mutation({
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: account.projectId,
-      userId,
+      userId: actor._id,
       action: "account.updated",
       details: {
         accountId,
@@ -267,9 +285,12 @@ export const update = mutation({
 export const remove = mutation({
   args: {
     accountId: v.id("projectAccounts"),
-    deletedBy: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    deletedBy: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    // Identity is server-derived — client-supplied actor ids are ignored.
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const account = await ctx.db.get(args.accountId);
@@ -282,14 +303,18 @@ export const remove = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: owner, or assigned PM / team lead (role-only, no grant
-    // fallback — parity with variables.remove; developers can never delete).
-    await authorizeAccountAccess(ctx, {
-      userId: args.deletedBy,
-      projectId: account.projectId,
-      action: "project:delete_account",
-      preloadedProject: project,
-    });
+    // Authorization: owner, or assigned PM / team lead / editor (role-only,
+    // no grant fallback — parity with variables.remove; developers can never
+    // delete). Env-scoped editors may only delete in-scope accounts.
+    {
+      const { environmentScope } = await authorizeAccountAccess(ctx, {
+        userId: actor._id,
+        projectId: account.projectId,
+        action: "project:delete_account",
+        preloadedProject: project,
+      });
+      assertWithinEnvironmentScope(environmentScope, account.environments);
+    }
 
     // Idempotent no-op: an account that's already soft-deleted must not be
     // re-patched (which would clobber the original deletedAt) or emit a
@@ -314,7 +339,7 @@ export const remove = mutation({
       await ctx.db.patch(perm._id, {
         isActive: false,
         revokedAt: now,
-        revokedBy: args.deletedBy,
+        revokedBy: actor._id,
       });
     }
 
@@ -323,13 +348,13 @@ export const remove = mutation({
     await revokeSharesForResource(ctx, {
       resourceType: "account",
       accountId: args.accountId,
-      actorId: args.deletedBy,
+      actorId: actor._id,
     });
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: account.projectId,
-      userId: args.deletedBy,
+      userId: actor._id,
       action: "account.deleted",
       details: {
         accountId: args.accountId,
@@ -366,9 +391,12 @@ export const remove = mutation({
 export const restore = mutation({
   args: {
     accountId: v.id("projectAccounts"),
-    restoredBy: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    restoredBy: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    // Identity is server-derived — client-supplied actor ids are ignored.
+    const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const account = await ctx.db.get(args.accountId);
@@ -396,14 +424,18 @@ export const restore = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: owner, or assigned PM / team lead (parity with
-    // accounts.remove — role-only, developers can never restore).
-    await authorizeAccountAccess(ctx, {
-      userId: args.restoredBy,
-      projectId: account.projectId,
-      action: "project:delete_account",
-      preloadedProject: project,
-    });
+    // Authorization: owner, or assigned PM / team lead / editor (parity with
+    // accounts.remove — role-only, developers can never restore). Env-scoped
+    // editors may only restore in-scope accounts.
+    {
+      const { environmentScope } = await authorizeAccountAccess(ctx, {
+        userId: actor._id,
+        projectId: account.projectId,
+        action: "project:delete_account",
+        preloadedProject: project,
+      });
+      assertWithinEnvironmentScope(environmentScope, account.environments);
+    }
 
     await ctx.db.patch(args.accountId, {
       deletedAt: undefined,
@@ -413,7 +445,7 @@ export const restore = mutation({
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: account.projectId,
-      userId: args.restoredBy,
+      userId: actor._id,
       action: "account.updated",
       details: {
         accountId: args.accountId,
@@ -444,6 +476,8 @@ export const logAccess = mutation({
     sessionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Identity is server-derived — client-supplied actor ids are ignored.
+    const actor = await requireAuthedUser(ctx);
     const account = await ctx.db.get(args.accountId);
     if (!account) {
       throw new Error("Account not found");
@@ -456,12 +490,12 @@ export const logAccess = mutation({
 
     // Authorization: anyone with effective access to this account
     // (role-based write, or an active read/write grant)
-    await requireAccountAccess(ctx, args.accessedBy, account, "read");
+    await requireAccountAccess(ctx, actor._id, account, "read");
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,
       projectId: account.projectId,
-      userId: args.accessedBy,
+      userId: actor._id,
       action: "account.accessed",
       details: {
         accountId: args.accountId,

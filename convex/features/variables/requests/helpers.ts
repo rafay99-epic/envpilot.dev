@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { MutationCtx, QueryCtx } from "../../../_generated/server";
 import { Id } from "../../../_generated/dataModel";
 import { assertOrgMembership, assertProjectAction } from "../../../lib/authz";
@@ -9,7 +10,9 @@ export async function getProjectAndOrgRole(
 ) {
   const project = await ctx.db.get(projectId);
   if (!project || project.deletedAt) {
-    throw new Error("Project not found");
+    // ConvexError: user-facing — plain Error is redacted to "Server Error"
+    // in production (both variable- and account-request flows depend on this).
+    throw new ConvexError("Project not found");
   }
 
   const { membership } = await assertOrgMembership(

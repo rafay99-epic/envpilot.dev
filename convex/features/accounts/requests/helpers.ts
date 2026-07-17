@@ -7,9 +7,10 @@ export { getProjectAndOrgRole } from "../../variables/requests/helpers";
 
 /**
  * Non-throwing check: can this user review (approve/reject) account requests?
- * Reviewers are owners, or PMs/team leads assigned to the project — the same
- * set that holds "project:update_account" (mirror of the variable flow's
- * canReviewRequests, which keys off "project:update_variable").
+ * Reviewers are owners, or PMs/team leads assigned to the project — the
+ * dedicated "project:review_requests" action (same as the variable flow):
+ * review is a people-power, so editors (who hold project:update_account for
+ * direct edits) must never pass this check.
  */
 export async function canReviewAccountRequests(
   ctx: MutationCtx | QueryCtx,
@@ -17,7 +18,12 @@ export async function canReviewAccountRequests(
   projectId: Id<"projects">
 ): Promise<boolean> {
   try {
-    await assertProjectAction(ctx, userId, projectId, "project:update_account");
+    await assertProjectAction(
+      ctx,
+      userId,
+      projectId,
+      "project:review_requests"
+    );
     return true;
   } catch (err) {
     console.error("accountRequests.canReviewAccountRequests.denied", {

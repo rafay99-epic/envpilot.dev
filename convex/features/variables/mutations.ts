@@ -311,9 +311,13 @@ async function updateCore(
       )
       .first();
 
+    const updaterRole = editorMembership
+      ? normalizeOrgRole(editorMembership.role)
+      : null;
     if (
-      editorMembership &&
-      normalizeOrgRole(editorMembership.role) === "developer"
+      updaterRole === "developer" ||
+      updaterRole === "editor" ||
+      updaterRole === "viewer"
     ) {
       const editorAssignment = await ctx.db
         .query("projectMembers")
@@ -563,13 +567,17 @@ async function removeCore(
     throw new Error("Project not found");
   }
 
-  // Authorization: owner, or assigned PM / team lead
-  await authorizeVariableAccess(ctx, {
-    userId: args.deletedBy,
-    projectId: variable.projectId,
-    action: "project:delete_variable",
-    preloadedProject: project,
-  });
+  // Authorization: owner, or assigned PM / team lead / editor. Env-scoped
+  // editors may only delete variables fully inside their scope.
+  {
+    const { environmentScope } = await authorizeVariableAccess(ctx, {
+      userId: args.deletedBy,
+      projectId: variable.projectId,
+      action: "project:delete_variable",
+      preloadedProject: project,
+    });
+    assertWithinEnvironmentScope(environmentScope, variable.environments);
+  }
 
   // Idempotent no-op: a variable that's already soft-deleted must not be
   // re-patched (which would clobber the original deletedAt) or emit a
@@ -665,12 +673,17 @@ export const bulkDelete = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: owner, or assigned PM / team lead
-    await authorizeVariableAccess(ctx, {
-      userId: actor._id,
-      projectId: firstVariable.projectId,
-      action: "project:delete_variable",
-    });
+    // Authorization: owner, or assigned PM / team lead / editor. The scope
+    // is enforced per variable below (a scoped editor must not bulk-delete
+    // out-of-scope variables).
+    const { environmentScope: bulkDeleteScope } = await authorizeVariableAccess(
+      ctx,
+      {
+        userId: actor._id,
+        projectId: firstVariable.projectId,
+        action: "project:delete_variable",
+      }
+    );
 
     // Check bulk_delete feature gate
     const bulkDeleteCheck = await checkBooleanFeature(
@@ -693,6 +706,9 @@ export const bulkDelete = mutation({
       if (variable.projectId !== firstVariable.projectId) {
         throw new Error("All variables must belong to the same project");
       }
+
+      // Env-scoped editors may only bulk-delete in-scope variables
+      assertWithinEnvironmentScope(bulkDeleteScope, variable.environments);
 
       // Soft delete
       await ctx.db.patch(variableId, {
@@ -777,12 +793,16 @@ export const restore = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: owner, or assigned PM / team lead
-    await authorizeVariableAccess(ctx, {
-      userId: actor._id,
-      projectId: variable.projectId,
-      action: "project:delete_variable",
-    });
+    // Authorization: owner, or assigned PM / team lead / editor. Env-scoped
+    // editors may only restore variables fully inside their scope.
+    {
+      const { environmentScope } = await authorizeVariableAccess(ctx, {
+        userId: actor._id,
+        projectId: variable.projectId,
+        action: "project:delete_variable",
+      });
+      assertWithinEnvironmentScope(environmentScope, variable.environments);
+    }
 
     // Restoring must not break per-environment key uniqueness: a variable
     // with the same key may have been (re)created for these environments

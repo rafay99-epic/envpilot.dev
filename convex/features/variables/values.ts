@@ -7,7 +7,7 @@ import {
   legacyProjectRoleValidator,
   orgRoleValidator,
 } from "../../lib/roleCompat";
-import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
+import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "../../lib/authz";
 
 // Explicit result types. Actions here call ctx.runQuery/runMutation/runAction
 // on `api`/`internal`; annotating each handler's return type breaks the
@@ -820,8 +820,17 @@ export const importValues = action({
     }
 
     // Editors import directly (blanket write); developers go through
-    // requests; viewers can do neither (request creation rejects them).
+    // requests; viewers can do NEITHER. Reject viewers up front — otherwise
+    // the request loop below encrypts each value into WorkOS Vault BEFORE the
+    // request mutation rejects the non-developer, orphaning a vault secret
+    // per key (the per-key catch swallows the rejection).
+    const importerRole = normalizeOrgRole(membership.role);
     const canWriteDirectly = roleLevel(membership.role) >= ROLE_LEVEL.editor;
+    if (!canWriteDirectly && importerRole !== "developer") {
+      throw new ConvexError(
+        "You do not have permission to import variables into this project."
+      );
+    }
 
     let created = 0;
     let updated = 0;

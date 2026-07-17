@@ -1,5 +1,6 @@
 import { v, ConvexError } from "convex/values";
 import { mutation } from "../../../_generated/server";
+import { internal } from "../../../_generated/api";
 import { createAuditLog } from "../../../lib/audit";
 import { requireAuthedUser } from "../../../lib/identity";
 import {
@@ -161,6 +162,14 @@ export const review = mutation({
     }
 
     if (args.action === "reject") {
+      // The submitted credentials were never used — purge them from the vault
+      // so a rejected password doesn't linger. Best-effort (scheduled action).
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.vault.vault.deleteSecret,
+        { vaultRef: request.vaultRef }
+      );
+
       await ctx.db.patch(args.requestId, {
         status: "rejected",
         reviewReason: args.reviewReason,
@@ -328,6 +337,13 @@ export const cancel = mutation({
     if (!canCancel) {
       throw new ConvexError("Not authorized to cancel this request");
     }
+
+    // The submitted credentials were never used — purge from the vault.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.vault.vault.deleteSecret,
+      { vaultRef: request.vaultRef }
+    );
 
     await ctx.db.patch(args.requestId, {
       status: "canceled",

@@ -111,9 +111,10 @@ export const listExpiringVariables = query({
       const project = accessibleProjects.get(variable.projectId as string);
       if (!project) continue;
 
-      // Scoped developers never receive out-of-scope variables.
+      // Scoped developers/editors/viewers never receive out-of-scope
+      // variables.
       const environmentScope =
-        orgRole === "developer"
+        orgRole === "developer" || orgRole === "editor" || orgRole === "viewer"
           ? scopeByProject.get(variable.projectId as string)
           : undefined;
       if (!isEnvironmentScopeAllowed(environmentScope, variable.environments)) {
