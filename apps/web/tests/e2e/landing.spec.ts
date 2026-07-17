@@ -38,7 +38,10 @@ test.describe("landing page", () => {
     );
     await expect(
       page.getByRole("link", { name: /envpilot-action@v1/i })
-    ).toHaveAttribute("href", "https://github.com/rafay99-epic/envpilot-action");
+    ).toHaveAttribute(
+      "href",
+      "https://github.com/rafay99-epic/envpilot-action"
+    );
   });
 
   test("founder strip is present with changelog and roadmap links", async ({
@@ -47,10 +50,9 @@ test.describe("landing page", () => {
     const strip = page.locator("section", {
       hasText: "I built Envpilot after watching",
     });
-    await expect(strip.getByRole("link", { name: "changelog" })).toHaveAttribute(
-      "href",
-      "/changelog"
-    );
+    await expect(
+      strip.getByRole("link", { name: "changelog" })
+    ).toHaveAttribute("href", "/changelog");
     await expect(strip.getByRole("link", { name: "roadmap" })).toHaveAttribute(
       "href",
       "/wishlist"
@@ -74,9 +76,9 @@ test.describe("landing page", () => {
     const faq = schemas
       .map((s) => JSON.parse(s))
       .find((s) => s["@type"] === "FAQPage");
-    expect(
-      faq.mainEntity.map((q: { name: string }) => q.name)
-    ).toContain("Where do my secrets actually live?");
+    expect(faq.mainEntity.map((q: { name: string }) => q.name)).toContain(
+      "Where do my secrets actually live?"
+    );
   });
 
   test("final CTA links docs on the subdomain", async ({ page }) => {

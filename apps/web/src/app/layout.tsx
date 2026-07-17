@@ -55,8 +55,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Envpilot — Stop Pasting .env Files Into Slack",
-    description:
-      "Envpilot keeps your team's environment variables in sync.",
+    description: "Envpilot keeps your team's environment variables in sync.",
     images: [
       {
         url: ogImageJpg,
