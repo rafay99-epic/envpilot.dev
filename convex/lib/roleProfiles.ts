@@ -263,7 +263,9 @@ export function mergeSystemRoleCapabilities(
 ): CapabilityMap {
   const merged: CapabilityMap = { ...codeDefaults };
   for (const [key, value] of Object.entries(stored)) {
-    if (key in codeDefaults || (CAPABILITY_KEYS as string[]).includes(key)) {
+    // Catalog membership only — `key in codeDefaults` would walk the
+    // prototype chain and admit junk keys like "toString".
+    if ((CAPABILITY_KEYS as string[]).includes(key)) {
       merged[key as CapabilityKey] = value;
     }
   }

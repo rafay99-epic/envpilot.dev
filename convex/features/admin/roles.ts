@@ -146,6 +146,17 @@ export const updateRoleMeta = mutation({
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
+    const targetRole = await ctx.db.get(args.roleId);
+    if (!targetRole) throw new ConvexError("Role not found");
+    // System-role identity (name, description, color, level, sort) is
+    // code-defined and re-synced by every seed — accepting an edit here
+    // would silently revert on the next deploy. Capabilities are the only
+    // editable surface for system roles (via the matrix).
+    if (targetRole.isSystem) {
+      throw new ConvexError(
+        "System role identity is code-defined. Only capabilities are editable."
+      );
+    }
     if (
       args.level !== undefined &&
       (args.level < MIN_CUSTOM_LEVEL ||
@@ -156,11 +167,6 @@ export const updateRoleMeta = mutation({
         `Role level must be an integer between ${MIN_CUSTOM_LEVEL} and ${MAX_CUSTOM_LEVEL} (owner is always 100).`
       );
     }
-    const role = await ctx.db.get(args.roleId);
-    if (!role) throw new ConvexError("Role not found");
-    if (args.level !== undefined && role.isSystem) {
-      throw new ConvexError("System role levels are code-defined");
-    }
     await ctx.db.patch(args.roleId, {
       ...(args.displayName !== undefined && { displayName: args.displayName }),
       ...(args.description !== undefined && { description: args.description }),
@@ -169,16 +175,17 @@ export const updateRoleMeta = mutation({
       ...(args.level !== undefined && { level: args.level }),
       updatedAt: Date.now(),
     });
-    console.log(`[admin] role meta updated: ${role.slug}`);
+    console.log(`[admin] role meta updated: ${targetRole.slug}`);
   },
 });
 
-/** Replace a non-system role's capability matrix */
+/** Toggle one capability on any role except Owner (single-key, race-free) */
 export const updateRoleCapabilities = mutation({
   args: {
     secret: v.string(),
     roleId: v.id("roleRegistry"),
-    capabilities: v.record(v.string(), v.boolean()),
+    key: v.string(),
+    granted: v.boolean(),
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
@@ -190,12 +197,27 @@ export const updateRoleCapabilities = mutation({
     if (role.slug === "owner") {
       throw new ConvexError("The Owner capability matrix is locked.");
     }
-    validateCapabilityKeys(args.capabilities);
+    // System roles ship to every organization — they must never become
+    // owner-class. Deliberate owner-class delegates are CUSTOM roles.
+    if (args.key === "org.manage" && args.granted && role.isSystem) {
+      throw new ConvexError(
+        "System roles cannot hold org.manage. Create a custom role for owner-class delegation."
+      );
+    }
+    validateCapabilityKeys({ [args.key]: args.granted });
+    // Single-key patch over a FRESH read: two quick toggles in the panel
+    // can't revert each other via a stale client-side snapshot.
     await ctx.db.patch(args.roleId, {
-      capabilities: args.capabilities,
+      capabilities: { ...role.capabilities, [args.key]: args.granted },
       updatedAt: Date.now(),
     });
-    console.log(`[admin] role capabilities updated: ${role.slug}`);
+    // Structured log — the durable record in the Convex dashboard for a
+    // platform-global policy change (roleRegistry has no org for auditLogs).
+    console.log(
+      `[admin][role-capability] ${role.slug}: ${args.key} ${
+        args.granted ? "GRANTED" : "REVOKED"
+      } (was ${role.capabilities[args.key] === true ? "granted" : "absent/false"})`
+    );
   },
 });
 

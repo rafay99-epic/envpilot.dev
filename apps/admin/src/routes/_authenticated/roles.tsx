@@ -268,7 +268,8 @@ function RolesPage() {
     try {
       await updateRoleCapabilities({
         roleId: role._id,
-        capabilities: { ...role.capabilities, [key]: granted },
+        key,
+        granted,
       });
       toast(
         "success",
@@ -348,8 +349,13 @@ function RolesPage() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEdit(role)}
-                      className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                      title="Edit role"
+                      disabled={role.isSystem}
+                      className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                      title={
+                        role.isSystem
+                          ? "System role identity is code-defined — only capabilities are editable (in the matrix)"
+                          : "Edit role"
+                      }
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
@@ -418,8 +424,9 @@ function RolesPage() {
           Capability Matrix
         </h2>
         <p className="mb-4 text-xs text-zinc-500">
-          Toggles save immediately. System role columns are locked — their
-          capability matrices are code-defined.
+          Toggles save immediately for every role except Owner (always locked,
+          always holds everything). System-role edits survive deploys — new code
+          defaults only fill in capabilities you haven&apos;t touched.
         </p>
 
         {!roles || !capabilities ? (

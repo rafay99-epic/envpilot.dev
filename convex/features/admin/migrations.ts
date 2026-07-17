@@ -320,6 +320,10 @@ export const runMigration = mutation({
       let created = 0;
       let updated = 0;
       let skipped = 0;
+      // Merge semantics make default changes invisible on drifted rows —
+      // this report is the visibility: for every system role, the keys
+      // whose stored value differs from the current code default.
+      const drift: Record<string, string[]> = {};
       const now = Date.now();
 
       for (const role of SEED_ROLES) {
@@ -342,6 +346,16 @@ export const runMigration = mutation({
                     role.capabilities,
                     existing.capabilities as Record<string, boolean>
                   ) as Record<string, boolean>);
+            const defaults = role.capabilities as Record<string, boolean>;
+            const driftKeys = [
+              ...new Set([
+                ...Object.keys(defaults),
+                ...Object.keys(targetCaps),
+              ]),
+            ].filter(
+              (k) => (targetCaps[k] === true) !== (defaults[k] === true)
+            );
+            if (driftKeys.length > 0) drift[role.slug] = driftKeys.sort();
             const normalizeCaps = (caps: Record<string, boolean>) =>
               JSON.stringify(
                 Object.keys(caps)
@@ -401,6 +415,7 @@ export const runMigration = mutation({
 
       return {
         success: true,
+        drift,
         created,
         updated,
         skipped,
