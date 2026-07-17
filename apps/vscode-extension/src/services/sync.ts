@@ -53,6 +53,21 @@ const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 const ENV_FILE_MARKER = "# Envpilot - Synced Environment Variables";
 
 /**
+ * Workspace Trust choke point: Envpilot never writes secrets into a
+ * Restricted Mode window. Every sync path funnels through the two env-file
+ * writers, so this single guard covers them all. Cleanup (unsync purge,
+ * revocation deletes) intentionally does NOT check trust — removing secrets
+ * from an untrusted workspace is always allowed.
+ */
+function assertTrustedWorkspace(): void {
+  if (!vscode.workspace.isTrusted) {
+    throw new Error(
+      "This workspace is in Restricted Mode — Envpilot will not write secrets here. Trust the workspace to sync."
+    );
+  }
+}
+
+/**
  * Sync service for managing environment variable synchronization
  */
 export class SyncService {
@@ -366,6 +381,7 @@ export class SyncService {
     project: LinkedProject,
     variables: EnvironmentVariable[]
   ): Promise<void> {
+    assertTrustedWorkspace();
     const envFilePath = path.resolve(project.workspacePath, project.targetFile);
     const normalizedWorkspace = path.resolve(project.workspacePath);
 
@@ -1005,6 +1021,7 @@ export class SyncService {
     variables: EnvironmentVariable[],
     projectId?: string
   ): Promise<void> {
+    assertTrustedWorkspace();
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path.resolve(platformPath, targetFile);
     const normalizedDir = path.resolve(platformPath);

@@ -440,8 +440,12 @@ export async function activate(context: vscode.ExtensionContext) {
     })();
   }
 
-  // Start reactive sync if authenticated and auto-sync enabled
-  if (isAuthenticated && shouldAutoSync()) {
+  // Start reactive sync if authenticated and auto-sync enabled. In a
+  // Restricted Mode (untrusted) window we never write secrets, so sync and
+  // the write-triggering subscriptions stay off until trust is granted —
+  // the unsync purge and crash sweep above still ran, so previously synced
+  // files are cleaned up even in Restricted Mode.
+  const startSyncPipeline = async () => {
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       void syncService.syncAllDirectories(linkedProject);
@@ -455,6 +459,20 @@ export async function activate(context: vscode.ExtensionContext) {
       syncService.startPeriodicSync();
       realTimeSyncService.startRealTimeSync();
     });
+  };
+  if (isAuthenticated && shouldAutoSync()) {
+    if (vscode.workspace.isTrusted) {
+      await startSyncPipeline();
+    } else {
+      output.log(
+        "Envpilot: workspace is in Restricted Mode — sync is paused until you trust it (cleanup still runs)."
+      );
+      context.subscriptions.push(
+        vscode.workspace.onDidGrantWorkspaceTrust(() => {
+          void startSyncPipeline();
+        })
+      );
+    }
   }
 
   // Check for extension updates (non-blocking)

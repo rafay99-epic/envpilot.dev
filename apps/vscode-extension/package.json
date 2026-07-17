@@ -40,6 +40,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In Restricted Mode, Envpilot never writes secrets: sync, pull, and link are disabled until you trust the workspace. Cleanup still runs — previously synced .env files are removed on close (unsync-on-close) and after crashes."
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
