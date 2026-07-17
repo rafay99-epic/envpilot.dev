@@ -446,10 +446,10 @@ function RolesPage() {
                           style={{ backgroundColor: colorHex(role.color) }}
                         />
                         {role.displayName}
-                        {role.isSystem && (
+                        {role.slug === "owner" && (
                           <Lock
                             className="h-3 w-3 text-zinc-500"
-                            aria-label="Locked (system role)"
+                            aria-label="Locked (owner always holds everything)"
                           />
                         )}
                       </div>
@@ -486,7 +486,7 @@ function RolesPage() {
           drawerMode === "create"
             ? "Custom roles are platform-global and editable from this panel."
             : editingRole?.isSystem
-              ? "System role: level and capabilities are code-defined."
+              ? "System role: slug and level are code-defined. Capabilities are editable in the matrix (Owner excluded) and survive deploys."
               : "Changes apply immediately to all members holding this role."
         }
         onClose={() => setDrawerMode(null)}
@@ -725,7 +725,7 @@ function RoleCategoryGroup({
             const cellId = `${role._id}:${cap.key}`;
             return (
               <td key={role._id} className="px-4 py-2 text-center">
-                {role.isSystem ? (
+                {role.slug === "owner" ? (
                   granted ? (
                     <Check className="mx-auto h-3.5 w-3.5 text-emerald-500/70" />
                   ) : (

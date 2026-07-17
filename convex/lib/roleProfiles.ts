@@ -18,6 +18,7 @@ import {
   type CapabilityMap,
   type OrgAction,
   type ProjectAction,
+  CAPABILITY_KEYS,
   ORG_ACTION_TO_CAPABILITY,
   PROJECT_ACTION_TO_CAPABILITY,
 } from "./capabilities";
@@ -243,6 +244,30 @@ export function expandActions(profile: Pick<RoleProfile, "capabilities">): {
     hasCapability(profile, PROJECT_ACTION_TO_CAPABILITY[action])
   );
   return { orgActions, projectActions };
+}
+
+/**
+ * Merge-seed semantics for system-role capability sync (owner excluded —
+ * owner is always fully code-synced). Code defaults fill keys the stored
+ * row has never seen (new features arrive enabled per code); keys already
+ * present on the stored row keep their stored value (admin-panel edits
+ * survive every deploy). Stored keys no longer in the catalog are dropped.
+ *
+ * Consequence: REMOVING a default from code does not propagate to rows
+ * that already carry the key — retirements are panel actions or one-off
+ * migrations, never silent seed effects.
+ */
+export function mergeSystemRoleCapabilities(
+  codeDefaults: CapabilityMap,
+  stored: Record<string, boolean>
+): CapabilityMap {
+  const merged: CapabilityMap = { ...codeDefaults };
+  for (const [key, value] of Object.entries(stored)) {
+    if (key in codeDefaults || (CAPABILITY_KEYS as string[]).includes(key)) {
+      merged[key as CapabilityKey] = value;
+    }
+  }
+  return merged;
 }
 
 /**

@@ -4,9 +4,12 @@
 // authorization matrix (convex/lib/authz.ts ORG_ACTIONS / PROJECT_ACTIONS on
 // main @ d908d4ff) plus the access-decision behavior of getVariableAccess /
 // getAccountAccess. The seeded system profiles MUST reproduce them exactly.
-// A failure here means the registry changed policy — which is only ever
-// allowed as a deliberate, admin-panel-visible profile edit, never as a
-// side effect of code changes.
+//
+// Since the merge-seed change this is the DEFAULTS-AT-SEED contract: it pins
+// what a fresh deployment (or a never-edited row) resolves to. Live rows may
+// deliberately drift via admin-panel edits — the seed merges instead of
+// overwriting — so a failure here still always means CODE changed policy,
+// which is only ever allowed as an explicit fixture update in the same PR.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -15,6 +18,7 @@ import {
   UNKNOWN_ROLE_PROFILE,
   expandActions,
   hasCapability,
+  mergeSystemRoleCapabilities,
 } from "@convex/lib/roleProfiles";
 import {
   CAPABILITY_KEYS,
@@ -239,6 +243,43 @@ describe("seeded custom roles (editor / viewer)", () => {
       "org.clients.link",
       "project.read",
     ]);
+  });
+});
+
+describe("merge-seed semantics (system-role capability sync)", () => {
+  const defaults = SYSTEM_PROFILES.team_lead.capabilities;
+
+  it("admin edits survive a re-seed (stored keys win, true and false alike)", () => {
+    const stored = {
+      ...defaults,
+      "project.share": false, // admin revoked
+      "org.rollback": true, // admin granted beyond defaults
+    } as Record<string, boolean>;
+    const merged = mergeSystemRoleCapabilities(defaults, stored);
+    expect(merged["project.share"]).toBe(false);
+    expect(merged["org.rollback"]).toBe(true);
+  });
+
+  it("a new code default fills in keys the stored row has never seen", () => {
+    const stored = { ...defaults } as Record<string, boolean>;
+    delete stored["project.requests.review"];
+    const merged = mergeSystemRoleCapabilities(defaults, stored);
+    expect(merged["project.requests.review"]).toBe(true);
+  });
+
+  it("stored keys outside the catalog are dropped", () => {
+    const merged = mergeSystemRoleCapabilities(defaults, {
+      "retired.capability": true,
+    });
+    expect("retired.capability" in merged).toBe(false);
+  });
+
+  it("identical inputs merge to identical output (seed idempotency)", () => {
+    const merged = mergeSystemRoleCapabilities(
+      defaults,
+      defaults as Record<string, boolean>
+    );
+    expect(merged).toEqual(defaults);
   });
 });
 

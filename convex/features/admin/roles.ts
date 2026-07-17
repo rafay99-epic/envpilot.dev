@@ -184,8 +184,11 @@ export const updateRoleCapabilities = mutation({
     verifyAdmin(args.secret);
     const role = await ctx.db.get(args.roleId);
     if (!role) throw new ConvexError("Role not found");
-    if (role.isSystem) {
-      throw new ConvexError("System role capability matrices are code-defined");
+    // Owner is the only locked matrix: it must always hold every capability
+    // (org.manage included) — an editable owner is a bricked-org hazard.
+    // Other system roles are editable; the seed MERGES, so edits survive.
+    if (role.slug === "owner") {
+      throw new ConvexError("The Owner capability matrix is locked.");
     }
     validateCapabilityKeys(args.capabilities);
     await ctx.db.patch(args.roleId, {
