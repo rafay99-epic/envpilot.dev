@@ -1,0 +1,38 @@
+# Gitleaks config for Envpilot. Extends the default rules; the allowlist
+# below suppresses KNOWN example/placeholder strings (verified non-secrets)
+# so the CI guard only fires on real credentials.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Verified non-secrets: doc examples, landing-page demos, CI stubs"
+regexes = [
+  '''sk_live_4eC39HqLyjWDarj''',        # Stripe's PUBLIC doc example key (landing demo)
+  '''sk_test_placeholder''',            # CI env stub
+  '''whsec_placeholder''',
+  '''re_placeholder''',
+  '''pat_placeholder''',
+  '''Authorization: Bearer <[^>]+>''',   # docs curl examples
+  '''API_KEY=your-''',                   # paste-form / example placeholders
+  '''sk-1234567890''',                   # bulk-paste-form textarea placeholder
+  '''postgres://localhost''',            # example DSN in the same placeholder
+]
+paths = [
+  '''\.env\.example$''',
+  '''apps/web/content/docs/.*\.mdx$''',
+  '''apps/docs/content/.*\.mdx$''',
+  '''apps/web/src/components/variables/bulk-paste-form\.tsx$''',
+  '''(^|/)\.claude/''',
+  '''apps/web/src/components/landing/.*''',
+  # Build output, dependencies, lockfiles, sourcemaps — never source secrets,
+  # pure scan noise. gitleaks dir walks the filesystem, not just tracked files.
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)\.turbo/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)out/''',
+  '''(^|/)\.vercel/''',
+  '''\.map$''',
+  '''bun\.lock$''',
+]
