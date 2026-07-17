@@ -907,54 +907,16 @@ function Pricing({
 
 /* ────────────────────────────── trust ────────────────────────────── */
 
-// ⚠️ LAYOUT-PREVIEW PLACEHOLDERS — these are NOT real people. They exist so
-// the owner can judge the section's final look before merge. Each renders
-// with a visible "sample" chip (`sample: true`). BEFORE MERGE: replace with
-// real, permissioned quotes (name + role + link) and drop the sample flag —
-// or empty the array to fall back to the founder-only layout.
+// Real, permissioned quotes ONLY — never invent people. When the first real
+// quote lands (name + role + link to the actual tweet/profile), add it here
+// and the tweet-style grid appears automatically. Research note: for dev
+// tools, ONE verifiable quote with a face beats a wall of anonymous praise.
 const TESTIMONIALS: {
   quote: string;
   name: string;
   role: string;
   href?: string;
-  sample?: boolean;
-}[] = [
-  {
-    quote:
-      "We onboarded a new developer on Monday. One npm install, one login, and their dev server had every variable — nobody dug through Slack history.",
-    name: "Replace: customer name",
-    role: "replace: role · company",
-    sample: true,
-  },
-  {
-    quote:
-      "The per-environment split saved us twice already. Staging keys stay in staging — the CLI literally won't let prod values leak into a dev shell.",
-    name: "Replace: customer name",
-    role: "replace: role · company",
-    sample: true,
-  },
-  {
-    quote:
-      "I deleted every .env file in the repo the week we switched. envpilot run injects straight into the process and nothing secret touches disk.",
-    name: "Replace: customer name",
-    role: "replace: role · company",
-    sample: true,
-  },
-  {
-    quote:
-      "Rotating a leaked key used to be a fire drill across four machines. Now it's one dashboard edit and everyone's next run picks it up.",
-    name: "Replace: customer name",
-    role: "replace: role · company",
-    sample: true,
-  },
-  {
-    quote:
-      "The audit log is what sold my lead — every read and change with who, when, and where. Compliance questions became a one-click export.",
-    name: "Replace: customer name",
-    role: "replace: role · company",
-    sample: true,
-  },
-];
+}[] = [];
 
 function TrustSection() {
   return (
@@ -970,12 +932,11 @@ function TrustSection() {
           description="No logo wall, no invented praise — a real product, a reachable founder, and a public changelog you can hold us to."
         />
 
-        <Stagger className="mt-14 grid gap-4 lg:grid-cols-3">
-          <StaggerItem
-            className={TESTIMONIALS.length === 0 ? "lg:col-span-2" : ""}
-          >
-            <GlowCard className="h-full">
-              <div className="flex h-full flex-col p-6">
+        <Reveal className="mt-14">
+          <GlowCard>
+            <div className="grid gap-8 p-8 lg:grid-cols-[1fr_260px] lg:gap-12">
+              {/* Founder */}
+              <div>
                 <div className="flex items-center gap-4">
                   <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 font-sans text-sm font-bold text-green-400">
                     AR
@@ -989,87 +950,90 @@ function TrustSection() {
                     </p>
                   </div>
                 </div>
-                <p className="mt-5 font-sans text-base leading-relaxed text-zinc-300">
+                <p className="mt-5 max-w-xl font-sans text-base leading-relaxed text-zinc-300">
                   &ldquo;I built Envpilot after watching one too many production
                   keys get pasted into Slack channels half the company could
                   scroll. It&apos;s the tool I wanted: encrypted, synced, and
                   boring to use.&rdquo;
                 </p>
-                <div className="mt-auto flex flex-wrap gap-x-5 gap-y-2 border-t border-zinc-800/80 pt-4 font-mono text-xs">
-                  <Link
-                    href="/changelog"
-                    className="inline-flex items-center gap-1.5 text-zinc-400 transition-colors hover:text-green-400"
-                  >
-                    <GitBranch className="h-3.5 w-3.5" />
-                    changelog — shipping weekly
-                  </Link>
-                  <Link
-                    href="/wishlist"
-                    className="inline-flex items-center gap-1.5 text-zinc-400 transition-colors hover:text-green-400"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5" />
-                    public roadmap
-                  </Link>
-                </div>
               </div>
-            </GlowCard>
-          </StaggerItem>
 
-          {TESTIMONIALS.map((t) => (
-            <StaggerItem key={t.quote}>
-              <GlowCard className="h-full">
-                <div className="flex h-full flex-col p-6">
-                  {t.sample && (
-                    <span className="mb-3 inline-flex w-fit items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-400">
-                      sample — replace before launch
-                    </span>
-                  )}
-                  <p className="font-sans text-sm leading-relaxed text-zinc-300">
-                    &ldquo;{t.quote}&rdquo;
-                  </p>
-                  <p className="mt-auto pt-4 font-mono text-[11px] text-zinc-500">
-                    {t.href ? (
-                      <a
-                        href={t.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="transition-colors hover:text-green-400"
-                      >
-                        {t.name} · {t.role}
-                      </a>
-                    ) : (
-                      <>
-                        {t.name} · {t.role}
-                      </>
-                    )}
-                  </p>
-                </div>
-              </GlowCard>
-            </StaggerItem>
-          ))}
-
-          <StaggerItem>
-            <div className="h-full rounded-xl border border-dashed border-zinc-700/80 p-6">
-              <div className="flex h-full flex-col">
-                <p className="font-sans text-sm font-semibold text-zinc-200">
-                  Using Envpilot?
-                </p>
-                <p className="mt-2 font-mono text-xs leading-relaxed text-zinc-500">
-                  Tell me what&apos;s working — or what isn&apos;t. Real
-                  feedback shapes the roadmap, and the best lines end up right
-                  here with your name on them.
+              {/* Live links + feedback CTA */}
+              <div className="flex flex-col gap-3 border-zinc-800/80 font-mono text-xs lg:border-l lg:pl-10">
+                <Link
+                  href="/changelog"
+                  className="inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
+                >
+                  <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                  changelog — shipping weekly
+                </Link>
+                <Link
+                  href="/wishlist"
+                  className="inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                  public roadmap
+                </Link>
+                <p className="mt-3 text-zinc-600">
+                  Using Envpilot? The best lines end up here with your name on
+                  them.
                 </p>
                 <a
                   href="mailto:hello@envpilot.dev?subject=Envpilot%20feedback"
-                  className="mt-auto inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 pt-2.5 font-mono text-xs font-semibold text-green-400 transition-colors hover:bg-green-500/20"
+                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 font-semibold text-green-400 transition-colors hover:bg-green-500/20"
                 >
                   hello@envpilot.dev
                   <ArrowRight className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>
-          </StaggerItem>
-        </Stagger>
+          </GlowCard>
+        </Reveal>
+
+        {TESTIMONIALS.length > 0 && (
+          <Stagger className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <StaggerItem key={t.quote}>
+                <GlowCard className="h-full">
+                  <div className="flex h-full flex-col p-6">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-sans text-xs font-bold text-zinc-300">
+                        {t.name
+                          .split(" ")
+                          .map((w) => w[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        {t.href ? (
+                          <a
+                            href={t.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block truncate font-sans text-xs font-semibold text-zinc-100 transition-colors hover:text-green-400"
+                          >
+                            {t.name}
+                          </a>
+                        ) : (
+                          <p className="truncate font-sans text-xs font-semibold text-zinc-100">
+                            {t.name}
+                          </p>
+                        )}
+                        <p className="truncate font-mono text-[11px] text-zinc-500">
+                          {t.role}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-4 font-sans text-sm leading-relaxed text-zinc-300">
+                      {t.quote}
+                    </p>
+                  </div>
+                </GlowCard>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        )}
       </div>
     </section>
   );
