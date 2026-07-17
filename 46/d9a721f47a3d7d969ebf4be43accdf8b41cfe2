@@ -1,0 +1,29 @@
+apps/web/package.json
+  s_a3ac6d49efb842::t_31e829afbf3d4f 3
+apps/web/src/app/page.tsx
+  s_a3ac6d49efb842::t_6171cad7ba21dd 25
+apps/web/src/components/landing/LandingPage.tsx
+  s_a3ac6d49efb842::t_a8b9dc1246c20e 142,145,153-155,910,912
+apps/web/src/lib/versions.ts
+  s_a3ac6d49efb842::t_77d48be2a2bb2f 17
+convex/features/admin/migrations.ts
+  s_a3ac6d49efb842::t_dfc41e50e65e45 314-315
+convex/lib/seedData.ts
+  s_a3ac6d49efb842::t_3acc7beac897f3 121,130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "46d9a721f47a3d7d969ebf4be43accdf8b41cfe2",
+  "prompts": {},
+  "sessions": {
+    "s_a3ac6d49efb842": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fdf4860-d1ca-4221-814d-45e02d7e435c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
