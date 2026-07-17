@@ -1,0 +1,19 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/accounts/page.tsx
+  s_c0d41f513c83f7::t_ad65ef1c52132e 49-52,56-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "753de3e5e1d1ecd8db00779d1fc20538ba4bac1f",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
