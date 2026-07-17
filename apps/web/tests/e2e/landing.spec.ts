@@ -57,8 +57,8 @@ test.describe("landing page", () => {
       section.getByRole("link", { name: /public roadmap/i })
     ).toHaveAttribute("href", "/wishlist");
     await expect(
-      section.getByRole("link", { name: /hello@envpilot\.dev/i })
-    ).toHaveAttribute("href", /^mailto:hello@envpilot\.dev/);
+      section.getByRole("link", { name: /ceo@envpilot\.dev/i })
+    ).toHaveAttribute("href", /^mailto:ceo@envpilot\.dev/);
   });
 
   test("FAQ answers expand and structured data is served", async ({ page }) => {

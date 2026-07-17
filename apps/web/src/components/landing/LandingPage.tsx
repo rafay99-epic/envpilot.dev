@@ -979,10 +979,10 @@ function TrustSection() {
                   them.
                 </p>
                 <a
-                  href="mailto:hello@envpilot.dev?subject=Envpilot%20feedback"
+                  href="mailto:ceo@envpilot.dev?subject=Envpilot%20feedback"
                   className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 font-semibold text-green-400 transition-colors hover:bg-green-500/20"
                 >
-                  hello@envpilot.dev
+                  ceo@envpilot.dev
                   <ArrowRight className="h-3.5 w-3.5" />
                 </a>
               </div>
