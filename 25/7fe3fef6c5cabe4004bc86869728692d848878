@@ -1,0 +1,31 @@
+apps/web/package.json
+  s_8d79f2bb6db198::t_a62619a6625aec 3
+apps/web/src/components/landing/LandingPage.tsx
+  s_8d79f2bb6db198::t_c5ab1f520ca05f 15,20,159-160,219-223,939,970-980,983
+apps/web/src/components/landing/faq-data.ts
+  s_8d79f2bb6db198::t_78a22794945036 18-23
+apps/web/src/components/marketing/index.tsx
+  s_8d79f2bb6db198::t_47b190b7128d50 47
+apps/web/src/lib/versions.ts
+  s_8d79f2bb6db198::t_d7bb7f75877496 17
+apps/web/tests/e2e/landing.spec.ts
+  s_8d79f2bb6db198::t_64664d9835df0b 13-15,48-50,65-67,93-97
+packages/ui/src/site-urls.ts
+  s_8d79f2bb6db198::t_f98dd74df68ab9 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "257fe3fef6c5cabe4004bc86869728692d848878",
+  "prompts": {},
+  "sessions": {
+    "s_8d79f2bb6db198": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a13690c-b595-4d39-8e52-79e370dd4553",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
