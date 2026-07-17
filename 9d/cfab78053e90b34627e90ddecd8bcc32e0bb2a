@@ -1,0 +1,23 @@
+.circleci/jobs.yml
+  s_c0d41f513c83f7::t_c112bc1cb6d7fa 432-433,436-438,442-461
+.github/workflows/ci.yml
+  s_c0d41f513c83f7::t_d830b8f7ff8f69 16-20,22-24,209-217
+.gitleaks.toml
+  s_c0d41f513c83f7::t_4274f9e0b9663e 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9dcfab78053e90b34627e90ddecd8bcc32e0bb2a",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
