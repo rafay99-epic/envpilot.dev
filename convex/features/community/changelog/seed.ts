@@ -1066,6 +1066,27 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
   },
 
   // ============================================================
+  // v1.49.0 — Legacy client retirement (2026-07-18)
+  // ============================================================
+  {
+    title: "Older CLI and Extension Versions Now Require an Update",
+    version: "v1.49.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-18T18:00:00Z"),
+    content: `The platform now requires CLI **1.18.0+** and VS Code extension **1.15.0+** — the first versions built for the new role system.
+
+### Why
+- Older builds talked to server endpoints that predate the new role system; keeping both paths alive forever would slow every future release
+- Affected versions now show a clear update prompt instead of failing with confusing errors
+
+### What to do
+- CLI: \`npm install -g @envpilot/cli@latest\` (or \`brew upgrade envpilot\`)
+- VS Code extension: update from your editor's extension panel
+
+Nothing else changes — projects, variables, and roles are untouched.`,
+  },
+
+  // ============================================================
   // v1.48.0 — Role Registry (2026-07-18)
   // ============================================================
   {

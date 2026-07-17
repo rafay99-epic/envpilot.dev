@@ -306,7 +306,10 @@ Browser/CLI/Extension → Next.js API Routes → Convex (database) + WorkOS Vaul
 - `convex/` — Backend functions (queries, mutations) and `schema.ts` (database schema). Auto-generates types in `convex/_generated/`. Has its own independent tsconfig. **Must stay at the monorepo root** (Convex CLI requirement).
   - `convex/features/<feature>/` — ALL implementation code, organized by feature/sub-feature (variables, accounts, permissions, sharing, projects, organizations, users, billing, featureRegistry, admin, dashboard, audit, community, support, emails, vault, auth).
   - `convex/lib/` — shared pure helpers (identity, authz, audit, rateLimits, roleCompat, seedData, users). No registered functions here.
-  - **9 root `<module>.ts` files are legacy client compat shims** (deviceSessions, featureRegistry, organizations, projectMembers, projects, tierLimits, variableRequests, variableValues, variables). They re-export ONLY the 16 functions that published CLI (>= 1.14.0) / extension (>= 1.7.2) builds call by baked-in string paths. Never add exports to them or import from them; all monorepo code uses the real `api.features.*` paths. Delete the shims once `minCli`/`minExtension` pass the last old-path release (see convex/README.md).
+  - The legacy root `<module>.ts` client-compat shims are GONE (deleted when
+    `minCli`/`minExtension` reached the features/_-native builds 1.18.0 /
+    1.15.0). Never register functions at the convex root; all code uses the
+    real `api.features._` paths.
   - `schema.ts`, `crons.ts`, `auth.config.ts`, `convex.config.ts` stay at the convex root (Convex requirements).
 - `apps/web/` — Next.js web app (`@envpilot/web`) — marketing site + authed
   dashboard + API routes. Does NOT serve /blog or /docs anymore: next.config
