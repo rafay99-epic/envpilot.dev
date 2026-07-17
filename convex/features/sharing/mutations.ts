@@ -11,6 +11,8 @@ import {
   assertOrgMembership,
   getVariableAccess,
   getAccountAccess,
+  roleLevel,
+  ROLE_LEVEL,
 } from "../../lib/authz";
 import { normalizeResourceType, countActiveShares } from "./helpers";
 
@@ -63,7 +65,19 @@ export const createShare = mutation({
     // 0. Authorization: the caller must be a member of the org AND have at
     // least read access to the resource being shared. Without this a member
     // could mint a share link for a resource they cannot see.
-    await assertOrgMembership(ctx, actor._id, args.organizationId);
+    // LOCKDOWN: sharing is team_lead+ (owner/PM/TL). Read access alone was
+    // an exfiltration loophole — a read-only member could mail any secret to
+    // an outside address. ConvexError so the denial survives prod redaction.
+    const { membership: sharerMembership } = await assertOrgMembership(
+      ctx,
+      actor._id,
+      args.organizationId
+    );
+    if (roleLevel(sharerMembership.role) < ROLE_LEVEL.team_lead) {
+      throw new ConvexError(
+        "Sharing secrets requires a team lead, project manager, or owner role. Ask your team lead to create the share."
+      );
+    }
 
     if (resourceType === "account") {
       if (!args.accountId) {

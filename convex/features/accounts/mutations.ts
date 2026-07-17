@@ -63,7 +63,7 @@ export const create = mutation({
     }
 
     // Authorization: owner, or assigned PM / team lead / developer
-    const { orgRole, environmentScope } = await authorizeAccountAccess(ctx, {
+    const { environmentScope } = await authorizeAccountAccess(ctx, {
       userId: args.createdBy,
       projectId: args.projectId,
       action: "project:create_account",
@@ -127,18 +127,10 @@ export const create = mutation({
       updatedAt: now,
     });
 
-    // Developers have no blanket write access — an automatic grant keeps
-    // write access to the accounts they create (parity with variables.create).
-    if (orgRole === "developer") {
-      await ctx.db.insert("accountPermissions", {
-        accountId,
-        userId: args.createdBy,
-        permission: "write",
-        grantedBy: args.createdBy,
-        grantedAt: now,
-        isActive: true,
-      });
-    }
+    // LOCKDOWN NOTE: developers can no longer reach this mutation
+    // (project:create_account excludes them — account requests are the
+    // path), so the old auto-write-grant-on-create is gone. Grants cap at
+    // read in getAccountAccess regardless.
 
     await createAuditLog(ctx, {
       organizationId: project.organizationId,

@@ -54,8 +54,9 @@ async function createCore(
     throw new Error("Project not found");
   }
 
-  // Authorization: owner, or assigned PM / team lead / developer
-  const { orgRole, environmentScope } = await authorizeVariableAccess(ctx, {
+  // Authorization: owner, or assigned PM / team lead (developers are
+  // request-only — see PROJECT_ACTIONS lockdown)
+  const { environmentScope } = await authorizeVariableAccess(ctx, {
     userId: args.createdBy,
     projectId: args.projectId,
     action: "project:create_variable",
@@ -216,18 +217,11 @@ async function createCore(
     createdAt: now,
   });
 
-  // Developers have no blanket write access — an automatic grant keeps
-  // write access to the variables they create.
-  if (orgRole === "developer") {
-    await ctx.db.insert("variablePermissions", {
-      variableId,
-      userId: args.createdBy,
-      permission: "write",
-      grantedBy: args.createdBy,
-      grantedAt: now,
-      isActive: true,
-    });
-  }
+  // LOCKDOWN NOTE: developers can no longer reach this mutation
+  // (project:create_variable excludes them — they go through variable
+  // requests), so the old auto-write-grant-on-create is gone. If a
+  // developer-created path ever returns, grants cap at read in
+  // getVariableAccess regardless.
 
   await createAuditLog(ctx, {
     organizationId: project.organizationId,

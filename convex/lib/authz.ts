@@ -111,26 +111,19 @@ export const ORG_ACTIONS = {
 export const PROJECT_ACTIONS = {
   "project:read": ["project_manager", "team_lead", "developer"] as OrgRole[],
   "project:update": ["project_manager"] as OrgRole[],
-  "project:create_variable": [
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
-  // Developers update variables via per-variable write grants, enforced in
-  // getVariableAccess — not via this action.
+  // LOCKDOWN: developers are read+request-only. They no longer create
+  // variables directly — a variable request (reviewed by owner/PM/TL) is the
+  // only path. Grants can never elevate a developer to write either (capped
+  // in getVariableAccess).
+  "project:create_variable": ["project_manager", "team_lead"] as OrgRole[],
   "project:update_variable": ["project_manager", "team_lead"] as OrgRole[],
   "project:delete_variable": ["project_manager", "team_lead"] as OrgRole[],
   "project:manage_permissions": ["project_manager", "team_lead"] as OrgRole[],
   // Team leads may only add/remove developers (hierarchy enforced separately).
   "project:manage_members": ["project_manager", "team_lead"] as OrgRole[],
-  // Shared accounts — parity with the variable actions above. Any assigned
-  // role (incl. developer) may create; developers update via per-account write
-  // grants, enforced in getAccountAccess — not via this action.
-  "project:create_account": [
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
+  // Shared accounts — same lockdown as variables: developers request, never
+  // create; grants cap at read in getAccountAccess.
+  "project:create_account": ["project_manager", "team_lead"] as OrgRole[],
   "project:update_account": ["project_manager", "team_lead"] as OrgRole[],
   "project:delete_account": ["project_manager", "team_lead"] as OrgRole[],
   "project:manage_account_permissions": [
@@ -612,7 +605,11 @@ export async function getVariableAccess(
   // Users without a project assignment are capped at read (viewer sharing)
   if (!projectMembership) return "read";
 
-  return grant.permission === "read" ? "read" : "write"; // legacy "admin" → write
+  // LOCKDOWN: developers are read+request-only — a grant (including legacy
+  // write/admin rows) never resolves above read. Changes go through the
+  // variable-request flow. This caps historical write grants with no data
+  // migration and is trivially reversible.
+  return "read";
 }
 
 // ─── Account-level access ─────────────────────────────────────────────────────
@@ -724,5 +721,7 @@ export async function getAccountAccess(
   // Users without a project assignment are capped at read (viewer sharing)
   if (!projectMembership) return "read";
 
-  return grant.permission === "read" ? "read" : "write";
+  // LOCKDOWN: developers are read+request-only — account grants cap at read,
+  // exactly like variable grants (see getVariableAccess).
+  return "read";
 }
