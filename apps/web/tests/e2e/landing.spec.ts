@@ -10,6 +10,9 @@ import "./env";
 
 const DOCS_URL =
   process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.envpilot.dev";
+// Hardcoded in SITE_URLS (no env override) — the repo the open-source
+// showcase points at.
+const GITHUB_URL = "https://github.com/rafay99-epic/envpilot.dev";
 
 test.describe("landing page", () => {
   test.beforeEach(async ({ page }) => {
@@ -42,6 +45,9 @@ test.describe("landing page", () => {
       "href",
       "https://github.com/rafay99-epic/envpilot-action"
     );
+    await expect(
+      page.getByRole("link", { name: /open source/i })
+    ).toHaveAttribute("href", GITHUB_URL);
   });
 
   test("trust section has founder card and feedback invite", async ({
@@ -56,6 +62,9 @@ test.describe("landing page", () => {
     await expect(
       section.getByRole("link", { name: /public roadmap/i })
     ).toHaveAttribute("href", "/wishlist");
+    await expect(
+      section.getByRole("link", { name: /star on github/i })
+    ).toHaveAttribute("href", GITHUB_URL);
     await expect(
       section.getByRole("link", { name: /ceo@envpilot\.dev/i })
     ).toHaveAttribute("href", /^mailto:ceo@envpilot\.dev/);
@@ -80,6 +89,11 @@ test.describe("landing page", () => {
       .find((s) => s["@type"] === "FAQPage");
     expect(faq.mainEntity.map((q: { name: string }) => q.name)).toContain(
       "Where do my secrets actually live?"
+    );
+    // The open-source showcase adds a dedicated FAQ entry — assert it reached
+    // the structured data too.
+    expect(faq.mainEntity.map((q: { name: string }) => q.name)).toContain(
+      "Is Envpilot open source?"
     );
   });
 

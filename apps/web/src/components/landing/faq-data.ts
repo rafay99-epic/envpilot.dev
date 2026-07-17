@@ -15,7 +15,12 @@ export const FAQ_ITEMS = [
   {
     question: "How is this different from Doppler or Infisical?",
     answer:
-      "No per-seat pricing — one flat price per organization — and nothing to self-host or operate. Built for small teams that share variables over Slack today, not for enterprise procurement.",
+      "No per-seat pricing — one flat price per organization — and the whole platform is open source (MIT): run our zero-ops hosted cloud, or self-host it yourself. Built for small teams that share variables over Slack today, not for enterprise procurement.",
+  },
+  {
+    question: "Is Envpilot open source?",
+    answer:
+      "Yes — the entire platform (web app, CLI, VS Code extension, and backend) is MIT-licensed on GitHub. Read the code, audit how your secrets are handled, self-host it, or contribute a pull request.",
   },
   {
     question: "What does the free plan include?",
