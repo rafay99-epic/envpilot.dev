@@ -12,7 +12,12 @@ import {
   requireAccountAccess,
 } from "../../lib/authHelpers";
 import { PURGE_RETENTION_DAYS } from "../vault/gc";
-import { isEnvironmentScopeAllowed, normalizeOrgRole } from "../../lib/authz";
+import {
+  isEnvironmentScopeAllowed,
+  normalizeOrgRole,
+  getRoleProfile,
+  hasCapability,
+} from "../../lib/authz";
 import { revokeSharesForResource } from "../sharing/helpers";
 
 /**
@@ -62,13 +67,14 @@ export const create = mutation({
       throw new Error("Project not found");
     }
 
-    // Authorization: owner, or assigned PM / team lead / developer
-    const { orgRole, environmentScope } = await authorizeAccountAccess(ctx, {
-      userId: args.createdBy,
-      projectId: args.projectId,
-      action: "project:create_account",
-      preloadedProject: project,
-    });
+    // Authorization: capability project.accounts.create (assignment-gated)
+    const { environmentScope, profile: creatorProfile } =
+      await authorizeAccountAccess(ctx, {
+        userId: args.createdBy,
+        projectId: args.projectId,
+        action: "project:create_account",
+        preloadedProject: project,
+      });
 
     // Environment scope: scoped developers may only create accounts whose
     // environments all fall inside their assignment scope
@@ -127,9 +133,9 @@ export const create = mutation({
       updatedAt: now,
     });
 
-    // Developers have no blanket write access — an automatic grant keeps
-    // write access to the accounts they create (parity with variables.create).
-    if (orgRole === "developer") {
+    // Creators WITHOUT blanket write get an automatic write grant — main
+    // parity, generalized (see variables.createCore).
+    if (!hasCapability(creatorProfile, "project.accounts.update")) {
       await ctx.db.insert("accountPermissions", {
         accountId,
         userId: args.createdBy,
@@ -205,9 +211,12 @@ export const update = mutation({
         )
         .first();
 
+      const updaterProfile = editorMembership
+        ? await getRoleProfile(ctx, editorMembership.role)
+        : null;
       if (
-        editorMembership &&
-        normalizeOrgRole(editorMembership.role) === "developer"
+        updaterProfile &&
+        hasCapability(updaterProfile, "access.env_scoped")
       ) {
         const editorAssignment = await ctx.db
           .query("projectMembers")

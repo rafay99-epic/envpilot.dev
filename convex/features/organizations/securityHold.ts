@@ -3,7 +3,7 @@ import { mutation, query } from "../../_generated/server";
 import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 import {
   assertOrgAction,
-  assertCanManageUser,
+  assertCanManageUserAsync,
   normalizeOrgRole,
 } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
@@ -80,7 +80,8 @@ export const suspendMemberAccess = mutation({
       );
     }
 
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       membership.role,
       "suspend member"
@@ -166,7 +167,8 @@ export const reinstateMemberAccess = mutation({
       throw new Error("User is not a member of this organization");
     }
 
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       membership.role,
       "reinstate member"
@@ -277,7 +279,8 @@ export const listMemberCredentials = query({
     if (!targetMembership) {
       throw new Error("User is not a member of this organization");
     }
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       callerMembership.role,
       targetMembership.role,
       "view credentials"

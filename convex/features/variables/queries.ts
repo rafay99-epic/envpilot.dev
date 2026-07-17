@@ -13,6 +13,10 @@ import {
   toLegacyProjectRole,
   getActiveMembership,
   isSuspendedMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  hasCapability,
+  profileToLegacyProjectRole,
 } from "../../lib/authz";
 import {
   buildActiveGrantMap,
@@ -91,9 +95,10 @@ export const listOrgVariablesWithAccess = query({
     if (!membership) return [];
 
     const orgRole = normalizeOrgRole(membership.role);
-    const isOwner = orgRole === "owner";
+    const profile = await getRoleProfile(ctx, orgRole);
+    const isOwner = bypassesAssignment(profile);
 
-    // Determine accessible projects and (for developers) their env scope.
+    // Determine accessible projects and (for scoped roles) their env scope.
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -123,7 +128,8 @@ export const listOrgVariablesWithAccess = query({
     // Owners and assigned PMs/TLs have blanket write; developers depend on
     // per-variable grants (resolved below).
     const roleWrite =
-      isOwner || orgRole === "project_manager" || orgRole === "team_lead";
+      isOwner || hasCapability(profile, "project.variables.update");
+    const roleRead = hasCapability(profile, "access.blanket_read");
 
     // Prefetch the caller's active grants ONCE (only developers consult them,
     // but a single indexed query is far cheaper than one per variable).
@@ -149,10 +155,9 @@ export const listOrgVariablesWithAccess = query({
     > = [];
 
     for (const project of accessibleProjects) {
-      const environmentScope =
-        orgRole === "developer"
-          ? scopeByProject.get(project._id as string)
-          : undefined;
+      const environmentScope = hasCapability(profile, "access.env_scoped")
+        ? scopeByProject.get(project._id as string)
+        : undefined;
 
       const allVariables = await ctx.db
         .query("environmentVariables")
@@ -172,11 +177,19 @@ export const listOrgVariablesWithAccess = query({
         let access: "write" | "read" | null = null;
         if (roleWrite) {
           access = "write";
+        } else if (roleRead) {
+          // Auditor class — blanket read, no grants involved
+          access = "read";
         } else {
-          // Developer — resolve per-variable grant from the prefetched map
+          // Grant-fallback roles — resolve from the prefetched map
           const grant = grantByVariable.get(variable._id as string) ?? null;
           if (grant) {
-            access = grant.permission === "read" ? "read" : "write";
+            access =
+              grant.permission === "read"
+                ? "read"
+                : hasCapability(profile, "access.grant_fallback")
+                  ? "write"
+                  : "read";
           }
         }
 
@@ -239,9 +252,10 @@ export const listOrgVariablesWithAccessPaginated = query({
     if (!membership) return empty;
 
     const orgRole = normalizeOrgRole(membership.role);
-    const isOwner = orgRole === "owner";
+    const profile = await getRoleProfile(ctx, orgRole);
+    const isOwner = bypassesAssignment(profile);
 
-    // Determine accessible projects and (for developers) their env scope.
+    // Determine accessible projects and (for scoped roles) their env scope.
     const allProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -283,9 +297,12 @@ export const listOrgVariablesWithAccessPaginated = query({
     const assigned = !isOwner;
     const roleAccess =
       isOwner ||
-      (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-    const canManagePermissions = roleAccess;
-    const projectRole = toLegacyProjectRole(orgRole, assigned);
+      (assigned && hasCapability(profile, "project.variables.update"));
+    const roleRead = assigned && hasCapability(profile, "access.blanket_read");
+    const canManagePermissions =
+      isOwner ||
+      (assigned && hasCapability(profile, "project.permissions.manage"));
+    const projectRole = profileToLegacyProjectRole(profile, true);
 
     // Prefetch the caller's active grants ONCE (only developers consult them).
     const grantByVariable = buildActiveGrantMap(
@@ -354,10 +371,9 @@ export const listOrgVariablesWithAccessPaginated = query({
       isDone = true;
     } else {
       const project = accessibleProjects[pi];
-      const environmentScope =
-        orgRole === "developer"
-          ? scopeByProject.get(project._id as string)
-          : undefined;
+      const environmentScope = hasCapability(profile, "access.env_scoped")
+        ? scopeByProject.get(project._id as string)
+        : undefined;
 
       const inner = await ctx.db
         .query("environmentVariables")
@@ -379,14 +395,21 @@ export const listOrgVariablesWithAccessPaginated = query({
         let access: "write" | "read" | null = null;
         if (roleAccess) {
           access = "write";
+        } else if (roleRead) {
+          access = "read";
         } else if (grant) {
-          access = !assigned || grant.permission === "read" ? "read" : "write";
+          access =
+            !assigned || grant.permission === "read"
+              ? "read"
+              : hasCapability(profile, "access.grant_fallback")
+                ? "write"
+                : "read";
         }
 
         // Not accessible → skip entirely (identical to the non-paginated list).
         if (access === null) continue;
 
-        const effectivePermission = roleAccess ? "admin" : access;
+        const effectivePermission = canManagePermissions ? "admin" : access;
         const { vaultRef, ...metadata } = variable;
         page.push({
           ...metadata,
@@ -925,7 +948,10 @@ export const globalSearchWithAccess = query({
       if (!org) continue;
 
       const orgRole = normalizeOrgRole(membership.role);
-      const isOwner = orgRole === "owner";
+      // Per-ORG resolution (multi-org search loop) — bounded by the caller's
+      // org count, not by rows.
+      const searchProfile = await getRoleProfile(ctx, orgRole);
+      const isOwner = bypassesAssignment(searchProfile);
 
       // Metadata visibility: owners see all org projects, everyone else
       // sees the projects they are assigned to.
@@ -998,10 +1024,12 @@ export const globalSearchWithAccess = query({
 
         // Scoped developers never receive out-of-scope variables at all —
         // not even their metadata/keys
-        const environmentScope =
-          orgRole === "developer"
-            ? scopeByProject.get(project._id as string)
-            : undefined;
+        const environmentScope = hasCapability(
+          searchProfile,
+          "access.env_scoped"
+        )
+          ? scopeByProject.get(project._id as string)
+          : undefined;
 
         const matches = variables.filter(
           (variable) =>

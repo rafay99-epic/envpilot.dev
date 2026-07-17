@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation } from "../../_generated/server";
 import {
   checkNumericLimit,
@@ -10,8 +10,10 @@ import { batchGetUsers } from "../../lib/users";
 import {
   assertOrgAction,
   assertOrgMembership,
-  assertCanAssignRole,
+  assertCanAssignRoleAsync,
   normalizeOrgRole,
+  getRoleProfile,
+  hasCapability,
 } from "../../lib/authz";
 import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 import { voidTombstones } from "./tombstones";
@@ -125,7 +127,16 @@ export const create = mutation({
     );
 
     // Hierarchy: can only invite roles below your own (owners may invite any)
-    assertCanAssignRole(callerMembership.role, args.role);
+    await assertCanAssignRoleAsync(ctx, callerMembership.role, args.role);
+
+    // The invited role must exist and be active in the registry — a typo'd
+    // or deactivated slug must never enter organizationMembers.
+    const invitedRoleProfile = await getRoleProfile(ctx, args.role);
+    if (invitedRoleProfile.level === 0) {
+      throw new ConvexError(
+        `Unknown or inactive role "${args.role}" — pick a role from the registry.`
+      );
+    }
 
     if (args.environments && args.environments.length === 0) {
       throw new Error(
@@ -325,8 +336,13 @@ export const accept = mutation({
     ) {
       // Environment scope only constrains developers — owners, PMs, and team
       // leads are always unrestricted, so a scope on the invitation is ignored
-      const environmentScope =
-        invitedRole === "developer" ? invitation.environments : undefined;
+      const invitedProfile = await getRoleProfile(ctx, invitedRole);
+      const environmentScope = hasCapability(
+        invitedProfile,
+        "access.env_scoped"
+      )
+        ? invitation.environments
+        : undefined;
 
       for (const projectId of invitation.projectIds) {
         const project = await ctx.db.get(projectId);
@@ -356,10 +372,12 @@ export const accept = mutation({
         invitationId: invitation._id,
         role: invitedRole,
         projectIds: invitation.projectIds,
-        environments:
-          invitedRole === "developer"
-            ? (invitation.environments ?? "all")
-            : "all",
+        environments: hasCapability(
+          await getRoleProfile(ctx, invitedRole),
+          "access.env_scoped"
+        )
+          ? (invitation.environments ?? "all")
+          : "all",
       }),
       createdAt: now,
     });
@@ -478,7 +496,7 @@ export const resend = mutation({
 
     // Hierarchy: cannot re-arm an invitation for a role at or above your own
     // (e.g. a team_lead must not resend an owner/PM invitation).
-    assertCanAssignRole(callerMembership.role, invitation.role);
+    await assertCanAssignRoleAsync(ctx, callerMembership.role, invitation.role);
 
     const now = Date.now();
     const expiresInDays = args.expiresInDays ?? 7;

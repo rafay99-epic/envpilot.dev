@@ -6,7 +6,12 @@ import {
   countActiveProjects,
 } from "../featureRegistry/gates";
 import { requireAuthedUser } from "../../lib/identity";
-import { assertOrgAction, assertProjectAction } from "../../lib/authz";
+import {
+  assertOrgAction,
+  assertProjectAction,
+  getRoleProfile,
+  bypassesAssignment,
+} from "../../lib/authz";
 
 // ==========================================
 // MUTATIONS
@@ -76,7 +81,8 @@ export const create = mutation({
 
     // Auto-assign the creator to the project. Owners have implicit access to
     // every project; project managers need an explicit assignment.
-    if (creatorMembership.role === "project_manager") {
+    const creatorProfile = await getRoleProfile(ctx, creatorMembership.role);
+    if (!bypassesAssignment(creatorProfile)) {
       await ctx.db.insert("projectMembers", {
         projectId,
         userId: actor._id,

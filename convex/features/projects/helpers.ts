@@ -5,6 +5,8 @@ import {
   toLegacyProjectRole,
   getActiveMembership,
   isSuspendedMembership,
+  getRoleProfile,
+  bypassesAssignment,
 } from "../../lib/authz";
 
 /**
@@ -114,7 +116,7 @@ export async function listForUserCore(ctx: QueryCtx, userId: Id<"users">) {
       const orgRole = normalizeOrgRole(membership.role);
 
       // Owners see all projects in the org
-      if (orgRole === "owner") {
+      if (bypassesAssignment(await getRoleProfile(ctx, orgRole))) {
         const projects = await ctx.db
           .query("projects")
           .withIndex("by_organization", (q) =>

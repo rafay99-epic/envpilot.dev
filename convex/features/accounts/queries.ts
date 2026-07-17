@@ -10,8 +10,11 @@ import { requireAuthedUser } from "../../lib/identity";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
-  toLegacyProjectRole,
   getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  hasCapability,
+  profileToLegacyProjectRole,
 } from "../../lib/authz";
 
 /**
@@ -90,7 +93,8 @@ export const listWithAccess = query({
     }
 
     const orgRole = normalizeOrgRole(membership.role);
-    const isOwner = orgRole === "owner";
+    const profile = await getRoleProfile(ctx, orgRole);
+    const isOwner = bypassesAssignment(profile);
 
     // Assignment is a pure scope check — projectMembers.role is legacy
     // and never consulted for authorization.
@@ -104,18 +108,24 @@ export const listWithAccess = query({
         )
         .first();
       assigned = !!projectMembership;
-      // Environment scope only constrains assigned developers
-      if (orgRole === "developer") {
+      // Environment scope constrains env-scopeable roles
+      if (hasCapability(profile, "access.env_scoped")) {
         environmentScope = projectMembership?.environments;
       }
     }
 
-    // Owners and assigned PMs/team leads have blanket write access
+    // The owner class and assigned blanket-write roles have write access
     const roleAccess =
       isOwner ||
-      (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-    const canManagePermissions = roleAccess;
-    const projectRole = toLegacyProjectRole(orgRole, assigned);
+      (assigned && hasCapability(profile, "project.accounts.update"));
+    const roleRead = assigned && hasCapability(profile, "access.blanket_read");
+    const canManagePermissions =
+      isOwner ||
+      (assigned && hasCapability(profile, "project.permissions.manage"));
+    const projectRole = profileToLegacyProjectRole(
+      profile,
+      assigned || isOwner
+    );
 
     const allAccounts = await ctx.db
       .query("projectAccounts")
@@ -143,17 +153,25 @@ export const listWithAccess = query({
     const accountsWithAccess = accounts.map((account) => {
       const grant = grantByAccount.get(account._id as string) ?? null;
 
-      // Mirrors getAccountAccess: owner → write; assigned PM/TL → write;
-      // developers per grant; unassigned grant holders capped at read.
+      // Mirrors getAccountAccess: owner class → write; assigned blanket-write
+      // roles → write; auditor class → read; grant fallback per grant;
+      // unassigned grant holders capped at read.
       let access: "write" | "read" | null = null;
       if (roleAccess) {
         access = "write";
+      } else if (roleRead) {
+        access = "read";
       } else if (grant) {
-        access = !assigned || grant.permission === "read" ? "read" : "write";
+        access =
+          !assigned || grant.permission === "read"
+            ? "read"
+            : hasCapability(profile, "access.grant_fallback")
+              ? "write"
+              : "read";
       }
 
       const hasAccess = access !== null;
-      const effectivePermission = roleAccess ? "admin" : access;
+      const effectivePermission = canManagePermissions ? "admin" : access;
 
       // Vault refs are only returned for accounts the user can access;
       // assigned members still see metadata for the rest.

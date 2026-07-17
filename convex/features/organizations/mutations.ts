@@ -8,8 +8,8 @@ import { rateLimiter } from "../../lib/rateLimits";
 import { writeTombstone } from "./tombstones";
 import {
   assertOrgAction,
-  assertCanManageUser,
-  assertCanAssignRole,
+  assertCanManageUserAsync,
+  assertCanAssignRoleAsync,
   normalizeOrgRole,
 } from "../../lib/authz";
 
@@ -439,7 +439,8 @@ export const removeMember = mutation({
 
     // Hierarchy: when removing others, cannot remove a user at or above your level
     if (!isSelfRemoval && callerMembership) {
-      assertCanManageUser(
+      await assertCanManageUserAsync(
+        ctx,
         callerMembership.role,
         membership.role,
         "remove member"
@@ -625,10 +626,15 @@ export const updateMemberRole = mutation({
     }
 
     // Hierarchy: cannot change role of someone at or above your level
-    assertCanManageUser(callerMembership.role, membership.role, "change role");
+    await assertCanManageUserAsync(
+      ctx,
+      callerMembership.role,
+      membership.role,
+      "change role"
+    );
 
     // Hierarchy: can only assign roles below your own (owners may assign any)
-    assertCanAssignRole(callerMembership.role, args.newRole);
+    await assertCanAssignRoleAsync(ctx, callerMembership.role, args.newRole);
 
     const oldRole = membership.role;
 

@@ -3,7 +3,7 @@ import { mutation, query } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { createAuditLog } from "../../lib/audit";
-import { normalizeOrgRole } from "../../lib/authz";
+import { normalizeOrgRole, assertOrgAction } from "../../lib/authz";
 import { rateLimiter } from "../../lib/rateLimits";
 
 /**
@@ -57,35 +57,9 @@ const tagDocValidator = v.object({
 });
 
 /** Verify that the caller is an org member and return their role */
-async function requireOrgMembership(
-  ctx: { db: any },
-  userId: Id<"users">,
-  organizationId: Id<"organizations">,
-  requiredRoles?: string[]
-): Promise<{ role: string }> {
-  const user = await ctx.db.get(userId);
-  if (!user) {
-    throw new Error("Not authorized");
-  }
-
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q: any) =>
-      q.eq("organizationId", organizationId).eq("userId", userId)
-    )
-    .first();
-
-  if (!membership) {
-    throw new Error("Not authorized");
-  }
-
-  const role = normalizeOrgRole(membership.role);
-  if (requiredRoles && !requiredRoles.includes(role)) {
-    throw new Error("Insufficient permissions");
-  }
-
-  return { role };
-}
+// The old private requireOrgMembership helper (its own slug-list checks,
+// bypassing lib/authz) is folded into the central capability system:
+// creation = org:create_tag, management = org:manage_tag.
 
 // ==========================================
 // QUERIES
@@ -148,7 +122,12 @@ export const create = mutation({
     const now = Date.now();
 
     // Auth: verify caller is a member of the org
-    await requireOrgMembership(ctx, args.createdBy, args.organizationId);
+    await assertOrgAction(
+      ctx,
+      args.createdBy,
+      args.organizationId,
+      "org:create_tag"
+    );
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -249,11 +228,12 @@ export const update = mutation({
     }
 
     // Auth: verify caller is admin or team_lead in the org
-    await requireOrgMembership(ctx, args.updatedBy, tag.organizationId, [
-      "owner",
-      "project_manager",
-      "team_lead",
-    ]);
+    await assertOrgAction(
+      ctx,
+      args.updatedBy,
+      tag.organizationId,
+      "org:manage_tag"
+    );
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {
@@ -342,11 +322,12 @@ export const remove = mutation({
     }
 
     // Auth: verify caller is admin or team_lead in the org
-    await requireOrgMembership(ctx, args.deletedBy, tag.organizationId, [
-      "owner",
-      "project_manager",
-      "team_lead",
-    ]);
+    await assertOrgAction(
+      ctx,
+      args.deletedBy,
+      tag.organizationId,
+      "org:manage_tag"
+    );
 
     // Rate limit
     await rateLimiter.limit(ctx, "tagMutate", {

@@ -108,6 +108,8 @@ export function roleLevel(role: string): number {
 // review-blocking finding.
 
 export type { OrgAction, ProjectAction } from "./capabilities";
+export type { RoleProfile } from "./roleProfiles";
+export { hasCapability } from "./roleProfiles";
 
 /**
  * Resolve a role slug to its capability profile.
