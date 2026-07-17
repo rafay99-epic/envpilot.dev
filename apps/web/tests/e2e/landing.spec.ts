@@ -44,19 +44,21 @@ test.describe("landing page", () => {
     );
   });
 
-  test("founder strip is present with changelog and roadmap links", async ({
+  test("trust section has founder card and feedback invite", async ({
     page,
   }) => {
-    const strip = page.locator("section", {
+    const section = page.locator("section", {
       hasText: "I built Envpilot after watching",
     });
     await expect(
-      strip.getByRole("link", { name: "changelog" })
+      section.getByRole("link", { name: /changelog/i })
     ).toHaveAttribute("href", "/changelog");
-    await expect(strip.getByRole("link", { name: "roadmap" })).toHaveAttribute(
-      "href",
-      "/wishlist"
-    );
+    await expect(
+      section.getByRole("link", { name: /public roadmap/i })
+    ).toHaveAttribute("href", "/wishlist");
+    await expect(
+      section.getByRole("link", { name: /hello@envpilot\.dev/i })
+    ).toHaveAttribute("href", /^mailto:hello@envpilot\.dev/);
   });
 
   test("FAQ answers expand and structured data is served", async ({ page }) => {

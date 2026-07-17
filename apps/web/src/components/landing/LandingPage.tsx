@@ -905,36 +905,127 @@ function Pricing({
   );
 }
 
-/* ────────────────────────────── founder ────────────────────────────── */
+/* ────────────────────────────── trust ────────────────────────────── */
 
-function FounderStrip() {
+// Real, permissioned quotes ONLY — never invent people or testimonials.
+// As users give quotable feedback (email, X, support), add them here with
+// their permission and the grid grows on its own.
+const TESTIMONIALS: {
+  quote: string;
+  name: string;
+  role: string;
+  href?: string;
+}[] = [];
+
+function TrustSection() {
   return (
-    <section className="relative py-20">
-      <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-        <Reveal>
-          <p className="font-sans text-lg leading-relaxed text-zinc-300 [text-wrap:balance] sm:text-xl">
-            &ldquo;I built Envpilot after watching one too many production keys
-            get pasted into Slack channels half the company could scroll.
-            It&apos;s the tool I wanted: encrypted, synced, and boring to
-            use.&rdquo;
-          </p>
-          <p className="mt-5 font-mono text-xs text-zinc-500">
-            — Abdul Rafay, founder ·{" "}
-            <Link
-              href="/changelog"
-              className="text-zinc-400 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-green-400"
-            >
-              changelog
-            </Link>{" "}
-            ·{" "}
-            <Link
-              href="/wishlist"
-              className="text-zinc-400 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-green-400"
-            >
-              roadmap
-            </Link>
-          </p>
-        </Reveal>
+    <section className="relative py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <SectionHeading
+          eyebrow="community"
+          title={
+            <>
+              Built in the <span className="text-green-400">open</span>
+            </>
+          }
+          description="No logo wall, no invented praise — a real product, a reachable founder, and a public changelog you can hold us to."
+        />
+
+        <Stagger className="mt-14 grid gap-4 lg:grid-cols-3">
+          <StaggerItem
+            className={TESTIMONIALS.length === 0 ? "lg:col-span-2" : ""}
+          >
+            <GlowCard className="h-full">
+              <div className="flex h-full flex-col p-6">
+                <div className="flex items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-green-500/30 bg-green-500/10 font-sans text-sm font-bold text-green-400">
+                    AR
+                  </span>
+                  <div>
+                    <p className="font-sans text-sm font-semibold text-zinc-100">
+                      Abdul Rafay
+                    </p>
+                    <p className="font-mono text-[11px] text-zinc-500">
+                      founder &amp; the person answering your support email
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-5 font-sans text-base leading-relaxed text-zinc-300">
+                  &ldquo;I built Envpilot after watching one too many production
+                  keys get pasted into Slack channels half the company could
+                  scroll. It&apos;s the tool I wanted: encrypted, synced, and
+                  boring to use.&rdquo;
+                </p>
+                <div className="mt-auto flex flex-wrap gap-x-5 gap-y-2 border-t border-zinc-800/80 pt-4 font-mono text-xs">
+                  <Link
+                    href="/changelog"
+                    className="inline-flex items-center gap-1.5 text-zinc-400 transition-colors hover:text-green-400"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" />
+                    changelog — shipping weekly
+                  </Link>
+                  <Link
+                    href="/wishlist"
+                    className="inline-flex items-center gap-1.5 text-zinc-400 transition-colors hover:text-green-400"
+                  >
+                    <ArrowRight className="h-3.5 w-3.5" />
+                    public roadmap
+                  </Link>
+                </div>
+              </div>
+            </GlowCard>
+          </StaggerItem>
+
+          {TESTIMONIALS.map((t) => (
+            <StaggerItem key={t.name}>
+              <GlowCard className="h-full">
+                <div className="flex h-full flex-col p-6">
+                  <p className="font-sans text-sm leading-relaxed text-zinc-300">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <p className="mt-auto pt-4 font-mono text-[11px] text-zinc-500">
+                    {t.href ? (
+                      <a
+                        href={t.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="transition-colors hover:text-green-400"
+                      >
+                        {t.name} · {t.role}
+                      </a>
+                    ) : (
+                      <>
+                        {t.name} · {t.role}
+                      </>
+                    )}
+                  </p>
+                </div>
+              </GlowCard>
+            </StaggerItem>
+          ))}
+
+          <StaggerItem>
+            <div className="h-full rounded-xl border border-dashed border-zinc-700/80 p-6">
+              <div className="flex h-full flex-col">
+                <p className="font-sans text-sm font-semibold text-zinc-200">
+                  Using Envpilot?
+                </p>
+                <p className="mt-2 font-mono text-xs leading-relaxed text-zinc-500">
+                  Tell me what&apos;s working — or what isn&apos;t. Real
+                  feedback shapes the roadmap, and the best lines end up right
+                  here with your name on them.
+                </p>
+                <a
+                  href="mailto:hello@envpilot.dev?subject=Envpilot%20feedback"
+                  className="mt-auto inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 pt-2.5 font-mono text-xs font-semibold text-green-400 transition-colors hover:bg-green-500/20"
+                >
+                  hello@envpilot.dev
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+          </StaggerItem>
+        </Stagger>
       </div>
     </section>
   );
@@ -1088,7 +1179,7 @@ export default function LandingPage({
       <Workflow />
       <FeaturesBento />
       <Platform />
-      <FounderStrip />
+      <TrustSection />
       <Pricing pricingData={pricingData} paymentsEnabled={paymentsEnabled} />
       <Faq />
       <FinalCTA />
