@@ -158,9 +158,12 @@ export async function POST(request: Request) {
     // variable request (vault-encrypted, reviewed by owner/PM/TL) instead of
     // creating directly. The page surfaces `requested: true` as a submitted-
     // for-approval notice. Editors and above create directly below.
-    const roles = await authed.query(api.features.auth.queries.resolveLegacyRoles, {
-      projectId: projectId as Id<"projects">,
-    });
+    const roles = await authed.query(
+      api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: projectId as Id<"projects">,
+      }
+    );
     if (roles.role === "developer") {
       const request = await authed.action(
         api.features.variables.requests.actions.createWithValue,

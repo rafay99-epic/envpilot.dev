@@ -265,8 +265,7 @@ export const getRecentProjects = query({
       .filter((p) => p.deletedAt === undefined)
       .filter(
         (p) =>
-          assignedProjectIds === null ||
-          assignedProjectIds.has(p._id as string)
+          assignedProjectIds === null || assignedProjectIds.has(p._id as string)
       )
       .slice(0, 5);
 

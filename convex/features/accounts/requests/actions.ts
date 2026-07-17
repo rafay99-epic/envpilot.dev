@@ -48,13 +48,13 @@ export const createWithCredentials = action({
       );
     }
     if (args.environments.length === 0) {
-      throw new ConvexError("An account request needs at least one environment");
+      throw new ConvexError(
+        "An account request needs at least one environment"
+      );
     }
     if (
       access.environmentScope !== null &&
-      !args.environments.every((env) =>
-        access.environmentScope!.includes(env)
-      )
+      !args.environments.every((env) => access.environmentScope!.includes(env))
     ) {
       throw new ConvexError(
         `Your access is limited to these environments: ${access.environmentScope.join(", ")}`
