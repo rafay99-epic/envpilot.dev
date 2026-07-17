@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -41,6 +42,15 @@ import {
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
+import { purgeManagedFilesFiltered } from "./utils/managedFiles";
+import {
+  writeSessionMarker,
+  clearSessionMarker,
+  reapDeadSessionMarkers,
+  getLiveSessionFolders,
+  appendUnsyncReport,
+  drainUnsyncReports,
+} from "./utils/unsyncState";
 import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
 import { groupProjectsForPicker } from "./utils/requestTarget";
 import type { Project } from "./types";
@@ -210,6 +220,25 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Run storage migration if needed
   await storageService.migrateIfNeeded();
+
+  // Unsync-on-close crash detection: a session marker left by a dead
+  // extension host means that session never ran its deactivate() purge
+  // (crash, force-quit, power loss) — sweep the CRASHED session's recorded
+  // workspace folders NOW, before anything can trigger a fresh sync, so the
+  // purge never races a new write (the sweep would otherwise delete a
+  // just-written file whose hash matches the manifest). The sweep targets
+  // the dead session's folders, not this window's — a crash in project X
+  // must be cleaned up even when the next launch opens project Y.
+  const { crashed, deadFolders } = await reapDeadSessionMarkers();
+  await writeSessionMarker(
+    process.pid,
+    vscode.workspace.workspaceFolders?.map((folder) =>
+      path.resolve(folder.uri.fsPath)
+    ) ?? []
+  );
+  if (crashed && deadFolders.length > 0) {
+    await runUnsyncPurge("crash-sweep", deadFolders);
+  }
 
   // Initialize services. The TokenManager owns WorkOS access-token freshness
   // and is shared by every surface that authenticates to Convex or the vault
@@ -402,8 +431,21 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Start reactive sync if authenticated and auto-sync enabled
-  if (isAuthenticated && shouldAutoSync()) {
+  // Send unsync audit reports queued at previous shutdowns (fire-and-forget;
+  // only drain when signed in so an unauthenticated launch keeps the queue).
+  if (isAuthenticated) {
+    void (async () => {
+      const reports = await drainUnsyncReports();
+      await apiService.reportUnsync(reports);
+    })();
+  }
+
+  // Start reactive sync if authenticated and auto-sync enabled. In a
+  // Restricted Mode (untrusted) window we never write secrets, so sync and
+  // the write-triggering subscriptions stay off until trust is granted —
+  // the unsync purge and crash sweep above still ran, so previously synced
+  // files are cleaned up even in Restricted Mode.
+  const startSyncPipeline = async () => {
     const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
     if (linkedProject) {
       void syncService.syncAllDirectories(linkedProject);
@@ -417,6 +459,20 @@ export async function activate(context: vscode.ExtensionContext) {
       syncService.startPeriodicSync();
       realTimeSyncService.startRealTimeSync();
     });
+  };
+  if (isAuthenticated && shouldAutoSync()) {
+    if (vscode.workspace.isTrusted) {
+      await startSyncPipeline();
+    } else {
+      output.log(
+        "Envpilot: workspace is in Restricted Mode — sync is paused until you trust it (cleanup still runs)."
+      );
+      context.subscriptions.push(
+        vscode.workspace.onDidGrantWorkspaceTrust(() => {
+          void startSyncPipeline();
+        })
+      );
+    }
   }
 
   // Check for extension updates (non-blocking)
@@ -437,6 +493,7 @@ export async function activate(context: vscode.ExtensionContext) {
   syncService.onSyncComplete(() => {
     envCodeLensProvider.refresh();
     dashboardPanelProvider.notifySyncCompleted();
+    void maybeShowUnsyncNotice(context);
   });
 
   // Listen for workspace changes
@@ -1578,13 +1635,157 @@ async function handleRemoveCommitGuard(): Promise<void> {
   vscode.window.showInformationMessage("Envpilot: Commit guard hook removed.");
 }
 
+/**
+ * Unsync-on-close: delete this window's synced .env files for opted-in
+ * projects. Runs at deactivate ("close") and, when a dead session marker is
+ * found at activation, as a crash sweep ("crash-sweep").
+ *
+ * Safety invariants (the old unconditional delete-on-deactivate destroyed
+ * hand-edited files and was removed in PR #73 — these guards are what make
+ * reintroducing it safe):
+ *  - HASH GUARD: only files whose on-disk sha256 still matches the managed-
+ *    files manifest are deleted; hand-edited files are always spared.
+ *  - OPT-OUT: projects whose cached server flag is false are skipped, and
+ *    their directories are EXCLUDED from every other project's purge — a
+ *    linked directory of an opted-out project nested inside an opted-in
+ *    project's tree keeps its files (flag = member override ?? project
+ *    default ?? true, resolved server-side, cached at sync time so this
+ *    works offline).
+ *  - SCOPE: "close" purges only under THIS window's workspace folders;
+ *    "crash-sweep" purges only under the crashed session's recorded folders.
+ *  - LIVE-WINDOW GUARD: folders recorded by other still-running extension
+ *    hosts (session markers) are excluded — closing one window never
+ *    deletes files another live window is using, even for overlapping
+ *    workspaces (/repo open in A, /repo/apps/web open in B).
+ * Purge outcomes are queued as counts-only audit reports, sent on the next
+ * activation (network at shutdown is unreliable).
+ */
+async function runUnsyncPurge(
+  trigger: "close" | "crash-sweep",
+  scopeFolders?: string[]
+): Promise<void> {
+  try {
+    const folders = (
+      scopeFolders ??
+      vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ??
+      []
+    ).map((folder) => path.resolve(folder));
+    if (folders.length === 0) return;
+
+    const isInside = (child: string, parent: string) =>
+      child === parent || child.startsWith(parent + path.sep);
+
+    const projects = storageService.getLinkedProjectsMetadataV2();
+
+    // Exclusions: opted-out projects' directories (their opt-out must win
+    // even when nested inside an opted-in project's tree) and any folder a
+    // still-live extension host has claimed.
+    const excludedDirs = projects
+      .filter((project) => project.autoUnsyncOnClose === false)
+      .flatMap((project) =>
+        project.directories.map((dir) => path.resolve(dir.directoryPath))
+      );
+    excludedDirs.push(
+      ...(await getLiveSessionFolders(process.pid)).map((folder) =>
+        path.resolve(folder)
+      )
+    );
+
+    for (const project of projects) {
+      if (project.autoUnsyncOnClose === false) continue;
+
+      const eligibleDirs = project.directories
+        .map((dir) => path.resolve(dir.directoryPath))
+        .filter((dir) => folders.some((folder) => isInside(dir, folder)));
+      if (eligibleDirs.length === 0) continue;
+
+      const result = await purgeManagedFilesFiltered(
+        (filePath) =>
+          eligibleDirs.some((dir) => isInside(filePath, dir)) &&
+          !excludedDirs.some((dir) => isInside(filePath, dir))
+      );
+
+      if (result.deleted > 0 || result.spared > 0 || result.failed > 0) {
+        output.log(
+          `Envpilot: unsync (${trigger}) ${project.projectName}: removed ${result.deleted}, spared ${result.spared} locally modified${result.failed > 0 ? `, ${result.failed} failed` : ""}`
+        );
+        if (result.failed > 0) {
+          captureError(new Error("unsync purge had failures"), {
+            phase: "unsync-purge",
+            trigger,
+            failed: result.failed,
+          });
+        }
+        await appendUnsyncReport({
+          projectId: project.projectId,
+          deletedCount: result.deleted,
+          sparedCount: result.spared,
+          trigger,
+          occurredAt: Date.now(),
+        });
+      }
+    }
+  } catch (err) {
+    // Purge is best-effort — never break shutdown or activation over it.
+    captureError(err, { phase: "unsync-purge", trigger });
+  }
+}
+
+const UNSYNC_NOTICE_KEY = "envpilot.unsyncNoticeShown";
+
+/**
+ * One-time heads-up that unsync-on-close is active — the default flipped ON
+ * for everyone with this release, and silently vanishing .env files would
+ * read as a bug without it.
+ */
+async function maybeShowUnsyncNotice(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  try {
+    if (context.globalState.get<boolean>(UNSYNC_NOTICE_KEY)) return;
+    const armed = storageService
+      .getLinkedProjectsMetadataV2()
+      .some((project) => project.autoUnsyncOnClose !== false);
+    if (!armed) return;
+    await context.globalState.update(UNSYNC_NOTICE_KEY, true);
+    vscode.window.showInformationMessage(
+      "Envpilot: Unsync on close is active — synced .env files are removed when VS Code closes and restored on the next sync. Hand-edited files are never touched. Configure this per project in Project Settings on the web."
+    );
+  } catch {
+    // Purely informational — never let the notice break a sync callback.
+  }
+}
+
 export async function deactivate() {
-  // Deactivate must only release resources — it must NEVER delete the user's
-  // synced .env files. deactivate() runs on every extension-host shutdown
-  // (window close, reload, VS Code/extension update), so deleting files here
-  // caused guaranteed data loss (writable files hand-edited by owners/PMs/TLs
-  // were destroyed with no backup). Genuine sign-out / explicit unlink delete
-  // files through their own gated paths (shouldPreventCopyOnRevoke in sync.ts).
-  // Remaining resource cleanup is handled by dispose subscriptions.
+  // Unsync-on-close purge — hash-guarded, opt-out aware, window-scoped, and
+  // live-window aware (see runUnsyncPurge above; the PR #73 data-loss
+  // incident is why deletion here must never be unconditional). Note this
+  // fires on EVERY extension-host shutdown — window close, Reload Window,
+  // extension update — which is the intended security semantics: files never
+  // outlive the session, and the next activation's auto-sync restores them.
+  // Sign-out / explicit unlink still delete through their own gated paths
+  // (shouldPreventCopyOnRevoke in sync.ts). Remaining resource cleanup is
+  // handled by dispose subscriptions.
+  // TEAR DOWN EVERY FILE WRITER FIRST. FileProtection's anti-tamper watcher
+  // treats any deletion of a protected file as an unauthorized edit and
+  // re-syncs it (fileProtection.ts onDidDelete → 500ms debounce →
+  // resyncCallback) — without this, the purge deletes a file and the watcher
+  // restores it before the host dies, silently defeating unsync-on-close
+  // (observed in testing: purge reported deleted=1, file was back seconds
+  // later). Periodic sync and real-time subscriptions can rewrite too.
+  // These dispose() calls are idempotent; the context.subscriptions cleanup
+  // runs them again harmlessly.
+  try {
+    fileProtectionService?.dispose();
+    realTimeSyncService?.dispose();
+    syncService?.dispose();
+  } catch {
+    // Never let teardown stop the purge.
+  }
+  // Marker is cleared LAST: if the purge dies mid-shutdown the marker
+  // survives, so the next activation's crash sweep retries the cleanup
+  // (sweeping an already-purged folder is a no-op).
+  await runUnsyncPurge("close");
+  await clearSessionMarker(process.pid);
   await closeSentry();
 }

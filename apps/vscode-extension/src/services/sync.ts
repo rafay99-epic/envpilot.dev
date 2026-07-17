@@ -53,6 +53,21 @@ const ENV_FILE_HEADER = `# Envpilot - Synced Environment Variables
 const ENV_FILE_MARKER = "# Envpilot - Synced Environment Variables";
 
 /**
+ * Workspace Trust choke point: Envpilot never writes secrets into a
+ * Restricted Mode window. Every sync path funnels through the two env-file
+ * writers, so this single guard covers them all. Cleanup (unsync purge,
+ * revocation deletes) intentionally does NOT check trust — removing secrets
+ * from an untrusted workspace is always allowed.
+ */
+function assertTrustedWorkspace(): void {
+  if (!vscode.workspace.isTrusted) {
+    throw new Error(
+      "This workspace is in Restricted Mode — Envpilot will not write secrets here. Trust the workspace to sync."
+    );
+  }
+}
+
+/**
  * Sync service for managing environment variable synchronization
  */
 export class SyncService {
@@ -309,6 +324,10 @@ export class SyncService {
         }
       );
 
+      // Cache the server-resolved unsync-on-close flag so deactivate() can
+      // act on it offline.
+      await this.persistUnsyncFlag(project.projectId);
+
       const result: SyncResult = {
         success: true,
         variablesCount: variables.length,
@@ -362,6 +381,7 @@ export class SyncService {
     project: LinkedProject,
     variables: EnvironmentVariable[]
   ): Promise<void> {
+    assertTrustedWorkspace();
     const envFilePath = path.resolve(project.workspacePath, project.targetFile);
     const normalizedWorkspace = path.resolve(project.workspacePath);
 
@@ -927,6 +947,10 @@ export class SyncService {
         directory.directoryPath
       );
 
+      // Cache the server-resolved unsync-on-close flag so deactivate() can
+      // act on it offline.
+      await this.persistUnsyncFlag(project.projectId);
+
       return {
         success: true,
         variablesCount: totalVars,
@@ -997,6 +1021,7 @@ export class SyncService {
     variables: EnvironmentVariable[],
     projectId?: string
   ): Promise<void> {
+    assertTrustedWorkspace();
     const platformPath = toPlatformPath(directoryPath);
     const envFilePath = path.resolve(platformPath, targetFile);
     const normalizedDir = path.resolve(platformPath);
@@ -1394,6 +1419,23 @@ export class SyncService {
     }
 
     return this.syncAllDirectories(linkedProject);
+  }
+
+  /**
+   * Persist the unsync-on-close flag the last getVariables() call resolved
+   * for this project (cacheAccessMeta populates it on the same request).
+   * Best-effort — never fails a sync.
+   */
+  private async persistUnsyncFlag(projectId: string): Promise<void> {
+    try {
+      const flag = this.api.getAccessMeta(projectId)?.autoUnsyncOnClose;
+      if (flag !== undefined) {
+        await this.storage.setProjectUnsyncFlag(projectId, flag);
+      }
+    } catch {
+      // Flag caching must never break a sync; deactivate() falls back to
+      // the secure default (true) when no cached value exists.
+    }
   }
 
   dispose(): void {

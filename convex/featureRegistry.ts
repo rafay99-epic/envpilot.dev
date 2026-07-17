@@ -13,3 +13,6 @@
 
 export { getResolvedFeatures } from "./features/featureRegistry/queries";
 export { getResolvedFeaturesBatch } from "./features/featureRegistry/queries";
+// Called by published extension builds (1.7.2 – 1.13.0); missed in the PR #95
+// shim set.
+export { checkFeature } from "./features/featureRegistry/queries";

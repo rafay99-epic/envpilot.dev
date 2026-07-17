@@ -38,6 +38,7 @@ type PullResult = {
     hasWriteAccess: boolean;
     scopeRestricted: boolean;
     decryptionFailures?: string[];
+    autoUnsyncOnClose?: boolean;
   };
 };
 
@@ -131,6 +132,10 @@ export const pullValues = action({
       hasWriteAccess: v.boolean(),
       scopeRestricted: v.boolean(),
       decryptionFailures: v.optional(v.array(v.string())),
+      // Effective unsync-on-close for the caller (member override ??
+      // project default ?? true; pro gate re-checked at read time).
+      // Optional so older payload consumers stay valid.
+      autoUnsyncOnClose: v.optional(v.boolean()),
     }),
   }),
   handler: async (ctx, args): Promise<PullResult> => {
@@ -159,6 +164,12 @@ export const pullValues = action({
     );
     const legacy = await ctx.runQuery(
       api.features.auth.queries.resolveLegacyRoles,
+      {
+        projectId: args.projectId,
+      }
+    );
+    const autoUnsyncOnClose: boolean = await ctx.runQuery(
+      api.features.projects.queries.resolveUnsyncOnClose,
       {
         projectId: args.projectId,
       }
@@ -269,6 +280,7 @@ export const pullValues = action({
         scopeRestricted,
         decryptionFailures:
           decryptionFailures.length > 0 ? decryptionFailures : undefined,
+        autoUnsyncOnClose,
       },
     };
   },

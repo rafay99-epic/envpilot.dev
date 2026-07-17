@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",
@@ -40,6 +40,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In Restricted Mode, Envpilot never writes secrets: sync, pull, and link are disabled until you trust the workspace. Cleanup still runs — previously synced .env files are removed on close (unsync-on-close) and after crashes."
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [

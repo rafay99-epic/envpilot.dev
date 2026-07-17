@@ -108,6 +108,8 @@ import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_seedData from "../lib/seedData.js";
 import type * as lib_users from "../lib/users.js";
 import type * as organizations from "../organizations.js";
+import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
+import type * as projectAccess from "../projectAccess.js";
 import type * as projectMembers from "../projectMembers.js";
 import type * as projects from "../projects.js";
 import type * as tierLimits from "../tierLimits.js";
@@ -222,6 +224,8 @@ declare const fullApi: ApiFromModules<{
   "lib/seedData": typeof lib_seedData;
   "lib/users": typeof lib_users;
   organizations: typeof organizations;
+  permissionRevocationEvents: typeof permissionRevocationEvents;
+  projectAccess: typeof projectAccess;
   projectMembers: typeof projectMembers;
   projects: typeof projects;
   tierLimits: typeof tierLimits;

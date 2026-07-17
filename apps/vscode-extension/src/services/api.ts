@@ -91,6 +91,8 @@ interface PullValuesResult {
     hasWriteAccess: boolean;
     scopeRestricted: boolean;
     decryptionFailures?: string[];
+    /** Server-resolved unsync-on-close; absent on older deployments. */
+    autoUnsyncOnClose?: boolean;
   };
 }
 
@@ -125,6 +127,7 @@ export class ApiService {
       environmentScope?: string[] | null;
       hasWriteAccess?: boolean;
       scopeRestricted?: boolean;
+      autoUnsyncOnClose?: boolean;
     }
   > = new Map();
   /** Short-TTL response cache (one sync fans out to several refreshes). */
@@ -356,7 +359,7 @@ export class ApiService {
 
     return this.coalesce("orgs", async () => {
       const orgs = await this.convexQuery<OrgRow[]>(
-        anyApi.organizations.listForUser,
+        anyApi.features.organizations.queries.listForUser,
         {}
       );
 
@@ -365,7 +368,7 @@ export class ApiService {
       if (orgIds.length > 0) {
         try {
           tiers = await this.convexQuery<ResolvedFeatures[]>(
-            anyApi.featureRegistry.getResolvedFeaturesBatch,
+            anyApi.features.featureRegistry.queries.getResolvedFeaturesBatch,
             { organizationIds: orgIds }
           );
         } catch {
@@ -419,11 +422,14 @@ export class ApiService {
   /** Projects within one organization, with unified-role + assignment info. */
   private async listProjectsForOrg(organizationId: string): Promise<Project[]> {
     const [projects, membership] = await Promise.all([
-      this.convexQuery<ProjectRow[]>(anyApi.projects.listWithStats, {
-        organizationId,
-      }),
+      this.convexQuery<ProjectRow[]>(
+        anyApi.features.projects.queries.listWithStats,
+        {
+          organizationId,
+        }
+      ),
       this.convexQuery<MembershipRow | null>(
-        anyApi.organizations.getMembership,
+        anyApi.features.organizations.queries.getMembership,
         { organizationId }
       ),
     ]);
@@ -439,7 +445,7 @@ export class ApiService {
   /** Every accessible project across all orgs (per-project role). */
   private async listAllProjects(): Promise<Project[]> {
     const projects = await this.convexQuery<ProjectRow[]>(
-      anyApi.projects.listForUser,
+      anyApi.features.projects.queries.listForUser,
       {}
     );
     return Promise.all(
@@ -471,7 +477,7 @@ export class ApiService {
     if (!isOwner) {
       const projectMembership =
         await this.convexQuery<ProjectMembershipRow | null>(
-          anyApi.projectMembers.getProjectMembership,
+          anyApi.features.projects.members.getProjectMembership,
           { projectId: project._id }
         );
       assigned = projectMembership !== null;
@@ -500,7 +506,7 @@ export class ApiService {
   async getProject(projectId: string): Promise<Project | null> {
     try {
       const project = await this.convexQuery<ProjectRow | null>(
-        anyApi.projects.getById,
+        anyApi.features.projects.queries.getById,
         { projectId }
       );
       if (!project) return null;
@@ -539,7 +545,7 @@ export class ApiService {
       // Direct Convex action (decrypts server-side) — replaces the deleted
       // GET /api/extension/variables vault route.
       const result = await this.convexAction<PullValuesResult>(
-        anyApi.variableValues.pullValues,
+        anyApi.features.variables.values.pullValues,
         { projectId, environment }
       );
 
@@ -580,6 +586,7 @@ export class ApiService {
           environmentScope?: string[] | null;
           hasWriteAccess?: boolean;
           scopeRestricted?: boolean;
+          autoUnsyncOnClose?: boolean;
         }
       | undefined
   ): void {
@@ -596,6 +603,7 @@ export class ApiService {
         environmentScope: data.environmentScope,
         hasWriteAccess: data.hasWriteAccess,
         scopeRestricted: data.scopeRestricted,
+        autoUnsyncOnClose: data.autoUnsyncOnClose,
       });
     }
   }
@@ -607,9 +615,35 @@ export class ApiService {
         environmentScope?: string[] | null;
         hasWriteAccess?: boolean;
         scopeRestricted?: boolean;
+        autoUnsyncOnClose?: boolean;
       }
     | undefined {
     return this.accessMetaCache.get(projectId);
+  }
+
+  /**
+   * Send queued unsync purge summaries (counts only) for the server-side
+   * audit trail. Fire-and-forget by contract: failures are captured to
+   * Sentry and swallowed — a report must never block activation or sync.
+   */
+  async reportUnsync(
+    reports: Array<{
+      projectId: string;
+      deletedCount: number;
+      sparedCount: number;
+      trigger: "close" | "crash-sweep";
+      occurredAt: number;
+    }>
+  ): Promise<void> {
+    if (reports.length === 0) return;
+    try {
+      await this.convexMutation(
+        anyApi.features.users.projectAccess.reportUnsync,
+        { reports }
+      );
+    } catch (err) {
+      captureError(err, { phase: "report-unsync" });
+    }
   }
 
   /**
@@ -630,7 +664,7 @@ export class ApiService {
       // Direct Convex action, metadata-only (no vault decryption, no export
       // audit) — replaces the deleted GET /api/extension/variables?metadataOnly.
       const result = await this.convexAction<PullValuesResult>(
-        anyApi.variableValues.pullValues,
+        anyApi.features.variables.values.pullValues,
         { projectId, environment, metadataOnly: true }
       );
 
@@ -670,12 +704,15 @@ export class ApiService {
     deviceInfo: DeviceInfo,
     expiresInDays: number = LINK_EXPIRES_DAYS_DEFAULT
   ): Promise<{ accessToken: string; expiresAt: number }> {
-    await this.convexMutation(anyApi.projectAccess.linkExtension, {
-      projectId,
-      deviceId: deviceInfo.deviceId,
-      deviceName: deviceInfo.deviceName,
-      expiresInDays,
-    });
+    await this.convexMutation(
+      anyApi.features.users.projectAccess.linkExtension,
+      {
+        projectId,
+        deviceId: deviceInfo.deviceId,
+        deviceName: deviceInfo.deviceName,
+        expiresInDays,
+      }
+    );
     return {
       // Link marker (NOT the projectAccess token) — kept only so storage's
       // presence filter treats the project as linked.
@@ -685,10 +722,13 @@ export class ApiService {
   }
 
   async unlinkExtension(projectId: string, deviceId: string): Promise<void> {
-    await this.convexMutation(anyApi.projectAccess.unlinkExtension, {
-      projectId,
-      deviceId,
-    });
+    await this.convexMutation(
+      anyApi.features.users.projectAccess.unlinkExtension,
+      {
+        projectId,
+        deviceId,
+      }
+    );
   }
 
   // ============================================
@@ -701,7 +741,7 @@ export class ApiService {
   ): Promise<{ enabled: boolean; reason?: string }> {
     try {
       const result = await this.convexQuery<CheckFeatureResult>(
-        anyApi.featureRegistry.checkFeature,
+        anyApi.features.featureRegistry.queries.checkFeature,
         { organizationId, featureKey: "extension_access" }
       );
       return {
@@ -723,7 +763,7 @@ export class ApiService {
 
     try {
       const membership = await this.convexQuery<MembershipRow | null>(
-        anyApi.organizations.getMembership,
+        anyApi.features.organizations.queries.getMembership,
         { organizationId }
       );
       if (!membership) {
@@ -732,12 +772,15 @@ export class ApiService {
 
       const [usageData, enforcementEnabled, resolved] = await Promise.all([
         this.convexQuery<OrganizationUsage | null>(
-          anyApi.tierLimits.getOrganizationUsage,
+          anyApi.features.billing.tierLimits.getOrganizationUsage,
           { organizationId }
         ),
-        this.convexQuery<boolean>(anyApi.tierLimits.isEnforcementEnabled, {}),
+        this.convexQuery<boolean>(
+          anyApi.features.billing.tierLimits.isEnforcementEnabled,
+          {}
+        ),
         this.convexQuery<ResolvedFeatures>(
-          anyApi.featureRegistry.getResolvedFeatures,
+          anyApi.features.featureRegistry.queries.getResolvedFeatures,
           { organizationId }
         ),
       ]);
@@ -805,7 +848,7 @@ export class ApiService {
     // Direct Convex action — replaces the deleted
     // POST /api/extension/variable-requests vault route.
     const created = await this.convexAction<VariableRequest | null>(
-      anyApi.variableRequests.createWithValue,
+      anyApi.features.variables.requests.actions.createWithValue,
       {
         projectId: request.projectId,
         key: request.key,
@@ -833,7 +876,7 @@ export class ApiService {
       args.status = status;
     }
     return this.convexQuery<VariableRequest[]>(
-      anyApi.variableRequests.listForProject,
+      anyApi.features.variables.requests.queries.listForProject,
       args
     );
   }

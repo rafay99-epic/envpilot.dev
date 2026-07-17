@@ -476,6 +476,67 @@ export const unlinkExtension = mutation({
   },
 });
 
+/**
+ * Batched unsync activity report from the VS Code extension. Purges happen at
+ * editor shutdown where network calls are unreliable, so the extension stores
+ * a local summary and reports it on the NEXT activation — one call, counts
+ * only (never file paths or values). Best-effort by contract: the extension
+ * fires and forgets; unknown/deleted projects are skipped, not errors.
+ */
+export const reportUnsync = mutation({
+  args: {
+    reports: v.array(
+      v.object({
+        projectId: v.id("projects"),
+        deletedCount: v.number(),
+        sparedCount: v.number(),
+        trigger: v.union(v.literal("close"), v.literal("crash-sweep")),
+        occurredAt: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    const now = Date.now();
+
+    // Cap defensively: a legitimate report covers a handful of projects.
+    const reports = args.reports.slice(0, 50);
+
+    let logged = 0;
+    for (const report of reports) {
+      const project = await ctx.db.get(report.projectId);
+      if (!project) continue;
+
+      // Only org members may write audit rows into an org — a stale link on
+      // a device whose membership ended is skipped, not an error.
+      const membership = await ctx.db
+        .query("organizationMembers")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("organizationId", project.organizationId).eq("userId", actor._id)
+        )
+        .first();
+      if (!membership) continue;
+
+      await ctx.db.insert("auditLogs", {
+        organizationId: project.organizationId,
+        projectId: report.projectId,
+        userId: actor._id,
+        action: "access.extension_unsync",
+        details: JSON.stringify({
+          deletedCount: report.deletedCount,
+          sparedCount: report.sparedCount,
+          trigger: report.trigger,
+          occurredAt: report.occurredAt,
+        }),
+        createdAt: now,
+      });
+      logged++;
+    }
+
+    return { logged };
+  },
+});
+
 export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {

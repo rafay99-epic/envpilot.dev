@@ -131,6 +131,15 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "vscode_unsync_customization",
+    displayName: "VS Code Unsync Customization",
+    valueType: "boolean" as const,
+    category: "Tools",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
 
   // Security
   {

@@ -1,6 +1,7 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation } from "../../_generated/server";
 import {
+  checkBooleanFeature,
   checkNumericLimit,
   countActiveProjects,
 } from "../featureRegistry/gates";
@@ -104,6 +105,7 @@ export const update = mutation({
     description: v.optional(v.string()),
     icon: v.optional(v.string()),
     color: v.optional(v.string()),
+    vscodeAutoUnsyncOnClose: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -116,7 +118,20 @@ export const update = mutation({
 
     const project = await ctx.db.get(projectId);
     if (!project || project.deletedAt) {
-      throw new Error("Project not found");
+      throw new ConvexError("Project not found");
+    }
+
+    if (updates.vscodeAutoUnsyncOnClose !== undefined) {
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        project.organizationId,
+        "vscode_unsync_customization"
+      );
+      if (!gate.allowed) {
+        throw new ConvexError(
+          "Customizing VS Code unsync-on-close requires a Pro plan."
+        );
+      }
     }
 
     const updateData: Record<string, unknown> = { updatedAt: now };
@@ -125,6 +140,8 @@ export const update = mutation({
       updateData.description = updates.description;
     if (updates.icon !== undefined) updateData.icon = updates.icon;
     if (updates.color !== undefined) updateData.color = updates.color;
+    if (updates.vscodeAutoUnsyncOnClose !== undefined)
+      updateData.vscodeAutoUnsyncOnClose = updates.vscodeAutoUnsyncOnClose;
 
     await ctx.db.patch(projectId, updateData);
 
@@ -138,6 +155,72 @@ export const update = mutation({
     });
 
     return projectId;
+  },
+});
+
+/**
+ * Set or clear a member's override of the project's unsync-on-close default.
+ * `value: null` clears the override (member inherits the project setting).
+ * Pro-gated (vscode_unsync_customization), same permission as project update.
+ */
+export const setMemberUnsyncOverride = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    value: v.union(v.boolean(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
+    await assertProjectAction(ctx, actor._id, args.projectId, "project:update");
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) {
+      throw new ConvexError("Project not found");
+    }
+
+    const gate = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "vscode_unsync_customization"
+    );
+    if (!gate.allowed) {
+      throw new ConvexError(
+        "Customizing VS Code unsync-on-close requires a Pro plan."
+      );
+    }
+
+    const member = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", args.projectId).eq("userId", args.userId)
+      )
+      .first();
+    if (!member) {
+      throw new ConvexError("User is not a member of this project.");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(member._id, {
+      vscodeAutoUnsyncOnClose: args.value ?? undefined,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      organizationId: project.organizationId,
+      projectId: args.projectId,
+      userId: actor._id,
+      action: "project.updated",
+      details: JSON.stringify({
+        memberUnsyncOverride: {
+          targetUserId: args.userId,
+          previous: member.vscodeAutoUnsyncOnClose ?? null,
+          next: args.value,
+        },
+      }),
+      createdAt: now,
+    });
+
+    return member._id;
   },
 });
 

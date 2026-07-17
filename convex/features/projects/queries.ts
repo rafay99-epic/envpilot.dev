@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
+import { checkBooleanFeature } from "../featureRegistry/gates";
 import { listWithStatsCore, listForUserCore } from "./helpers";
 
 /**
@@ -30,6 +31,53 @@ export const getById = query({
     const project = await ctx.db.get(args.projectId);
     if (project?.deletedAt) return null;
     return project;
+  },
+});
+
+/**
+ * Effective unsync-on-close for the CALLER on this project:
+ * member override ?? project default ?? true. The pro gate
+ * (vscode_unsync_customization) is re-checked at read time — when it's not
+ * allowed, stored customizations are ignored and the secure default (true)
+ * applies, so a pro→free downgrade re-locks everyone immediately.
+ */
+export const resolveUnsyncOnClose = query({
+  args: { projectId: v.id("projects") },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.deletedAt) return true;
+
+    // Non-members get the platform default — the same answer as a missing
+    // project, so this public query neither confirms a project exists nor
+    // leaks its settings across org boundaries.
+    const orgMembership = await ctx.db
+      .query("organizationMembers")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("organizationId", project.organizationId).eq("userId", actor._id)
+      )
+      .first();
+    if (!orgMembership) return true;
+
+    const gate = await checkBooleanFeature(
+      ctx.db,
+      project.organizationId,
+      "vscode_unsync_customization"
+    );
+    if (!gate.allowed) return true;
+
+    const member = await ctx.db
+      .query("projectMembers")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", args.projectId).eq("userId", actor._id)
+      )
+      .first();
+
+    return (
+      member?.vscodeAutoUnsyncOnClose ?? project.vscodeAutoUnsyncOnClose ?? true
+    );
   },
 });
 

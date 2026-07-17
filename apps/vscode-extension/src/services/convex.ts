@@ -63,7 +63,7 @@ export class ConvexService {
     const id = `revocations-${Date.now()}`;
 
     const unsubscribe = this.client.onUpdate(
-      anyApi.permissionRevocationEvents.listMine,
+      anyApi.features.permissions.revocationEvents.listMine,
       {},
       (events: unknown) => {
         const arr = (events as RevocationEvent[]) ?? [];
@@ -89,7 +89,7 @@ export class ConvexService {
     const id = `access-${Date.now()}`;
 
     const unsubscribe = this.client.onUpdate(
-      anyApi.projectAccess.listForCaller,
+      anyApi.features.users.projectAccess.listForCaller,
       {},
       (records: unknown) => {
         callback((records as CallerProjectAccess[]) ?? []);
@@ -122,7 +122,7 @@ export class ConvexService {
     const id = `vars-${projectId.slice(0, 8)}-${Date.now()}`;
 
     const unsubscribe = this.client.onUpdate(
-      anyApi.variables.listMetadataByProject,
+      anyApi.features.variables.queries.listMetadataByProject,
       { projectId, environment },
       (metadata: unknown) => {
         callback(
@@ -148,7 +148,7 @@ export class ConvexService {
    */
   async acknowledgeRevocations(eventIds: string[]): Promise<void> {
     await this.client.mutation(
-      anyApi.permissionRevocationEvents.acknowledgeMine,
+      anyApi.features.permissions.revocationEvents.acknowledgeMine,
       { eventIds }
     );
   }
