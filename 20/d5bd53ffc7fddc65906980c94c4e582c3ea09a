@@ -1,0 +1,43 @@
+convex/features/accounts/mutations.ts
+  s_c0d41f513c83f7::t_2faf55d25a9435 16,51-53,61-62,72,128-129,143,161-162,173-174,176-182,196,210,214-216,218-220,225,240,267,288-289,292-293,306-317,342,351,357,394-395,398-399,427-438,448,479-480,493,498
+convex/features/accounts/requests/helpers.ts
+  s_c0d41f513c83f7::t_9b127794efd1a9 10-13,21-26
+convex/features/accounts/requests/mutations.ts
+  s_c0d41f513c83f7::t_03d02867436e25 3,165-172,341-347
+convex/features/dashboard/dashboard.ts
+  s_c0d41f513c83f7::t_de17f5bd5424c5 151-153,155-159
+convex/features/variables/helpers.ts
+  s_a3ac6d49efb842::t_6573c33cdf58ed 1,24-26
+convex/features/variables/mutations.ts
+  s_a3ac6d49efb842::t_3691ae402eaaa5 314-316,318-320,570-580,676-686,710-712,796-805
+convex/features/variables/requests/helpers.ts
+  s_a3ac6d49efb842::t_13f72a1c0fdca7 1,13-15
+convex/features/variables/rotation.ts
+  s_c0d41f513c83f7::t_ee746bf16e53eb 114-115,117
+convex/features/variables/values.ts
+  s_c0d41f513c83f7::t_16aa147544d753 10,823-827,829-833
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "20d5bd53ffc7fddc65906980c94c4e582c3ea09a",
+  "prompts": {},
+  "sessions": {
+    "s_a3ac6d49efb842": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fdf4860-d1ca-4221-814d-45e02d7e435c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
