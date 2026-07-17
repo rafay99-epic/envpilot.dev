@@ -22,7 +22,7 @@ const softwareAppSchema = {
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS, Linux, Windows, Web",
   description:
-    "Securely manage, share, and sync environment variables across your team. CLI, VS Code extension, and web dashboard with role-based access control.",
+    "Stop pasting .env files into Slack. Envpilot keeps your team's environment variables in sync — CLI, VS Code extension, and web dashboard with role-based access control.",
   offers: {
     "@type": "Offer",
     price: "0",

@@ -139,10 +139,10 @@ function Hero() {
           variants={fadeUp}
           className="mx-auto mt-8 max-w-4xl font-sans text-4xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-5xl md:text-7xl"
         >
-          Secrets management
+          Stop pasting .env files
           <br />
           <span className="gradient-text-green text-glow-green">
-            from your terminal.
+            into Slack.
           </span>
         </motion.h1>
 
@@ -150,9 +150,9 @@ function Hero() {
           variants={fadeUp}
           className="mx-auto mt-6 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500 md:text-base"
         >
-          Stop sharing .env files over Slack. AES-256 encrypted storage,
-          role-based access, and runtime injection — for teams that live in the
-          terminal.
+          Envpilot keeps your team&apos;s environment variables in sync — CLI,
+          VS Code extension, and web dashboard. Encrypted end to end. Free for
+          small teams, no credit card.
         </motion.p>
 
         <motion.div
@@ -907,9 +907,9 @@ function FinalCTA() {
             {"// ready when you are"}
           </span>
           <h2 className="mt-6 font-sans text-3xl font-bold tracking-tight text-zinc-100 [text-wrap:balance] sm:text-4xl md:text-6xl">
-            Stop pasting secrets
+            The last .env file
             <br />
-            <span className="gradient-text-green">into Slack.</span>
+            <span className="gradient-text-green">you&apos;ll ever paste.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-xl font-mono text-sm leading-relaxed text-zinc-500">
             Set up your first project in under two minutes. Free plan, no credit
