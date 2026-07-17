@@ -50,8 +50,14 @@ describe("isRequestEligible", () => {
     ).toBe(true);
   });
 
-  it("rejects owners / project managers / team leads (they write directly)", () => {
-    for (const role of ["owner", "project_manager", "team_lead"]) {
+  it("rejects every non-developer role (only developers request)", () => {
+    for (const role of [
+      "owner",
+      "project_manager",
+      "team_lead",
+      "editor",
+      "viewer",
+    ]) {
       expect(isRequestEligible(project({ _id: "p", unifiedRole: role }))).toBe(
         false
       );

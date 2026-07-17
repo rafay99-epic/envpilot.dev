@@ -1096,6 +1096,36 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
   },
 
   // ============================================================
+  // v1.47.0 — Six Org Roles & Request-Based Workflow (2026-07-17)
+  // ============================================================
+  {
+    title: "New Editor & Viewer Roles, Developers Go Request-Only",
+    version: "v1.47.0",
+    type: "feature",
+    publishedAt: ts("2026-07-17T18:00:00Z"),
+    content: `The role model grows to six organization roles, and the developer role is now strictly read + request-only.
+
+### Two New Roles
+- **Editor** — creates and edits variables and accounts directly in assigned projects (including CLI push and bulk import), with no member, permission, approval, or sharing powers
+- **Viewer** — sees everything in assigned projects but changes nothing: no edits, no requests, no shares
+- The full hierarchy is now owner > project manager > team lead > editor > developer > viewer
+
+### Developers: Read + Request-Only
+- Developers no longer write variables directly — every change goes through a variable request reviewed by an owner, project manager, or team lead
+- Existing per-variable write grants now behave as read grants; pulled .env files are read-only for developers
+- Environment-scoped assignments still apply to what a developer can see and request
+
+### Sharing Restriction
+- Sharing variables now requires team lead or above — editors, developers, and viewers cannot create shares
+
+### Account Requests
+- Developers can now propose new accounts through the same request-and-review flow as variables, with approvals handled by owner/PM/team lead
+
+### No Action Needed
+- Existing CLI and extension installs keep working — file writability is driven by the server, so the new roles take effect automatically. Update to CLI v1.18.0 / extension v1.15.0 for the new role labels.`,
+  },
+
+  // ============================================================
   // v1.40.0 — Launch & Welcome (2026-07-12)
   // ============================================================
   {

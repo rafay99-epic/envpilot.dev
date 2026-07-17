@@ -22,7 +22,9 @@ describe("normalizeOrgRole", () => {
     expect(normalizeOrgRole("owner")).toBe("owner");
     expect(normalizeOrgRole("project_manager")).toBe("project_manager");
     expect(normalizeOrgRole("team_lead")).toBe("team_lead");
+    expect(normalizeOrgRole("editor")).toBe("editor");
     expect(normalizeOrgRole("developer")).toBe("developer");
+    expect(normalizeOrgRole("viewer")).toBe("viewer");
   });
 
   it("defaults unknown / null / undefined to developer", () => {
@@ -32,16 +34,17 @@ describe("normalizeOrgRole", () => {
     expect(normalizeOrgRole(undefined)).toBe("developer");
     // legacy project role that is not an org role also falls through
     expect(normalizeOrgRole("manager")).toBe("developer");
-    expect(normalizeOrgRole("viewer")).toBe("developer");
   });
 });
 
 describe("roleLevel", () => {
-  it("orders owner > project_manager > team_lead > developer", () => {
-    expect(roleLevel("owner")).toBe(4);
-    expect(roleLevel("project_manager")).toBe(3);
-    expect(roleLevel("team_lead")).toBe(2);
-    expect(roleLevel("developer")).toBe(1);
+  it("orders owner > project_manager > team_lead > editor > developer > viewer", () => {
+    expect(roleLevel("owner")).toBe(6);
+    expect(roleLevel("project_manager")).toBe(5);
+    expect(roleLevel("team_lead")).toBe(4);
+    expect(roleLevel("editor")).toBe(3);
+    expect(roleLevel("developer")).toBe(2);
+    expect(roleLevel("viewer")).toBe(1);
   });
 
   it("is strictly descending across the hierarchy", () => {
@@ -49,7 +52,9 @@ describe("roleLevel", () => {
     expect(roleLevel("project_manager")).toBeGreaterThan(
       roleLevel("team_lead")
     );
-    expect(roleLevel("team_lead")).toBeGreaterThan(roleLevel("developer"));
+    expect(roleLevel("team_lead")).toBeGreaterThan(roleLevel("editor"));
+    expect(roleLevel("editor")).toBeGreaterThan(roleLevel("developer"));
+    expect(roleLevel("developer")).toBeGreaterThan(roleLevel("viewer"));
   });
 
   it("normalizes legacy roles before ranking", () => {
@@ -68,7 +73,9 @@ describe("formatRoleLabel", () => {
     expect(formatRoleLabel("owner")).toBe("Owner");
     expect(formatRoleLabel("project_manager")).toBe("Project Manager");
     expect(formatRoleLabel("team_lead")).toBe("Team Lead");
+    expect(formatRoleLabel("editor")).toBe("Editor");
     expect(formatRoleLabel("developer")).toBe("Developer");
+    expect(formatRoleLabel("viewer")).toBe("Viewer");
   });
 
   it("normalizes legacy roles to unified labels", () => {
@@ -94,7 +101,9 @@ describe("isFileWritable", () => {
     for (const role of [
       "project_manager",
       "team_lead",
+      "editor",
       "developer",
+      "viewer",
     ] as OrgRole[]) {
       expect(
         isFileWritable(access({ role, assigned: false, hasWriteAccess: true }))
@@ -134,6 +143,27 @@ describe("isFileWritable", () => {
     expect(
       isFileWritable(
         access({ role: "developer", assigned: true, hasWriteAccess: false })
+      )
+    ).toBe(false);
+  });
+
+  it("assigned editor rides hasWriteAccess (server sends true)", () => {
+    expect(
+      isFileWritable(
+        access({ role: "editor", assigned: true, hasWriteAccess: true })
+      )
+    ).toBe(true);
+    expect(
+      isFileWritable(
+        access({ role: "editor", assigned: true, hasWriteAccess: false })
+      )
+    ).toBe(false);
+  });
+
+  it("assigned viewer is read-only (server sends hasWriteAccess=false)", () => {
+    expect(
+      isFileWritable(
+        access({ role: "viewer", assigned: true, hasWriteAccess: false })
       )
     ).toBe(false);
   });

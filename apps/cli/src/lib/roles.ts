@@ -1,30 +1,41 @@
 // Unified role model — CLI mirror of apps/web/src/lib/roles.ts / convex/authz.ts.
 //
-// ONE org role per user: owner > project_manager > team_lead > developer.
-// What a user can do in a project follows from this role plus whether they are
-// assigned to it; per-variable access is grant-based (read/write) and a
+// ONE org role per user: owner > project_manager > team_lead > editor >
+// developer > viewer. What a user can do in a project follows from this role
+// plus whether they are assigned to it; editors get blanket write in assigned
+// projects, developers are read + request-only, viewers are read-only, and a
 // developer's assignment can be scoped to specific environments.
 //
 // Legacy CLIs/servers use "admin"/"team_lead"/"member" (org) and
 // "manager"/"developer"/"viewer" (project). Always normalize before comparing.
 
-export type OrgRole = "owner" | "project_manager" | "team_lead" | "developer";
+export type OrgRole =
+  | "owner"
+  | "project_manager"
+  | "team_lead"
+  | "editor"
+  | "developer"
+  | "viewer";
 export type VariablePermission = "read" | "write";
 export type LegacyOrgRole = "admin" | "team_lead" | "member";
 export type LegacyProjectRole = "manager" | "developer" | "viewer";
 
 export const ROLE_LEVEL: Record<OrgRole, number> = {
-  owner: 4,
-  project_manager: 3,
-  team_lead: 2,
-  developer: 1,
+  owner: 6,
+  project_manager: 5,
+  team_lead: 4,
+  editor: 3,
+  developer: 2,
+  viewer: 1,
 };
 
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   owner: "Owner",
   project_manager: "Project Manager",
   team_lead: "Team Lead",
+  editor: "Editor",
   developer: "Developer",
+  viewer: "Viewer",
 };
 
 /** Map any legacy or unified role string onto the unified model. */
@@ -37,7 +48,9 @@ export function normalizeOrgRole(role: string | null | undefined): OrgRole {
     case "owner":
     case "project_manager":
     case "team_lead":
+    case "editor":
     case "developer":
+    case "viewer":
       return role;
     default:
       return "developer";
@@ -79,9 +92,10 @@ export interface ProjectAccess {
  * Decide whether a pulled .env file should be writable for this user.
  *
  * Owners, project managers, and team leads assigned to the project get a
- * writable file. Developers get a writable file only when they hold write
- * access to the variables (a write grant); read-only developers, grant-only
- * viewers, and unassigned users get a read-only file.
+ * writable file. Editors, developers, and viewers ride the server's
+ * hasWriteAccess meta boolean (the authority): editors get true, developers
+ * and viewers get false under the request-only model. Unassigned users get a
+ * read-only file.
  */
 export function isFileWritable(access: ProjectAccess): boolean {
   // Owners have implicit access to every project — never gated on assignment.
@@ -93,7 +107,9 @@ export function isFileWritable(access: ProjectAccess): boolean {
     case "project_manager":
     case "team_lead":
       return true;
+    case "editor":
     case "developer":
+    case "viewer":
       return access.hasWriteAccess;
   }
 }
