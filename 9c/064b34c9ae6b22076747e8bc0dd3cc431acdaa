@@ -1,0 +1,33 @@
+apps/admin/package.json
+  s_c0d41f513c83f7::t_7197af63400a60 3
+apps/admin/src/routeTree.gen.ts
+  s_c0d41f513c83f7::t_23db9a41b75f30 19,122,251-257
+apps/admin/src/routes/_authenticated/roles.tsx
+  s_c0d41f513c83f7::t_18504df451ba64 449,452,489,728
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_c0d41f513c83f7::t_9a0c082836d789 7-12,21,249-285
+convex/features/admin/migrations.ts
+  s_c0d41f513c83f7::t_67497f437285b9 7,46,333-344,354,371
+convex/features/admin/roles.ts
+  s_c0d41f513c83f7::t_8da9448722cbe8 187-191
+convex/lib/roleProfiles.ts
+  s_c0d41f513c83f7::t_23a1f96664659b 21,249-272
+package.json
+  s_c0d41f513c83f7::t_73007eba86ef52 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9c064b34c9ae6b22076747e8bc0dd3cc431acdaa",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
