@@ -52,7 +52,10 @@ import {
   drainUnsyncReports,
 } from "./utils/unsyncState";
 import { roleLevel, ROLE_LEVEL, normalizeOrgRole } from "./roles";
-import { groupProjectsForPicker } from "./utils/requestTarget";
+import {
+  groupProjectsForPicker,
+  isRequestEligible,
+} from "./utils/requestTarget";
 import type { Project } from "./types";
 import * as output from "./utils/outputChannel";
 
@@ -139,13 +142,16 @@ async function updateContextFlags(): Promise<void> {
       "envpilot.projectRole",
       projectRole || ""
     );
-    // Normalized flag for menu when-clauses: works whether the server sends
-    // legacy ("member") or unified ("developer") role names.
+    // Normalized flag for menu when-clauses. Capability-driven when the
+    // server sent a capability map (registry roles, incl. custom ones);
+    // legacy role comparison otherwise.
     const meta = apiService.getAccessMeta(firstProject.projectId);
     vscode.commands.executeCommand(
       "setContext",
       "envpilot.isDeveloper",
-      normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
+      meta?.capabilities
+        ? meta.capabilities["project.requests.submit"] === true
+        : normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
     );
   }
 }
@@ -1209,11 +1215,10 @@ async function handleRequestVariable(): Promise<void> {
   }
   const project = pick.project;
 
-  // Defense-in-depth: re-derive the developer guard from the PICKED project.
+  // Defense-in-depth: re-derive the eligibility guard from the PICKED project.
   // groupProjectsForPicker already filtered to eligible projects, so this only
   // fires if that invariant is ever violated.
-  const role = normalizeOrgRole(project.unifiedRole ?? project.userRole);
-  if (role !== "developer") {
+  if (!isRequestEligible(project)) {
     vscode.window.showInformationMessage(
       "As an owner, project manager, or team lead you can create variables directly on the dashboard."
     );

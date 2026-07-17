@@ -39,6 +39,8 @@ type PullResult = {
     scopeRestricted: boolean;
     decryptionFailures?: string[];
     autoUnsyncOnClose?: boolean;
+    /** Resolved capability map — capability-aware clients prefer this. */
+    capabilities: Record<string, boolean>;
   };
 };
 
@@ -136,6 +138,9 @@ export const pullValues = action({
       // project default ?? true; pro gate re-checked at read time).
       // Optional so older payload consumers stay valid.
       autoUnsyncOnClose: v.optional(v.boolean()),
+      // Resolved capability map — capability-aware clients prefer this over
+      // role-slug comparisons (custom registry roles).
+      capabilities: v.record(v.string(), v.boolean()),
     }),
   }),
   handler: async (ctx, args): Promise<PullResult> => {
@@ -280,6 +285,7 @@ export const pullValues = action({
         decryptionFailures:
           decryptionFailures.length > 0 ? decryptionFailures : undefined,
         autoUnsyncOnClose,
+        capabilities: legacy.capabilities,
       },
     };
   },

@@ -1,15 +1,14 @@
-// Unified role model — VS Code extension mirror of apps/cli/src/lib/roles.ts /
-// convex/authz.ts. Keep in sync with those.
+// Registry-driven role model — VS Code extension mirror of
+// apps/cli/src/lib/roles.ts / convex/lib/authz.ts. Keep in sync with those.
 //
-// ONE org role per user: owner > project_manager > team_lead > developer.
-// What a user can do in a project follows from this role plus whether they are
-// assigned to it; per-variable access is grant-based (read/write) and a
-// developer's assignment can be scoped to specific environments.
-//
-// Legacy extensions/servers use "admin"/"team_lead"/"member" (org) and
-// "manager"/"developer"/"viewer" (project). Always normalize before comparing.
+// Roles are rows in the server-side role registry (an OPEN slug set — custom
+// roles exist), so role slugs pass through untouched and the server-provided
+// capability map / meta booleans are the authority on what a user can do.
+// Legacy extensions/servers use "admin"/"team_lead"/"member" (org) — always
+// normalize before comparing.
 
-export type OrgRole = "owner" | "project_manager" | "team_lead" | "developer";
+/** Open registry slug set — any string can be a role. */
+export type OrgRole = string;
 export type VariablePermission = "read" | "write";
 export type LegacyOrgRole = "admin" | "team_lead" | "member";
 export type LegacyProjectRole = "manager" | "developer" | "viewer";
@@ -20,44 +19,58 @@ export type ProtectionMode =
   | "readonly-with-request"
   | "strict-readonly";
 
-export const ROLE_LEVEL: Record<OrgRole, number> = {
-  owner: 4,
-  project_manager: 3,
-  team_lead: 2,
-  developer: 1,
+/**
+ * Seeded registry levels (mirrors convex/lib/authz.ts). Custom roles are not
+ * listed — roleLevel() returns 0 for them (fail-closed for level comparisons;
+ * capabilities are the real authority).
+ */
+export const ROLE_LEVEL: Record<string, number> = {
+  owner: 100,
+  project_manager: 80,
+  team_lead: 60,
+  editor: 50,
+  developer: 40,
+  viewer: 20,
 };
 
-export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  owner: "Owner",
-  project_manager: "Project Manager",
-  team_lead: "Team Lead",
-  developer: "Developer",
-};
-
-/** Map any legacy or unified role string onto the unified model. */
+/**
+ * Map a role string onto the registry slug set. Legacy strings are translated;
+ * unknown slugs PASS THROUGH (custom registry roles); only a missing/empty
+ * role falls back to "developer".
+ */
 export function normalizeOrgRole(role: string | null | undefined): OrgRole {
   switch (role) {
     case "admin":
       return "owner";
     case "member":
       return "developer";
-    case "owner":
-    case "project_manager":
-    case "team_lead":
-    case "developer":
-      return role;
-    default:
+    case undefined:
+    case null:
+    case "":
       return "developer";
+    default:
+      return role;
   }
 }
 
+/** Registry level for a role; unknown/custom slugs rank 0 (fail-closed). */
 export function roleLevel(role: string | null | undefined): number {
-  return ROLE_LEVEL[normalizeOrgRole(role)];
+  return ROLE_LEVEL[normalizeOrgRole(role)] ?? 0;
 }
 
-/** Human-readable label for any role string (normalizes legacy values). */
-export function formatRoleLabel(role: string | null | undefined): string {
-  return ORG_ROLE_LABELS[normalizeOrgRole(role)];
+/**
+ * Human-readable label for any role string. Prefers a server-provided display
+ * name when given; otherwise humanizes the slug (snake_case → Title Case).
+ */
+export function formatRoleLabel(
+  role: string | null | undefined,
+  meta?: { displayName?: string | null }
+): string {
+  if (meta?.displayName) return meta.displayName;
+  return normalizeOrgRole(role)
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /**
@@ -66,18 +79,19 @@ export function formatRoleLabel(role: string | null | undefined): string {
  * command gating.
  */
 export interface ProjectAccess {
-  /** The user's unified org role. */
+  /** The user's org role slug (registry-driven, open set). */
   role: OrgRole;
   /** Whether the user is assigned to the project (owners are implicitly true). */
   assigned: boolean;
   /**
-   * Environment scope for a scoped developer (e.g. ["development","staging"]).
-   * null/undefined = unrestricted. Only meaningful for developers.
+   * Environment scope for a scoped assignment (e.g. ["development","staging"]).
+   * null/undefined = unrestricted.
    */
   environmentScope?: string[] | null;
   /**
-   * Whether the user holds a write path to the variables — via role
-   * (owner/PM/TL assigned) or a per-variable write grant.
+   * Whether the user holds a write path to the variables — the server computes
+   * this from the role's capabilities and per-variable write grants, so it is
+   * authoritative for custom roles too.
    */
   hasWriteAccess: boolean;
 }
@@ -85,10 +99,11 @@ export interface ProjectAccess {
 /**
  * Whether the pulled .env should be writable for this user.
  *
- * Owners have implicit access to every project and are always writable (the
- * legacy server sends no assignment info for owners, so gating on `assigned`
- * here would wrongly lock an owner's file read-only). Project managers and team
- * leads need assignment; developers additionally need a write grant.
+ * Owners are always writable (implicit access to every project — the legacy
+ * server sends no assignment info for them). Assigned project managers and
+ * team leads are writable by role. Every other role — developer, editor,
+ * viewer, and custom registry roles — defers to the server-computed
+ * hasWriteAccess.
  */
 export function isFileWritable(access: ProjectAccess): boolean {
   if (access.role === "owner") return true;
@@ -97,7 +112,7 @@ export function isFileWritable(access: ProjectAccess): boolean {
     case "project_manager":
     case "team_lead":
       return true;
-    case "developer":
+    default:
       return access.hasWriteAccess;
   }
 }
@@ -105,16 +120,27 @@ export function isFileWritable(access: ProjectAccess): boolean {
 /**
  * Map a ProjectAccess to a VS Code file-protection mode.
  *
- *   writable              — can edit the .env in place (owner/PM/TL, or a
- *                           developer with write access)
- *   readonly-with-request — assigned developer without write access; can
- *                           request access from the request dialog
- *   strict-readonly       — no project assignment (grant-only viewer / not a
- *                           member of the project)
+ *   writable              — can edit the .env in place
+ *   readonly-with-request — read-only, but may submit a variable request
+ *   strict-readonly       — read-only, no request path
+ *
+ * When the server sent a capability map (registry roles, including custom
+ * ones) it is the authority: hasWriteAccess decides writability and the
+ * "project.requests.submit" capability decides request eligibility. Without
+ * capabilities (older servers), falls back to the legacy role-based rules.
  */
-export function fileProtectionMode(access: ProjectAccess): ProtectionMode {
+export function fileProtectionMode(
+  access: ProjectAccess,
+  capabilities?: Record<string, boolean> | null
+): ProtectionMode {
+  if (capabilities) {
+    if (access.hasWriteAccess) return "writable";
+    return capabilities["project.requests.submit"] === true
+      ? "readonly-with-request"
+      : "strict-readonly";
+  }
   if (isFileWritable(access)) return "writable";
-  if (access.role === "developer" && access.assigned) {
+  if (normalizeOrgRole(access.role) === "developer" && access.assigned) {
     return "readonly-with-request";
   }
   return "strict-readonly";

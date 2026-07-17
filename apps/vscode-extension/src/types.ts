@@ -89,6 +89,8 @@ export interface Project {
   assigned?: boolean;
   /** Environment scope for a scoped developer; null/undefined = unrestricted. */
   environmentScope?: string[] | null;
+  /** Resolved capability map (additive server field; absent on older servers). */
+  capabilities?: Record<string, boolean> | null;
 }
 
 export interface VariableTag {

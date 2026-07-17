@@ -510,7 +510,12 @@ export class SyncService {
     projectId: string,
     variables: EnvironmentVariable[]
   ): ProtectionMode {
-    return fileProtectionMode(this.buildProjectAccess(projectId, variables));
+    // Capability map from the same response that delivered the variables —
+    // when present it is the authority (registry roles, incl. custom ones).
+    return fileProtectionMode(
+      this.buildProjectAccess(projectId, variables),
+      this.api.getAccessMeta(projectId)?.capabilities
+    );
   }
 
   /**
