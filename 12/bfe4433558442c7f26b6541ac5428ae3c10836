@@ -1,0 +1,29 @@
+apps/cli/src/lib/roles.ts
+  s_57f8e69e815c3c::t_50007e9464ca78 1,3-7,9-10,15-26,29-33,40-42,44-45,49,51,54-66,75,80-81,86-87,95-98,107
+apps/cli/src/lib/ui.ts
+  s_9bf93a91c48575::t_6890568dcae929 206-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "12bfe4433558442c7f26b6541ac5428ae3c10836",
+  "prompts": {},
+  "sessions": {
+    "s_57f8e69e815c3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae65bb36eac6fb304",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_9bf93a91c48575": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac543c637e633b2d0",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
