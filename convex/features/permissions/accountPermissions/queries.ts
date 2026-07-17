@@ -106,12 +106,8 @@ const userInfoValidator = v.union(
   v.null()
 );
 
-const orgRoleValidator = v.union(
-  v.literal("owner"),
-  v.literal("project_manager"),
-  v.literal("team_lead"),
-  v.literal("developer")
-);
+// Registry-driven role slugs — open string set (see lib/roleCompat.ts).
+const orgRoleValidator = v.string();
 
 // ==========================================
 // QUERIES

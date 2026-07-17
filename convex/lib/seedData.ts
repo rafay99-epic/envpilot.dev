@@ -304,3 +304,30 @@ export const SEED_FEATURES = [
     sortOrder: 2,
   },
 ];
+
+// ─── Role registry seeds ──────────────────────────────────────────────────────
+//
+// Consumed by runMigration's `seed-role-registry` handler (upsert by slug —
+// safe to re-run; system rows update capabilities from code truth, custom
+// seeded rows are inserted only if absent so admin-panel edits survive).
+// Profiles live in lib/roleProfiles.ts — the golden parity suite pins the
+// system profiles to pre-registry behavior.
+
+import {
+  SYSTEM_PROFILES,
+  SEEDED_CUSTOM_PROFILES,
+  type RoleProfile,
+} from "./roleProfiles";
+
+export interface SeedRole extends RoleProfile {
+  sortOrder: number;
+}
+
+export const SEED_ROLES: SeedRole[] = [
+  { ...SYSTEM_PROFILES.owner, sortOrder: 0 },
+  { ...SYSTEM_PROFILES.project_manager, sortOrder: 1 },
+  { ...SYSTEM_PROFILES.team_lead, sortOrder: 2 },
+  { ...SEEDED_CUSTOM_PROFILES.editor, sortOrder: 3 },
+  { ...SYSTEM_PROFILES.developer, sortOrder: 4 },
+  { ...SEEDED_CUSTOM_PROFILES.viewer, sortOrder: 5 },
+];

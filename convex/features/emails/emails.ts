@@ -92,15 +92,9 @@ export const sendInvitationEmail = action({
     to: v.string(),
     inviterName: v.string(),
     organizationName: v.string(),
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer"),
-      // Legacy values (pre unified-roles migration)
-      v.literal("admin"),
-      v.literal("member")
-    ),
+    // Registry-driven role slug (open set); ROLE_DISPLAY falls back to the
+    // slug itself for custom roles.
+    role: v.string(),
     token: v.string(),
     expiresAt: v.number(),
   },
@@ -124,7 +118,9 @@ export const sendInvitationEmail = action({
       admin: "Owner",
       member: "Developer",
     };
-    const roleDisplay = ROLE_DISPLAY[args.role] ?? "Developer";
+    const roleDisplay =
+      ROLE_DISPLAY[args.role] ??
+      args.role.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
     const safeInviter = escapeHtml(args.inviterName);
     const safeOrg = escapeHtml(args.organizationName);

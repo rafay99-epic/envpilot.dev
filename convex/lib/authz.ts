@@ -1,6 +1,19 @@
 import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import {
+  type CapabilityKey,
+  ORG_ACTION_TO_CAPABILITY,
+  PROJECT_ACTION_TO_CAPABILITY,
+} from "./capabilities";
+import {
+  type RoleProfile,
+  SYSTEM_PROFILES,
+  SEEDED_CUSTOM_PROFILES,
+  UNKNOWN_ROLE_PROFILE,
+  hasCapability,
+} from "./roleProfiles";
+import type { OrgAction, ProjectAction } from "./capabilities";
 
 // ─── Unified role model ───────────────────────────────────────────────────────
 //
@@ -21,126 +34,130 @@ import type { Doc, Id } from "../_generated/dataModel";
 // Per-variable VIEW sharing is a grant (variablePermissions), not a role: any
 // org member can be granted read on a specific variable.
 
-export type OrgRole = "owner" | "project_manager" | "team_lead" | "developer";
+/**
+ * Role slugs are OPEN — the four system slugs below are seeded, and custom
+ * roles are registry rows created from the admin panel. Feature code must
+ * never compare slugs; ask the resolved profile (getRoleProfile) instead.
+ */
+export type OrgRole = string;
+export const SYSTEM_ROLE_SLUGS = [
+  "owner",
+  "project_manager",
+  "team_lead",
+  "developer",
+] as const;
 /** Roles that may still exist in the DB from before the unified-role migration. */
 export type LegacyOrgRole = "admin" | "member";
 export type StoredOrgRole = OrgRole | LegacyOrgRole;
 export type VariablePermission = "read" | "write" | "admin"; // "admin" is legacy, treated as "write"
 
-/** Map legacy role values (pre-migration rows) onto the unified model. */
+/**
+ * Map legacy role values (pre-migration rows) onto slugs. Unknown slugs pass
+ * THROUGH — the registry resolver decides what they mean (fail-closed when
+ * absent). Only truly empty values fall back to "developer".
+ */
 export function normalizeOrgRole(role: string): OrgRole {
   switch (role) {
     case "admin":
       return "owner";
     case "member":
       return "developer";
-    case "owner":
-    case "project_manager":
-    case "team_lead":
-    case "developer":
-      return role;
-    default:
+    case "":
+    case undefined as unknown as string:
       return "developer";
+    default:
+      return role;
   }
 }
 
 // ─── Role hierarchy (higher number = more authority) ──────────────────────────
+//
+// Registry levels are authoritative (owner 100 … viewer 20). The sync
+// ROLE_LEVEL/roleLevel pair below covers the SEEDED slugs only and exists for
+// call sites that compare against a known system floor (e.g. "team_lead and
+// above") without a ctx at hand; unknown slugs resolve to 0 (fail closed) —
+// custom roles must be compared via their resolved profile.level.
 
-export const ROLE_LEVEL: Record<OrgRole, number> = {
-  owner: 4,
-  project_manager: 3,
-  team_lead: 2,
-  developer: 1,
+export const ROLE_LEVEL: Record<string, number> = {
+  owner: 100,
+  project_manager: 80,
+  team_lead: 60,
+  editor: 50,
+  developer: 40,
+  viewer: 20,
 };
 
 export function roleLevel(role: string): number {
-  return ROLE_LEVEL[normalizeOrgRole(role)];
+  return ROLE_LEVEL[normalizeOrgRole(role)] ?? 0;
 }
 
-// ─── Action → allowed org roles mapping ───────────────────────────────────────
+// ─── Registry-driven capability resolution ────────────────────────────────────
 //
-// This is the SINGLE SOURCE OF TRUTH for what each role can do.
-// Frontend reads these via the getMyPermissions query. Backend enforces
-// them via the assert* helpers below. Nothing else defines permissions.
+// SINGLE SOURCE OF TRUTH: the capability catalog (lib/capabilities.ts) plus
+// the roleRegistry table (seeded from lib/roleProfiles.ts SYSTEM_PROFILES /
+// SEEDED_CUSTOM_PROFILES). Existing assert* call sites keep their action
+// strings — ORG_ACTION_TO_CAPABILITY / PROJECT_ACTION_TO_CAPABILITY translate.
+//
+// DUAL-MODE MIGRATION: until seed-role-registry has run, the registry table
+// is empty and the resolver falls back to the built-in profiles — byte-
+// identical to the pre-registry behavior (asserted by the golden parity
+// suite). Unknown slugs fail CLOSED (zero capabilities).
+//
+// COST RULE: resolve the profile ONCE per request and pass it down. The
+// registry is a tiny by_slug read, but per-row/per-loop resolution is a
+// review-blocking finding.
 
-export const ORG_ACTIONS = {
-  // Organization management
-  "org:update": ["owner"] as OrgRole[],
-  "org:delete": ["owner"] as OrgRole[],
-  "org:transfer_ownership": ["owner"] as OrgRole[],
-  "org:update_settings": ["owner"] as OrgRole[],
-  "org:manage_billing": ["owner"] as OrgRole[],
+export type { OrgAction, ProjectAction } from "./capabilities";
 
-  // Member management (hierarchy also applies: see assertCanManageUser /
-  // assertCanAssignRole — you can only invite/manage roles below your own)
-  "org:invite_member": ["owner", "project_manager", "team_lead"] as OrgRole[],
-  "org:remove_member": ["owner", "project_manager"] as OrgRole[],
-  "org:change_role": ["owner"] as OrgRole[],
+/**
+ * Resolve a role slug to its capability profile.
+ * Order: registry row (active) → built-in seeded profile → fail-closed.
+ */
+export async function getRoleProfile(
+  ctx: MutationCtx | QueryCtx,
+  role: string
+): Promise<RoleProfile> {
+  const slug = normalizeOrgRole(role);
+  const row = await ctx.db
+    .query("roleRegistry")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .first();
+  if (row && row.isActive) {
+    return {
+      slug: row.slug,
+      displayName: row.displayName,
+      description: row.description,
+      color: row.color,
+      level: row.level,
+      isSystem: row.isSystem,
+      capabilities: row.capabilities as RoleProfile["capabilities"],
+    };
+  }
+  if (row && !row.isActive) {
+    // Deactivated roles fail closed even if a member still holds the slug
+    // (the admin panel blocks that, but data wins over assumptions here).
+    return UNKNOWN_ROLE_PROFILE;
+  }
+  const builtin = SYSTEM_PROFILES[slug] ?? SEEDED_CUSTOM_PROFILES[slug];
+  return builtin ?? UNKNOWN_ROLE_PROFILE;
+}
 
-  // Session management
-  "org:revoke_session": ["owner", "project_manager"] as OrgRole[],
-  "org:view_sessions": ["owner", "project_manager"] as OrgRole[],
+/** Capability check against a resolved profile. */
+export function profileCan(
+  profile: RoleProfile,
+  capability: CapabilityKey
+): boolean {
+  return hasCapability(profile, capability);
+}
 
-  // Project lifecycle
-  "org:create_project": ["owner", "project_manager"] as OrgRole[],
-  "org:delete_project": ["owner"] as OrgRole[],
-
-  // Extension/CLI linking (any org member can link their own)
-  "org:link_extension": [
-    "owner",
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
-
-  // Variable rollback (owner-only power feature)
-  "org:rollback_variable": ["owner"] as OrgRole[],
-
-  // Tag management
-  "org:create_tag": [
-    "owner",
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
-  "org:manage_tag": ["owner", "project_manager", "team_lead"] as OrgRole[],
-} as const;
-
-// Project actions are checked against the user's ORG role, gated on their
-// assignment to the project (projectMembers row). Owners bypass assignment.
-export const PROJECT_ACTIONS = {
-  "project:read": ["project_manager", "team_lead", "developer"] as OrgRole[],
-  "project:update": ["project_manager"] as OrgRole[],
-  "project:create_variable": [
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
-  // Developers update variables via per-variable write grants, enforced in
-  // getVariableAccess — not via this action.
-  "project:update_variable": ["project_manager", "team_lead"] as OrgRole[],
-  "project:delete_variable": ["project_manager", "team_lead"] as OrgRole[],
-  "project:manage_permissions": ["project_manager", "team_lead"] as OrgRole[],
-  // Team leads may only add/remove developers (hierarchy enforced separately).
-  "project:manage_members": ["project_manager", "team_lead"] as OrgRole[],
-  // Shared accounts — parity with the variable actions above. Any assigned
-  // role (incl. developer) may create; developers update via per-account write
-  // grants, enforced in getAccountAccess — not via this action.
-  "project:create_account": [
-    "project_manager",
-    "team_lead",
-    "developer",
-  ] as OrgRole[],
-  "project:update_account": ["project_manager", "team_lead"] as OrgRole[],
-  "project:delete_account": ["project_manager", "team_lead"] as OrgRole[],
-  "project:manage_account_permissions": [
-    "project_manager",
-    "team_lead",
-  ] as OrgRole[],
-} as const;
-
-export type OrgAction = keyof typeof ORG_ACTIONS;
-export type ProjectAction = keyof typeof PROJECT_ACTIONS;
+/**
+ * Assignment bypass: a profile holding org.manage (the owner class) has
+ * implicit access to every project in the org — the registry generalization
+ * of the old `role === "owner"` special case.
+ */
+export function bypassesAssignment(profile: RoleProfile): boolean {
+  return hasCapability(profile, "org.manage");
+}
 
 // ─── Legacy client compatibility ──────────────────────────────────────────────
 //
@@ -151,13 +168,16 @@ export type ProjectAction = keyof typeof PROJECT_ACTIONS;
 export function toLegacyOrgRole(
   role: OrgRole
 ): "admin" | "team_lead" | "member" {
-  switch (role) {
+  switch (normalizeOrgRole(role)) {
     case "owner":
       return "admin";
     case "project_manager":
     case "team_lead":
       return "team_lead";
-    case "developer":
+    default:
+      // Custom roles and developer-class roles map to "member" for old
+      // clients — labels are cosmetic there; writability rides the meta
+      // booleans, never the role string.
       return "member";
   }
 }
@@ -172,14 +192,39 @@ export function toLegacyProjectRole(
   assigned: boolean
 ): "manager" | "developer" | "viewer" | null {
   if (!assigned) return null;
-  switch (role) {
+  switch (normalizeOrgRole(role)) {
     case "owner":
     case "project_manager":
     case "team_lead":
       return "manager";
-    case "developer":
+    default:
+      // Custom roles map to "developer" (readonly-with-request on old
+      // clients; actual writability comes from meta.hasWriteAccess). The
+      // profile-aware variant below refines auditor-class roles to "viewer".
       return "developer";
   }
+}
+
+/**
+ * Profile-aware legacy project role for old clients: blanket-write roles →
+ * "manager" (writable .env), blanket-read auditor roles → "viewer" (strict
+ * readonly), everything else → "developer" (readonly-with-request).
+ */
+export function profileToLegacyProjectRole(
+  profile: RoleProfile,
+  assigned: boolean
+): "manager" | "developer" | "viewer" | null {
+  if (!assigned && !bypassesAssignment(profile)) return null;
+  if (
+    bypassesAssignment(profile) ||
+    hasCapability(profile, "project.variables.update")
+  ) {
+    return "manager";
+  }
+  if (hasCapability(profile, "access.blanket_read")) {
+    return "viewer";
+  }
+  return "developer";
 }
 
 // ─── Return types ─────────────────────────────────────────────────────────────
@@ -191,16 +236,20 @@ interface OrgAuthResult {
     userId: Id<"users">;
     organizationId: Id<"organizations">;
   };
+  /** Resolved capability profile — pass it down; never re-resolve per row. */
+  profile: RoleProfile;
 }
 
 interface ProjectAuthResult {
   orgRole: OrgRole;
   /** Whether the user has an explicit projectMembers assignment. Owners may not. */
   assigned: boolean;
+  /** Resolved capability profile — pass it down; never re-resolve per row. */
+  profile: RoleProfile;
   /**
-   * Environment scope of the assignment (developers only). Undefined =
-   * unrestricted. Callers creating/updating variables must check this via
-   * isEnvironmentScopeAllowed.
+   * Environment scope of the assignment (env-scopeable roles only).
+   * Undefined = unrestricted. Callers creating/updating variables must check
+   * this via isEnvironmentScopeAllowed.
    */
   environmentScope?: string[];
 }
@@ -309,10 +358,12 @@ export async function assertOrgAction(
   assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
-  const allowedRoles = ORG_ACTIONS[action];
-  if (!allowedRoles.includes(role)) {
-    throw new Error(
-      `Insufficient permissions: ${action} requires ${allowedRoles.join(" or ")}`
+  const profile = await getRoleProfile(ctx, role);
+  const capability = ORG_ACTION_TO_CAPABILITY[action];
+  if (!hasCapability(profile, capability)) {
+    // ConvexError: user-facing denial — plain Error is redacted in prod.
+    throw new ConvexError(
+      `Insufficient permissions: ${action} requires the "${capability}" capability (your role: ${profile.displayName})`
     );
   }
 
@@ -323,6 +374,7 @@ export async function assertOrgAction(
       userId: membership.userId,
       organizationId: membership.organizationId,
     },
+    profile,
   };
 }
 
@@ -363,10 +415,17 @@ export async function assertProjectAction(
   assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
+  const profile = await getRoleProfile(ctx, role);
+  const capability = PROJECT_ACTION_TO_CAPABILITY[action];
 
-  // Owners bypass project assignment checks
-  if (role === "owner") {
-    return { orgRole: "owner", assigned: false };
+  // The owner class (org.manage) bypasses project assignment checks
+  if (bypassesAssignment(profile)) {
+    if (!hasCapability(profile, capability)) {
+      throw new ConvexError(
+        `Insufficient project permissions: ${action} requires the "${capability}" capability (your role: ${profile.displayName})`
+      );
+    }
+    return { orgRole: role, assigned: false, profile };
   }
 
   // Everyone else needs an explicit project assignment
@@ -378,22 +437,24 @@ export async function assertProjectAction(
     .first();
 
   if (!projectMembership) {
-    throw new Error("No access to this project");
+    throw new ConvexError("No access to this project");
   }
 
-  const allowedRoles = PROJECT_ACTIONS[action];
-  if (!allowedRoles.includes(role)) {
-    throw new Error(
-      `Insufficient project permissions: ${action} requires ${allowedRoles.join(" or ")}`
+  if (!hasCapability(profile, capability)) {
+    throw new ConvexError(
+      `Insufficient project permissions: ${action} requires the "${capability}" capability (your role: ${profile.displayName})`
     );
   }
 
   return {
     orgRole: role,
     assigned: true,
-    // Environment scope only constrains developers; managers are unrestricted
-    environmentScope:
-      role === "developer" ? projectMembership.environments : undefined,
+    profile,
+    // Environment scope constrains env-scopeable roles; managers are
+    // unrestricted (profile-driven — no slug comparisons)
+    environmentScope: hasCapability(profile, "access.env_scoped")
+      ? projectMembership.environments
+      : undefined,
   };
 }
 
@@ -422,11 +483,16 @@ export async function assertOrgMembership(
   assertNotSuspended(membership);
 
   const role = normalizeOrgRole(membership.role);
+  const profile = await getRoleProfile(ctx, role);
 
   if (minimumRole) {
-    if (roleLevel(role) < ROLE_LEVEL[minimumRole]) {
-      throw new Error(
-        `Insufficient permissions: requires at least ${minimumRole} role`
+    // Minimum floors are expressed as SEEDED slugs (owner/PM/TL/…); the
+    // caller's own level comes from their resolved profile so custom roles
+    // slot into the hierarchy correctly.
+    const floor = ROLE_LEVEL[minimumRole] ?? Number.POSITIVE_INFINITY;
+    if (profile.level < floor) {
+      throw new ConvexError(
+        `Insufficient permissions: requires at least the ${minimumRole} role`
       );
     }
   }
@@ -438,6 +504,7 @@ export async function assertOrgMembership(
       userId: membership.userId,
       organizationId: membership.organizationId,
     },
+    profile,
   };
 }
 
@@ -459,7 +526,33 @@ export function assertCanManageUser(
   const target = normalizeOrgRole(targetRole);
 
   if (roleLevel(target) >= roleLevel(actor)) {
-    throw new Error(`Cannot ${action}: a ${actor} cannot manage a ${target}`);
+    throw new ConvexError(
+      `Cannot ${action}: a ${actor} cannot manage a ${target}`
+    );
+  }
+}
+
+/**
+ * Registry-aware hierarchy check — resolves BOTH roles' levels through the
+ * registry so custom roles participate correctly. Prefer this over the sync
+ * variant wherever a ctx is available (the sync variant scores unknown
+ * custom slugs as level 0 — fail closed, but wrong for elevated custom
+ * roles acting as managers).
+ */
+export async function assertCanManageUserAsync(
+  ctx: MutationCtx | QueryCtx,
+  actorRole: string,
+  targetRole: string,
+  action: string
+): Promise<void> {
+  const [actor, target] = await Promise.all([
+    getRoleProfile(ctx, actorRole),
+    getRoleProfile(ctx, targetRole),
+  ]);
+  if (target.level >= actor.level) {
+    throw new ConvexError(
+      `Cannot ${action}: a ${actor.displayName} cannot manage a ${target.displayName}`
+    );
   }
 }
 
@@ -478,8 +571,27 @@ export function assertCanAssignRole(
 
   if (actor === "owner") return;
   if (roleLevel(target) >= roleLevel(actor)) {
-    throw new Error(
+    throw new ConvexError(
       `Cannot assign role: a ${actor} can only assign roles below their own`
+    );
+  }
+}
+
+/** Registry-aware role-assignment hierarchy (see assertCanManageUserAsync). */
+export async function assertCanAssignRoleAsync(
+  ctx: MutationCtx | QueryCtx,
+  actorRole: string,
+  targetRole: string
+): Promise<void> {
+  const [actor, target] = await Promise.all([
+    getRoleProfile(ctx, actorRole),
+    getRoleProfile(ctx, targetRole),
+  ]);
+  // The owner class assigns anything, including another owner.
+  if (bypassesAssignment(actor)) return;
+  if (target.level >= actor.level) {
+    throw new ConvexError(
+      `Cannot assign role: a ${actor.displayName} can only assign roles below their own`
     );
   }
 }
@@ -535,6 +647,86 @@ export async function getActiveVariableGrant(
 }
 
 /**
+ * Shared profile-driven access resolution for a single resource
+ * (variable or account). Mirrors the pre-registry behavior exactly:
+ *
+ *   org.manage (owner class)              → write, assignment bypassed
+ *   assigned + <blanketWrite capability>  → write
+ *   env-scopeable + out-of-scope          → null (grants included)
+ *   assigned + access.blanket_read        → read (auditor class)
+ *   grant present                         → unassigned capped at read;
+ *     assigned grant-fallback roles get the grant's permission
+ *     (read → read, write/legacy-admin → write)
+ *   otherwise                             → null
+ */
+async function resolveResourceAccess(
+  ctx: MutationCtx | QueryCtx,
+  args: {
+    userId: Id<"users">;
+    projectId: Id<"projects">;
+    organizationId: Id<"organizations">;
+    resourceEnvironments: string[];
+    blanketWrite: CapabilityKey;
+    getGrant: () => Promise<{ permission: string } | null>;
+  }
+): Promise<"write" | "read" | null> {
+  const membership = await getActiveMembership(
+    ctx,
+    args.organizationId,
+    args.userId
+  );
+  if (!membership) return null;
+
+  const profile = await getRoleProfile(ctx, membership.role);
+  if (bypassesAssignment(profile)) return "write";
+
+  const projectMembership = await ctx.db
+    .query("projectMembers")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", args.projectId).eq("userId", args.userId)
+    )
+    .first();
+
+  if (projectMembership && hasCapability(profile, args.blanketWrite)) {
+    return "write";
+  }
+
+  // Environment scope: an assigned env-scopeable role never gets access to
+  // an out-of-scope resource — grants included.
+  if (
+    projectMembership &&
+    hasCapability(profile, "access.env_scoped") &&
+    !isEnvironmentScopeAllowed(
+      projectMembership.environments,
+      args.resourceEnvironments
+    )
+  ) {
+    return null;
+  }
+
+  // Blanket read (auditor class): every in-scope resource, no grants needed.
+  if (projectMembership && hasCapability(profile, "access.blanket_read")) {
+    return "read";
+  }
+
+  // Grant fallback (and unassigned per-resource sharing for ANY org member).
+  const grant = await args.getGrant();
+  if (!grant) return null;
+
+  // Users without a project assignment are capped at read (viewer sharing).
+  if (!projectMembership) return "read";
+
+  // Assigned grant-fallback roles: the grant decides (legacy "admin" → write).
+  if (hasCapability(profile, "access.grant_fallback")) {
+    return grant.permission === "read" ? "read" : "write";
+  }
+
+  // Assigned role with neither blanket access nor grant fallback: the grant
+  // still caps at read (defensive default — never widens access).
+  return "read";
+}
+
+/**
  * Compute a user's effective access to a single variable.
  *
  *   "write" — can view and modify the value
@@ -564,55 +756,14 @@ export async function getVariableAccess(
       : await ctx.db.get(variable.projectId);
   if (!project || project.deletedAt) return null;
 
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId)
-    )
-    .first();
-
-  if (!membership) return null;
-  if (isSuspendedMembership(membership)) return null;
-
-  const role = normalizeOrgRole(membership.role);
-  if (role === "owner") return "write";
-
-  const projectMembership = await ctx.db
-    .query("projectMembers")
-    .withIndex("by_project_and_user", (q) =>
-      q.eq("projectId", variable.projectId).eq("userId", userId)
-    )
-    .first();
-
-  if (
-    projectMembership &&
-    (role === "project_manager" || role === "team_lead")
-  ) {
-    return "write";
-  }
-
-  // Environment scope: an assigned developer restricted to e.g.
-  // ["development", "staging"] never gets access to a variable that lives in
-  // production — grants included.
-  if (
-    projectMembership &&
-    role === "developer" &&
-    !isEnvironmentScopeAllowed(
-      projectMembership.environments,
-      variable.environments
-    )
-  ) {
-    return null;
-  }
-
-  // Developers (and any grant-only viewers) fall through to explicit grants
-  const grant = await getActiveVariableGrant(ctx, userId, variable._id);
-  if (!grant) return null;
-
-  // Users without a project assignment are capped at read (viewer sharing)
-  if (!projectMembership) return "read";
-
-  return grant.permission === "read" ? "read" : "write"; // legacy "admin" → write
+  return resolveResourceAccess(ctx, {
+    userId,
+    projectId: variable.projectId,
+    organizationId: project.organizationId,
+    resourceEnvironments: variable.environments,
+    blanketWrite: "project.variables.update",
+    getGrant: () => getActiveVariableGrant(ctx, userId, variable._id),
+  });
 }
 
 // ─── Account-level access ─────────────────────────────────────────────────────
@@ -676,53 +827,12 @@ export async function getAccountAccess(
       : await ctx.db.get(account.projectId);
   if (!project || project.deletedAt) return null;
 
-  const membership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId)
-    )
-    .first();
-
-  if (!membership) return null;
-  if (isSuspendedMembership(membership)) return null;
-
-  const role = normalizeOrgRole(membership.role);
-  if (role === "owner") return "write";
-
-  const projectMembership = await ctx.db
-    .query("projectMembers")
-    .withIndex("by_project_and_user", (q) =>
-      q.eq("projectId", account.projectId).eq("userId", userId)
-    )
-    .first();
-
-  if (
-    projectMembership &&
-    (role === "project_manager" || role === "team_lead")
-  ) {
-    return "write";
-  }
-
-  // Environment scope: an assigned developer restricted to e.g.
-  // ["development", "staging"] never gets access to an account that lives in
-  // production — grants included.
-  if (
-    projectMembership &&
-    role === "developer" &&
-    !isEnvironmentScopeAllowed(
-      projectMembership.environments,
-      account.environments
-    )
-  ) {
-    return null;
-  }
-
-  // Developers (and any grant-only viewers) fall through to explicit grants
-  const grant = await getActiveAccountGrant(ctx, userId, account._id);
-  if (!grant) return null;
-
-  // Users without a project assignment are capped at read (viewer sharing)
-  if (!projectMembership) return "read";
-
-  return grant.permission === "read" ? "read" : "write";
+  return resolveResourceAccess(ctx, {
+    userId,
+    projectId: account.projectId,
+    organizationId: project.organizationId,
+    resourceEnvironments: account.environments,
+    blanketWrite: "project.accounts.update",
+    getGrant: () => getActiveAccountGrant(ctx, userId, account._id),
+  });
 }
