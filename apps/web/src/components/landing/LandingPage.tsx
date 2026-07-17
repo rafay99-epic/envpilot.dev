@@ -12,10 +12,12 @@ import {
   Eye,
   FileWarning,
   GitBranch,
+  Github,
   Lock,
   Monitor,
   Puzzle,
   ShieldCheck,
+  Star,
   Terminal,
   Users,
   Zap,
@@ -154,8 +156,8 @@ function Hero() {
           className="mx-auto mt-6 max-w-2xl font-mono text-sm leading-relaxed text-zinc-500 md:text-base"
         >
           Envpilot keeps your team&apos;s environment variables in sync — CLI,
-          VS Code extension, and web dashboard. Encrypted end to end. Free for
-          small teams, no credit card.
+          VS Code extension, and web dashboard. Encrypted end to end, open
+          source (MIT). Free for small teams, no credit card.
         </motion.p>
 
         <motion.div
@@ -214,6 +216,11 @@ function Hero() {
 /* ─────────────────────────── proof bar ─────────────────────────── */
 
 const PROOF_BADGES = [
+  {
+    strong: "open source",
+    label: "MIT on GitHub",
+    href: SITE_URLS.github,
+  },
   {
     strong: "npm",
     label: `@envpilot/cli · v${APP_VERSIONS.cli}`,
@@ -929,7 +936,7 @@ function TrustSection() {
               Built in the <span className="text-green-400">open</span>
             </>
           }
-          description="No logo wall, no invented praise — a real product, a reachable founder, and a public changelog you can hold us to."
+          description="Not a slogan — the whole platform is MIT-licensed on GitHub. Read the code, self-host it, or open a PR. A real product, a reachable founder, and a public changelog you can hold us to."
         />
 
         <Reveal className="mt-14">
@@ -960,9 +967,20 @@ function TrustSection() {
 
               {/* Live links + feedback CTA */}
               <div className="flex flex-col gap-3 border-zinc-800/80 font-mono text-xs lg:border-l lg:pl-10">
+                <a
+                  href={SITE_URLS.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 font-semibold text-green-400 transition-colors hover:bg-green-500/20"
+                >
+                  <Github className="h-3.5 w-3.5 shrink-0" />
+                  Star on GitHub
+                  <Star className="h-3.5 w-3.5" />
+                </a>
+                <p className="text-zinc-600">MIT licensed · self-host it</p>
                 <Link
                   href="/changelog"
-                  className="inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
+                  className="mt-1 inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-green-400"
                 >
                   <GitBranch className="h-3.5 w-3.5 shrink-0" />
                   changelog — shipping weekly
