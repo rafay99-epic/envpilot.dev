@@ -14,20 +14,17 @@
  * device-flow auth cutover broke every pre-1.12.1 CLI / pre-1.7.2 extension).
  */
 export const APP_VERSIONS = {
-  web: "1.48.0",
+  web: "1.49.0",
   cli: "1.18.0",
   extension: "1.15.0",
-  // First CLI build on the Stage 3 vault path: ≤1.13.x fetch secret values
-  // via GET/POST /api/cli/variables{,/bulk}, REST routes DELETED when vault
-  // crypto moved into Convex (PR #86). On those builds auth/identity commands
-  // still work (direct-to-Convex since Stage 2) but `run`/`pull`/`push` fail
-  // with a confusing "session not authorized" error instead of an upgrade
-  // prompt — exactly the failure mode minCli exists to prevent. 1.14.0 is the
-  // first published build using the pullValues Convex action.
-  minCli: "1.14.0",
-  // First extension build that works post-auth-cutover (Stage 2): pre-1.7.2
-  // used deleted token routes / shipped an empty embedded WorkOS client id.
-  minExtension: "1.7.2",
+  // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
+  // builds that call the real features/* Convex paths and consume
+  // capability-driven role metadata. Everything below called the legacy root
+  // shim paths (convex/<module>.ts), DELETED in the same release that set
+  // these floors — older builds would fail with "function not found" instead
+  // of an upgrade prompt, exactly what min versions exist to prevent.
+  minCli: "1.18.0",
+  minExtension: "1.15.0",
 } as const;
 
 export type AppVersions = typeof APP_VERSIONS;
