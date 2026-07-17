@@ -11,7 +11,7 @@ import { checkBooleanFeature } from "../../featureRegistry/gates";
 import { createAuditLog } from "../../../lib/audit";
 import {
   assertProjectAction,
-  assertCanManageUser,
+  assertCanManageUserAsync,
   type OrgRole,
 } from "../../../lib/authz";
 
@@ -76,7 +76,12 @@ async function assertGrantTarget(
   }
 
   if (actorRole !== "owner") {
-    assertCanManageUser(actorRole, targetMembership.role, action);
+    await assertCanManageUserAsync(
+      ctx,
+      actorRole,
+      targetMembership.role,
+      action
+    );
   }
 }
 

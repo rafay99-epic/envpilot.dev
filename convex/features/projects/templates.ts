@@ -1,6 +1,10 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { assertOrgMembership } from "../../lib/authz";
+import {
+  assertOrgMembership,
+  getRoleProfile,
+  hasCapability,
+} from "../../lib/authz";
 import { createAuditLog } from "../../lib/audit";
 
 /**
@@ -279,12 +283,16 @@ export const create = mutation({
     }
 
     // Verify user has at least the team_lead role in the organization
-    await assertOrgMembership(
+    const { profile: templateProfile } = await assertOrgMembership(
       ctx,
       args.createdBy,
-      args.organizationId,
-      "team_lead"
+      args.organizationId
     );
+    if (!hasCapability(templateProfile, "project.templates.manage")) {
+      throw new ConvexError(
+        "Managing templates requires the templates capability."
+      );
+    }
 
     // Check for duplicate variable keys within the template
     const variableKeys = new Set<string>();
@@ -376,13 +384,19 @@ export const update = mutation({
       throw new Error("Template has no organization");
     }
 
-    // Verify user has at least the project_manager role in the organization
-    await assertOrgMembership(
+    // Capability + hierarchy floor: template edits keep the PM-and-above
+    // floor from main AND require the templates capability.
+    const { profile: templateProfile } = await assertOrgMembership(
       ctx,
       args.updatedBy,
       template.organizationId,
       "project_manager"
     );
+    if (!hasCapability(templateProfile, "project.templates.manage")) {
+      throw new ConvexError(
+        "Managing templates requires the templates capability."
+      );
+    }
 
     const { templateId, ...updates } = args;
     const updateData: Record<string, unknown> = { updatedAt: Date.now() };
@@ -438,13 +452,19 @@ export const remove = mutation({
       throw new Error("Template has no organization");
     }
 
-    // Verify user has at least the project_manager role in the organization
-    await assertOrgMembership(
+    // Capability + hierarchy floor: template edits keep the PM-and-above
+    // floor from main AND require the templates capability.
+    const { profile: templateProfile } = await assertOrgMembership(
       ctx,
       args.deletedBy,
       template.organizationId,
       "project_manager"
     );
+    if (!hasCapability(templateProfile, "project.templates.manage")) {
+      throw new ConvexError(
+        "Managing templates requires the templates capability."
+      );
+    }
 
     await ctx.db.patch(args.templateId, {
       deletedAt: Date.now(),

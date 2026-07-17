@@ -3,8 +3,12 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import {
   isEnvironmentScopeAllowed,
   normalizeOrgRole,
-  toLegacyProjectRole,
   getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+  profileToLegacyProjectRole,
+  hasCapability,
+  type RoleProfile,
 } from "../../lib/authz";
 
 /**
@@ -52,7 +56,7 @@ export function buildActiveGrantMap(
 }
 
 type OrgRole = ReturnType<typeof normalizeOrgRole>;
-type ProjectRole = ReturnType<typeof toLegacyProjectRole>;
+type ProjectRole = ReturnType<typeof profileToLegacyProjectRole>;
 
 /**
  * The per-project access context shared by listWithAccess and
@@ -63,6 +67,8 @@ type ProjectRole = ReturnType<typeof toLegacyProjectRole>;
  */
 export type VariableAccessContext = {
   orgRole: OrgRole;
+  /** Resolved capability profile — the single per-request resolution. */
+  profile: RoleProfile;
   isOwner: boolean;
   assigned: boolean;
   environmentScope: string[] | undefined;
@@ -105,7 +111,10 @@ export async function resolveProjectAccessContext(
   }
 
   const orgRole = normalizeOrgRole(membership.role);
-  const isOwner = orgRole === "owner";
+  // ONE profile resolution per request (cost rule) — every per-row decision
+  // below derives from this context, never from slug comparisons.
+  const profile = await getRoleProfile(ctx, orgRole);
+  const isOwner = bypassesAssignment(profile);
 
   // Assignment is a pure scope check — projectMembers.role is legacy
   // and never consulted for authorization.
@@ -119,18 +128,19 @@ export async function resolveProjectAccessContext(
       )
       .first();
     assigned = !!projectMembership;
-    // Environment scope only constrains assigned developers
-    if (orgRole === "developer") {
+    // Environment scope constrains env-scopeable roles
+    if (hasCapability(profile, "access.env_scoped")) {
       environmentScope = projectMembership?.environments;
     }
   }
 
-  // Owners and assigned PMs/team leads have blanket write access
+  // The owner class and assigned blanket-write roles have write access
   const roleAccess =
+    isOwner || (assigned && hasCapability(profile, "project.variables.update"));
+  const canManagePermissions =
     isOwner ||
-    (assigned && (orgRole === "project_manager" || orgRole === "team_lead"));
-  const canManagePermissions = roleAccess;
-  const projectRole = toLegacyProjectRole(orgRole, assigned);
+    (assigned && hasCapability(profile, "project.permissions.manage"));
+  const projectRole = profileToLegacyProjectRole(profile, assigned || isOwner);
 
   // Prefetch the caller's active grants ONCE instead of one indexed query
   // per variable (getActiveVariableGrant N+1). by_user_active already
@@ -150,6 +160,7 @@ export async function resolveProjectAccessContext(
     project,
     access: {
       orgRole,
+      profile,
       isOwner,
       assigned,
       environmentScope,
@@ -176,6 +187,7 @@ export function mapVariableRow(
 ) {
   const {
     roleAccess,
+    profile,
     assigned,
     orgRole,
     projectRole,
@@ -188,13 +200,26 @@ export function mapVariableRow(
   let effectiveAccess: "write" | "read" | null = null;
   if (roleAccess) {
     effectiveAccess = "write";
+  } else if (assigned && hasCapability(profile, "access.blanket_read")) {
+    // Auditor class: every in-scope variable, read-only, no grants involved.
+    effectiveAccess = "read";
   } else if (grant) {
     effectiveAccess =
-      !assigned || grant.permission === "read" ? "read" : "write";
+      !assigned || grant.permission === "read"
+        ? "read"
+        : hasCapability(profile, "access.grant_fallback")
+          ? "write"
+          : "read";
   }
 
   const hasAccess = effectiveAccess !== null;
-  const effectivePermission = roleAccess ? "admin" : effectiveAccess;
+  // "admin" marks rows whose holder may manage permissions — decoupled from
+  // blanket write so write-only roles never surface management UI.
+  const effectivePermission = canManagePermissions
+    ? "admin"
+    : roleAccess
+      ? "write"
+      : effectiveAccess;
 
   const { vaultRef, ...metadata } = variable;
 

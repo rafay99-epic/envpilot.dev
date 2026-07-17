@@ -528,8 +528,12 @@ export const sendRotationReminderEmail = internalAction({
 
     for (const member of members) {
       if (!member?.user?.email) continue;
-      // Only notify members with at least the team_lead role
-      // (owner / project_manager / team_lead) — they can act on rotation
+      // Only notify roles holding the notify.variable_changes capability
+      // (owner/PM/TL by default) — they can act on rotation. Sync fallback:
+      // ROLE_LEVEL covers seeded slugs; unknown custom slugs resolve to 0 and
+      // are skipped (fail-closed, no email). Actions have no ctx.db, so the
+      // registry-resolved profile isn't reachable here; the seeded-notify
+      // floor and the level floor coincide for every seeded role.
       if (roleLevel(member.role) < ROLE_LEVEL.team_lead) continue;
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)

@@ -31,11 +31,13 @@ export async function canReviewRequests(
   projectId: Id<"projects">
 ): Promise<boolean> {
   try {
+    // Dedicated review action: reviewing is a people-power, decoupled from
+    // blanket variable write so write-roles and reviewer-roles can differ.
     await assertProjectAction(
       ctx,
       userId,
       projectId,
-      "project:update_variable"
+      "project:review_requests"
     );
     return true;
   } catch (err) {

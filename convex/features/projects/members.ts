@@ -1,12 +1,15 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   assertProjectAction,
-  assertCanManageUser,
+  assertCanManageUserAsync,
   normalizeOrgRole,
   roleLevel,
+  getRoleProfile,
+  hasCapability,
+  bypassesAssignment,
 } from "../../lib/authz";
 
 /**
@@ -234,7 +237,8 @@ export const addMember = mutation({
     }
 
     // Hierarchy: can only add users whose org role is strictly below your own
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       actorRole,
       targetOrgMembership.role,
       "add project member"
@@ -260,10 +264,10 @@ export const addMember = mutation({
 
     // Environment scope only constrains developers — owners, PMs, and team
     // leads are always unrestricted, so a scope on their assignment is ignored
-    const environmentScope =
-      normalizeOrgRole(targetOrgMembership.role) === "developer"
-        ? args.environments
-        : undefined;
+    const targetProfile = await getRoleProfile(ctx, targetOrgMembership.role);
+    const environmentScope = hasCapability(targetProfile, "access.env_scoped")
+      ? args.environments
+      : undefined;
 
     // Pure scope assignment — capabilities come from the org role
     const membershipId = await ctx.db.insert("projectMembers", {
@@ -346,7 +350,8 @@ export const removeMember = mutation({
       .first();
 
     if (targetOrgMembership) {
-      assertCanManageUser(
+      await assertCanManageUserAsync(
+        ctx,
         actorRole,
         targetOrgMembership.role,
         "remove project member"
@@ -483,14 +488,19 @@ export const setMemberEnvironments = mutation({
 
     // Environment scopes only constrain developers — everyone else always
     // has access to all environments
-    if (normalizeOrgRole(targetOrgMembership.role) !== "developer") {
-      throw new Error(
-        "Environment scopes only apply to developers — owners, project managers, and team leads always have access to all environments"
+    const scopeTargetProfile = await getRoleProfile(
+      ctx,
+      targetOrgMembership.role
+    );
+    if (!hasCapability(scopeTargetProfile, "access.env_scoped")) {
+      throw new ConvexError(
+        "Environment scopes only apply to environment-scopeable roles — this role always has access to all environments"
       );
     }
 
     // Hierarchy: can only modify users whose org role is strictly below your own
-    assertCanManageUser(
+    await assertCanManageUserAsync(
+      ctx,
       actorRole,
       targetOrgMembership.role,
       "change environment scope"

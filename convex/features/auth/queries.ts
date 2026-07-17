@@ -9,6 +9,7 @@ import {
   bypassesAssignment,
   assertNotSuspended,
   isSuspendedMembership,
+  hasCapability,
 } from "../../lib/authz";
 import { expandActions } from "../../lib/roleProfiles";
 import {
@@ -159,6 +160,9 @@ export const resolveLegacyRoles = query({
     grantOnly: v.boolean(),
     legacyProjectRole: legacyProjectRoleValidator,
     environmentScope: v.union(v.array(v.string()), v.null()),
+    // Resolved capability map (additive) — the value actions consume these
+    // instead of comparing role slugs.
+    capabilities: v.record(v.string(), v.boolean()),
   }),
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -181,8 +185,9 @@ export const resolveLegacyRoles = query({
 
     const role = normalizeOrgRole(membership.role);
 
-    // Owners are implicitly assigned to every project.
-    let assigned = role === "owner";
+    // The owner class is implicitly assigned to every project.
+    const legacyProfile = await getRoleProfile(ctx, role);
+    let assigned = bypassesAssignment(legacyProfile);
     // A scoped developer's environment restriction (subset semantics). Only
     // populated for an assigned developer whose projectMembers row sets it.
     let environmentScope: string[] | null = null;
@@ -194,7 +199,7 @@ export const resolveLegacyRoles = query({
         )
         .first();
       assigned = projectMembership !== null;
-      if (role === "developer") {
+      if (hasCapability(legacyProfile, "access.env_scoped")) {
         environmentScope = projectMembership?.environments ?? null;
       }
     }
@@ -234,6 +239,7 @@ export const resolveLegacyRoles = query({
       grantOnly,
       legacyProjectRole,
       environmentScope,
+      capabilities: legacyProfile.capabilities as Record<string, boolean>,
     };
   },
 });
