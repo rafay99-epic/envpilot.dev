@@ -1,0 +1,41 @@
+apps/web/src/lib/__tests__/role-parity.test.ts
+  s_c0d41f513c83f7::t_edd22dd7598330 1-273
+convex/features/auth/queries.ts
+  s_c0d41f513c83f7::t_4d400d9f848851 8-9,13,33-34,37-47,69-70,75-79,81,89-99,102-104,115,124-129
+convex/features/emails/emails.ts
+  s_c0d41f513c83f7::t_f15566327d55f9 95-97,121-123
+convex/features/permissions/accountPermissions/queries.ts
+  s_c0d41f513c83f7::t_94f75549d94dd2 109-110
+convex/features/permissions/variablePermissions/queries.ts
+  s_c0d41f513c83f7::t_81905d34da374f 143-144
+convex/features/variables/values.ts
+  s_c0d41f513c83f7::t_d41a5f079dea48 34
+convex/lib/authz.ts
+  s_c0d41f513c83f7::t_c83964a28f2714 4-16,37-48,54-58,65-66,68-69,74-87,91,94-104,106-160,171,177-180,195,200-203,208-229,239-240,247-248,250-252,361-366,377,418-428,440,443-445,452-457,486,489-495,507,529-555,574,580-598,650-651,653-660,662,664-671,673-677,680-681,686,690,694-695,698,701,707-713,716,719-766,830-837
+convex/lib/capabilities.ts
+  s_c0d41f513c83f7::t_fd14715abe510e 1-281
+convex/lib/roleCompat.ts
+  s_c0d41f513c83f7::t_12efc08ca0cbf2 13-17
+convex/lib/roleProfiles.ts
+  s_c0d41f513c83f7::t_72f7ae4328bab4 1-263
+convex/lib/seedData.ts
+  s_c0d41f513c83f7::t_34fa99a818d8e9 307-333
+convex/schema.ts
+  s_c0d41f513c83f7::t_ce1f4094ba667f 89-119,130-135,629-631
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "50ec9c14ceb5c8d2bd7e3d3ea4ecf1517b308e9b",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
