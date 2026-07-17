@@ -1,0 +1,21 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/diff/page.tsx
+  s_a3ac6d49efb842::t_3d2235913edfb8 697
+apps/web/src/components/landing/LandingPage.tsx
+  s_a3ac6d49efb842::t_50310e3d81e501 52,60,563
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "18e2f226605a72235aa7ad29fef7391179e451e5",
+  "prompts": {},
+  "sessions": {
+    "s_a3ac6d49efb842": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fdf4860-d1ca-4221-814d-45e02d7e435c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
