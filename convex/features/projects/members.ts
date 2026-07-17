@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
@@ -493,7 +493,7 @@ export const setMemberEnvironments = mutation({
       targetRole !== "editor" &&
       targetRole !== "viewer"
     ) {
-      throw new Error(
+      throw new ConvexError(
         "Environment scopes only apply to developers, editors, and viewers — owners, project managers, and team leads always have access to all environments"
       );
     }

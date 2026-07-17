@@ -89,15 +89,15 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
   const { slug } = use(params);
   const { canDo, organization, user } = useAuthContext();
   // Project-scoped gates follow from the unified org role (assignment is
-  // enforced server-side): every assigned member can create variables;
-  // team leads and above have full variable CRUD; developers edit only
-  // variables they hold a write grant on and can submit requests.
+  // enforced server-side): editors and above have full variable CRUD;
+  // developers are read+request-only (LOCKDOWN — direct creation was
+  // removed from them); viewers can neither create nor request.
   const orgRole = normalizeOrgRole(organization?.role);
   const hasOrgRole = !!organization?.role;
-  const canCreateVariable = hasOrgRole;
-  const canUpdateVariable =
-    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
-  const canDeleteVariable = canUpdateVariable;
+  const canCreateVariable =
+    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.editor;
+  const canUpdateVariable = canCreateVariable;
+  const canDeleteVariable = canCreateVariable;
   const canRequestVariable = hasOrgRole && orgRole === "developer";
 
   const orgId = organization?.id as Id<"organizations"> | undefined;

@@ -832,6 +832,30 @@ export const importValues = action({
       );
     }
 
+    // Editors (unlike owner/PM/TL, who are never env-restricted) must be
+    // ASSIGNED to the project and the target environment must be inside
+    // their scope — checked BEFORE the decrypt-to-diff loop below, which
+    // reads existing secret values. Without this, a scoped editor could
+    // target an out-of-scope environment and turn the diff into a
+    // value-equality oracle for secrets they can never read.
+    if (importerRole === "editor") {
+      const editorScope = await ctx.runQuery(
+        api.features.auth.queries.resolveLegacyRoles,
+        { projectId: args.projectId }
+      );
+      if (!editorScope.assigned) {
+        throw new ConvexError("You are not assigned to this project.");
+      }
+      if (
+        editorScope.environmentScope !== null &&
+        !editorScope.environmentScope.includes(args.environment)
+      ) {
+        throw new ConvexError(
+          `Your access is limited to these environments: ${editorScope.environmentScope.join(", ")}`
+        );
+      }
+    }
+
     let created = 0;
     let updated = 0;
     let deleted = 0;

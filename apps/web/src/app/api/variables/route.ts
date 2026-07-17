@@ -152,22 +152,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Unified RBAC: assigned developers create variables directly (they get a
-    // write grant on variables they create). The composed Convex action
-    // encrypts the value into WorkOS Vault and persists the ref in one hop;
-    // authorization — including project assignment scoping — is enforced there.
-    const { _id: variableId } = await createAuthedConvexClient(
-      accessToken!
-    ).action(api.features.variables.values.createWithValue, {
+    const authed = createAuthedConvexClient(accessToken!);
+
+    // LOCKDOWN: developers are read+request-only — their "create" files a
+    // variable request (vault-encrypted, reviewed by owner/PM/TL) instead of
+    // creating directly. The page surfaces `requested: true` as a submitted-
+    // for-approval notice. Editors and above create directly below.
+    const roles = await authed.query(api.features.auth.queries.resolveLegacyRoles, {
       projectId: projectId as Id<"projects">,
-      key,
-      value,
-      description,
-      environments,
-      isSensitive,
-      rotationFrequencyDays,
-      tagIds: tagIds as Id<"variableTags">[] | undefined,
     });
+    if (roles.role === "developer") {
+      const request = await authed.action(
+        api.features.variables.requests.actions.createWithValue,
+        {
+          projectId: projectId as Id<"projects">,
+          key,
+          value,
+          description,
+          environments,
+          isSensitive,
+        }
+      );
+      return NextResponse.json(
+        { requested: true, requestId: request._id },
+        { status: 202 }
+      );
+    }
+
+    // Unified RBAC: editors and above create directly. The composed Convex
+    // action encrypts the value into WorkOS Vault and persists the ref in one
+    // hop; authorization — including project assignment scoping — is
+    // enforced there.
+    const { _id: variableId } = await authed.action(
+      api.features.variables.values.createWithValue,
+      {
+        projectId: projectId as Id<"projects">,
+        key,
+        value,
+        description,
+        environments,
+        isSensitive,
+        rotationFrequencyDays,
+        tagIds: tagIds as Id<"variableTags">[] | undefined,
+      }
+    );
 
     const variable = await convex.query(
       api.features.variables.queries.getById,

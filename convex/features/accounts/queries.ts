@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query } from "../../_generated/server";
 import type { Doc } from "../../_generated/dataModel";
 import {
@@ -203,22 +203,27 @@ export const listWithAccess = query({
 export const get = query({
   args: {
     accountId: v.id("projectAccounts"),
-    userId: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    // Trusting a client-supplied id let any caller probe another member's
+    // access and read account metadata + vaultRef they cannot see.
+    userId: v.optional(v.id("users")),
     // Minimum access the caller must hold. Defaults to "read". Callers that
     // are about to mutate the underlying Vault secret (credential rotation)
     // pass "write" so the request is rejected BEFORE any Vault write happens.
     minimumAccess: v.optional(v.union(v.literal("read"), v.literal("write"))),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
     const account = await ctx.db.get(args.accountId);
     if (!account || account.deletedAt) {
-      throw new Error("Account not found");
+      throw new ConvexError("Account not found");
     }
 
-    // Authorization: owner / assigned PM/TL / developer or viewer with a grant
+    // Authorization: owner / assigned PM/TL / editor, or viewer / developer
+    // with access (grants cap at read).
     await requireAccountAccess(
       ctx,
-      args.userId,
+      actor._id,
       account,
       args.minimumAccess ?? "read"
     );

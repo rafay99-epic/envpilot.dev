@@ -79,9 +79,10 @@ export default function TrashPage({ params }: TrashPageProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Empty-trash mirrors variable deletion capability: owner implicit,
-  // assigned PM / team lead. The server re-checks; this only hides the button.
+  // assigned PM / team lead / editor. The server re-checks; this only hides
+  // the button.
   const canEmpty =
-    roleLevel(organization?.role ?? "") >= ROLE_LEVEL.team_lead ||
+    roleLevel(organization?.role ?? "") >= ROLE_LEVEL.editor ||
     organization?.role === "owner";
 
   const loading =

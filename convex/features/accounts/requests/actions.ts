@@ -32,6 +32,35 @@ export const createWithCredentials = action({
       throw new ConvexError("Project not found");
     }
 
+    // PRE-CHECK before the vault write (repo rule: never orphan a secret).
+    // The mutation below is authoritative, but every PREDICTABLE rejection —
+    // wrong role, unassigned, out-of-scope environment — must fire before
+    // the caller's credentials are encrypted into this org's vault context.
+    // Without this, any authenticated user could push a secret into a
+    // foreign org's vault (deleted only best-effort afterwards).
+    const access = await ctx.runQuery(
+      api.features.auth.queries.resolveLegacyRoles,
+      { projectId: args.projectId }
+    );
+    if (access.role !== "developer" || !access.assigned) {
+      throw new ConvexError(
+        "Only developers assigned to the project can request accounts. Owners, project managers, team leads, and editors create accounts directly."
+      );
+    }
+    if (args.environments.length === 0) {
+      throw new ConvexError("An account request needs at least one environment");
+    }
+    if (
+      access.environmentScope !== null &&
+      !args.environments.every((env) =>
+        access.environmentScope!.includes(env)
+      )
+    ) {
+      throw new ConvexError(
+        `Your access is limited to these environments: ${access.environmentScope.join(", ")}`
+      );
+    }
+
     // The project's own organizationId is authoritative for the vault key
     // context — never a client-supplied value.
     const vault = await ctx.runAction(

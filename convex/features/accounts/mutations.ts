@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation } from "../../_generated/server";
 import {
   checkBooleanFeature,
@@ -35,7 +35,8 @@ function assertWithinEnvironmentScope(
   environments: string[]
 ): void {
   if (!isEnvironmentScopeAllowed(scope, environments)) {
-    throw new Error(
+    // ConvexError: user-facing — plain Error is redacted in production.
+    throw new ConvexError(
       `Your access is limited to these environments: ${(scope ?? []).join(", ")}`
     );
   }
@@ -470,7 +471,8 @@ export const restore = mutation({
 export const logAccess = mutation({
   args: {
     accountId: v.id("projectAccounts"),
-    accessedBy: v.id("users"),
+    // DEPRECATED, ignored: identity is server-derived (requireAuthedUser).
+    accessedBy: v.optional(v.id("users")),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
     sessionId: v.optional(v.string()),

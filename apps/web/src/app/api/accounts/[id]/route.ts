@@ -83,7 +83,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Side effect only: ensure the Convex user row exists before the
+    // authed calls run; identity comes from the JWT.
+    await getOrCreateConvexUser(convex, user);
 
     const { name, websiteUrl, username, password, description, environments } =
       validation.data;
@@ -121,11 +123,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     );
 
-    const updatedAccount = await convex.query(
+    const updatedAccount = await createAuthedConvexClient(accessToken!).query(
       api.features.accounts.queries.get,
       {
         accountId: id as Id<"projectAccounts">,
-        userId: convexUser._id,
       }
     );
 
@@ -147,21 +148,26 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const { user } = await withAuth();
+    const { user, accessToken } = await withAuth();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { id } = await context.params;
-    const convexUser = await getOrCreateConvexUser(convex, user);
+    // Ensure the Convex user row exists before the authed mutation runs.
+    await getOrCreateConvexUser(convex, user);
 
     // Authorization (role-only, no grant fallback — parity with
-    // variables.remove) is enforced entirely by the Convex mutation.
-    await convex.mutation(api.features.accounts.mutations.remove, {
-      accountId: id as Id<"projectAccounts">,
-      deletedBy: convexUser._id,
-    });
+    // variables.remove) is enforced by the mutation, which derives the actor
+    // from the JWT — so it MUST be called with an authenticated client, not
+    // the tokenless singleton (requireAuthedUser would otherwise reject).
+    await createAuthedConvexClient(accessToken!).mutation(
+      api.features.accounts.mutations.remove,
+      {
+        accountId: id as Id<"projectAccounts">,
+      }
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -3,7 +3,7 @@ import { query } from "../../_generated/server";
 import { Id } from "../../_generated/dataModel";
 import { batchGetUsers } from "../../lib/users";
 import { resolveFeatureValue } from "../featureRegistry/resolver";
-import { normalizeOrgRole } from "../../lib/authz";
+import { normalizeOrgRole, getActiveMembership } from "../../lib/authz";
 import { requireAuthedUser } from "../../lib/identity";
 
 /**
@@ -226,6 +226,34 @@ export const getRecentProjects = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
+    // Same authorization + scoping as getRecentActivity: caller must be an
+    // active org member, and non-manager roles (editor/developer/viewer)
+    // only see projects they're assigned to.
+    const actor = await requireAuthedUser(ctx);
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) {
+      return [];
+    }
+    const orgRole = normalizeOrgRole(membership.role);
+    let assignedProjectIds: Set<string> | null = null;
+    if (
+      orgRole === "developer" ||
+      orgRole === "editor" ||
+      orgRole === "viewer"
+    ) {
+      const assignments = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_user", (q) => q.eq("userId", actor._id))
+        .collect();
+      assignedProjectIds = new Set(
+        assignments.map((pm) => pm.projectId as string)
+      );
+    }
+
     const recentProjects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -235,6 +263,11 @@ export const getRecentProjects = query({
       .take(50);
     const projects = recentProjects
       .filter((p) => p.deletedAt === undefined)
+      .filter(
+        (p) =>
+          assignedProjectIds === null ||
+          assignedProjectIds.has(p._id as string)
+      )
       .slice(0, 5);
 
     // Cap the per-project variable read. Collecting every variable of each of

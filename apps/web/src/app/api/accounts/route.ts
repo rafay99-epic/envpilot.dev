@@ -65,7 +65,9 @@ export async function POST(request: Request) {
     // the two lookups are independent. The project's own organizationId is
     // authoritative for the Vault key context and Convex mutation — never the
     // client-supplied organizationId — to prevent cross-tenant key confusion.
-    const [convexUser, { project, organizationId }] = await Promise.all([
+    // getOrCreateConvexUser is a side effect (ensures the row exists before
+    // the authed action runs); identity now comes from the JWT, not this id.
+    const [, { project, organizationId }] = await Promise.all([
       getOrCreateConvexUser(convex, user),
       getProjectOrganization(convex, projectId as Id<"projects">),
     ]);
@@ -102,10 +104,12 @@ export async function POST(request: Request) {
       }
     );
 
-    const account = await convex.query(api.features.accounts.queries.get, {
-      accountId,
-      userId: convexUser._id,
-    });
+    const account = await createAuthedConvexClient(accessToken!).query(
+      api.features.accounts.queries.get,
+      {
+        accountId,
+      }
+    );
 
     return NextResponse.json({ account }, { status: 201 });
   } catch (error) {
