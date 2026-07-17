@@ -35,9 +35,12 @@ import {
   StaggerItem,
   fadeUp,
   staggerContainer,
+  SITE_URLS,
   type TerminalScene,
 } from "@/components/marketing";
 import type { PricingData } from "@/components/pricing/PricingContent";
+import { APP_VERSIONS } from "@/lib/versions";
+import { FAQ_ITEMS } from "./faq-data";
 
 /* ────────────────────────────── hero ────────────────────────────── */
 
@@ -76,10 +79,10 @@ const HERO_SCENES: TerminalScene[] = [
 ];
 
 const HERO_STATS = [
-  { value: "AES-256", label: "encryption at rest" },
-  { value: "40+", label: "audit event types" },
-  { value: "3", label: "synced surfaces" },
+  { value: "AES-256", label: "encrypted in vault" },
   { value: "0", label: "plaintext secrets stored" },
+  { value: "< 2 min", label: "to first injected secret" },
+  { value: "$0", label: "for small teams · no card" },
 ];
 
 function InstallChip() {
@@ -208,44 +211,54 @@ function Hero() {
   );
 }
 
-/* ─────────────────────────── command marquee ─────────────────────────── */
+/* ─────────────────────────── proof bar ─────────────────────────── */
 
-const MARQUEE_COMMANDS = [
-  "envpilot run -- bun dev",
-  "envpilot pull --env production",
-  "envpilot push --env staging --dry-run",
-  "envpilot switch production",
-  "envpilot list variables --show-values",
-  "envpilot audit --days 90 --format json",
-  "envpilot run --print",
-  "envpilot login",
-  "envpilot init",
+const PROOF_BADGES = [
+  {
+    strong: "npm",
+    label: `@envpilot/cli · v${APP_VERSIONS.cli}`,
+    href: "https://www.npmjs.com/package/@envpilot/cli",
+  },
+  {
+    strong: "VS Code",
+    label: `Marketplace · v${APP_VERSIONS.extension}`,
+    href: "https://marketplace.visualstudio.com/items?itemName=envpilot.envpilot",
+  },
+  {
+    strong: "GitHub Action",
+    label: "envpilot-action@v1",
+    href: "https://github.com/rafay99-epic/envpilot-action",
+  },
+  {
+    strong: "MCP",
+    label: "server for AI agents",
+    href: `${SITE_URLS.docs}/mcp-server`,
+  },
+  {
+    strong: "changelog",
+    label: "shipping weekly",
+    href: "/changelog",
+  },
 ];
 
-function CommandMarquee() {
-  const items = [...MARQUEE_COMMANDS, ...MARQUEE_COMMANDS];
+function ProofBar() {
   return (
     <div className="relative border-y border-zinc-800/60 bg-zinc-900/30 py-5">
-      <div
-        className="overflow-hidden"
-        style={{
-          maskImage:
-            "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-          WebkitMaskImage:
-            "linear-gradient(90deg, transparent, black 12%, black 88%, transparent)",
-        }}
-      >
-        <div className="animate-marquee flex w-max gap-10">
-          {items.map((cmd, i) => (
-            <span
-              key={`${cmd}-${i}`}
-              className="whitespace-nowrap font-mono text-xs text-zinc-600"
-            >
-              <span className="mr-2 text-green-500/70">❯</span>
-              {cmd}
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-3 px-4 sm:px-6">
+        {PROOF_BADGES.map((badge) => (
+          <a
+            key={badge.strong}
+            href={badge.href}
+            target={badge.href.startsWith("/") ? undefined : "_blank"}
+            rel={badge.href.startsWith("/") ? undefined : "noopener noreferrer"}
+            className="group inline-flex items-center gap-2 font-mono text-xs text-zinc-500 transition-colors hover:text-zinc-200"
+          >
+            <span className="font-semibold text-green-400/90">
+              {badge.strong}
             </span>
-          ))}
-        </div>
+            {badge.label}
+          </a>
+        ))}
       </div>
     </div>
   );
@@ -892,6 +905,89 @@ function Pricing({
   );
 }
 
+/* ────────────────────────────── founder ────────────────────────────── */
+
+function FounderStrip() {
+  return (
+    <section className="relative py-20">
+      <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+        <Reveal>
+          <p className="font-sans text-lg leading-relaxed text-zinc-300 [text-wrap:balance] sm:text-xl">
+            &ldquo;I built Envpilot after watching one too many production keys
+            get pasted into Slack channels half the company could scroll.
+            It&apos;s the tool I wanted: encrypted, synced, and boring to
+            use.&rdquo;
+          </p>
+          <p className="mt-5 font-mono text-xs text-zinc-500">
+            — Abdul Rafay, founder ·{" "}
+            <Link
+              href="/changelog"
+              className="text-zinc-400 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-green-400"
+            >
+              changelog
+            </Link>{" "}
+            ·{" "}
+            <Link
+              href="/wishlist"
+              className="text-zinc-400 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-green-400"
+            >
+              roadmap
+            </Link>
+          </p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────── faq ────────────────────────────── */
+
+function Faq() {
+  return (
+    <section id="faq" className="relative scroll-mt-20 py-28">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <SectionHeading
+          eyebrow="faq"
+          title={
+            <>
+              Before you <span className="text-green-400">ask</span>
+            </>
+          }
+          align="center"
+          className="items-center"
+        />
+        <div className="mt-12 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
+          {FAQ_ITEMS.map((item) => (
+            <details key={item.question} className="group py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-sans text-sm font-medium text-zinc-200 [&::-webkit-details-marker]:hidden">
+                {item.question}
+                <span
+                  aria-hidden
+                  className="font-mono text-green-500 transition-transform group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <p className="mt-3 max-w-2xl font-mono text-xs leading-relaxed text-zinc-500">
+                {item.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+        <Reveal className="mt-8 text-center">
+          <Link
+            href="/faq"
+            className="inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 transition-colors hover:text-green-400"
+          >
+            More questions answered
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* ────────────────────────────── final CTA ────────────────────────────── */
 
 function FinalCTA() {
@@ -956,7 +1052,7 @@ function FinalCTA() {
             </Link>
           </motion.div>
           <Link
-            href="/docs"
+            href={SITE_URLS.docs}
             className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-7 py-3.5 font-mono text-sm text-zinc-400 transition-colors hover:border-green-500/30 hover:text-zinc-200"
           >
             <GitBranch className="h-4 w-4" />
@@ -987,12 +1083,14 @@ export default function LandingPage({
         style={{ scaleX: scrollYProgress }}
       />
       <Hero />
-      <CommandMarquee />
-      <FeaturesBento />
-      <Workflow />
+      <ProofBar />
       <BeforeAfter />
+      <Workflow />
+      <FeaturesBento />
       <Platform />
+      <FounderStrip />
       <Pricing pricingData={pricingData} paymentsEnabled={paymentsEnabled} />
+      <Faq />
       <FinalCTA />
     </MarketingShell>
   );
