@@ -4,10 +4,18 @@ import { verifyAdmin } from "./auth";
 import { CAPABILITIES, CAPABILITY_KEYS } from "../../lib/capabilities";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{1,30}$/;
-// Legacy values normalizeOrgRole rewrites BEFORE registry lookup — a custom
-// role with one of these slugs would silently resolve to another profile
-// (admin → the full OWNER profile). Never allow them as custom slugs.
-const RESERVED_SLUGS = new Set(["admin", "member"]);
+// Legacy values normalizeOrgRole rewrites BEFORE registry lookup (admin →
+// the full OWNER profile), and system slugs are seed-owned — a custom row
+// claiming one pre-seed would shadow the built-in profile in getRoleProfile.
+// Never allow any of them as custom slugs.
+const RESERVED_SLUGS = new Set([
+  "admin",
+  "member",
+  "owner",
+  "project_manager",
+  "team_lead",
+  "developer",
+]);
 // Custom-role hierarchy bounds: strictly below owner (100) and above the
 // fail-closed 0 so the owner can always manage every assignable role.
 const MIN_CUSTOM_LEVEL = 1;
@@ -137,6 +145,7 @@ export const updateRoleMeta = mutation({
     level: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    verifyAdmin(args.secret);
     if (
       args.level !== undefined &&
       (args.level < MIN_CUSTOM_LEVEL ||
@@ -147,7 +156,6 @@ export const updateRoleMeta = mutation({
         `Role level must be an integer between ${MIN_CUSTOM_LEVEL} and ${MAX_CUSTOM_LEVEL} (owner is always 100).`
       );
     }
-    verifyAdmin(args.secret);
     const role = await ctx.db.get(args.roleId);
     if (!role) throw new ConvexError("Role not found");
     if (args.level !== undefined && role.isSystem) {

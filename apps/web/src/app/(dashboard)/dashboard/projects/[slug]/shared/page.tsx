@@ -340,7 +340,12 @@ function ShareCard({
 
 export default function SharedVariablesPage({ params }: SharedPageProps) {
   const { slug } = use(params);
-  const { organization, user, isLoading: isAuthLoading } = useAuthContext();
+  const {
+    organization,
+    roleMeta,
+    user,
+    isLoading: isAuthLoading,
+  } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
 
   // Stable timestamp for relative time formatting — refreshes every 60s
@@ -373,7 +378,7 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   // Revoking shares requires team lead or above (variables CRUD scope)
   const isOrgAdmin =
     !!organization?.role &&
-    roleLevel(organization.role) >= ROLE_LEVEL.team_lead;
+    (roleMeta?.level ?? roleLevel(organization.role)) >= ROLE_LEVEL.team_lead;
 
   // ── UI state ──
   const [filter, setFilter] = useState<FilterKey>("all");

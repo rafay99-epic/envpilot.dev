@@ -1,12 +1,12 @@
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import {
+  bypassesAssignment,
+  getActiveMembership,
+  getRoleProfile,
+  isSuspendedMembership,
   normalizeOrgRole,
   toLegacyProjectRole,
-  getActiveMembership,
-  isSuspendedMembership,
-  getRoleProfile,
-  bypassesAssignment,
 } from "../../lib/authz";
 
 /**
@@ -51,7 +51,8 @@ export async function listWithStatsCore(
 
   userRole = normalizeOrgRole(membership.role);
 
-  if (normalizeOrgRole(membership.role) !== "owner") {
+  const viewerProfile = await getRoleProfile(ctx, membership.role);
+  if (!bypassesAssignment(viewerProfile)) {
     // Get user's project assignments
     const projectMemberships = await ctx.db
       .query("projectMembers")

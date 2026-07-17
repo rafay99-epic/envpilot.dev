@@ -42,36 +42,38 @@ const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
 function assertValidName(name: string): void {
   if (name.trim().length === 0 || name.length > 100) {
-    throw new Error("Key name must be 1-100 characters");
+    throw new ConvexError("Key name must be 1-100 characters");
   }
 }
 
 function assertValidEnvironments(environments: "all" | string[]): void {
   if (environments === "all") return;
   if (environments.length === 0) {
-    throw new Error('Key must be scoped to at least one environment, or "all"');
+    throw new ConvexError(
+      'Key must be scoped to at least one environment, or "all"'
+    );
   }
   for (const env of environments) {
     if (!VALID_ENVIRONMENTS.includes(env)) {
-      throw new Error(`Unknown environment "${env}"`);
+      throw new ConvexError(`Unknown environment "${env}"`);
     }
   }
 }
 
 function assertValidResources(resources: string[]): void {
   if (resources.length === 0) {
-    throw new Error("Key must be scoped to at least one resource");
+    throw new ConvexError("Key must be scoped to at least one resource");
   }
   for (const resource of resources) {
     if (!VALID_RESOURCES.includes(resource)) {
-      throw new Error(`Unknown resource "${resource}"`);
+      throw new ConvexError(`Unknown resource "${resource}"`);
     }
   }
 }
 
 function assertValidExpiry(expiresAt: number | undefined): void {
   if (expiresAt !== undefined && expiresAt <= Date.now()) {
-    throw new Error("expiresAt must be in the future");
+    throw new ConvexError("expiresAt must be in the future");
   }
 }
 
@@ -133,7 +135,7 @@ export const _store = internalMutation({
 
     const org = await ctx.db.get(args.organizationId);
     if (!org) {
-      throw new Error("Organization not found");
+      throw new ConvexError("Organization not found");
     }
 
     if (args.scopeProjects === "all") {
@@ -151,7 +153,9 @@ export const _store = internalMutation({
       }
     } else {
       if (args.scopeProjects.length === 0) {
-        throw new Error('Key must be scoped to at least one project, or "all"');
+        throw new ConvexError(
+          'Key must be scoped to at least one project, or "all"'
+        );
       }
       for (const projectId of args.scopeProjects) {
         const project = await ctx.db.get(projectId);
@@ -160,7 +164,7 @@ export const _store = internalMutation({
           project.deletedAt !== undefined ||
           project.organizationId !== args.organizationId
         ) {
-          throw new Error("Project not found");
+          throw new ConvexError("Project not found");
         }
         await authorizeVariableAccess(ctx, {
           userId: actor._id,
@@ -177,7 +181,7 @@ export const _store = internalMutation({
       "public_api"
     );
     if (!gate.allowed) {
-      throw new Error(
+      throw new ConvexError(
         "The public API is available on the Pro plan. Upgrade to create API keys."
       );
     }
@@ -190,7 +194,7 @@ export const _store = internalMutation({
       .collect();
     const live = existing.filter((k) => k.revokedAt === undefined);
     if (live.length >= MAX_KEYS_PER_ORG) {
-      throw new Error(
+      throw new ConvexError(
         `An organization can have at most ${MAX_KEYS_PER_ORG} active API keys — revoke unused ones first`
       );
     }
@@ -370,7 +374,7 @@ export const revoke = mutation({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     const key = await ctx.db.get(args.keyId);
-    if (!key) throw new Error("API key not found");
+    if (!key) throw new ConvexError("API key not found");
     if (key.revokedAt !== undefined) return null;
 
     await assertCanManageKey(ctx, actor._id, key);

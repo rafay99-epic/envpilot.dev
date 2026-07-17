@@ -154,6 +154,7 @@ export const getAssignableOrgMembers = query({
     // Levels resolve through the registry (memoized per slug) so custom
     // roles rank correctly instead of scoring 0.
     const requesterProfile = await getRoleProfile(ctx, requesterRole);
+    const requesterBypasses = bypassesAssignment(requesterProfile);
     const levelMemo = new Map<string, number>();
     const bypassMemo = new Map<string, boolean>();
     const prefiltered: typeof allOrgMembers = [];
@@ -167,7 +168,13 @@ export const getAssignableOrgMembers = query({
       if (bypassMemo.get(slug)) continue;
       if (assignedUserIds.has(member.userId.toString())) continue;
       if (member.userId === actor._id) continue;
-      if ((levelMemo.get(slug) ?? 0) >= requesterProfile.level) continue;
+      // Owner-class requesters may assign anyone; others strictly below.
+      if (
+        !requesterBypasses &&
+        (levelMemo.get(slug) ?? 0) >= requesterProfile.level
+      ) {
+        continue;
+      }
       prefiltered.push(member);
     }
     const assignable = await Promise.all(

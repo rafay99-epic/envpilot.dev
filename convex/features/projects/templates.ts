@@ -282,12 +282,12 @@ export const create = mutation({
       throw new Error("Organization not found");
     }
 
-    // Verify user has at least the team_lead role in the organization
+    // The registry capability is the single gate — the admin matrix checkbox
+    // must be authoritative (seeded grant: owner/PM/TL).
     const { profile: templateProfile } = await assertOrgMembership(
       ctx,
       args.createdBy,
-      args.organizationId,
-      "team_lead"
+      args.organizationId
     );
     if (!hasCapability(templateProfile, "project.templates.manage")) {
       throw new ConvexError(

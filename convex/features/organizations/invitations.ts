@@ -295,7 +295,9 @@ export const accept = mutation({
       (acceptingUser.email ?? "").toLowerCase() !==
       invitation.email.toLowerCase()
     ) {
-      throw new Error("This invitation was sent to a different email address.");
+      throw new ConvexError(
+        "This invitation was sent to a different email address."
+      );
     }
 
     const existingMembership = await ctx.db
