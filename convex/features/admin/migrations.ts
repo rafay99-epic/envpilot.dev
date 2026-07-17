@@ -331,9 +331,16 @@ export const runMigration = mutation({
           if (role.isSystem) {
             // System roles: code is the source of truth for the capability
             // matrix, level, and metadata — sync drift on every run.
+            const normalizeCaps = (caps: Record<string, boolean>) =>
+              JSON.stringify(
+                Object.keys(caps)
+                  .sort()
+                  .map((k) => [k, caps[k]])
+              );
             const capsChanged =
-              JSON.stringify(existing.capabilities) !==
-              JSON.stringify(role.capabilities);
+              normalizeCaps(
+                existing.capabilities as Record<string, boolean>
+              ) !== normalizeCaps(role.capabilities as Record<string, boolean>);
             const needsUpdate =
               capsChanged ||
               existing.displayName !== role.displayName ||
