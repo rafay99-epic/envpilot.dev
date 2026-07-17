@@ -1,0 +1,39 @@
+apps/admin/package.json
+  s_9bf93a91c48575::t_f841239090474c 3
+apps/admin/src/components/layout/Sidebar.tsx
+  s_9bf93a91c48575::t_491aca06c2182c 15,24
+apps/admin/src/routeTree.gen.ts
+  s_57f8e69e815c3c::t_80d541659a23d5 18,61-65,108,138,156,170,186,243-249,309,324
+apps/admin/src/routes/_authenticated/roles.tsx
+  s_9bf93a91c48575::t_b44ab2759b871c 1-751
+convex/_generated/api.d.ts
+  s_57f8e69e815c3c::t_3370c8dcdae55e 27,146
+convex/features/admin/auth.ts
+  s_9bf93a91c48575::t_c2602a45ba57c9 16
+convex/features/admin/roles.ts
+  s_9bf93a91c48575::t_ea3e7779697d31 1-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3bddaa3e5225beacdbebcd72afc5a337e949bd6a",
+  "prompts": {},
+  "sessions": {
+    "s_57f8e69e815c3c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae65bb36eac6fb304",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_9bf93a91c48575": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac543c637e633b2d0",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
