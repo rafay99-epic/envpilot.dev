@@ -76,8 +76,12 @@ function roleBadgeClasses(role: OrgRole): string {
       return "border-amber-500/20 bg-amber-500/10 text-amber-400";
     case "team_lead":
       return "border-blue-500/20 bg-blue-500/10 text-blue-400";
+    case "editor":
+      return "border-teal-500/20 bg-teal-500/10 text-teal-400";
     case "developer":
       return "border-zinc-500/20 bg-zinc-500/10 text-zinc-400";
+    case "viewer":
+      return "border-slate-500/20 bg-slate-500/10 text-slate-400";
   }
 }
 
@@ -118,7 +122,8 @@ export default function ProjectMembersPage({
     !!organization?.role && roleLevel(myRole) >= ROLE_LEVEL.team_lead;
   const canManageTarget = (targetRole: OrgRole): boolean => {
     if (!canManageMembers) return false;
-    if (myRole === "team_lead") return targetRole === "developer";
+    // Strictly-below rule (matches backend assertCanManageUser): team leads
+    // manage editors/developers/viewers, PMs manage everyone below them.
     return roleLevel(targetRole) < roleLevel(myRole);
   };
 
@@ -127,13 +132,14 @@ export default function ProjectMembersPage({
     canManageTarget(normalizeOrgRole(m.orgRole))
   );
 
-  // Environment scoping only applies to developer targets.
+  // Environment scoping applies to developer/editor/viewer targets.
+  const scopedRoles: OrgRole[] = ["developer", "editor", "viewer"];
   const selectedAddTarget = addableMembers.find(
     (m) => m._id === selectedUserId
   );
   const addEnvScopeApplies =
     !!selectedAddTarget &&
-    normalizeOrgRole(selectedAddTarget.orgRole) === "developer";
+    scopedRoles.includes(normalizeOrgRole(selectedAddTarget.orgRole));
 
   async function fetchData() {
     try {
@@ -407,8 +413,10 @@ export default function ProjectMembersPage({
                         {ORG_ROLE_LABELS[targetRole]}
                       </span>
 
-                      {/* Environment scope — only meaningful for developers */}
-                      {targetRole === "developer" && (
+                      {/* Environment scope — developers, editors, viewers */}
+                      {(targetRole === "developer" ||
+                        targetRole === "editor" ||
+                        targetRole === "viewer") && (
                         <span
                           className="inline-flex items-center rounded-full border border-zinc-500/20 bg-zinc-500/10 px-2 py-0.5 text-xs font-medium text-zinc-400"
                           title="Environment access"
@@ -417,7 +425,9 @@ export default function ProjectMembersPage({
                         </span>
                       )}
 
-                      {targetRole === "developer" &&
+                      {(targetRole === "developer" ||
+                        targetRole === "editor" ||
+                        targetRole === "viewer") &&
                         canManageTarget(targetRole) && (
                           <button
                             onClick={() => openScopeEditor(member)}

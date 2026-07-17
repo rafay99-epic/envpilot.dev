@@ -290,8 +290,13 @@ export const listForReviewer = query({
       args.organizationId
     );
 
-    // Developers are never reviewers — bail before touching the request table.
-    if (membership.role === "developer") {
+    // Developers, editors, and viewers are never reviewers — bail before
+    // touching the request table.
+    if (
+      membership.role === "developer" ||
+      membership.role === "editor" ||
+      membership.role === "viewer"
+    ) {
       return [];
     }
 

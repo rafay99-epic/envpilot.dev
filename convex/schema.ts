@@ -100,7 +100,11 @@ export default defineSchema({
       v.literal("owner"),
       v.literal("project_manager"),
       v.literal("team_lead"),
+      // editor: full variable/account write, zero people-powers.
+      // viewer: read-everything auditor, changes nothing.
+      v.literal("editor"),
       v.literal("developer"),
+      v.literal("viewer"),
       // Legacy values (pre unified-roles migration): admin → owner, member → developer
       v.literal("admin"),
       v.literal("member")
@@ -603,7 +607,9 @@ export default defineSchema({
       v.literal("owner"),
       v.literal("project_manager"),
       v.literal("team_lead"),
+      v.literal("editor"),
       v.literal("developer"),
+      v.literal("viewer"),
       // Legacy values (pre unified-roles migration)
       v.literal("admin"),
       v.literal("member")
@@ -611,7 +617,7 @@ export default defineSchema({
     // Optional: projects to assign the invited user to upon acceptance
     projectIds: v.optional(v.array(v.id("projects"))),
     // Optional: environment scope applied to the created assignments
-    // (developers only; e.g. ["development", "staging"])
+    // (developer / editor / viewer; e.g. ["development", "staging"])
     environments: v.optional(v.array(v.string())),
     // LEGACY: project-level role — ignored by the unified role model
     projectRole: v.optional(

@@ -21,7 +21,13 @@ import type { Doc, Id } from "../_generated/dataModel";
 // Per-variable VIEW sharing is a grant (variablePermissions), not a role: any
 // org member can be granted read on a specific variable.
 
-export type OrgRole = "owner" | "project_manager" | "team_lead" | "developer";
+export type OrgRole =
+  | "owner"
+  | "project_manager"
+  | "team_lead"
+  | "editor"
+  | "developer"
+  | "viewer";
 /** Roles that may still exist in the DB from before the unified-role migration. */
 export type LegacyOrgRole = "admin" | "member";
 export type StoredOrgRole = OrgRole | LegacyOrgRole;
@@ -37,7 +43,9 @@ export function normalizeOrgRole(role: string): OrgRole {
     case "owner":
     case "project_manager":
     case "team_lead":
+    case "editor":
     case "developer":
+    case "viewer":
       return role;
     default:
       return "developer";
@@ -45,12 +53,21 @@ export function normalizeOrgRole(role: string): OrgRole {
 }
 
 // ─── Role hierarchy (higher number = more authority) ──────────────────────────
+//
+// editor: "hands on the variables, hands off the people" — full
+// variable/account write in assigned projects, zero member/permission/share
+// authority. The pressure valve that keeps teams from over-provisioning
+// team_lead just to let someone edit env vars.
+// viewer: auditor — sees everything in assigned projects (env-scoped,
+// audited), changes nothing, shares nothing, requests nothing.
 
 export const ROLE_LEVEL: Record<OrgRole, number> = {
-  owner: 4,
-  project_manager: 3,
-  team_lead: 2,
-  developer: 1,
+  owner: 6,
+  project_manager: 5,
+  team_lead: 4,
+  editor: 3,
+  developer: 2,
+  viewer: 1,
 };
 
 export function roleLevel(role: string): number {
@@ -85,22 +102,26 @@ export const ORG_ACTIONS = {
   "org:create_project": ["owner", "project_manager"] as OrgRole[],
   "org:delete_project": ["owner"] as OrgRole[],
 
-  // Extension/CLI linking (any org member can link their own)
+  // Extension/CLI linking (any org member can link their own — viewers
+  // included: read-only pull is exactly their job)
   "org:link_extension": [
     "owner",
     "project_manager",
     "team_lead",
+    "editor",
     "developer",
+    "viewer",
   ] as OrgRole[],
 
   // Variable rollback (owner-only power feature)
   "org:rollback_variable": ["owner"] as OrgRole[],
 
-  // Tag management
+  // Tag management (viewers change nothing, tags included)
   "org:create_tag": [
     "owner",
     "project_manager",
     "team_lead",
+    "editor",
     "developer",
   ] as OrgRole[],
   "org:manage_tag": ["owner", "project_manager", "team_lead"] as OrgRole[],
@@ -109,23 +130,57 @@ export const ORG_ACTIONS = {
 // Project actions are checked against the user's ORG role, gated on their
 // assignment to the project (projectMembers row). Owners bypass assignment.
 export const PROJECT_ACTIONS = {
-  "project:read": ["project_manager", "team_lead", "developer"] as OrgRole[],
+  "project:read": [
+    "project_manager",
+    "team_lead",
+    "editor",
+    "developer",
+    "viewer",
+  ] as OrgRole[],
   "project:update": ["project_manager"] as OrgRole[],
   // LOCKDOWN: developers are read+request-only. They no longer create
   // variables directly — a variable request (reviewed by owner/PM/TL) is the
   // only path. Grants can never elevate a developer to write either (capped
-  // in getVariableAccess).
-  "project:create_variable": ["project_manager", "team_lead"] as OrgRole[],
-  "project:update_variable": ["project_manager", "team_lead"] as OrgRole[],
-  "project:delete_variable": ["project_manager", "team_lead"] as OrgRole[],
+  // in getVariableAccess). Editors hold full variable/account write but no
+  // people-powers (no approvals, permissions, members, settings, shares).
+  "project:create_variable": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
+  "project:update_variable": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
+  "project:delete_variable": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
   "project:manage_permissions": ["project_manager", "team_lead"] as OrgRole[],
+  // Reviewing variable/account requests is a people-power: editors edit
+  // directly but never approve. Owner bypasses assignment as usual.
+  "project:review_requests": ["project_manager", "team_lead"] as OrgRole[],
   // Team leads may only add/remove developers (hierarchy enforced separately).
   "project:manage_members": ["project_manager", "team_lead"] as OrgRole[],
   // Shared accounts — same lockdown as variables: developers request, never
   // create; grants cap at read in getAccountAccess.
-  "project:create_account": ["project_manager", "team_lead"] as OrgRole[],
-  "project:update_account": ["project_manager", "team_lead"] as OrgRole[],
-  "project:delete_account": ["project_manager", "team_lead"] as OrgRole[],
+  "project:create_account": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
+  "project:update_account": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
+  "project:delete_account": [
+    "project_manager",
+    "team_lead",
+    "editor",
+  ] as OrgRole[],
   "project:manage_account_permissions": [
     "project_manager",
     "team_lead",
@@ -150,7 +205,11 @@ export function toLegacyOrgRole(
     case "project_manager":
     case "team_lead":
       return "team_lead";
+    // New roles map to "member" for old clients: legacy labels are cosmetic —
+    // writability on published builds rides the meta booleans, never the role.
+    case "editor":
     case "developer":
+    case "viewer":
       return "member";
   }
 }
@@ -158,7 +217,8 @@ export function toLegacyOrgRole(
 /**
  * Legacy per-project role for old clients: writable roles map to "manager",
  * developers map to "developer" (readonly-with-request), and grant-only
- * viewers map to "viewer" (strict readonly).
+ * viewers map to "viewer" (strict readonly). New roles: editor → "developer"
+ * (its file writability comes from meta.hasWriteAccess), viewer → "viewer".
  */
 export function toLegacyProjectRole(
   role: OrgRole,
@@ -170,8 +230,11 @@ export function toLegacyProjectRole(
     case "project_manager":
     case "team_lead":
       return "manager";
+    case "editor":
     case "developer":
       return "developer";
+    case "viewer":
+      return "viewer";
   }
 }
 
@@ -191,9 +254,9 @@ interface ProjectAuthResult {
   /** Whether the user has an explicit projectMembers assignment. Owners may not. */
   assigned: boolean;
   /**
-   * Environment scope of the assignment (developers only). Undefined =
-   * unrestricted. Callers creating/updating variables must check this via
-   * isEnvironmentScopeAllowed.
+   * Environment scope of the assignment (developer / editor / viewer).
+   * Undefined = unrestricted. Callers creating/updating variables must check
+   * this via isEnvironmentScopeAllowed.
    */
   environmentScope?: string[];
 }
@@ -384,9 +447,12 @@ export async function assertProjectAction(
   return {
     orgRole: role,
     assigned: true,
-    // Environment scope only constrains developers; managers are unrestricted
+    // Environment scope constrains the non-manager roles; managers (PM/TL)
+    // are unrestricted
     environmentScope:
-      role === "developer" ? projectMembership.environments : undefined,
+      role === "developer" || role === "editor" || role === "viewer"
+        ? projectMembership.environments
+        : undefined,
   };
 }
 
@@ -584,12 +650,12 @@ export async function getVariableAccess(
     return "write";
   }
 
-  // Environment scope: an assigned developer restricted to e.g.
-  // ["development", "staging"] never gets access to a variable that lives in
-  // production — grants included.
+  // Environment scope: an assigned developer/editor/viewer restricted to
+  // e.g. ["development", "staging"] never gets access to a variable that
+  // lives in production — grants included.
   if (
     projectMembership &&
-    role === "developer" &&
+    (role === "developer" || role === "editor" || role === "viewer") &&
     !isEnvironmentScopeAllowed(
       projectMembership.environments,
       variable.environments
@@ -597,6 +663,12 @@ export async function getVariableAccess(
   ) {
     return null;
   }
+
+  // Editor: blanket write in assigned projects (env-scoped above) — the
+  // hands-on-variables role. Viewer: blanket read, no grants needed — the
+  // auditor role.
+  if (projectMembership && role === "editor") return "write";
+  if (projectMembership && role === "viewer") return "read";
 
   // Developers (and any grant-only viewers) fall through to explicit grants
   const grant = await getActiveVariableGrant(ctx, userId, variable._id);
@@ -700,12 +772,12 @@ export async function getAccountAccess(
     return "write";
   }
 
-  // Environment scope: an assigned developer restricted to e.g.
-  // ["development", "staging"] never gets access to an account that lives in
-  // production — grants included.
+  // Environment scope: an assigned developer/editor/viewer restricted to
+  // e.g. ["development", "staging"] never gets access to an account that
+  // lives in production — grants included.
   if (
     projectMembership &&
-    role === "developer" &&
+    (role === "developer" || role === "editor" || role === "viewer") &&
     !isEnvironmentScopeAllowed(
       projectMembership.environments,
       account.environments
@@ -713,6 +785,10 @@ export async function getAccountAccess(
   ) {
     return null;
   }
+
+  // Editor: blanket write; viewer: blanket read (see getVariableAccess).
+  if (projectMembership && role === "editor") return "write";
+  if (projectMembership && role === "viewer") return "read";
 
   // Developers (and any grant-only viewers) fall through to explicit grants
   const grant = await getActiveAccountGrant(ctx, userId, account._id);

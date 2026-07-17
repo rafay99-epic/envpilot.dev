@@ -22,7 +22,14 @@ const CONVEX_ID_PATTERN = /^[a-z0-9]+$/i;
 
 const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
-  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
+  role: z.enum([
+    "owner",
+    "project_manager",
+    "team_lead",
+    "editor",
+    "developer",
+    "viewer",
+  ]),
   // Project assignments only — project-level roles no longer exist.
   projectIds: z.array(z.string()).optional(),
   // Developer environment scope — omitted means unrestricted access.
@@ -34,7 +41,14 @@ const inviteMemberSchema = z.object({
 
 const updateRoleSchema = z.object({
   userId: z.string().regex(CONVEX_ID_PATTERN, "Invalid user ID format"),
-  role: z.enum(["owner", "project_manager", "team_lead", "developer"]),
+  role: z.enum([
+    "owner",
+    "project_manager",
+    "team_lead",
+    "editor",
+    "developer",
+    "viewer",
+  ]),
 });
 
 type RouteParams = { params: Promise<{ slug: string }> };

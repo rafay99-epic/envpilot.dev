@@ -31,11 +31,13 @@ export async function canReviewRequests(
   projectId: Id<"projects">
 ): Promise<boolean> {
   try {
+    // Dedicated action: editors hold project:update_variable for direct
+    // edits but must NOT approve requests — review is a people-power.
     await assertProjectAction(
       ctx,
       userId,
       projectId,
-      "project:update_variable"
+      "project:review_requests"
     );
     return true;
   } catch (err) {

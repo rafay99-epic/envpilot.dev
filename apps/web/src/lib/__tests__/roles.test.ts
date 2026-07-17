@@ -25,7 +25,9 @@ describe("normalizeOrgRole", () => {
     expect(normalizeOrgRole("owner")).toBe("owner");
     expect(normalizeOrgRole("project_manager")).toBe("project_manager");
     expect(normalizeOrgRole("team_lead")).toBe("team_lead");
+    expect(normalizeOrgRole("editor")).toBe("editor");
     expect(normalizeOrgRole("developer")).toBe("developer");
+    expect(normalizeOrgRole("viewer")).toBe("viewer");
   });
 
   it("falls back to developer for unknown values", () => {
@@ -41,18 +43,22 @@ describe("normalizeOrgRole", () => {
 });
 
 describe("ROLE_LEVEL / roleLevel", () => {
-  it("orders roles owner > project_manager > team_lead > developer", () => {
+  it("orders roles owner > PM > TL > editor > developer > viewer", () => {
     expect(ROLE_LEVEL.owner).toBeGreaterThan(ROLE_LEVEL.project_manager);
     expect(ROLE_LEVEL.project_manager).toBeGreaterThan(ROLE_LEVEL.team_lead);
-    expect(ROLE_LEVEL.team_lead).toBeGreaterThan(ROLE_LEVEL.developer);
+    expect(ROLE_LEVEL.team_lead).toBeGreaterThan(ROLE_LEVEL.editor);
+    expect(ROLE_LEVEL.editor).toBeGreaterThan(ROLE_LEVEL.developer);
+    expect(ROLE_LEVEL.developer).toBeGreaterThan(ROLE_LEVEL.viewer);
   });
 
   it("assigns the documented numeric levels", () => {
     expect(ROLE_LEVEL).toEqual({
-      owner: 4,
-      project_manager: 3,
-      team_lead: 2,
-      developer: 1,
+      owner: 6,
+      project_manager: 5,
+      team_lead: 4,
+      editor: 3,
+      developer: 2,
+      viewer: 1,
     });
   });
 
@@ -69,7 +75,9 @@ describe("ROLE_LEVEL / roleLevel", () => {
       "owner",
       "project_manager",
       "team_lead",
+      "editor",
       "developer",
+      "viewer",
     ]);
     expect(new Set(ORG_ROLES).size).toBe(ORG_ROLES.length);
   });
@@ -87,23 +95,35 @@ describe("assignableRoles", () => {
       "owner",
       "project_manager",
       "team_lead",
+      "editor",
       "developer",
+      "viewer",
     ]);
   });
 
   it("project_manager can assign only roles strictly below them", () => {
     expect(assignableRoles("project_manager")).toEqual([
       "team_lead",
+      "editor",
       "developer",
+      "viewer",
     ]);
   });
 
-  it("team_lead can assign only developer", () => {
-    expect(assignableRoles("team_lead")).toEqual(["developer"]);
+  it("team_lead can assign editor, developer, and viewer", () => {
+    expect(assignableRoles("team_lead")).toEqual([
+      "editor",
+      "developer",
+      "viewer",
+    ]);
   });
 
-  it("developer can assign nothing", () => {
-    expect(assignableRoles("developer")).toEqual([]);
+  it("developer's strictly-below set is viewer only (unreachable in UI — invite requires team_lead+)", () => {
+    expect(assignableRoles("developer")).toEqual(["viewer"]);
+  });
+
+  it("viewer can assign nothing", () => {
+    expect(assignableRoles("viewer")).toEqual([]);
   });
 
   it("legacy admin behaves as owner", () => {
@@ -111,22 +131,24 @@ describe("assignableRoles", () => {
       "owner",
       "project_manager",
       "team_lead",
+      "editor",
       "developer",
+      "viewer",
     ]);
   });
 
   it("legacy member, unknown, null and undefined behave as developer", () => {
-    expect(assignableRoles("member")).toEqual([]);
-    expect(assignableRoles("nonsense")).toEqual([]);
-    expect(assignableRoles(null)).toEqual([]);
-    expect(assignableRoles(undefined)).toEqual([]);
+    expect(assignableRoles("member")).toEqual(["viewer"]);
+    expect(assignableRoles("nonsense")).toEqual(["viewer"]);
+    expect(assignableRoles(null)).toEqual(["viewer"]);
+    expect(assignableRoles(undefined)).toEqual(["viewer"]);
   });
 
   it("returns a fresh array for owners (no shared mutable state)", () => {
     const first = assignableRoles("owner");
     first.pop();
-    expect(assignableRoles("owner")).toHaveLength(4);
-    expect(ORG_ROLES).toHaveLength(4);
+    expect(assignableRoles("owner")).toHaveLength(6);
+    expect(ORG_ROLES).toHaveLength(6);
   });
 });
 
@@ -135,7 +157,9 @@ describe("toLegacyOrgRole", () => {
     ["owner", "admin"],
     ["project_manager", "team_lead"],
     ["team_lead", "team_lead"],
+    ["editor", "member"],
     ["developer", "member"],
+    ["viewer", "member"],
     // Legacy inputs round-trip through normalization first.
     ["admin", "admin"],
     ["member", "member"],
@@ -167,8 +191,13 @@ describe("toLegacyProjectRole", () => {
     }
   });
 
-  it("maps assigned developer to developer", () => {
+  it("maps assigned developer and editor to developer", () => {
     expect(toLegacyProjectRole("developer", true)).toBe("developer");
+    expect(toLegacyProjectRole("editor", true)).toBe("developer");
+  });
+
+  it("maps assigned viewer to viewer", () => {
+    expect(toLegacyProjectRole("viewer", true)).toBe("viewer");
   });
 
   it("maps assigned legacy and unknown roles through normalization", () => {

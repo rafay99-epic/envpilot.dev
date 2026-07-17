@@ -143,15 +143,26 @@ async function buildVariableAccessMap(
       continue;
     }
 
-    // Developers scoped to specific environments never see out-of-scope vars.
+    // Developers/editors/viewers scoped to specific environments never see
+    // out-of-scope vars.
     if (
       projectMembership &&
-      role === "developer" &&
+      (role === "developer" || role === "editor" || role === "viewer") &&
       !isEnvironmentScopeAllowed(
         projectMembership.environments,
         variable.environments
       )
     ) {
+      continue;
+    }
+
+    // Editor: blanket write; viewer: blanket read (mirrors getVariableAccess).
+    if (projectMembership && role === "editor") {
+      accessMap.set(variable._id.toString(), "write");
+      continue;
+    }
+    if (projectMembership && role === "viewer") {
+      accessMap.set(variable._id.toString(), "read");
       continue;
     }
 
@@ -164,10 +175,9 @@ async function buildVariableAccessMap(
       continue;
     }
 
-    accessMap.set(
-      variable._id.toString(),
-      grant.permission === "read" ? "read" : "write"
-    );
+    // LOCKDOWN: grants cap at read — developers are read+request-only
+    // (mirrors getVariableAccess/getAccountAccess).
+    accessMap.set(variable._id.toString(), "read");
   }
 
   return accessMap;
@@ -284,15 +294,26 @@ async function buildAccountAccessMap(
       continue;
     }
 
-    // Developers scoped to specific environments never see out-of-scope accounts.
+    // Developers/editors/viewers scoped to specific environments never see
+    // out-of-scope accounts.
     if (
       projectMembership &&
-      role === "developer" &&
+      (role === "developer" || role === "editor" || role === "viewer") &&
       !isEnvironmentScopeAllowed(
         projectMembership.environments,
         account.environments
       )
     ) {
+      continue;
+    }
+
+    // Editor: blanket write; viewer: blanket read (mirrors getVariableAccess).
+    if (projectMembership && role === "editor") {
+      accessMap.set(account._id.toString(), "write");
+      continue;
+    }
+    if (projectMembership && role === "viewer") {
+      accessMap.set(account._id.toString(), "read");
       continue;
     }
 
@@ -305,10 +326,9 @@ async function buildAccountAccessMap(
       continue;
     }
 
-    accessMap.set(
-      account._id.toString(),
-      grant.permission === "read" ? "read" : "write"
-    );
+    // LOCKDOWN: grants cap at read — developers are read+request-only
+    // (mirrors getVariableAccess/getAccountAccess).
+    accessMap.set(account._id.toString(), "read");
   }
 
   return accessMap;

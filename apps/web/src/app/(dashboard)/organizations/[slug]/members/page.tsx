@@ -40,8 +40,12 @@ function roleBadgeClasses(role: OrgRole): string {
       return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
     case "team_lead":
       return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    case "editor":
+      return "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400";
     case "developer":
       return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
+    case "viewer":
+      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
   }
 }
 
@@ -208,7 +212,10 @@ function OrganizationMembersPageContent({
   // Environment scoping only applies to developer invites with project
   // assignments. All environments checked = unrestricted = send nothing.
   const inviteEnvScopeApplies =
-    inviteRole === "developer" && selectedProjectIds.length > 0;
+    (inviteRole === "developer" ||
+      inviteRole === "editor" ||
+      inviteRole === "viewer") &&
+    selectedProjectIds.length > 0;
 
   function resetInviteForm() {
     setShowInviteModal(false);
