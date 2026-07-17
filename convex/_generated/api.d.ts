@@ -24,6 +24,7 @@ import type * as features_admin_featureRequests from "../features/admin/featureR
 import type * as features_admin_inbox from "../features/admin/inbox.js";
 import type * as features_admin_migrations from "../features/admin/migrations.js";
 import type * as features_admin_organizations from "../features/admin/organizations.js";
+import type * as features_admin_roles from "../features/admin/roles.js";
 import type * as features_admin_settings from "../features/admin/settings.js";
 import type * as features_admin_stats from "../features/admin/stats.js";
 import type * as features_admin_tables from "../features/admin/tables.js";
@@ -142,6 +143,7 @@ declare const fullApi: ApiFromModules<{
   "features/admin/inbox": typeof features_admin_inbox;
   "features/admin/migrations": typeof features_admin_migrations;
   "features/admin/organizations": typeof features_admin_organizations;
+  "features/admin/roles": typeof features_admin_roles;
   "features/admin/settings": typeof features_admin_settings;
   "features/admin/stats": typeof features_admin_stats;
   "features/admin/tables": typeof features_admin_tables;
