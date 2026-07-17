@@ -332,12 +332,15 @@ export const review = mutation({
       createdAt: now,
     });
 
-    // The requester (a developer with no blanket write access) keeps write
-    // access to the variable they requested via an automatic grant.
+    // LOCKDOWN: the requester gets READ on the variable they requested —
+    // enough to see and pull it. Developers never hold write; further
+    // changes go through another request ("request once, edit forever" is
+    // deliberately dead). getVariableAccess additionally caps any legacy
+    // write grant at read.
     await ctx.db.insert("variablePermissions", {
       variableId,
       userId: request.requestedBy,
-      permission: "write",
+      permission: "read",
       grantedBy: actor._id,
       grantedAt: now,
       isActive: true,
