@@ -141,6 +141,8 @@ export interface RequestProjectCandidate {
   role?: string | null;
   assigned?: boolean;
   environmentScope?: string[] | null;
+  /** Resolved capability map (additive server field; absent on older servers). */
+  capabilities?: Record<string, boolean> | null;
 }
 
 /** A resolved request target with the display names the banner/summary need. */
@@ -153,17 +155,39 @@ export interface RequestTarget {
 }
 
 /**
- * A project is request-eligible when the caller is a *developer assigned to it*
- * — owners, project managers, and team leads create variables directly and so
- * never submit requests. The `/api/cli/projects` route only returns assigned
- * projects to non-owners, but we check `assigned` explicitly so a stray
- * unassigned entry can never leak into the picker.
+ * Whether the caller may submit variable requests. Capability-driven when the
+ * server sent a capability map (registry roles, including custom ones);
+ * otherwise falls back to the legacy rule: only developers submit requests
+ * (owners, project managers, and team leads create variables directly).
+ */
+export function canSubmitRequests(input: {
+  capabilities?: Record<string, boolean> | null;
+  role?: string | null;
+}): boolean {
+  if (input.capabilities) {
+    return input.capabilities["project.requests.submit"] === true;
+  }
+  return normalizeOrgRole(input.role) === "developer";
+}
+
+/**
+ * A project is request-eligible when the caller is assigned to it and may
+ * submit requests (see {@link canSubmitRequests}). The `/api/cli/projects`
+ * route only returns assigned projects to non-owners, but we check `assigned`
+ * explicitly so a stray unassigned entry can never leak into the picker.
  */
 export function isRequestEligibleProject(
-  project: Pick<RequestProjectCandidate, "unifiedRole" | "role" | "assigned">
+  project: Pick<
+    RequestProjectCandidate,
+    "unifiedRole" | "role" | "assigned" | "capabilities"
+  >
 ): boolean {
-  const role = normalizeOrgRole(project.unifiedRole ?? project.role);
-  return role === "developer" && project.assigned === true;
+  return (
+    canSubmitRequests({
+      capabilities: project.capabilities,
+      role: project.unifiedRole ?? project.role,
+    }) && project.assigned === true
+  );
 }
 
 /**

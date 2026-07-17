@@ -222,6 +222,8 @@ type PullMeta = {
   hasWriteAccess: boolean;
   scopeRestricted: boolean;
   decryptionFailures?: string[];
+  /** Resolved capability map (additive; absent on older deployments). */
+  capabilities?: Record<string, boolean>;
 };
 type PullValuesResult = { variables: PulledVariableRow[]; meta: PullMeta };
 type PushBulkResult = {
@@ -678,6 +680,7 @@ export class APIClient {
       hasWriteAccess: result.meta.hasWriteAccess,
       scopeRestricted: result.meta.scopeRestricted,
       decryptionFailures: result.meta.decryptionFailures,
+      capabilities: result.meta.capabilities,
     } as unknown as VariablesMeta;
 
     return {

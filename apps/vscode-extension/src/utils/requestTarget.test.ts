@@ -69,6 +69,39 @@ describe("isRequestEligible", () => {
       true
     );
   });
+
+  it("uses capabilities over the role slug when present (custom roles)", () => {
+    // A custom role that may submit requests is eligible…
+    expect(
+      isRequestEligible(
+        project({
+          _id: "p",
+          unifiedRole: "release_captain",
+          capabilities: { "project.requests.submit": true },
+        })
+      )
+    ).toBe(true);
+    // …and a developer whose registry role lost the capability is not.
+    expect(
+      isRequestEligible(
+        project({
+          _id: "p",
+          unifiedRole: "developer",
+          capabilities: { "project.requests.submit": false },
+        })
+      )
+    ).toBe(false);
+    // Explicit non-assignment still wins over the capability.
+    expect(
+      isRequestEligible(
+        project({
+          _id: "p",
+          assigned: false,
+          capabilities: { "project.requests.submit": true },
+        })
+      )
+    ).toBe(false);
+  });
 });
 
 describe("groupProjectsForPicker", () => {

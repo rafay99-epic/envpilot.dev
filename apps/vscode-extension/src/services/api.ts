@@ -93,6 +93,8 @@ interface PullValuesResult {
     decryptionFailures?: string[];
     /** Server-resolved unsync-on-close; absent on older deployments. */
     autoUnsyncOnClose?: boolean;
+    /** Resolved capability map (additive; absent on older deployments). */
+    capabilities?: Record<string, boolean>;
   };
 }
 
@@ -128,6 +130,7 @@ export class ApiService {
       hasWriteAccess?: boolean;
       scopeRestricted?: boolean;
       autoUnsyncOnClose?: boolean;
+      capabilities?: Record<string, boolean>;
     }
   > = new Map();
   /** Short-TTL response cache (one sync fans out to several refreshes). */
@@ -587,6 +590,7 @@ export class ApiService {
           hasWriteAccess?: boolean;
           scopeRestricted?: boolean;
           autoUnsyncOnClose?: boolean;
+          capabilities?: Record<string, boolean>;
         }
       | undefined
   ): void {
@@ -604,6 +608,7 @@ export class ApiService {
         hasWriteAccess: data.hasWriteAccess,
         scopeRestricted: data.scopeRestricted,
         autoUnsyncOnClose: data.autoUnsyncOnClose,
+        capabilities: data.capabilities,
       });
     }
   }
@@ -616,6 +621,7 @@ export class ApiService {
         hasWriteAccess?: boolean;
         scopeRestricted?: boolean;
         autoUnsyncOnClose?: boolean;
+        capabilities?: Record<string, boolean>;
       }
     | undefined {
     return this.accessMetaCache.get(projectId);

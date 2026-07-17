@@ -1066,6 +1066,29 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
   },
 
   // ============================================================
+  // v1.48.0 — Role Registry (2026-07-18)
+  // ============================================================
+  {
+    title: "A New Role System: Roles Managed from the Platform",
+    version: "v1.48.0",
+    type: "feature",
+    publishedAt: ts("2026-07-18T10:00:00Z"),
+    content: `Roles are now managed from the platform itself — no more fixed role list baked into the apps.
+
+### Roles, Managed from the Platform
+- Roles live in a registry on the platform, so what each role can do is defined in one place and applied everywhere
+- Two new roles are available out of the box: **Editor** (writes variables without managing the team) and **Viewer** (read-only access)
+
+### Capability-Based Permissions Everywhere
+- Permissions are now capability-based across the web app, CLI, and VS Code extension — every surface asks "what can this role do" instead of hardcoding role names
+- The CLI and extension understand any role, including ones added in the future: file protection, variable requests, and command gating all follow the role's actual capabilities
+
+### No Action Needed
+- Existing users and their roles carry over exactly as they are — Owner, Project Manager, Team Lead, and Developer behave the same as before
+- Older CLI and extension versions keep working unchanged`,
+  },
+
+  // ============================================================
   // v1.46.0 — VS Code Unsync-on-Close (2026-07-17)
   // ============================================================
   {

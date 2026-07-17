@@ -78,6 +78,8 @@ export const projectSchema = z.object({
   unifiedRole: z.string().nullable().optional(),
   assigned: z.boolean().optional(),
   environmentScope: z.array(z.string()).nullable().optional(),
+  // Resolved capability map (additive; absent on older deployments).
+  capabilities: z.record(z.string(), z.boolean()).nullable().optional(),
 });
 
 export type Project = z.infer<typeof projectSchema>;
@@ -126,6 +128,8 @@ export const variablesMetaSchema = z
     environmentScope: z.array(z.string()).nullable().optional(),
     hasWriteAccess: z.boolean().optional(),
     scopeRestricted: z.boolean().optional(),
+    // Resolved capability map (additive; absent on older deployments).
+    capabilities: z.record(z.string(), z.boolean()).optional(),
   })
   .passthrough();
 
