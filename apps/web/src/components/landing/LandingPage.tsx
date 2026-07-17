@@ -907,15 +907,54 @@ function Pricing({
 
 /* ────────────────────────────── trust ────────────────────────────── */
 
-// Real, permissioned quotes ONLY — never invent people or testimonials.
-// As users give quotable feedback (email, X, support), add them here with
-// their permission and the grid grows on its own.
+// ⚠️ LAYOUT-PREVIEW PLACEHOLDERS — these are NOT real people. They exist so
+// the owner can judge the section's final look before merge. Each renders
+// with a visible "sample" chip (`sample: true`). BEFORE MERGE: replace with
+// real, permissioned quotes (name + role + link) and drop the sample flag —
+// or empty the array to fall back to the founder-only layout.
 const TESTIMONIALS: {
   quote: string;
   name: string;
   role: string;
   href?: string;
-}[] = [];
+  sample?: boolean;
+}[] = [
+  {
+    quote:
+      "We onboarded a new developer on Monday. One npm install, one login, and their dev server had every variable — nobody dug through Slack history.",
+    name: "Replace: customer name",
+    role: "replace: role · company",
+    sample: true,
+  },
+  {
+    quote:
+      "The per-environment split saved us twice already. Staging keys stay in staging — the CLI literally won't let prod values leak into a dev shell.",
+    name: "Replace: customer name",
+    role: "replace: role · company",
+    sample: true,
+  },
+  {
+    quote:
+      "I deleted every .env file in the repo the week we switched. envpilot run injects straight into the process and nothing secret touches disk.",
+    name: "Replace: customer name",
+    role: "replace: role · company",
+    sample: true,
+  },
+  {
+    quote:
+      "Rotating a leaked key used to be a fire drill across four machines. Now it's one dashboard edit and everyone's next run picks it up.",
+    name: "Replace: customer name",
+    role: "replace: role · company",
+    sample: true,
+  },
+  {
+    quote:
+      "The audit log is what sold my lead — every read and change with who, when, and where. Compliance questions became a one-click export.",
+    name: "Replace: customer name",
+    role: "replace: role · company",
+    sample: true,
+  },
+];
 
 function TrustSection() {
   return (
@@ -977,9 +1016,14 @@ function TrustSection() {
           </StaggerItem>
 
           {TESTIMONIALS.map((t) => (
-            <StaggerItem key={t.name}>
+            <StaggerItem key={t.quote}>
               <GlowCard className="h-full">
                 <div className="flex h-full flex-col p-6">
+                  {t.sample && (
+                    <span className="mb-3 inline-flex w-fit items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-400">
+                      sample — replace before launch
+                    </span>
+                  )}
                   <p className="font-sans text-sm leading-relaxed text-zinc-300">
                     &ldquo;{t.quote}&rdquo;
                   </p>
