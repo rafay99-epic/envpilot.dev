@@ -13,6 +13,7 @@ export function verifyAdmin(secret: string) {
 
 export const BROWSABLE_TABLES = [
   "users",
+  "roleRegistry",
   "userPreferences",
   "organizations",
   "organizationMembers",
