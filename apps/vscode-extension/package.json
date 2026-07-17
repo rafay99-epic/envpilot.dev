@@ -5,7 +5,7 @@
   "version": "1.15.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "homepage": "https://www.envpilot.dev",
   "repository": {
     "type": "git",
