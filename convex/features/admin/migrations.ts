@@ -3,7 +3,7 @@ import { query, mutation } from "../../_generated/server";
 import { normalizeOrgRole } from "../../lib/authz";
 import { SEED_CHANGELOG } from "../community/changelog/seed";
 import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
-import { SEED_FEATURES } from "../../lib/seedData";
+import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
 import { verifyAdmin } from "./auth";
 
 export const listMigrations = query({
@@ -36,6 +36,24 @@ export const listMigrations = query({
           "Seeds or updates default 'free' and 'pro' tier definitions (upsert). Safe to run multiple times — updates existing tiers with latest pricing and display fields.",
         category: "Feature & Tier System",
         priority: 3,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "seed-role-registry",
+        description:
+          "Seeds the role registry from SEED_ROLES: system roles (owner/project_manager/team_lead/developer) get their capability matrices synced from code truth; seeded custom roles (editor/viewer) are inserted only if absent so admin-panel edits survive. Idempotent.",
+        category: "Feature & Tier System",
+        priority: 4,
+        destructive: false,
+        runOnce: false,
+      },
+      {
+        name: "migrate-roles",
+        description:
+          "Role-registry migration: normalizes surviving legacy role values (admin→owner, member→developer) on organizationMembers and pending invitations, then VERIFIES every stored role slug resolves in the registry. Reports anomalies without changing them. Idempotent.",
+        category: "Feature & Tier System",
+        priority: 5,
         destructive: false,
         runOnce: false,
       },
@@ -294,6 +312,147 @@ export const runMigration = mutation({
         migrated: created,
         updated,
         skipped,
+      };
+    }
+
+    if (args.name === "seed-role-registry") {
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      const now = Date.now();
+
+      for (const role of SEED_ROLES) {
+        const existing = await ctx.db
+          .query("roleRegistry")
+          .withIndex("by_slug", (q: any) => q.eq("slug", role.slug))
+          .first();
+
+        if (existing) {
+          if (role.isSystem) {
+            // System roles: code is the source of truth for the capability
+            // matrix, level, and metadata — sync drift on every run.
+            const capsChanged =
+              JSON.stringify(existing.capabilities) !==
+              JSON.stringify(role.capabilities);
+            const needsUpdate =
+              capsChanged ||
+              existing.displayName !== role.displayName ||
+              existing.description !== role.description ||
+              existing.color !== role.color ||
+              existing.level !== role.level ||
+              existing.isSystem !== true ||
+              existing.sortOrder !== role.sortOrder;
+            if (needsUpdate) {
+              await ctx.db.patch(existing._id, {
+                displayName: role.displayName,
+                description: role.description,
+                color: role.color,
+                level: role.level,
+                isSystem: true,
+                sortOrder: role.sortOrder,
+                capabilities: role.capabilities as Record<string, boolean>,
+                updatedAt: now,
+              });
+              updated++;
+            } else {
+              skipped++;
+            }
+          } else {
+            // Seeded custom roles (editor/viewer): insert-only — the admin
+            // panel owns them after the first seed.
+            skipped++;
+          }
+          continue;
+        }
+
+        await ctx.db.insert("roleRegistry", {
+          slug: role.slug,
+          displayName: role.displayName,
+          description: role.description,
+          color: role.color,
+          level: role.level,
+          isSystem: role.isSystem,
+          isActive: true,
+          sortOrder: role.sortOrder,
+          capabilities: role.capabilities as Record<string, boolean>,
+          createdAt: now,
+          updatedAt: now,
+        });
+        created++;
+      }
+
+      return {
+        success: true,
+        created,
+        updated,
+        skipped,
+        total: SEED_ROLES.length,
+      };
+    }
+
+    if (args.name === "migrate-roles") {
+      const now = Date.now();
+      let normalizedMembers = 0;
+      let normalizedInvitations = 0;
+      const anomalies: string[] = [];
+
+      // Registry slugs for verification
+      const registryRows = await ctx.db.query("roleRegistry").collect();
+      const activeSlugs = new Set(
+        registryRows.filter((r: any) => r.isActive).map((r: any) => r.slug)
+      );
+      if (activeSlugs.size === 0) {
+        return {
+          success: false,
+          error:
+            "Role registry is empty — run seed-role-registry before migrate-roles.",
+        };
+      }
+
+      const LEGACY_MAP: Record<string, string> = {
+        admin: "owner",
+        member: "developer",
+      };
+
+      const members = await ctx.db.query("organizationMembers").collect();
+      for (const m of members) {
+        const mapped = LEGACY_MAP[m.role];
+        if (mapped) {
+          await ctx.db.patch(m._id, { role: mapped });
+          normalizedMembers++;
+          continue;
+        }
+        if (!activeSlugs.has(m.role)) {
+          anomalies.push(
+            `organizationMembers ${m._id}: unknown role slug "${m.role}"`
+          );
+        }
+      }
+
+      const invitations = await ctx.db.query("invitations").collect();
+      for (const inv of invitations) {
+        if (inv.status !== "pending") continue;
+        const mapped = LEGACY_MAP[inv.role];
+        if (mapped) {
+          await ctx.db.patch(inv._id, { role: mapped });
+          normalizedInvitations++;
+          continue;
+        }
+        if (!activeSlugs.has(inv.role)) {
+          anomalies.push(
+            `invitations ${inv._id}: unknown role slug "${inv.role}"`
+          );
+        }
+      }
+
+      // Anomalies are REPORTED, never auto-fixed: an unknown slug means a
+      // member is fail-closed (zero capabilities) until a human decides.
+      return {
+        success: true,
+        normalizedMembers,
+        normalizedInvitations,
+        anomalies,
+        verifiedAt: now,
       };
     }
 
