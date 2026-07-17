@@ -46,13 +46,15 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
 
   const orgRole = normalizeOrgRole(organization?.role);
   const hasOrgRole = !!organization?.role;
-  // LOCKDOWN (R1): developers are read+request-only — direct creation is
-  // team lead and above; developers submit account requests instead.
-  const canCreate = hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
+  // LOCKDOWN: developers are read+request-only — direct creation is editor
+  // and above (editors write, never manage); developers submit account
+  // requests instead; viewers can do neither.
+  const canCreate = hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.editor;
   const canRequest = hasOrgRole && orgRole === "developer";
   const canUpdate = canCreate;
   const canDelete = canUpdate;
-  const canManagePermissions = canUpdate;
+  const canManagePermissions =
+    hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
 
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
