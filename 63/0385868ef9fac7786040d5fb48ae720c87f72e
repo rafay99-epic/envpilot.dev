@@ -1,0 +1,29 @@
+CLAUDE.md
+  s_c0d41f513c83f7::t_95e257cc6e7214 309-312
+apps/web/package.json
+  s_c0d41f513c83f7::t_28c94c240c7f02 3
+apps/web/src/lib/versions.ts
+  s_c0d41f513c83f7::t_6c5a16c1381a76 17,20-27
+convex/README.md
+  s_c0d41f513c83f7::t_e46bf5b83e2565 52,54-64
+convex/features/community/changelog/seed.ts
+  s_c0d41f513c83f7::t_9f5498d7b45df0 1068-1088
+package.json
+  s_c0d41f513c83f7::t_4111535969bcd3 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "630385868ef9fac7786040d5fb48ae720c87f72e",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
