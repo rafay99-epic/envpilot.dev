@@ -1,0 +1,25 @@
+apps/cli/src/lib/roles.ts
+  s_fbe516e86d6234::t_5f84f6c6b2ada2 3-6,12-18,24-29,36,38,51,53,95-98,110,112
+apps/cli/src/lib/ui.ts
+  s_fbe516e86d6234::t_7500799d7cc70b 204-205,208-209,216-218,224
+apps/cli/tests/roles.test.ts
+  s_fbe516e86d6234::t_ab760d1a6d513d 25,27,41-47,55-57,76,78,104,106,149-169
+apps/vscode-extension/src/roles.ts
+  s_fbe516e86d6234::t_ce827ee751a8af 4-7,13-19,31-36,43,45,58,60,103-106,115,117,125-127,129-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "fae258ac51b27c9bce1707d4aea243cc855d2243",
+  "prompts": {},
+  "sessions": {
+    "s_fbe516e86d6234": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8e1f4a491b809a93",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
