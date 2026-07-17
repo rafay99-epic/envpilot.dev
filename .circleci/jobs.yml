@@ -423,7 +423,12 @@ jobs:
           environment:
             ENVPILOT_SERVER_URL: https://www.envpilot.dev
             SENTRY_EXTENSION_DSN: https://24f72269c7fbd01271c7df8c6bd50744@o4509762173009920.ingest.de.sentry.io/4511055962505296
-          command: bunx @vscode/vsce package --no-dependencies
+          # Build in THIS shell (env provably present — same pattern as the
+          # CLI job), then package with the rebuild skipped: the env did not
+          # reliably reach the build when vsce re-ran it via nested npm.
+          command: |
+            bun run package
+            EXT_PREBUILT=1 bunx @vscode/vsce package --no-dependencies
       - run:
           name: Verify credentials embedded in the packaged VSIX
           working_directory: apps/vscode-extension
