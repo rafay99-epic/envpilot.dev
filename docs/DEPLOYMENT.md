@@ -2,21 +2,22 @@
 
 ## Overview
 
-Envpilot deploys to multiple platforms. The **CircleCI** pipeline
-(`.circleci/config.yml` + `.circleci/jobs.yml`) handles all deployments on push
-to `main` — see [CI docs](ci.md) for how the workflow is generated. Deploy jobs
-run only on `main`, backend first (clients require `deploy-convex`).
+Envpilot deploys to multiple platforms. The **GitHub Actions** pipeline
+(`.github/workflows/ci.yml` + `deploy-*.yml`) handles all deployments on push
+to `main` — see [CI docs](ci.md) for how the workflow is built. Deploy jobs
+run only on `main`, backend first (clients require `deploy-convex`). The old
+CircleCI config is retained, disabled, at `.circleci/config.yml.old`.
 
-| Component                 | Platform                        | Trigger                                        |
-| ------------------------- | ------------------------------- | ---------------------------------------------- |
-| Web / Blog / Docs / Admin | Vercel (`vercel deploy --prod`) | CircleCI `deploy-*` job when the app changed   |
-| Convex Backend            | Convex Cloud                    | CircleCI detects `convex/` changes             |
-| VS Code Extension         | Open VSX                        | CircleCI `publish-extension` on a version bump |
-| CLI                       | npm Registry                    | CircleCI `publish-cli` on a version bump       |
-| GitHub Action             | public `envpilot-action` repo   | CircleCI `publish-action` on a version bump    |
+| Component                 | Platform                        | Trigger                                              |
+| ------------------------- | ------------------------------- | ---------------------------------------------------- |
+| Web / Blog / Docs / Admin | Vercel (`vercel deploy --prod`) | GitHub Actions `deploy-*` job when the app changed   |
+| Convex Backend            | Convex Cloud                    | GitHub Actions detects `convex/` changes             |
+| VS Code Extension         | Open VSX                        | GitHub Actions `publish-extension` on a version bump |
+| CLI                       | npm Registry                    | GitHub Actions `publish-cli` on a version bump       |
+| GitHub Action             | public `envpilot-action` repo   | GitHub Actions `publish-action` on a version bump    |
 
 > Vercel's own git integration (including previews) is **disabled** in every
-> app's `vercel.json` — prod deploys happen only through the CircleCI jobs,
+> app's `vercel.json` — prod deploys happen only through the GitHub Actions jobs,
 > which run `vercel deploy --prod` on Vercel infra.
 
 ## Web App (Vercel)
@@ -49,7 +50,7 @@ Set these in Vercel's project settings:
 
 ### Deploy
 
-Production deploys run through the CircleCI `deploy-web` job (`vercel deploy
+Production deploys run through the GitHub Actions `deploy-web` job (`vercel deploy
 --prod`) — Vercel's git integration is disabled, so pushes do not auto-deploy.
 The blog, docs, and admin apps deploy the same way via their own `deploy-*`
 jobs. For a manual deploy:
@@ -156,19 +157,20 @@ After installation (`bun install -g @envpilot/cli`), the CLI is available as `en
 
 ## CI/CD
 
-The CircleCI pipeline (`.circleci/config.yml` + `.circleci/jobs.yml`) handles
-everything on push to `main`:
+The GitHub Actions pipeline (`.github/workflows/ci.yml` + `deploy-*.yml`)
+handles everything on push to `main`:
 
 ```
 quality → per-surface build → deploy-convex → publish-cli / publish-extension /
 publish-action → deploy-homebrew → deploy-web / -blog / -docs / -admin → release
 ```
 
-See [CI docs](ci.md) for how the workflow is generated and for the dormant
-GitHub Actions files.
+See [CI docs](ci.md) for how the pipeline is built, the required secrets, and
+how to run on CircleCI instead (its config is retained, disabled, at
+`.circleci/config.yml.old`).
 
-Publish/deploy credentials are stored as **CircleCI project environment
-variables** (Convex deploy key, npm token, Open VSX token, Vercel token, the
+Publish/deploy credentials are stored as **GitHub repository secrets** (Convex
+deploy key, npm token, Open VSX token, Vercel token/project ids, the
 `ACTION_PUBLISH_TOKEN` for the public action repo, Homebrew tap token).
 
 ## Monitoring
