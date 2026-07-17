@@ -1,0 +1,53 @@
+apps/web/src/components/auth/require-role.tsx
+  s_c0d41f513c83f7::t_69efea3f820e71 27-31,33
+convex/features/accounts/queries.ts
+  s_c0d41f513c83f7::t_fe94b1a1caff40 125
+convex/features/admin/roles.ts
+  s_c0d41f513c83f7::t_601eaa19cb4b13 7-14,85-98,140-149
+convex/features/api/keys.ts
+  s_c0d41f513c83f7::t_b0931411abee5b 1,13,91-100,142-151
+convex/features/emails/emails.ts
+  s_c0d41f513c83f7::t_ad7a6f3acb1371 530-532
+convex/features/organizations/invitations.ts
+  s_c0d41f513c83f7::t_f2fca81a8a2340 11,14,17,328-329,333,335-336
+convex/features/organizations/queries.ts
+  s_c0d41f513c83f7::t_0ae914c2966894 5-10,135-137,141-159
+convex/features/permissions/accountPermissions/mutations.ts
+  s_c0d41f513c83f7::t_c6a06320f9a081 14-16,80-82
+convex/features/permissions/accountPermissions/queries.ts
+  s_c0d41f513c83f7::t_fdbea26030a8bf 7,251-261
+convex/features/permissions/variablePermissions/queries.ts
+  s_c0d41f513c83f7::t_d3cd5360eb9223 8,452-462
+convex/features/projects/members.ts
+  s_c0d41f513c83f7::t_a4b642e54e669e 7-8,11,151-172,174-185
+convex/features/projects/templates.ts
+  s_c0d41f513c83f7::t_5b38fa445acd93 289-290
+convex/features/sharing/mutations.ts
+  s_c0d41f513c83f7::t_7f61484cf80ebe 14,67-80
+convex/features/variables/helpers.ts
+  s_c0d41f513c83f7::t_c2d4169e6a117a 143
+convex/features/variables/queries.ts
+  s_c0d41f513c83f7::t_8b40bd73be2d7e 305
+convex/features/variables/requests/queries.ts
+  s_c0d41f513c83f7::t_393ecd24ff0bc2 315-316,320
+convex/lib/authz.ts
+  s_c0d41f513c83f7::t_990c50a94ae738 86-89,162-185,245-246,691-695,707-710
+convex/lib/roleProfiles.ts
+  s_c0d41f513c83f7::t_b44d5b14bb78de 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "97defad914461f72e9be6a722187c37d0db5f50f",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
