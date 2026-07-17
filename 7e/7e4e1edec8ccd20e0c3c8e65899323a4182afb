@@ -1,0 +1,27 @@
+convex/features/accounts/mutations.ts
+  s_c0d41f513c83f7::t_16d7005b7d417d 66,130-133
+convex/features/sharing/mutations.ts
+  s_c0d41f513c83f7::t_8280c5e3edcd65 14-15,68-80
+convex/features/variables/mutations.ts
+  s_c0d41f513c83f7::t_55127f148a03fb 57-59,220-224
+convex/features/variables/requests/mutations.ts
+  s_c0d41f513c83f7::t_1a01fb0c3abd57 335-339,343
+convex/lib/authz.ts
+  s_c0d41f513c83f7::t_889a9189ad530a 114-118,124-126,608-612,724-726
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7e7e4e1edec8ccd20e0c3c8e65899323a4182afb",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
