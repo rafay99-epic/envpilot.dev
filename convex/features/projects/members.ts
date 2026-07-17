@@ -3,13 +3,12 @@ import { mutation, query, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import {
-  assertProjectAction,
   assertCanManageUserAsync,
-  normalizeOrgRole,
-  roleLevel,
+  assertProjectAction,
+  bypassesAssignment,
   getRoleProfile,
   hasCapability,
-  bypassesAssignment,
+  normalizeOrgRole,
 } from "../../lib/authz";
 
 /**
@@ -149,30 +148,41 @@ export const getAssignableOrgMembers = query({
       existingProjectMembers.map((m) => m.userId.toString())
     );
 
-    // Filter: exclude owners (implicit access), already-assigned, self, and
-    // anyone at or above the requester's role (hierarchy: you may only assign
-    // users strictly below your own role)
+    // Filter: exclude owner-class members (implicit access), already-
+    // assigned, self, and anyone at or above the requester's level
+    // (hierarchy: you may only assign users strictly below your own role).
+    // Levels resolve through the registry (memoized per slug) so custom
+    // roles rank correctly instead of scoring 0.
+    const requesterProfile = await getRoleProfile(ctx, requesterRole);
+    const levelMemo = new Map<string, number>();
+    const bypassMemo = new Map<string, boolean>();
+    const prefiltered: typeof allOrgMembers = [];
+    for (const member of allOrgMembers) {
+      const slug = normalizeOrgRole(member.role);
+      if (!levelMemo.has(slug)) {
+        const p = await getRoleProfile(ctx, slug);
+        levelMemo.set(slug, p.level);
+        bypassMemo.set(slug, bypassesAssignment(p));
+      }
+      if (bypassMemo.get(slug)) continue;
+      if (assignedUserIds.has(member.userId.toString())) continue;
+      if (member.userId === actor._id) continue;
+      if ((levelMemo.get(slug) ?? 0) >= requesterProfile.level) continue;
+      prefiltered.push(member);
+    }
     const assignable = await Promise.all(
-      allOrgMembers
-        .filter((member) => {
-          if (normalizeOrgRole(member.role) === "owner") return false;
-          if (assignedUserIds.has(member.userId.toString())) return false;
-          if (member.userId === actor._id) return false;
-          if (roleLevel(member.role) >= roleLevel(requesterRole)) return false;
-          return true;
-        })
-        .map(async (member) => {
-          const user = await ctx.db.get(member.userId);
-          return user
-            ? {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-                avatarUrl: user.avatarUrl,
-                orgRole: normalizeOrgRole(member.role),
-              }
-            : null;
-        })
+      prefiltered.map(async (member) => {
+        const user = await ctx.db.get(member.userId);
+        return user
+          ? {
+              _id: user._id,
+              email: user.email,
+              name: user.name,
+              avatarUrl: user.avatarUrl,
+              orgRole: normalizeOrgRole(member.role),
+            }
+          : null;
+      })
     );
 
     return assignable.filter(Boolean);

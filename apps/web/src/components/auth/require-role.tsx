@@ -24,11 +24,13 @@ export function useRequireRole(minimum: OrgRole): {
   isLoading: boolean;
   allowed: boolean;
 } {
-  const { organization, isLoading } = useAuthContext();
+  const { organization, roleMeta, isLoading } = useAuthContext();
+  // Prefer the server-resolved registry level (covers custom roles); the
+  // static map only knows seeded slugs and scores custom roles 0, which
+  // would lock them out of every gated page.
+  const effectiveLevel = roleMeta?.level ?? roleLevel(organization?.role ?? "");
   const allowed =
-    !isLoading &&
-    !!organization &&
-    roleLevel(organization.role) >= ROLE_LEVEL[minimum];
+    !isLoading && !!organization && effectiveLevel >= ROLE_LEVEL[minimum];
   return { isLoading, allowed };
 }
 

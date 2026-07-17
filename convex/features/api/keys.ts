@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import {
   action,
   internalMutation,
@@ -10,7 +10,7 @@ import { internal } from "../../_generated/api";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
-import { assertOrgMembership } from "../../lib/authz";
+import { assertOrgMembership, hasCapability } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 
 /**
@@ -88,7 +88,16 @@ async function assertCanManageKey(
   key: Doc<"apiKeys">
 ): Promise<void> {
   if (key.scopeProjects === "all") {
-    await assertOrgMembership(ctx, userId, key.organizationId, "owner");
+    const { profile: keyManagerProfile } = await assertOrgMembership(
+      ctx,
+      userId,
+      key.organizationId
+    );
+    if (!hasCapability(keyManagerProfile, "org.api_keys")) {
+      throw new ConvexError(
+        "Managing API keys requires the API-keys capability (owner by default)."
+      );
+    }
     return;
   }
   for (const projectId of key.scopeProjects) {
@@ -130,7 +139,16 @@ export const _store = internalMutation({
     if (args.scopeProjects === "all") {
       // Org-wide scope grants read access to every current AND future
       // project in the org — an owner-only power (⚖️ PLAN §1).
-      await assertOrgMembership(ctx, actor._id, args.organizationId, "owner");
+      const { profile: keyManagerProfile } = await assertOrgMembership(
+        ctx,
+        actor._id,
+        args.organizationId
+      );
+      if (!hasCapability(keyManagerProfile, "org.api_keys")) {
+        throw new ConvexError(
+          "Managing API keys requires the API-keys capability (owner by default)."
+        );
+      }
     } else {
       if (args.scopeProjects.length === 0) {
         throw new Error('Key must be scoped to at least one project, or "all"');

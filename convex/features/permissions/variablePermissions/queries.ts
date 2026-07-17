@@ -5,8 +5,8 @@ import { requireAuthedUser } from "../../../lib/identity";
 import { batchGetUsers, userInfo } from "../../../lib/users";
 import {
   assertProjectAction,
+  filterMembersStrictlyBelow,
   normalizeOrgRole,
-  roleLevel,
   type OrgRole,
 } from "../../../lib/authz";
 
@@ -449,18 +449,17 @@ export const getAssignableMembers = query({
       projectMembers.map((pm) => pm.userId.toString())
     );
 
-    const eligibleMembers = orgMembers.filter((member) => {
-      if (member.userId === actor._id) return false;
-      if (usersWithPermissions.has(member.userId.toString())) return false;
-      // Owners can grant to anyone; everyone else only strictly below their level
-      if (
-        requesterRole !== "owner" &&
-        roleLevel(member.role) >= roleLevel(requesterRole)
-      ) {
-        return false;
-      }
-      return true;
-    });
+    // Owner-class grants to anyone; everyone else only strictly below their
+    // registry-resolved level (custom roles rank correctly).
+    const eligibleMembers = await filterMembersStrictlyBelow(
+      ctx,
+      requesterRole,
+      orgMembers.filter((member) => {
+        if (member.userId === actor._id) return false;
+        if (usersWithPermissions.has(member.userId.toString())) return false;
+        return true;
+      })
+    );
 
     // Batch fetch every eligible user in one pass instead of one ctx.db.get
     // per member (getAssignableMembers N+1).

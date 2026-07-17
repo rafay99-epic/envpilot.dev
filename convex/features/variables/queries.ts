@@ -302,7 +302,7 @@ export const listOrgVariablesWithAccessPaginated = query({
     const canManagePermissions =
       isOwner ||
       (assigned && hasCapability(profile, "project.permissions.manage"));
-    const projectRole = profileToLegacyProjectRole(profile, true);
+    const projectRole = profileToLegacyProjectRole(profile, assigned);
 
     // Prefetch the caller's active grants ONCE (only developers consult them).
     const grantByVariable = buildActiveGrantMap(

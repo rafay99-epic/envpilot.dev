@@ -140,7 +140,7 @@ export async function resolveProjectAccessContext(
   const canManagePermissions =
     isOwner ||
     (assigned && hasCapability(profile, "project.permissions.manage"));
-  const projectRole = profileToLegacyProjectRole(profile, assigned || isOwner);
+  const projectRole = profileToLegacyProjectRole(profile, assigned);
 
   // Prefetch the caller's active grants ONCE instead of one indexed query
   // per variable (getActiveVariableGrant N+1). by_user_active already

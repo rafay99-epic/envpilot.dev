@@ -286,7 +286,8 @@ export const create = mutation({
     const { profile: templateProfile } = await assertOrgMembership(
       ctx,
       args.createdBy,
-      args.organizationId
+      args.organizationId,
+      "team_lead"
     );
     if (!hasCapability(templateProfile, "project.templates.manage")) {
       throw new ConvexError(

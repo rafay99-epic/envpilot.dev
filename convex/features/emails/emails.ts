@@ -4,7 +4,6 @@ import { action, internalAction } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { roleLevel, ROLE_LEVEL } from "../../lib/authz";
 import {
   CODE_STYLE,
   emailWrapper,
@@ -528,13 +527,9 @@ export const sendRotationReminderEmail = internalAction({
 
     for (const member of members) {
       if (!member?.user?.email) continue;
-      // Only notify roles holding the notify.variable_changes capability
-      // (owner/PM/TL by default) — they can act on rotation. Sync fallback:
-      // ROLE_LEVEL covers seeded slugs; unknown custom slugs resolve to 0 and
-      // are skipped (fail-closed, no email). Actions have no ctx.db, so the
-      // registry-resolved profile isn't reachable here; the seeded-notify
-      // floor and the level floor coincide for every seeded role.
-      if (roleLevel(member.role) < ROLE_LEVEL.team_lead) continue;
+      // Only notify roles holding notify.variable_changes — resolved by
+      // getMembersInternal (registry-aware, custom roles included).
+      if (!member.notifyVariableChanges) continue;
 
       // Check rotation reminder preference (defaults to true via DEFAULT_NOTIFICATIONS)
       const prefs = await ctx.runQuery(

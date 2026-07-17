@@ -8,12 +8,13 @@ import { rateLimiter } from "../../lib/rateLimits";
 import { isCronPaused } from "../billing/tierLimits";
 import { batchGetUsers } from "../../lib/users";
 import {
+  assertCanAssignRoleAsync,
   assertOrgAction,
   assertOrgMembership,
-  assertCanAssignRoleAsync,
-  normalizeOrgRole,
+  bypassesAssignment,
   getRoleProfile,
   hasCapability,
+  normalizeOrgRole,
 } from "../../lib/authz";
 import { requireAuthedUser, getAuthedUser } from "../../lib/identity";
 import { voidTombstones } from "./tombstones";
@@ -324,15 +325,15 @@ export const accept = mutation({
     await voidTombstones(ctx, invitation.organizationId, actor._id);
 
     // Create project assignments if projects were specified in the invitation.
-    // Owners have implicit access to every project, so no assignments needed.
+    // Owner-class roles have implicit access to every project — no assignments.
+    const invitedProfile = await getRoleProfile(ctx, invitedRole);
     if (
       invitation.projectIds &&
       invitation.projectIds.length > 0 &&
-      invitedRole !== "owner"
+      !bypassesAssignment(invitedProfile)
     ) {
-      // Environment scope only constrains developers — owners, PMs, and team
-      // leads are always unrestricted, so a scope on the invitation is ignored
-      const invitedProfile = await getRoleProfile(ctx, invitedRole);
+      // Environment scope only constrains env-scopeable roles — everyone
+      // else is always unrestricted, so a scope on the invitation is ignored
       const environmentScope = hasCapability(
         invitedProfile,
         "access.env_scoped"

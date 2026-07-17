@@ -4,6 +4,14 @@ import { verifyAdmin } from "./auth";
 import { CAPABILITIES, CAPABILITY_KEYS } from "../../lib/capabilities";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{1,30}$/;
+// Legacy values normalizeOrgRole rewrites BEFORE registry lookup — a custom
+// role with one of these slugs would silently resolve to another profile
+// (admin → the full OWNER profile). Never allow them as custom slugs.
+const RESERVED_SLUGS = new Set(["admin", "member"]);
+// Custom-role hierarchy bounds: strictly below owner (100) and above the
+// fail-closed 0 so the owner can always manage every assignable role.
+const MIN_CUSTOM_LEVEL = 1;
+const MAX_CUSTOM_LEVEL = 99;
 
 function validateCapabilityKeys(capabilities: Record<string, boolean>) {
   const unknown = Object.keys(capabilities).filter(
@@ -74,6 +82,20 @@ export const createRole = mutation({
         "Slug must start with a letter and contain only lowercase letters, digits, and underscores (2-31 chars)"
       );
     }
+    if (RESERVED_SLUGS.has(args.slug)) {
+      throw new ConvexError(
+        `"${args.slug}" is a reserved legacy slug and cannot be used for a custom role.`
+      );
+    }
+    if (
+      args.level < MIN_CUSTOM_LEVEL ||
+      args.level > MAX_CUSTOM_LEVEL ||
+      !Number.isInteger(args.level)
+    ) {
+      throw new ConvexError(
+        `Role level must be an integer between ${MIN_CUSTOM_LEVEL} and ${MAX_CUSTOM_LEVEL} (owner is always 100).`
+      );
+    }
     const existing = await ctx.db
       .query("roleRegistry")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
@@ -115,6 +137,16 @@ export const updateRoleMeta = mutation({
     level: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (
+      args.level !== undefined &&
+      (args.level < MIN_CUSTOM_LEVEL ||
+        args.level > MAX_CUSTOM_LEVEL ||
+        !Number.isInteger(args.level))
+    ) {
+      throw new ConvexError(
+        `Role level must be an integer between ${MIN_CUSTOM_LEVEL} and ${MAX_CUSTOM_LEVEL} (owner is always 100).`
+      );
+    }
     verifyAdmin(args.secret);
     const role = await ctx.db.get(args.roleId);
     if (!role) throw new ConvexError("Role not found");

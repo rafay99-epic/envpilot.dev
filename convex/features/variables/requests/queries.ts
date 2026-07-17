@@ -312,12 +312,12 @@ export const listForReviewer = query({
       .order("desc")
       .take(100);
 
-    // Reviewer scoping. Owners see every org request. project_manager /
-    // team_lead only see requests from projects they are ASSIGNED to. Fetch
+    // Reviewer scoping. The owner class sees every org request; every other
+    // reviewer only sees requests from projects they are ASSIGNED to. Fetch
     // the caller's project memberships ONCE and build a Set of allowed
     // projectIds, then filter in memory — NOT one assertProjectAction per row.
     let scopedRequests = requests;
-    if (membership.role !== "owner") {
+    if (!bypassesAssignment(reviewerProfile)) {
       const memberships = await ctx.db
         .query("projectMembers")
         .withIndex("by_user", (q) => q.eq("userId", actor._id))

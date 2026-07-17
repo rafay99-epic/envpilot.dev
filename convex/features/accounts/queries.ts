@@ -122,10 +122,7 @@ export const listWithAccess = query({
     const canManagePermissions =
       isOwner ||
       (assigned && hasCapability(profile, "project.permissions.manage"));
-    const projectRole = profileToLegacyProjectRole(
-      profile,
-      assigned || isOwner
-    );
+    const projectRole = profileToLegacyProjectRole(profile, assigned);
 
     const allAccounts = await ctx.db
       .query("projectAccounts")

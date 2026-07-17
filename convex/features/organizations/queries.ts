@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import { query, internalQuery, type QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { requireAuthedUser } from "../../lib/identity";
-import { isSuspendedMembership } from "../../lib/authz";
+import {
+  getRoleProfile,
+  hasCapability,
+  isSuspendedMembership,
+  normalizeOrgRole,
+} from "../../lib/authz";
 
 /**
  * Organization Queries and Mutations
@@ -127,20 +132,31 @@ export const getMembersInternal = internalQuery({
       )
       .collect();
 
+    // Resolve notify eligibility here (queries have ctx.db; the consuming
+    // email ACTION does not) — one profile resolution per distinct slug.
+    const notifyMemo = new Map<string, boolean>();
     const members = await Promise.all(
       memberships.map(async (membership) => {
         const user = await ctx.db.get(membership.userId);
-        return user
-          ? {
-              ...membership,
-              user: {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-                avatarUrl: user.avatarUrl,
-              },
-            }
-          : null;
+        if (!user) return null;
+        const slug = normalizeOrgRole(membership.role);
+        if (!notifyMemo.has(slug)) {
+          const profile = await getRoleProfile(ctx, slug);
+          notifyMemo.set(
+            slug,
+            hasCapability(profile, "notify.variable_changes")
+          );
+        }
+        return {
+          ...membership,
+          notifyVariableChanges: notifyMemo.get(slug) === true,
+          user: {
+            _id: user._id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+          },
+        };
       })
     );
 

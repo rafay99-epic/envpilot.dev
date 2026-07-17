@@ -82,9 +82,11 @@ export const ROLE_LEVEL: Record<string, number> = {
   owner: 100,
   project_manager: 80,
   team_lead: 60,
-  editor: 50,
   developer: 40,
-  viewer: 20,
+  // editor/viewer deliberately ABSENT: their levels are registry rows the
+  // admin panel can edit — static copies here would drift. Only SYSTEM
+  // floors may be compared synchronously; everything else goes through the
+  // resolved profile.level.
 };
 
 export function roleLevel(role: string): number {
@@ -157,6 +159,30 @@ export function profileCan(
  * implicit access to every project in the org — the registry generalization
  * of the old `role === "owner"` special case.
  */
+/**
+ * Hierarchy filter: keep members whose resolved role level is strictly below
+ * the requester's. Owner-class requesters (org.manage) are exempt and see
+ * everyone. Profiles resolve once per distinct slug, not per member.
+ */
+export async function filterMembersStrictlyBelow<T extends { role: string }>(
+  ctx: MutationCtx | QueryCtx,
+  requesterRole: string,
+  members: T[]
+): Promise<T[]> {
+  const requesterProfile = await getRoleProfile(ctx, requesterRole);
+  if (bypassesAssignment(requesterProfile)) return members;
+  const levelMemo = new Map<string, number>();
+  const out: T[] = [];
+  for (const member of members) {
+    const slug = normalizeOrgRole(member.role);
+    if (!levelMemo.has(slug)) {
+      levelMemo.set(slug, (await getRoleProfile(ctx, slug)).level);
+    }
+    if ((levelMemo.get(slug) ?? 0) < requesterProfile.level) out.push(member);
+  }
+  return out;
+}
+
 export function bypassesAssignment(profile: RoleProfile): boolean {
   return hasCapability(profile, "org.manage");
 }
@@ -216,7 +242,8 @@ export function profileToLegacyProjectRole(
   profile: RoleProfile,
   assigned: boolean
 ): "manager" | "developer" | "viewer" | null {
-  if (!assigned && !bypassesAssignment(profile)) return null;
+  // Wire parity with main: unassigned users (owner class included) get null.
+  if (!assigned) return null;
   if (
     bypassesAssignment(profile) ||
     hasCapability(profile, "project.variables.update")
@@ -519,20 +546,6 @@ export async function assertOrgMembership(
  * - team_lead manages developer
  * - developer manages no one
  */
-export function assertCanManageUser(
-  actorRole: string,
-  targetRole: string,
-  action: string
-): void {
-  const actor = normalizeOrgRole(actorRole);
-  const target = normalizeOrgRole(targetRole);
-
-  if (roleLevel(target) >= roleLevel(actor)) {
-    throw new ConvexError(
-      `Cannot ${action}: a ${actor} cannot manage a ${target}`
-    );
-  }
-}
 
 /**
  * Registry-aware hierarchy check — resolves BOTH roles' levels through the
@@ -564,20 +577,6 @@ export async function assertCanManageUserAsync(
  * Owners can assign any role (including another owner). Everyone else can
  * only assign roles strictly below their own.
  */
-export function assertCanAssignRole(
-  actorRole: string,
-  targetRole: string
-): void {
-  const actor = normalizeOrgRole(actorRole);
-  const target = normalizeOrgRole(targetRole);
-
-  if (actor === "owner") return;
-  if (roleLevel(target) >= roleLevel(actor)) {
-    throw new ConvexError(
-      `Cannot assign role: a ${actor} can only assign roles below their own`
-    );
-  }
-}
 
 /** Registry-aware role-assignment hierarchy (see assertCanManageUserAsync). */
 export async function assertCanAssignRoleAsync(
@@ -689,12 +688,11 @@ async function resolveResourceAccess(
     )
     .first();
 
-  if (projectMembership && hasCapability(profile, args.blanketWrite)) {
-    return "write";
-  }
-
-  // Environment scope: an assigned env-scopeable role never gets access to
-  // an out-of-scope resource — grants included.
+  // Environment scope FIRST: an assigned env-scopeable role never gets
+  // access to an out-of-scope resource — blanket write and grants included.
+  // (Ordering matters: a role holding BOTH access.env_scoped and a blanket
+  // write capability — the seeded editor — must not write out-of-scope
+  // resources it can't even see in lists.)
   if (
     projectMembership &&
     hasCapability(profile, "access.env_scoped") &&
@@ -704,6 +702,10 @@ async function resolveResourceAccess(
     )
   ) {
     return null;
+  }
+
+  if (projectMembership && hasCapability(profile, args.blanketWrite)) {
+    return "write";
   }
 
   // Blanket read (auditor class): every in-scope resource, no grants needed.
