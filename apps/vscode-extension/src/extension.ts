@@ -1748,6 +1748,22 @@ export async function deactivate() {
   // Sign-out / explicit unlink still delete through their own gated paths
   // (shouldPreventCopyOnRevoke in sync.ts). Remaining resource cleanup is
   // handled by dispose subscriptions.
+  // TEAR DOWN EVERY FILE WRITER FIRST. FileProtection's anti-tamper watcher
+  // treats any deletion of a protected file as an unauthorized edit and
+  // re-syncs it (fileProtection.ts onDidDelete → 500ms debounce →
+  // resyncCallback) — without this, the purge deletes a file and the watcher
+  // restores it before the host dies, silently defeating unsync-on-close
+  // (observed in testing: purge reported deleted=1, file was back seconds
+  // later). Periodic sync and real-time subscriptions can rewrite too.
+  // These dispose() calls are idempotent; the context.subscriptions cleanup
+  // runs them again harmlessly.
+  try {
+    fileProtectionService?.dispose();
+    realTimeSyncService?.dispose();
+    syncService?.dispose();
+  } catch {
+    // Never let teardown stop the purge.
+  }
   // Marker is cleared LAST: if the purge dies mid-shutdown the marker
   // survives, so the next activation's crash sweep retries the cleanup
   // (sweeping an already-purged folder is a no-op).
