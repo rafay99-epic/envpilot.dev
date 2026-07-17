@@ -13,14 +13,15 @@ name: CI
 # (CLI tarball, VSIX) are available in the run's Artifacts panel; nothing is
 # commented on PRs.
 
-# ⛔ DORMANT — FULL CI/CD MOVED TO CIRCLECI (2026-07-16). GitHub Actions
-# billing is unpaid, so nothing here runs; the entire pipeline (checks +
-# every deploy + release) now lives in .circleci/config.yml. This file is
-# kept verbatim for reference/revert. Moving back: restore
-#   on: { push: { branches: [main] }, pull_request: }
-# and retire the CircleCI deploy workflow (or every merge deploys twice).
-# workflow_dispatch remains as a manual escape hatch if billing is fixed.
+# ✅ ACTIVE — CI/CD runs on GitHub Actions (2026-07-18). Envpilot is now
+# open source, so Actions minutes are free; the full pipeline (quality gate
+# + per-surface builds + main-only deploys + release) lives here. CircleCI
+# is retired (.circleci/config.yml renamed to .old so it no longer runs).
+# The E2E gate stays disabled (see the e2e job's `false &&`).
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -205,6 +206,15 @@ jobs:
             turbo-${{ runner.os }}-
       - name: Prettier check
         run: bunx prettier --check .
+      - name: Secret scan (gitleaks)
+        # Standing guard: fail the gate if any real credential is committed.
+        # Filesystem scan of the working tree (fast); full-history was swept
+        # once at open-sourcing. Allowlist for known example strings lives in
+        # .gitleaks.toml.
+        run: |
+          V=8.30.1
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz" | tar xz -C /tmp gitleaks
+          /tmp/gitleaks dir . --config .gitleaks.toml --max-target-megabytes 2 --redact --no-banner
       - name: Build, lint, typecheck, test (turbo)
         run: bunx turbo build lint typecheck test --cache-dir=.turbo
       - name: Typecheck Convex functions
