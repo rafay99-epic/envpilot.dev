@@ -754,3 +754,60 @@ export const sendVariableRequestReviewedEmail = internalAction({
     return sendEmail(args.to, subject, html, text);
   },
 });
+
+/**
+ * Wishlist: notify the submitter when their feature request moves to a
+ * meaningful status (planned / in progress / completed). Scheduled from the
+ * status-update mutations — fire-and-forget, never blocks the update.
+ */
+export const sendFeatureRequestStatusEmail = internalAction({
+  args: {
+    to: v.string(),
+    submitterName: v.optional(v.string()),
+    title: v.string(),
+    status: v.union(
+      v.literal("planned"),
+      v.literal("in_progress"),
+      v.literal("completed")
+    ),
+  },
+  handler: async (_ctx, args) => {
+    const safeTitle = escapeHtml(args.title);
+    const greeting = args.submitterName
+      ? `Hi ${escapeHtml(args.submitterName)}, `
+      : "";
+
+    const STATUS_COPY = {
+      planned: {
+        heading: "Your feature request is on the roadmap",
+        subject: `On the roadmap: ${args.title}`,
+        line: `${greeting}your request <strong>&ldquo;${safeTitle}&rdquo;</strong> is now <strong style="color:#4ade80;">planned</strong>. It made the roadmap — thank you for suggesting it.`,
+      },
+      in_progress: {
+        heading: "Your feature request is being built",
+        subject: `In progress: ${args.title}`,
+        line: `${greeting}your request <strong>&ldquo;${safeTitle}&rdquo;</strong> is now <strong style="color:#4ade80;">in progress</strong>. It is actively being built.`,
+      },
+      completed: {
+        heading: "Your feature request shipped",
+        subject: `Shipped: ${args.title}`,
+        line: `${greeting}your request <strong>&ldquo;${safeTitle}&rdquo;</strong> has <strong style="color:#4ade80;">shipped</strong>. It is live now — thank you for making Envpilot better.`,
+      },
+    } as const;
+
+    const copy = STATUS_COPY[args.status];
+    const rows = [
+      iconRow(args.title.charAt(0).toUpperCase()),
+      headingRow(copy.heading),
+      paragraphRow(copy.line),
+      footerRow(
+        "You received this because you submitted this request on the Envpilot wishlist."
+      ),
+    ];
+
+    const html = emailWrapper(copy.heading, rows.join(""));
+    const text = `${copy.heading}\n\n"${args.title}" is now ${args.status.replace("_", " ")}.`;
+
+    return sendEmail(args.to, copy.subject, html, text);
+  },
+});

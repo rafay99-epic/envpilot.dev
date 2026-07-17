@@ -159,4 +159,22 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: 60_000,
     capacity: 5,
   },
+
+  // ==========================================
+  // PUBLIC WISHLIST (anonymous-capable — throttle per email/user)
+  // ==========================================
+
+  // Feature-request submissions: 3 per hour per identity
+  wishlistSubmit: {
+    kind: "fixed window",
+    rate: 3,
+    period: 3_600_000,
+  },
+
+  // Wishlist votes: 30 per hour per identity
+  wishlistVote: {
+    kind: "fixed window",
+    rate: 30,
+    period: 3_600_000,
+  },
 });

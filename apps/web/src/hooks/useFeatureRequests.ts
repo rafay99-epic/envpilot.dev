@@ -15,10 +15,15 @@ type FeatureStatus =
 /**
  * Hook for listing all public feature requests
  */
-export function useFeatureRequests(status?: FeatureStatus, category?: string) {
+export function useFeatureRequests(
+  status?: FeatureStatus,
+  category?: string,
+  sort?: "top" | "new"
+) {
   return useQuery(api.features.community.featureRequests.queries.listPublic, {
     status,
     category,
+    sort,
   });
 }
 

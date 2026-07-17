@@ -27,6 +27,7 @@ export const listPublic = query({
       )
     ),
     category: v.optional(v.string()),
+    sort: v.optional(v.union(v.literal("top"), v.literal("new"))),
   },
   handler: async (ctx, args) => {
     let requests;
@@ -47,8 +48,10 @@ export const listPublic = query({
       filteredRequests = requests.filter((r) => r.category === args.category);
     }
 
-    // Sort by vote count descending
-    return filteredRequests.sort((a, b) => b.voteCount - a.voteCount);
+    // "top" (default): most-voted first; "new": most recent first
+    return args.sort === "new"
+      ? filteredRequests.sort((a, b) => b.createdAt - a.createdAt)
+      : filteredRequests.sort((a, b) => b.voteCount - a.voteCount);
   },
 });
 

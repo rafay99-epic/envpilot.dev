@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
+import { internal } from "../../_generated/api";
 import { verifyAdmin } from "./auth";
 
 export const listFeatureRequests = query({
@@ -30,10 +31,33 @@ export const updateFeatureRequestStatus = mutation({
   },
   handler: async (ctx, args) => {
     verifyAdmin(args.secret);
+    const feature = await ctx.db.get(args.id);
+    if (!feature) return;
     await ctx.db.patch(args.id, {
       status: args.status,
       updatedAt: Date.now(),
     });
+
+    // Notify the submitter on meaningful transitions. Fire-and-forget via the
+    // scheduler — a send failure must never block or roll back the update.
+    if (
+      feature.submitterEmail &&
+      feature.status !== args.status &&
+      (args.status === "planned" ||
+        args.status === "in_progress" ||
+        args.status === "completed")
+    ) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.emails.emails.sendFeatureRequestStatusEmail,
+        {
+          to: feature.submitterEmail,
+          submitterName: feature.submitterName,
+          title: feature.title,
+          status: args.status,
+        }
+      );
+    }
   },
 });
 

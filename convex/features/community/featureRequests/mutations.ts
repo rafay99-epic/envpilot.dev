@@ -1,7 +1,9 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation } from "../../../_generated/server";
+import { internal } from "../../../_generated/api";
 import { normalizeOrgRole } from "../../../lib/authz";
 import { getAuthedUser, requireAuthedUser } from "../../../lib/identity";
+import { rateLimiter } from "../../../lib/rateLimits";
 
 /**
  * Feature Requests (Wishlist) Mutations
@@ -49,34 +51,42 @@ export const submit = mutation({
 
     // Validate required fields
     if (!title) {
-      throw new Error("Title is required");
+      throw new ConvexError("Title is required");
     }
 
     if (title.length > MAX_TITLE_LENGTH) {
-      throw new Error(`Title must be ${MAX_TITLE_LENGTH} characters or less`);
+      throw new ConvexError(
+        `Title must be ${MAX_TITLE_LENGTH} characters or less`
+      );
     }
 
     if (!description) {
-      throw new Error("Description is required");
+      throw new ConvexError("Description is required");
     }
 
     if (description.length > MAX_DESCRIPTION_LENGTH) {
-      throw new Error(
+      throw new ConvexError(
         `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`
       );
     }
 
     // Validate email format if provided
     if (email && !validateEmail(email)) {
-      throw new Error("Invalid email format");
+      throw new ConvexError("Invalid email format");
     }
 
     // Validate category length if provided
     if (category && category.length > MAX_CATEGORY_LENGTH) {
-      throw new Error(
+      throw new ConvexError(
         `Category must be ${MAX_CATEGORY_LENGTH} characters or less`
       );
     }
+
+    // Throttle public submissions per identity (spam guard)
+    await rateLimiter.limit(ctx, "wishlistSubmit", {
+      key: actor?._id ?? email ?? "anonymous",
+      throws: true,
+    });
 
     // Create the feature request
     const featureRequestId = await ctx.db.insert("featureRequests", {
@@ -124,19 +134,25 @@ export const vote = mutation({
 
     // Validate that we have some form of voter identification
     if (!actor && !email) {
-      throw new Error("User ID or email required to vote");
+      throw new ConvexError("User ID or email required to vote");
     }
 
     // Validate email format if provided
     if (email && !validateEmail(email)) {
-      throw new Error("Invalid email format");
+      throw new ConvexError("Invalid email format");
     }
 
     // Check if feature request exists
     const feature = await ctx.db.get(args.featureRequestId);
     if (!feature) {
-      throw new Error("Feature request not found");
+      throw new ConvexError("Feature request not found");
     }
+
+    // Throttle public voting per identity (spam guard)
+    await rateLimiter.limit(ctx, "wishlistVote", {
+      key: actor?._id ?? email ?? "anonymous",
+      throws: true,
+    });
 
     // If user is logged in, check by userId only (prevent double-identity voting)
     if (actor) {
@@ -150,7 +166,7 @@ export const vote = mutation({
         .first();
 
       if (existingVote) {
-        throw new Error("You have already voted for this feature");
+        throw new ConvexError("You have already voted for this feature");
       }
 
       // Create vote with userId only (don't store email for logged-in users)
@@ -172,7 +188,7 @@ export const vote = mutation({
         .first();
 
       if (existingVote) {
-        throw new Error("This email has already voted for this feature");
+        throw new ConvexError("This email has already voted for this feature");
       }
 
       // Create vote with email
@@ -211,7 +227,7 @@ export const unvote = mutation({
     // Check if feature request exists
     const feature = await ctx.db.get(args.featureRequestId);
     if (!feature) {
-      throw new Error("Feature request not found");
+      throw new ConvexError("Feature request not found");
     }
 
     let vote = null;
@@ -241,7 +257,7 @@ export const unvote = mutation({
     }
 
     if (!vote) {
-      throw new Error("Vote not found");
+      throw new ConvexError("Vote not found");
     }
 
     // Delete the vote
@@ -290,12 +306,12 @@ export const updateStatus = mutation({
     );
 
     if (!ownerMembership) {
-      throw new Error("Unauthorized: Admin access required");
+      throw new ConvexError("Unauthorized: Admin access required");
     }
 
     const feature = await ctx.db.get(args.featureRequestId);
     if (!feature) {
-      throw new Error("Feature request not found");
+      throw new ConvexError("Feature request not found");
     }
 
     await ctx.db.patch(args.featureRequestId, {
@@ -303,6 +319,27 @@ export const updateStatus = mutation({
       adminNotes: args.adminNotes,
       updatedAt: now,
     });
+
+    // Notify the submitter on meaningful transitions. Fire-and-forget via the
+    // scheduler — a send failure must never block or roll back the update.
+    if (
+      feature.submitterEmail &&
+      feature.status !== args.status &&
+      (args.status === "planned" ||
+        args.status === "in_progress" ||
+        args.status === "completed")
+    ) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.emails.emails.sendFeatureRequestStatusEmail,
+        {
+          to: feature.submitterEmail,
+          submitterName: feature.submitterName,
+          title: feature.title,
+          status: args.status,
+        }
+      );
+    }
 
     return args.featureRequestId;
   },
@@ -336,12 +373,12 @@ export const update = mutation({
     );
 
     if (!ownerMembership) {
-      throw new Error("Unauthorized: Admin access required");
+      throw new ConvexError("Unauthorized: Admin access required");
     }
 
     const feature = await ctx.db.get(featureRequestId);
     if (!feature) {
-      throw new Error("Feature request not found");
+      throw new ConvexError("Feature request not found");
     }
 
     const updateData: Record<string, unknown> = { updatedAt: now };
@@ -350,7 +387,9 @@ export const update = mutation({
     if (updates.title !== undefined) {
       const title = updates.title.trim();
       if (title.length > MAX_TITLE_LENGTH) {
-        throw new Error(`Title must be ${MAX_TITLE_LENGTH} characters or less`);
+        throw new ConvexError(
+          `Title must be ${MAX_TITLE_LENGTH} characters or less`
+        );
       }
       updateData.title = title;
     }
@@ -359,7 +398,7 @@ export const update = mutation({
     if (updates.description !== undefined) {
       const description = updates.description.trim();
       if (description.length > MAX_DESCRIPTION_LENGTH) {
-        throw new Error(
+        throw new ConvexError(
           `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`
         );
       }
@@ -370,7 +409,7 @@ export const update = mutation({
     if (updates.category !== undefined) {
       const category = updates.category.trim();
       if (category.length > MAX_CATEGORY_LENGTH) {
-        throw new Error(
+        throw new ConvexError(
           `Category must be ${MAX_CATEGORY_LENGTH} characters or less`
         );
       }
@@ -409,12 +448,12 @@ export const remove = mutation({
     );
 
     if (!ownerMembership) {
-      throw new Error("Unauthorized: Admin access required");
+      throw new ConvexError("Unauthorized: Admin access required");
     }
 
     const feature = await ctx.db.get(args.featureRequestId);
     if (!feature) {
-      throw new Error("Feature request not found");
+      throw new ConvexError("Feature request not found");
     }
 
     // Delete all votes for this feature

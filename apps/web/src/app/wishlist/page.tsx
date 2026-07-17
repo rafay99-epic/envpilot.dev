@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useFeatureRequests,
   usePlannedFeatures,
@@ -8,7 +8,8 @@ import {
   useFeatureRequestMutations,
 } from "@/hooks";
 import { Id } from "@convex/_generated/dataModel";
-import { ChevronUp, Plus, X, AlertTriangle } from "lucide-react";
+import { ChevronUp, Plus, Search, X, AlertTriangle } from "lucide-react";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import {
   MarketingShell,
   PageHero,
@@ -63,26 +64,102 @@ interface FeatureRequestType {
   createdAt: number;
 }
 
+// Anonymous voter identity + vote history, persisted so returning visitors
+// keep their vote highlights across reloads (the backend enforces uniqueness
+// either way — this is purely UX state).
+const VOTER_STORAGE_KEY = "envpilot-wishlist-voter";
+
 export default function WishlistPage() {
   const [activeTab, setActiveTab] = useState<TabType>("requests");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"top" | "new">("top");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [votedFeatures, setVotedFeatures] = useState<Set<string>>(new Set());
   const [voterEmail, setVoterEmail] = useState("");
+  const [voterLoaded, setVoterLoaded] = useState(false);
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
   const [pendingVoteId, setPendingVoteId] =
     useState<Id<"featureRequests"> | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Restore the anonymous voter identity + vote history after mount (not in a
+  // state initializer — that would mismatch the server-rendered HTML). The
+  // backend enforces vote uniqueness either way; this is purely UX state.
+  useEffect(() => {
+    // Deferred to a microtask: satisfies the compiler rule against
+    // synchronous setState in effects while still running before paint-time
+    // interactions matter.
+    queueMicrotask(() => {
+      try {
+        const raw = window.localStorage.getItem(VOTER_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            email?: string;
+            votedIds?: string[];
+          };
+          if (typeof parsed.email === "string") setVoterEmail(parsed.email);
+          if (Array.isArray(parsed.votedIds))
+            setVotedFeatures(new Set(parsed.votedIds));
+        }
+      } catch {
+        // Corrupt/unavailable storage — start fresh
+      }
+      setVoterLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!voterLoaded) return;
+    try {
+      window.localStorage.setItem(
+        VOTER_STORAGE_KEY,
+        JSON.stringify({ email: voterEmail, votedIds: [...votedFeatures] })
+      );
+    } catch {
+      // Storage unavailable (private mode) — votes just won't persist
+    }
+  }, [voterLoaded, voterEmail, votedFeatures]);
+
   const featureRequests = useFeatureRequests(
     statusFilter === "all" ? undefined : statusFilter,
-    categoryFilter === "all" ? undefined : categoryFilter
+    categoryFilter === "all" ? undefined : categoryFilter,
+    sortBy
   );
   const plannedFeatures = usePlannedFeatures();
   const categories = useFeatureCategories();
   const { submit, vote, unvote } = useFeatureRequestMutations();
+
+  const query = searchQuery.trim().toLowerCase();
+  const visibleRequests =
+    featureRequests && query
+      ? featureRequests.filter(
+          (f: FeatureRequestType) =>
+            f.title.toLowerCase().includes(query) ||
+            f.description.toLowerCase().includes(query) ||
+            f.category?.toLowerCase().includes(query)
+        )
+      : featureRequests;
+
+  const markVoted = (featureId: Id<"featureRequests">) =>
+    setVotedFeatures((prev) => new Set([...prev, featureId]));
+
+  const handleVoteError = (
+    err: unknown,
+    featureId: Id<"featureRequests">,
+    fallback: string
+  ) => {
+    const message = sanitizeConvexError(err);
+    if (/already voted/i.test(message)) {
+      // Backend says this identity voted before (e.g. cleared storage) —
+      // adopt that as truth instead of showing an error.
+      markVoted(featureId);
+      return;
+    }
+    setToastMessage(message || fallback);
+  };
 
   const handleVote = async (featureId: Id<"featureRequests">) => {
     if (!voterEmail) {
@@ -101,12 +178,10 @@ export default function WishlistPage() {
         });
       } else {
         await vote({ featureRequestId: featureId, voterEmail });
-        setVotedFeatures((prev) => new Set([...prev, featureId]));
+        markVoted(featureId);
       }
-    } catch {
-      setToastMessage(
-        "Failed to update vote. You may have already voted for this feature."
-      );
+    } catch (err) {
+      handleVoteError(err, featureId, "Failed to update vote.");
     }
   };
 
@@ -121,11 +196,9 @@ export default function WishlistPage() {
 
     try {
       await vote({ featureRequestId: pendingVoteId, voterEmail: email });
-      setVotedFeatures((prev) => new Set([...prev, pendingVoteId]));
-    } catch {
-      setToastMessage(
-        "Failed to vote. You may have already voted for this feature."
-      );
+      markVoted(pendingVoteId);
+    } catch (err) {
+      handleVoteError(err, pendingVoteId, "Failed to vote.");
     }
     setPendingVoteId(null);
   };
@@ -223,16 +296,52 @@ export default function WishlistPage() {
                     </select>
                   </>
                 )}
+
+                <span className="font-mono text-xs text-zinc-600">--sort</span>
+                <div className="flex gap-2">
+                  {(["top", "new"] as const).map((sort) => (
+                    <button
+                      key={sort}
+                      onClick={() => setSortBy(sort)}
+                      className={`rounded-lg border px-2.5 py-1 font-mono text-xs transition-all ${
+                        sortBy === sort
+                          ? "border-green-500/40 bg-green-500/10 text-green-400 shadow-[0_0_16px_-4px_rgba(34,197,94,0.4)]"
+                          : "border-zinc-800 text-zinc-500 hover:border-green-500/30 hover:text-zinc-300"
+                      }`}
+                    >
+                      {sort}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative ml-auto min-w-[180px] flex-1 sm:max-w-xs">
+                  <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="search requests..."
+                    aria-label="Search feature requests"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 py-1 pr-2.5 pl-8 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-green-500/40 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                  />
+                </div>
               </div>
 
               {/* Feature List */}
-              {!featureRequests ? (
+              {!visibleRequests ? (
                 <LoadingSkeleton rows={4} />
-              ) : featureRequests.length === 0 ? (
-                <EmptyState onSubmit={() => setShowSubmitForm(true)} />
+              ) : visibleRequests.length === 0 ? (
+                query ? (
+                  <p className="py-10 text-center font-mono text-xs text-zinc-500">
+                    No requests match &ldquo;{searchQuery.trim()}&rdquo; — maybe
+                    yours is a new idea?
+                  </p>
+                ) : (
+                  <EmptyState onSubmit={() => setShowSubmitForm(true)} />
+                )
               ) : (
                 <Stagger className="space-y-3">
-                  {featureRequests.map((feature: FeatureRequestType) => (
+                  {visibleRequests.map((feature: FeatureRequestType) => (
                     <StaggerItem key={feature._id}>
                       <FeatureCard
                         feature={feature}
@@ -257,6 +366,9 @@ export default function WishlistPage() {
           onSubmit={submit}
           voterEmail={voterEmail}
           setVoterEmail={setVoterEmail}
+          existingRequests={featureRequests}
+          votedFeatures={votedFeatures}
+          onVoteExisting={handleVote}
         />
       )}
 
@@ -641,6 +753,32 @@ interface SubmitFeatureModalProps {
   }) => Promise<Id<"featureRequests">>;
   voterEmail: string;
   setVoterEmail: (email: string) => void;
+  existingRequests: FeatureRequestType[] | undefined;
+  votedFeatures: Set<string>;
+  onVoteExisting: (id: Id<"featureRequests">) => void;
+}
+
+/**
+ * Cheap client-side similarity: significant-word overlap between the typed
+ * title and existing request titles. Good enough to catch duplicates at this
+ * table size without a search index.
+ */
+function findSimilarRequests(
+  title: string,
+  requests: FeatureRequestType[] | undefined
+): FeatureRequestType[] {
+  if (!requests) return [];
+  const words = title
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4);
+  if (words.length === 0) return [];
+  return requests
+    .filter((r) => {
+      const haystack = r.title.toLowerCase();
+      return words.some((w) => haystack.includes(w));
+    })
+    .slice(0, 3);
 }
 
 const INPUT_CLASSES =
@@ -651,6 +789,9 @@ function SubmitFeatureModal({
   onSubmit,
   voterEmail,
   setVoterEmail,
+  existingRequests,
+  votedFeatures,
+  onVoteExisting,
 }: SubmitFeatureModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -659,6 +800,8 @@ function SubmitFeatureModal({
   const [category, setCategory] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const similar = findSimilarRequests(title, existingRequests);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -696,9 +839,7 @@ function SubmitFeatureModal({
       setVoterEmail(email);
       onClose();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to submit feature request"
-      );
+      setError(sanitizeConvexError(err) || "Failed to submit feature request");
     } finally {
       setIsSubmitting(false);
     }
@@ -747,6 +888,36 @@ function SubmitFeatureModal({
               className={INPUT_CLASSES}
               placeholder="Brief title for your feature"
             />
+            {similar.length > 0 && (
+              <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                <p className="font-mono text-[11px] text-amber-400">
+                  similar requests already exist — vote instead of duplicating:
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {similar.map((r) => (
+                    <li
+                      key={r._id}
+                      className="flex items-center justify-between gap-3 font-mono text-[11px] text-zinc-400"
+                    >
+                      <span className="truncate">
+                        {r.title}{" "}
+                        <span className="text-zinc-600">
+                          · {r.voteCount} {r.voteCount === 1 ? "vote" : "votes"}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onVoteExisting(r._id)}
+                        disabled={votedFeatures.has(r._id)}
+                        className="shrink-0 rounded border border-green-500/30 px-2 py-0.5 text-green-400 transition-colors hover:bg-green-500/10 disabled:cursor-default disabled:border-zinc-800 disabled:text-zinc-600"
+                      >
+                        {votedFeatures.has(r._id) ? "voted" : "+1"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div>
