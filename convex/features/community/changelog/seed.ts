@@ -1066,6 +1066,36 @@ The auth middleware was blocking unauthenticated access to these routes. Added b
   },
 
   // ============================================================
+  // v1.46.0 — VS Code Unsync-on-Close (2026-07-17)
+  // ============================================================
+  {
+    title: "VS Code Unsync-on-Close: Secrets Never Outlive Your Editor",
+    version: "v1.46.0",
+    type: "feature",
+    publishedAt: ts("2026-07-17T13:00:00Z"),
+    content: `**Heads up — behavior change.** After updating the VS Code extension (v1.14.0), synced .env files are now removed when VS Code closes, and restored automatically on your next sync. This is ON by default for every project.
+
+### Unsync on Close
+- Closing VS Code deletes the .env files the extension synced — secrets no longer linger on disk after your session ends
+- **Hand-edited files are never deleted**: a file is only removed if its content still exactly matches what Envpilot last wrote
+- Crashes are covered too: if VS Code is force-quit, the cleanup runs on the next launch
+- A one-time notice in the editor explains the change when it first takes effect
+
+### Per-Project & Per-Member Control (Pro)
+- Project Settings → General gets a new **VS Code Sync** section: toggle unsync-on-close per project
+- Pin individual members On / Off / Inherit — an override always beats the project default
+- Free tier stays locked to the secure default (unsync ON); customization is a Pro feature
+- Every toggle change and every cleanup is recorded in the audit log
+
+### Restricted Mode Support
+- The extension now runs in VS Code Restricted Mode with limited powers: it never writes secrets into an untrusted workspace, but cleanup still runs
+- Trusting the workspace starts sync instantly — no reload needed
+
+### Reliability Fixes
+- Restored several extension backend paths that had silently broken project linking and real-time sync for published extension builds — link, unlink, and live revocation sync work again on all versions`,
+  },
+
+  // ============================================================
   // v1.40.0 — Launch & Welcome (2026-07-12)
   // ============================================================
   {
