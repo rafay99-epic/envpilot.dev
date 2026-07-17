@@ -1,67 +1,108 @@
 # CI / CD
 
-CI/CD runs on **CircleCI** ("pipeline v2"), a dynamic config split across
-`.circleci/config.yml` (setup) and `.circleci/jobs.yml` (job definitions).
+CI/CD runs on **GitHub Actions**. The workflows live in `.github/workflows/`,
+with `ci.yml` as the entry point that fans out to per-surface build and deploy
+jobs.
 
-## How the pipeline is built
+> **History:** the pipeline previously ran on CircleCI. Envpilot is open source
+> now, so GitHub Actions minutes are free and CI moved back to it. The CircleCI
+> config is retained (disabled) at `.circleci/config.yml.old` and
+> `.circleci/jobs.yml` — see [Running on CircleCI instead](#running-on-circleci-instead)
+> if you want to use or maintain both.
 
-Every push starts with a tiny setup job, `detect` (`.circleci/config.yml`),
-that diffs the push, maps changed paths to **surfaces**, and _generates_ the
-workflow so only the relevant jobs exist:
+## Triggers
 
-| Changed path                                           | Surface(s) built            |
-| ------------------------------------------------------ | --------------------------- |
-| `convex/`                                              | convex                      |
-| `apps/web/`, `apps/blog/`, `apps/docs/`, `apps/admin/` | web / blog / docs / admin   |
-| `apps/cli/`, `apps/vscode-extension/`                  | cli / extension             |
-| `packages/github-action/`                              | action                      |
-| `packages/ui/`                                         | web + blog + docs (fan-out) |
-| root manifests, shared configs, `.circleci/`           | all surfaces                |
+`ci.yml` runs on:
 
-Branch pushes diff against the fork point with `main`; `main` pushes diff the
-merge itself.
+- **`push` to `main`** — quality gate, per-surface builds, and deploys.
+- **`pull_request`** — quality gate and builds only (no deploys).
+- **`workflow_dispatch`** — manual runs.
 
 ## Quality gate first
 
-Every generated pipeline starts with a single **quality** job (prettier, lint,
-typecheck via `next typegen`, convex `tsc` — no builds). Per-surface **build**
-jobs `require: [quality]`. CLI and extension build DIRECT via `bun run build`
-(never turbo).
+Every run starts with a consolidated **checks** job: prettier, lint, typecheck,
+build, and test via Turborepo, plus a Convex `tsc` pass and a **gitleaks**
+secret scan (`.gitleaks.toml` allowlists known example strings). A single
+required status check, **All checks passed**, gates everything downstream — red
+means nothing else runs.
 
-## Deploys (main pipelines only)
+## Change detection
 
-Deploy jobs are added only when the branch is `main`. Ordering is strict —
-**backend first**: client publishes and web/blog/docs/admin deploys that need
-the backend contract `require` `deploy-convex` when it exists.
+A `changes` job maps changed paths to **surfaces**, so only the relevant build
+jobs do real work (Turborepo's own hashing makes unchanged packages replay from
+cache):
+
+| Changed path                                       | Surface(s)                  |
+| -------------------------------------------------- | --------------------------- |
+| `convex/`                                          | convex                      |
+| `apps/web`, `apps/blog`, `apps/docs`, `apps/admin` | web / blog / docs / admin   |
+| `apps/cli`, `apps/vscode-extension`                | cli / extension             |
+| `packages/github-action`                           | action                      |
+| `packages/ui`                                      | web + blog + docs (fan-out) |
+| root manifests / shared config                     | all surfaces                |
+
+## Deploys (main only)
+
+Deploy jobs run only on `push` to `main`, **backend first** — client publishes
+and Vercel deploys that depend on the backend contract require `deploy-convex`:
 
 ```
-deploy-convex (+ feature-registry / changelog seeds)
-  → publish-cli (npm) + publish-extension (Open VSX) + publish-action (public envpilot-action repo)
+deploy-convex
+  ├─ seeds after every deploy (idempotent upserts):
+  │    seed-feature-registry, seed-tier-features,
+  │    seed-role-registry, migrate-roles, seed-changelog
+  → publish-cli (npm) + publish-extension (Open VSX) + publish-action (public repo)
   → deploy-homebrew
-  → deploy-web / deploy-blog / deploy-docs / deploy-admin (CI-gated `vercel deploy --prod`)
+  → deploy-web / deploy-blog / deploy-docs / deploy-admin  (vercel deploy --prod)
   → release (GitHub release with .tgz / .vsix artifacts)
 ```
 
-Vercel prod deploys run through the CircleCI `deploy-*` jobs — Vercel's own git
-integration is disabled (see `vercel.json` in each app).
+Vercel's own git integration is disabled in each app's `vercel.json` — prod
+deploys happen only through the `deploy-*` jobs.
 
-## Manual control
+### Auto-seeding
 
-From the CircleCI UI (**Trigger Pipeline**) or API, pass parameters to force
-surfaces: `force-<surface>: true` runs that surface's jobs even if unchanged;
-`run-everything: true` runs all of them. Forcing on a branch runs builds only —
-deploys still happen only on `main`.
+The convex deploy runs the seed migrations on every deploy, so a release that
+adds a gated feature, a role, or a changelog entry is live the moment it
+deploys — no manual admin-panel step. All handlers are idempotent upserts.
 
-## GitHub Actions — dormant
+## Required repository secrets
 
-The workflow files under `.github/workflows/` (`ci.yml`, `deploy-*.yml`,
-`version-tracker.yml`) are kept for reference but their triggers are
-**`workflow_dispatch`-only** — nothing runs there and GitHub Actions billing is
-not used. To move CI back to GitHub Actions, restore the original triggers on
-those files.
+Deploys read these from **Settings → Secrets and variables → Actions**:
+
+```
+CONVEX_DEPLOY_KEY   NEXT_PUBLIC_CONVEX_URL   WORKOS_CLIENT_ID
+NPM_TOKEN   OPEN_VSX_TOKEN   VSCODE_MARKETPLACE_TOKEN (optional)
+ACTION_PUBLISH_TOKEN   HOMEBREW_TAP_PAT
+VERCEL_TOKEN   VERCEL_ORG_ID
+VERCEL_PROJECT_ID_WEB   VERCEL_PROJECT_ID_ADMIN
+VERCEL_PROJECT_ID_BLOG  VERCEL_PROJECT_ID_DOCS
+```
+
+`ADMIN_SECRET` is read from the Convex deployment's own env (via the deploy
+key), so it isn't a GitHub secret. `GITHUB_TOKEN` is automatic.
 
 ## E2E
 
-Playwright is **not** run in CI (disabled by design — it drove a cloud Convex
-dev deployment and burned the free-tier quota). The full local suite is the
-gate of record; see [`apps/web/tests/e2e/README.md`](../apps/web/tests/e2e/README.md).
+The Playwright `e2e` job is **disabled** (guarded by `false &&` in its `if:`)
+— it drove a cloud Convex dev deployment and burned the free-tier quota. Deploy
+jobs accept an `e2e` result of `skipped`, so they keep working. The full local
+suite is the gate of record; see
+[`apps/web/tests/e2e/README.md`](../apps/web/tests/e2e/README.md). To re-enable,
+remove the `false &&` in the `e2e` job's condition.
+
+## Running on CircleCI instead
+
+The CircleCI "pipeline v2" config is kept, disabled, for anyone who prefers it
+or wants to run both:
+
+- `.circleci/config.yml.old` — the dynamic setup config. **Rename it back to
+  `.circleci/config.yml`** and enable the project in the CircleCI UI to
+  reactivate it.
+- `.circleci/jobs.yml` — the job definitions it generates from.
+
+If you enable CircleCI **and** leave GitHub Actions deploys on, every merge
+deploys twice. Pick one as the deployer: either disable the GitHub `deploy-*`
+jobs, or keep CircleCI for builds only (it never deploys off `main` anyway).
+CircleCI's own docs for this config are in the header comments of
+`.circleci/config.yml.old`.

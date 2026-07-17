@@ -7,7 +7,9 @@
 <p align="center">Secure environment variable management for teams. Bun + Turborepo monorepo powering the web dashboard, blog, docs site, CLI, and VS Code extension.</p>
 
 <p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-proprietary-a855f7?style=flat-square" alt="License" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License: MIT" /></a>
+  <a href="https://github.com/rafay99-epic/envpilot.dev/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rafay99-epic/envpilot.dev/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI" alt="CI" /></a>
+  <a href="./CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-3b82f6?style=flat-square" alt="PRs welcome" /></a>
   <a href="https://envpilot.dev"><img src="https://img.shields.io/badge/website-envpilot.dev-0ea5e9?style=flat-square&logo=safari&logoColor=white" alt="Website" /></a>
 </p>
 
@@ -35,11 +37,12 @@
 - [Commands](docs/commands.md) (dev, build, test, deploy)
 - [Architecture](docs/architecture.md) (data flow, auth, RBAC)
 - [Project Structure](docs/structure.md) (folder layout)
-- [CI / CD](docs/ci.md) (CircleCI pipeline v2)
+- [CI / CD](docs/ci.md) (GitHub Actions)
 - [Development Guide](docs/DEVELOPMENT.md) (conventions, Convex, TypeScript)
 - [Deployment Guide](docs/DEPLOYMENT.md) (Vercel, Convex, npm, Open VSX)
 - [Features](docs/FEATURES.md) (full feature inventory)
-- [Roadmap](docs/ROADMAP.md) (planned features)
+- [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
+- [Self-Hosting](docs/SELF_HOSTING.md) (run your own instance)
 - [Security TODO](docs/SECURITY-TODO.md) (pre-launch security checklist)
 
 ## Quick Start
