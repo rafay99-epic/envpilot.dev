@@ -10,12 +10,11 @@ import { v } from "convex/values";
  * resolveLegacyRoles).
  */
 
-export const orgRoleValidator = v.union(
-  v.literal("owner"),
-  v.literal("project_manager"),
-  v.literal("team_lead"),
-  v.literal("developer")
-);
+// Role slugs are registry-driven (open set) — validators accept any string;
+// the registry resolver decides meaning and fails closed on unknowns.
+// Published clients normalize unknown slugs to "developer" labels and obey
+// the meta booleans, so widening is backward compatible.
+export const orgRoleValidator = v.string();
 export const legacyOrgRoleValidator = v.union(
   v.literal("admin"),
   v.literal("team_lead"),

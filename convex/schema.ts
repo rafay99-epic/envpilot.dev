@@ -87,6 +87,37 @@ export default defineSchema({
     .index("by_created_by", ["createdBy"]),
 
   // ==========================================
+  // ROLE REGISTRY (roles as data — see convex/lib/capabilities.ts)
+  // ==========================================
+  // Capability KEYS are code-defined (lib/capabilities.ts); roles map keys to
+  // booleans. System roles (owner/project_manager/team_lead/developer) are
+  // seeded with main-parity profiles and capability-locked in the admin
+  // panel; custom roles are platform-global, created from the admin panel.
+  // organizationMembers.role / invitations.role reference rows by slug.
+  roleRegistry: defineTable({
+    // Immutable identifier referenced by organizationMembers.role
+    slug: v.string(),
+    displayName: v.string(),
+    description: v.string(),
+    // Badge color token (web maps to its palette)
+    color: v.string(),
+    // Hierarchy: higher = more authority. Strictly-below rules compare this.
+    level: v.number(),
+    // Seeded system role: capability matrix immutable, cannot be deactivated
+    isSystem: v.boolean(),
+    // Inactive roles cannot be assigned; deactivation is blocked while any
+    // member or pending invitation still holds the slug
+    isActive: v.boolean(),
+    sortOrder: v.number(),
+    // capabilityKey -> granted. Missing key = false (fail closed).
+    capabilities: v.record(v.string(), v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active", ["isActive", "sortOrder"]),
+
+  // ==========================================
   // ORGANIZATION MEMBERS
   // ==========================================
   organizationMembers: defineTable({
@@ -96,15 +127,12 @@ export default defineSchema({
     userId: v.id("users"),
     // Unified role within the organization (single source of truth for what
     // the user can do; project scope comes from projectMembers assignments)
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer"),
-      // Legacy values (pre unified-roles migration): admin → owner, member → developer
-      v.literal("admin"),
-      v.literal("member")
-    ),
+    // Role slug — references roleRegistry.slug (system slugs seeded; custom
+    // roles admin-panel created). Legacy values admin/member normalize at
+    // read time. Validation against the registry happens in the invite /
+    // change-role mutations — the schema stays open so registry rows are
+    // the single source of truth.
+    role: v.string(),
     // When the member joined
     joinedAt: v.number(),
     // Who invited them (null if they created the org)
@@ -598,16 +626,9 @@ export default defineSchema({
     email: v.string(),
     // Organization they're invited to
     organizationId: v.id("organizations"),
-    // Unified role they'll receive upon accepting
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer"),
-      // Legacy values (pre unified-roles migration)
-      v.literal("admin"),
-      v.literal("member")
-    ),
+    // Role slug they'll receive upon accepting (validated against the
+    // registry at create time)
+    role: v.string(),
     // Optional: projects to assign the invited user to upon acceptance
     projectIds: v.optional(v.array(v.id("projects"))),
     // Optional: environment scope applied to the created assignments

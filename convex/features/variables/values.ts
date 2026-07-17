@@ -31,7 +31,7 @@ type PullResult = {
   meta: {
     role: "admin" | "team_lead" | "member";
     projectRole: "manager" | "developer" | "viewer" | null;
-    unifiedRole: "owner" | "project_manager" | "team_lead" | "developer";
+    unifiedRole: string;
     assigned: boolean;
     grantOnly: boolean;
     environmentScope: string[] | null;
