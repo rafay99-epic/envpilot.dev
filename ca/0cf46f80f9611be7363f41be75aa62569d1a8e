@@ -1,0 +1,19 @@
+apps/web/src/components/landing/LandingPage.tsx
+  s_fdee4a09f06b0c::t_f50ddebe82f13c 910-913,919,935-939,953,961-979,983,990-1036
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ca0cf46f80f9611be7363f41be75aa62569d1a8e",
+  "prompts": {},
+  "sessions": {
+    "s_fdee4a09f06b0c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab592135107c18894",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
