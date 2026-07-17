@@ -1,0 +1,23 @@
+apps/vscode-extension/package.json
+  s_c0d41f513c83f7::t_e1159ce8921f5b 43-48
+apps/vscode-extension/src/extension.ts
+  s_c0d41f513c83f7::t_84506f335c25f3 443-448,462-475
+apps/vscode-extension/src/services/sync.ts
+  s_c0d41f513c83f7::t_c988868b2593db 55-69,384,1024
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f6348cd6d50c4245fb87191bbc8486271fa32aaf",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
