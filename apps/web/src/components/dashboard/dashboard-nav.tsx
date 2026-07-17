@@ -32,6 +32,7 @@ import {
   useConvexUser,
   useProjectBySlug,
   usePendingRequestCount,
+  usePendingAccountRequestCount,
 } from "@/hooks";
 
 interface NavItem {
@@ -121,10 +122,16 @@ export function DashboardNav() {
     organization?.id ?? undefined,
     projectSlug ?? undefined
   );
-  const pendingRequestCount = usePendingRequestCount(
+  const pendingVariableRequestCount = usePendingRequestCount(
     navProject?._id,
     convexUserId
   );
+  const pendingAccountRequestCount = usePendingAccountRequestCount(
+    navProject?._id,
+    convexUserId
+  );
+  const pendingRequestCount =
+    pendingVariableRequestCount + pendingAccountRequestCount;
 
   // Org-level settings href
   const orgSettingsHref = organization?.slug

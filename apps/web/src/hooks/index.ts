@@ -135,6 +135,14 @@ export {
   usePendingRequestCount,
 } from "./useVariableRequests";
 
+// Account request hooks (mirror of the variable-request hooks)
+export {
+  useAccountRequests,
+  useCreateAccountRequest,
+  useResolveAccountRequest,
+  usePendingAccountRequestCount,
+} from "./useAccountRequests";
+
 // Audit log hooks
 export {
   useOrganizationAuditLogs,

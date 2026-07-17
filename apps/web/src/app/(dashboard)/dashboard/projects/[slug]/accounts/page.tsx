@@ -16,11 +16,13 @@ import {
   useConvexUser,
   useAccounts,
   useCreateAccount,
+  useCreateAccountRequest,
   useUpdateAccount,
   useDeleteAccount,
   useRevealAccount,
   type Account,
 } from "@/hooks";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import {
   AccountListItem,
   AccountFormDrawer,
@@ -44,8 +46,11 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
 
   const orgRole = normalizeOrgRole(organization?.role);
   const hasOrgRole = !!organization?.role;
-  const canCreate = hasOrgRole;
-  const canUpdate = hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
+  // LOCKDOWN (R1): developers are read+request-only — direct creation is
+  // team lead and above; developers submit account requests instead.
+  const canCreate = hasOrgRole && roleLevel(orgRole) >= ROLE_LEVEL.team_lead;
+  const canRequest = hasOrgRole && orgRole === "developer";
+  const canUpdate = canCreate;
   const canDelete = canUpdate;
   const canManagePermissions = canUpdate;
 
@@ -61,6 +66,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
   const isLoadingAccounts = accounts === undefined;
 
   const createAccount = useCreateAccount();
+  const createAccountRequest = useCreateAccountRequest();
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
   const revealAccount = useRevealAccount();
@@ -128,6 +134,35 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
     if (!projectId || !orgId) return;
     setNotice(null);
     setError(null);
+
+    // Developers are request-only (R1 lockdown): the same drawer submits an
+    // account request for reviewer approval instead of creating directly.
+    if (!canCreate) {
+      try {
+        await createAccountRequest.mutateAsync({
+          projectId,
+          name: data.name,
+          websiteUrl: data.websiteUrl || undefined,
+          username: data.username,
+          password: data.password,
+          description: data.description || undefined,
+          environments: data.environments,
+        });
+        setNotice("Account request submitted for approval.");
+        setShowCreateDrawer(false);
+      } catch (err) {
+        const message = sanitizeConvexError(err);
+        log.error(
+          "project_account_request_failed",
+          { projectId, organizationId: orgId },
+          err
+        );
+        setError(message);
+        throw new Error(message);
+      }
+      return;
+    }
+
     try {
       await createAccount.mutateAsync({
         organizationId: orgId,
@@ -322,12 +357,14 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                 {selectedEnvironment !== "all" && ` in ${selectedEnvironment}`}
               </p>
             </div>
-            {canCreate && (
+            {(canCreate || canRequest) && (
               <button
                 onClick={() => setShowCreateDrawer(true)}
-                disabled={!canCreateGate}
+                // The limit only blocks direct creation — requests are
+                // re-checked against the cap at approval time.
+                disabled={canCreate && !canCreateGate}
                 title={
-                  !canCreateGate
+                  canCreate && !canCreateGate
                     ? "Account limit reached. Upgrade to add more."
                     : undefined
                 }
@@ -346,7 +383,7 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                Add Account
+                {canCreate ? "Add Account" : "Request Account"}
               </button>
             )}
           </div>
@@ -403,13 +440,13 @@ export default function ProjectAccountsPage({ params }: AccountsPageProps) {
           </div>
         </div>
 
-        {/* Create drawer */}
+        {/* Create drawer (developers submit a request instead) */}
         <AccountFormDrawer
           isOpen={showCreateDrawer}
           onClose={() => setShowCreateDrawer(false)}
           onSubmit={handleCreate}
-          title="Add Account"
-          submitLabel="Create Account"
+          title={canCreate ? "Add Account" : "Request Account"}
+          submitLabel={canCreate ? "Create Account" : "Submit Request"}
         />
 
         {/* Edit drawer */}
