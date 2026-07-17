@@ -1,0 +1,29 @@
+CONTRIBUTING.md
+  s_c0d41f513c83f7::t_5e4cfac0106a2d 1-89
+README.md
+  s_c0d41f513c83f7::t_2561042d85fd86 10-12,40,44-45
+SECURITY.md
+  s_c0d41f513c83f7::t_0b010017793ff6 1-63
+docs/DEPLOYMENT.md
+  s_c0d41f513c83f7::t_24b439563dfc43 5-17,20,53,160-161,168-170,172-173
+docs/SELF_HOSTING.md
+  s_c0d41f513c83f7::t_9b104c543e51ca 1-150
+docs/ci.md
+  s_c0d41f513c83f7::t_cc4ffd82f94585 3-5,7-11,13,15,17-19,23-27,29,31-47,50-54,56,60-61,63,65-67,69,71-83,87-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3bd546772e0c175799af89b1d686513c1af97ca7",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
