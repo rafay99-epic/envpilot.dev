@@ -1,0 +1,25 @@
+apps/admin/src/routes/_authenticated/roles.tsx
+  s_c0d41f513c83f7::t_72fec583736ff3 271-272,352-358,427-429
+convex/features/admin/migrations.ts
+  s_c0d41f513c83f7::t_77db1ee393b54f 323-326,349-358,418
+convex/features/admin/roles.ts
+  s_c0d41f513c83f7::t_4f317b6b342bff 149-159,178,182,187-188,200-209,211,214-220
+convex/lib/roleProfiles.ts
+  s_c0d41f513c83f7::t_fd08ecab4a1e02 266-268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ac942175c16ae55cdd2465a706f1ced919a6c26f",
+  "prompts": {},
+  "sessions": {
+    "s_c0d41f513c83f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0436fc9-48ab-4e24-bad2-5661f13d7b76",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
