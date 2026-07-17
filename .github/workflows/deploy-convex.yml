@@ -37,6 +37,9 @@ jobs:
       # ADMIN_SECRET is read from the deployment's own env via the deploy
       # key — no extra GitHub secret to manage. Masked so it never appears
       # in logs.
+      # seed-role-registry + migrate-roles keep the dynamic role system in
+      # sync on every deploy (system roles synced from code, custom roles
+      # insert-only, legacy slugs normalized) — same idempotent upsert model.
       # seed-changelog rides along for the same reason: changelog entries
       # live in code (convex/features/community/changelog/seed.ts), so the
       # website changelog updates the moment a release with new entries
@@ -52,7 +55,7 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$ADMIN_SECRET"
-          for migration in seed-feature-registry seed-tier-features seed-changelog; do
+          for migration in seed-feature-registry seed-tier-features seed-role-registry migrate-roles seed-changelog; do
             echo "Running $migration..."
             bunx convex run features/admin/migrations:runMigration \
               "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')"
