@@ -15,7 +15,10 @@ import {
   useConvexUser,
   useVariableRequests,
   useResolveVariableRequest,
+  useAccountRequests,
+  useResolveAccountRequest,
 } from "@/hooks";
+import { sanitizeConvexError } from "@/lib/error-messages";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("app/dashboard/project-requests");
@@ -40,11 +43,29 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
   const projectError = project === null ? new Error("Project not found") : null;
   const projectId = project?._id as Id<"projects"> | undefined;
 
-  const { requests, isLoading: isLoadingRequests } = useVariableRequests(
-    projectId,
-    convexUserId
-  );
+  const { requests: variableRequests, isLoading: isLoadingVariableRequests } =
+    useVariableRequests(projectId, convexUserId);
+  const { requests: accountRequests, isLoading: isLoadingAccountRequests } =
+    useAccountRequests(projectId, convexUserId);
   const resolveRequest = useResolveVariableRequest();
+  const resolveAccountRequest = useResolveAccountRequest();
+
+  const isLoadingRequests =
+    isLoadingVariableRequests || isLoadingAccountRequests;
+
+  // Unified feed: variable + account requests interleaved, newest first.
+  const requests = [
+    ...variableRequests.map((request) => ({
+      ...request,
+      type: "variable" as const,
+      label: request.key,
+    })),
+    ...accountRequests.map((request) => ({
+      ...request,
+      type: "account" as const,
+      label: request.name,
+    })),
+  ].sort((a, b) => b.createdAt - a.createdAt);
 
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,29 +78,68 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
       timeStyle: "short",
     }).format(new Date(timestamp));
 
-  const handleCancel = async (requestId: Id<"environmentVariableRequests">) => {
+  const handleCancel = async (request: {
+    type: "variable" | "account";
+    _id: string;
+  }) => {
     if (!projectId || !convexUserId) return;
     setNotice(null);
     setError(null);
     try {
-      await resolveRequest.mutateAsync({
-        requestId,
-        action: "cancel",
-        reviewedBy: convexUserId as string,
-      });
+      if (request.type === "account") {
+        await resolveAccountRequest.mutateAsync({
+          requestId: request._id,
+          action: "cancel",
+        });
+      } else {
+        await resolveRequest.mutateAsync({
+          requestId: request._id,
+          action: "cancel",
+          reviewedBy: convexUserId as string,
+        });
+      }
       setNotice("Request canceled.");
     } catch (err) {
       log.error(
         "project_request_cancel_failed",
         {
           projectId,
-          requestId,
+          requestId: request._id,
+          type: request.type,
           reviewedBy: convexUserId,
           organizationId: organization?.id,
         },
         err
       );
-      setError(err instanceof Error ? err.message : "Failed to cancel request");
+      setError(sanitizeConvexError(err));
+    }
+  };
+
+  // Account requests are reviewed inline here (variable requests keep their
+  // org-wide review page at /dashboard/requests).
+  const handleReviewAccountRequest = async (
+    requestId: string,
+    action: "approve" | "reject"
+  ) => {
+    setNotice(null);
+    setError(null);
+    try {
+      await resolveAccountRequest.mutateAsync({ requestId, action });
+      setNotice(
+        `Account request ${action === "approve" ? "approved" : "rejected"}.`
+      );
+    } catch (err) {
+      log.error(
+        "project_account_request_review_failed",
+        {
+          projectId,
+          requestId,
+          action,
+          organizationId: organization?.id,
+        },
+        err
+      );
+      setError(sanitizeConvexError(err));
     }
   };
 
@@ -119,8 +179,8 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
               Requests
             </h1>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Member-submitted variable changes with approval history for{" "}
-              {project.name}.
+              Member-submitted variable and account requests with approval
+              history for {project.name}.
             </p>
           </div>
         </div>
@@ -158,8 +218,19 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                       <div>
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                            {request.key}
+                            {request.label}
                           </code>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              request.type === "account"
+                                ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            }`}
+                          >
+                            {request.type === "account"
+                              ? "Account"
+                              : "Variable"}
+                          </span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                               request.status === "approved"
@@ -208,24 +279,47 @@ export default function ProjectRequestsPage({ params }: RequestsPageProps) {
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        {canReviewRequests && request.status === "pending" && (
-                          <Link
-                            href="/dashboard/requests"
-                            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          >
-                            Review →
-                          </Link>
-                        )}
+                        {canReviewRequests &&
+                          request.status === "pending" &&
+                          (request.type === "variable" ? (
+                            <Link
+                              href="/dashboard/requests"
+                              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                              Review →
+                            </Link>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleReviewAccountRequest(
+                                    request._id,
+                                    "approve"
+                                  )
+                                }
+                                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleReviewAccountRequest(
+                                    request._id,
+                                    "reject"
+                                  )
+                                }
+                                className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ))}
                         {!canReviewRequests &&
                           convexUserId &&
                           request.status === "pending" &&
                           request.requestedBy === convexUserId && (
                             <button
-                              onClick={() =>
-                                handleCancel(
-                                  request._id as Id<"environmentVariableRequests">
-                                )
-                              }
+                              onClick={() => handleCancel(request)}
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                             >
                               Cancel

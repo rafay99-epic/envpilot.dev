@@ -466,6 +466,53 @@ export default defineSchema({
     .index("by_vaultRef", ["vaultRef"]),
 
   // ==========================================
+  // ACCOUNT REQUESTS
+  // Mirror of environmentVariableRequests for projectAccounts: developers are
+  // read+request-only (R1 lockdown), so this is their only path to a new
+  // shared account. The proposed credentials live encrypted in WorkOS Vault;
+  // only the opaque vaultRef is stored here.
+  // ==========================================
+  accountRequests: defineTable({
+    // Display label, e.g. "Stripe Dashboard"
+    name: v.string(),
+    // Validated https?:// URL (optional)
+    websiteUrl: v.optional(v.string()),
+    // WorkOS Vault reference holding JSON {"username","password"}
+    vaultRef: v.string(),
+    // Optional human-readable description
+    description: v.optional(v.string()),
+    // Environment tags (e.g., ["development", "staging", "production"]); >= 1
+    environments: v.array(v.string()),
+    // Parent project
+    projectId: v.id("projects"),
+    // Parent organization (denormalized for easier querying)
+    organizationId: v.id("organizations"),
+    // User who requested this account
+    requestedBy: v.id("users"),
+    // Request lifecycle status
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("canceled")
+    ),
+    // Optional reviewer decision note
+    reviewReason: v.optional(v.string()),
+    // Reviewer metadata
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    // If approved, the created account
+    createdAccountId: v.optional(v.id("projectAccounts")),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_status", ["projectId", "status"])
+    // Serves the duplicate-pending guard on create (same requester + name)
+    .index("by_project_and_name", ["projectId", "name"]),
+
+  // ==========================================
   // ACCOUNT ACCESS PERMISSIONS (per-account grants)
   // EXACT mirror of variablePermissions (no legacy "admin" level).
   // ==========================================
@@ -887,7 +934,12 @@ export default defineSchema({
       v.literal("account.accessed"),
       v.literal("account.permission_granted"),
       v.literal("account.permission_revoked"),
-      v.literal("account.permission_updated")
+      v.literal("account.permission_updated"),
+      // Account request actions (mirror of the variable.request* literals)
+      v.literal("account.requested"),
+      v.literal("account.request_approved"),
+      v.literal("account.request_rejected"),
+      v.literal("account.request_canceled")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
