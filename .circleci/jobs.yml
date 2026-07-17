@@ -295,7 +295,7 @@ jobs:
               echo "ERROR: ADMIN_SECRET is not set on the production Convex deployment"
               exit 1
             fi
-            for migration in seed-feature-registry seed-tier-features seed-changelog; do
+            for migration in seed-feature-registry seed-tier-features seed-role-registry migrate-roles seed-changelog; do
               echo "Running $migration..."
               bunx convex run features/admin/migrations:runMigration \
                 "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')"
