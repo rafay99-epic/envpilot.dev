@@ -5,7 +5,9 @@
 import { execSync } from "node:child_process";
 
 if (process.env.EXT_PREBUILT === "1") {
-  console.log("EXT_PREBUILT=1 — dist was built by the CI step; skipping rebuild.");
+  console.log(
+    "EXT_PREBUILT=1 — dist was built by the CI step; skipping rebuild."
+  );
   process.exit(0);
 }
 execSync("npm run package", { stdio: "inherit" });
