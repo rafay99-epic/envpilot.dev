@@ -49,7 +49,7 @@ const HERO_SCENES: TerminalScene[] = [
     command: "envpilot run -- bun dev",
     output: [
       { text: "✓ Injected 47 variables from backend-api/staging", tone: "ok" },
-      { text: "⚡ fingerprint cache hit — ready in 0.3s", tone: "dim" },
+      { text: "↻ fingerprint cache hit — ready in 0.3s", tone: "dim" },
       { text: "$ bun dev — server listening on :3000", tone: "out" },
     ],
   },
@@ -57,7 +57,7 @@ const HERO_SCENES: TerminalScene[] = [
     command: "envpilot pull --env production",
     output: [
       { text: "✓ Pulled 32 variables from backend-api/production", tone: "ok" },
-      { text: "🔒 decrypted in memory — nothing written to disk", tone: "dim" },
+      { text: "✓ decrypted in memory — nothing written to disk", tone: "dim" },
     ],
   },
   {
@@ -560,7 +560,7 @@ function BeforeAfter() {
                 </p>
                 <p className="text-green-400/80">
                   ✓ Injected 12 vars from backend/staging{" "}
-                  <span className="text-zinc-600">⚡ cache (4s ago)</span>
+                  <span className="text-zinc-600">↻ cache (4s ago)</span>
                 </p>
                 <p className="text-zinc-500">
                   <span className="text-amber-400">DATABASE_URL</span>

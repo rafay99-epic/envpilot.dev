@@ -694,7 +694,7 @@ export default function EnvironmentDiffPage({
         ? "matching (content)"
         : row.status;
       const cells = selectedEnvs.map((env) => (row.slots[env] ? "✓" : "—"));
-      const sensitive = row.isSensitive ? " 🔒" : "";
+      const sensitive = row.isSensitive ? " (sensitive)" : "";
       lines.push(
         `| \`${row.key}\`${sensitive} | ${status} | ${cells.join(" | ")} |`
       );
