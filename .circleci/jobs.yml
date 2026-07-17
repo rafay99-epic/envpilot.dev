@@ -442,14 +442,15 @@ jobs:
             [ -f "$VSIX" ] || { echo "ERROR: expected package $VSIX not found."; ls ./*.vsix || true; exit 1; }
             unzip -p "$VSIX" extension/dist/extension.js | shasum | awk '{print $1}' > /tmp/vsix-checksum
             [ "$(awk '{print $1}' /tmp/dist-checksum)" = "$(cat /tmp/vsix-checksum)" ] || { echo "ERROR: VSIX bundle differs from the step-shell build — prepublish rebuilt despite the marker."; exit 1; }
-            # Embed check in THIS shell — the standalone verify step read a
-            # DIFFERENT env value than the one baked here (that mismatch was
-            # the recurring "client id not in vsix"). Forensics print lengths
-            # and hash prefixes only, never values.
-            BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
+            # Embed check by STREAMING the VSIX bundle into grep — never
+            # capture it in a shell variable. $(unzip ...) mangles the 500 KB
+            # minified bundle (bash drops NUL/binary bytes), so a variable
+            # copy is truncated and the grep misses a value that IS in the
+            # file — the real cause of every past "client id not in vsix"
+            # (the checksum step above uses a pipe, which is why it passed).
             for pair in "WORKOS_CLIENT_ID:$WORKOS_CLIENT_ID" "NEXT_PUBLIC_CONVEX_URL:$NEXT_PUBLIC_CONVEX_URL"; do
               name="${pair%%:*}"; val="${pair#*:}"
-              if ! printf '%s' "$BUNDLE" | grep -qF "$val"; then
+              if ! unzip -p "$VSIX" extension/dist/extension.js | grep -qF "$val"; then
                 echo "ERROR: $name not in $VSIX — refusing to publish."
                 echo "diag: len=${#val} sha8=$(printf '%s' "$val" | shasum | cut -c1-8)"
                 echo "diag: dist files containing it:"; grep -rlF "$val" dist || echo "  (none)"
