@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
 import { TerminalLoading } from "@/components/dashboard/terminal-ui";
-import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 
 interface InvitationDetails {
   email: string;
@@ -291,9 +291,7 @@ export default function InvitationAcceptPage({
               {invitation.invitedBy.name || invitation.invitedBy.email}
             </span>{" "}
             invited you to join as a{" "}
-            <span className="font-medium">
-              {ORG_ROLE_LABELS[normalizeOrgRole(invitation.role)]}
-            </span>
+            <span className="font-medium">{roleLabel(invitation.role)}</span>
           </p>
 
           <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">

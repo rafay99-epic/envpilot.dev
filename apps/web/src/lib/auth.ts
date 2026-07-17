@@ -36,6 +36,13 @@ export interface Organization {
   updatedAt: Date;
 }
 
+/** Registry display metadata for the caller's resolved role (getMyPermissions). */
+export interface RoleMeta {
+  displayName: string;
+  color: string;
+  level: number;
+}
+
 export interface AuthSession {
   user: AuthUser | null;
   organization: Organization | null;

@@ -6,10 +6,12 @@ import { resolveFeatureForUser } from "../featureRegistry/resolver";
 import { getDefaultTierName } from "../billing/tierLimits";
 import { rateLimiter } from "../../lib/rateLimits";
 import { writeTombstone } from "./tombstones";
+import { ConvexError } from "convex/values";
 import {
   assertOrgAction,
   assertCanManageUserAsync,
   assertCanAssignRoleAsync,
+  getRoleProfile,
   normalizeOrgRole,
 } from "../../lib/authz";
 
@@ -574,12 +576,8 @@ export const updateMemberRole = mutation({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
-    newRole: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer")
-    ),
+    // Open slug — validated against the role registry below.
+    newRole: v.string(),
   },
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
@@ -635,6 +633,15 @@ export const updateMemberRole = mutation({
 
     // Hierarchy: can only assign roles below your own (owners may assign any)
     await assertCanAssignRoleAsync(ctx, callerMembership.role, args.newRole);
+
+    // The new role must exist and be active in the registry — a typo'd or
+    // deactivated slug must never enter organizationMembers.
+    const newRoleProfile = await getRoleProfile(ctx, args.newRole);
+    if (newRoleProfile.level === 0) {
+      throw new ConvexError(
+        `Unknown or inactive role "${args.newRole}" — pick a role from the registry.`
+      );
+    }
 
     const oldRole = membership.role;
 

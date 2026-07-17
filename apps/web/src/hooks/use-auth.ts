@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
-import type { AuthUser, Organization } from "@/lib/auth";
+import type { AuthUser, Organization, RoleMeta } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("hooks/use-auth");
@@ -11,6 +11,10 @@ interface UserData {
   user: AuthUser | null;
   organization: Organization | null;
   actions?: string[];
+  /** Resolved capability map for the active org role (registry-driven). */
+  capabilities?: Record<string, boolean>;
+  /** Registry display metadata for the active org role. */
+  roleMeta?: RoleMeta | null;
   accessToken: string | null;
   impersonator?: {
     email: string;
@@ -31,6 +35,10 @@ interface UseAuthReturn {
   canDo: (action: string) => boolean;
   /** All actions the current user can perform (from backend authz) */
   actions: string[];
+  /** Registry capability map for the active org role (e.g. "project.variables.create"). */
+  capabilities: Record<string, boolean>;
+  /** Registry display metadata for the active org role (null while loading / no org). */
+  roleMeta: RoleMeta | null;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -45,6 +53,12 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     initialData?.organization ?? null
   );
   const [actions, setActions] = useState<string[]>(initialData?.actions ?? []);
+  const [capabilities, setCapabilities] = useState<Record<string, boolean>>(
+    initialData?.capabilities ?? {}
+  );
+  const [roleMeta, setRoleMeta] = useState<RoleMeta | null>(
+    initialData?.roleMeta ?? null
+  );
   const [isLoading, setIsLoading] = useState(!initialData);
   const [impersonator, setImpersonator] = useState(initialData?.impersonator);
 
@@ -57,11 +71,15 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
         setUser(data.user);
         setOrganization(data.organization);
         setActions(data.actions ?? []);
+        setCapabilities(data.capabilities ?? {});
+        setRoleMeta(data.roleMeta ?? null);
         setImpersonator(data.impersonator);
       } else {
         setUser(null);
         setOrganization(null);
         setActions([]);
+        setCapabilities({});
+        setRoleMeta(null);
         setImpersonator(undefined);
       }
     } catch (error) {
@@ -69,6 +87,8 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
       setUser(null);
       setOrganization(null);
       setActions([]);
+      setCapabilities({});
+      setRoleMeta(null);
       setImpersonator(undefined);
     } finally {
       setIsLoading(false);
@@ -113,6 +133,8 @@ export function useAuth(initialData?: UserData): UseAuthReturn {
     impersonator,
     canDo: (action: string) => actions.includes(action),
     actions,
+    capabilities,
+    roleMeta,
     signOut: signOutHandler,
     refreshUser: fetchUser,
   };

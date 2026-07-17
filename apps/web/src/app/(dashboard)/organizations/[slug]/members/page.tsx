@@ -12,7 +12,7 @@ import {
 } from "@/components/members/environment-scope-selector";
 import { Pagination } from "@/components/dashboard/pagination";
 import { AnimatedList } from "@/components/dashboard/animated-list";
-import { usePagination, useConvexUser } from "@/hooks";
+import { usePagination, useConvexUser, useAssignableRoles } from "@/hooks";
 import { RequireRole, useAuthContext } from "@/components/auth";
 import { useEnforcementEnabled } from "@/hooks/useTierLimits";
 import { useFeatureGate } from "@/hooks";
@@ -22,28 +22,17 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   normalizeOrgRole,
   roleLevel,
+  roleLabel,
+  roleBadgeColor,
   ROLE_LEVEL,
-  ORG_ROLE_LABELS,
+  ROLE_FALLBACK_COLOR,
   ORG_ROLE_DESCRIPTIONS,
-  assignableRoles,
+  ENV_SCOPED_ROLE_FALLBACK,
   type OrgRole,
 } from "@/lib/roles";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("app/dashboard/organization-members");
-
-function roleBadgeClasses(role: OrgRole): string {
-  switch (role) {
-    case "owner":
-      return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-    case "project_manager":
-      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-    case "team_lead":
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-    case "developer":
-      return "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400";
-  }
-}
 
 interface SearchUser {
   _id: string;
@@ -94,6 +83,22 @@ function OrganizationMembersPageContent({
     api.features.projects.queries.listByOrganization,
     orgId ? { organizationId: orgId } : "skip"
   );
+  // Registry roles the caller may assign — drives the invite / role-change
+  // pickers and supplies badge metadata (displayName + color).
+  const assignable = useAssignableRoles(orgId) ?? [];
+  const roleMetaBySlug = new Map(assignable.map((r) => [r.slug, r]));
+
+  /** Badge label + classes: registry meta first, seeded fallback otherwise. */
+  function roleBadge(role: string): { label: string; classes: string } {
+    const slug = normalizeOrgRole(role);
+    const meta = roleMetaBySlug.get(slug);
+    return {
+      label: meta?.displayName ?? roleLabel(slug),
+      classes: roleBadgeColor(
+        meta?.color ?? ROLE_FALLBACK_COLOR[slug] ?? "zinc"
+      ),
+    };
+  }
 
   // Derive loading state from Convex query readiness
   const isLoading = org === undefined || membersData === undefined;
@@ -205,10 +210,14 @@ function OrganizationMembersPageContent({
   // auto-updates queries after backend data changes (no manual refetch needed)
   // ---------------------------------------------------------------------------
 
-  // Environment scoping only applies to developer invites with project
-  // assignments. All environments checked = unrestricted = send nothing.
+  // Environment scoping only applies to env-scopeable roles (registry
+  // capability access.env_scoped) with project assignments. All environments
+  // checked = unrestricted = send nothing.
+  const inviteRoleEnvScoped =
+    roleMetaBySlug.get(inviteRole)?.envScoped ??
+    ENV_SCOPED_ROLE_FALLBACK.has(inviteRole);
   const inviteEnvScopeApplies =
-    inviteRole === "developer" && selectedProjectIds.length > 0;
+    inviteRoleEnvScoped && selectedProjectIds.length > 0;
 
   function resetInviteForm() {
     setShowInviteModal(false);
@@ -568,7 +577,7 @@ function OrganizationMembersPageContent({
   const canRemoveMembers =
     hasRole && roleLevel(userRole) >= ROLE_LEVEL.project_manager;
   const canManageSessions = canRemoveMembers;
-  const inviteRoleOptions = assignableRoles(userRole);
+  const inviteRoleOptions = assignable;
 
   if (isLoading) {
     return (
@@ -776,19 +785,19 @@ function OrganizationMembersPageContent({
                       }
                       className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                     >
-                      {assignableRoles(userRole).map((role) => (
-                        <option key={role} value={role}>
-                          {ORG_ROLE_LABELS[role]}
+                      {assignable.map((role) => (
+                        <option key={role.slug} value={role.slug}>
+                          {role.displayName}
                         </option>
                       ))}
                     </select>
                   ) : (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(
-                        normalizeOrgRole(member.role)
-                      )}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        roleBadge(member.role).classes
+                      }`}
                     >
-                      {ORG_ROLE_LABELS[normalizeOrgRole(member.role)]}
+                      {roleBadge(member.role).label}
                     </span>
                   )}
                   {canManageSessions && (
@@ -1122,11 +1131,11 @@ function OrganizationMembersPageContent({
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(
-                      normalizeOrgRole(invitation.role)
-                    )}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      roleBadge(invitation.role).classes
+                    }`}
                   >
-                    {ORG_ROLE_LABELS[normalizeOrgRole(invitation.role)]}
+                    {roleBadge(invitation.role).label}
                   </span>
                   {canInvite && (
                     <>
@@ -1327,13 +1336,15 @@ function OrganizationMembersPageContent({
               className="mt-2 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
             >
               {inviteRoleOptions.map((role) => (
-                <option key={role} value={role}>
-                  {ORG_ROLE_LABELS[role]}
+                <option key={role.slug} value={role.slug}>
+                  {role.displayName}
                 </option>
               ))}
             </select>
             <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-              {ORG_ROLE_DESCRIPTIONS[inviteRole]}
+              {roleMetaBySlug.get(inviteRole)?.description ??
+                ORG_ROLE_DESCRIPTIONS[inviteRole] ??
+                ""}
             </p>
           </div>
           {inviteRole !== "owner" && projects.length === 0 && (

@@ -101,12 +101,8 @@ export const create = mutation({
   args: {
     email: v.string(),
     organizationId: v.id("organizations"),
-    role: v.union(
-      v.literal("owner"),
-      v.literal("project_manager"),
-      v.literal("team_lead"),
-      v.literal("developer")
-    ),
+    // Open slug — validated against the role registry below.
+    role: v.string(),
     projectIds: v.optional(v.array(v.id("projects"))),
     // Environment scope applied to the created project assignments on
     // acceptance — only applied when the invited role is developer

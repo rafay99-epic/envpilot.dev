@@ -17,7 +17,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useProjects, useConvexUser } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { ConfirmDialog } from "@/components/ui";
-import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
 
 // Mirrors PURGE_RETENTION_DAYS in convex/features/vault/gc.ts (server-only
 // module — must not end up in the client bundle).
@@ -50,7 +49,7 @@ interface TrashPageProps {
  */
 export default function TrashPage({ params }: TrashPageProps) {
   const { slug } = use(params);
-  const { organization, user } = useAuthContext();
+  const { organization, user, capabilities } = useAuthContext();
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
 
@@ -78,11 +77,10 @@ export default function TrashPage({ params }: TrashPageProps) {
   const [emptying, setEmptying] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Empty-trash mirrors variable deletion capability: owner implicit,
-  // assigned PM / team lead. The server re-checks; this only hides the button.
-  const canEmpty =
-    roleLevel(organization?.role ?? "") >= ROLE_LEVEL.team_lead ||
-    organization?.role === "owner";
+  // Empty-trash mirrors the variable-deletion capability from the caller's
+  // resolved registry profile. The server re-checks; this only hides the
+  // button.
+  const canEmpty = capabilities["project.variables.delete"] === true;
 
   const loading =
     project === undefined ||

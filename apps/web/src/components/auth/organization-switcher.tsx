@@ -8,7 +8,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { setActiveOrganizationCookie } from "@/lib/organization-context";
-import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import { roleLabel } from "@/lib/roles";
 import { useAuthContext } from "./auth-provider";
 import { useConvexUser } from "@/hooks/useConvexUser";
 
@@ -35,7 +35,7 @@ interface OrganizationSwitcherProps {
 }
 
 function formatRole(role: string): string {
-  return ORG_ROLE_LABELS[normalizeOrgRole(role)];
+  return roleLabel(role);
 }
 
 export function OrganizationSwitcher({

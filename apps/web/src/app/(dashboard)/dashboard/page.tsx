@@ -23,7 +23,7 @@ import {
 } from "@/components/dashboard/terminal-ui";
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { SharedSecretsWidget } from "@/components/dashboard/shared-secrets-widget";
-import { normalizeOrgRole, ORG_ROLE_LABELS } from "@/lib/roles";
+import { normalizeOrgRole, roleLabel } from "@/lib/roles";
 import { Plus, ChevronRight, Check, RotateCcw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -560,7 +560,7 @@ function TeamMemberRow({
           {member.user.name || member.user.email}
         </span>
       </div>
-      <TerminalBadge color={roleColor}>{ORG_ROLE_LABELS[role]}</TerminalBadge>
+      <TerminalBadge color={roleColor}>{roleLabel(role)}</TerminalBadge>
     </div>
   );
 }
