@@ -429,36 +429,29 @@ jobs:
           # (like the secrets themselves) never survives into the prepublish
           # hook — a file on disk always does.
           command: |
-            [ -n "$WORKOS_CLIENT_ID" ] || { echo "ERROR: WORKOS_CLIENT_ID empty in step shell"; exit 1; }
-            [ -n "$NEXT_PUBLIC_CONVEX_URL" ] || { echo "ERROR: NEXT_PUBLIC_CONVEX_URL empty in step shell"; exit 1; }
+            set -x
             command -v unzip >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq unzip; }
+            echo "=== vsce version ==="; bunx @vscode/vsce --version
+            echo "=== WORKOS_CLIENT_ID present? len=${#WORKOS_CLIENT_ID} ==="
+            echo "=== CONVEX present? len=${#NEXT_PUBLIC_CONVEX_URL} ==="
+            rm -rf dist ./*.vsix .prebuilt
             bun run package
-            grep -rqF "$WORKOS_CLIENT_ID" dist || { echo "ERROR: client id missing from dist straight after the step-shell build."; exit 1; }
-            grep -rqF "$NEXT_PUBLIC_CONVEX_URL" dist || { echo "ERROR: Convex URL missing from dist straight after the step-shell build."; exit 1; }
-            shasum dist/extension.js > /tmp/dist-checksum
+            echo "=== DIST after step-shell build ==="
+            ls -la dist/
+            echo "dist/extension.js sha256:"; sha256sum dist/extension.js
+            echo "client_ occurrences in dist/extension.js:"; grep -c "client_" dist/extension.js || true
+            echo "client_ occurrences in dist/extension.js.map:"; grep -c "client_" dist/extension.js.map 2>/dev/null || echo "no map"
+            echo "WORKOS value in dist/extension.js?"; grep -cF "$WORKOS_CLIENT_ID" dist/extension.js || true
+            echo "WORKOS value in dist/extension.js.map?"; grep -cF "$WORKOS_CLIENT_ID" dist/extension.js.map 2>/dev/null || echo "no map"
             touch .prebuilt
             bunx @vscode/vsce package --no-dependencies
             VSIX="envpilot-$(jq -r '.version' package.json).vsix"
-            [ -f "$VSIX" ] || { echo "ERROR: expected package $VSIX not found."; ls ./*.vsix || true; exit 1; }
-            unzip -p "$VSIX" extension/dist/extension.js | shasum | awk '{print $1}' > /tmp/vsix-checksum
-            [ "$(awk '{print $1}' /tmp/dist-checksum)" = "$(cat /tmp/vsix-checksum)" ] || { echo "ERROR: VSIX bundle differs from the step-shell build — prepublish rebuilt despite the marker."; exit 1; }
-            # Embed check by STREAMING the VSIX bundle into grep — never
-            # capture it in a shell variable. $(unzip ...) mangles the 500 KB
-            # minified bundle (bash drops NUL/binary bytes), so a variable
-            # copy is truncated and the grep misses a value that IS in the
-            # file — the real cause of every past "client id not in vsix"
-            # (the checksum step above uses a pipe, which is why it passed).
-            for pair in "WORKOS_CLIENT_ID:$WORKOS_CLIENT_ID" "NEXT_PUBLIC_CONVEX_URL:$NEXT_PUBLIC_CONVEX_URL"; do
-              name="${pair%%:*}"; val="${pair#*:}"
-              if ! unzip -p "$VSIX" extension/dist/extension.js | grep -qF "$val"; then
-                echo "ERROR: $name not in $VSIX — refusing to publish."
-                echo "diag: len=${#val} sha8=$(printf '%s' "$val" | shasum | cut -c1-8)"
-                echo "diag: dist files containing it:"; grep -rlF "$val" dist || echo "  (none)"
-                exit 1
-              fi
-            done
-            cp "$VSIX" /tmp/ws/
-            echo "Embedded prod credentials verified in $VSIX ✓"
+            echo "=== VSIX listing ==="; unzip -l "$VSIX"
+            echo "=== vsix extension.js sha256 ==="; unzip -p "$VSIX" extension/dist/extension.js | sha256sum
+            echo "=== vsix extension.js byte size ==="; unzip -p "$VSIX" extension/dist/extension.js | wc -c
+            echo "=== WORKOS value in vsix extension.js? ==="; unzip -p "$VSIX" extension/dist/extension.js | grep -cF "$WORKOS_CLIENT_ID" || true
+            echo "=== FORENSIC RUN — intentionally stopping before publish ==="
+            exit 1
       - run:
           name: Publish to Open VSX
           working_directory: apps/vscode-extension
