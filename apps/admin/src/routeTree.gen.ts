@@ -15,8 +15,8 @@ import { Route as AuthenticatedIndexRouteImport } from "./routes/_authenticated/
 import { Route as AuthenticatedWebTrafficRouteImport } from "./routes/_authenticated/web-traffic"
 import { Route as AuthenticatedUsersRouteImport } from "./routes/_authenticated/users"
 import { Route as AuthenticatedTiersRouteImport } from "./routes/_authenticated/tiers"
-import { Route as AuthenticatedRolesRouteImport } from "./routes/_authenticated/roles"
 import { Route as AuthenticatedTicketsRouteImport } from "./routes/_authenticated/tickets"
+import { Route as AuthenticatedRolesRouteImport } from "./routes/_authenticated/roles"
 import { Route as AuthenticatedOrganizationsRouteImport } from "./routes/_authenticated/organizations"
 import { Route as AuthenticatedMigrationsRouteImport } from "./routes/_authenticated/migrations"
 import { Route as AuthenticatedMessagesRouteImport } from "./routes/_authenticated/messages"
@@ -119,6 +119,7 @@ export interface FileRoutesByTo {
   "/messages": typeof AuthenticatedMessagesRoute
   "/migrations": typeof AuthenticatedMigrationsRoute
   "/organizations": typeof AuthenticatedOrganizationsRoute
+  "/roles": typeof AuthenticatedRolesRoute
   "/tickets": typeof AuthenticatedTicketsRoute
   "/tiers": typeof AuthenticatedTiersRoute
   "/users": typeof AuthenticatedUsersRoute
@@ -240,18 +241,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AuthenticatedTiersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    "/_authenticated/roles": {
-      id: "/_authenticated/roles"
-      path: "/roles"
-      fullPath: "/roles"
-      preLoaderRoute: typeof AuthenticatedRolesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     "/_authenticated/tickets": {
       id: "/_authenticated/tickets"
       path: "/tickets"
       fullPath: "/tickets"
       preLoaderRoute: typeof AuthenticatedTicketsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    "/_authenticated/roles": {
+      id: "/_authenticated/roles"
+      path: "/roles"
+      fullPath: "/roles"
+      preLoaderRoute: typeof AuthenticatedRolesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     "/_authenticated/organizations": {

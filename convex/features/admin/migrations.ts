@@ -4,6 +4,7 @@ import { normalizeOrgRole } from "../../lib/authz";
 import { SEED_CHANGELOG } from "../community/changelog/seed";
 import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
 import { SEED_FEATURES, SEED_ROLES } from "../../lib/seedData";
+import { mergeSystemRoleCapabilities } from "../../lib/roleProfiles";
 import { verifyAdmin } from "./auth";
 
 export const listMigrations = query({
@@ -42,7 +43,7 @@ export const listMigrations = query({
       {
         name: "seed-role-registry",
         description:
-          "Seeds the role registry from SEED_ROLES: system roles (owner/project_manager/team_lead/developer) get their capability matrices synced from code truth; seeded custom roles (editor/viewer) are inserted only if absent so admin-panel edits survive. Idempotent.",
+          "Seeds the role registry from SEED_ROLES: system-role metadata and levels sync from code; system capability matrices MERGE (new code defaults fill in, admin edits survive) except owner, which stays fully code-synced. Seeded custom roles (editor/viewer) insert only if absent. Idempotent.",
         category: "Feature & Tier System",
         priority: 4,
         destructive: false,
@@ -319,6 +320,10 @@ export const runMigration = mutation({
       let created = 0;
       let updated = 0;
       let skipped = 0;
+      // Merge semantics make default changes invisible on drifted rows —
+      // this report is the visibility: for every system role, the keys
+      // whose stored value differs from the current code default.
+      const drift: Record<string, string[]> = {};
       const now = Date.now();
 
       for (const role of SEED_ROLES) {
@@ -329,8 +334,28 @@ export const runMigration = mutation({
 
         if (existing) {
           if (role.isSystem) {
-            // System roles: code is the source of truth for the capability
-            // matrix, level, and metadata — sync drift on every run.
+            // System roles: code owns level and metadata on every run. The
+            // capability matrix MERGES (except owner, which stays fully
+            // code-synced): keys the stored row already has keep their
+            // stored value — admin-panel edits survive deploys — while new
+            // code defaults fill in keys the row has never seen.
+            const targetCaps =
+              role.slug === "owner"
+                ? (role.capabilities as Record<string, boolean>)
+                : (mergeSystemRoleCapabilities(
+                    role.capabilities,
+                    existing.capabilities as Record<string, boolean>
+                  ) as Record<string, boolean>);
+            const defaults = role.capabilities as Record<string, boolean>;
+            const driftKeys = [
+              ...new Set([
+                ...Object.keys(defaults),
+                ...Object.keys(targetCaps),
+              ]),
+            ].filter(
+              (k) => (targetCaps[k] === true) !== (defaults[k] === true)
+            );
+            if (driftKeys.length > 0) drift[role.slug] = driftKeys.sort();
             const normalizeCaps = (caps: Record<string, boolean>) =>
               JSON.stringify(
                 Object.keys(caps)
@@ -340,7 +365,7 @@ export const runMigration = mutation({
             const capsChanged =
               normalizeCaps(
                 existing.capabilities as Record<string, boolean>
-              ) !== normalizeCaps(role.capabilities as Record<string, boolean>);
+              ) !== normalizeCaps(targetCaps);
             const needsUpdate =
               capsChanged ||
               existing.displayName !== role.displayName ||
@@ -357,7 +382,7 @@ export const runMigration = mutation({
                 level: role.level,
                 isSystem: true,
                 sortOrder: role.sortOrder,
-                capabilities: role.capabilities as Record<string, boolean>,
+                capabilities: targetCaps,
                 updatedAt: now,
               });
               updated++;
@@ -390,6 +415,7 @@ export const runMigration = mutation({
 
       return {
         success: true,
+        drift,
         created,
         updated,
         skipped,
