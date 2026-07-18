@@ -1,0 +1,19 @@
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_604afe176f97a4 3,18,150-151,153,157-164,403,406-407,411-412,442-461,598-606,695,937,948
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "27c9e3c40783861f7c741db7659332b588bb2156",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
