@@ -1,0 +1,19 @@
+apps/vscode-extension/CHANGELOG.md
+  s_5532a122e78401::t_6ac2866d3c1c9d 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "59ad810b5c1fe971944891403505afcdf5d3b322",
+  "prompts": {},
+  "sessions": {
+    "s_5532a122e78401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6949f66-7e65-4bf5-a865-3cbf805ad2d3",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
