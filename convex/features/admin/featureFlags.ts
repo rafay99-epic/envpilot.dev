@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -63,7 +63,9 @@ export const setTierFeatureValue = mutation({
       .withIndex("by_key", (q) => q.eq("key", args.featureKey))
       .first();
     if (!feature) {
-      throw new Error(`Feature "${args.featureKey}" not found in registry`);
+      throw new ConvexError(
+        `Feature "${args.featureKey}" not found in registry`
+      );
     }
 
     // Validate tier exists
@@ -72,13 +74,13 @@ export const setTierFeatureValue = mutation({
       .withIndex("by_name", (q) => q.eq("name", args.tierName))
       .first();
     if (!tier) {
-      throw new Error(`Tier "${args.tierName}" not found`);
+      throw new ConvexError(`Tier "${args.tierName}" not found`);
     }
 
     // Validate value matches feature type
     if (feature.valueType === "boolean") {
       if (args.value !== "true" && args.value !== "false") {
-        throw new Error(
+        throw new ConvexError(
           `Boolean feature "${args.featureKey}" requires "true" or "false"`
         );
       }
@@ -86,7 +88,7 @@ export const setTierFeatureValue = mutation({
       if (args.value !== "null") {
         const n = parseInt(args.value, 10);
         if (isNaN(n) || n < 0) {
-          throw new Error(
+          throw new ConvexError(
             `Numeric feature "${args.featureKey}" requires a non-negative number or "null"`
           );
         }

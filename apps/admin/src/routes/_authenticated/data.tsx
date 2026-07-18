@@ -7,6 +7,7 @@ import { useState } from "react";
 import {
   useAdminMutation,
   useAdminPaginatedQuery,
+  useAdminQuery,
 } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Select } from "@/components/ui/Select";
@@ -32,47 +33,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BROWSABLE_TABLES = [
-  { value: "", label: "Select a table..." },
-  { value: "users", label: "users" },
-  { value: "userPreferences", label: "userPreferences" },
-  { value: "organizations", label: "organizations" },
-  { value: "organizationMembers", label: "organizationMembers" },
-  { value: "organizationTiers", label: "organizationTiers" },
-  { value: "projects", label: "projects" },
-  { value: "favoriteProjects", label: "favoriteProjects" },
-  { value: "projectMembers", label: "projectMembers" },
-  { value: "environmentVariables", label: "environmentVariables" },
-  {
-    value: "environmentVariableRequests",
-    label: "environmentVariableRequests",
-  },
-  { value: "variableVersions", label: "variableVersions" },
-  { value: "variablePermissions", label: "variablePermissions" },
-  { value: "projectAccess", label: "projectAccess" },
-  { value: "invitations", label: "invitations" },
-  { value: "featureRequests", label: "featureRequests" },
-  { value: "featureVotes", label: "featureVotes" },
-  { value: "changelog", label: "changelog" },
-  { value: "auditLogs", label: "auditLogs" },
-  { value: "subscriptions", label: "subscriptions" },
-  { value: "polarCustomers", label: "polarCustomers" },
-  { value: "cliSessions", label: "cliSessions" },
-  { value: "cliTokens", label: "cliTokens" },
-  { value: "environmentTemplates", label: "environmentTemplates" },
-  { value: "templateVariables", label: "templateVariables" },
-  {
-    value: "permissionRevocationEvents",
-    label: "permissionRevocationEvents",
-  },
-  { value: "supportTickets", label: "supportTickets" },
-  { value: "contactMessages", label: "contactMessages" },
-  { value: "tierDefinitions", label: "tierDefinitions" },
-  { value: "adminSettings", label: "adminSettings" },
-  { value: "paymentProducts", label: "paymentProducts" },
-  { value: "processedWebhookEvents", label: "processedWebhookEvents" },
-];
-
 const PAGE_SIZE = 50;
 
 type SearchParams = { table?: string };
@@ -88,6 +48,17 @@ function DataBrowserPage() {
   const { table } = useSearch({ from: "/_authenticated/data" });
   const navigate = useNavigate();
   const { confirm } = useConfirmStore();
+
+  // Server is the single source of truth for which tables are browsable —
+  // the old hardcoded copy here had drifted from the backend allowlist.
+  const browsableTables = useAdminQuery(
+    api.features.admin.tables.listBrowsableTables,
+    {}
+  );
+  const tableOptions = [
+    { value: "", label: "Select a table..." },
+    ...(browsableTables ?? []).map((t) => ({ value: t, label: t })),
+  ];
 
   // Paginated data fetch
   const {
@@ -242,7 +213,7 @@ function DataBrowserPage() {
           <Select
             label="Table"
             id="table-select"
-            options={BROWSABLE_TABLES}
+            options={tableOptions}
             value={table ?? ""}
             onChange={(e) => handleTableChange(e.target.value)}
           />

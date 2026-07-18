@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -69,11 +69,11 @@ export const createFeatureRequest = mutation({
 
     const title = args.title.trim();
     const description = args.description.trim();
-    if (!title) throw new Error("Title is required");
-    if (!description) throw new Error("Description is required");
-    if (title.length > 200) throw new Error("Title too long (max 200)");
+    if (!title) throw new ConvexError("Title is required");
+    if (!description) throw new ConvexError("Description is required");
+    if (title.length > 200) throw new ConvexError("Title too long (max 200)");
     if (description.length > 5000)
-      throw new Error("Description too long (max 5000)");
+      throw new ConvexError("Description too long (max 5000)");
 
     const now = Date.now();
     return await ctx.db.insert("featureRequests", {

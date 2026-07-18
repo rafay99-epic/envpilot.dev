@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -34,7 +34,7 @@ export const createTierDefinition = mutation({
       .first();
 
     if (existing) {
-      throw new Error(`A tier with name "${args.name}" already exists.`);
+      throw new ConvexError(`A tier with name "${args.name}" already exists.`);
     }
 
     const now = Date.now();
@@ -80,7 +80,7 @@ export const updateTierDefinition = mutation({
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Tier definition not found");
+      throw new ConvexError("Tier definition not found");
     }
 
     const now = Date.now();
@@ -119,12 +119,12 @@ export const deleteTierDefinition = mutation({
 
     const tierDef = await ctx.db.get(args.id);
     if (!tierDef) {
-      throw new Error("Tier definition not found");
+      throw new ConvexError("Tier definition not found");
     }
 
     // Prevent deleting the default tier
     if (tierDef.isDefault) {
-      throw new Error(
+      throw new ConvexError(
         "Cannot delete the default tier. Set another tier as default first."
       );
     }
@@ -133,7 +133,7 @@ export const deleteTierDefinition = mutation({
     const userTiers = await ctx.db.query("userTiers").collect();
     const usedBy = userTiers.filter((ut) => ut.tier === tierDef.name);
     if (usedBy.length > 0) {
-      throw new Error(
+      throw new ConvexError(
         `Cannot delete tier "${tierDef.name}": ${usedBy.length} user(s) are using it. Reassign them first.`
       );
     }
@@ -181,7 +181,7 @@ export const createPaymentProduct = mutation({
       .withIndex("by_name", (q) => q.eq("name", args.tierName))
       .first();
     if (!tier) {
-      throw new Error(`Tier "${args.tierName}" does not exist`);
+      throw new ConvexError(`Tier "${args.tierName}" does not exist`);
     }
 
     // Check for duplicate tier+provider mapping
@@ -192,7 +192,7 @@ export const createPaymentProduct = mutation({
       )
       .first();
     if (existing) {
-      throw new Error(
+      throw new ConvexError(
         `A product mapping already exists for tier "${args.tierName}" with provider "${args.provider}"`
       );
     }
@@ -222,7 +222,7 @@ export const updatePaymentProduct = mutation({
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Payment product not found");
+      throw new ConvexError("Payment product not found");
     }
 
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
@@ -243,7 +243,7 @@ export const deletePaymentProduct = mutation({
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Payment product not found");
+      throw new ConvexError("Payment product not found");
     }
 
     await ctx.db.delete(args.id);

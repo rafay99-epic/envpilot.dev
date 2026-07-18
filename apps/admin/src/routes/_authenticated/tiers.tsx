@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConvexError } from "convex/values";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Switch } from "@/components/ui/Switch";
+import { toast } from "@/components/ui/Toast";
 import { Shield } from "lucide-react";
 import { TierDefinitionsTab } from "@/components/tiers/TierDefinitionsTab";
 import { FeatureMatrixTab } from "@/components/tiers/FeatureMatrixTab";
@@ -15,6 +17,12 @@ import { PaymentProductsTab } from "@/components/tiers/PaymentProductsTab";
 export const Route = createFileRoute("/_authenticated/tiers")({
   component: TiersPage,
 });
+
+/** ConvexError payloads survive prod redaction; plain Error.message does not */
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof ConvexError) return String(err.data);
+  return err instanceof Error ? err.message : fallback;
+}
 
 const TABS = [
   {
@@ -72,12 +80,19 @@ function TiersPage() {
           <Switch
             checked={tierEnforcement}
             disabled={settings === undefined}
-            onChange={(checked) =>
-              updateSetting({
-                key: "tierEnforcement",
-                value: checked ? "true" : "false",
-              })
-            }
+            onChange={async (checked) => {
+              try {
+                await updateSetting({
+                  key: "tierEnforcement",
+                  value: checked ? "true" : "false",
+                });
+              } catch (err) {
+                toast(
+                  "error",
+                  errMsg(err, "Failed to update tier enforcement")
+                );
+              }
+            }}
           />
           <span
             className={`text-xs font-medium ${tierEnforcement ? "text-emerald-400" : "text-zinc-500"}`}

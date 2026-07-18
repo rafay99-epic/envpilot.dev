@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { normalizeOrgRole } from "../../lib/authz";
 import { requireAdmin } from "./auth";
@@ -31,6 +31,12 @@ export const banUser = mutation({
   },
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
+
+    // Self-ban would atomically revoke this admin's own access (banned users
+    // fail requireAdmin) with no in-panel recovery path.
+    if (args.userId === admin._id) {
+      throw new ConvexError("You cannot ban your own account");
+    }
 
     await ctx.db.patch(args.userId, {
       isBanned: true,
@@ -140,7 +146,7 @@ export const updateUserTier = mutation({
       .withIndex("by_name", (q) => q.eq("name", args.tier))
       .first();
     if (!tierDef) {
-      throw new Error(`Tier "${args.tier}" not found`);
+      throw new ConvexError(`Tier "${args.tier}" not found`);
     }
 
     // Upsert userTiers

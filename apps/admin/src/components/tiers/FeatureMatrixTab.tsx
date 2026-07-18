@@ -7,6 +7,7 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { QueryState } from "@/components/ui/QueryState";
 import { useFilteredList } from "@/hooks/useFilteredList";
 import { toast } from "@/components/ui/Toast";
+import { useConfirmStore } from "@/stores/confirm-store";
 import {
   ChevronDown,
   ChevronRight,
@@ -410,6 +411,9 @@ function FeatureCategoryGroup({
                     {feature.valueType === "boolean" ? (
                       <BooleanCell
                         value={effective === "true"}
+                        hasOverride={hasOverride}
+                        featureKey={feature.key}
+                        tierLabel={td.displayName}
                         onChange={(val) =>
                           handleMatrixChange(
                             td.name,
@@ -458,23 +462,44 @@ function highlightMatch(text: string, query: string): ReactNode {
   );
 }
 
-// Fire-and-forget: apply on toggle, disabled while the mutation is in flight.
+// Confirm before applying (tier-gate toggles affect production billing gates),
+// then apply; disabled while the mutation is in flight.
 function BooleanCell({
   value,
+  hasOverride,
+  featureKey,
+  tierLabel,
   onChange,
 }: {
   value: boolean;
+  hasOverride: boolean;
+  featureKey: string;
+  tierLabel: string;
   onChange: (val: boolean) => void | Promise<void>;
 }) {
+  const { confirm } = useConfirmStore();
   const [saving, setSaving] = useState(false);
 
   return (
-    <div className="flex items-center justify-center">
+    <div
+      className={`flex items-center justify-center rounded-full p-0.5 ${
+        hasOverride ? "ring-1 ring-emerald-600/40" : ""
+      }`}
+    >
       <Switch
         checked={value}
         disabled={saving}
         size="sm"
         onChange={async (val) => {
+          const ok = await confirm({
+            title: "Change Feature Value",
+            message: `Set "${featureKey}" to ${
+              val ? "enabled" : "disabled"
+            } for the ${tierLabel} tier?`,
+            confirmLabel: val ? "Enable" : "Disable",
+            variant: "warning",
+          });
+          if (!ok) return;
           setSaving(true);
           try {
             await onChange(val);
@@ -502,6 +527,7 @@ function NumericCell({
   const [unlimited, setUnlimited] = useState(isUnlimited);
   const [saving, setSaving] = useState(false);
   const prevServer = useRef(value);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Resync the local buffer when the server value changes underneath us, but
   // never while a save is in flight (don't clobber the optimistic edit). The
@@ -538,18 +564,23 @@ function NumericCell({
   const toggleUnlimited = (checked: boolean) => {
     setUnlimited(checked);
     if (checked) {
+      // Going TO unlimited commits immediately.
       setDraft("");
       save("null");
     } else {
+      // Coming OFF unlimited only opens the cell for editing — no save until
+      // blur/Enter (Escape reverts back to unlimited).
       const restored = isUnlimited ? "0" : value;
       setDraft(restored);
-      save(restored);
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
   };
 
   return (
     <div className="flex items-center justify-center gap-1">
       <input
+        ref={inputRef}
         type="text"
         value={unlimited ? "" : draft}
         placeholder="∞"

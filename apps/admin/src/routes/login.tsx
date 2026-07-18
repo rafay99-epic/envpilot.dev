@@ -37,6 +37,11 @@ function LoginPage() {
               <p className="font-mono text-sm text-red-400">
                 ✗ {whoami.email ?? "This account"} is not an admin.
               </p>
+              <p className="text-xs text-zinc-500">
+                If this email was just allowlisted, sign in to the main Envpilot
+                app once first — admin access needs an existing Envpilot
+                account.
+              </p>
               <Button
                 variant="outline"
                 className="w-full"

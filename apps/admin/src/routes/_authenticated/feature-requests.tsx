@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ConvexError } from "convex/values";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
+import { toast } from "@/components/ui/Toast";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { Badge } from "@/components/ui/Badge";
@@ -52,6 +54,12 @@ import { useState } from "react";
 export const Route = createFileRoute("/_authenticated/feature-requests")({
   component: FeatureRequestsPage,
 });
+
+/** ConvexError payloads survive prod redaction; plain Error.message does not */
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof ConvexError) return String(err.data);
+  return err instanceof Error ? err.message : fallback;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RequestItem = Record<string, any>;
@@ -152,7 +160,12 @@ function FeatureRequestsPage() {
       variant: "danger",
     });
     if (!ok) return;
-    await deleteRequest({ id: requestId });
+    try {
+      await deleteRequest({ id: requestId });
+    } catch (err) {
+      toast("error", errMsg(err, "Failed to delete feature request"));
+      return;
+    }
     if (expandedId === requestId) setExpandedId(null);
   };
 
@@ -164,7 +177,11 @@ function FeatureRequestsPage() {
       variant: "danger",
     });
     if (!ok) return;
-    await clearAll({});
+    try {
+      await clearAll({});
+    } catch (err) {
+      toast("error", errMsg(err, "Failed to clear feature requests"));
+    }
   };
 
   const handleDiscard = async () => {
@@ -323,6 +340,8 @@ function FeatureRequestsPage() {
             updateStatus({
               id: draggedId as Id<"featureRequests">,
               status: targetStatus,
+            }).catch((err) => {
+              toast("error", errMsg(err, "Failed to move feature request"));
             });
           };
 

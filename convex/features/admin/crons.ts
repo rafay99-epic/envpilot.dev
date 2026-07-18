@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -83,7 +83,7 @@ export const toggleCronPause = mutation({
 
     // Validate it's a known cron setting key
     if (!args.settingKey.startsWith("cron_pause_")) {
-      throw new Error("Invalid cron setting key");
+      throw new ConvexError("Invalid cron setting key");
     }
 
     const existing = await ctx.db

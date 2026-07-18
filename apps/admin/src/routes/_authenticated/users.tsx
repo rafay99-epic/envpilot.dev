@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConvexError } from "convex/values";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -19,6 +20,12 @@ import { useConfirmStore } from "@/stores/confirm-store";
 export const Route = createFileRoute("/_authenticated/users")({
   component: UsersPage,
 });
+
+/** ConvexError payloads survive prod redaction; plain Error.message does not */
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof ConvexError) return String(err.data);
+  return err instanceof Error ? err.message : fallback;
+}
 
 interface UserRow extends Record<string, unknown> {
   _id: Id<"users">;
@@ -58,6 +65,8 @@ function UsersPage() {
       await banUser({ userId: banModal.userId, banReason });
       setBanModal(null);
       setBanReason("");
+    } catch (err) {
+      toast("error", errMsg(err, "Failed to ban user"));
     } finally {
       setIsBanning(false);
     }
@@ -75,10 +84,7 @@ function UsersPage() {
     try {
       await unbanUser({ userId });
     } catch (err) {
-      toast(
-        "error",
-        err instanceof Error ? err.message : "Failed to unban user"
-      );
+      toast("error", errMsg(err, "Failed to unban user"));
     }
   };
 

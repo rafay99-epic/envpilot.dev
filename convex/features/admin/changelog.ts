@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -109,7 +109,7 @@ export const updateChangelog = mutation({
 
     const now = Date.now();
     const entry = await ctx.db.get(args.id);
-    if (!entry) throw new Error("Changelog entry not found");
+    if (!entry) throw new ConvexError("Changelog entry not found");
 
     const updates: Record<string, unknown> = { updatedAt: now };
     if (args.title !== undefined) updates.title = args.title;
@@ -159,7 +159,7 @@ export const toggleChangelogPublish = mutation({
 
     const entry = await ctx.db.get(args.id);
     if (!entry) {
-      throw new Error("Changelog entry not found");
+      throw new ConvexError("Changelog entry not found");
     }
 
     const now = Date.now();

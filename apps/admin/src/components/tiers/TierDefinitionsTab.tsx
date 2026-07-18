@@ -218,12 +218,16 @@ export function TierDefinitionsTab() {
         await updateTier({
           id: editingId,
           displayName: form.displayName,
-          description: form.description || undefined,
+          // Send the raw string (even "") on update: these are optional
+          // string fields in the schema, so "" is a valid value meaning
+          // "clear it". Mapping "" -> undefined here would make a cleared
+          // field indistinguishable from an untouched one on the backend.
+          description: form.description,
           sortOrder: form.sortOrder,
           isDefault: form.isDefault,
           isComingSoon: form.isComingSoon,
           color: form.color,
-          polarProductId: form.polarProductId || undefined,
+          polarProductId: form.polarProductId,
         });
         toast("success", `Tier "${form.displayName}" updated`);
       } else {

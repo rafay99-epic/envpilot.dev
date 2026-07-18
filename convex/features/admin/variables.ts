@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { requireAdmin } from "./auth";
 
@@ -21,9 +21,9 @@ export const updateVariableExpiry = mutation({
     await requireAdmin(ctx);
 
     const variable = await ctx.db.get(args.variableId);
-    if (!variable) throw new Error("Variable not found");
+    if (!variable) throw new ConvexError("Variable not found");
     if (!variable.rotationFrequencyDays) {
-      throw new Error("Variable does not have rotation enabled");
+      throw new ConvexError("Variable does not have rotation enabled");
     }
 
     await ctx.db.patch(args.variableId, {
