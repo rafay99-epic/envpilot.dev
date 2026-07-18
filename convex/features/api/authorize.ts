@@ -122,6 +122,14 @@ export const _authorizeRequest = internalMutation({
     // behavior); new keys are always explicit. Older web builds may not
     // pass `surface` yet — infer it from gateFeature (the only pre-surface
     // caller that isn't plain REST is the MCP server).
+    //
+    // KNOWN LIMIT: `surface` is caller-asserted, not transport-derived —
+    // the reads/requests actions are the shared backend of both HTTP
+    // surfaces, so a key holder calling Convex directly can claim either
+    // surface. The field segments well-behaved surfaces (a leaked Action
+    // key stays useless on REST/MCP routes); the hard security boundary
+    // remains the key's resource/environment/project scope + tier gates,
+    // which no claimed surface can widen.
     const surface =
       args.surface ??
       (args.gateFeature === "mcp_server" ? "mcp_server" : "rest_api");
@@ -161,14 +169,20 @@ export const _authorizeRequest = internalMutation({
     }
 
     // Tier gate re-checked on every request: a downgraded org's keys stop
-    // working rather than grandfathering silent access forever. The gate is
-    // implied by the surface (github_action rides public_api — the Action
-    // hits /api/v1/secrets); explicit gateFeature wins for older callers.
+    // working rather than grandfathering silent access forever. When a
+    // surface is given it ALONE decides the gate (github_action rides
+    // public_api — the Action hits /api/v1/secrets); gateFeature is only a
+    // fallback for pre-surface callers. Never honor a mismatched pair — a
+    // caller must not check the mcp_server surface against the public_api
+    // gate (or vice versa) to outlive its own surface's gate being off.
     const gate = await checkBooleanFeature(
       ctx.db,
       key.organizationId,
-      args.gateFeature ??
-        (surface === "mcp_server" ? "mcp_server" : "public_api")
+      args.surface !== undefined
+        ? args.surface === "mcp_server"
+          ? "mcp_server"
+          : "public_api"
+        : (args.gateFeature ?? "public_api")
     );
     if (!gate.allowed) {
       await logDenied(key, "tier_gate");

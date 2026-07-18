@@ -497,15 +497,11 @@ function CreateKeyPanel({
       }
       return next;
     });
-    // The Action pull path only accepts single-project, variables keys —
-    // steer the form into that shape instead of failing at submit.
+    // The Action pull path only accepts single-project, exactly-variables
+    // keys — steer the form into that shape instead of failing at submit.
     if (adding && surface === "github_action") {
       setProjectMode("specific");
-      setSelectedResources((resources) =>
-        resources.has("variables")
-          ? resources
-          : new Set(resources).add("variables")
-      );
+      setSelectedResources(new Set<Resource>(["variables"]));
     }
   };
 
@@ -517,7 +513,8 @@ function CreateKeyPanel({
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
   const resourceSelectionValid =
     selectedResources.size > 0 &&
-    (!githubActionSelected || selectedResources.has("variables"));
+    (!githubActionSelected ||
+      (selectedResources.size === 1 && selectedResources.has("variables")));
   const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
@@ -855,15 +852,23 @@ function CreateKeyPanel({
             <div className="mt-2 flex flex-wrap gap-2">
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
+                const disabled =
+                  githubActionSelected && resource !== "variables";
                 return (
                   <button
                     key={resource}
                     type="button"
                     aria-pressed={selected}
+                    disabled={disabled}
+                    title={
+                      disabled
+                        ? "GitHub Action keys carry exactly the variables resource"
+                        : undefined
+                    }
                     onClick={() => toggleResource(resource)}
                     className={`${CHIP_BASE} ${
                       selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
-                    }`}
+                    } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
                   >
                     {resource}
                   </button>

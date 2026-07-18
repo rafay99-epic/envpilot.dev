@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -13,6 +12,7 @@ import { FeatureGate } from "@/components/tier/FeatureGate";
 import {
   TerminalCard,
   TerminalButton,
+  TerminalButtonLink,
   TerminalBadge,
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
@@ -105,14 +105,15 @@ function CicdTokensSectionInner({ projectId }: { projectId: Id<"projects"> }) {
             the GitHub Action surface — one key model for every machine
             credential.
           </p>
-          <Link href={apiKeysHref} data-testid="cicd-goto-api-keys">
-            <TerminalButton type="button">
-              <span className="inline-flex items-center gap-1.5">
-                Open API Keys
-                <ArrowRight className="h-3.5 w-3.5" />
-              </span>
-            </TerminalButton>
-          </Link>
+          <TerminalButtonLink
+            href={apiKeysHref}
+            data-testid="cicd-goto-api-keys"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              Open API Keys
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </TerminalButtonLink>
         </div>
 
         <div className="mt-6">

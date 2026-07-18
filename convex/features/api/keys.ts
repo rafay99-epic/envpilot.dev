@@ -115,9 +115,9 @@ function assertValidSurfaces(
         "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter, the key IS the project scope"
       );
     }
-    if (!scopeResources.includes("variables")) {
+    if (scopeResources.length !== 1 || scopeResources[0] !== "variables") {
       throw new ConvexError(
-        'A GitHub Action key must include the "variables" resource — that is all the Action pulls'
+        'A GitHub Action key must have exactly the "variables" resource — that is all the Action pulls, and an Action credential must not double as broader REST/MCP access'
       );
     }
   }
