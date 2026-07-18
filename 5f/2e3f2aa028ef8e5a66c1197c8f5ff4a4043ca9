@@ -1,0 +1,51 @@
+apps/vscode-extension/package.json
+  s_6fe8e7fc22da4b::t_a78500beab934e 390
+apps/vscode-extension/src/extension.ts
+  s_6fe8e7fc22da4b::t_2d984ce7700fc5 4,53,284-288,290-297,489-491,698-701,753-755,773-775
+apps/vscode-extension/src/providers/envHover.ts
+  s_6fe8e7fc22da4b::t_896fe88f3e6b52 76-81,93-95
+apps/vscode-extension/src/services/clipboardGuard.ts
+  s_0a819333eb5377::t_27bb9e9a5cce9b 2,191-192
+apps/vscode-extension/src/services/cloak.ts
+  s_6fe8e7fc22da4b::t_c9052af26b698f 46-49
+apps/vscode-extension/src/services/sync.ts
+  s_6fe8e7fc22da4b::t_027c4b813b3839 17-18,187-190,214,271-279,287,885,927-934,936-964,991,1011-1012
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_0a819333eb5377::t_2431e910d3fe15 97-117
+apps/vscode-extension/src/utils/paths.test.ts
+  s_6fe8e7fc22da4b::t_fd78c83f4f7a17 5,44,46-48,51,54
+apps/vscode-extension/src/utils/paths.ts
+  s_5a6eaa03e058b2::t_23094037fe3b9f 6-11,22-34,51,59-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5f2e3f2aa028ef8e5a66c1197c8f5ff4a4043ca9",
+  "prompts": {},
+  "sessions": {
+    "s_0a819333eb5377": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8a4cf2f7a80f2d1b",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_5a6eaa03e058b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a449e212124f53df8",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_6fe8e7fc22da4b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a09aa3486a6402139",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
