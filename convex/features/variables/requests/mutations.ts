@@ -287,7 +287,11 @@ export const _createFromKey = internalMutation({
   returns: v.id("environmentVariableRequests"),
   handler: async (ctx, args) => {
     const apiKey = await ctx.db.get(args.keyId);
-    if (!apiKey || apiKey.revokedAt !== undefined) {
+    if (
+      !apiKey ||
+      apiKey.revokedAt !== undefined ||
+      (apiKey.expiresAt !== undefined && apiKey.expiresAt <= Date.now())
+    ) {
       throw new ConvexError("Invalid or revoked API key");
     }
 
@@ -382,11 +386,17 @@ export const cancelStaleMachineRequests = internalMutation({
   returns: v.number(),
   handler: async (ctx) => {
     const STALE_MS = 30 * 24 * 60 * 60 * 1000;
+    // Bounded batch per run — an unbounded collect() over all pendings
+    // could exceed transaction limits and roll the whole sweep back. The
+    // index's ascending _creationTime order puts the OLDEST pendings first,
+    // so daily runs always chew through the stale end of the queue.
+    const SWEEP_BATCH = 200;
     const cutoff = Date.now() - STALE_MS;
     const pending = await ctx.db
       .query("environmentVariableRequests")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .collect();
+      .order("asc")
+      .take(SWEEP_BATCH);
 
     let canceled = 0;
     for (const request of pending) {

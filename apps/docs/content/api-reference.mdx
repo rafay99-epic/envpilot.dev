@@ -8,7 +8,7 @@ icon: book
 
 Base URL: `https://www.envpilot.dev/api/v1`. All endpoints require the `Authorization: Bearer <api key>` header and are read-only. Requires the **Pro** plan (`public_api` feature). See [API Quickstart](/api-quickstart) to create a key and [API Security](/api-security) for the auth and audit model.
 
-Every key carries **surfaces** (`rest_api`, `mcp_server`, `github_action`) and a resource scope that can optionally include `requests` — the one machine write path, filing a variable request for a human to approve. See [Architecture](/architecture) for how the surfaces share one auth core, and [Rate limits](/rate-limits) for every per-key bucket.
+Every key carries **surfaces** (`rest_api`, `mcp_server`, `github_action`) and a resource scope that can optionally include `requests` — the one machine-initiated action: filing a variable request (an ask, not a write — nothing exists until a human approves it and supplies the value) via the MCP server. See [Architecture](/architecture) for how the surfaces share one auth core, and [Rate limits](/rate-limits) for every per-key bucket.
 
 Every response is JSON unless `format=env` is passed. Every error response is `{ "error": string, "code": string }` plus an `x-request-id` header for support.
 

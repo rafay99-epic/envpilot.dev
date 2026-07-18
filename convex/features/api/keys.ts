@@ -12,6 +12,7 @@ import { requireAuthedUser } from "../../lib/identity";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { assertOrgMembership, hasCapability } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
+import { getRetentionCutoff } from "../audit/helpers";
 
 /**
  * API keys — the generalized token platform.
@@ -511,6 +512,13 @@ export const usageForOrganization = query({
     > = {};
     let windowOldest: number | null = null;
 
+    // Retention is enforced query-side everywhere audit logs are read —
+    // usage derived from them must honor the same entitlement window.
+    const retentionCutoff = await getRetentionCutoff(
+      ctx.db,
+      args.organizationId
+    );
+
     for (const window of WINDOWS) {
       const rows = await ctx.db
         .query("auditLogs")
@@ -522,6 +530,9 @@ export const usageForOrganization = query({
         .order("desc")
         .take(window.take);
       for (const row of rows) {
+        if (retentionCutoff !== null && row.createdAt < retentionCutoff) {
+          continue;
+        }
         if (windowOldest === null || row.createdAt < windowOldest) {
           windowOldest = row.createdAt;
         }

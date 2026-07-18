@@ -14,7 +14,7 @@ Envpilot exposes your projects and variables through five client surfaces. Two a
 | ----------------- | ------------- | ---------------------------------- | ---------------------------- |
 | CLI               | A human       | WorkOS device flow (browser login) | Read and write (role-gated)  |
 | VS Code extension | A human       | WorkOS device flow (browser login) | Read and write (role-gated)  |
-| REST API          | A program     | API key (`envpk_…`)                | Read, and **file** a request |
+| REST API          | A program     | API key (`envpk_…`)                | Read                         |
 | MCP server        | An agent      | API key (`envpk_…`)                | Read, and **file** a request |
 | GitHub Action     | CI            | API key (`envpk_…`)                | Read only — never requests   |
 
@@ -48,7 +48,7 @@ Because all three machine surfaces route through one authorizer, there is no sec
 
 The core rule for machine credentials is simple: **a machine credential never writes a secret.** No API key — for the REST API, the MCP server, or the GitHub Action — can create, edit, or delete a variable's value.
 
-There is exactly **one** mutation a machine credential may perform, and only if its scope includes the `requests` resource: it can **file a variable request**. A request is not a write. It is an ask, with a required justification, that lands in a human reviewer's queue in the dashboard. The reviewer decides, and if they approve, **the reviewer supplies the value.** The agent never proposes a value — it states what it needs and why, and a human fills in the secret.
+There is exactly **one** mutation a machine credential may perform, and only over the MCP server with a scope that includes the `requests` resource: it can **file a variable request**. A request is not a write. It is an ask, with a required justification, that lands in a human reviewer's queue in the dashboard. The reviewer decides, and if they approve, **the reviewer supplies the value.** The agent never proposes a value — it states what it needs and why, and a human fills in the secret.
 
 This keeps the blast radius of a leaked machine key bounded to _reads within its scope_ plus _the ability to ask a human for more_ — never the ability to silently change what a deploy pulls.
 

@@ -155,8 +155,9 @@ function ApiKeysSectionInner({
           <div>
             <h2 className="text-base font-semibold text-zinc-100">API Keys</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Scoped, read-only keys for the public REST API, MCP server, and
-              GitHub Action.
+              Scoped keys for the public REST API, MCP server, and GitHub
+              Action. Read-only — except keys with the requests resource, which
+              may file variable requests for human approval.
             </p>
           </div>
           <TerminalButton
@@ -932,9 +933,9 @@ function CreateKeyDrawer({
             </div>
             {selectedResources.has("requests") && (
               <p className="mt-2 text-xs text-zinc-500">
-                This key may file variable requests (MCP/REST) — a human
-                approves them in the dashboard and supplies the value. Keys
-                never write secrets.
+                This key may file variable requests over MCP — a human approves
+                them in the dashboard and supplies the value. Keys never write
+                secrets.
               </p>
             )}
           </div>

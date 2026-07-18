@@ -256,6 +256,18 @@ export const approveWithValue = action({
     if (!request) {
       throw new ConvexError("Variable request not found");
     }
+    // Preflight the cheap checks BEFORE the Vault write so obviously
+    // doomed calls never mint a secret object. The review mutation remains
+    // the authorization of record (reviewer capability, key liveness), and
+    // its rejection still triggers the orphan cleanup below.
+    if (request.status !== "pending") {
+      throw new ConvexError(`Request has already been ${request.status}`);
+    }
+    if (request.vaultRef !== undefined) {
+      throw new ConvexError(
+        "A value can only be supplied when approving a request that has none"
+      );
+    }
 
     const vault = await ctx.runAction(
       internal.features.vault.vault.createSecret,

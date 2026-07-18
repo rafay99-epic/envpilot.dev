@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 let counter = 0;
+let initialized = false;
 
 /**
  * Minimal client-side Mermaid renderer for MDX pages.
@@ -21,7 +22,12 @@ export function Mermaid({ chart }: { chart: string }) {
     let cancelled = false;
     void (async () => {
       const mermaid = (await import("mermaid")).default;
-      mermaid.initialize({ startOnLoad: false, theme: "dark" });
+      if (!initialized) {
+        // initialize() sets GLOBAL config — doing it per render would reset
+        // it mid-flight for other diagrams on the same page.
+        mermaid.initialize({ startOnLoad: false, theme: "dark" });
+        initialized = true;
+      }
       try {
         const { svg } = await mermaid.render(id, chart);
         if (!cancelled && ref.current) ref.current.innerHTML = svg;
