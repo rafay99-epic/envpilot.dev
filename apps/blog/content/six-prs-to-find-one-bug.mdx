@@ -1,0 +1,195 @@
+---
+title: "Six Pull Requests to Find One Missing Environment Variable"
+description: "A CI guard kept refusing to publish the VS Code extension because the WorkOS client id 'was not in the VSIX'. It was in the VSIX. Six merges to main later we still had not proven why — and then we changed CI platforms and it passed on the first run."
+date: "2026-07-17"
+tags: ["engineering", "ci-cd"]
+keywords: ["ci cd", "circleci", "github actions", "build pipeline", "debugging"]
+author:
+  name: "Envpilot Team"
+---
+
+The VS Code extension bakes two values into its bundle at build time: the WorkOS AuthKit client id and the Convex deployment URL. They are not secrets in the dangerous sense — the client id is public — but if either one is missing, the extension builds successfully, packages successfully, publishes successfully, and then fails to sign anyone in. Here is the line in `apps/vscode-extension/scripts/build.mjs` that makes that possible:
+
+```js
+__WORKOS_CLIENT_ID__: JSON.stringify(process.env.WORKOS_CLIENT_ID || ""),
+__CONVEX_URL__: JSON.stringify(process.env.NEXT_PUBLIC_CONVEX_URL || ""),
+```
+
+The `|| ""` is the whole problem. An absent env var is not an error, it is an empty string, and an empty string travels all the way to the marketplace. We had already shipped that exact breakage once — [PR #90](https://github.com/rafay99-epic/envpilot.dev/pull/90), eleven days earlier — so we added a guard that unzips the packaged `.vsix` and greps the bundle for the values before publishing.
+
+On 2026-07-17 that guard started refusing to publish extension 1.15.0. It kept refusing for six merges.
+
+## Why we could not just skip it
+
+The extension publish was not optional that evening. [PR #131](https://github.com/rafay99-epic/envpilot.dev/pull/131) was queued: delete all eleven legacy root `convex/<module>.ts` compatibility shims and raise the floors in `apps/web/src/lib/versions.ts` to `minCli: 1.18.0` / `minExtension: 1.15.0`. Its body carries a hard merge gate, and the reasoning is worth quoting because it is why nobody was willing to hand-wave the guard away:
+
+> Setting a minimum above a published, installable version is a **total lockout** — every blocked user would have no upgrade target.
+
+So: extension 1.15.0 had to actually exist on Open VSX before #131 could merge. And the only place the publish job runs is `main`. That is the shape of the next hour — six PRs merged straight to main, each one a hypothesis, because a branch could not reproduce the failure.
+
+The warm-up act was [#129](https://github.com/rafay99-epic/envpilot.dev/pull/129), merged 27 minutes earlier: `vsce` was prompting `Do you want to continue? [y/N]` because the extension had no LICENSE file, and a headless CI job has no TTY to answer it. The job sat there until the 10-minute no-output timeout. Shipping the LICENSE got us far enough to reach the real failure.
+
+## The chain the value has to survive
+
+```text
+ CI project env                        ┌──────────────────────────────┐
+   WORKOS_CLIENT_ID  ────────────────► │  ❶ step shell                │
+   NEXT_PUBLIC_CONVEX_URL              │     bun run package          │
+                                       └──────────────┬───────────────┘
+                                                      │ esbuild define
+                                                      │ env || ""  ← silent
+                                                      ▼
+                                              dist/extension.js
+                                                      │
+                       ┌──────────────────────────────┴──────────────┐
+                       │ ❷ vsce package                              │
+                       │    └─ npm run vscode:prepublish             │
+                       │        └─ node scripts/prepublish.mjs       │
+                       │            └─ npm run package  ← REBUILDS   │
+                       └──────────────────────────────┬──────────────┘
+                                                      ▼
+                                        envpilot-1.15.0.vsix
+                                          └─ extension/dist/extension.js
+                                                      │
+                              ┌───────────────────────┴──────────────┐
+                              │ ❸ checksum:  unzip -p | shasum       │ ✓ passed
+                              │ ❹ embed:   B=$(unzip -p ...)         │ ✗ failed
+                              │            printf '%s' "$B" | grep   │
+                              └──────────────────────────────────────┘
+                                    same bytes. one pipes, one captures.
+```
+
+Four places to blame, and over the next 52 minutes we blamed all four in order.
+
+## #132: the env dies inside vsce
+
+The observation that started it was a good one. `publish-cli` ran an _identical_ embed check against the CLI bundle, with the same project env vars on the same image, and passed. The structural difference: the CLI builds in the step shell. The extension was rebuilt inside `vsce`'s spawned npm chain, three processes deep. [PR #132](https://github.com/rafay99-epic/envpilot.dev/pull/132) moved the build up:
+
+```yaml
+command: |
+  bun run package
+  EXT_PREBUILT=1 bunx @vscode/vsce package --no-dependencies
+```
+
+plus a new `vscode:prepublish` hook that exits early when `EXT_PREBUILT=1` so `vsce` would keep the dist we had just built rather than rebuilding it blind. Textbook differential diagnosis. It did not work.
+
+## #133: the pipeline works as designed, at our expense
+
+[PR #133](https://github.com/rafay99-epic/envpilot.dev/pull/133) is four added lines and two removed. #132 had committed the new `prepublish.mjs` unformatted — and a unicode-escaped em dash into `package.json` — so `prettier --check .` went red — and the CircleCI pipeline we had built the day before puts the quality gate first, on purpose, with nothing running downstream of a red verdict. So the publish job we were debugging never ran at all. A whole cycle burned on a formatting fix, by a rule we wrote and still think is correct.
+
+## #134: if the env dies, so does the flag
+
+This is the sharpest piece of reasoning in the whole sequence. If the vsce → npm chain scrubs environment variables, then `EXT_PREBUILT=1` — an environment variable — never reaches the hook either. The hook would rebuild without env and overwrite the good bundle. Filesystem state survives what env does not, so [PR #134](https://github.com/rafay99-epic/envpilot.dev/pull/134) replaced the flag with a marker file. It is still in the tree:
+
+```js
+const marker = fileURLToPath(new URL("../.prebuilt", import.meta.url));
+
+if (process.env.EXT_PREBUILT === "1" || existsSync(marker)) {
+  rmSync(marker, { force: true }); // one-shot: never leaks into a later local build
+  console.log(
+    "prebuilt marker found — keeping the CI-built dist, skipping rebuild."
+  );
+  process.exit(0);
+}
+execSync("npm run package", { stdio: "inherit" });
+```
+
+`.prebuilt` went into `.vscodeignore` so it never ships. #134 also added the instrumentation that made the next PR's paradox possible: fail fast if either secret is empty in the step shell, grep `dist` immediately after the build, then checksum `dist/extension.js` against the same file unzipped out of the VSIX.
+
+```bash
+grep -rqF "$WORKOS_CLIENT_ID" dist || { echo "ERROR: client id missing from dist straight after the step-shell build."; exit 1; }
+shasum dist/extension.js > /tmp/dist-checksum
+touch .prebuilt
+bunx @vscode/vsce package --no-dependencies
+unzip -p envpilot-*.vsix extension/dist/extension.js | shasum | awk '{print $1}' > /tmp/vsix-checksum
+```
+
+And it caught a real, separate bug on the way past: `NEXT_PUBLIC_CONVEX_URL` had been deleted from the CircleCI project env at some point. The proof it had ever existed is nice — the already-published CLI 1.18.0 has the correct production Convex URL baked into it, so the variable was present when that artifact was built. Re-added, cause never determined.
+
+The escape hatch was also already shut. From #134's body: the dormant GitHub Actions path returned "account payments have failed" on dispatch, jobs never started.
+
+## #135: the impossible log, and the actual turning point
+
+#134's run produced a contradiction. `dist` contained the client id. The VSIX bundle was checksum-identical to `dist`. And then a later step, grepping those same bytes, said the value was not there.
+
+[PR #135](https://github.com/rafay99-epic/envpilot.dev/pull/135) concluded the two steps must be resolving different values for `$WORKOS_CLIENT_ID`, and merged the check into the same shell that bakes them. That conclusion was wrong. It does not matter, because of what else it added:
+
+```bash
+echo "diag: len=${#val} sha8=$(printf '%s' "$val" | shasum | cut -c1-8)"
+echo "diag: dist files containing it:"; grep -rlF "$val" dist || echo "  (none)"
+```
+
+Every prior PR changed the build. This one changed what the failure _printed_ — a length and a hash prefix that identify the value without leaking it, and a list of files that actually contain it. Three PRs of inference; this was the first one that bought an observation. If you take one thing from this post, take that: when hypotheses are cheap and wrong, stop shipping fixes and ship instrumentation.
+
+## #136: the answer, apparently
+
+The diagnostics #135 added print the ERROR line, then `diag: len=… sha8=…`, then the list of `dist` files containing the value. #136's body reports the outcome: the value was in `dist/extension.js`, the VSIX bundle was byte-identical to it, and the embed grep still failed.
+
+[PR #136](https://github.com/rafay99-epic/envpilot.dev/pull/136) proposed a mechanism: the grep ran against `BUNDLE=$(unzip -p ...)`, a 500 KB minified bundle captured into a shell variable. Bash strips binary bytes from command substitution, so the captured copy was mangled and grep missed a value that is genuinely in the file. The checksum step never broke because it _pipes_ rather than captures. One-line fix, capture becomes pipe:
+
+```bash
+- if ! printf '%s' "$BUNDLE" | grep -qF "$val"; then
++ if ! unzip -p "$VSIX" extension/dist/extension.js | grep -qF "$val"; then
+```
+
+The PR body declares: "This was the cause the whole time — not env vars, not the marker, not two different values." It reads like the ending.
+
+## #137: it was not the ending
+
+Twelve minutes later, [PR #137](https://github.com/rafay99-epic/envpilot.dev/pull/137):
+
+> The stream fix (#136) failed identically to variable-capture, which is impossible if the checksum (dist==vsix) truly passed — so an assumption is wrong.
+
+So #136's mechanism is a hypothesis, not a finding, and the evidence is against it. (Worth noting for anyone reaching for the same explanation: `$(...)` in bash _removes_ NUL bytes rather than truncating at the first one, which on its own would not hide a plain-ASCII client id.)
+
+#137 replaced the whole verification block with `set -x` and unconditional evidence collection, then `exit 1` before publish on purpose. The escalation is in the shape of the checks — every boolean became a count, every artifact got a sha256, `rm -rf dist ./*.vsix .prebuilt` guaranteed a clean slate, and one grep looks for the string `client_` rather than the secret's exact value, asking "is there _any_ client id in here" independent of which one we expect:
+
+```bash
+echo "client_ occurrences in dist/extension.js:"; grep -c "client_" dist/extension.js || true
+echo "=== vsix extension.js byte size ==="; unzip -p "$VSIX" extension/dist/extension.js | wc -c
+echo "=== FORENSIC RUN — intentionally stopping before publish ==="
+exit 1
+```
+
+Its commit subject is the thesis of the entire evening: `ci(debug): forensic dump in extension package step — stop guessing, read bytes`.
+
+## How it actually ended
+
+It ended by moving house. Open-sourcing the monorepo under MIT ([#138](https://github.com/rafay99-epic/envpilot.dev/pull/138)) restored free GitHub Actions minutes, and [#139](https://github.com/rafay99-epic/envpilot.dev/pull/139) migrated the entire pipeline off CircleCI — renaming `.circleci/config.yml` to `config.yml.old`, since CircleCI reads only `config.yml`. Its body notes, almost in passing, that CircleCI "is also where the extension-publish env flakiness lived."
+
+The tag tells the rest. `extension-v1.15.0` is a lightweight tag on `0c058de9` — the merge commit of #139 itself. The extension published on the first GitHub Actions run. #131 unblocked eight minutes later.
+
+And the code that published it? `.github/workflows/deploy-extension.yml` still greps a captured variable:
+
+```bash
+BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
+if ! printf '%s' "$BUNDLE" | grep -qF "$WORKOS_CLIENT_ID"; then
+```
+
+The #136 "real fix" only ever existed in `.circleci/jobs.yml`, which #139 archived. The unchanged, supposedly-broken pattern has since published 1.15.0 and 1.16.0 without complaint. We did not fix the bug. We outran it.
+
+Two CI platforms in 48 hours, incidentally: GitHub Actions billing died on 2026-07-16, we moved to CircleCI the same day, rebuilt it properly as pipeline v2 hours later ([#119](https://github.com/rafay99-epic/envpilot.dev/pull/119) — a `detect` job that diffs the push and _generates_ the continuation workflow, quality-first, deploys structurally impossible from branches), and archived the whole thing about 30 hours after that. It is genuinely good pipeline engineering whose entire production career consisted of correctly running one broken grep six times.
+
+## What landed
+
+| PR                                                            | What it changed                                                                                                      |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [#90](https://github.com/rafay99-epic/envpilot.dev/pull/90)   | Build CLI/extension directly, never via turbo; verify the _packaged_ artifact — where the guard was born             |
+| [#119](https://github.com/rafay99-epic/envpilot.dev/pull/119) | CircleCI pipeline v2: dynamic per-surface workflow generation, quality gate first, deploys only from main            |
+| [#129](https://github.com/rafay99-epic/envpilot.dev/pull/129) | Ship LICENSE in the VSIX so vsce stops prompting and hanging the headless job                                        |
+| [#132](https://github.com/rafay99-epic/envpilot.dev/pull/132) | Build in the step shell; `EXT_PREBUILT=1` tells vsce not to rebuild                                                  |
+| [#133](https://github.com/rafay99-epic/envpilot.dev/pull/133) | Prettier fix — #132's own files failed the quality gate before any publish job ran                                   |
+| [#134](https://github.com/rafay99-epic/envpilot.dev/pull/134) | `.prebuilt` marker file instead of an env flag; dist-vs-VSIX checksum; re-added the missing `NEXT_PUBLIC_CONVEX_URL` |
+| [#135](https://github.com/rafay99-epic/envpilot.dev/pull/135) | Embed check moved into the build shell, plus the non-leaking diagnostics that finally produced evidence              |
+| [#136](https://github.com/rafay99-epic/envpilot.dev/pull/136) | Stream the VSIX into grep instead of capturing it in a shell variable                                                |
+| [#137](https://github.com/rafay99-epic/envpilot.dev/pull/137) | Forensic dump: `set -x`, sha256 everything, `exit 1` before publish                                                  |
+| [#138](https://github.com/rafay99-epic/envpilot.dev/pull/138) | Relicense the monorepo under MIT                                                                                     |
+| [#139](https://github.com/rafay99-epic/envpilot.dev/pull/139) | Migrate CircleCI → GitHub Actions, add a gitleaks secret scan to the quality gate                                    |
+| [#131](https://github.com/rafay99-epic/envpilot.dev/pull/131) | Delete 11 legacy Convex shims, raise `minCli`/`minExtension` — the thing all of this was blocking                    |
+| [#148](https://github.com/rafay99-epic/envpilot.dev/pull/148) | Re-enable Vercel prod deploys, which the migration had left switched off at both ends                                |
+
+## What is still wrong
+
+The forensic output was never recorded anywhere — no PR, no commit, no comment says what #137 printed. The incident closed by migration, not by diagnosis, and that is a worse outcome than it looks: if #136's mechanism is real, `deploy-extension.yml` is carrying a latent version of it today. The `.prebuilt` marker machinery is now dead code on the live path — GitHub Actions never writes the marker — and `.circleci/jobs.yml` still sits in the repo under an active-looking filename.
+
+The one thing that did generalise: [#148](https://github.com/rafay99-epic/envpilot.dev/pull/148) moved the Vercel builds off the runner and onto Vercel's infrastructure specifically because the workflow-level CI stub `NEXT_PUBLIC_CONVEX_URL: http://127.0.0.1:3210` would otherwise have been baked into a production bundle. Same class of bug — a build-time env var silently embedded in a shipped artifact — caught in review this time instead of over six merges to main. That is the only part of this we would call a fix.

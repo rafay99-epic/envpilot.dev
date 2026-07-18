@@ -1,0 +1,239 @@
+---
+title: "How to Delete Backwards Compatibility Without Bricking Anyone"
+description: "Old CLI builds were failing with 'session not authorized' instead of 'please update'. Fixing that meant building a two-tier version floor first, and only then deleting the eleven compatibility shims it gave us permission to remove."
+date: "2026-07-17"
+tags: ["engineering", "architecture"]
+keywords:
+  ["versioning", "backwards compatibility", "deprecation", "cli", "release"]
+author:
+  name: "Envpilot Team"
+---
+
+A user on an old CLI runs `envpilot pull` and gets `session not authorized`. Their session is fine. What actually happened is that we moved vault crypto into Convex and deleted `GET/POST /api/cli/variables` along with its `/bulk` sibling, and their build is calling a route that no longer exists. The error they see is a lie, and it is a lie that points them at the wrong fix — they will re-login, it will not help, and then they will open a support ticket.
+
+That is the real problem with deleting things. Not that old clients break. Old clients are supposed to break; that is what a breaking change is. The problem is that they break **illegibly**. A deleted endpoint produces a 404 that some client-side branch turns into whatever error string was nearest at hand. A deleted Convex function produces `function not found`. Neither of those strings contains the word "update".
+
+We had an update-notification system already. It shipped in [PR #26](https://github.com/rafay99-epic/envpilot.dev/pull/26) back in March. When we finally went to look at it, it was broken in three independent ways.
+
+## Three quiet failures in the thing that was supposed to warn people
+
+First: `/api/version` was not in `unauthenticatedPaths` in `apps/web/src/proxy.ts`. Every version check is made by a signed-out client — the CLI polls before it has a session, the extension polls on activation. So every one of those requests got a WorkOS redirect to an HTML sign-in page instead of JSON. The check did not error loudly. It just quietly did nothing, forever, and a version check that does nothing looks exactly like "you're up to date."
+
+Second: the manifest itself was stale. `APP_VERSIONS.cli` and `.extension` still said `1.3.3` while the CLI was shipping 1.12.x. Even if the request had succeeded, the server was advertising an ancient version as "latest," so a running 1.12 compared as _newer_ than latest and no notice would ever fire.
+
+Third: the CLI ran its check in a Commander `postAction` hook. After the command. A hook that tells you your version is unsupported once the unsupported command has already failed is decoration.
+
+Three-for-three. It took a forcing function — the device-flow auth cutover, and [PR #86](https://github.com/rafay99-epic/envpilot.dev/pull/86) moving vault crypto into Convex — to notice that the guardrail had never been load-bearing.
+
+## Two tiers, because "outdated" and "broken" are different states
+
+The design in [PR #89](https://github.com/rafay99-epic/envpilot.dev/pull/89) is one constant with two tiers per client surface.
+
+```ts
+export const APP_VERSIONS = {
+  web: "1.51.0",
+  cli: "1.18.0",
+  extension: "1.16.0",
+  // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
+  // builds that call the real features/* Convex paths and consume
+  // capability-driven role metadata. Everything below called the legacy root
+  // shim paths (convex/<module>.ts), DELETED in the same release that set
+  // these floors — older builds would fail with "function not found" instead
+  // of an upgrade prompt, exactly what min versions exist to prevent.
+  minCli: "1.18.0",
+  minExtension: "1.15.0",
+} as const;
+```
+
+Below `cli`/`extension` you get a soft notice and your command still runs. Below `minCli`/`minExtension` you get hard-blocked before anything executes. The server side of the whole enforcement system is this constant plus `return NextResponse.json(APP_VERSIONS)` in a twelve-line route handler. The complexity is entirely in the clients and entirely about failure modes.
+
+The alternative we did not build was per-endpoint capability negotiation: clients advertise what they support, the server routes accordingly. It is the more correct design and it is the wrong one here. It requires every endpoint to carry a compatibility matrix forever, which is precisely the maintenance cost we were trying to delete. A single version floor is coarse — it blocks a 1.17 client from commands that would have worked fine — but coarse is the point. One number, one place, one thing to reason about on merge day.
+
+```text
+apps/web/src/lib/versions.ts
+   APP_VERSIONS = { web, cli, extension, minCli, minExtension }
+              │
+              ├─ app/api/version/route.ts → NextResponse.json(APP_VERSIONS)
+              │        ▲
+              │        └── proxy.ts  unauthenticatedPaths: [... "/api/version"]
+              │            (without this: 302 → WorkOS HTML, checks no-op)
+              │
+   GET /api/version (public JSON)
+        │
+        ├──► CLI      lib/version-check.ts → enforceVersion()
+        │             called from program.hook("preAction", …)
+        │             blocked → printHardBlock() + process.exit(1)
+        │
+        ├──► VS Code  services/versionCheck.ts → checkForUpdate()
+        │             blocked → _outdated latch + setContext + modal
+        │             wrapCommand() refuses EVERY command while latched
+        │
+        └──► Web      dashboard/update-banner.tsx (soft notice only)
+```
+
+The CLI hook is four lines, and the comment on it earns its keep:
+
+```ts
+// Enforce the version policy BEFORE any command runs (parseAsync awaits this).
+// Below the server's minimum supported version → hard-block and exit, since
+// the command would otherwise call server/Convex contracts that no longer
+// exist. Merely-outdated just prints a soft update notice and proceeds.
+// `--version`/`--help` short-circuit Commander before actions, so they are
+// naturally exempt (users can always check their version / read help).
+program.hook("preAction", async () => {
+  const blocked = await enforceVersion();
+  if (blocked) process.exit(1);
+});
+```
+
+A hard-blocked user must still be able to ask what version they are on. `--version` and `--help` never reach `preAction` because Commander short-circuits them, so that exemption came free — but it is the kind of thing you only notice is missing after you have locked someone out.
+
+## We had to teach the gate, twice, not to be a gate
+
+The first working version of `enforceVersion()` awaited the network on the hot path. Every command, a fetch. That is a fine idea until the server is slow, at which point every `envpilot list` takes three seconds. Commit `176ebb25` restructured it: fresh cache means a pure disk read with no network at all; stale-but-populated means decide from disk and refresh in the background; only a first-ever run awaits, bounded to 3s. The throttle timestamp is written _before_ the fetch, so a down server is hit at most once an hour and can never turn every command into a hang.
+
+Then commit `b07ae212` fixed the failure mode we had not thought about: not the network, the disk.
+
+```ts
+  } catch {
+    // FAIL OPEN. A version-check failure (corrupt cache file, disk/permission
+    // error, unexpected Conf throw) must NEVER block a command — the check is a
+    // guardrail, not a gate on the CLI working at all.
+    return false;
+  }
+```
+
+A corrupt cache file or a read-only home directory would throw out of `Conf`, reject the `preAction` hook, and take down _every command in the CLI_. We shipped a version check that could brick the tool it was meant to protect from being bricked. Twice in one PR we had to walk it back toward "advisory unless it is certain."
+
+```text
+envpilot <cmd>
+   │
+   └─ preAction → enforceVersion()
+        ├─ try {
+        │    fresh (<1h)?    → decide from disk        (no network)
+        │    stale + data?   → decide from disk,
+        │                      void refreshCache()     (background)
+        │    stale + NO data → await refreshCache()    (≤3s, unref'd)
+        │
+        │    evaluateVersion(CLI_VERSION, latest, min)
+        │       ├─ current < min    → hard block → exit(1)
+        │       ├─ current < latest → soft notice → proceed
+        │       └─ else             → proceed
+        │  }
+        └─ catch { return false }   ← FAIL OPEN, never blocks
+```
+
+The decision itself is a pure function with no I/O, which is the only part that gets unit tests:
+
+```ts
+export function evaluateVersion(
+  current: string,
+  latest: string | undefined,
+  min: string | undefined
+): VersionVerdict {
+  const blocked = !!min && compareVersions(current, min) < 0;
+  const updateAvailable =
+    !!latest && compareVersions(current, latest) < 0 ? latest : null;
+  return { blocked, updateAvailable };
+}
+```
+
+There is one systems detail in that file worth stealing. The fetch timeout does not use `AbortSignal.timeout()`, because that keeps a _referenced_ timer on the event loop and a command that finishes in 40ms will sit there for the full 3s before the process exits. Manual `setTimeout` plus `timer.unref?.()` instead.
+
+The extension landed on a stricter rule than the CLI: fail-open only on no-cache _and_ network error. A block it has already learned persists offline. Otherwise the hard block would silently evaporate the first time the network blipped after the fetch interval lapsed — which is exactly when a stale client is most likely to be doing something it should not.
+
+## The floor is a permission to delete
+
+Here is the part that made all of this worth building.
+
+[PR #95](https://github.com/rafay99-epic/envpilot.dev/pull/95) restructured the Convex backend from flat root modules into `convex/features/<feature>/`. Published CLI and extension builds call Convex functions by baked-in string references — `"variables:listWithAccess"` — so every moved function would have vanished out from under every installed client. The restructure shipped with nine compatibility shims re-exporting sixteen functions. This is what backwards compatibility actually looks like on disk: seventeen lines, fourteen of them comment.
+
+```ts
+/**
+ * LEGACY CLIENT COMPAT SHIM — DO NOT ADD EXPORTS, DO NOT IMPORT FROM HERE.
+ *
+ * Published CLI (>= 1.14.0) / VS Code extension (>= 1.7.2) builds call
+ * the function path(s) below by baked-in string refs. This shim keeps those
+ * exact paths registered on the deployment. All monorepo code uses the real
+ * feature paths.
+ *
+ * Removal: once the CLI/extension releases that use the features/* paths are
+ * the minimum supported versions (minCli/minExtension in
+ * apps/web/src/lib/versions.ts), delete this file.
+ */
+
+export { listWithAccess } from "./features/variables/queries";
+// Called by published extension builds (1.7.2 – 1.13.0); missed in the PR #95
+// shim set, which broke the extension's real-time metadata subscription.
+export { listMetadataByProject } from "./features/variables/queries";
+```
+
+Read that second comment again. The shim set was declared complete in #95 — "verified as the complete set across the git history of both clients" — and it was not. You cannot reliably enumerate what published clients call by reading your own source, because the callers are compiled artifacts on other people's machines. You find out from breakage. By the time we came to remove them there were eleven shim files, not nine.
+
+[PR #131](https://github.com/rafay99-epic/envpilot.dev/pull/131) deleted all eleven and set the floors to `minCli: 1.18.0` / `minExtension: 1.15.0` in the same change. 48 insertions, 213 deletions, 17 files. `deviceSessions.ts`, `featureRegistry.ts`, `organizations.ts`, `permissionRevocationEvents.ts`, `projectAccess.ts`, `projectMembers.ts`, `projects.ts`, `tierLimits.ts`, `variableRequests.ts`, `variables.ts`, `variableValues.ts` — gone. The `convex/` root is back to `schema.ts`, `crons.ts`, `auth.config.ts`, and `convex.config.ts`.
+
+The floor and the deletion have to move together. Raise the floor without deleting and you carry dead code. Delete without raising the floor and old clients get `function not found` instead of an upgrade prompt — which is the original bug, reintroduced by the fix for it.
+
+```text
+#95  2026-07-10  convex/ restructured → root shims born
+                 (re-export only, keep "variables:listWithAccess" alive)
+        │
+        │  gate 1: npm has @envpilot/cli 1.18.0?
+        │  gate 2: Open VSX has extension 1.15.0?
+        │  gate 3: convex logs show zero calls to variables:* / projects:*
+        ▼
+#131 2026-07-17  minCli 1.18.0, minExtension 1.15.0
+                 → 11 shims DELETED (PR total: 213 lines across 17 files)
+                 → older builds get an upgrade prompt, not a stack trace
+```
+
+## The hard part was proving the upgrade target existed
+
+#131's description opens with a merge-gate block, and both gates were about distribution, not code:
+
+1. npm must actually have `@envpilot/cli@1.18.0`. It did not — publishing was blocked on a missing `NPM_TOKEN` in CircleCI, and npm was still serving 1.17.0.
+2. Open VSX must actually have extension 1.15.0. Publishing had been hanging: `vsce` prompts `Do you want to continue? [y/N]` when a package has no LICENSE file, CI has no TTY, and the CircleCI job sat there until the ten-minute no-output timeout killed it. [PR #129](https://github.com/rafay99-epic/envpilot.dev/pull/129) shipped the LICENSE into the VSIX to unblock it.
+
+From the PR body, verbatim, because it is the whole thesis:
+
+> Setting a minimum above a published, installable version is a **total lockout** — every blocked user would have no upgrade target. The Playwright `version-endpoint` spec asserts `min ≤ latest`, but "actually published" is verified by a human. That human is you, on merge day.
+
+The spec is a backstop and knows it. Note `maxRedirects: 0` — it was written specifically to catch the original WorkOS-redirect failure, not just to assert a 200.
+
+```ts
+const response = await request.get("/api/version", { maxRedirects: 0 });
+expect(response.status()).toBe(200);
+expect(response.headers()["content-type"]).toContain("application/json");
+```
+
+```ts
+// Minimum must never exceed latest, or every client would be hard-blocked.
+expect(compare(body.minCli, body.cli)).toBeLessThanOrEqual(0);
+expect(compare(body.minExtension, body.extension)).toBeLessThanOrEqual(0);
+```
+
+A third gate is recommended in the PR body but is not automated: check Convex function logs for calls to the old root paths for a few days before merging. Telemetry is the actual permission slip; the version floor is only the enforcement.
+
+Distribution has a way of humbling you here. While building the Homebrew tap, [PR #92](https://github.com/rafay99-epic/envpilot.dev/pull/92) added a five-attempt retry with 3→15s backoff around the npm tarball fetch, because the registry has a propagation delay after publish. Good fix. Except the actual failure was that the URL was wrong — npm strips the scope from tarball filenames, so `@envpilot/cli` publishes to `.../cli-{version}.tgz`, not `.../envpilot-cli-{version}.tgz`. We shipped a retry loop for a 404 that was never going to succeed. Worse, the URL fix was orphaned during the merge and had to be cherry-picked separately (`2945131a`) the same evening. Adding resilience to a deterministic failure is a specific and embarrassing genre of bug.
+
+## What landed
+
+| PR                                                            | What it changed                                                                                                                                                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#26](https://github.com/rafay99-epic/envpilot.dev/pull/26)   | Add update notification system — first-generation soft notice; the one later found broken three ways.                                                                                |
+| [#89](https://github.com/rafay99-epic/envpilot.dev/pull/89)   | Two-tier client version enforcement (warn + hard-block) — `minCli`/`minExtension`, `/api/version` made public, `postAction` → `preAction`, extension latch, `version-endpoint` spec. |
+| [#91](https://github.com/rafay99-epic/envpilot.dev/pull/91)   | Homebrew distribution via the existing public `rafay99-epic/homebrew-apps` tap, so the monorepo stays private.                                                                       |
+| [#92](https://github.com/rafay99-epic/envpilot.dev/pull/92)   | Retry npm tarball fetch on 404 for registry propagation delay (the URL fix itself was cherry-picked separately as `2945131a`).                                                       |
+| [#94](https://github.com/rafay99-epic/envpilot.dev/pull/94)   | Sentry backlog triage; raised `minCli` 1.12.1 → 1.14.0 because ≤1.13.x called the deleted REST vault routes.                                                                         |
+| [#129](https://github.com/rafay99-epic/envpilot.dev/pull/129) | Ship LICENSE in the VSIX — unblocked `publish-extension`, which had been hanging on a `vsce` prompt with no TTY.                                                                     |
+| [#131](https://github.com/rafay99-epic/envpilot.dev/pull/131) | Retire legacy client fallback: 11 shims deleted, floors raised to `minCli` 1.18.0 / `minExtension` 1.15.0.                                                                           |
+
+Rollback, from the PR: revert `versions.ts` and redeploy web to lower the floors — minutes. Revert the PR and redeploy Convex to restore the shims — pure re-exports, zero data risk. Both directions cheap, which is the only reason merging felt reasonable.
+
+## What this still does not solve
+
+Not everything went. `convex/lib/roleCompat.ts` and `resolveLegacyRoles` stay, because they shape wire fields that _current_ clients still read — that is not shim plumbing, it is the actual contract, and it needs its own deprecation with its own floor.
+
+The enforcement mechanism needed a fix the day after the deletion shipped. `checkForUpdate()` used to fetch first and evaluate after, meaning `wrapCommand` could run commands on a known-outdated build for the several seconds the network round trip took. Commit `9ef9de68` split it into `evaluate(false)` before the fetch and the full evaluation after. The thing built to make breakage legible was itself briefly unreliable in exactly the window that mattered.
+
+And the third gate — Convex logs showing zero calls to the old paths — is still a sentence in a PR description rather than a query anyone runs. Until that is automated, "is it safe to delete this yet" remains a judgment call made by a human on merge day, which is precisely the kind of decision humans are worst at.

@@ -1,0 +1,350 @@
+---
+title: "One Key, Two Environments: The Uniqueness Rule That Was Backwards"
+description: "We spent a PR polishing a duplicate-key error message that production never sent, then found the constraint behind it made our core use case illegal. Here is the per-environment uniqueness invariant that replaced it, the write path we missed, and the class of bug that only exists in prod."
+date: "2026-07-16"
+tags: ["engineering", "architecture"]
+keywords:
+  [
+    "environment variables",
+    "uniqueness constraint",
+    "convex error",
+    "data model",
+  ]
+author:
+  name: "Envpilot Team"
+---
+
+A user pasted their production `.env` into a project that already had the development copies of the same keys. Every single row failed. Every single row's reason was the string `Server Error`.
+
+Two separate bugs stacked into that one screen, and both of them had been sitting in the codebase long enough that we had already shipped a fix for the wrong one. Five calendar days earlier, [PR #110](https://github.com/rafay99-epic/envpilot.dev/pull/110) had carefully cleaned up how duplicate-key errors render in the UI — stripping the `Uncaught Error:` prefix, adding friendly copy, surfacing bulk-paste failures that were being silently swallowed. It worked. We tested it. Its duplicate-key copy was a no-op in production, because the message it was rewriting does not exist in production. (The same PR's bulk-paste fix — failures the parent collected and never rendered — was real and does fire in prod.)
+
+## The message that only exists in dev
+
+Production Convex deployments redact plain `Error` messages. A mutation that throws `new Error("Variable key already exists in this project")` delivers exactly that text to a dev client, and delivers `"Server Error"` to a prod client. The thrown string survives locally and evaporates on deploy.
+
+Once you know that, the whole failure chain reads differently:
+
+```text
+                            DEV DEPLOYMENT                 PROD DEPLOYMENT
+convex mutation
+  throw new Error("Variable key already                    (same code)
+     exists in this project")
+         │                          │                             │
+         ▼                          ▼                             ▼
+Convex transport            message preserved            message REDACTED
+         │                          │                             │
+         ▼                          ▼                             ▼
+apps/web/src/app/api/       "…already exists…"            "Server Error"
+  variables/route.ts
+  sanitizeConvexError(error)        │                             │
+  message.includes("already exists")│  TRUE                       │  FALSE
+         ▼                          ▼                             ▼
+                              HTTP 409                      HTTP 500 (generic)
+         │                          │                             │
+         ▼                          ▼                             ▼
+projects/[slug]/page.tsx    friendly inline banner        "Failed to create
+  isDuplicateKey = 409 &&    drawer stays open             variable"
+  /already exists/                                         drawer state wrong
+         │
+         ▼
+   PR #110's fix              ✓ works                      ✗ never fires
+```
+
+Three layers — the backend text, the API route's status mapping, the UI's friendly rewrite — were all keyed off a substring that production erases. The route decided an HTTP status by reading `error.message` on a platform that deletes `error.message`. That is the anti-pattern, stated plainly: **`.data` is a contract, `.message` is a courtesy the platform can withdraw.**
+
+The fix is mechanical. Any error a user should read must be `ConvexError`, whose application payload survives redaction:
+
+```typescript
+export function sanitizeConvexError(error: unknown): string {
+  // ConvexError application payloads survive prod redaction (plain Error
+  // messages become "Server Error" on production deployments). The payload
+  // is already a clean user-facing string — return it directly.
+  if (
+    error instanceof Error &&
+    "data" in error &&
+    typeof (error as Error & { data: unknown }).data === "string"
+  ) {
+    return (error as Error & { data: string }).data;
+  }
+  // …regex chain below is now a fallback for non-user-facing errors
+}
+```
+
+That early return is [#117](https://github.com/rafay99-epic/envpilot.dev/pull/117). The `+` quantifier still living further down the same function is #110's fix, for a real but much smaller problem: a Convex _action_ re-throwing a _mutation's_ error double-wraps the prefix (`Uncaught Error: Uncaught Error: …`), and stripping one layer leaked the inner one. Everything below the early return is now archaeology — a museum of what production used to leak.
+
+## The rule underneath was also wrong
+
+The redaction bug hid the message. The message itself was defending a constraint that should never have existed.
+
+Keys were unique per **project**:
+
+```typescript
+const existingVariable = await ctx.db
+  .query("environmentVariables")
+  .withIndex("by_project_and_key", (q) =>
+    q.eq("projectId", args.projectId).eq("key", args.key)
+  )
+  .first();
+
+if (existingVariable && !existingVariable.deletedAt) {
+  throw new Error("Variable key already exists in this project");
+}
+```
+
+`DATABASE_URL` for `[development]` and `DATABASE_URL` for `[production]` are two variables with independent values. That is not an edge case in a secrets manager; that is the product. The constraint made the core use case illegal, and the bulk import that triggered the incident was the most ordinary thing a user can do.
+
+The obvious alternative was a database-level unique index on `(projectId, key, environment)`. We could not take it: Convex has no unique constraints, and the schema stores `environments` as an array on the variable row, not as one row per environment. Normalizing to a join table would have meant a schema migration, a rewrite of every read path, and — the part that killed it — a change to what CLI `pull`, extension sync, and the public API receive. We wanted a rule that changed nothing for clients.
+
+So we wrote it as an invariant instead of a constraint:
+
+> Every `(key, environment)` pair resolves to **at most one** active variable.
+
+That is precisely strong enough. CLI `pull`/`push`/`sync`, `pushBulk`, `importValues`, extension sync, and `/api/v1/secrets` are all already environment-scoped, so if that invariant holds, every one of them stays deterministic. `APP_VERSIONS.cli` stayed `1.17.0` and `APP_VERSIONS.extension` stayed `1.13.0` across every PR in this story. Zero client changes. That was the point.
+
+Overlap is a set intersection, not a first-match lookup:
+
+```typescript
+export async function findEnvironmentConflicts(
+  ctx: QueryCtx,
+  args: {
+    projectId: Id<"projects">;
+    key: string;
+    environments: string[];
+    excludeVariableId?: Id<"environmentVariables">;
+  }
+): Promise<string[]> {
+  const sameKey = await ctx.db
+    .query("environmentVariables")
+    .withIndex("by_project_and_key", (q) =>
+      q.eq("projectId", args.projectId).eq("key", args.key)
+    )
+    .collect();
+
+  const clashes = new Set<string>();
+  for (const existing of sameKey) {
+    if (existing.deletedAt) continue;
+    if (args.excludeVariableId && existing._id === args.excludeVariableId) {
+      continue;
+    }
+    for (const env of existing.environments) {
+      if (args.environments.includes(env)) clashes.add(env);
+    }
+  }
+  return [...clashes];
+}
+```
+
+Same index, same read shape. Only the predicate changed, and the return type: it hands back **which** environments clash rather than a boolean, because "already exists" without naming an environment is now a lie. `excludeVariableId` exists so the update path does not conflict with itself.
+
+The create path shed both bugs in one hunk — `.first()` became the intersection, and `Error` became `ConvexError`:
+
+```typescript
+const envClashes = await findEnvironmentConflicts(ctx, {
+  projectId: args.projectId,
+  key: args.key,
+  environments: args.environments,
+});
+if (envClashes.length > 0) {
+  throw new ConvexError(environmentConflictMessage(args.key, envClashes));
+}
+```
+
+## The orphan nobody saw
+
+There was a third failure in that incident, and it left no trace in the UI at all.
+
+`createWithValue` is an action. It wrote the secret to WorkOS Vault **first**, then called the create mutation — which is where the duplicate check lived. Every clash therefore minted encrypted bytes in Vault with no owning Convex row. The import that failed on every row produced one orphan per row.
+
+```text
+BEFORE (#117)                          AFTER (#117)
+─────────────────────────────          ─────────────────────────────
+action createWithValue                 action createWithValue
+  │                                      │
+  │                                      ├─ runQuery getEnvironmentConflicts…
+  │                                      │     conflicts? ──► throw ConvexError
+  │                                      │                    (NOTHING WRITTEN)
+  ├─ vault.createSecret ──► WorkOS       ├─ vault.createSecret ──► WorkOS
+  │     ref = vs_abc123                  │     ref = vs_abc123
+  │                                      │
+  ├─ runMutation variables.create        ├─ try runMutation variables.create
+  │     duplicate key ──► THROW          │     (race backstop: re-checks)
+  │                                      │  catch:
+  ▼                                      │     └─ vault.deleteSecret(ref)
+ ORPHAN: vs_abc123 lives in Vault,       │     └─ rethrow
+ referenced by no Convex row.            ▼
+ One per failed import row.             No orphan on the common path.
+ (#117 also points vaultGc at the existing backlog.)
+```
+
+Belt and braces. The pre-check is an `internalQuery` wrapping the same helper, so an action can run a `QueryCtx` check without duplicating the logic:
+
+```typescript
+const envClashes: string[] = await ctx.runQuery(
+  internal.features.variables.queries.getEnvironmentConflictsInternal,
+  { projectId: args.projectId, key: args.key, environments: args.environments }
+);
+if (envClashes.length > 0) {
+  throw new ConvexError(/* …clashing environments named… */);
+}
+
+const vault = await ctx.runAction(internal.features.vault.vault.createSecret, {
+  /* … */
+});
+
+try {
+  variableId = await ctx.runMutation(api.features.variables.mutations.create, {
+    /* … */
+  });
+} catch (error) {
+  // The DB row never materialized — don't leave the secret orphaned.
+  await ctx
+    .runAction(internal.features.vault.vault.deleteSecret, {
+      vaultRef: vault.id,
+    })
+    .catch(() => {});
+  throw error;
+}
+```
+
+The mutation stays the authority. The pre-check is not enforcement, it is orphan avoidance — which is why it being a duplicate check is correct rather than redundant.
+
+## Fourteen minutes later
+
+Convex has no unique constraint, so this invariant is a convention enforced in code at every write path. That means the design is really an _enumeration_, and an enumeration is only as good as its audit. [#117](https://github.com/rafay99-epic/envpilot.dev/pull/117) listed five paths: create, `createWithValue`, update, request-create, request-approve.
+
+[#118](https://github.com/rafay99-epic/envpilot.dev/pull/118) merged fourteen minutes and thirty-five seconds after it, because the follow-up audit found a sixth.
+
+**Restore from trash.** Delete `API_KEY` for `[development]`, create a new `API_KEY` for `[development]`, restore the old one — two active variables in one environment, and pulls become nondeterministic. Restore was missed because it is a write path that writes nothing new: it clears `deletedAt`. Any audit that greps for `db.insert` walks straight past it. Soft delete quietly turns _un_-delete into an unaudited creation path.
+
+```typescript
+const envClashes = await findEnvironmentConflicts(ctx, {
+  projectId: variable.projectId,
+  key: variable.key,
+  environments: variable.environments,
+});
+if (envClashes.length > 0) {
+  throw new ConvexError(
+    `Cannot restore: variable "${variable.key}" already exists in environment(s): ${envClashes.join(", ")}. Delete or re-scope the active variable first.`
+  );
+}
+```
+
+Deliberately not the shared message helper — the user's remedy here is different, so the sentence is different.
+
+Six call sites, four files, one helper:
+
+```text
+                        ┌──────────────────────────────────────┐
+   web drawer ─────────►│ variables.mutations.create           │──┐
+   REST /api/variables  └──────────────────────────────────────┘  │
+                        ┌──────────────────────────────────────┐  │
+   web (value path) ───►│ values.createWithValue (ACTION)      │──┤ pre-check
+   CLI push / import    │   → getEnvironmentConflictsInternal  │  │ BEFORE vault
+                        └──────────────────────────────────────┘  │
+                        ┌──────────────────────────────────────┐  │
+   env edit ───────────►│ variables.mutations.update           │──┤ excludeVariableId
+                        └──────────────────────────────────────┘  │
+                        ┌──────────────────────────────────────┐  │
+   `envpilot request` ─►│ requests.mutations.create            │──┤
+                        └──────────────────────────────────────┘  │
+                        ┌──────────────────────────────────────┐  │
+   reviewer approve ───►│ requests.mutations.review            │──┤ approvedEnvironments
+                        └──────────────────────────────────────┘  │   (may be a SUBSET)
+                        ┌──────────────────────────────────────┐  │
+   trash restore ──────►│ variables.mutations.restore  ◄ #118  │──┤ ← the missed one
+                        └──────────────────────────────────────┘  │   (writes nothing;
+                                                                  │   clears deletedAt)
+                                                                  ▼
+                             convex/features/variables/helpers.ts
+                                   findEnvironmentConflicts()
+                             ────────────────────────────────────
+                             INVARIANT: every (key, environment)
+                             → AT MOST ONE active variable
+```
+
+The approve path is the subtle one. It validates `approvedEnvironments`, not `request.environments` — a reviewer may approve a _subset_ of what was asked for, so approval is a new write with reviewer-chosen scope, not a rubber stamp on the original.
+
+#118 also reverted a bug it had just caused: the project page and bulk-paste drawer were rewriting the backend's environment-specific message back into "already exists in this project" — now factually wrong, and it discarded the one piece of information the user needed.
+
+The audit cleared the rest with reasons worth recording: key rename via `update` is impossible (`update` takes no `key` argument); CLI pull/push/sync are environment-scoped and default to `development`; `pushBulk` and `importValues` diff against environment-scoped queries; rollback is per-variable-id and changes neither key nor environments; account restore enforces no name uniqueness at all, so there is nothing to break.
+
+## The same bug, everywhere else
+
+#117 closed with a note: every other plain `Error` in Convex is still redacted in prod. [#121](https://github.com/rafay99-epic/envpilot.dev/pull/121) was that sweep, driven by two audit documents the PR references, and it found the same root cause wearing different clothes.
+
+The worst one: every terminal state of a share link — expired, burned, revoked, locked out, invalid OTP — arrived at the viewer page as `"Server Error"`. The page could not classify it, so the recipient got an **infinite OTP loop**. Enter a code, generic failure, enter another code, forever, on a link that had been dead the whole time. All of those are `ConvexError` now, and the attempt counter actually reaches the user:
+
+```typescript
+const remaining = 5 - newAttempts;
+throw new ConvexError(
+  remaining > 0
+    ? `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`
+    : "Too many failed attempts. This email has been locked out."
+);
+```
+
+Rate limiting is the cleanest statement of the lesson. `@convex-dev/rate-limiter` throws `new ConvexError({ kind: "RateLimited", … })` — the structured payload survives, the message does not. So detect by shape:
+
+```typescript
+export function isRateLimitError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "data" in error &&
+    typeof (error as Error & { data: unknown }).data === "object" &&
+    (error as Error & { data: { kind?: unknown } }).data?.kind === "RateLimited"
+  );
+}
+```
+
+And the route line it replaced, which is the whole post in one diff:
+
+```diff
+   } catch (error) {
+-    const message =
+-      error instanceof Error ? error.message : "Verification failed";
++    if (isRateLimitError(error)) {
++      return NextResponse.json(
++        { error: "Too many requests. Please try again later." },
++        { status: 429 }
++      );
++    }
++    const message = sanitizeConvexError(error);
+```
+
+There is a smaller casualty worth naming, because it shows the second-order cost. In `apps/cli/src/commands/request.ts`, #121 deleted this:
+
+```typescript
+// The server is the source of truth for authorization — surface its
+// 403 message directly instead of a generic stack trace.
+if (err instanceof APIError && err.statusCode === 403) {
+```
+
+`createVariableRequest` goes direct to Convex. It never throws an `APIError` with a status code. That branch had been dead since the migration, and nobody noticed — because when every error surfaces as `Server Error`, you cannot tell a dead branch from a working one. Redaction did not just hide errors from users. It hid the shape of the code from us.
+
+## What landed
+
+| PR                                                            | What changed                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#110](https://github.com/rafay99-epic/envpilot.dev/pull/110) | `fix(web): friendly duplicate-variable-key feedback, never raw Convex errors (web v1.38.1)` — `sanitizeConvexError` strips repeated `Uncaught Error:` prefixes; bulk-paste failures stop being silently swallowed. Web 1.38.1 → 1.38.2.                               |
+| [#117](https://github.com/rafay99-epic/envpilot.dev/pull/117) | `feat(variables): per-environment key uniqueness + prod error visibility + vault orphan fix` — `findEnvironmentConflicts` replaces per-project uniqueness; rejections become `ConvexError`; `createWithValue` pre-checks before the vault write. Web 1.41.0 → 1.42.0. |
+| [#118](https://github.com/rafay99-epic/envpilot.dev/pull/118) | `fix(variables): trash-restore re-validates per-env uniqueness; UI surfaces clashing environments` — the sixth write path, plus the UI stops overwriting the backend's environment-specific message. Web 1.42.0 → 1.42.1.                                             |
+| [#120](https://github.com/rafay99-epic/envpilot.dev/pull/120) | `docs: align CLAUDE.md + all repo docs with current reality` — both rules promoted to CRITICAL sections in `CLAUDE.md`. The bug became a law.                                                                                                                         |
+| [#121](https://github.com/rafay99-epic/envpilot.dev/pull/121) | `fix(sharing,requests): trustworthy errors in prod + share lifecycle + request notifications` — the `ConvexError` sweep beyond variables; `isRateLimitError` classifies by data shape; `revokeSharesForResource`. Web 1.42.1 → 1.43.0.                                |
+
+## What this still does not fix
+
+The sweep is nowhere near done. The working tree today holds **286** `throw new Error(` against **164** `throw new ConvexError(` across `convex/`, and the worst single file is the one this story is about: `convex/features/variables/mutations.ts`, with 33 plain throws. Including this one, in the same file as the fix:
+
+```typescript
+throw new Error(
+  "Secret rotation requires a higher tier. Upgrade to enable rotation schedules."
+);
+```
+
+`isTierLimitError()` classifies that by substring-matching `"requires a higher tier"` — which in production reads `"Server Error"`. The exact bug class #121 fixed for shares is still live for rotation tier gates. The bug outlived its own fix by a few hundred lines.
+
+Two more, honestly: `importValues` on the request path still writes to Vault inside a bare `try/catch` that swallows the error without a `deleteSecret`, so a rejected request there still orphans a secret. And `updateWithValue` mints the vault secret before the mutation validates, with only best-effort cleanup and no pre-check — no permanent leak, but a wasted external write on every conflicting update.
+
+There is also a live trap in the test suite. The e2e spec #110 added still asserts `A variable named "${key}" already exists` — copy that no product code emits anymore after #118 changed the page to surface the backend message verbatim. The full local Playwright run is our only merge gate, since e2e is disabled in CI, so a stale assertion there is a real blocker waiting to happen.
+
+The structural problem is the one we cannot test our way out of. Both #117 and #121 shipped with a post-deploy manual check as their only proof, because the redaction behavior does not exist locally — dev deployments hand over plain messages. Our development environment is strictly more forgiving than production, in exactly the dimension that makes this entire class of bug invisible until a user hits it. No test we can write locally catches it. That is why the rule ended up in `CLAUDE.md` as a hard convention rather than as a spec: when the environment cannot enforce an invariant, the only remaining enforcement is a rule everyone reads before they type `throw`.

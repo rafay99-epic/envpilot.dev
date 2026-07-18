@@ -1,0 +1,243 @@
+---
+title: "The Extension That Left Secrets Behind: Clipboard, Uninstall, and 26 Bugs"
+description: "Our VS Code extension writes decrypted .env files to disk, which means every exit path — clipboard, uninstall, window close, crash — is a leak path. Closing them took five PRs, one data-loss incident, and a purge that kept getting undone by our own file watcher."
+date: "2026-07-18"
+tags: ["engineering", "security"]
+keywords: ["vscode extension", "clipboard", "secrets", "sync", "security"]
+author:
+  name: "Envpilot Team"
+---
+
+Envpilot's whole storage story is that plaintext never touches our database. Convex holds vault reference IDs; WorkOS Vault holds the ciphertext. That property is easy to defend on the server and impossible to defend on the client, because the entire point of the VS Code extension is to take a decrypted value and write it to `<workspace>/.env` so your dev server can read it.
+
+The moment that write lands, the secret exists in three places we do not control: a file on a laptop, a buffer in an editor, and — one `⌘C` later — the OS clipboard. Every way that state can leave the machine is an exit path. This is the story of finding them, and of the ones we opened while closing others.
+
+## Exit path zero: the settings that pointed somewhere else
+
+The first fix was not about files at all. In [#69](https://github.com/rafay99-epic/envpilot.dev/pull/69) we were doing a performance pass — splitting `@sentry/node` out of the activation bundle (~2.8MB down to ~1MB), adding a `metadataOnly` mode to `/api/extension/variables` so the tree view stopped triggering per-variable vault decryption just to render names.
+
+That last one had a side effect worth naming: rendering the tree was emitting export audit events. Every glance at the sidebar looked like a secret read in the audit log. Fixing the performance problem fixed the audit noise, because they were the same bug seen from two angles.
+
+The security findings in that same PR were sharper. `envpilot.serverUrl` and `envpilot.convexUrl` were workspace-scoped settings, which means a `.vscode/settings.json` committed to a repo you clone could point the extension — carrying your auth token — at someone else's server. Both became machine-scoped. And the sign-in URL, which carries a session token, stopped being copied to the clipboard by default; it now goes there only if opening a browser fails.
+
+That was the first time the clipboard showed up as an exit path. It was not the last.
+
+## The incident: `deactivate()` was deleting files it did not write
+
+Here is the code that shipped before [#73](https://github.com/rafay99-epic/envpilot.dev/pull/73):
+
+```typescript
+export async function deactivate() {
+  // Clean up synced .env files to prevent secrets from persisting on disk
+  const projects = storageService.getLinkedProjectsMetadataV2();
+  for (const project of projects) {
+    for (const dir of project.directories) {
+      const envFilePath = path.resolve(dir.directoryPath, dir.targetFile);
+      try {
+        await fs.chmod(envFilePath, 0o644);
+        await fs.unlink(envFilePath);
+      } catch {
+        // File may not exist or be inaccessible
+      }
+    }
+  }
+}
+```
+
+The intent is correct. The blast radius is not. Note the `chmod` — it strips the read-only bit that our own file protection set, then unlinks unconditionally. It does not ask whether the file on disk is still the file we wrote.
+
+And `deactivate()` does not mean "the user is done with this extension." It runs on every extension-host shutdown: closing a window, Reload Window, an extension update. So a developer who added one hand-written line to a synced `.env` and closed the window got that file deleted, with no backup and no notification.
+
+We removed the deletion in #73 and left a comment forbidding anyone from putting it back. The same PR fixed a dashboard webview that was entirely non-functional — strict nonce CSP blocks inline `onclick`, so every button in it was dead, and we had shipped it that way. We rewrote it with `data-action` event delegation and kept the CSP strict. It also fixed a clipboard guard that was hijacking copy and cut for _all_ files, not just protected ones, and added the extension's first-ever tests: 21 vitest cases for `src/roles.ts`. Before that PR, the extension had zero.
+
+## Removing the deletion reopened the original hole
+
+Fine — `deactivate()` no longer deletes. Now walk through this:
+
+```text
+  install → sign in → sync → uninstall
+                                  │
+                                  ▼
+       ~/project/.env still on disk, plaintext, forever
+```
+
+The extension is gone. Nothing is left running that could clean up. The secrets stay.
+
+We could not fix this from `deactivate()` — that is exactly the code we had just forbidden from deleting, and it cannot distinguish "uninstall" from "window close" anyway. VS Code does have a hook for this: `vscode:uninstall`, run as a plain node script on first launch after the extension is fully removed. It does not fire on updates or reloads. It also has no `vscode` API at all — no `ExtensionContext`, no `globalStorageUri`, no `SecretStorage`.
+
+That constraint wrote the design for us. If the cleanup code cannot ask VS Code where our data lives, the data has to live somewhere deterministic. [#104](https://github.com/rafay99-epic/envpilot.dev/pull/104) added `~/.envpilot/vscode-managed-files.json`, mode 0600, holding `{ path, sha256 }` per file and never a value.
+
+The hash is the interesting part. It is not there for integrity — it is the data-loss guard that #73 forced us to invent. From the module docstring:
+
+> The hash is the data-loss guard: the uninstall hook deletes a file ONLY if its on-disk content still matches what the extension last wrote. Hand-edited files are always spared (see the `deactivate()` comment in extension.ts for the incident that makes this non-negotiable).
+
+The purge itself is a single readable loop (the selector call that applies the guards is elided here):
+
+```typescript
+let content: string;
+try {
+  content = await fs.readFile(entry.path, "utf-8");
+} catch {
+  continue; // Already gone — drop the stale manifest entry.
+}
+if (hashContent(content) !== entry.sha256) {
+  spared++; // Hand-edited since last sync — never delete user data.
+  kept.push(entry);
+  continue;
+}
+try {
+  await fs.chmod(entry.path, 0o644);
+  await fs.unlink(entry.path);
+  deleted++;
+} catch {
+  failed++;
+  kept.push(entry); // Keep the entry so a later purge can retry.
+}
+```
+
+The whole uninstall hook is 21 lines, built as a separate esbuild entry to `dist/uninstall.js`. That is why `managedFiles.ts` and `paths.ts` have to stay free of `vscode` imports — they get bundled into a script that runs outside VS Code entirely.
+
+One thing this hook genuinely cannot do: clear the WorkOS token. It lives in VS Code `SecretStorage`, which is the OS keychain, reachable only through the `vscode` API the hook does not have. Our mitigation is server-side device-session revocation, which is a different guarantee than "the token is gone from your machine." We shipped it as a documented limitation rather than pretending otherwise.
+
+## Version two of the thing that caused the incident
+
+With a hash guard in hand, we could finally put deletion back into `deactivate()` — where it belonged all along, because uninstall is the rarest exit, not the common one. [#124](https://github.com/rafay99-epic/envpilot.dev/pull/124) added unsync-on-close: files do not outlive the editor session.
+
+Four guards, not one, because a single guard was what got us into trouble:
+
+```text
+file F in manifest, window W closing
+        │
+        ├─ is F under a workspace folder of W?            ── SCOPE
+        │      no → keep
+        ├─ is F's project autoUnsyncOnClose === false?    ── OPT-OUT
+        │      yes → keep
+        ├─ is F under ANY opted-out project's directory?  ── nested opt-out wins
+        │      yes → keep
+        ├─ is F under a folder claimed by another LIVE    ── LIVE-WINDOW GUARD
+        │  extension host pid?  yes → keep
+        ▼  read F
+        ├─ ENOENT             → drop stale manifest entry
+        ├─ sha256 mismatch    → spared++   ← THE HASH GUARD
+        └─ sha256 match       → chmod 0o644 → unlink → deleted++
+```
+
+The live-window guard exists because two VS Code windows can have the same folder open; closing one must not yank the file out from under the other. PID liveness is a heuristic — a recycled pid makes a dead session look alive — but it fails toward _not_ deleting, which is the correct direction for a heuristic to fail.
+
+Then the purge did not work, and the reason was our own code.
+
+`FileProtectionService` watches every managed file and treats deletion as tampering: `onDidDelete` → 500ms debounce → resync. So `deactivate()` deleted the file and the watcher put it back before the host died. The comment in the current source records the observation verbatim: "purge reported deleted=1, file was back seconds later."
+
+The fix is ordering, not logic (comments abridged):
+
+```typescript
+// TEAR DOWN EVERY FILE WRITER FIRST.
+try {
+  fileProtectionService?.dispose();
+  realTimeSyncService?.dispose();
+  syncService?.dispose();
+} catch {
+  // Never let teardown stop the purge.
+}
+// Marker is cleared LAST: if the purge dies mid-shutdown the marker
+// survives, so the next activation's crash sweep retries the cleanup.
+await runUnsyncPurge("close");
+await clearSessionMarker(process.pid);
+```
+
+Crashes get the same treatment from the other end. A session marker left by a dead pid means that session never ran `deactivate()`, so activation reaps it and sweeps the _crashed_ session's folders — not the current window's, since a crash in project X must be cleaned up even when you next open project Y. Ordering matters here for the opposite reason: the hash guard fails toward _deletion_ on a crash sweep, because a fresh sync writes a file whose hash matches the manifest exactly. So the sweep runs before anything can trigger a sync.
+
+The backend side is small and deliberately boring. `resolveUnsyncOnClose` returns `member override ?? project default ?? true`, and every failure mode — no project, not a member, feature gate closed — returns `true`, the secure answer. Non-members get the platform default rather than an error, so the query neither confirms a project exists nor leaks its settings across an org boundary. The resolved flag rides along inside `pullValues` with the variables the extension already fetches, which is why the purge works with no network. The pro gate is re-checked at read time, so a pro-to-free downgrade re-locks immediately.
+
+Audit rows carry counts only: `deletedCount`, `sparedCount`, `trigger`, `occurredAt`. No paths, no keys.
+
+We accepted one behavior that looks like a bug and is not: the purge fires on Reload Window and on extension updates too. The next activation's auto-sync restores the files. That is the security semantics — files never outlive the session.
+
+## The thing we found while fixing the thing
+
+While migrating extension code to Convex's `features/*` paths in #124, we found that seven of them had been dead in production since [#95](https://github.com/rafay99-epic/envpilot.dev/pull/95) restructured the backend. That refactor moved `projectAccess` and `permissionRevocationEvents` under `convex/features/` and shimmed 16 functions — but published builds called by baked-in string refs, and seven of those refs had no shim. Extension link and unlink, both real-time subscriptions, revocation acknowledge, `projects:listForUser`, `featureRegistry:checkFeature`.
+
+Nobody noticed because the errors were swallowed client-side. Real-time permission revocation — a security feature — was silently non-functional in shipped builds.
+
+That is a worse failure than any clipboard hole in this post. An exit path you know is open gets a mitigation. An exit path you believe is closed gets nothing. We added shims, migrated the extension source to full `features/*` paths, and updated the shim inventory in `convex/README.md` with a verify-before-assuming rule. The shims themselves were deleted later in [#131](https://github.com/rafay99-epic/envpilot.dev/pull/131), once `minExtension` was raised to `1.15.0` and no supported client depended on them.
+
+## Closing the remaining exits
+
+[#144](https://github.com/rafay99-epic/envpilot.dev/pull/144) landed as five stacked blocks — one commit each: clipboard lockdown, autocomplete and hover, sync correctness, auth lifecycle, UI polish — plus 26 fixes and two rounds of review repair.
+
+The clipboard change is one function and a default flip:
+
+```typescript
+export function shouldBlock(
+  scope: ClipboardGuardScope,
+  mode: ProtectionMode | undefined
+): boolean {
+  if (mode === undefined || scope === "off") {
+    return false;
+  }
+  if (scope === "all-managed") {
+    return true;
+  }
+  // "readonly-roles": block only non-writable roles
+  return mode === "strict-readonly" || mode === "readonly-with-request";
+}
+```
+
+The default became `all-managed`. Before this, the guard keyed off role: writable roles could copy freely, because we had built it as a _permissions_ feature. That was the wrong frame. Your role decides whether you may edit a value. It says nothing about whether that value belongs on the system clipboard, where any process can read it. Exfiltration and authorization are different questions and we had been answering only one.
+
+Three of the fixes in that PR are worth showing because they are all the same kind of mistake — a boundary that was almost complete.
+
+**The bypass in the Command Palette.** We guarded `editor.action.clipboardCopyAction`. We did not guard `editor.action.clipboardCopyWithSyntaxHighlightingAction`, which is right there in the Command Palette.
+
+**The unguarded startup window.** On window reload, restored tabs were copyable until the first sync re-registered them with the guard. Fixing it meant re-arming from the manifest at activation, which meant adding an optional `mode` field to manifest entries — and older manifests lack it. `readManifest` drops unknown modes so the `?? "readonly-with-request"` fallback fails closed.
+
+**Path identity.** The guard is a `Map` keyed by path, so two spellings of one file is a bypass. `normalizePath` resolves symlinks first (so `/tmp` and `/private/tmp` on macOS collapse), then the key case-folds where the filesystem usually is case-insensitive:
+
+```typescript
+export function pathKey(inputPath: string): string {
+  const normalized = normalizePath(inputPath);
+  return process.platform === "darwin" || process.platform === "win32"
+    ? normalized.toLowerCase()
+    : normalized;
+}
+```
+
+Note this is the _key_, never the stored path. `process.platform` cannot tell you whether a specific volume is case-sensitive, so case-folding a path you then hand to `fs.*` is a bug waiting for a case-sensitive mount.
+
+Hover and IntelliSense were added the same way: surface the _name_, never the value (abridged from `src/providers/envHover.ts`):
+
+```typescript
+// The value itself is NEVER rendered here — only the mask.
+markdown.appendMarkdown("**Envpilot**\n\nProject: ");
+markdown.appendText(resolved.project.projectName);
+markdown.appendCodeblock(MASK, "text");
+markdown.appendMarkdown(
+  `\n[Reveal value](command:envpilot.revealHoverValue?${args})`
+);
+// Trust ONLY the one command the hover needs — never blanket-trust.
+markdown.isTrusted = { enabledCommands: ["envpilot.revealHoverValue"] };
+```
+
+Project and environment names are server-controlled, so they are appended as text — a crafted name cannot smuggle a command link into the hover. And `isTrusted` names exactly one command, because blanket trust would execute any command URI that reached the markdown. The masks are fixed-length in both the hover and the inline cloak decoration, so the mask never leaks the value's length.
+
+The key-matching regex came from DopplerHQ's extension (Apache-2.0, with derivation headers and a `THIRD_PARTY_NOTICES.md`). Porting it fixed a range-anchoring bug in the inherited pattern: it located the key with `line.indexOf(key)`, which returns the first occurrence and mis-highlights when the same key appears twice on a line. `ENV['ENV']` and `process.env.env` are now real test cases.
+
+The best finding was not ours. The cubic review noticed that #69's 30-second response cache and #144's hover composed into a leak: a hover opened before revocation could still pass its role check and read a value from the stale cache. Two individually safe features. The fix is one line in the revocation handler — `apiService.clearCache()` — so the refetch hits the server and the server denies the revoked caller.
+
+## What landed
+
+| PR                                                            | Title                                                                                                          | What it changed                                                                                                                                                    |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#69](https://github.com/rafay99-epic/envpilot.dev/pull/69)   | perf(extension): faster activation and variable loading, security hardening                                    | Lazy Sentry load (~2.8MB → ~1MB), `metadataOnly` variable reads, machine-scoped server URL settings, sign-in URL off the clipboard by default                      |
+| [#73](https://github.com/rafay99-epic/envpilot.dev/pull/73)   | VS Code extension: unified RBAC, brutal-review fixes, optimization                                             | Removed the unconditional `deactivate()` deletion, fixed a fully dead CSP-blocked webview, scoped the clipboard guard to protected files, added the first 21 tests |
+| [#104](https://github.com/rafay99-epic/envpilot.dev/pull/104) | fix(extension): purge synced .env files on uninstall (ext v1.12.0)                                             | `vscode:uninstall` hook, `~/.envpilot/vscode-managed-files.json` manifest, sha256 hand-edit guard                                                                  |
+| [#124](https://github.com/rafay99-epic/envpilot.dev/pull/124) | feat: VS Code unsync-on-close — hash-guarded purge, pro-gated toggles, audit; restore 7 broken extension paths | Purge on window close with four guards, crash sweep, pro-gated per-project/per-member toggles, counts-only audit, and repair of 7 Convex paths dead in production  |
+| [#144](https://github.com/rafay99-epic/envpilot.dev/pull/144) | feat(extension): clipboard lockdown, IntelliSense, and 26 verified bug fixes (1.16.0)                          | Clipboard blocked for all roles by default, fixed-length value cloaking, name-only hover and autocomplete, path-identity and startup-window fixes                  |
+
+The extension is on `1.16.0`; `minExtension` sits at `1.15.0`.
+
+## What this still does not solve
+
+Cloaking is deterrence, not a boundary — minimap, peek views, and diff editors render raw text, and the setting description says so rather than implying a guarantee we cannot make. The manifest is shared by every VS Code fork on the machine, so Code, Cursor, and VSCodium write to one file; in-process access is locked, cross-_process_ read-modify-write still races, with bounded damage documented at the call site. The uninstall hook still cannot clear the token from the OS keychain.
+
+And the honest structural point: none of this prevents `cat .env`. Once a value is decrypted onto a developer's disk, we are managing the number of easy exits, not eliminating them. What #124 changed is the _duration_ — the file exists for a session instead of forever. That is a smaller window, not a closed one, and the correct next move is probably to shrink the window further rather than add another guard around it.

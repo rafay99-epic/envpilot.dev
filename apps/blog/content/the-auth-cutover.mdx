@@ -1,0 +1,313 @@
+---
+title: "Removing the Bridge: Moving Every Client to Server-Verified Identity"
+description: "Every Convex function trusted a client-supplied userId argument, and the CLI ran a second homegrown identity system on top of it. Here is how we cut both out in three stages, and the five hours of broken builds that followed."
+date: "2026-07-18"
+tags: ["engineering", "security"]
+keywords: ["convex auth", "workos", "device flow", "oauth", "jwt"]
+author:
+  name: "Envpilot Team"
+---
+
+A Convex deployment is publicly reachable. The URL lives in `NEXT_PUBLIC_CONVEX_URL`, which means it is shipped to every browser that loads the app, printed in every bundle, and trivially readable. That is fine — it is designed that way, because Convex verifies the caller's identity from a JWT on the connection.
+
+We were not sending a JWT. Every query and mutation took the actor as an _argument_:
+
+```typescript
+export const getMembership = query({
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // ...uses args.userId as the actor
+  },
+});
+```
+
+So the authorization model was: whatever user id the caller claims to be, is the user. Anyone who could reach the deployment — which is anyone — could pass any `userId`. That is the whole bug. It is one line of args.
+
+## Two identity systems, neither of them verifying
+
+The web app was the easy half. The CLI and the VS Code extension were worse, in a way that took a while to see clearly.
+
+Neither of them talked to Convex at all. They talked to twenty-six Next.js routes under `/api/cli/*` and `/api/extension/*`. Those routes held an opaque bearer token, looked it up, resolved a `userId`, and then called Convex passing that id as an argument. We called this the bridge.
+
+```text
+ CLI / VS Code extension
+   │  Authorization: Bearer <opaque cliTokens.accessToken>
+   ▼
+ Next.js  /api/cli/{auth,organizations,projects,tier,usage,variables,...}
+          /api/extension/{auth/*,link,unlink,projects,variables,...}
+   │
+   │  validateCLIToken()  →  api.cliSessions.validateToken  →  { userId }
+   │
+   ▼  convex.query(api.organizations.getMembership, { organizationId, userId })
+ Convex  ── believes `userId`. No verification. ──────────────────────────┐
+                                                                          │
+ Browser ── convex.query(..., { userId }) over unauthenticated WS ────────┘
+            ▲
+            └── anyone with NEXT_PUBLIC_CONVEX_URL could send any userId
+```
+
+The framing we used internally at first was "the CLI has an extra HTTP hop." That undersells it badly. The bridge was a second, parallel identity system: its own token format, its own storage (`cliTokens`), its own refresh endpoint (`/api/cli/auth?action=refresh`), and its own approval UI — a self-hosted device-flow page at `apps/web/src/app/cli/auth/page.tsx`, reached by a link carrying a twelve-character session code. We had written our own OAuth device flow, badly, on top of a backend that verified nothing.
+
+The tell that this had rotted further than we thought: the Playwright suite had been _exploiting_ the hole. Variable-request seeding worked by having an unauthenticated client pass `requestedBy` directly. Our own tests were the proof of concept.
+
+## Stage 1: verify identity, but keep the bridge alive
+
+The replacement primitive already existed in the tree as dormant scaffolding. `convex/identity.ts` (today `convex/lib/identity.ts`) had a header reading "CURRENTLY UNUSED / DORMANT. No function calls these yet." [PR #83](https://github.com/rafay99-epic/envpilot.dev/pull/83) turned it on:
+
+```typescript
+export async function getAuthedUser(
+  ctx: MutationCtx | QueryCtx
+): Promise<Doc<"users"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+
+  // WorkOS AuthKit puts the WorkOS user id in the JWT `sub` claim, surfaced by
+  // Convex as `identity.subject`. That maps 1:1 to `users.workosId`.
+  const workosId = identity.subject;
+  if (!workosId) return null;
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_workos_id", (q) => q.eq("workosId", workosId))
+    .first();
+
+  return user;
+}
+```
+
+`convex/auth.config.ts` registers two WorkOS `customJwt` providers (AuthKit issues under two issuers), the browser gets `ConvexProviderWithAuth`, and roughly eighty-four functions were converted in four risk-ordered batches: RBAC first, then secrets, then token minting, then everything else. The diff hunk that carries the entire story is four lines:
+
+```diff
+   args: {
+     organizationId: v.id("organizations"),
+-    userId: v.id("users"),
+   },
+   handler: async (ctx, args) => {
++    const actor = await requireAuthedUser(ctx);
+```
+
+The interesting decision was what to do about the CLI and extension, which had no JWTs yet. The obvious move is to keep passing userIds from the routes — they are our routes, after all, they are trusted. We rejected that. `ConvexHttpClient` cannot call internal functions, so "trusted route calls private function" was not available anyway, and more importantly: in-Convex validation is a strictly stronger trust boundary. Even a compromised route should not be able to impersonate an arbitrary user.
+
+So #83 added `requireBearerUser` and a set of `*ForToken` public variants — `listForUserForToken`, `getMembershipForToken`, `acknowledgeMultipleForToken`. The route forwards _the bearer token itself_; Convex resolves it. The PR body counts twelve of these; the PR that deleted them counts eighteen. We never reconciled that.
+
+```typescript
+/**
+ * The token itself is the proof of identity — it is validated INSIDE Convex
+ * (active, unexpired, user exists), so even a compromised route cannot
+ * impersonate an arbitrary user by passing a made-up id. ...
+ *
+ * TEMPORARY BRIDGE: goes away in Stage 2 when the CLI/extension move to
+ * WorkOS device-flow JWTs and call the JWT-verified functions directly.
+ */
+export async function requireBearerUser(
+  ctx: MutationCtx | QueryCtx,
+  accessToken: string
+): Promise<Doc<"users">> {
+```
+
+That is the beat that made the rest cheap. The bridge got _demoted_ before it got deleted — from identity authority to dumb pipe. And every converted function was split into a `*Core(ctx, userId)` helper with two thin wrappers, one per caller class:
+
+```typescript
+export const listForUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const actor = await requireAuthedUser(ctx);
+    return listForUserCore(ctx, actor._id);
+  },
+});
+
+export const listForUserForToken = query({
+  args: { accessToken: v.string() },
+  handler: async (ctx, args) => {
+    const actor = await requireBearerUser(ctx, args.accessToken);
+    return listForUserCore(ctx, actor._id);
+  },
+});
+```
+
+Stage 2 then became a deletion instead of a rewrite: drop the second wrapper.
+
+## Stage 2: delete the bridge
+
+[PR #84](https://github.com/rafay99-epic/envpilot.dev/pull/84) is +1,818 / −4,811. Net three thousand lines gone: the `cliSessions` and `pendingExtensionAuthSessions` tables and modules, all the `*ForToken` variants, `requireBearerUser` itself (shipped and removed one PR apart, exactly as its docstring promised), the `/cli/auth` approval page, and roughly twenty API routes.
+
+What replaced it is RFC 8628 device authorization against WorkOS directly, over raw HTTP with no SDK, plus `ConvexHttpClient.setAuth(jwt)` for data.
+
+```text
+BEFORE — homegrown device flow, homegrown tokens
+  envpilot login
+    └─ POST /api/cli/auth?action=initiate
+         └─ convex mutation api.cliSessions.initiate  →  { code }
+    └─ human opens  https://www.envpilot.dev/cli/auth?code=XXXX   (our page)
+    └─ GET /api/cli/auth?action=poll&code=XXXX
+         └─ opaque accessToken + refreshToken  →  stored in cliTokens (server)
+
+AFTER (#84) — RFC 8628 against WorkOS, real JWTs
+  envpilot login                              apps/cli/src/lib/auth-flow.ts
+    └─ requestDeviceCode()
+         POST api.workos.com/user_management/authorize/device
+         → { user_code, verification_uri_complete, interval, expires_in }
+    └─ human approves on the WorkOS-hosted page   (not our page, not our UI)
+    └─ pollForToken(device_code)  [interval, +5s on slow_down, until expiry]
+         grant_type=urn:ietf:params:oauth:grant-type:device_code
+         → { access_token (5 min), refresh_token, user }
+    └─ getJwtSessionId(access_token)  →  sid
+    └─ recordDeviceSession(deviceName, sid)  →  cliTokens row = DISPLAY only
+                                                (the JWT is never stored server-side)
+```
+
+`cliTokens` survives, repurposed as a display-and-revoke record. No client JWT is ever stored server-side.
+
+The CLI's polling loop maps a single HTTP attempt onto a discriminated union and owns the retry policy itself, which keeps the transport function honest:
+
+```typescript
+export type PollResult =
+  | { status: "complete"; token: TokenResponse }
+  | { status: "pending" }
+  | { status: "slow_down" }
+  | { status: "denied" }
+  | { status: "expired" }
+  | { status: "network" };
+```
+
+The same distinction shows up in refresh, where getting it wrong means logging people out for a blip:
+
+```typescript
+//   - 5xx / 429           → server unavailable or rate-limited; the refresh
+//                           token is probably still valid. Surface as
+//                           `network` so the caller KEEPS the creds and the
+//                           user can retry (no wrongful forced re-login).
+//   - other 4xx (400/401) → the refresh grant was rejected (revoked/expired
+//                           token) → access_denied so the caller clears creds.
+const transient = result.status >= 500 || result.status === 429;
+```
+
+[PR #85](https://github.com/rafay99-epic/envpilot.dev/pull/85) did the extension, and got the better payoff: it moved from HTTP polling to an authenticated Convex WebSocket via `ConvexClient.setAuth(getFreshToken)`, and its three subscriptions lost their identity arguments entirely.
+
+| before (token/userId args)      | after (identity-scoped)                          |
+| ------------------------------- | ------------------------------------------------ |
+| `checkForTokens(accessTokens)`  | `permissionRevocationEvents.listMine()`          |
+| `getByAccessToken(token)`       | `projectAccess.listForCaller()`                  |
+| `acknowledgeMultiple(ids, uid)` | `permissionRevocationEvents.acknowledgeMine({})` |
+
+One subtlety that cost real debugging: for a Convex client, a null token is _terminal_. A transient refresh failure does not retry itself, so the extension has to explicitly re-arm.
+
+```typescript
+/** Capped backoff for re-auth after a transient refresh failure — a null
+ * token is TERMINAL for the Convex client, so we must call setAuth again. */
+private static readonly REAUTH_DELAYS_MS = [5_000, 15_000, 60_000];
+private static readonly REAUTH_CAP_MS = 3 * 60 * 1000;
+```
+
+#84 and #85 merged one hour and fifty-six minutes apart. In between, main contained an extension calling backend functions that #84 had just deleted. We knew; we shipped anyway rather than hold a security fix.
+
+## Five hours, four fixes
+
+Then the interesting part.
+
+**22:58 UTC.** A direct commit to main, no PR: `58a6582a`, "auth:fix". It hardcoded the production WorkOS client id into `auth.config.ts` to remove deploy-time env resolution as a failure source, because something had frozen the providers against a mismatched client id and everything was failing with "No auth provider found matching the given token."
+
+`auth.config.ts` deploys to _both_ Convex deployments. They trust _different_ WorkOS clients. So the production fix made dev trust the production client, and every dev CLI, extension, and web JWT started failing with the exact error the hardcode was meant to fix.
+
+[PR #87](https://github.com/rafay99-epic/envpilot.dev/pull/87) is fourteen lines. Read the env first, keep the hardcode as a fallback:
+
+```typescript
+const clientId =
+  process.env.WORKOS_CLIENT_ID || "client_01KHWDD75944NBADKY0ANTRXR8";
+```
+
+**00:49 UTC.** [PR #88](https://github.com/rafay99-epic/envpilot.dev/pull/88): the published CLI and extension artifacts shipped an empty client id. Diagnosis: the publish workflows never set `WORKOS_CLIENT_ID` or `NEXT_PUBLIC_CONVEX_URL` on the build step, so `tsup` and `esbuild` baked `""`. Set them, patch-bump, republish. Correct diagnosis. Insufficient fix.
+
+**01:57 UTC.** [PR #90](https://github.com/rafay99-epic/envpilot.dev/pull/90) found the two real causes. The first: turbo dropped the env. The vars were declared in `turbo.json`, they were set on the step, the deploy log showed `WORKOS_CLIENT_ID: ***` and a fresh `cache miss` — and the bundle still had `""`. We never diagnosed the mechanism. We stopped building through turbo. To this day the rule in `CLAUDE.md` reads: CLI and extension always build directly.
+
+The second cause is the one worth internalizing. The CLI's `"prepublishOnly": "npm run build"` and the extension's `"vscode:prepublish": "npm run package"` both re-run the bundler _at publish time_, in a context that never received the env, overwriting the artifact that had just been verified. That is why an earlier guard checking the pre-publish `dist` passed while the published artifact was still empty.
+
+The fix is verify-then-publish-the-exact-bytes. From the workflows as they stood then:
+
+```yaml
+- name: Publish to npm
+  # --ignore-scripts is CRITICAL: the CLI has "prepublishOnly": "npm run
+  # build", so a plain `bun publish` would RE-RUN tsup here — without the
+  # WORKOS_CLIENT_ID env that only the Build step above had — overwriting the
+  # just-verified bundle with an empty-client-id one. --ignore-scripts
+  # publishes the exact dist the guard verified, so what ships == what passed.
+  # … (if / working-directory / env omitted)
+  run: bun publish --ignore-scripts --access public
+```
+
+And for the extension, grep inside the zip:
+
+```yaml
+BUNDLE=$(unzip -p "$VSIX" extension/dist/extension.js)
+if ! printf '%s' "$BUNDLE" | grep -qF "$WORKOS_CLIENT_ID"; then
+echo "::error::Packaged $VSIX does not contain the WorkOS client id — refusing to publish a broken build."
+```
+
+**01:17 UTC**, between those two: [PR #89](https://github.com/rafay99-epic/envpilot.dev/pull/89). Because #84 deleted routes, every older client was permanently broken and we had no way to tell anyone. Building two-tier version enforcement surfaced three latent bugs at once. `/api/version` was not in `unauthenticatedPaths`, so signed-out clients got a WorkOS HTML redirect instead of JSON — every version check had been silently failing. `APP_VERSIONS` was stale at `1.3.3` while the real CLI was at 1.12, so a running client looked _newer_ than "latest" and no notice could ever fire. And the CLI ran its check in `postAction`, after the command had already executed. All three had been broken for a long time and were invisible until something depended on them.
+
+## Stage 3, and what is still wrong
+
+[PR #86](https://github.com/rafay99-epic/envpilot.dev/pull/86) moved WorkOS Vault crypto into Convex and deleted the six surviving vault routes. Today `find apps/web/src/app/api/cli apps/web/src/app/api/extension -name route.ts` errors on the first path — it does not exist — and returns exactly one file: `apps/web/src/app/api/extension/config/route.ts`. Convex is the single backend.
+
+```text
+ Browser            CLI                      VS Code extension
+   │ AuthKit JWT      │ WorkOS JWT             │ WorkOS JWT
+   └──────────┬───────┴────────────────┬───────┘
+              ▼                        ▼
+        ┌──────────────────────────────────────────┐
+        │ convex/auth.config.ts                    │
+        │  customJwt × 2, JWKS:                    │
+        │  api.workos.com/sso/jwks/<clientId>      │
+        │  clientId = process.env.WORKOS_CLIENT_ID │  ← #87: per-deployment
+        └───────────────┬──────────────────────────┘
+                        ▼  ctx.auth.getUserIdentity().subject
+        ┌──────────────────────────────────────────┐
+        │ convex/lib/identity.ts                   │
+        │  getAuthedUser / requireAuthedUser       │
+        │  users.by_workos_id → Doc<"users">       │
+        └───────────────┬──────────────────────────┘
+                        ▼
+              every query/mutation: args have NO userId
+```
+
+The regression test attacks the deployment the way an attacker would — no session, no middleware in the way:
+
+```typescript
+test("the impersonation arg is gone: passing userId is a validation error", async ({
+  request,
+}) => {
+  const result = await convexQuery(
+    request,
+    "features/organizations/queries:listForUser",
+    { userId: "jd7f0000000000000000000000000000" }
+  );
+  expect(result.status).toBe("error");
+  expect(result.errorMessage).toMatch(/Unauthenticated|ArgumentValidation/);
+```
+
+### What landed
+
+| PR                                                          | What it changed                                                                                                                                                                         |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#83](https://github.com/rafay99-epic/envpilot.dev/pull/83) | Stage 1. Activated `auth.config.ts`; converted ~84 functions to `requireAuthedUser`, deleting the client-supplied actor args; added `requireBearerUser` + the `*ForToken` bridge.       |
+| [#84](https://github.com/rafay99-epic/envpilot.dev/pull/84) | Stage 2, CLI 1.12.0. WorkOS device flow, direct `ConvexHttpClient.setAuth`; deleted `cliSessions`, `pendingExtensionAuthSessions`, every `*ForToken`, the `/cli/auth` page, ~20 routes. |
+| [#85](https://github.com/rafay99-epic/envpilot.dev/pull/85) | Stage 2, extension 1.7.0. Device flow, SecretStorage, authenticated Convex WebSocket; subscriptions repointed to `listMine` / `listForCaller` / `acknowledgeMine`.                      |
+| `58a6582a`                                                  | Direct to main, no PR. Hardcoded the prod WorkOS client id. Broke dev.                                                                                                                  |
+| [#87](https://github.com/rafay99-epic/envpilot.dev/pull/87) | `auth.config.ts` resolves `WORKOS_CLIENT_ID` per deployment, hardcode as fallback.                                                                                                      |
+| [#88](https://github.com/rafay99-epic/envpilot.dev/pull/88) | Set the two build-time env vars on the publish workflows. CLI 1.12.1, extension 1.7.2.                                                                                                  |
+| [#89](https://github.com/rafay99-epic/envpilot.dev/pull/89) | Two-tier version enforcement; `minCli: 1.12.1` / `minExtension: 1.7.2`; `/api/version` into `unauthenticatedPaths`; CLI check moved `postAction` → `preAction`; fail-open on network.   |
+| [#90](https://github.com/rafay99-epic/envpilot.dev/pull/90) | Real root cause: turbo dropped the env, and `prepublishOnly` / `vscode:prepublish` rebuilt at publish time without it. Direct builds, `--ignore-scripts`, artifact-content guards.      |
+| [#86](https://github.com/rafay99-epic/envpilot.dev/pull/86) | Stage 3. Vault crypto into Convex, six vault routes deleted, `convex/vaultReveal.ts` gated by `canRevealVaultRef`.                                                                      |
+
+### The scars
+
+The "TEMPORARY EMERGENCY FIX" comment is still in `convex/auth.config.ts` today, and so is the hardcoded prod fallback. It is still there, and it is load-bearing by accident. `cliTokens` still carries `accessToken` and `refreshToken` as optional strings — dead columns from the homegrown era, kept for legacy rows nobody has migrated. `apps/web/src/lib/cli-auth.ts` still exports `authenticateCLIRequest` and the `CLIAuthResult` interface alongside the JWT-native `verifyWorkosBearer` and `requireWorkosUser`.
+
+Stage 3 also over-deleted on its first pass: it removed `/api/vault` believing it dead, five live callers disagreed, dashboard reveals 404'd, and it came back as `convex/vaultReveal.ts` (today `convex/features/vault/reveal.ts`).
+
+The version floor #89 created has since moved on to `minCli: "1.18.0"` and `minExtension: "1.15.0"` for an unrelated reason. That mechanism now has its own hazard, documented in `CLAUDE.md`: never set a minimum above a version that is actually published, or you lock out every user with no valid upgrade target.
+
+The thing we would do differently is not the design. It is that we hardcoded a config value into a file that deploys to two environments, at 22:58, without a PR, while already firefighting. The fourteen-line fix took another hour to land. Everything else in that five-hour window was a build-pipeline problem that had been latent for months and only became visible once a client's correctness depended on a value being baked into a bundle.
