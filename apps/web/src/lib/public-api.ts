@@ -58,6 +58,9 @@ export function mapPublicApiError(error: unknown): MappedPublicApiError {
   if (/not in this api key.?s scope/i.test(message)) {
     return { status: 403, code: "FORBIDDEN_SCOPE", message };
   }
+  if (/not enabled for this surface/i.test(message)) {
+    return { status: 403, code: "FORBIDDEN_SURFACE", message };
+  }
   if (/pro plan/i.test(message)) {
     return { status: 403, code: "TIER_GATE", message };
   }

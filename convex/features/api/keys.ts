@@ -40,7 +40,7 @@ export const VALID_ENVIRONMENTS = ["development", "staging", "production"];
 export const VALID_RESOURCES = ["variables", "accounts", "projects"];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
-const surfaceValidator = v.union(
+export const surfaceValidator = v.union(
   v.literal("github_action"),
   v.literal("rest_api"),
   v.literal("mcp_server")
@@ -301,7 +301,10 @@ export const create = action({
     scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
     scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
     scopeResources: v.array(v.string()),
-    surfaces: v.array(surfaceValidator),
+    // Optional ONLY for the deploy window where the previous web bundle
+    // (which doesn't send surfaces) is still serving — those creates get
+    // the pre-surfaces default below. The UI always passes it explicitly.
+    surfaces: v.optional(v.array(surfaceValidator)),
     expiresAt: v.optional(v.number()),
   },
   returns: v.object({
@@ -334,7 +337,7 @@ export const create = action({
       scopeProjects: args.scopeProjects,
       scopeEnvironments: args.scopeEnvironments,
       scopeResources: args.scopeResources,
-      surfaces: args.surfaces,
+      surfaces: args.surfaces ?? ["rest_api", "mcp_server"],
       expiresAt: args.expiresAt,
       tokenHash,
     });

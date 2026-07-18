@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
+import { surfaceValidator } from "./keys";
 
 /**
  * THE single enforcement core for the public API key platform.
@@ -49,13 +50,7 @@ export const _authorizeRequest = internalMutation({
     // `surfaces` array (absent array = grandfathered key, valid everywhere).
     // Optional only for the deploy window where older web builds don't pass
     // it — those calls fall back to inferring the surface from gateFeature.
-    surface: v.optional(
-      v.union(
-        v.literal("rest_api"),
-        v.literal("mcp_server"),
-        v.literal("github_action")
-      )
-    ),
+    surface: v.optional(surfaceValidator),
   },
   returns: v.union(
     v.object({

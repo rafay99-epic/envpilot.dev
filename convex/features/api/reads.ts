@@ -324,9 +324,10 @@ const gateFeatureArg = v.optional(
 );
 
 // Which surface is presenting the key — enforced against the key's
-// `surfaces` array in authorize.ts. REST routes pass "rest_api", the MCP
-// server passes "mcp_server". Optional so calls from web builds predating
-// this field keep working (authorize.ts infers their surface).
+// `surfaces` array in authorize.ts. The MCP server passes "mcp_server";
+// REST routes omit it and rely on authorize.ts's inference fallback
+// (surface absent + no mcp gateFeature = "rest_api"), which also covers
+// calls from web builds predating this field.
 const surfaceArg = v.optional(
   v.union(v.literal("rest_api"), v.literal("mcp_server"))
 );

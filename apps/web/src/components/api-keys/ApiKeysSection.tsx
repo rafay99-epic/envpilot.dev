@@ -487,25 +487,26 @@ function CreateKeyPanel({
   };
 
   const toggleSurface = (surface: Surface) => {
+    const adding = !selectedSurfaces.has(surface);
     setSelectedSurfaces((prev) => {
       const next = new Set(prev);
       if (next.has(surface)) {
         next.delete(surface);
       } else {
         next.add(surface);
-        // The Action pull path only accepts single-project, variables keys —
-        // steer the form into that shape instead of failing at submit.
-        if (surface === "github_action") {
-          setProjectMode("specific");
-          setSelectedResources((resources) =>
-            resources.has("variables")
-              ? resources
-              : new Set(resources).add("variables")
-          );
-        }
       }
       return next;
     });
+    // The Action pull path only accepts single-project, variables keys —
+    // steer the form into that shape instead of failing at submit.
+    if (adding && surface === "github_action") {
+      setProjectMode("specific");
+      setSelectedResources((resources) =>
+        resources.has("variables")
+          ? resources
+          : new Set(resources).add("variables")
+      );
+    }
   };
 
   const githubActionSelected = selectedSurfaces.has("github_action");

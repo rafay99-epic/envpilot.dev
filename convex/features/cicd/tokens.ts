@@ -46,6 +46,11 @@ function assertValidScope(name: string, environments: string[]): void {
 /**
  * Store a freshly minted token hash. Internal — only the `create` action
  * below calls it (the caller's JWT identity propagates through runMutation).
+ *
+ * DEPRECATED CREATE PATH: the web UI no longer calls `create`/`_store` —
+ * Action credentials are minted as apiKeys with the github_action surface
+ * (features/api/keys.ts). Both are kept registered only until the
+ * serviceTokens retirement PR deletes this module with the table.
  */
 export const _store = internalMutation({
   args: {

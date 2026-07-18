@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { normalizeOrgRole } from "../../lib/authz";
 import { SEED_CHANGELOG } from "../community/changelog/seed";
 import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
@@ -1070,10 +1071,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     const serviceTokens = await ctx.db.query("serviceTokens").collect();
     let migrated = 0;
     let skipped = 0;
-    // Migrated rows bypass keys.ts's MAX_KEYS_PER_ORG hygiene cap — surface
-    // per-org counts in the result so an over-cap org is visible instead of
-    // silently blocked from minting new keys later.
-    const migratedByOrg: Record<string, number> = {};
+    let backfilled = 0;
 
     for (const token of serviceTokens) {
       const existing = await ctx.db
@@ -1081,7 +1079,16 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         .withIndex("by_token_hash", (q) => q.eq("tokenHash", token.tokenHash))
         .first();
       if (existing) {
-        skipped++;
+        // Rows copied by earlier runs predate the surfaces field and would
+        // otherwise stay grandfathered onto EVERY surface — a leaked CI
+        // token must never widen into a REST/MCP credential. Same tokenHash
+        // = same credential, so stamping is always correct here.
+        if (existing.surfaces === undefined) {
+          await ctx.db.patch(existing._id, { surfaces: ["github_action"] });
+          backfilled++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -1102,16 +1109,34 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         revokedBy: token.revokedBy,
       });
       migrated++;
-      migratedByOrg[token.organizationId as string] =
-        (migratedByOrg[token.organizationId as string] ?? 0) + 1;
+    }
+
+    // Migrated rows bypass keys.ts's MAX_KEYS_PER_ORG hygiene cap (25) —
+    // report each touched org's LIVE key count so an over-cap org is
+    // visible instead of silently blocked from minting new keys later.
+    // Rerun-stable: recomputed from apiKeys, not from this run's inserts.
+    const liveKeysByOrg: Record<string, number> = {};
+    for (const orgId of new Set(
+      serviceTokens.map((t) => t.organizationId as string)
+    )) {
+      const keys = await ctx.db
+        .query("apiKeys")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", orgId as Id<"organizations">)
+        )
+        .collect();
+      liveKeysByOrg[orgId] = keys.filter(
+        (k) => k.revokedAt === undefined
+      ).length;
     }
 
     return {
       success: true,
       total: serviceTokens.length,
       migrated,
+      backfilled,
       skipped,
-      migratedByOrg,
+      liveKeysByOrg,
     };
   }
 

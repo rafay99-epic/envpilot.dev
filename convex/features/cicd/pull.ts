@@ -56,7 +56,10 @@ export const _authorizePull = internalMutation({
       denied: v.union(
         v.literal("invalid_token"),
         v.literal("environment_scope"),
-        v.literal("tier_gate")
+        v.literal("tier_gate"),
+        // apiKeys credentials gate on public_api, not cicd_service_tokens —
+        // distinct value so the thrown message names the right feature.
+        v.literal("tier_gate_public_api")
       ),
     })
   ),
@@ -160,7 +163,7 @@ export const _authorizePull = internalMutation({
       );
       if (!gate.allowed) {
         await logApiKeyDenied("tier_gate");
-        return { ok: false as const, denied: "tier_gate" as const };
+        return { ok: false as const, denied: "tier_gate_public_api" as const };
       }
 
       await ctx.db.patch(apiKey._id, { lastUsedAt: now });
@@ -351,7 +354,11 @@ export const pullSecrets = action({
         }
       | {
           ok: false;
-          denied: "invalid_token" | "environment_scope" | "tier_gate";
+          denied:
+            | "invalid_token"
+            | "environment_scope"
+            | "tier_gate"
+            | "tier_gate_public_api";
         } = await ctx.runMutation(internal.features.cicd.pull._authorizePull, {
       tokenHash,
       environment: args.environment,
@@ -369,6 +376,13 @@ export const pullSecrets = action({
       if (authorization.denied === "tier_gate") {
         throw new Error(
           "CI/CD service tokens are available on the Pro plan — this organization's plan no longer includes them"
+        );
+      }
+      if (authorization.denied === "tier_gate_public_api") {
+        // Same "Pro plan" phrase — the /api/v1/secrets route's 403 regex
+        // matches it — but naming the gate that actually denied the pull.
+        throw new Error(
+          "The public API is available on the Pro plan — this organization's plan no longer includes it"
         );
       }
       throw new Error("Invalid or revoked service token");
