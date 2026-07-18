@@ -1,0 +1,19 @@
+convex/features/community/changelog/seed.ts
+  s_74a8cf9e9767a8::t_96377503180a8a 1189-1212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6b0bcf646232cc3eedb25560ec706d3177b65caf",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
