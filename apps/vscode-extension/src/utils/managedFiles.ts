@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
+import { pathsEqual } from "./paths";
 
 /**
  * Persistent manifest of every .env file this extension has written, so the
@@ -24,6 +25,13 @@ import * as path from "path";
 export interface ManagedFileEntry {
   path: string;
   sha256: string;
+  /**
+   * Protection mode at write time — lets activation re-arm the clipboard
+   * guard before the first sync. Optional: older manifests (and entries the
+   * uninstall hook reads) simply lack it. Type is inlined so this module
+   * stays vscode-free for the uninstall bundle.
+   */
+  mode?: "strict-readonly" | "readonly-with-request" | "writable";
 }
 
 // ponytail: one manifest shared by all VS Code forks (Code/Cursor/VSCodium).
@@ -45,13 +53,38 @@ export async function readManifest(
     const raw = await fs.readFile(manifestPath, "utf-8");
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    const entries = parsed.filter(
       (e): e is ManagedFileEntry =>
         typeof e?.path === "string" && typeof e?.sha256 === "string"
     );
+    // Unknown modes (version skew, hand-edited manifest) become undefined so
+    // consumers' `?? "readonly-with-request"` fallbacks fail closed.
+    for (const e of entries) {
+      if (
+        e.mode !== "strict-readonly" &&
+        e.mode !== "readonly-with-request" &&
+        e.mode !== "writable"
+      ) {
+        delete e.mode;
+      }
+    }
+    return entries;
   } catch {
     return []; // Missing or corrupt manifest — treat as empty.
   }
+}
+
+/**
+ * Serializes every in-process read-modify-write of the manifest so parallel
+ * writers (per-env sync fan-out, rename events) can't clobber each other's
+ * entries with a stale snapshot. Cross-process (multi-window) races remain
+ * the disclosed bounded tradeoff — see purgeManagedFilesFiltered.
+ */
+let manifestChain: Promise<unknown> = Promise.resolve();
+function withManifestLock<T>(fn: () => Promise<T>): Promise<T> {
+  const p = manifestChain.then(fn, fn);
+  manifestChain = p.catch(() => {});
+  return p;
 }
 
 async function writeManifest(
@@ -59,26 +92,66 @@ async function writeManifest(
   entries: ManagedFileEntry[]
 ): Promise<void> {
   await fs.mkdir(path.dirname(manifestPath), { recursive: true });
-  await fs.writeFile(manifestPath, JSON.stringify(entries, null, 2), {
-    encoding: "utf-8",
-    mode: 0o600,
-  });
+  // Atomic: write a temp sibling, rename over the target — a concurrent
+  // readManifest must never observe truncated JSON.
+  const tmpPath = `${manifestPath}.tmp`;
+  try {
+    await fs.writeFile(tmpPath, JSON.stringify(entries, null, 2), {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
+    await fs.rename(tmpPath, manifestPath);
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => {});
+    throw err;
+  }
 }
 
 /** Record (upsert) a file the extension just wrote. Best-effort. */
 export async function recordManagedFile(
   filePath: string,
   content: string,
+  manifestPath: string = getManifestPath(),
+  mode?: ManagedFileEntry["mode"]
+): Promise<void> {
+  try {
+    await withManifestLock(async () => {
+      const resolved = path.resolve(filePath);
+      const entries = await readManifest(manifestPath);
+      const next = entries.filter((e) => !pathsEqual(e.path, resolved));
+      next.push({
+        path: resolved,
+        sha256: hashContent(content),
+        ...(mode ? { mode } : {}),
+      });
+      await writeManifest(manifestPath, next);
+    });
+  } catch {
+    // Never let manifest bookkeeping break a sync.
+  }
+}
+
+/**
+ * Re-key a manifest entry after a rename/move (keeps sha256/mode) so
+ * protection, purge, and release still find the file. Best-effort.
+ */
+export async function renameManagedFile(
+  oldPath: string,
+  newPath: string,
   manifestPath: string = getManifestPath()
 ): Promise<void> {
   try {
-    const resolved = path.resolve(filePath);
-    const entries = await readManifest(manifestPath);
-    const next = entries.filter((e) => e.path !== resolved);
-    next.push({ path: resolved, sha256: hashContent(content) });
-    await writeManifest(manifestPath, next);
+    await withManifestLock(async () => {
+      const entries = await readManifest(manifestPath);
+      // pathsEqual (not string equality): the persisted spelling may differ
+      // in casing or symlink form from the rename event's path.
+      const entry = entries.find((e) => pathsEqual(e.path, oldPath));
+      if (!entry) return;
+      entry.path = path.resolve(newPath);
+      await writeManifest(manifestPath, entries);
+    });
   } catch {
-    // Never let manifest bookkeeping break a sync.
+    // Never let manifest bookkeeping break a rename.
   }
 }
 
@@ -88,11 +161,12 @@ export async function forgetManagedFile(
   manifestPath: string = getManifestPath()
 ): Promise<void> {
   try {
-    const resolved = path.resolve(filePath);
-    const entries = await readManifest(manifestPath);
-    const next = entries.filter((e) => e.path !== resolved);
-    if (next.length === entries.length) return;
-    await writeManifest(manifestPath, next);
+    await withManifestLock(async () => {
+      const entries = await readManifest(manifestPath);
+      const next = entries.filter((e) => !pathsEqual(e.path, filePath));
+      if (next.length === entries.length) return;
+      await writeManifest(manifestPath, next);
+    });
   } catch {
     // Never let manifest bookkeeping break a delete.
   }
@@ -109,55 +183,57 @@ export async function forgetManagedFile(
  * Used by unsync-on-close (deactivate + crash sweep), where only files for
  * opted-in projects under the closing window's workspace may be removed.
  *
- * ponytail: the read-modify-write of the shared manifest is unlocked, so a
- * concurrent writer in another extension host (sync's recordManagedFile, a
- * second window's purge) can be clobbered by a stale `kept` write. The
- * damage is bounded — a lost entry is re-recorded on that project's next
- * sync, and a resurrected entry for a deleted file drops itself on the next
- * purge (readFile fails). Add proper-lockfile if this ever bites for real.
+ * ponytail: in-process writers are serialized via withManifestLock; only a
+ * concurrent writer in ANOTHER extension host (a second window's sync or
+ * purge) can still be clobbered by a stale `kept` write. The damage is
+ * bounded — a lost entry is re-recorded on that project's next sync, and a
+ * resurrected entry for a deleted file drops itself on the next purge
+ * (readFile fails). Add proper-lockfile if this ever bites for real.
  */
 export async function purgeManagedFilesFiltered(
   shouldPurge: (filePath: string) => boolean,
   manifestPath: string = getManifestPath()
 ): Promise<{ deleted: number; spared: number; failed: number }> {
-  let deleted = 0;
-  let spared = 0;
-  let failed = 0;
-  const entries = await readManifest(manifestPath);
-  const kept: ManagedFileEntry[] = [];
-  for (const entry of entries) {
-    if (!shouldPurge(entry.path)) {
-      kept.push(entry);
-      continue;
+  return withManifestLock(async () => {
+    let deleted = 0;
+    let spared = 0;
+    let failed = 0;
+    const entries = await readManifest(manifestPath);
+    const kept: ManagedFileEntry[] = [];
+    for (const entry of entries) {
+      if (!shouldPurge(entry.path)) {
+        kept.push(entry);
+        continue;
+      }
+      let content: string;
+      try {
+        content = await fs.readFile(entry.path, "utf-8");
+      } catch {
+        // Already gone — drop the stale manifest entry.
+        continue;
+      }
+      if (hashContent(content) !== entry.sha256) {
+        spared++; // Hand-edited since last sync — never delete user data.
+        kept.push(entry);
+        continue;
+      }
+      try {
+        // Synced files are often chmod 0o444 by file protection.
+        await fs.chmod(entry.path, 0o644);
+        await fs.unlink(entry.path);
+        deleted++;
+      } catch {
+        failed++;
+        kept.push(entry); // Keep the entry so a later purge can retry.
+      }
     }
-    let content: string;
     try {
-      content = await fs.readFile(entry.path, "utf-8");
+      await writeManifest(manifestPath, kept);
     } catch {
-      // Already gone — drop the stale manifest entry.
-      continue;
+      // Manifest bookkeeping must never break a purge.
     }
-    if (hashContent(content) !== entry.sha256) {
-      spared++; // Hand-edited since last sync — never delete user data.
-      kept.push(entry);
-      continue;
-    }
-    try {
-      // Synced files are often chmod 0o444 by file protection.
-      await fs.chmod(entry.path, 0o644);
-      await fs.unlink(entry.path);
-      deleted++;
-    } catch {
-      failed++;
-      kept.push(entry); // Keep the entry so a later purge can retry.
-    }
-  }
-  try {
-    await writeManifest(manifestPath, kept);
-  } catch {
-    // Manifest bookkeeping must never break a purge.
-  }
-  return { deleted, spared, failed };
+    return { deleted, spared, failed };
+  });
 }
 
 /**

@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "MIT",
@@ -150,6 +150,18 @@
         "title": "Sign Out of All Accounts",
         "category": "Envpilot",
         "icon": "$(close-all)"
+      },
+      {
+        "command": "envpilot.toggleCloaking",
+        "title": "Toggle Value Cloaking",
+        "category": "Envpilot",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "envpilot.revealValues",
+        "title": "Reveal Values for 30 Seconds",
+        "category": "Envpilot",
+        "icon": "$(eye)"
       }
     ],
     "viewsContainers": {
@@ -336,16 +348,6 @@
           ],
           "description": "Default action when existing .env files are found"
         },
-        "envpilot.enableMultiDirectorySync": {
-          "type": "boolean",
-          "default": true,
-          "description": "Allow linking multiple directories to the same project"
-        },
-        "envpilot.syncOnDirectoryOpen": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically sync when opening a linked directory"
-        },
         "envpilot.convexUrl": {
           "type": "string",
           "default": "",
@@ -366,6 +368,37 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically install a pre-commit hook to block .env file commits"
+        },
+        "envpilot.clipboardGuard.scope": {
+          "type": "string",
+          "default": "all-managed",
+          "enum": [
+            "all-managed",
+            "readonly-roles",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Block copy/cut in every Envpilot-managed .env file, regardless of your role",
+            "Block copy/cut only in read-only files (viewer and request-only roles)",
+            "Never block copy/cut"
+          ],
+          "description": "Which Envpilot-managed .env files block clipboard copy/cut"
+        },
+        "envpilot.cloakValues": {
+          "type": "boolean",
+          "scope": "application",
+          "default": true,
+          "description": "Visually mask variable values in Envpilot-managed .env files (the file content on disk is unchanged). Masking uses editor decorations, so values may still be visible in surfaces VS Code renders directly: the minimap (with editor.minimap.renderCharacters on), peek views, and diff editors."
+        },
+        "envpilot.autocomplete.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Suggest variable names from your linked Envpilot project when typing environment variable references (process.env., os.getenv, etc.)"
+        },
+        "envpilot.hover.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a masked Envpilot hover on recognized environment variable references, with a role-checked option to reveal the value"
         },
         "envpilot.idlePauseMinutes": {
           "type": "number",

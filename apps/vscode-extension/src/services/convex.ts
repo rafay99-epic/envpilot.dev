@@ -1,8 +1,15 @@
 import { ConvexClient } from "convex/browser";
 import { anyApi } from "convex/server";
 
-/** Async fetcher returning a fresh WorkOS access token (or null when signed out). */
-export type TokenFetcher = () => Promise<string | null>;
+/**
+ * Async fetcher returning a fresh WorkOS access token (or null when signed
+ * out). Matches Convex's AuthTokenFetcher: the server passes
+ * `{ forceRefreshToken: true }` when it rejected the previous token, and the
+ * fetcher must then refresh instead of returning the same cached token.
+ */
+export type TokenFetcher = (args?: {
+  forceRefreshToken: boolean;
+}) => Promise<string | null>;
 
 /** A single active project-access scoping record for the caller. */
 export interface CallerProjectAccess {
@@ -44,12 +51,73 @@ export class ConvexService {
   private client: ConvexClient;
   private subscriptions = new Map<string, () => void>();
   private _disposed = false;
+  private fetcher: TokenFetcher;
+  /** Last auth state reported by the client's setAuth onChange callback. */
+  private _authenticated = true;
+  private reauthTimer: ReturnType<typeof setTimeout> | null = null;
+  private reauthAttempt = 0;
+  /** Capped backoff for re-auth after a transient refresh failure — a null
+   * token is TERMINAL for the Convex client, so we must call setAuth again. */
+  private static readonly REAUTH_DELAYS_MS = [5_000, 15_000, 60_000];
+  private static readonly REAUTH_CAP_MS = 3 * 60 * 1000;
 
   constructor(convexUrl: string, getFreshToken: TokenFetcher) {
     this.client = new ConvexClient(convexUrl);
+    this.fetcher = getFreshToken;
     // Authenticate the socket with a WorkOS JWT, refreshed on demand. Convex
     // calls this fetcher whenever it needs a (fresh) token.
-    this.client.setAuth(getFreshToken);
+    this.applyAuth();
+  }
+
+  private applyAuth(): void {
+    this.client.setAuth(this.fetcher, (isAuthenticated) => {
+      this._authenticated = isAuthenticated;
+      if (isAuthenticated) {
+        this.reauthAttempt = 0;
+        this.clearReauthTimer();
+      } else if (!this._disposed) {
+        // The fetcher returned null (transient refresh failure or signed
+        // out). Retrying while signed out is a cheap local storage read —
+        // no network — so no account check is needed here.
+        this.scheduleReauth();
+      }
+    });
+  }
+
+  /** Whether the socket's auth is currently alive (per the last onChange). */
+  get isAuthenticated(): boolean {
+    return this._authenticated;
+  }
+
+  /**
+   * Force the socket to re-run token fetch + authentication. Used after an
+   * account switch (the old socket auth belongs to the previous account) and
+   * by the transient-failure backoff.
+   */
+  reauthenticate(): void {
+    this.clearReauthTimer();
+    this.reauthAttempt = 0;
+    this.applyAuth();
+  }
+
+  private scheduleReauth(): void {
+    if (this.reauthTimer) return;
+    const delay =
+      ConvexService.REAUTH_DELAYS_MS[this.reauthAttempt] ??
+      ConvexService.REAUTH_CAP_MS;
+    this.reauthAttempt++;
+    this.reauthTimer = setTimeout(() => {
+      this.reauthTimer = null;
+      if (!this._disposed) this.applyAuth();
+    }, delay);
+    this.reauthTimer.unref?.();
+  }
+
+  private clearReauthTimer(): void {
+    if (this.reauthTimer) {
+      clearTimeout(this.reauthTimer);
+      this.reauthTimer = null;
+    }
   }
 
   /**
@@ -180,6 +248,7 @@ export class ConvexService {
   async dispose(): Promise<void> {
     if (this._disposed) return;
     this._disposed = true;
+    this.clearReauthTimer();
     this.unsubscribeAll();
     await this.client.close();
   }

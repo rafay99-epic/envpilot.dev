@@ -326,10 +326,11 @@ export class AuthService {
     const session = await this.getSession();
     if (session) {
       await this.revokeDeviceSession(session);
+      // Abandon any in-flight refresh for THIS account so it can't hand back
+      // a token after the account is cleared — other signed-in accounts'
+      // refreshes must keep running.
+      this.tokenManager.clearInflightFor(session.user.id);
     }
-    // Abandon any in-flight refresh so it can't hand back a token for the
-    // account we're about to clear.
-    this.tokenManager.clearInflight();
     await this.storage.clearAuthSession();
     this._onAuthStateChanged.fire(null);
     vscode.window.showInformationMessage("Signed out of Envpilot");

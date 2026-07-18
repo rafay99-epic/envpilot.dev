@@ -160,9 +160,10 @@ export class DashboardPanelProvider implements vscode.Disposable {
         vscode.commands.executeCommand("envpilot.addDirectory");
         break;
       case "removeDirectory":
-        // The remove directory command expects a tree item, but from webview
-        // we trigger the command without args — user picks from quick pick
-        vscode.commands.executeCommand("envpilot.removeDirectory");
+        vscode.commands.executeCommand("envpilot.removeDirectory", {
+          projectId: message.projectId,
+          directoryPath: message.directoryPath,
+        });
         break;
       case "signIn":
         vscode.commands.executeCommand("envpilot.signIn");

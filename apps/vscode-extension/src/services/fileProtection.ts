@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
 import * as fs from "fs/promises";
+import * as path from "path";
+import {
+  getManifestPath,
+  hashContent,
+  readManifest,
+} from "../utils/managedFiles";
 
 export type ProtectionMode =
   | "strict-readonly"
@@ -17,13 +23,19 @@ export class FileProtectionService {
   private watchers: Map<string, vscode.FileSystemWatcher> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private protectionModes: Map<string, ProtectionMode> = new Map();
-  private _isSyncing = false;
+  /** Depth counter — concurrent sync writes (per-env fan-out) each hold the
+   * suppression until their own finally releases it. */
+  private syncDepth = 0;
 
   /**
    * Set syncing state to suppress revert during our own writes
    */
   setSyncing(value: boolean): void {
-    this._isSyncing = value;
+    this.syncDepth = Math.max(0, this.syncDepth + (value ? 1 : -1));
+  }
+
+  private get isSyncing(): boolean {
+    return this.syncDepth > 0;
   }
 
   /**
@@ -45,47 +57,39 @@ export class FileProtectionService {
 
     const fileWatcher = vscode.workspace.createFileSystemWatcher(filePath);
 
-    fileWatcher.onDidChange(async () => {
-      if (this._isSyncing) {
-        return;
-      }
-
-      // Debounce to avoid multiple triggers
-      const existing = this.debounceTimers.get(filePath);
-      if (existing) {
-        clearTimeout(existing);
-      }
-
-      this.debounceTimers.set(
-        filePath,
-        setTimeout(async () => {
-          this.debounceTimers.delete(filePath);
-          await this.handleUnauthorizedEdit(filePath, resyncCallback);
-        }, 500)
-      );
-    });
-
+    fileWatcher.onDidChange(() => this.scheduleCheck(filePath, resyncCallback));
     // Also handle deletion — if someone deletes a protected file, re-sync it
-    fileWatcher.onDidDelete(async () => {
-      if (this._isSyncing) {
-        return;
-      }
-
-      const existing = this.debounceTimers.get(filePath);
-      if (existing) {
-        clearTimeout(existing);
-      }
-
-      this.debounceTimers.set(
-        filePath,
-        setTimeout(async () => {
-          this.debounceTimers.delete(filePath);
-          await this.handleUnauthorizedEdit(filePath, resyncCallback);
-        }, 500)
-      );
-    });
+    fileWatcher.onDidDelete(() => this.scheduleCheck(filePath, resyncCallback));
 
     this.watchers.set(filePath, fileWatcher);
+  }
+
+  /**
+   * Debounced verification of a watcher event. Events delivered mid-sync are
+   * NOT dropped (a genuine external edit can land inside the per-env fan-out
+   * window) — the timer re-arms until the sync settles, then the manifest-hash
+   * check in handleUnauthorizedEdit suppresses our own writes.
+   */
+  private scheduleCheck(
+    filePath: string,
+    resyncCallback: () => Promise<void>
+  ): void {
+    const existing = this.debounceTimers.get(filePath);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    this.debounceTimers.set(
+      filePath,
+      setTimeout(async () => {
+        this.debounceTimers.delete(filePath);
+        if (this.isSyncing) {
+          this.scheduleCheck(filePath, resyncCallback);
+          return;
+        }
+        await this.handleUnauthorizedEdit(filePath, resyncCallback);
+      }, 500)
+    );
   }
 
   /**
@@ -114,6 +118,23 @@ export class FileProtectionService {
     filePath: string,
     resyncCallback: () => Promise<void>
   ): Promise<void> {
+    // A watcher event can land after the sync's setSyncing(false) — if the
+    // on-disk content still matches the managed-files manifest hash, it was
+    // our own write; never warn or revert over it.
+    try {
+      const [entries, content] = await Promise.all([
+        readManifest(getManifestPath()),
+        fs.readFile(filePath, "utf-8"),
+      ]);
+      const resolved = path.resolve(filePath);
+      const entry = entries.find((e) => e.path === resolved);
+      if (entry && hashContent(content) === entry.sha256) {
+        return;
+      }
+    } catch {
+      // Unreadable/deleted file — fall through to the normal revert path.
+    }
+
     const mode = this.protectionModes.get(filePath) || "readonly-with-request";
 
     let action: string | undefined;
@@ -132,7 +153,7 @@ export class FileProtectionService {
 
     // Revert the file regardless of which button was clicked
     try {
-      this._isSyncing = true;
+      this.setSyncing(true);
 
       // Make writable so we can overwrite
       try {
@@ -150,7 +171,7 @@ export class FileProtectionService {
         // Ignore
       }
     } finally {
-      this._isSyncing = false;
+      this.setSyncing(false);
     }
 
     if (action === "Request Variable") {

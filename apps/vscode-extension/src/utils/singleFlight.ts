@@ -19,11 +19,21 @@ export class SingleFlight {
   run<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const existing = this.inflight.get(key) as Promise<T> | undefined;
     if (existing) return existing;
-    const p = fn().finally(() => {
-      this.inflight.delete(key);
+    // Identity-checked cleanup: after delete()/clear(), a NEW run may have
+    // registered under this key — the old promise's settle must not evict it.
+    const p: Promise<T> = fn().finally(() => {
+      if (this.inflight.get(key) === p) this.inflight.delete(key);
     });
     this.inflight.set(key, p);
     return p;
+  }
+
+  /**
+   * Forget ONE tracked request so new callers for that key start fresh work.
+   * A promise already returned still settles for its original callers.
+   */
+  delete(key: string): void {
+    this.inflight.delete(key);
   }
 
   /**

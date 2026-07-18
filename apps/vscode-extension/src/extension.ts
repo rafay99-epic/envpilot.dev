@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { existsSync } from "fs";
+import { chmod, stat, unlink } from "fs/promises";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -17,8 +19,11 @@ import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
 import { ClipboardGuardService } from "./services/clipboardGuard";
+import { CloakService } from "./services/cloak";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
+import { registerAutocomplete } from "./providers/autocomplete";
+import { registerEnvHover, revealHoverValue } from "./providers/envHover";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import {
   VersionCheckService,
@@ -40,9 +45,14 @@ import {
   isCommitGuardEnabled,
   getIdlePauseMinutes,
 } from "./utils/config";
-import { getDisplayPath } from "./utils/paths";
+import { getDisplayPath, isPathInside } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
-import { purgeManagedFilesFiltered } from "./utils/managedFiles";
+import {
+  purgeManagedFilesFiltered,
+  readManifest,
+  renameManagedFile,
+  getManifestPath,
+} from "./utils/managedFiles";
 import {
   writeSessionMarker,
   clearSessionMarker,
@@ -102,6 +112,7 @@ let convexService: ConvexService | null = null;
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
 let clipboardGuardService: ClipboardGuardService;
+let cloakService: CloakService;
 let gitCommitGuardService: GitCommitGuardService;
 let envCodeLensProvider: EnvCodeLensProvider;
 let dashboardPanelProvider: DashboardPanelProvider;
@@ -153,6 +164,19 @@ async function updateContextFlags(): Promise<void> {
         ? meta.capabilities["project.requests.submit"] === true
         : normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
     );
+  } else {
+    // No linked projects — clear stale role flags from a previous link
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.userRole",
+      undefined
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.projectRole",
+      undefined
+    );
+    vscode.commands.executeCommand("setContext", "envpilot.isDeveloper", false);
   }
 }
 
@@ -192,6 +216,21 @@ async function initializeConvexService(): Promise<void> {
     output.error(
       `Failed to initialize Convex service: ${error instanceof Error ? error.message : String(error)}`
     );
+  }
+}
+
+/**
+ * Fire-and-forget removal of a crash-leftover atomic-write temp, but only
+ * when it is old enough that no live window can still be mid-write on it.
+ */
+async function sweepStaleTemp(tmpPath: string): Promise<void> {
+  try {
+    const s = await stat(tmpPath);
+    if (Date.now() - s.mtimeMs > 60_000) {
+      await unlink(tmpPath);
+    }
+  } catch {
+    // Missing temp (the common case) — nothing to sweep.
   }
 }
 
@@ -255,6 +294,31 @@ export async function activate(context: vscode.ExtensionContext) {
   fileProtectionService = new FileProtectionService();
   clipboardGuardService = new ClipboardGuardService();
   clipboardGuardService.activate();
+  // Re-arm the clipboard guard from the managed-files manifest BEFORE the
+  // first sync — a managed file must never sit unguarded between window
+  // reload and the sync that would re-register it. Gated on an auth session
+  // so a signed-out reload doesn't re-lock files releaseAllProtection() just
+  // released. Entries recorded by older builds lack `mode` — fail closed
+  // with the restrictive default; the next sync corrects it.
+  const rearmAuthenticated = await authService.isAuthenticated();
+  for (const entry of await readManifest(getManifestPath())) {
+    // Sweep a stale atomic-write temp a crash may have left beside the file
+    // (it holds plaintext secrets and is not itself in the manifest).
+    // Age-gated: the manifest is shared across extension hosts, and another
+    // live window may be mid-atomic-write on this very path — its temp is
+    // milliseconds old, a crash leftover is minutes+.
+    void sweepStaleTemp(`${entry.path}.tmp-envpilot`);
+    if (rearmAuthenticated && existsSync(entry.path)) {
+      clipboardGuardService.protectFile(
+        entry.path,
+        entry.mode ?? "readonly-with-request"
+      );
+    }
+  }
+  cloakService = new CloakService((fsPath) =>
+    clipboardGuardService.isManaged(fsPath)
+  );
+  cloakService.activate();
   gitCommitGuardService = new GitCommitGuardService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
@@ -330,6 +394,16 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Secret-name autocomplete + masked hover (both check their enable setting
+  // on every invocation, so toggling applies live without a reload).
+  const intelliSenseDeps = {
+    api: apiService,
+    auth: authService,
+    storage: storageService,
+  };
+  registerAutocomplete(context, intelliSenseDeps);
+  registerEnvHover(context, intelliSenseDeps);
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -404,7 +478,37 @@ export async function activate(context: vscode.ExtensionContext) {
       wrapCommand(async () => {
         dashboardPanelProvider.show();
       })
+    ),
+    // Value cloaking commands
+    vscode.commands.registerCommand(
+      "envpilot.toggleCloaking",
+      wrapCommand(async () => cloakService.toggle())
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.revealValues",
+      wrapCommand(async () => {
+        cloakService.reveal();
+      })
+    ),
+    // Hover "Reveal value" link (role-checked; not surfaced in the palette)
+    vscode.commands.registerCommand(
+      "envpilot.revealHoverValue",
+      wrapCommand(async (args) => revealHoverValue(apiService, args))
     )
+  );
+
+  // Keep clipboard protection attached to a guarded file when it is
+  // renamed/moved (fileProtection's onDidDelete on the old path already
+  // triggers a resync of the original).
+  context.subscriptions.push(
+    vscode.workspace.onDidRenameFiles((e) => {
+      for (const { oldUri, newUri } of e.files) {
+        clipboardGuardService.handleRename(oldUri.fsPath, newUri.fsPath);
+        // Re-key the manifest too, or the renamed file's protection is lost
+        // on reload (re-arm) and never cleaned up by purge/release.
+        void renameManagedFile(oldUri.fsPath, newUri.fsPath);
+      }
+    })
   );
 
   // Subscribe to auth state changes
@@ -452,9 +556,20 @@ export async function activate(context: vscode.ExtensionContext) {
   // the unsync purge and crash sweep above still ran, so previously synced
   // files are cleaned up even in Restricted Mode.
   const startSyncPipeline = async () => {
-    const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
-    if (linkedProject) {
-      void syncService.syncAllDirectories(linkedProject);
+    // Sync every linked project with a directory inside ANY workspace folder
+    // (multi-root aware). Projects are unique, so no directory syncs twice;
+    // syncDirectory's per-directory single-flight is the backstop.
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const linkedProjects = await syncService.getAllLinkedProjectsV2();
+    for (const project of linkedProjects) {
+      const inWorkspace = project.directories.some((dir) =>
+        folders.some((folder) =>
+          isPathInside(dir.directoryPath, folder.uri.fsPath)
+        )
+      );
+      if (inWorkspace) {
+        void syncService.syncAllDirectories(project);
+      }
     }
 
     await updateContextFlags();
@@ -481,12 +596,27 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Check for extension updates (non-blocking)
+  // Check for extension updates (non-blocking), then hourly — a window left
+  // open for days must still learn about a new hard block. refreshManifest's
+  // own hourly throttle keeps the actual fetches bounded.
   const versionCheckService = new VersionCheckService(context);
   versionCheckService.checkForUpdate();
+  const versionCheckTimer = setInterval(
+    () => void versionCheckService.checkForUpdate(),
+    60 * 60 * 1000
+  );
+  versionCheckTimer.unref?.();
+  context.subscriptions.push({
+    dispose: () => clearInterval(versionCheckTimer),
+  });
 
   // Subscribe to real-time revocation events for UI updates
   realTimeSyncService.onRevocationDetected(({ project, reason }) => {
+    // Drop every ApiService cache (responses, access metadata, roles) so a
+    // hover/reveal opened pre-revocation can't pass its role check or read
+    // variables from a stale cache — the refetch hits the server, which
+    // denies the revoked caller.
+    apiService.clearCache();
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();
@@ -499,6 +629,8 @@ export async function activate(context: vscode.ExtensionContext) {
   syncService.onSyncComplete(() => {
     envCodeLensProvider.refresh();
     dashboardPanelProvider.notifySyncCompleted();
+    // Sync may have registered new managed files — re-apply cloaking.
+    cloakService.refresh();
     void maybeShowUnsyncNotice(context);
   });
 
@@ -571,6 +703,7 @@ export async function activate(context: vscode.ExtensionContext) {
       convexService?.dispose();
       fileProtectionService.dispose();
       clipboardGuardService.dispose();
+      cloakService.dispose();
       gitCommitGuardService.dispose();
       envCodeLensProvider.dispose();
       dashboardPanelProvider.dispose();
@@ -585,6 +718,10 @@ export async function activate(context: vscode.ExtensionContext) {
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
   if (success) {
+    // The Convex socket may still be authenticated as a previous account (or
+    // unauthenticated) — force it to re-run the token fetch before any
+    // subscriptions start, same as switchToAccount.
+    convexService?.reauthenticate();
     // If sign-in added a new account alongside existing ones, point the user
     // at the switcher — AuthService.signIn() already showed the plain
     // "Signed in as <email>" toast for the single-account case.
@@ -620,6 +757,27 @@ async function handleSignIn(): Promise<void> {
   }
 }
 
+/**
+ * Release every managed file's local locks after a FULL sign-out: stop the
+ * revert watcher, restore normal permissions, drop the clipboard guard. Files
+ * stay on disk — sign-out is not revocation — but a signed-out user must not
+ * be left with read-only, clipboard-blocked files and no way to release them.
+ */
+async function releaseAllProtection(): Promise<void> {
+  for (const entry of await readManifest(getManifestPath())) {
+    fileProtectionService.unwatchFile(entry.path);
+    try {
+      await chmod(entry.path, 0o644);
+    } catch {
+      // File may already be gone.
+    }
+    clipboardGuardService.unprotectFile(entry.path);
+  }
+  // Unmask already-open editors immediately — cloaking keys off the guard's
+  // managed map, which the loop above just emptied.
+  cloakService.refresh();
+}
+
 async function handleSignOut(): Promise<void> {
   await authService.signOut();
   clearSentryUser();
@@ -635,6 +793,9 @@ async function handleSignOut(): Promise<void> {
   // handler just applied.
   const remainingSession = await storageService.getAuthSession();
   if (remainingSession) {
+    // The Convex socket is still authenticated as the signed-out account —
+    // force a token re-fetch before subscriptions restart under the new one.
+    convexService?.reauthenticate();
     setSentryUser(remainingSession.user.id, remainingSession.user.email);
     vscode.commands.executeCommand(
       "setContext",
@@ -647,9 +808,9 @@ async function handleSignOut(): Promise<void> {
     await updateContextFlags();
 
     if (shouldAutoSync()) {
+      // refreshSubscriptions() already sets up the metadata subscriptions.
       await syncService.refreshSubscriptions();
       await realTimeSyncService.refreshSubscriptions();
-      syncService.startPeriodicSync();
       realTimeSyncService.startRealTimeSync();
     }
 
@@ -657,6 +818,7 @@ async function handleSignOut(): Promise<void> {
       `Envpilot: Now signed in as ${remainingSession.user.email}.`
     );
   } else {
+    await releaseAllProtection();
     vscode.window.showInformationMessage("Signed out.");
   }
 }
@@ -744,6 +906,9 @@ async function switchToAccount(accountId: string): Promise<void> {
   }
 
   apiService.clearCache();
+  // The Convex socket is still authenticated as the PREVIOUS account — force
+  // it to re-run the token fetch so subscriptions come up under the new one.
+  convexService?.reauthenticate();
 
   await vscode.window.withProgress(
     {
@@ -760,9 +925,9 @@ async function switchToAccount(accountId: string): Promise<void> {
 
       if (shouldAutoSync()) {
         progress.report({ message: "Starting sync..." });
+        // refreshSubscriptions() already sets up the metadata subscriptions.
         await syncService.refreshSubscriptions();
         await realTimeSyncService.refreshSubscriptions();
-        syncService.startPeriodicSync();
         realTimeSyncService.startRealTimeSync();
       }
     }
@@ -821,6 +986,7 @@ async function handleSignOutAll(): Promise<void> {
   statusBarProvider.update();
   dashboardPanelProvider.refresh();
   await updateContextFlags();
+  await releaseAllProtection();
 
   vscode.window.showInformationMessage("Signed out of all Envpilot accounts.");
 }
@@ -1126,14 +1292,51 @@ async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
   }
 }
 
-async function handleRemoveDirectory(item?: ProjectTreeItem): Promise<void> {
-  if (!item?.directory || !item.project) {
-    vscode.window.showWarningMessage("Select a directory to remove");
-    return;
+async function handleRemoveDirectory(
+  item?: ProjectTreeItem | { projectId?: string; directoryPath?: string }
+): Promise<void> {
+  let projectId: string | undefined;
+  let projectName: string | undefined;
+  let directoryPath: string | undefined;
+
+  if (item instanceof ProjectTreeItem) {
+    projectId = item.project?._id;
+    projectName = item.project?.name;
+    directoryPath = item.directory?.directoryPath;
+  } else if (item?.projectId && item.directoryPath) {
+    projectId = item.projectId;
+    directoryPath = item.directoryPath;
+    const linked = await storageService.getLinkedProjectsV2();
+    projectName = linked.find((p) => p.projectId === projectId)?.projectName;
+  }
+
+  if (!projectId || !directoryPath) {
+    // No usable context — let the user pick from all linked directories
+    const linked = await storageService.getLinkedProjectsV2();
+    const picks = linked.flatMap((p) =>
+      p.directories.map((d) => ({
+        label: getDisplayPath(d.directoryPath),
+        description: p.projectName,
+        projectId: p.projectId,
+        projectName: p.projectName,
+        directoryPath: d.directoryPath,
+      }))
+    );
+    if (picks.length === 0) {
+      vscode.window.showWarningMessage("No linked directories to remove");
+      return;
+    }
+    const pick = await vscode.window.showQuickPick(picks, {
+      placeHolder: "Select a directory to remove",
+    });
+    if (!pick) return;
+    projectId = pick.projectId;
+    projectName = pick.projectName;
+    directoryPath = pick.directoryPath;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    `Remove "${getDisplayPath(item.directory.directoryPath)}" from ${item.project.name}?`,
+    `Remove "${getDisplayPath(directoryPath)}" from ${projectName ?? "this project"}?`,
     "Remove",
     "Cancel"
   );
@@ -1143,10 +1346,7 @@ async function handleRemoveDirectory(item?: ProjectTreeItem): Promise<void> {
   }
 
   try {
-    await syncService.removeDirectoryFromProject(
-      item.project._id,
-      item.directory.directoryPath
-    );
+    await syncService.removeDirectoryFromProject(projectId, directoryPath);
 
     vscode.window.showInformationMessage("Directory removed");
     projectsTreeProvider.refresh();
@@ -1393,61 +1593,67 @@ async function handlePullVariables(): Promise<void> {
     return;
   }
 
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Envpilot: Pulling variables...",
-    },
-    async () => {
-      statusBarProvider.setSyncing(true);
-      dashboardPanelProvider.notifySyncStarted();
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Envpilot: Pulling variables...",
+      },
+      async () => {
+        statusBarProvider.setSyncing(true);
+        dashboardPanelProvider.notifySyncStarted();
 
-      // Sync all linked projects (V2) in parallel
-      const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
-      if (allLinkedProjects.length > 0) {
-        const resultsPerProject = await Promise.all(
-          allLinkedProjects.map((project) =>
-            syncService.syncAllDirectories(project)
-          )
-        );
+        // Sync all linked projects (V2) in parallel
+        const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
+        if (allLinkedProjects.length > 0) {
+          const resultsPerProject = await Promise.all(
+            allLinkedProjects.map((project) =>
+              syncService.syncAllDirectories(project)
+            )
+          );
 
-        let totalSuccessful = 0;
-        let totalDirs = 0;
-        for (const results of resultsPerProject) {
-          totalSuccessful += results.filter((r) => r.success).length;
-          totalDirs += results.length;
+          let totalSuccessful = 0;
+          let totalDirs = 0;
+          for (const results of resultsPerProject) {
+            totalSuccessful += results.filter((r) => r.success).length;
+            totalDirs += results.length;
+          }
+
+          statusBarProvider.setSyncing(false);
+
+          if (totalDirs > 0) {
+            const projectCount = allLinkedProjects.length;
+            const projectLabel =
+              projectCount > 1 ? ` across ${projectCount} projects` : "";
+            if (totalSuccessful === totalDirs) {
+              vscode.window.showInformationMessage(
+                `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
+              );
+            } else {
+              vscode.window.showWarningMessage(
+                `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
+              );
+            }
+            variablesTreeProvider.refresh();
+          }
+          return;
         }
+
+        // Fallback to V1
+        const result = await syncService.syncCurrentWorkspace();
 
         statusBarProvider.setSyncing(false);
 
-        if (totalDirs > 0) {
-          const projectCount = allLinkedProjects.length;
-          const projectLabel =
-            projectCount > 1 ? ` across ${projectCount} projects` : "";
-          if (totalSuccessful === totalDirs) {
-            vscode.window.showInformationMessage(
-              `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
-            );
-          } else {
-            vscode.window.showWarningMessage(
-              `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
-            );
-          }
+        if (result) {
           variablesTreeProvider.refresh();
         }
-        return;
       }
-
-      // Fallback to V1
-      const result = await syncService.syncCurrentWorkspace();
-
-      statusBarProvider.setSyncing(false);
-
-      if (result) {
-        variablesTreeProvider.refresh();
-      }
-    }
-  );
+    );
+  } finally {
+    // A pull that ends without an onSyncComplete firing (no dirs, early
+    // return, error) must still clear the dashboard spinner — idempotent.
+    dashboardPanelProvider.notifySyncCompleted();
+  }
 }
 
 function handleRefresh(): void {

@@ -60,11 +60,17 @@ export class VersionCheckService {
   }
 
   async checkForUpdate(): Promise<void> {
+    // Latch a cached hard block BEFORE the fetch — the network round trip can
+    // take seconds (or hang), and wrapCommand must not run commands on a
+    // known-outdated build in the meantime. Prompts wait for the post-fetch
+    // evaluation so the user is never shown two dialogs per check.
+    await this.evaluate(false);
+
     // Best-effort manifest refresh, isolated from enforcement. A fetch failure
     // (offline, server down) must NOT skip the cached min/latest evaluation
     // below — otherwise the hard block silently disappears the moment the
     // network blips after the fetch interval lapses. Enforce from last-known
-    // cached state regardless.
+    // cached state regardless (fail-open only on no-cache + network error).
     try {
       await this.refreshManifest();
     } catch (err) {
@@ -73,6 +79,11 @@ export class VersionCheckService {
       );
     }
 
+    await this.evaluate(true);
+  }
+
+  /** Evaluate cached min/latest against the running version; set the latch. */
+  private async evaluate(prompt: boolean): Promise<void> {
     try {
       const current = this.context.extension.packageJSON.version as string;
       const latest = this.context.globalState.get<string>(LATEST_KEY);
@@ -86,10 +97,12 @@ export class VersionCheckService {
           "envpilot.outdated",
           true
         );
-        await this.promptUpdate(
-          `Envpilot v${min} or newer is required — your version (v${current}) no longer works with the server. Update to continue.`,
-          true
-        );
+        if (prompt) {
+          await this.promptUpdate(
+            `Envpilot v${min} or newer is required — your version (v${current}) no longer works with the server. Update to continue.`,
+            true
+          );
+        }
         return;
       }
 
@@ -99,6 +112,7 @@ export class VersionCheckService {
         "envpilot.outdated",
         false
       );
+      if (!prompt) return;
 
       // Soft notice: supported but behind latest. Throttled to once per day.
       if (latest && compareVersions(current, latest) < 0) {

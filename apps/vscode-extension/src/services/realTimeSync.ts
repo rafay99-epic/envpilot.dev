@@ -1,8 +1,11 @@
 import * as vscode from "vscode";
+import { ConvexHttpClient } from "convex/browser";
+import { anyApi } from "convex/server";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
 import {
   ConvexService,
+  type CallerProjectAccess,
   type RevocationEvent,
   type TokenFetcher,
 } from "./convex";
@@ -162,7 +165,15 @@ export class RealTimeSyncService {
    */
   private async checkConnectionAndReconnect(): Promise<void> {
     if (!this.desiredRunning || this.reconnecting) return;
-    if (this.convexService && this.isRunning) return; // already healthy
+    // "Client exists but its auth died" (transient refresh failure — a null
+    // token is terminal for the Convex client) counts as UNHEALTHY, not just
+    // "no client at all".
+    if (
+      this.convexService &&
+      this.isRunning &&
+      this.convexService.isAuthenticated
+    )
+      return; // already healthy
 
     this.reconnecting = true;
     this.syncService.setConnectionState("reconnecting");
@@ -176,6 +187,8 @@ export class RealTimeSyncService {
         const convexService = new ConvexService(convexUrl, this.getFreshToken);
         this.setConvexService(convexService);
         this.syncService.setConvexService(convexService);
+      } else if (!this.convexService.isAuthenticated) {
+        this.convexService.reauthenticate();
       }
 
       // Let startRealTimeSync (re-)establish subscriptions now that a
@@ -365,7 +378,28 @@ export class RealTimeSyncService {
       );
       if (orphaned.length === 0) return;
 
-      for (const project of orphaned) {
+      // A lagged/partial subscription snapshot must never delete files on its
+      // own — confirm each missing project against one authoritative one-shot
+      // read before cleaning up. Unreadable = fail safe, skip entirely.
+      const authoritative = await this.fetchAuthoritativeAccessIds();
+      if (!authoritative) {
+        console.warn(
+          "[RealTimeSync] Skipping access cleanup — authoritative re-check unavailable"
+        );
+        return;
+      }
+      const confirmed = orphaned.filter((p) => {
+        if (authoritative.has(p.projectId)) {
+          console.log(
+            `[RealTimeSync] Snapshot lag for ${p.projectName} — access still active, skipping cleanup`
+          );
+          return false;
+        }
+        return true;
+      });
+      if (confirmed.length === 0) return;
+
+      for (const project of confirmed) {
         console.log(
           `[RealTimeSync] Access ended for project: ${project.projectName}`
         );
@@ -389,6 +423,41 @@ export class RealTimeSyncService {
       await this.refreshSubscriptions();
     } finally {
       this.isProcessingRevocation = false;
+    }
+  }
+
+  /**
+   * One-shot authoritative read of the caller's active project accesses over
+   * HTTP (same query the subscription uses, but at current server state).
+   * Returns null when it cannot be made (offline, signed out).
+   */
+  private async fetchAuthoritativeAccessIds(): Promise<Set<string> | null> {
+    try {
+      const url = await this.resolveConvexUrl();
+      if (!url) return null;
+      const token = await this.getFreshToken();
+      if (!token) return null;
+      const client = new ConvexHttpClient(url);
+      client.setAuth(token);
+      // Bounded: this await runs while isProcessingRevocation holds — a
+      // stalled query must not block revocation handling for minutes. A
+      // timeout degrades to the fail-safe null (skip cleanup this round).
+      const records = (await Promise.race([
+        client.query(
+          anyApi.features.users.projectAccess.listForCaller as never,
+          {} as never
+        ),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Access re-check timed out")),
+            10000
+          )
+        ),
+      ])) as CallerProjectAccess[] | null;
+      return new Set((records ?? []).map((r) => r.projectId));
+    } catch (err) {
+      captureError(err, { phase: "access-recheck" });
+      return null;
     }
   }
 
