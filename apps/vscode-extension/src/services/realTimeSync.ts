@@ -1,8 +1,11 @@
 import * as vscode from "vscode";
+import { ConvexHttpClient } from "convex/browser";
+import { anyApi } from "convex/server";
 import { SyncService } from "./sync";
 import { StorageService } from "../utils/storage";
 import {
   ConvexService,
+  type CallerProjectAccess,
   type RevocationEvent,
   type TokenFetcher,
 } from "./convex";
@@ -365,7 +368,28 @@ export class RealTimeSyncService {
       );
       if (orphaned.length === 0) return;
 
-      for (const project of orphaned) {
+      // A lagged/partial subscription snapshot must never delete files on its
+      // own — confirm each missing project against one authoritative one-shot
+      // read before cleaning up. Unreadable = fail safe, skip entirely.
+      const authoritative = await this.fetchAuthoritativeAccessIds();
+      if (!authoritative) {
+        console.warn(
+          "[RealTimeSync] Skipping access cleanup — authoritative re-check unavailable"
+        );
+        return;
+      }
+      const confirmed = orphaned.filter((p) => {
+        if (authoritative.has(p.projectId)) {
+          console.log(
+            `[RealTimeSync] Snapshot lag for ${p.projectName} — access still active, skipping cleanup`
+          );
+          return false;
+        }
+        return true;
+      });
+      if (confirmed.length === 0) return;
+
+      for (const project of confirmed) {
         console.log(
           `[RealTimeSync] Access ended for project: ${project.projectName}`
         );
@@ -389,6 +413,30 @@ export class RealTimeSyncService {
       await this.refreshSubscriptions();
     } finally {
       this.isProcessingRevocation = false;
+    }
+  }
+
+  /**
+   * One-shot authoritative read of the caller's active project accesses over
+   * HTTP (same query the subscription uses, but at current server state).
+   * Returns null when it cannot be made (offline, signed out).
+   */
+  private async fetchAuthoritativeAccessIds(): Promise<Set<string> | null> {
+    try {
+      const url = await this.resolveConvexUrl();
+      if (!url) return null;
+      const token = await this.getFreshToken();
+      if (!token) return null;
+      const client = new ConvexHttpClient(url);
+      client.setAuth(token);
+      const records = (await client.query(
+        anyApi.features.users.projectAccess.listForCaller as never,
+        {} as never
+      )) as CallerProjectAccess[] | null;
+      return new Set((records ?? []).map((r) => r.projectId));
+    } catch (err) {
+      captureError(err, { phase: "access-recheck" });
+      return null;
     }
   }
 

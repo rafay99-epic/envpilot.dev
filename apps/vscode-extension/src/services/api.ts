@@ -139,6 +139,9 @@ export class ApiService {
   private static readonly CACHE_TTL_MS = 30_000;
   /** In-flight GET coalescing keyed by cache key (single-flight). */
   private inflight = new SingleFlight();
+  /** Bumped by clearCache() so fetches started before the clear (e.g. under
+   * the old account) can never repopulate the caches with stale data. */
+  private cacheGeneration = 0;
   /** Guards against stacking multiple "session expired" prompts at once. */
   private reauthPromptActive = false;
 
@@ -327,6 +330,7 @@ export class ApiService {
 
   /** Drop all cached responses (manual refresh, sign-out, account switch). */
   clearCache(): void {
+    this.cacheGeneration++;
     this.responseCache.clear();
     this.inflight.clear();
     this.roleCache.clear();
@@ -361,6 +365,7 @@ export class ApiService {
     if (cached) return cached;
 
     return this.coalesce("orgs", async () => {
+      const gen = this.cacheGeneration;
       const orgs = await this.convexQuery<OrgRow[]>(
         anyApi.features.organizations.queries.listForUser,
         {}
@@ -389,7 +394,9 @@ export class ApiService {
         unifiedRole: normalizeOrgRole(org.role),
       }));
 
-      this.setCached("orgs", organizations);
+      if (gen === this.cacheGeneration) {
+        this.setCached("orgs", organizations);
+      }
       return organizations;
     });
   }
@@ -404,20 +411,23 @@ export class ApiService {
     if (cached) return cached;
 
     return this.coalesce(cacheKey, async () => {
+      const gen = this.cacheGeneration;
       const projects = organizationId
         ? await this.listProjectsForOrg(organizationId)
         : await this.listAllProjects();
 
-      for (const project of projects) {
-        if (project.unifiedRole) {
-          this.roleCache.set(project._id, project.unifiedRole);
+      if (gen === this.cacheGeneration) {
+        for (const project of projects) {
+          if (project.unifiedRole) {
+            this.roleCache.set(project._id, project.unifiedRole);
+          }
+          if (project.projectRole) {
+            this.projectRoleCache.set(project._id, project.projectRole);
+          }
         }
-        if (project.projectRole) {
-          this.projectRoleCache.set(project._id, project.projectRole);
-        }
-      }
 
-      this.setCached(cacheKey, projects);
+        this.setCached(cacheKey, projects);
+      }
       return projects;
     });
   }
@@ -545,6 +555,7 @@ export class ApiService {
     }
 
     return this.coalesce(cacheKey, async () => {
+      const gen = this.cacheGeneration;
       // Direct Convex action (decrypts server-side) — replaces the deleted
       // GET /api/extension/variables vault route.
       const result = await this.convexAction<PullValuesResult>(
@@ -552,13 +563,14 @@ export class ApiService {
         { projectId, environment }
       );
 
-      this.roleCache.set(projectId, result.meta.role);
-      this.cacheAccessMeta(projectId, result.meta);
-
       const variables = result.variables.map((row) =>
         ApiService.toEnvironmentVariable(row)
       );
-      this.setCached(cacheKey, variables);
+      if (gen === this.cacheGeneration) {
+        this.roleCache.set(projectId, result.meta.role);
+        this.cacheAccessMeta(projectId, result.meta);
+        this.setCached(cacheKey, variables);
+      }
       return variables;
     });
   }
@@ -667,6 +679,7 @@ export class ApiService {
     if (cached) return cached;
 
     return this.coalesce(cacheKey, async () => {
+      const gen = this.cacheGeneration;
       // Direct Convex action, metadata-only (no vault decryption, no export
       // audit) — replaces the deleted GET /api/extension/variables?metadataOnly.
       const result = await this.convexAction<PullValuesResult>(
@@ -674,13 +687,14 @@ export class ApiService {
         { projectId, environment, metadataOnly: true }
       );
 
-      this.roleCache.set(projectId, result.meta.role);
-      this.cacheAccessMeta(projectId, result.meta);
-
       const variables = result.variables.map((row) =>
         ApiService.toEnvironmentVariable(row)
       );
-      this.setCached(cacheKey, variables);
+      if (gen === this.cacheGeneration) {
+        this.roleCache.set(projectId, result.meta.role);
+        this.cacheAccessMeta(projectId, result.meta);
+        this.setCached(cacheKey, variables);
+      }
       return variables;
     });
   }
@@ -766,6 +780,7 @@ export class ApiService {
     const cacheKey = `usage:${organizationId}`;
     const cached = this.getCached<UsageInfo>(cacheKey);
     if (cached) return cached;
+    const gen = this.cacheGeneration;
 
     try {
       const membership = await this.convexQuery<MembershipRow | null>(
@@ -830,7 +845,9 @@ export class ApiService {
         },
       };
 
-      this.setCached(cacheKey, usage);
+      if (gen === this.cacheGeneration) {
+        this.setCached(cacheKey, usage);
+      }
       return usage;
     } catch (err) {
       captureError(err, { phase: "get-usage" });

@@ -44,7 +44,7 @@ import {
   isCommitGuardEnabled,
   getIdlePauseMinutes,
 } from "./utils/config";
-import { getDisplayPath } from "./utils/paths";
+import { getDisplayPath, isPathInside } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
 import {
   purgeManagedFilesFiltered,
@@ -510,9 +510,20 @@ export async function activate(context: vscode.ExtensionContext) {
   // the unsync purge and crash sweep above still ran, so previously synced
   // files are cleaned up even in Restricted Mode.
   const startSyncPipeline = async () => {
-    const linkedProject = await syncService.getLinkedProjectV2ForWorkspace();
-    if (linkedProject) {
-      void syncService.syncAllDirectories(linkedProject);
+    // Sync every linked project with a directory inside ANY workspace folder
+    // (multi-root aware). Projects are unique, so no directory syncs twice;
+    // syncDirectory's per-directory single-flight is the backstop.
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const linkedProjects = await syncService.getAllLinkedProjectsV2();
+    for (const project of linkedProjects) {
+      const inWorkspace = project.directories.some((dir) =>
+        folders.some((folder) =>
+          isPathInside(dir.directoryPath, folder.uri.fsPath)
+        )
+      );
+      if (inWorkspace) {
+        void syncService.syncAllDirectories(project);
+      }
     }
 
     await updateContextFlags();
@@ -708,9 +719,9 @@ async function handleSignOut(): Promise<void> {
     await updateContextFlags();
 
     if (shouldAutoSync()) {
+      // refreshSubscriptions() already sets up the metadata subscriptions.
       await syncService.refreshSubscriptions();
       await realTimeSyncService.refreshSubscriptions();
-      syncService.startPeriodicSync();
       realTimeSyncService.startRealTimeSync();
     }
 
@@ -821,9 +832,9 @@ async function switchToAccount(accountId: string): Promise<void> {
 
       if (shouldAutoSync()) {
         progress.report({ message: "Starting sync..." });
+        // refreshSubscriptions() already sets up the metadata subscriptions.
         await syncService.refreshSubscriptions();
         await realTimeSyncService.refreshSubscriptions();
-        syncService.startPeriodicSync();
         realTimeSyncService.startRealTimeSync();
       }
     }

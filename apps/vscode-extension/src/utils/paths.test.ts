@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { normalizePath, pathsEqual } from "./paths";
+import { normalizePath, pathsEqual, isPathInside } from "./paths";
 
 const caseInsensitive =
   process.platform === "darwin" || process.platform === "win32";
@@ -51,6 +51,15 @@ describe("normalizePath", () => {
     } else {
       expect(normalized.endsWith("Mixed/Case.ENV")).toBe(true);
     }
+  });
+
+  it("isPathInside: containment, self, and sibling-prefix bypass", () => {
+    const parent = path.join(tmpDir, "repo");
+    expect(isPathInside(path.join(parent, "apps", "web"), parent)).toBe(true);
+    expect(isPathInside(parent, parent)).toBe(true);
+    // Sibling whose name shares a prefix must NOT count as inside.
+    expect(isPathInside(path.join(tmpDir, "repo-two"), parent)).toBe(false);
+    expect(isPathInside(tmpDir, parent)).toBe(false);
   });
 
   it("treats two casings of an existing file as the same key on case-insensitive platforms", () => {
