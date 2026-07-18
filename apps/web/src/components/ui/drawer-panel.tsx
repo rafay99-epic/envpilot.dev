@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, type ReactNode } from "react";
+import { useEffect, useCallback, useRef, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface DrawerPanelProps {
@@ -20,6 +20,9 @@ const widthClasses = {
   xl: "w-[560px]",
 };
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function DrawerPanel({
   isOpen,
   onClose,
@@ -29,16 +32,40 @@ export function DrawerPanel({
   preventClose = false,
   side = "right",
 }: DrawerPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   const safeClose = useCallback(() => {
     if (!preventClose) {
       onClose();
     }
   }, [onClose, preventClose]);
 
-  const handleEscape = useCallback(
+  const handleKeydown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         safeClose();
+        return;
+      }
+      // Contain Tab inside the dialog — without this, keyboard users tab
+      // straight out of the modal into the inert page behind it.
+      if (e.key === "Tab" && panelRef.current) {
+        const focusables = Array.from(
+          panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || !panelRef.current.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     },
     [safeClose]
@@ -46,15 +73,26 @@ export function DrawerPanel({
 
   useEffect(() => {
     if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
+      document.addEventListener("keydown", handleKeydown);
       document.body.style.overflow = "hidden";
+      // Initial focus into the dialog; restore to the trigger on close.
+      const previouslyFocused = document.activeElement as HTMLElement | null;
+      const frame = requestAnimationFrame(() => {
+        const target = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+        (target ?? panelRef.current)?.focus();
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+        document.removeEventListener("keydown", handleKeydown);
+        document.body.style.overflow = "unset";
+        previouslyFocused?.focus();
+      };
     }
-
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleKeydown);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, handleEscape]);
+  }, [isOpen, handleKeydown]);
 
   return (
     <AnimatePresence>
@@ -81,6 +119,8 @@ export function DrawerPanel({
             role="dialog"
             aria-modal="true"
             aria-labelledby="drawer-title"
+            ref={panelRef}
+            tabIndex={-1}
           >
             <div className="flex h-full flex-col bg-white shadow-xl dark:bg-zinc-900">
               {/* Header */}

@@ -263,7 +263,7 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
           </div>
           {/* One quiet scope line instead of a badge per datum — status is
               the only thing that earns a colored pill. */}
-          <p className="mt-1 truncate font-mono text-xs text-zinc-400">
+          <p className="mt-1 font-mono text-xs text-zinc-400">
             {keyItem.scopeProjects === "all"
               ? "all projects"
               : `${keyItem.scopeProjects.length} project${
