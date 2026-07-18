@@ -21,6 +21,8 @@ import { ClipboardGuardService } from "./services/clipboardGuard";
 import { CloakService } from "./services/cloak";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
+import { registerAutocomplete } from "./providers/autocomplete";
+import { registerEnvHover, revealHoverValue } from "./providers/envHover";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
 import {
   VersionCheckService,
@@ -349,6 +351,16 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Secret-name autocomplete + masked hover (both check their enable setting
+  // on every invocation, so toggling applies live without a reload).
+  const intelliSenseDeps = {
+    api: apiService,
+    auth: authService,
+    storage: storageService,
+  };
+  registerAutocomplete(context, intelliSenseDeps);
+  registerEnvHover(context, intelliSenseDeps);
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -434,6 +446,11 @@ export async function activate(context: vscode.ExtensionContext) {
       wrapCommand(async () => {
         cloakService.reveal();
       })
+    ),
+    // Hover "Reveal value" link (role-checked; not surfaced in the palette)
+    vscode.commands.registerCommand(
+      "envpilot.revealHoverValue",
+      wrapCommand(async (args) => revealHoverValue(apiService, args))
     )
   );
 

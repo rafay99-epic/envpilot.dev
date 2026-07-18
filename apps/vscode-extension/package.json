@@ -399,6 +399,16 @@
           "default": true,
           "description": "Visually mask variable values in Envpilot-managed .env files (the file content on disk is unchanged)"
         },
+        "envpilot.autocomplete.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Suggest variable names from your linked Envpilot project when typing environment variable references (process.env., os.getenv, etc.)"
+        },
+        "envpilot.hover.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a masked Envpilot hover on recognized environment variable references, with a role-checked option to reveal the value"
+        },
         "envpilot.idlePauseMinutes": {
           "type": "number",
           "default": 10,
