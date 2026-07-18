@@ -31,33 +31,7 @@ The warm-up act was [#129](https://github.com/rafay99-epic/envpilot.dev/pull/129
 
 ## The chain the value has to survive
 
-```text
- CI project env                        ┌──────────────────────────────┐
-   WORKOS_CLIENT_ID  ────────────────► │  ❶ step shell                │
-   NEXT_PUBLIC_CONVEX_URL              │     bun run package          │
-                                       └──────────────┬───────────────┘
-                                                      │ esbuild define
-                                                      │ env || ""  ← silent
-                                                      ▼
-                                              dist/extension.js
-                                                      │
-                       ┌──────────────────────────────┴──────────────┐
-                       │ ❷ vsce package                              │
-                       │    └─ npm run vscode:prepublish             │
-                       │        └─ node scripts/prepublish.mjs       │
-                       │            └─ npm run package  ← REBUILDS   │
-                       └──────────────────────────────┬──────────────┘
-                                                      ▼
-                                        envpilot-1.15.0.vsix
-                                          └─ extension/dist/extension.js
-                                                      │
-                              ┌───────────────────────┴──────────────┐
-                              │ ❸ checksum:  unzip -p | shasum       │ ✓ passed
-                              │ ❹ embed:   B=$(unzip -p ...)         │ ✗ failed
-                              │            printf '%s' "$B" | grep   │
-                              └──────────────────────────────────────┘
-                                    same bytes. one pipes, one captures.
-```
+<Mermaid name="six-prs-to-find-one-bug-value-chain" />
 
 Four places to blame, and over the next 52 minutes we blamed all four in order.
 

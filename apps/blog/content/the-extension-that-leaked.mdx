@@ -54,12 +54,7 @@ We removed the deletion in #73 and left a comment forbidding anyone from putting
 
 Fine — `deactivate()` no longer deletes. Now walk through this:
 
-```text
-  install → sign in → sync → uninstall
-                                  │
-                                  ▼
-       ~/project/.env still on disk, plaintext, forever
-```
+<Mermaid name="the-extension-that-leaked-uninstall-hole" />
 
 The extension is gone. Nothing is left running that could clean up. The secrets stay.
 
@@ -105,22 +100,7 @@ With a hash guard in hand, we could finally put deletion back into `deactivate()
 
 Four guards, not one, because a single guard was what got us into trouble:
 
-```text
-file F in manifest, window W closing
-        │
-        ├─ is F under a workspace folder of W?            ── SCOPE
-        │      no → keep
-        ├─ is F's project autoUnsyncOnClose === false?    ── OPT-OUT
-        │      yes → keep
-        ├─ is F under ANY opted-out project's directory?  ── nested opt-out wins
-        │      yes → keep
-        ├─ is F under a folder claimed by another LIVE    ── LIVE-WINDOW GUARD
-        │  extension host pid?  yes → keep
-        ▼  read F
-        ├─ ENOENT             → drop stale manifest entry
-        ├─ sha256 mismatch    → spared++   ← THE HASH GUARD
-        └─ sha256 match       → chmod 0o644 → unlink → deleted++
-```
+<Mermaid name="the-extension-that-leaked-purge-guards" />
 
 The live-window guard exists because two VS Code windows can have the same folder open; closing one must not yank the file out from under the other. PID liveness is a heuristic — a recycled pid makes a dead session look alive — but it fails toward _not_ deleting, which is the correct direction for a heuristic to fail.
 

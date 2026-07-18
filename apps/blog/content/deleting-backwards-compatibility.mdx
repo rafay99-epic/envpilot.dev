@@ -49,27 +49,7 @@ Below `cli`/`extension` you get a soft notice and your command still runs. Below
 
 The alternative we did not build was per-endpoint capability negotiation: clients advertise what they support, the server routes accordingly. It is the more correct design and it is the wrong one here. It requires every endpoint to carry a compatibility matrix forever, which is precisely the maintenance cost we were trying to delete. A single version floor is coarse — it blocks a 1.17 client from commands that would have worked fine — but coarse is the point. One number, one place, one thing to reason about on merge day.
 
-```text
-apps/web/src/lib/versions.ts
-   APP_VERSIONS = { web, cli, extension, minCli, minExtension }
-              │
-              ├─ app/api/version/route.ts → NextResponse.json(APP_VERSIONS)
-              │        ▲
-              │        └── proxy.ts  unauthenticatedPaths: [... "/api/version"]
-              │            (without this: 302 → WorkOS HTML, checks no-op)
-              │
-   GET /api/version (public JSON)
-        │
-        ├──► CLI      lib/version-check.ts → enforceVersion()
-        │             called from program.hook("preAction", …)
-        │             blocked → printHardBlock() + process.exit(1)
-        │
-        ├──► VS Code  services/versionCheck.ts → checkForUpdate()
-        │             blocked → _outdated latch + setContext + modal
-        │             wrapCommand() refuses EVERY command while latched
-        │
-        └──► Web      dashboard/update-banner.tsx (soft notice only)
-```
+<Mermaid name="deleting-backwards-compatibility-version-manifest" />
 
 The CLI hook is four lines, and the comment on it earns its keep:
 
@@ -105,23 +85,7 @@ Then commit `b07ae212` fixed the failure mode we had not thought about: not the 
 
 A corrupt cache file or a read-only home directory would throw out of `Conf`, reject the `preAction` hook, and take down _every command in the CLI_. We shipped a version check that could brick the tool it was meant to protect from being bricked. Twice in one PR we had to walk it back toward "advisory unless it is certain."
 
-```text
-envpilot <cmd>
-   │
-   └─ preAction → enforceVersion()
-        ├─ try {
-        │    fresh (<1h)?    → decide from disk        (no network)
-        │    stale + data?   → decide from disk,
-        │                      void refreshCache()     (background)
-        │    stale + NO data → await refreshCache()    (≤3s, unref'd)
-        │
-        │    evaluateVersion(CLI_VERSION, latest, min)
-        │       ├─ current < min    → hard block → exit(1)
-        │       ├─ current < latest → soft notice → proceed
-        │       └─ else             → proceed
-        │  }
-        └─ catch { return false }   ← FAIL OPEN, never blocks
-```
+<Mermaid name="deleting-backwards-compatibility-enforce-version" />
 
 The decision itself is a pure function with no I/O, which is the only part that gets unit tests:
 
@@ -174,18 +138,7 @@ Read that second comment again. The shim set was declared complete in #95 — "v
 
 The floor and the deletion have to move together. Raise the floor without deleting and you carry dead code. Delete without raising the floor and old clients get `function not found` instead of an upgrade prompt — which is the original bug, reintroduced by the fix for it.
 
-```text
-#95  2026-07-10  convex/ restructured → root shims born
-                 (re-export only, keep "variables:listWithAccess" alive)
-        │
-        │  gate 1: npm has @envpilot/cli 1.18.0?
-        │  gate 2: Open VSX has extension 1.15.0?
-        │  gate 3: convex logs show zero calls to variables:* / projects:*
-        ▼
-#131 2026-07-17  minCli 1.18.0, minExtension 1.15.0
-                 → 11 shims DELETED (PR total: 213 lines across 17 files)
-                 → older builds get an upgrade prompt, not a stack trace
-```
+<Mermaid name="deleting-backwards-compatibility-shim-lifecycle" />
 
 ## The hard part was proving the upgrade target existed
 

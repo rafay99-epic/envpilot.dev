@@ -132,22 +132,7 @@ The comment above it is the whole security posture in one clause: "for a secrets
 
 ## The three eras, side by side
 
-```text
-ERA 0 (pre-#51)          ERA 1 (#51 → #70)        ERA 2 (#128/#130)
-──────────────────       ──────────────────       ──────────────────
-Browser                  Browser                  Browser / CLI / ext
- └─ ROLES[MEMBER]         └─ canDo("org:x")        └─ capabilities{}
-    .permissions[]           (render hint only)       (render hint only)
-    ▼ decides                ▼ asks                   ▼ asks
- API route               convex/authz.ts          convex/lib/authz.ts
- (inline role check)      ORG_ACTIONS = {          getRoleProfile(ctx, slug)
-    ▼                      "org:update":["admin"]     │
- Convex mutation          }                          ├─ roleRegistry row (DB)
- (no check)               assertOrgAction()          ├─ SYSTEM_PROFILES (code)
-                              ▼                      └─ UNKNOWN_ROLE_PROFILE
-                          Convex mutation                ▼
-                                                 hasCapability(p,"org.manage")
-```
+<Mermaid name="roles-as-data-three-eras" />
 
 The resolver is dual-mode on purpose — the registry is authoritative when it has an answer, code is the fallback when it does not (a fresh deployment before the seed migration runs):
 
@@ -187,28 +172,7 @@ That one function replaced every `role === "owner"` in the project-access path. 
 
 The action-level gate, `assertProjectAction` — it checks the capability and then computes `environmentScope` as a returned field for env-scopeable roles:
 
-```text
-assertProjectAction(ctx, userId, projectId, "project:update_variable")
-      │ 1. project doc     2. organizationMembers → role  3. not suspended
-      ▼
-normalizeOrgRole("editor")  →  getRoleProfile(ctx, "editor")
-      │      one resolution per request (Convex DB-IO cost rule)
-      ├── roleRegistry.by_slug, isActive ──► profile from DATA
-      ├── row exists but inactive        ──► UNKNOWN_ROLE_PROFILE (closed)
-      └── no row (pre-seed)              ──► SEEDED_CUSTOM_PROFILES.editor
-      ▼
-PROJECT_ACTION_TO_CAPABILITY[action] = "project.variables.update"
-      ▼
-bypassesAssignment(profile)? ── yes ─► capability check only
-      │ no
-      ▼
-projectMembers by_project_and_user ── none ─► ConvexError("No access to this project")
-      ▼
-hasCapability(profile, "project.variables.update")   ── false ─► ConvexError
-      ▼ true
-environmentScope = hasCapability(profile, "access.env_scoped")
-                     ? projectMembership.environments : undefined
-```
+<Mermaid name="roles-as-data-assert-project-action" />
 
 The per-resource path is a different function — `resolveResourceAccess` in `convex/lib/authz.ts`, the shared helper behind `getVariableAccess` / `getAccountAccess` — and a second-pass review on #128 caught the ordering bug it makes possible. `editor` holds both `access.env_scoped` and blanket write capabilities. If you check blanket write first, an editor scoped to `development` can write a `production` variable it cannot even see in a list:
 
@@ -279,19 +243,7 @@ Owner is locked because an editable owner is a bricked-org hazard. System roles 
 
 And because "your edit survived, the code default did not propagate" is otherwise invisible as a zero-update seed run, the seed now returns a per-role drift report:
 
-```text
-SEED_ROLES (code)                roleRegistry row (live, admin-edited)
-owner       ─────► FULL OVERWRITE ─────► owner        (never editable)
-project_manager ─┐
-team_lead       ─┼─► mergeSystemRoleCapabilities(defaults, stored)
-developer       ─┘     stored has key  → stored value WINS
-                       stored lacks it → code default fills in
-                       not in catalog  → dropped
-editor ─┐
-viewer ─┴──► insert-only; skipped if present (panel owns them after seed)
-
-return { created, updated, skipped, drift: { team_lead: ["project.share"] } }
-```
+<Mermaid name="roles-as-data-merge-seed" />
 
 The regression fence is a golden parity suite (`apps/web/src/lib/__tests__/role-parity.test.ts`) holding a frozen snapshot of the pre-registry matrix from `main @ d908d4ff`. Seeded profiles must reproduce it exactly. Its own header states the contract: a failure there always means CODE changed policy, which is only ever allowed as an explicit fixture update in the same PR. #128 reports 19 tests, #130 reports 23.
 

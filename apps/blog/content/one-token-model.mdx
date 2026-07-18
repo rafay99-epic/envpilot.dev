@@ -12,24 +12,9 @@ On 2026-07-11 we merged two pull requests. [#101](https://github.com/rafay99-epi
 
 That is the whole problem. Same primitive, implemented twice, because the two features were designed in parallel by someone who did not stop to notice they were the same feature.
 
-```text
-BEFORE (#101 + #103, 2026-07-11 -> 2026-07-18)
+Here is what the two features looked like the week before the collapse:
 
-  GitHub Action --> /api/v1/secrets --> cicd/pull.ts::_authorizePull
-                                          |
-                                          |-> apiKeys        (by_token_hash)
-                                          `-> serviceTokens  (by_token_hash)  <-- FALLBACK
-                                              gate: cicd_service_tokens
-                                              UI: Project > Settings > CI/CD Tokens
-
-  REST client   --> /api/v1/*      --,
-  MCP agent     --> /api/mcp       --`-> api/authorize.ts::_authorizeRequest
-                                          `-> apiKeys
-                                              gate: public_api | mcp_server
-                                              UI: Organization > Settings > API Keys
-
-  TWO tables . TWO authorizers . TWO UIs . THREE tier flags
-```
+<Mermaid name="one-token-model-before" />
 
 Two tables. Two management surfaces (project settings versus org settings). Three tier flags: `cicd_service_tokens`, `public_api`, `mcp_server`. Two authorization code paths, one of which our own `CLAUDE.md` says must never exist — the invariant is "route EVERY request through `convex/features/api/authorize.ts::_authorizeRequest` — never re-implement authorization for a new surface."
 
@@ -196,46 +181,7 @@ Once there is one key model with a `resource` list, adding a capability is addin
 
 It exists because of a specific failure mode. An agent using the MCP server hits a variable outside its scope, gets a `resource_scope` denial, and has nowhere to go. The human has to notice, go to the dashboard, and add it. So we let the machine file the request itself — and then constrained it hard.
 
-```text
-  AGENT                          ENVPILOT                    HUMAN REVIEWER
-    |
-    | envpilot_get_variable(STRIPE_KEY)
-    |------------------------------>|
-    |                               | _authorizeRequest -> resource_scope
-    |<------------------------------|  "not in this API key's scope"
-    |
-    | envpilot_request_variable(project, key, envs, justification)
-    |------------------------------>|
-    |                       ,-------+--------------------------------,
-    |                       | 1 consumeRateLimit(machineRequestCreate|
-    |                       |     5/hr burst 2, keyed by tokenHash)  |
-    |                       | 2 _authorizeRequest{resource:"requests"|
-    |                       | 3 projects.getBySlug -> projectId      |
-    |                       | 4 _authorizeRequest{...,projectId}     |
-    |                       | 5 env scope subset of scopeEnvironments|
-    |                       | 6 _createFromKey: key live? open<5?    |
-    |                       |     no rejection in last 24h?          |
-    |                       | 7 insertRequest (SHARED w/ human path) |
-    |                       |     findEnvironmentConflicts . dedupe  |
-    |                       |     vaultRef = undefined  <- VALUELESS |
-    |                       `-------+--------------------------------'
-    |<------------------------------| {requestId, status:"pending", message}
-    |                               |
-    |                               |--- email + dashboard badge --->|
-    |                               |                                | sees
-    |                               |                                | "API key
-    |                               |                                |  <name>"
-    |                               |                                | TYPES the
-    |                               |                                | value
-    |                               |<---- approveWithValue ---------|
-    |                               | encrypt -> _approveWithSuppliedRef
-    | envpilot_get_request_status(requestId)
-    |------------------------------>|
-    |<------------------------------| {requestId, key, environments, status, reviewReason, createdAt}  (array)
-    |                               |    <- never vaultRef
-    v
-  If nobody reviews: daily cron 03:30 UTC cancels machine pendings > 30 days.
-```
+<Mermaid name="one-token-model-machine-request" />
 
 Three constraints carry the whole design.
 

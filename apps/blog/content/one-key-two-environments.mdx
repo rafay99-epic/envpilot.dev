@@ -24,31 +24,7 @@ Production Convex deployments redact plain `Error` messages. A mutation that thr
 
 Once you know that, the whole failure chain reads differently:
 
-```text
-                            DEV DEPLOYMENT                 PROD DEPLOYMENT
-convex mutation
-  throw new Error("Variable key already                    (same code)
-     exists in this project")
-         │                          │                             │
-         ▼                          ▼                             ▼
-Convex transport            message preserved            message REDACTED
-         │                          │                             │
-         ▼                          ▼                             ▼
-apps/web/src/app/api/       "…already exists…"            "Server Error"
-  variables/route.ts
-  sanitizeConvexError(error)        │                             │
-  message.includes("already exists")│  TRUE                       │  FALSE
-         ▼                          ▼                             ▼
-                              HTTP 409                      HTTP 500 (generic)
-         │                          │                             │
-         ▼                          ▼                             ▼
-projects/[slug]/page.tsx    friendly inline banner        "Failed to create
-  isDuplicateKey = 409 &&    drawer stays open             variable"
-  /already exists/                                         drawer state wrong
-         │
-         ▼
-   PR #110's fix              ✓ works                      ✗ never fires
-```
+<Mermaid name="one-key-two-environments-redaction-chain" />
 
 Three layers — the backend text, the API route's status mapping, the UI's friendly rewrite — were all keyed off a substring that production erases. The route decided an HTTP status by reading `error.message` on a platform that deletes `error.message`. That is the anti-pattern, stated plainly: **`.data` is a contract, `.message` is a courtesy the platform can withdraw.**
 
@@ -155,26 +131,9 @@ There was a third failure in that incident, and it left no trace in the UI at al
 
 `createWithValue` is an action. It wrote the secret to WorkOS Vault **first**, then called the create mutation — which is where the duplicate check lived. Every clash therefore minted encrypted bytes in Vault with no owning Convex row. The import that failed on every row produced one orphan per row.
 
-```text
-BEFORE (#117)                          AFTER (#117)
-─────────────────────────────          ─────────────────────────────
-action createWithValue                 action createWithValue
-  │                                      │
-  │                                      ├─ runQuery getEnvironmentConflicts…
-  │                                      │     conflicts? ──► throw ConvexError
-  │                                      │                    (NOTHING WRITTEN)
-  ├─ vault.createSecret ──► WorkOS       ├─ vault.createSecret ──► WorkOS
-  │     ref = vs_abc123                  │     ref = vs_abc123
-  │                                      │
-  ├─ runMutation variables.create        ├─ try runMutation variables.create
-  │     duplicate key ──► THROW          │     (race backstop: re-checks)
-  │                                      │  catch:
-  ▼                                      │     └─ vault.deleteSecret(ref)
- ORPHAN: vs_abc123 lives in Vault,       │     └─ rethrow
- referenced by no Convex row.            ▼
- One per failed import row.             No orphan on the common path.
- (#117 also points vaultGc at the existing backlog.)
-```
+<Mermaid name="one-key-two-environments-vault-orphan" />
+
+(#117 also points `vaultGc` at the existing backlog.)
 
 Belt and braces. The pre-check is an `internalQuery` wrapping the same helper, so an action can run a `QueryCtx` check without duplicating the logic:
 
@@ -233,34 +192,7 @@ Deliberately not the shared message helper — the user's remedy here is differe
 
 Six call sites, four files, one helper:
 
-```text
-                        ┌──────────────────────────────────────┐
-   web drawer ─────────►│ variables.mutations.create           │──┐
-   REST /api/variables  └──────────────────────────────────────┘  │
-                        ┌──────────────────────────────────────┐  │
-   web (value path) ───►│ values.createWithValue (ACTION)      │──┤ pre-check
-   CLI push / import    │   → getEnvironmentConflictsInternal  │  │ BEFORE vault
-                        └──────────────────────────────────────┘  │
-                        ┌──────────────────────────────────────┐  │
-   env edit ───────────►│ variables.mutations.update           │──┤ excludeVariableId
-                        └──────────────────────────────────────┘  │
-                        ┌──────────────────────────────────────┐  │
-   `envpilot request` ─►│ requests.mutations.create            │──┤
-                        └──────────────────────────────────────┘  │
-                        ┌──────────────────────────────────────┐  │
-   reviewer approve ───►│ requests.mutations.review            │──┤ approvedEnvironments
-                        └──────────────────────────────────────┘  │   (may be a SUBSET)
-                        ┌──────────────────────────────────────┐  │
-   trash restore ──────►│ variables.mutations.restore  ◄ #118  │──┤ ← the missed one
-                        └──────────────────────────────────────┘  │   (writes nothing;
-                                                                  │   clears deletedAt)
-                                                                  ▼
-                             convex/features/variables/helpers.ts
-                                   findEnvironmentConflicts()
-                             ────────────────────────────────────
-                             INVARIANT: every (key, environment)
-                             → AT MOST ONE active variable
-```
+<Mermaid name="one-key-two-environments-write-paths" />
 
 The approve path is the subtle one. It validates `approvedEnvironments`, not `request.environments` — a reviewer may approve a _subset_ of what was asked for, so approval is a new write with reviewer-chosen scope, not a rubber stamp on the original.
 

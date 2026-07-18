@@ -61,28 +61,7 @@ const expiredPermissions = await ctx.db
 
 [#100](https://github.com/rafay99-epic/envpilot.dev/pull/100) landed two hours later with the quota already blown. The number one offender was not a slow query. It was a component subscribing to more than it rendered.
 
-```text
-  Browser (one dashboard tab, any page)
-        │
-        ├── global nav ──► useTierStoreSync ──► getExtendedUsage
-        │                    ~2000 variable docs + per-project
-        │                    share/rotation/account counts
-        │                    ⟲ RE-RUNS ON EVERY VARIABLE WRITE, PER TAB
-        │
-        ├── org switcher ─► fetch("/api/organizations") ⟲ EVERY navigation
-        │                   (found in #109)
-        │                   └─► <OrgProBadge> PER DROPDOWN ROW
-        │                         └─► getResolvedFeatures (~60 docs each)
-        │
-        ├── page body ────► 2–5 × checkFeature (one per feature key)
-        │                   (found in #109)
-        │
-        ├── project list ─► .collect() ALL variables per project,
-        │                   including soft-deleted trash, just for a COUNT
-        │
-        └── <VariableCreateDrawer isOpen={false}>  ← mounted, closed, invisible
-                  └─► checkTierLimit ──► live variable count ⟲ every write
-```
+<Mermaid name="the-convex-quota-war-read-fanout" />
 
 `getExtendedUsage` moved into a new `useExtendedUsageSync()` mounted only on `/dashboard/usage`. The drawer got four lines:
 

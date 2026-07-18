@@ -1,10 +1,4 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import mermaid from "mermaid";
-
-let counter = 0;
-let initialized = false;
+import { MermaidChart } from "@envpilot/ui";
 
 /**
  * Diagram definitions live HERE, referenced from MDX by name:
@@ -43,50 +37,5 @@ const DIAGRAMS = {
 export type DiagramName = keyof typeof DIAGRAMS;
 
 export function Mermaid({ name }: { name: DiagramName }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [failed, setFailed] = useState(false);
-  const chart = DIAGRAMS[name];
-
-  useEffect(() => {
-    if (!chart) {
-      setFailed(true);
-      return;
-    }
-    let cancelled = false;
-    if (!initialized) {
-      // initialize() sets GLOBAL config — once per page, not per render.
-      mermaid.initialize({ startOnLoad: false, theme: "dark" });
-      initialized = true;
-    }
-    // Fresh id per render call — StrictMode double-invokes effects, and
-    // mermaid.render leaves artifacts behind a reused id.
-    const id = `mermaid-${++counter}`;
-    mermaid
-      .render(id, chart)
-      .then(({ svg }) => {
-        if (!cancelled && ref.current) ref.current.innerHTML = svg;
-      })
-      .catch((error: unknown) => {
-        console.error("mermaid render failed", error);
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [chart]);
-
-  if (failed) {
-    return (
-      <pre className="my-6 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-xs text-zinc-400">
-        {chart ?? `Unknown diagram: ${String(name)}`}
-      </pre>
-    );
-  }
-
-  return (
-    <div
-      ref={ref}
-      className="my-6 flex justify-center overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4"
-    />
-  );
+  return <MermaidChart chart={DIAGRAMS[name]} />;
 }

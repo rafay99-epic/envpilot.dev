@@ -15,8 +15,12 @@ import {
   Reveal,
 } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
+import { Mermaid } from "@/components/Mermaid";
 import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
+
+// Shared MDX overrides plus blog-only components (Mermaid diagrams).
+const mdxComponents = { ...docsComponents, Mermaid };
 
 const mdxOptions = {
   mdxOptions: {
@@ -190,7 +194,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             <article className="mt-8 sm:mt-10">
               <MDXRemote
                 source={post.content}
-                components={docsComponents}
+                components={mdxComponents}
                 options={mdxOptions as never}
               />
             </article>

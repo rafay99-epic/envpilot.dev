@@ -29,23 +29,9 @@ if (value !== undefined) {
 
 `updateSecret` overwrites the object in place. Same object id, new contents. So every version row for a given variable stored the _same_ `vaultRef` — the live one. Rollback flipped a pointer to itself and reported success.
 
-```text
-BEFORE  (in-place update: every version row aims at one object)
+Before #78, every version row aimed at the same object:
 
-  Convex                                   WorkOS Vault
-  ┌────────────────────────────┐
-  │ environmentVariables       │
-  │   vaultRef ────────────────┼──────────┐
-  ├────────────────────────────┤          ▼
-  │ variableVersions           │       ┌────────────────┐
-  │   v1 vaultRef ─────────────┼──────►│ obj_abc        │
-  │   v2 vaultRef ─────────────┼──────►│ value = "v3"   │ ← overwritten
-  │   v3 vaultRef ─────────────┼──────►│ (v1,v2 gone)   │   in place
-  └────────────────────────────┘       └────────────────┘
-
-  rollback(v1) = patch vaultRef := v1.vaultRef = obj_abc = current.
-  UI says "restored". Nothing moved.
-```
+<Mermaid name="deletion-that-is-real-shared-vaultref" />
 
 The obvious fix is to use the vendor's own versioning. WorkOS Vault does retain versions server-side, so before designing anything we probed the live API with a disposable object: create, update twice, list versions, then try to read an old one. Versions are retained. But no API surface returns a historical version's _value_ — reads by version id 404, version query params are ignored. Native versioning was legible and useless.
 
@@ -113,36 +99,7 @@ Deleting a variable set `deletedAt` and hid the row. The ciphertext stayed in Va
 
 [PR #80](https://github.com/rafay99-epic/envpilot.dev/pull/80) landed 87 minutes after #78 and defined the model: delete is a 7-day trash window, then the row and every Vault object behind it are destroyed for real. The ordering is the entire design.
 
-```text
-  user clicks Delete
-        │
-        ▼
-  patch { deletedAt: now }        rows hidden; Vault object UNTOUCHED
-        │
-        ├──── within 7 days ────► restore()
-        │                          guard: past the window → REFUSE
-        │                          (purge-eligible ⇒ un-restorable, so
-        │                           GC can never race a restore)
-        │
-        │      OR "Empty trash" ──► emptyProjectTrash(), same ordering
-        ▼
-  cron 04:00 UTC → purgeExpiredBatch(depth)
-        │
-        ├─ WORKOS_API_KEY unset? ──► ABORT. 0 rows deleted.
-        ▼
-  listPurgeEligible()   by_deleted_at, gt(0)..lt(cutoff), take(25)
-        │  refs = Set{ variable.vaultRef, ...versions[].vaultRef }
-        ▼
-  DELETE api.workos.com/vault/v1/kv/{ref}
-        2xx | 404 | 410 → ok
-        anything else   → skip THIS doc only, Sentry, retry next run
-        │
-        ▼  only if EVERY ref confirmed gone
-  hardDeleteVariable()  re-check window, delete versions +
-        │               permissions + doc.  auditLogs are KEPT.
-        ▼
-  full batch and depth+1 < 20 ──► scheduler.runAfter(0, depth+1)
-```
+<Mermaid name="deletion-that-is-real-trash-gc" />
 
 Two details in there carry most of the safety.
 

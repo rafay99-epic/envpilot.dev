@@ -91,31 +91,7 @@ const gate = await checkBooleanFeature(
 
 `public_api` and `mcp_server` are separate flags in the feature registry so the two surfaces can be priced and toggled independently — and a caller cannot check the MCP surface against the REST gate to outlive its own gate being switched off.
 
-```text
-  Authorization: Bearer envpk_<40 hex>
-        │
-        ├─ assertKeyFormat        ── cheap reject before any hashing
-        ├─ hashToken (SHA-256)    ── plaintext never stored, never logged
-        ├─ consumeRateLimit(hash) ── caps brute-forcing INVALID keys too;
-        │                            deliberately OUTSIDE the core
-        ▼
-  _authorizeRequest  (internalMutation — an ATOMIC WRITE, not a query)
-        │
-        ├─ no row      ─► invalid_key        (no audit: no org to attribute to)
-        ├─ revoked     ─► audit ─► invalid_key
-        ├─ expired     ─► audit ─► invalid_key
-        ├─ bad surface ─► audit ─► surface_scope
-        ├─ bad scope   ─► audit ─► resource|environment|project_scope
-        ├─ gate off    ─► audit ─► tier_gate
-        └─ ok          ─► lastUsedAt patch (only if ≥60s stale) + audit
-        │
-        │   NOTE: RETURNED, never thrown — a throw rolls back the mutation
-        │      and takes the denial audit row with it
-        ▼
-  bounded read: .take(MAX_PULL_ROWS + 1)
-        ├─ > 1000 rows        ─► throw ─► 422 OVERFLOW      (never partial)
-        └─ vault decrypt fail ─► throw ─► 503 DECRYPT_FAILED (never a sentinel)
-```
+<Mermaid name="one-core-three-faces-authorize-pipeline" />
 
 Rate limiting sits in the caller, not the core, because the buckets differ by cost: `apiMetadata` is 120/min, `cicdPull` (value pulls) is 30/min. Keying the limiter on the token hash means invalid keys burn budget too, so a hash-guessing loop rate-limits itself.
 
@@ -168,15 +144,7 @@ Grep every caller of `_authorizeRequest` today and you get `convex/features/api/
 
 `convex/features/cicd/pull.ts` still runs `_authorizePull`, its own function, with its own denial union (`invalid_token | environment_scope | tier_gate_public_api`) and its own copy of the revoked check, the expiry check, the surface check, the environment scope check, the tier gate and the audit insert. Same shape, line by line, different function.
 
-```text
-  REST client   ──► /api/v1/**  ──► api/reads.ts ────┐
-                                                     ├──► _authorizeRequest
-  MCP client    ──► /api/mcp    ──► api/reads.ts ────┘         (the core)
-
-  GitHub Action ──► /api/v1/secrets ──► cicd/pull.ts
-                                        _authorizePull  ✗ does NOT call it
-                                        └── re-implements the same checks
-```
+<Mermaid name="one-core-three-faces-core-fork" />
 
 The core's own docstring hedges exactly around this: "the REST API, the MCP server, and (indirectly, via a compat lookup) the legacy CI/CD pull endpoint." _Indirectly, via a compat lookup_ is carrying a lot of weight in that sentence.
 
