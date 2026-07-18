@@ -1,0 +1,53 @@
+apps/docs/content/architecture.mdx
+  s_74a8cf9e9767a8::t_0dda004517953f 3,9,11,33,37-38,42-43
+apps/docs/content/rate-limits.mdx
+  s_74a8cf9e9767a8::t_6c12df79469c76 13
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_c75d0d7a8a4946 137-141,144-145
+apps/web/tests/e2e/authenticated/cicd-tokens.spec.ts
+  s_74a8cf9e9767a8::t_9fe02cfa3f38a8 13-18
+apps/web/tests/e2e/authenticated/machine-requests.spec.ts
+  s_74a8cf9e9767a8::t_2d2f1e871e6d52 8,22,33-37,39-44
+apps/web/tests/e2e/authenticated/mcp.spec.ts
+  s_74a8cf9e9767a8::t_98affcae7b1bb5 11-12,165,182,187
+apps/web/tests/e2e/authenticated/public-api.spec.ts
+  s_74a8cf9e9767a8::t_6f9e2654a97802 20-24,26-27
+apps/web/tests/e2e/authenticated/support.ts
+  s_74a8cf9e9767a8::t_c1e5df6266665d 331-385
+apps/web/tests/e2e/authenticated/variable-requests.spec.ts
+  s_74a8cf9e9767a8::t_5aba9a14092c88 1
+convex/_generated/api.d.ts
+  s_74a8cf9e9767a8::t_4c9d76a001ed15 33,143
+convex/features/api/helpers.ts
+  s_74a8cf9e9767a8::t_d4d3530770eb90 1-104
+convex/features/api/keys.ts
+  s_74a8cf9e9767a8::t_77dec514010c1a 478-481,484
+convex/features/api/reads.ts
+  s_74a8cf9e9767a8::t_13347b8ee49bb8 8-14
+convex/features/api/requests.ts
+  s_74a8cf9e9767a8::t_aac91d57972db8 1,5-11,31-32,42-47,51,81-83,97-100,116-119,123-124,128-129,131,159-165,176-184,191-218,244-247
+convex/features/cicd/pull.ts
+  s_74a8cf9e9767a8::t_e17fc8ec252d37 14,22
+convex/features/variables/requests/actions.ts
+  s_74a8cf9e9767a8::t_b022b1c8047912 273
+convex/features/variables/requests/mutations.ts
+  s_74a8cf9e9767a8::t_b00b5909edd846 28-32,34,36,47,105,420-427,429-441,446,448-461,470-490,504,569,709-710
+convex/lib/rateLimits.ts
+  s_74a8cf9e9767a8::t_1bd56ae532fc7e 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "765657740c35869be18791f2c226a8adf811c7b1",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}

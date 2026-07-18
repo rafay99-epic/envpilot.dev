@@ -1,0 +1,19 @@
+convex/features/variables/requests/mutations.ts
+  s_74a8cf9e9767a8::t_f18460e70ad842 389-394,400,406-408
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "d06500b1c8fe79455f0c9bac8deb3b1fe23c7f9e",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
