@@ -1,0 +1,21 @@
+apps/admin/package.json
+  s_f44bf03078a0f8::t_461fdd421917bf 3
+package.json
+  s_f44bf03078a0f8::t_519b6f8af7e9f0 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ee78860288e3dfc4cd746ec32e2759f89d2c298a",
+  "prompts": {},
+  "sessions": {
+    "s_f44bf03078a0f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a313c6073a72777a6",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
