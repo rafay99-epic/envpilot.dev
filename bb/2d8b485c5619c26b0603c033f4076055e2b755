@@ -1,0 +1,33 @@
+apps/vscode-extension/package.json
+  s_095c5dd55f0ed1::t_4e2d98c815c0fd 153-164,382-401
+apps/vscode-extension/src/extension.ts
+  s_095c5dd55f0ed1::t_41070e5d13f1e6 3,21,47-51,111,265-276,426-436,440-450,543-544,617
+apps/vscode-extension/src/services/sync.ts
+  s_095c5dd55f0ed1::t_9cfd7ef847b11f 440-449,1078-1087
+apps/vscode-extension/src/utils/clipboardScope.test.ts
+  s_095c5dd55f0ed1::t_64d26284aa2034 1-31
+apps/vscode-extension/src/utils/clipboardScope.ts
+  s_095c5dd55f0ed1::t_96c75bf74152be 1-26
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_095c5dd55f0ed1::t_afa2181b9364b8 27-33,79-80,86-90
+apps/vscode-extension/src/utils/paths.test.ts
+  s_095c5dd55f0ed1::t_209b9de3fb3e83 1-66
+apps/vscode-extension/src/utils/paths.ts
+  s_095c5dd55f0ed1::t_9935163b72a58a 3,6-10,14-19,21-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bb2d8b485c5619c26b0603c033f4076055e2b755",
+  "prompts": {},
+  "sessions": {
+    "s_095c5dd55f0ed1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae36ca5deaaae33b2",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
