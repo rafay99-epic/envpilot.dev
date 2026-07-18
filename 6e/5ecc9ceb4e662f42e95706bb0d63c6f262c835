@@ -1,0 +1,35 @@
+apps/docs/content/api-quickstart.mdx
+  s_74a8cf9e9767a8::t_433ed8c272e472 93
+apps/docs/content/api-reference.mdx
+  s_74a8cf9e9767a8::t_c9c646a6eb85bd 11
+apps/docs/content/architecture.mdx
+  s_74a8cf9e9767a8::t_ed10910d0ac02b 17,51
+apps/docs/content/rbac.mdx
+  s_74a8cf9e9767a8::t_3a8aea7cfab8c5 83
+apps/docs/src/components/Mermaid.tsx
+  s_74a8cf9e9767a8::t_68ff94b2e71099 6,25-30
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_cbb72f49371cd3 158-160,936-938
+convex/features/api/keys.ts
+  s_74a8cf9e9767a8::t_8972fc76419e24 15,515-521,533-535
+convex/features/variables/requests/actions.ts
+  s_74a8cf9e9767a8::t_f343382778b348 259-270
+convex/features/variables/requests/mutations.ts
+  s_74a8cf9e9767a8::t_34860440e14016 290-294,389-393,398-399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6e5ecc9ceb4e662f42e95706bb0d63c6f262c835",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
