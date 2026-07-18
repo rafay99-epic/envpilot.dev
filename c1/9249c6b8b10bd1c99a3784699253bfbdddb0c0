@@ -1,0 +1,29 @@
+apps/web/src/app/api/v1/secrets/route.ts
+  s_74a8cf9e9767a8::t_38a7633a279334 81-85
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_0309018782ad10 500-501,504,516-517,855-856,862-867,871
+apps/web/src/components/cicd/CicdTokensSection.tsx
+  s_74a8cf9e9767a8::t_56a692d373b6b3 15,108-116
+apps/web/src/components/dashboard/terminal-ui.tsx
+  s_74a8cf9e9767a8::t_3eebacf2e55b35 103,109,114
+convex/features/api/authorize.ts
+  s_74a8cf9e9767a8::t_3e452997f2d5fa 125-132,172-177,181-185
+convex/features/api/keys.ts
+  s_74a8cf9e9767a8::t_3d4ca7558cb681 118,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c19249c6b8b10bd1c99a3784699253bfbdddb0c0",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
