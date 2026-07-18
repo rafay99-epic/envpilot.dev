@@ -8,6 +8,16 @@ icon: github
 
 [`envpilot-action`](https://github.com/rafay99-epic/envpilot-action) pulls environment variables from Envpilot straight into a GitHub Actions job, so your deploy secrets live in one place instead of being duplicated into GitHub repository settings.
 
+## Create a key
+
+The Action authenticates with an **API key** (`envpk_…`), the same credential the REST API and MCP server use. Create one in **Organization Settings → API Keys**:
+
+1. Click **New API Key** and select the **GitHub Action** surface.
+2. Lock it to a **single project** and the **variables** resource — that's all CI needs.
+3. Copy the `envpk_…` value (shown once) and store it as a GitHub **repository or environment secret** (`ENVPILOT_TOKEN` in the examples below).
+
+There is no separate "CI/CD service token" to mint — an Action key is just an API key with the GitHub Action surface. It is **read-only** and can **never file a variable request**; CI reads, it does not negotiate.
+
 ## Usage
 
 ```yaml
@@ -18,13 +28,13 @@ icon: github
     environment: production
 ```
 
-Store the service token as a repository or environment secret (`ENVPILOT_TOKEN` above) — never hardcode it in the workflow file.
+Store the API key as a repository or environment secret (`ENVPILOT_TOKEN` above) — never hardcode it in the workflow file.
 
 ## Inputs
 
 | Input         | Required | Default                    | Description                                                                                     |
 | ------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
-| `token`       | Yes      | —                          | Envpilot service token (`envpk_…`), scoped to a single project and environment                  |
+| `token`       | Yes      | —                          | Envpilot API key (`envpk_…`) with the GitHub Action surface, locked to a single project         |
 | `environment` | Yes      | —                          | Environment to pull, e.g. `production`, `staging`, `development`                                |
 | `api-url`     | No       | `https://www.envpilot.dev` | Envpilot API base URL. Override only for self-hosted or non-production instances                |
 | `export-env`  | No       | `"true"`                   | When `true`, exports every pulled variable to `$GITHUB_ENV` so later steps can read it directly |
@@ -68,10 +78,10 @@ Every pulled value is registered with GitHub Actions' log masking (`core.setSecr
 
 ## Security
 
-- **Read-only.** The token can pull variables; it cannot create, modify, or delete them.
-- **Project- and environment-scoped.** A service token only reads the single project and environment(s) it was minted for — it can't be pointed at other projects, and the action never prints or logs the token itself.
-- **Revocable with no grace period.** Revoke a token from Envpilot under **Project Settings → CI/CD Tokens** (or **API Keys** for the newer scoped-key platform) — the next pull is rejected immediately.
-- **Rate limited.** Pulls are rate-limited per token; a workflow that hammers this action in a tight loop will start getting `429` responses.
+- **Read-only.** The key can pull variables; it cannot create, modify, or delete them — and it can never file a variable request. CI reads only.
+- **Project-scoped.** An Action key only reads the single project and environment(s) it was minted for — it can't be pointed at other projects, and the action never prints or logs the key itself.
+- **Revocable with no grace period.** Revoke a key from Envpilot under **Organization Settings → API Keys** — the next pull is rejected immediately.
+- **Rate limited.** Pulls are rate-limited per key; a workflow that hammers this action in a tight loop will start getting `429` responses. See [Rate limits](/rate-limits).
 - **Ephemeral by design.** GitHub-hosted runners are destroyed after the job finishes, so pulled values never persist beyond the job's lifetime unless you explicitly write them to an artifact.
 
 See [API Security](/api-security) for the full key model shared across the GitHub Action, REST API, and MCP server.

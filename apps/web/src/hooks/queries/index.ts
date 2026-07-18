@@ -39,11 +39,6 @@ export {
 } from "./useVariablesQuery";
 
 export {
-  useVariableRequestsList,
-  useResolveVariableRequest,
-} from "./useVariableRequestsQuery";
-
-export {
   useOrganizationTags,
   useCreateTag,
   useUpdateTag,

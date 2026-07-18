@@ -24,7 +24,7 @@ Authorization: Bearer envpk_your_key_here
 
 ## Tools
 
-All tools are read-only and share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited.
+The read tools share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited.
 
 | Tool                     | Description                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
@@ -33,6 +33,25 @@ All tools are read-only and share the same scope, rate limits, and plan gate as 
 | `envpilot_get_variable`  | Get a single variable by exact key                                                               |
 | `envpilot_list_accounts` | List shared accounts for a project, optionally filtered by environment                           |
 | `envpilot_search`        | Search across the key's projects for a matching variable or account                              |
+
+Two additional tools cover the **only** write path a machine credential has — filing a variable request for a human to approve. They are available only if the key's scope includes the `requests` resource:
+
+| Tool                          | Description                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `envpilot_request_variable`   | File a request for a variable, with a **required justification**. A human must approve it and supply the value. |
+| `envpilot_get_request_status` | Poll a filed request — returns `pending`, `approved`, or `rejected` (with the reviewer's reason when rejected). |
+
+## Requesting variables
+
+A machine credential can never write a secret value. The one thing it can do beyond reading is **ask** — and only if its key carries the `requests` resource. `envpilot_request_variable` takes the variable key and a required justification, and files a request into a human reviewer's dashboard queue. The agent never proposes a value; if the reviewer approves, **the reviewer supplies it**.
+
+The loop for an agent is:
+
+1. Call `envpilot_request_variable` with the key and a justification explaining why it's needed.
+2. Poll `envpilot_get_request_status` until it returns `approved` or `rejected`.
+3. On `approved`, read the value with `envpilot_get_variable`. On `rejected`, the status carries the reviewer's reason — report it back rather than retrying blindly.
+
+Request creation is deliberately strict: it is rate-limited to 5 per hour per key (burst 2), capped at 5 open pending requests per key, and a rejected request for a given variable can't be re-filed for 24 hours. Every created request emails a reviewer, so these limits stop an agent loop from becoming alert spam. See [Rate limits](/rate-limits) for the full picture and [Architecture](/architecture) for how "agent requests, human approves" fits the wider trust model.
 
 ## Connect a client
 

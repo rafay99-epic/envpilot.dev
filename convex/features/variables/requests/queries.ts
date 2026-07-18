@@ -251,6 +251,7 @@ export const listForReviewer = query({
       organizationId: v.id("organizations"),
       isSensitive: v.boolean(),
       requestedBy: v.id("users"),
+      requestedByKeyId: v.optional(v.id("apiKeys")),
       status: v.union(
         v.literal("pending"),
         v.literal("approved"),
@@ -283,6 +284,11 @@ export const listForReviewer = query({
         v.null()
       ),
       projectName: v.string(),
+      // Machine provenance: the API key that filed the request (null for
+      // human requests) — the UI renders it with an automated-origin badge.
+      requestedByKeyName: v.union(v.string(), v.null()),
+      // false = valueless (machine) request: the approver supplies the value.
+      hasValue: v.boolean(),
     })
   ),
   handler: async (ctx, args) => {
@@ -342,10 +348,18 @@ export const listForReviewer = query({
     const uniqueProjectIds = [
       ...new Set(scopedRequests.map((request) => request.projectId)),
     ];
+    const uniqueKeyIds = [
+      ...new Set(
+        scopedRequests.flatMap((request) =>
+          request.requestedByKeyId ? [request.requestedByKeyId] : []
+        )
+      ),
+    ];
 
-    const [users, projects] = await Promise.all([
+    const [users, projects, keys] = await Promise.all([
       Promise.all(uniqueUserIds.map((id) => ctx.db.get(id))),
       Promise.all(uniqueProjectIds.map((id) => ctx.db.get(id))),
+      Promise.all(uniqueKeyIds.map((id) => ctx.db.get(id))),
     ]);
 
     const userById = new Map(
@@ -359,6 +373,11 @@ export const listForReviewer = query({
           (project): project is NonNullable<typeof project> => project !== null
         )
         .map((project) => [project._id, project])
+    );
+    const keyById = new Map(
+      keys
+        .filter((key): key is NonNullable<typeof key> => key !== null)
+        .map((key) => [key._id, key])
     );
 
     return scopedRequests.map((request) => {
@@ -374,6 +393,10 @@ export const listForReviewer = query({
 
       return {
         ...rest,
+        requestedByKeyName: request.requestedByKeyId
+          ? (keyById.get(request.requestedByKeyId)?.name ?? "deleted key")
+          : null,
+        hasValue: request.vaultRef !== undefined,
         requester: requester
           ? {
               _id: requester._id,

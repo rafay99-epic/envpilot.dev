@@ -8,6 +8,8 @@ icon: book
 
 Base URL: `https://www.envpilot.dev/api/v1`. All endpoints require the `Authorization: Bearer <api key>` header and are read-only. Requires the **Pro** plan (`public_api` feature). See [API Quickstart](/api-quickstart) to create a key and [API Security](/api-security) for the auth and audit model.
 
+Every key carries **surfaces** (`rest_api`, `mcp_server`, `github_action`) and a resource scope that can optionally include `requests` — the one machine write path, filing a variable request for a human to approve. See [Architecture](/architecture) for how the surfaces share one auth core, and [Rate limits](/rate-limits) for every per-key bucket.
+
 Every response is JSON unless `format=env` is passed. Every error response is `{ "error": string, "code": string }` plus an `x-request-id` header for support.
 
 ## Endpoints
@@ -128,7 +130,7 @@ curl "https://www.envpilot.dev/api/v1/projects/backend/accounts?environment=prod
 
 ### `GET /api/v1/secrets`
 
-Unchanged legacy endpoint used by the [GitHub Action](/github-action) — pulls variables for a single project + environment service token. Kept for backward compatibility; new integrations should use `GET /v1/projects/{slug}/variables` instead.
+Unchanged legacy endpoint used by the [GitHub Action](/github-action) — pulls variables for a single project + environment using an API key with the GitHub Action surface. Kept for backward compatibility; new integrations should use `GET /v1/projects/{slug}/variables` instead.
 
 ## Errors
 

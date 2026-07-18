@@ -35,6 +35,18 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 120,
   },
 
+  // Machine-originated variable requests: 5 per hour per key, burst 2.
+  // Each create fans out a reviewer email — a retry-looping agent must be
+  // blocked before it becomes reviewer alert fatigue. A standing cap on
+  // open pendings per key lives in the mutation (requests/mutations.ts).
+  // Documented publicly in docs/rate-limits — keep the page in sync.
+  machineRequestCreate: {
+    kind: "token bucket",
+    rate: 5,
+    period: 3_600_000,
+    capacity: 2,
+  },
+
   // CLI device code generation: 5 per minute per device
   cliAuthInitiate: {
     kind: "token bucket",

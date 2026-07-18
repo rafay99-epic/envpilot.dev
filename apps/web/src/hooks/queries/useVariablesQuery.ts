@@ -90,9 +90,6 @@ export function useCreateVariable() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.variables.list(variables.projectId),
       });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.variableRequests.list(variables.projectId),
-      });
     },
   });
 }

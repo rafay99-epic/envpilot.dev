@@ -337,9 +337,12 @@ export default defineSchema({
   environmentVariableRequests: defineTable({
     // The requested variable key (e.g., "DATABASE_URL")
     key: v.string(),
-    // Encrypted value reference proposed by the requester
-    vaultRef: v.string(),
-    // Optional human-readable description
+    // Encrypted value reference proposed by the requester. Absent =
+    // VALUELESS request (machine-originated): agents never propose secret
+    // values — the reviewer supplies one at approval (approveWithValue).
+    vaultRef: v.optional(v.string()),
+    // Optional human-readable description. REQUIRED (as the justification
+    // shown to the approver) on machine-originated requests.
     description: v.optional(v.string()),
     // Environment tags (e.g., ["development", "staging", "production"])
     environments: v.array(v.string()),
@@ -349,8 +352,15 @@ export default defineSchema({
     organizationId: v.id("organizations"),
     // Whether this is sensitive/secret
     isSensitive: v.boolean(),
-    // User who requested this variable
+    // User who requested this variable. For machine-originated requests
+    // this is the KEY CREATOR (the field is load-bearing for visibility,
+    // dedupe, and emails) with requestedByKeyId carrying the real principal.
     requestedBy: v.id("users"),
+    // Set only on machine-originated requests: the API key that filed it.
+    // Every UI/email surface renders the key (with an automated-origin
+    // badge) instead of the human when this is present, and approval skips
+    // the requester write-permission grant.
+    requestedByKeyId: v.optional(v.id("apiKeys")),
     // Request lifecycle status
     status: v.union(
       v.literal("pending"),
@@ -376,7 +386,9 @@ export default defineSchema({
     .index("by_project_and_status", ["projectId", "status"])
     .index("by_organization_and_status", ["organizationId", "status"])
     .index("by_project_and_requester", ["projectId", "requestedBy"])
-    .index("by_project_and_key", ["projectId", "key"]),
+    .index("by_project_and_key", ["projectId", "key"])
+    // Per-key open-pendings cap + revoke-time visibility for machine requests
+    .index("by_requested_key_and_status", ["requestedByKeyId", "status"]),
 
   // ==========================================
   // VARIABLE VERSIONS (History)
@@ -557,29 +569,11 @@ export default defineSchema({
   // ==========================================
   // CI/CD SERVICE TOKENS (machine identities)
   // ==========================================
-  // Long-lived, READ-ONLY credentials for CI pipelines (the GitHub Action).
-  // Only the SHA-256 hash is ever stored — the plaintext token is shown
-  // exactly once at creation. A token is scoped to one project and an
-  // explicit environment list; revocation is immediate (revokedAt set).
-  serviceTokens: defineTable({
-    organizationId: v.id("organizations"),
-    projectId: v.id("projects"),
-    // Human label ("Production deploys — frontend repo")
-    name: v.string(),
-    // SHA-256 hex of the plaintext token — the only stored credential form
-    tokenHash: v.string(),
-    // Environments this token may read (e.g. ["production"])
-    environments: v.array(v.string()),
-    createdBy: v.id("users"),
-    createdAt: v.number(),
-    // Set on every successful pull (observability: spot dead/leaked tokens)
-    lastUsedAt: v.optional(v.number()),
-    revokedAt: v.optional(v.number()),
-    revokedBy: v.optional(v.id("users")),
-  })
-    .index("by_token_hash", ["tokenHash"])
-    .index("by_project", ["projectId"])
-    .index("by_organization", ["organizationId"]),
+  // The legacy `serviceTokens` table (CI/CD pull tokens) is RETIRED: every
+  // row was drained into apiKeys (surfaces: [github_action]) by the
+  // migrate-service-tokens migration before this definition was removed.
+  // Convex keeps any leftover rows as unvalidated data — purge them from
+  // the dashboard once the drain is confirmed.
 
   // ==========================================
   // API KEYS (generalized token platform)

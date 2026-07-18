@@ -11,6 +11,8 @@ import {
   BookOpen,
   Plug,
   Github,
+  Network,
+  Gauge,
   ExternalLink,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +33,8 @@ export const DOC_ICONS: Record<string, LucideIcon> = {
   book: BookOpen,
   plug: Plug,
   github: Github,
+  network: Network,
+  gauge: Gauge,
 };
 
 const RESOURCES = [

@@ -53,8 +53,15 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
   production: "border-green-500/40 bg-green-500/10 text-green-400",
 };
 
-const RESOURCES = ["variables", "accounts", "projects"] as const;
+const RESOURCES = ["variables", "accounts", "projects", "requests"] as const;
 type Resource = (typeof RESOURCES)[number];
+
+// "requests" is the one mutating capability: the key may FILE variable
+// requests (a human approves them). Not compatible with the GitHub Action
+// surface — CI can't wait on human approval.
+const RESOURCE_HINT: Partial<Record<Resource, string>> = {
+  requests: "may file variable requests for human approval (agents)",
+};
 
 const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
 type Surface = (typeof SURFACES)[number];
@@ -86,9 +93,9 @@ interface ApiKeysSectionProps {
 }
 
 /**
- * "API Keys" organization settings section. Generalizes the project-scoped
- * CI/CD service tokens (see CicdTokensSection) into org-scoped, multi-resource
- * keys for the public REST API and MCP server. Pro-gated via the `public_api`
+ * "API Keys" organization settings section — org-scoped, multi-resource
+ * keys for the public REST API, MCP server, and GitHub Action (the one
+ * machine credential). Pro-gated via the `public_api`
  * registry feature (server enforces the same gate — this is UX, not the
  * security boundary).
  *
@@ -125,6 +132,15 @@ function ApiKeysSectionInner({
   );
   const isLoading = organizationId ? keys === undefined : true;
   const keyList = keys ?? [];
+
+  // Recent activity per key, derived from bounded audit-log reads (window
+  // = the org's audit retention, labeled as such in the row).
+  const usageResult = useQuery(
+    api.features.api.keys.usageForOrganization,
+    organizationId && keyList.length > 0
+      ? { organizationId, keyIds: keyList.map((k) => k._id) }
+      : "skip"
+  );
 
   const [showCreate, setShowCreate] = useState(false);
 
@@ -177,7 +193,11 @@ function ApiKeysSectionInner({
               className="divide-y divide-zinc-800"
             >
               {keyList.map((key) => (
-                <KeyRow key={key._id} keyItem={key} />
+                <KeyRow
+                  key={key._id}
+                  keyItem={key}
+                  usage={usageResult?.usage[key._id as string] ?? null}
+                />
               ))}
             </ul>
           )}
@@ -201,7 +221,19 @@ interface ApiKeyListItem {
   expiresAt: number | null;
 }
 
-function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
+interface KeyUsage {
+  pulls: number;
+  denials: number;
+  requestsFiled: number;
+}
+
+function KeyRow({
+  keyItem,
+  usage,
+}: {
+  keyItem: ApiKeyListItem;
+  usage: KeyUsage | null;
+}) {
   const revoke = useMutation(api.features.api.keys.revoke);
   const isRevoked = keyItem.revokedAt !== null;
 
@@ -309,6 +341,22 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
                   )}`
                 : "never used"}
             </span>
+            {usage &&
+              (usage.pulls > 0 ||
+                usage.denials > 0 ||
+                usage.requestsFiled > 0) && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    recent: {usage.pulls} pull{usage.pulls === 1 ? "" : "s"}
+                    {usage.denials > 0 && `, ${usage.denials} denied`}
+                    {usage.requestsFiled > 0 &&
+                      `, ${usage.requestsFiled} request${
+                        usage.requestsFiled === 1 ? "" : "s"
+                      } filed`}
+                  </span>
+                </>
+              )}
           </p>
         </div>
 
@@ -498,7 +546,8 @@ function CreateKeyDrawer({
       return next;
     });
     // The Action pull path only accepts single-project, exactly-variables
-    // keys — steer the form into that shape instead of failing at submit.
+    // keys (and never files requests) — steer the form into that shape
+    // instead of failing at submit.
     if (adding && surface === "github_action") {
       setProjectMode("specific");
       setSelectedResources(new Set<Resource>(["variables"]));
@@ -859,12 +908,13 @@ function CreateKeyDrawer({
                   <button
                     key={resource}
                     type="button"
+                    data-testid={`api-key-resource-${resource}`}
                     aria-pressed={selected}
                     disabled={disabled}
                     title={
                       disabled
                         ? "GitHub Action keys carry exactly the variables resource"
-                        : undefined
+                        : RESOURCE_HINT[resource]
                     }
                     onClick={() => toggleResource(resource)}
                     className={`${CHIP_BASE} ${
@@ -876,6 +926,13 @@ function CreateKeyDrawer({
                 );
               })}
             </div>
+            {selectedResources.has("requests") && (
+              <p className="mt-2 text-xs text-zinc-500">
+                This key may file variable requests (MCP/REST) — a human
+                approves them in the dashboard and supplies the value. Keys
+                never write secrets.
+              </p>
+            )}
           </div>
 
           <div>

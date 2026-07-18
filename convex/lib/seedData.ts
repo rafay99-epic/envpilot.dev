@@ -277,15 +277,6 @@ export const SEED_FEATURES = [
 
   // Integrations
   {
-    key: "cicd_service_tokens",
-    displayName: "CI/CD Service Tokens",
-    valueType: "boolean" as const,
-    category: "Integrations",
-    defaultValue: "false",
-    resettable: false,
-    sortOrder: 0,
-  },
-  {
     key: "public_api",
     displayName: "Public REST API",
     valueType: "boolean" as const,

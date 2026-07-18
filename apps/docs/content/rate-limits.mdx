@@ -1,0 +1,44 @@
+---
+title: Rate limits
+description: Every machine-surface rate-limit bucket — REST API, MCP server, GitHub Action, and variable requests — with exact limits and behavior when exceeded.
+icon: gauge
+---
+
+# Rate limits
+
+Envpilot is an open-source platform, and its rate limits are documented so you can build integrations that respect them instead of discovering them by getting throttled. Every machine surface — the REST API, the MCP server, the GitHub Action, and machine-filed variable requests — is metered per credential with a token-bucket limiter.
+
+## The buckets
+
+Each limit is scoped **per key** (or per CI/CD token). Two keys, or two tokens, never share a bucket.
+
+| Bucket            | Limit             | Applies to                                                                     |
+| ----------------- | ----------------- | ------------------------------------------------------------------------------ |
+| Value pulls       | 30 / min          | CI/CD secret pulls (GitHub Action), and any REST/MCP call that decrypts values |
+| Metadata reads    | 120 / min         | REST + MCP metadata calls — org, project lists, `metadata_only=true` reads     |
+| Variable requests | 5 / hour, burst 2 | Machine-filed variable requests (`envpilot_request_variable`)                  |
+
+The **value-pull** bucket has full capacity available as a burst (deploys fan out matrix builds, so a spike is normal) while the sustained rate stays at 30/min. The **metadata** bucket is higher because those reads never touch the vault — no decrypt cost.
+
+## Variable requests are capped twice
+
+Machine-filed requests get an extra layer beyond the per-hour rate limit, because every created request emails a human reviewer — a retry-looping agent must be stopped before it becomes reviewer alert fatigue:
+
+- **Rate limit** — 5 per hour per key, with a burst of 2. This throttles how fast requests can be filed.
+- **Standing open-pendings cap** — a key may have at most **5 open pending requests** at once. Even within the rate limit, the 6th outstanding request is refused until a human reviews one of the existing five.
+- **Rejection cooldown** — after a request for a given key is **rejected**, the same key cannot re-file a request for that variable for **24 hours**. A rejected ask is a decision, not an invitation to immediately retry.
+
+The GitHub Action never files requests at all, so none of these apply to it — it only draws from the value-pull bucket.
+
+## What happens when you exceed a limit
+
+- **You are temporarily blocked, not queued.** The request is rejected immediately with a `429`. Envpilot does not hold requests and replay them later — an over-limit call fails and it is your integration's job to back off.
+- **The error tells you how long to wait.** A `429` carries a `Retry-After` header (and the error message names the retry-after window) with the number of seconds until the bucket refills enough to try again.
+- **Bursts are blocked instantly.** Once a bucket is empty, further calls fail on arrival — there is no grace window and no partial service. This is what keeps an abusive loop from amplifying load.
+- **Unknown keys are throttled separately.** Requests presenting a key hash that matches nothing on file are rate-limited per hash, to slow brute-force key guessing without affecting real keys.
+
+## Keeping this page honest
+
+This table mirrors the limiter configuration in `convex/lib/rateLimits.ts` and the request caps in the variable-request mutations. That source file carries a matching comment pointing back here, so the two are kept in sync when limits change. If you are integrating against Envpilot and something here looks off, the code is the source of truth — and it's public.
+
+See [Architecture](/architecture) for how the surfaces and the request loop fit together, and [API Security](/api-security) for the auth and audit model behind every request.

@@ -236,11 +236,11 @@ export const getMyMembershipStatus = query({
 });
 
 /**
- * Credential sweep for the suspend dialog: org credentials the target
- * CREATED (API keys + CI/CD service tokens) that are still active. These
- * may live on the compromised machine — surfaced for opt-in revocation via
- * the existing apiKeys/serviceTokens revoke mutations, never auto-revoked
- * (they may power shared CI).
+ * Credential sweep for the suspend dialog: org API keys the target CREATED
+ * that are still active. These may live on the compromised machine —
+ * surfaced for opt-in revocation via the apiKeys revoke mutation, never
+ * auto-revoked (they may power shared CI). serviceTokens are gone — every
+ * machine credential is an apiKeys row now.
  */
 export const listMemberCredentials = query({
   args: {
@@ -250,7 +250,7 @@ export const listMemberCredentials = query({
   returns: v.array(
     v.object({
       id: v.string(),
-      type: v.union(v.literal("api_key"), v.literal("service_token")),
+      type: v.literal("api_key"),
       name: v.string(),
       createdAt: v.number(),
       lastUsedAt: v.optional(v.number()),
@@ -288,7 +288,7 @@ export const listMemberCredentials = query({
 
     const now = Date.now();
 
-    // Bounded: both tables retain revoked rows forever. 1000 org-wide
+    // Bounded: the table retains revoked rows forever. 1000 org-wide
     // credentials is far beyond any real org; the dialog only needs the
     // caller's created-and-active subset.
     const apiKeys = await ctx.db
@@ -298,39 +298,19 @@ export const listMemberCredentials = query({
       )
       .take(1000);
 
-    const serviceTokens = await ctx.db
-      .query("serviceTokens")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+    return apiKeys
+      .filter(
+        (k) =>
+          k.createdBy === args.targetUserId &&
+          !k.revokedAt &&
+          (!k.expiresAt || k.expiresAt > now)
       )
-      .take(1000);
-
-    const active = [
-      ...apiKeys
-        .filter(
-          (k) =>
-            k.createdBy === args.targetUserId &&
-            !k.revokedAt &&
-            (!k.expiresAt || k.expiresAt > now)
-        )
-        .map((k) => ({
-          id: k._id as string,
-          type: "api_key" as const,
-          name: k.name,
-          createdAt: k.createdAt,
-          lastUsedAt: k.lastUsedAt,
-        })),
-      ...serviceTokens
-        .filter((t) => t.createdBy === args.targetUserId && !t.revokedAt)
-        .map((t) => ({
-          id: t._id as string,
-          type: "service_token" as const,
-          name: t.name,
-          createdAt: t.createdAt,
-          lastUsedAt: t.lastUsedAt,
-        })),
-    ];
-
-    return active;
+      .map((k) => ({
+        id: k._id as string,
+        type: "api_key" as const,
+        name: k.name,
+        createdAt: k.createdAt,
+        lastUsedAt: k.lastUsedAt,
+      }));
   },
 });

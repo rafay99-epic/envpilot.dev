@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
 import { normalizeOrgRole } from "../../lib/authz";
 import { SEED_CHANGELOG } from "../community/changelog/seed";
 import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
@@ -138,15 +137,6 @@ export const listMigrations = query({
         priority: 3,
         destructive: false,
         runOnce: true,
-      },
-      {
-        name: "migrate-service-tokens",
-        description:
-          "Copies every serviceTokens row into the generalized apiKeys table (scope = [projectId], environments, resources ['variables']), preserving tokenHash/createdBy/createdAt/lastUsedAt/revoked*. Idempotent — skips rows whose tokenHash already exists in apiKeys. NOT a one-time migration: serviceTokens still receives live inserts from the CI/CD tab, so re-run this whenever new tokens are created there. Retiring serviceTokens creation is a separate decision.",
-        category: "Active Bridge",
-        priority: 4,
-        destructive: false,
-        runOnce: false,
       },
     ] as Array<{
       name: string;
@@ -522,7 +512,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         granular_permissions: "true",
         audit_log_retention_days: "7",
         sso_enabled: "false",
-        cicd_service_tokens: "false",
         public_api: "false",
         mcp_server: "false",
         secret_rotation: "false",
@@ -555,7 +544,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         granular_permissions: "true",
         audit_log_retention_days: "365",
         sso_enabled: "false",
-        cicd_service_tokens: "true",
         public_api: "true",
         mcp_server: "true",
         secret_rotation: "true",
@@ -1053,90 +1041,6 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
       orgSettingsRemaining,
       usageCountersDeleted: counters.length,
       usageCountersMayHaveMore: counters.length === BATCH,
-    };
-  }
-
-  // Copies every serviceTokens row into the generalized apiKeys table:
-  // scope = [projectId] (single project — serviceTokens were never
-  // org-wide), environments preserved as-is, resources fixed to
-  // ["variables"] (the only thing serviceTokens ever granted). Preserves
-  // tokenHash/createdBy/createdAt/lastUsedAt/revoked* exactly so the
-  // migrated row authenticates identically to the original.
-  // Idempotent: skips any serviceTokens row whose tokenHash already has a
-  // matching apiKeys row (by_token_hash is unique in practice — tokenHash
-  // is a SHA-256 digest). serviceTokens is never dropped —
-  // cicd/pull.ts's _authorizePull checks apiKeys first, then falls back
-  // to serviceTokens for any row this migration hasn't reached yet.
-  if (args.name === "migrate-service-tokens") {
-    const serviceTokens = await ctx.db.query("serviceTokens").collect();
-    let migrated = 0;
-    let skipped = 0;
-    let backfilled = 0;
-
-    for (const token of serviceTokens) {
-      const existing = await ctx.db
-        .query("apiKeys")
-        .withIndex("by_token_hash", (q) => q.eq("tokenHash", token.tokenHash))
-        .first();
-      if (existing) {
-        // Rows copied by earlier runs predate the surfaces field and would
-        // otherwise stay grandfathered onto EVERY surface — a leaked CI
-        // token must never widen into a REST/MCP credential. Same tokenHash
-        // = same credential, so stamping is always correct here.
-        if (existing.surfaces === undefined) {
-          await ctx.db.patch(existing._id, { surfaces: ["github_action"] });
-          backfilled++;
-        } else {
-          skipped++;
-        }
-        continue;
-      }
-
-      await ctx.db.insert("apiKeys", {
-        organizationId: token.organizationId,
-        name: token.name,
-        tokenHash: token.tokenHash,
-        scopeProjects: [token.projectId],
-        scopeEnvironments: token.environments,
-        scopeResources: ["variables"],
-        // Service tokens were only ever an Action credential — stamp the
-        // surface explicitly instead of grandfathering them onto all three.
-        surfaces: ["github_action"],
-        createdBy: token.createdBy,
-        createdAt: token.createdAt,
-        lastUsedAt: token.lastUsedAt,
-        revokedAt: token.revokedAt,
-        revokedBy: token.revokedBy,
-      });
-      migrated++;
-    }
-
-    // Migrated rows bypass keys.ts's MAX_KEYS_PER_ORG hygiene cap (25) —
-    // report each touched org's LIVE key count so an over-cap org is
-    // visible instead of silently blocked from minting new keys later.
-    // Rerun-stable: recomputed from apiKeys, not from this run's inserts.
-    const liveKeysByOrg: Record<string, number> = {};
-    for (const orgId of new Set(
-      serviceTokens.map((t) => t.organizationId as string)
-    )) {
-      const keys = await ctx.db
-        .query("apiKeys")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", orgId as Id<"organizations">)
-        )
-        .collect();
-      liveKeysByOrg[orgId] = keys.filter(
-        (k) => k.revokedAt === undefined
-      ).length;
-    }
-
-    return {
-      success: true,
-      total: serviceTokens.length,
-      migrated,
-      backfilled,
-      skipped,
-      liveKeysByOrg,
     };
   }
 

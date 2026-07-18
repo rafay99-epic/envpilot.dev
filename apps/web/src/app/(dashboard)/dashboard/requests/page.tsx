@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useConvexUser, useResolveVariableRequest } from "@/hooks";
@@ -39,6 +39,10 @@ interface ReviewerRequest {
   projectName: string;
   requester: { _id: Id<"users">; email: string; name?: string } | null;
   reviewer?: { _id: Id<"users">; email: string; name?: string } | null;
+  /** Set for machine-originated requests: the API key that filed it. */
+  requestedByKeyName: string | null;
+  /** false = valueless request — the approver supplies the value. */
+  hasValue: boolean;
 }
 
 const STATUS_TABS: { value: RequestStatus; label: string }[] = [
@@ -122,18 +126,22 @@ export default function RequestsPage() {
     activeOrganizationId && convexUserId ? requestsResult === undefined : false;
 
   const resolveRequest = useResolveVariableRequest();
+  const revealValue = useAction(
+    api.features.variables.requests.actions.revealValue
+  );
+  const approveWithValue = useAction(
+    api.features.variables.requests.actions.approveWithValue
+  );
 
   const handleRevealValue = async (request: ReviewerRequest) => {
     if (revealedValues[request._id] || revealingIds.has(request._id)) return;
 
     setRevealingIds((prev) => new Set(prev).add(request._id));
     try {
-      const res = await fetch(`/api/variable-requests/${request._id}/value`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to reveal value");
+      const data = await revealValue({ requestId: request._id });
       setRevealedValues((prev) => ({
         ...prev,
-        [request._id]: data.data.value,
+        [request._id]: data.value,
       }));
     } catch (err) {
       log.error(
@@ -154,18 +162,29 @@ export default function RequestsPage() {
 
   const handleAccept = async (
     request: ReviewerRequest,
-    environments: string[]
+    environments: string[],
+    suppliedValue?: string
   ) => {
     if (!convexUserId || environments.length === 0) return;
     setNotice(null);
     setError(null);
     try {
-      await resolveRequest.mutateAsync({
-        requestId: request._id,
-        action: "approve",
-        reviewedBy: convexUserId as string,
-        environments,
-      });
+      if (!request.hasValue) {
+        // Valueless (machine) request — the reviewer supplies the value;
+        // the action encrypts it before the review mutation runs.
+        await approveWithValue({
+          requestId: request._id,
+          value: suppliedValue ?? "",
+          environments,
+        });
+      } else {
+        await resolveRequest.mutateAsync({
+          requestId: request._id,
+          action: "approve",
+          reviewedBy: convexUserId as string,
+          environments,
+        });
+      }
       setNotice(`Request for "${request.key}" approved and variable created.`);
       setTimeout(() => setNotice(null), 3000);
     } catch (err) {
@@ -333,8 +352,8 @@ export default function RequestsPage() {
                     revealedValue={revealedValues[request._id] ?? null}
                     isRevealing={revealingIds.has(request._id)}
                     onReveal={() => handleRevealValue(request)}
-                    onAccept={(environments) =>
-                      handleAccept(request, environments)
+                    onAccept={(environments, suppliedValue) =>
+                      handleAccept(request, environments, suppliedValue)
                     }
                     onReject={() => setRejectingRequest(request)}
                   />
@@ -375,7 +394,7 @@ function RequestRow({
   revealedValue: string | null;
   isRevealing: boolean;
   onReveal: () => void;
-  onAccept: (environments: string[]) => void;
+  onAccept: (environments: string[], suppliedValue?: string) => void;
   onReject: () => void;
 }) {
   const [isValueVisible, setIsValueVisible] = useState(false);
@@ -383,6 +402,8 @@ function RequestRow({
   const [selectedEnvironments, setSelectedEnvironments] = useState<string[]>(
     request.environments
   );
+  // Valueless (machine) requests: the reviewer types the value here.
+  const [suppliedValue, setSuppliedValue] = useState("");
 
   const handleToggleReveal = () => {
     if (!revealedValue && !isRevealing) {
@@ -398,6 +419,7 @@ function RequestRow({
       prev.includes(env) ? prev.filter((e) => e !== env) : [...prev, env]
     );
 
+  const isMachine = request.requestedByKeyName !== null;
   const requesterName = request.requester?.name ?? request.requester?.email;
   const requesterEmail = request.requester?.email;
 
@@ -418,12 +440,27 @@ function RequestRow({
           </code>
         </div>
         <p className="mt-0.5 text-xs text-zinc-500">{request.projectName}</p>
-        <p className="mt-0.5 text-xs text-zinc-600">
-          {requesterName ?? "Unknown"}
-          {requesterName && requesterEmail && requesterName !== requesterEmail
-            ? ` · ${requesterEmail}`
-            : ""}
-        </p>
+        {isMachine ? (
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-zinc-600">
+            <TerminalBadge color="amber">automated</TerminalBadge>
+            <span>
+              API key &quot;{request.requestedByKeyName}&quot; · created by{" "}
+              {requesterName ?? "Unknown"}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-0.5 text-xs text-zinc-600">
+            {requesterName ?? "Unknown"}
+            {requesterName && requesterEmail && requesterName !== requesterEmail
+              ? ` · ${requesterEmail}`
+              : ""}
+          </p>
+        )}
+        {isMachine && request.description && (
+          <p className="mt-1 max-w-[24rem] text-xs italic text-zinc-500">
+            &ldquo;{request.description}&rdquo;
+          </p>
+        )}
       </td>
 
       {/* Environments — toggleable override for pending, static otherwise */}
@@ -462,36 +499,56 @@ function RequestRow({
         </div>
       </td>
 
-      {/* Value — hidden by default, fetched on click */}
+      {/* Value — hidden by default, fetched on click; valueless (machine)
+          requests take the reviewer's value inline instead */}
       <td className="px-5 py-3">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            {isValueVisible && revealedValue ? (
-              <code className="block max-w-[16rem] break-all font-mono text-xs text-green-400">
-                {revealedValue}
-              </code>
-            ) : (
-              <span className="font-mono text-sm text-zinc-500">••••••••</span>
-            )}
+        {!request.hasValue ? (
+          isPending ? (
+            <input
+              type="password"
+              data-testid="request-value-input"
+              value={suppliedValue}
+              onChange={(e) => setSuppliedValue(e.target.value)}
+              placeholder="Enter the value to approve"
+              className="w-44 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none"
+            />
+          ) : (
+            <span className="text-xs text-zinc-600">
+              value supplied at approval
+            </span>
+          )
+        ) : (
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              {isValueVisible && revealedValue ? (
+                <code className="block max-w-[16rem] break-all font-mono text-xs text-green-400">
+                  {revealedValue}
+                </code>
+              ) : (
+                <span className="font-mono text-sm text-zinc-500">
+                  ••••••••
+                </span>
+              )}
+            </div>
+            <button
+              data-testid="request-value-toggle"
+              onClick={handleToggleReveal}
+              disabled={isRevealing}
+              className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
+              title={
+                isValueVisible && revealedValue ? "Hide value" : "Reveal value"
+              }
+            >
+              {isRevealing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isValueVisible && revealedValue ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
           </div>
-          <button
-            data-testid="request-value-toggle"
-            onClick={handleToggleReveal}
-            disabled={isRevealing}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
-            title={
-              isValueVisible && revealedValue ? "Hide value" : "Reveal value"
-            }
-          >
-            {isRevealing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isValueVisible && revealedValue ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+        )}
       </td>
 
       {/* Requested date */}
@@ -506,8 +563,16 @@ function RequestRow({
             <div className="flex items-center justify-end gap-2">
               <button
                 data-testid="request-accept"
-                onClick={() => onAccept(selectedEnvironments)}
-                disabled={selectedEnvironments.length === 0}
+                onClick={() =>
+                  onAccept(
+                    selectedEnvironments,
+                    request.hasValue ? undefined : suppliedValue
+                  )
+                }
+                disabled={
+                  selectedEnvironments.length === 0 ||
+                  (!request.hasValue && suppliedValue.length === 0)
+                }
                 className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Check className="h-3.5 w-3.5" />
@@ -527,6 +592,13 @@ function RequestRow({
                 Select at least one environment.
               </p>
             )}
+            {!request.hasValue &&
+              suppliedValue.length === 0 &&
+              selectedEnvironments.length > 0 && (
+                <p className="text-xs text-zinc-500">
+                  Enter the value to approve this request.
+                </p>
+              )}
           </div>
         ) : (
           <div className="flex flex-col items-end gap-1">

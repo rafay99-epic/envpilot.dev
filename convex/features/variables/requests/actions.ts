@@ -202,6 +202,11 @@ export const revealValue = action({
     if (!request) {
       throw new ConvexError("Variable request not found");
     }
+    if (request.vaultRef === undefined) {
+      throw new ConvexError(
+        "This request has no proposed value — the reviewer supplies one at approval"
+      );
+    }
 
     const value = await ctx.runAction(
       internal.features.vault.vault.readSecret,
@@ -211,5 +216,87 @@ export const revealValue = action({
     );
 
     return { value };
+  },
+});
+
+/**
+ * Approve a VALUELESS (machine-originated) request, supplying the value the
+ * agent could not: encrypt the reviewer's plaintext into WorkOS Vault, then
+ * run the normal review mutation with the fresh ref. All review
+ * authorization (reviewer capability, pending status, origin-key liveness,
+ * conflict/tier checks) lives in the mutation — this wrapper exists only
+ * because vault encryption is action-only. Mirrors createWithValue's
+ * orphan cleanup: if the mutation rejects, the freshly minted vault object
+ * is deleted (best-effort; vaultGc reconciles stragglers).
+ */
+export const approveWithValue = action({
+  args: {
+    requestId: v.id("environmentVariableRequests"),
+    value: v.string(),
+    reviewReason: v.optional(v.string()),
+    environments: v.optional(v.array(v.string())),
+  },
+  returns: v.object({
+    requestId: v.id("environmentVariableRequests"),
+    status: v.literal("approved"),
+    variableId: v.id("environmentVariables"),
+  }),
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    requestId: Id<"environmentVariableRequests">;
+    status: "approved";
+    variableId: Id<"environmentVariables">;
+  }> => {
+    const request = await ctx.runQuery(
+      api.features.variables.requests.queries.getById,
+      { requestId: args.requestId }
+    );
+    if (!request) {
+      throw new ConvexError("Variable request not found");
+    }
+
+    const vault = await ctx.runAction(
+      internal.features.vault.vault.createSecret,
+      {
+        name: request.key,
+        value: args.value,
+        organizationId: request.organizationId,
+        projectId: request.projectId,
+      }
+    );
+
+    let result;
+    try {
+      result = await ctx.runMutation(
+        api.features.variables.requests.mutations.review,
+        {
+          requestId: args.requestId,
+          action: "approve",
+          reviewReason: args.reviewReason,
+          environments: args.environments,
+          vaultRef: vault.id,
+        }
+      );
+    } catch (mutationError) {
+      try {
+        await ctx.runAction(internal.features.vault.vault.deleteSecret, {
+          vaultRef: vault.id,
+        });
+      } catch {
+        // Best-effort — vaultGc reconciles any straggler.
+      }
+      throw mutationError;
+    }
+
+    if (result.status !== "approved" || !("variableId" in result)) {
+      throw new ConvexError("Approval did not complete");
+    }
+    return {
+      requestId: args.requestId,
+      status: "approved" as const,
+      variableId: result.variableId,
+    };
   },
 });
