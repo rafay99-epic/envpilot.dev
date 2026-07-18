@@ -1,0 +1,21 @@
+apps/admin/src/components/layout/Sidebar.tsx
+  s_b996504d91b1b3::t_1eda3beee42519 76
+apps/admin/src/routes/login.tsx
+  s_b996504d91b1b3::t_e21a4cf59cdea0 48-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a19c59459bdc6d097235be6cd0932664e4edd262",
+  "prompts": {},
+  "sessions": {
+    "s_b996504d91b1b3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f0f53f5-6bf0-4306-a3d4-7e9974e871f1",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
