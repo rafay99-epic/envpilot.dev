@@ -1,0 +1,19 @@
+scripts/convex-local-setup.sh
+  s_b996504d91b1b3::t_bb2b71474820ca 68-71,73,77,79-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e0b80d64d851f952d604fba0e9d68081d1a37edd",
+  "prompts": {},
+  "sessions": {
+    "s_b996504d91b1b3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f0f53f5-6bf0-4306-a3d4-7e9974e871f1",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
