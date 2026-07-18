@@ -1,18 +1,26 @@
 name: Deploy Vercel app
 
-# Reusable prod deployer for the three Vercel apps (web, blog, docs).
-# CURRENTLY DORMANT: the calling jobs in ci.yml are hard-disabled
-# (false &&) because web/blog/docs auto-deploy on merge to main via
-# Vercel's git integration, with `ignoreCommand: npx turbo-ignore` in
-# each vercel.json skipping builds for unchanged apps. Kept intact for
-# re-enable (remove the `false &&`s AND turn git.deploymentEnabled.main
-# off in the three vercel.json files, or every merge deploys twice).
+# Reusable prod deployer for the four Vercel apps (web, blog, docs, admin).
+# ACTIVE: production deploys happen ONLY here. Vercel's git integration is
+# fully disabled in every app's vercel.json (`git.deploymentEnabled: false`)
+# so a merge never deploys twice.
+#
+# The deploy uploads SOURCE and lets the build run on Vercel's infra — no
+# `vercel build` / `--prebuilt` here on purpose. A runner-side build would
+# inherit ci.yml's stub env vars (NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210)
+# and bake them into the client bundle. Vercel builds with the project's real
+# production env vars.
+#
+# Deploys run from the repo ROOT: each project's Root Directory (apps/web,
+# apps/blog, apps/docs, apps/admin) is applied by Vercel from its own
+# settings, and uploading from root keeps workspace packages (packages/ui)
+# and convex/ in the build context.
 
 on:
   workflow_call:
     inputs:
       app:
-        description: "App label (web | blog | docs) — used for concurrency + logs"
+        description: "App label (web | blog | docs | admin) — used for concurrency + logs"
         required: true
         type: string
     secrets:
@@ -52,13 +60,8 @@ jobs:
           fi
 
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
 
-      - name: Pull Vercel project settings
-        run: npx vercel@latest pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build (vercel build)
-        run: npx vercel@latest build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy prebuilt output to production
-        run: npx vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to production (build runs on Vercel)
+        run: |
+          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+          echo "${{ inputs.app }} deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"

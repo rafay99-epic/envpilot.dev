@@ -4,12 +4,11 @@ name: CI
 #   changes (path detection) → parallel scoped checks → checks-passed gate
 #   → artifact builds → deploys (main only, via reusable workflows) → release
 #
-# Web + Admin production deploys: the deploy-vercel job below is
-# HARD-DISABLED (if: false &&) — web/admin auto-deploy on merge to main via
-# Vercel's git integration instead (re-enabled in the Vercel dashboard,
-# 2026-07-12). The job is kept intact for potential re-enable; restoring it
-# requires turning git auto-deploy back off or merges deploy twice.
-# PR previews still come from Vercel's GitHub integration. Build artifacts
+# Vercel production deploys (web, admin, blog, docs) run HERE, via the
+# reusable deploy-vercel.yml — one path-gated job per project, so a merge
+# only deploys the apps it actually touched. Vercel's git auto-deploy is
+# fully OFF in every app's vercel.json (`git.deploymentEnabled: false`) —
+# prod deploys would otherwise ship twice per merge. Build artifacts
 # (CLI tarball, VSIX) are available in the run's Artifacts panel; nothing is
 # commented on PRs.
 
@@ -125,7 +124,7 @@ jobs:
 
           run_web=$(bool "$WEB" "$SHARED")
           # blog + docs deploy independently; shared changes (packages/ui,
-          # lockfile, configs) rebuild all three Vercel apps.
+          # lockfile, configs) rebuild all four Vercel apps.
           run_blog=$(bool "$BLOG" "$SHARED")
           run_docs=$(bool "$DOCS" "$SHARED")
           run_admin=$(bool "$ADMIN" "$SHARED")
@@ -162,6 +161,8 @@ jobs:
             echo "|---------|-------|--------|"
             echo "| Web | $run_web | Vercel |"
             echo "| Admin | $run_admin | Vercel |"
+            echo "| Blog | $run_blog | Vercel |"
+            echo "| Docs | $run_docs | Vercel |"
             echo "| CLI | $run_cli | $run_cli |"
             echo "| Extension | $run_extension | $run_extension |"
             echo "| Convex | $run_convex | $deploy_convex |"
@@ -453,19 +454,24 @@ jobs:
     uses: ./.github/workflows/deploy-convex.yml
     secrets: inherit
 
-  # Vercel prod deploys via CI — HARD-DISABLED (false &&): web/blog/docs
-  # auto-deploy on merge to main via Vercel's git integration, with
-  # `ignoreCommand: npx turbo-ignore` in each app's vercel.json doing the
-  # change detection (unchanged app → Vercel skips the build entirely).
-  # Kept for potential re-enable — restore by removing `false &&` from all
-  # three jobs AND setting git.deploymentEnabled.main back to false in the
-  # three vercel.json files, or every merge deploys twice. Backend-first
-  # ordering (web after deploy-convex) only exists on this CI path.
+  # ── Vercel prod deploys — ACTIVE (2026-07-18) ──────────────────────
+  # One job per Vercel project, all through the same reusable workflow.
+  # Each is path-gated by the `changes` job, so a docs-only merge deploys
+  # docs and nothing else — that IS the "only deploy blog/docs when they
+  # change" behaviour, done in CI instead of by turbo-ignore.
+  #
+  # Vercel's own git auto-deploy is fully OFF in every app's vercel.json
+  # (`git.deploymentEnabled: false`) — otherwise each merge would ship
+  # twice, once from Vercel and once from here.
+  #
+  # Backend-first ordering: web and admin call Convex functions, so they
+  # require deploy-convex. Blog and docs are static MDX sites that never
+  # touch Convex, so they deploy in parallel with it.
   deploy-web:
     name: Deploy web (Vercel)
     needs: [changes, checks-passed, e2e, deploy-convex]
     if: |
-      false && !failure() && !cancelled() &&
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_web == 'true'
@@ -477,12 +483,28 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
 
+  deploy-admin:
+    name: Deploy admin (Vercel)
+    needs: [changes, checks-passed, e2e, deploy-convex]
+    if: |
+      !failure() && !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
+      needs.changes.outputs.run_admin == 'true'
+    uses: ./.github/workflows/deploy-vercel.yml
+    with:
+      app: admin
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+
   deploy-blog:
     name: Deploy blog (Vercel)
+    # No deploy-convex dependency: blog.envpilot.dev is static MDX.
     needs: [changes, checks-passed, e2e]
-    # HARD-DISABLED (false &&) — see deploy-web note above.
     if: |
-      false && !failure() && !cancelled() &&
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_blog == 'true'
@@ -496,10 +518,10 @@ jobs:
 
   deploy-docs:
     name: Deploy docs (Vercel)
+    # No deploy-convex dependency: docs.envpilot.dev is static MDX.
     needs: [changes, checks-passed, e2e]
-    # HARD-DISABLED (false &&) — see deploy-web note above.
     if: |
-      false && !failure() && !cancelled() &&
+      !failure() && !cancelled() &&
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.changes.outputs.run_docs == 'true'
@@ -558,73 +580,6 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
-
-  deploy-vercel:
-    name: Deploy web + admin (Vercel)
-    # Backend FIRST (same strict ordering as deploy-cli/deploy-extension):
-    # web/admin ship only after the Convex functions they call are live.
-    # Auto-deploy for main is disabled in each app's vercel.json; this job
-    # deploys via the Vercel CLI pinned to THIS run's SHA — `vercel deploy`
-    # without --prebuilt only uploads source, the build runs on Vercel's
-    # infra (nothing is built here). SHA-pinning (vs. Deploy Hooks, which
-    # build branch HEAD at trigger time) means back-to-back merges can
-    # never ship a newer frontend before its own convex deploy. The
-    # !failure() guard lets a SKIPPED deploy-convex (no convex changes)
-    # fall through, while a FAILED one blocks.
-    # HARD-DISABLED (false &&): web/admin now auto-deploy on merge to main
-    # via Vercel's git integration (re-enabled in the Vercel dashboard).
-    # Kept for potential re-enable — restore by removing `false &&` AND
-    # turning git auto-deploy back off in Vercel, or every merge deploys twice.
-    # NOTE: git auto-deploy loses the strict backend-first ordering this job
-    # guaranteed (web can go live before deploy-convex finishes).
-    needs: [changes, checks-passed, e2e, deploy-convex]
-    if: |
-      false && !failure() && !cancelled() &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
-      (needs.changes.outputs.run_web == 'true' || needs.changes.outputs.run_admin == 'true')
-    runs-on: ubuntu-latest
-    env:
-      # VERCEL_ORG_ID + VERCEL_PROJECT_ID let the CLI deploy without a
-      # `vercel link` step. Root Directory (apps/web / apps/admin) is
-      # applied by Vercel from each project's settings — deploy from repo
-      # root so workspace packages and convex/ are included in the upload.
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Require Vercel secrets
-        env:
-          TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          PRJ_WEB: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
-          PRJ_ADMIN: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
-        run: |
-          missing=""
-          [ -z "$TOKEN" ] && missing="$missing VERCEL_TOKEN"
-          [ -z "$VERCEL_ORG_ID" ] && missing="$missing VERCEL_ORG_ID"
-          [ -z "$PRJ_WEB" ] && missing="$missing VERCEL_PROJECT_ID_WEB"
-          [ -z "$PRJ_ADMIN" ] && missing="$missing VERCEL_PROJECT_ID_ADMIN"
-          if [ -n "$missing" ]; then
-            echo "::error::Missing repo secret(s):$missing. Token: Vercel → Account Settings → Tokens (team scope). Org/project ids: Vercel project → Settings → General. Add with: gh secret set <NAME>"
-            exit 1
-          fi
-
-      - name: Deploy web (build runs on Vercel)
-        if: needs.changes.outputs.run_web == 'true'
-        env:
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
-        run: |
-          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
-          echo "Web deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Deploy admin (build runs on Vercel)
-        if: needs.changes.outputs.run_admin == 'true'
-        env:
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
-        run: |
-          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
-          echo "Admin deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-homebrew:
     name: Deploy Homebrew formula
