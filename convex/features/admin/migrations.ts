@@ -74,7 +74,7 @@ export const listMigrations = query({
       {
         name: "seed-changelog",
         description:
-          "Seeds all historical changelog entries (v0.1.0 through v1.50.0). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
+          "Seeds all historical changelog entries (v0.1.0 through v1.51.0). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
         category: "Content Seeding",
         priority: 1,
         destructive: false,

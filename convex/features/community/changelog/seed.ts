@@ -1210,4 +1210,34 @@ Nothing else changes — projects, variables, and roles are untouched.`,
 - The project-settings CI/CD Tokens tab no longer creates tokens — it lists legacy ones for revocation and points to **Organization Settings → API Keys**
 - Existing CI tokens keep working unchanged: same \`envpk_\` secret, same endpoint, nothing to rotate`,
   },
+
+  // ============================================================
+  // v1.51.0 — Machine Variable Requests (2026-07-18)
+  // ============================================================
+  {
+    title: "AI Agents Can Now Request Variables — Humans Approve",
+    version: "v1.51.0",
+    type: "feature",
+    publishedAt: ts("2026-07-18T22:00:00Z"),
+    content: `An AI agent working through the MCP server can now ask for an environment variable it needs — and a human decides.
+
+### Agent Requests, Human Approves
+- Keys with the new opt-in **requests** resource can file a variable request over MCP, with a required justification explaining why
+- Requests land in the same reviewer queue as developer requests, marked with an unmissable **automated** badge and the key's name
+- The approver types the secret value at approval — agents never propose or see values they aren't scoped to read
+- Machine credentials still never write secrets: a request is an ask, not a write
+
+### Built-In Abuse Protection
+- Strict per-key rate limit on filing (a few per hour), a cap on open pending requests, and a cooldown after a rejection that tells the agent why
+- Requests from revoked or expired keys can't be approved, and stale machine requests auto-cancel after 30 days
+
+### Public Rate Limits & Architecture Docs
+- New docs pages: **Architecture** (the five surfaces and the trust model, with diagrams) and **Rate limits** (every machine-surface bucket, published — build against them instead of discovering them)
+
+### Per-Key Activity
+- The API Keys list now shows each key's recent pulls, denials, and requests filed
+
+### Under the Hood
+- The legacy CI/CD service-token system is fully retired — every machine credential is an API key now`,
+  },
 ];
