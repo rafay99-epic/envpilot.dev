@@ -1,0 +1,49 @@
+apps/vscode-extension/README.md
+  s_00274c67c32790::t_c9453d76ed7ec8 78-81
+apps/vscode-extension/package.json
+  s_00274c67c32790::t_c68483f9beaef3 389
+apps/vscode-extension/src/extension.ts
+  s_00274c67c32790::t_c2853e13033510 4,222-236,307-310,615-619
+apps/vscode-extension/src/providers/autocomplete.ts
+  s_00274c67c32790::t_df75b80b14a9eb 145-163,176,182,188-189,195-196,201,206,211,216
+apps/vscode-extension/src/services/fileProtection.ts
+  s_00274c67c32790::t_0d9ded7efe925b 60,62,64-65,67-80,82-92
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_00274c67c32790::t_fea14b7c902d7d 442-456
+apps/vscode-extension/src/services/sync.ts
+  s_00274c67c32790::t_3921a79d446d17 88,91-92,159-165,1018-1022,1385-1387,1452-1453
+apps/vscode-extension/src/services/tokenManager.ts
+  s_00274c67c32790::t_bf997e5aa786b3 99-108,111,125
+apps/vscode-extension/src/ui/linkProjectDialog.ts
+  s_00274c67c32790::t_a05e2327ad22df 162
+apps/vscode-extension/src/utils/config.ts
+  s_00274c67c32790::t_3b8e21b792b1c1 2,80-87,90-97
+apps/vscode-extension/src/utils/envKeyMatch.test.ts
+  s_00274c67c32790::t_25e231f0407008 89-112
+apps/vscode-extension/src/utils/envKeyMatch.ts
+  s_00274c67c32790::t_a07db924c66605 10-11,13-19,51-55
+apps/vscode-extension/src/utils/managedFiles.ts
+  s_00274c67c32790::t_31deca1a8d9ce5 5,56,60-71,77-89,95-107,118-127,144-152,164-169,186-191,197-228,231,233,235-236
+apps/vscode-extension/src/utils/paths.ts
+  s_00274c67c32790::t_78cdc86ccd6c88 13-27,29-31,33-35,37-41
+apps/vscode-extension/src/utils/singleFlight.test.ts
+  s_00274c67c32790::t_bdf52462355ffa 97-119
+apps/vscode-extension/src/utils/singleFlight.ts
+  s_00274c67c32790::t_ecb10d8d144a5a 22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e896b4d008d1e92a5546d959279a9b788ac157d6",
+  "prompts": {},
+  "sessions": {
+    "s_00274c67c32790": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae30227602127c930",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
