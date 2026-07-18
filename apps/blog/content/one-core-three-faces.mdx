@@ -1,0 +1,314 @@
+---
+title: "I Wrote a Rule Against Duplicated Auth. Then I Found My Own Code Breaking It."
+description: "One function was supposed to authorize every machine that talks to Envpilot. Two of the three surfaces call it. The third one shipped first, and that turns out to be the whole story."
+date: "2026-07-18"
+tags: ["engineering", "api"]
+keywords:
+  ["rest api", "mcp server", "github action", "api keys", "authorization"]
+series: "Building Envpilot"
+seriesPart: 9
+seriesTotal: 18
+author:
+  name: "Abdul Rafay"
+---
+
+For most of its life, Envpilot believed exactly one thing about you: you're a human, and you're holding a WorkOS AuthKit session cookie. Every read path in the product assumed it.
+
+That's completely fine — right up until something without a browser needs a secret.
+
+A CI job. A deploy script. An agent living inside somebody's editor. None of them have a cookie. None of them have a browser to go get one. Which left exactly one workflow for CI: open the Envpilot dashboard, reveal each variable one at a time, paste it into GitHub repo settings.
+
+Two sources of truth. One of them rotates. The other one doesn't.
+
+So I shipped the narrow fix. And the narrow fix is where this gets interesting, because it was _correct_, and I still had to throw it away eight hours later.
+
+## The fix that worked and still had to die
+
+[#101](https://github.com/rafay99-epic/envpilot.dev/pull/101) added a `serviceTokens` table. Read-only. Only the SHA-256 hash gets stored — the plaintext (`envpk_` plus 160 bits of hex) is shown exactly once at creation and lives nowhere but the dialog's React state.
+
+If you close that dialog without copying it, it's gone. On purpose.
+
+Each token was scoped to one project and an explicit list of environments. Pro-gated on a `cicd_service_tokens` registry flag, checked at creation _and_ on every single pull — so if an org downgrades, their tokens stop working instead of getting grandfathered into free access forever.
+
+One endpoint consumed it: `GET /api/v1/secrets`, sitting in `unauthenticatedPaths` in `apps/web/src/proxy.ts` so the session middleware keeps its hands off. A GitHub Action consumed that endpoint.
+
+```yaml
+- uses: rafay99-epic/envpilot-action@v1
+  with:
+    token: ${{ secrets.ENVPILOT_TOKEN }}
+    environment: production
+```
+
+Notice what's missing. There's no `project` input.
+
+That's deliberate. The token carries its own project, so nobody can repoint a token at a different project by editing a workflow file. And minting a token _is_ granting read access — which is why creating one requires `project:manage_permissions`. That's the "hand a production token to a DevOps engineer who doesn't even have an Envpilot account" case, and it should cost the same permission as any other grant.
+
+All of that was right. Every line of it.
+
+The problem was the sentence the schema could express: **one project, variables only.**
+
+Because a REST API key needs to say "every project in this org, variables and shared accounts, expires in 90 days." An MCP connection needs the same. Neither of those sentences fits inside a token whose scope is one project ID and an array of environment strings.
+
+## The thing I was actually scared of
+
+I could have shipped `serviceTokensV2`. Or made `projectId` nullable and bolted a `resources` column onto the side.
+
+I didn't, and the reason had nothing to do with the schema.
+
+Three surfaces were about to exist. The failure mode I was genuinely afraid of was each one quietly growing its own authorization code. Three copies of "is this key revoked" drift apart. One of them eventually forgets the expiry check. Nobody notices until it matters.
+
+So the design doc opens with a rule, and the rule is basically this entire post:
+
+> One enforcement core, three faces. The REST API, the MCP server, and the existing GitHub Action all authenticate with the SAME key system and call the SAME Convex actions (auth → scope → gate → rate limit → bounded read → audit). New surfaces never re-implement authorization.
+
+Hold onto that. It comes back to bite me.
+
+## One function, and two things about it that aren't obvious
+
+[#103](https://github.com/rafay99-epic/envpilot.dev/pull/103) replaced the table with `apiKeys`, whose scope is dynamic — `scopeProjects: "all" | Id[]`, `scopeEnvironments: "all" | string[]`, `scopeResources` drawn at the time from `["variables","accounts","projects"]`, plus an optional `expiresAt`.
+
+Then it put every decision in one `internalMutation`: `convex/features/api/authorize.ts::_authorizeRequest`.
+
+Two things about that function are load-bearing, and I don't think either one is obvious from reading the signature.
+
+**The first one: it's a mutation, not a query, and denials are returned instead of thrown.**
+
+```ts
+/**
+ * Denials are RETURNED, not thrown: a throwing mutation rolls back its own
+ * writes, which would erase the denial audit entry. Callers map `ok: false`
+ * back onto whatever HTTP status / MCP error shape their surface uses.
+ */
+```
+
+**Why that matters:** a denial has to land in `auditLogs`. A revoked key still being presented by some pipeline is the single highest-signal event this whole system produces — somebody's CI is running with a credential you killed, and you want to know.
+
+But Convex mutations are transactional. `throw` inside one discards the insert you just did. So throwing the denial deletes the record of the denial.
+
+Returning it as data is the only way the audit row survives the refusal. Any transactional backend has this shape. It just bites harder here, because the transaction boundary is completely invisible in the function signature.
+
+**The second one: the caller and the audit log learn different things.**
+
+```ts
+// Unknown hash: nothing to attribute the attempt to — no audit possible.
+if (!key) {
+  return { ok: false as const, denied: "invalid_key" as const };
+}
+
+if (key.revokedAt !== undefined) {
+  await logDenied(key, "revoked_key_used");
+  return { ok: false as const, denied: "invalid_key" as const };
+}
+
+// Expiry gets the SAME uniform "invalid" answer as revocation — an
+// expired key is not a distinct signal from a revoked one to the caller.
+if (key.expiresAt !== undefined && key.expiresAt <= now) {
+  await logDenied(key, "expired_key_used");
+  return { ok: false as const, denied: "invalid_key" as const };
+}
+```
+
+Three distinct reasons. One uniform answer over the wire.
+
+The org's audit log gets the truth — `revoked_key_used` or `expired_key_used`. An unknown hash gets nothing at all, because there's no organization to attribute it to. You can't audit a stranger.
+
+That same asymmetry runs through scope too. `throwForDenial` in `convex/features/api/helpers.ts` maps `project_scope` onto the string `"Project not found"` — the exact message an unknown slug produces. So you can't use a scoped key to enumerate which projects exist outside your scope. Wrong project and nonexistent project look identical from outside.
+
+The tier gate re-runs on every request, and it refuses to accept a mismatched pair:
+
+```ts
+const gate = await checkBooleanFeature(
+  ctx.db,
+  key.organizationId,
+  args.surface !== undefined
+    ? args.surface === "mcp_server"
+      ? "mcp_server"
+      : "public_api"
+    : (args.gateFeature ?? "public_api")
+);
+```
+
+`public_api` and `mcp_server` are separate flags in the feature registry, so I can price and toggle the two surfaces independently — and a caller can't check the MCP surface against the REST gate to outlive its own gate being switched off.
+
+<Mermaid name="one-core-three-faces-authorize-pipeline" />
+
+Read it top to bottom: every arrow that leaves the pipeline early writes an audit row on the way out — except the unknown hash, which has no org to attribute it to.
+
+Rate limiting deliberately does _not_ live in the core, because the buckets differ by cost. `apiMetadata` gets 120/min. `cicdPull` — actual value pulls, with vault decrypts behind them — gets 30/min. And the limiter is keyed on the token hash, which means invalid keys burn budget too. A hash-guessing loop rate-limits itself. I like that one.
+
+## Never lie about completeness
+
+The read side has two rules that are really the same rule wearing different clothes.
+
+```ts
+const rows = await ctx.db
+  .query("environmentVariables")
+  .withIndex("by_project_deleted", (q) =>
+    q.eq("projectId", args.projectId).eq("deletedAt", undefined)
+  )
+  .take(MAX_PULL_ROWS + 1);
+
+if (rows.length > MAX_PULL_ROWS) {
+  throw new Error(
+    `Project has more than ${MAX_PULL_ROWS} active variables — refusing a partial pull. Contact support to raise the limit.`
+  );
+}
+```
+
+The `+ 1` is the entire trick.
+
+Take one row past the cap, and suddenly overflow is _detectable_. Then refuse loudly, instead of handing back a silently truncated list that lets a deploy succeed with three secrets missing. A deploy that fails is a bad afternoon. A deploy that succeeds wrong is a bad week.
+
+Same policy for decryption. If the vault fails on one variable, the whole pull aborts with a message naming the key. The error log carries `projectId` and `key` — and never, under any circumstance, the value.
+
+## The comment where I admit what I didn't get
+
+Every key carries a `surfaces` array: which machine faces are allowed to present it. It's enforced in the core.
+
+It is also, in the code's own words, not a security boundary:
+
+```ts
+// KNOWN LIMIT: `surface` is caller-asserted, not transport-derived —
+// the reads/requests actions are the shared backend of both HTTP
+// surfaces, so a key holder calling Convex directly can claim either
+// surface. The field segments well-behaved surfaces (a leaked Action
+// key stays useless on REST/MCP routes); the hard security boundary
+// remains the key's resource/environment/project scope + tier gates,
+// which no claimed surface can widen.
+```
+
+That comment exists because the alternative — deriving the surface from the transport — would mean the Convex actions can't be shared anymore. Which is the one thing this entire design exists to do.
+
+So I took segmentation over a boundary, and I wrote down exactly which one I got. I'd rather have an honest label than a comforting one.
+
+The MCP route makes the same bet, even more visibly. Its whole `verifyToken` is this:
+
+```ts
+if (!bearerToken || !bearerToken.startsWith("envpk_")) return undefined;
+```
+
+That looks like a gaping hole.
+
+It's the opposite. It's a shape check, cheap on purpose — because hash lookup, revocation, expiry, scope, tier gate, rate limit and audit all happen per-tool-call inside the Convex actions. If the MCP handler did any of its own authorization, it would be a fourth place that can drift.
+
+## Now the part where the thesis falls over
+
+Grep every caller of `_authorizeRequest` today. You get `convex/features/api/reads.ts` and `convex/features/api/requests.ts`.
+
+That's REST. That's MCP.
+
+The GitHub Action path is not in the list.
+
+`convex/features/cicd/pull.ts` still runs `_authorizePull` — its own function, with its own denial union (`invalid_token | environment_scope | tier_gate_public_api`), and its own copy of the revoked check, the expiry check, the surface check, the environment scope check, the tier gate, and the audit insert.
+
+Same shape, line by line. Different function.
+
+<Mermaid name="one-core-three-faces-core-fork" />
+
+Two boxes doing the same job is the whole diagram.
+
+And the core's own docstring hedges precisely around this: "the REST API, the MCP server, and (indirectly, via a compat lookup) the legacy CI/CD pull endpoint."
+
+_Indirectly, via a compat lookup._ That phrase is doing a lot of heavy lifting for four words.
+
+**Here's the thing:** this isn't really an accident, it's an ordering problem — and it generalizes. An enforcement core is trivially easy to hold for surfaces you build _after_ it exists. The hard case is always the surface that shipped first.
+
+[#146](https://github.com/rafay99-epic/envpilot.dev/pull/146) and [#147](https://github.com/rafay99-epic/envpilot.dev/pull/147), a week later, moved the Action onto `apiKeys` and deleted `serviceTokens` entirely. So the _table_ converged.
+
+The _function_ didn't. `_authorizePull` now reads `apiKeys` rows using its own duplicated logic — which is arguably worse than before, because the duplication is less visible now that both paths touch the same table.
+
+And there's a small tell that proves it's a real fork rather than a stylistic one. The core throttles the `lastUsedAt` patch to once per 60 seconds, so parallel CI pulls sharing one key don't OCC-contend on the same row:
+
+```ts
+if (!key.lastUsedAt || now - key.lastUsedAt >= 60_000) {
+  await ctx.db.patch(key._id, { lastUsedAt: now });
+}
+```
+
+`_authorizePull` patches it unconditionally. Two implementations, two behaviors, one of them worse under load. That's the drift I built the core to prevent, happening in the one place the core doesn't reach.
+
+There's a second bit of residue too: `gateFeature` is still an accepted argument, marked deprecated, kept alive for the window where Convex deploys before the web app does. And keys minted before `surfaces` existed have no `surfaces` array at all — which is read as "valid everywhere." Grandfathered.
+
+## Getting an Action out of a private repo
+
+Two details in `packages/github-action/src/main.ts` are worth more than the rest of the file combined.
+
+```ts
+// CRITICAL ORDER: mask every value before anything that could export or
+// log it, so it is redacted in logs even if a later workflow step echoes
+// it. Skip empty values — core.setSecret("") would mask every subsequent
+// log line for the rest of the job.
+for (const variable of variables) {
+  if (variable.value !== "") {
+    core.setSecret(variable.value);
+  }
+}
+```
+
+**Masking before export is the invariant.** But look at the `!== ""` guard — that's the footgun hiding inside the safety feature. `core.setSecret("")` matches everywhere, so a single empty variable would redact every remaining line of the workflow log. You'd have a build output made entirely of asterisks.
+
+```ts
+writeFileSync(envFile, content, { mode: 0o600 });
+// writeFileSync only applies `mode` when creating a new file; chmod
+// explicitly so an existing file at this path also ends up 0600.
+chmodSync(envFile, 0o600);
+```
+
+Then distribution turned out to be its own problem.
+
+GitHub resolves `uses: owner/repo@v1` against a public repo containing `action.yml` and a committed `dist/` at that ref. It cannot pull a subdirectory out of a private monorepo. It just can't.
+
+So there's a public mirror, and the publish job is paranoid about what crosses the line:
+
+```bash
+rm -rf dist action.yml README.md LICENSE
+cp -R "$WORKSPACE/packages/github-action/dist" dist
+cp "$WORKSPACE/packages/github-action/action.yml" action.yml
+...
+git tag "v${VERSION}" && git push origin "v${VERSION}"
+git tag -f "$MAJOR" && git push -f origin "$MAJOR"
+```
+
+`rm -rf` before `cp` so nothing accretes across releases. Four paths only. Never monorepo source. The exact version tag is created once and skipped if it already exists; the floating `v1` is force-moved, which is the convention that lets `@v1` pinners get non-breaking updates without editing anything.
+
+Publishing needs an `ACTION_PUBLISH_TOKEN` — a fine-grained PAT with Contents read/write on the mirror repo and nothing else — and the job fails loudly with instructions when it's missing. Ordering is strict: if `convex/` changed in the same merge, the backend deploys first. Never ship a client ahead of the contract it calls.
+
+The bootstrap was manual, and honestly, the evidence is still sitting there in the repo. `packages/github-action/scripts/publish-public.sh` still carries this at the end of its header block:
+
+```bash
+# DO NOT RUN THIS YET — the public repo (rafay99-epic/envpilot-action) does
+# not exist yet. This script is here so the publish step is documented and
+# ready once the repo is created.
+```
+
+The repo exists. `v1.0.0` was published by hand. Nobody updated the warning.
+
+## The receipts
+
+| PR                                                            | Title                                                                                    | What it changed                                                                                                                                 |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#101](https://github.com/rafay99-epic/envpilot.dev/pull/101) | `feat(cicd): service tokens + GitHub Action secret pulls (web v1.34.0)`                  | The narrow version: `serviceTokens` (one project, variables only), `GET /api/v1/secrets`, and the Action that consumes it.                      |
+| [#102](https://github.com/rafay99-epic/envpilot.dev/pull/102) | `ci: GitHub Action check + publish pipeline`                                             | Automated mirroring the built surface to the public action repo — exact tag plus force-moved floating major.                                    |
+| [#103](https://github.com/rafay99-epic/envpilot.dev/pull/103) | `feat: public REST API + MCP server + API keys platform + docs (web v1.35.0)`            | `apiKeys` + `_authorizeRequest`, REST v1, the MCP server with 5 tools, key management UI, and the docs. One commit per phase plus review fixes. |
+| [#146](https://github.com/rafay99-epic/envpilot.dev/pull/146) | `One Token Model: surfaces field unifies GitHub Action / REST / MCP credentials (PR-A)`  | Added `surfaces` to `apiKeys` so one credential type covers all three faces.                                                                    |
+| [#147](https://github.com/rafay99-epic/envpilot.dev/pull/147) | `Machine-initiated variable requests + serviceTokens retirement (PR-B, stacked on #146)` | Drained and deleted `serviceTokens`; added `envpilot_request_variable` and `envpilot_get_request_status` (7 MCP tools now).                     |
+
+#101 shipped with 9 unit tests covering masking order, dotenv escaping and error mapping, plus a full local e2e run of **48 passed / 3 self-skipped / 0 failed**. #103 took that to **72 passed / 3 self-skipped / 0 failed**, including 13 REST endpoint tests and 13 MCP protocol tests. The `migrate-service-tokens` migration was verified idempotent, 12 rows down to 0.
+
+## What I still haven't fixed
+
+`_authorizePull` is the honest answer. The tagline says three faces share one core, and two of them do.
+
+Collapsing it is a small diff. It has stayed un-done through five PRs, which is exactly how these things go — nothing is broken, so nothing forces it.
+
+Beyond that: `surface` is still caller-asserted and documented as segmentation rather than a boundary. Pre-`surfaces` keys are still grandfathered everywhere. The deprecated `gateFeature` argument is still accepted. MCP responses are SSE-framed because that's the package default. And OAuth for MCP got deferred, so today the connection is a bearer key you paste into a client config.
+
+Here's where I land on all of this.
+
+The thing worth keeping isn't the design. The design is fine — one function, everything routes through it, write down the limits you didn't get. That part works.
+
+The thing worth keeping is that a rule like "new surfaces never re-implement authorization" only ever applies _forward_. It has no power over what already exists. The surface that shipped before the rule will not migrate itself, and it will sit there quietly under a year of confident comments describing an architecture it never actually joined.
+
+Go grep your own enforcement core. Count the callers. See if the number matches the story you've been telling.
+
+Until then, peace out, nerds.

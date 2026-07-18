@@ -15,8 +15,12 @@ import {
   Reveal,
 } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
+import { Mermaid } from "@/components/Mermaid";
 import Link from "next/link";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Clock, Layers } from "lucide-react";
+
+// Shared MDX overrides plus blog-only components (Mermaid diagrams).
+const mdxComponents = { ...docsComponents, Mermaid };
 
 const mdxOptions = {
   mdxOptions: {
@@ -167,6 +171,20 @@ export default async function BlogPostPage({ params }: PageProps) {
                   </span>
                 </div>
 
+                {/* Series */}
+                {post.series && (
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-green-500/20 bg-green-500/5 px-2.5 py-1 font-mono text-xs text-green-400">
+                    <Layers className="h-3 w-3" />
+                    <span>{post.series}</span>
+                    {post.seriesPart && (
+                      <span className="text-zinc-500">
+                        part {post.seriesPart}
+                        {post.seriesTotal ? ` of ${post.seriesTotal}` : ""}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Tags */}
                 {post.tags.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-1.5">
@@ -190,7 +208,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             <article className="mt-8 sm:mt-10">
               <MDXRemote
                 source={post.content}
-                components={docsComponents}
+                components={mdxComponents}
                 options={mdxOptions as never}
               />
             </article>

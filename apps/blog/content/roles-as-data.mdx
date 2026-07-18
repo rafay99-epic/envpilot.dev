@@ -1,0 +1,344 @@
+---
+title: "I Rebuilt My Permission System Three Times to Add Two Checkboxes"
+description: "Adding an editor and a viewer role to Envpilot turned into a 57-file sweep with a runtime landmine at every missed site. I closed that PR unmerged and rebuilt the whole thing so roles are rows in a table and capabilities are the only thing code still owns."
+date: "2026-07-17"
+tags: ["engineering", "architecture"]
+keywords: ["rbac", "permissions", "role registry", "convex", "authorization"]
+author:
+  name: "Abdul Rafay"
+series: "Building Envpilot"
+seriesPart: 7
+seriesTotal: 18
+---
+
+I wanted two roles. `editor` — creates and edits variables in the projects it's assigned to, can't manage members, can't approve anything. `viewer` — looks, doesn't touch.
+
+Neither of those is exotic. Every product you've ever used has both. I figured it was a config change.
+
+It was **57 files**.
+
+That PR — [#127](https://github.com/rafay99-epic/envpilot.dev/pull/127) — was built in four phases, went through two multi-agent review rounds, and had 20 confirmed findings fixed. It worked. I closed it unmerged at **14:41 on 17 July 2026**. Six hours later I merged [#128](https://github.com/rafay99-epic/envpilot.dev/pull/128), which threw away the approach and kept the policy.
+
+This is the story of how a permission system gets rebuilt three times, and why the third one is the first one where adding a role isn't a deploy.
+
+## Version one: the browser decided who you were
+
+If you've never worked on RBAC, here's the whole idea in one sentence — a **role** is a label on a user, and somewhere in your code there's an `if` that reads the label and decides whether the thing they just clicked is allowed.
+
+The only question that matters is: _where_ does that `if` live?
+
+Mine lived in the browser. Before [#51](https://github.com/rafay99-epic/envpilot.dev/pull/51), the entire permission matrix was a TypeScript constant in `apps/web/src/lib/auth.ts`:
+
+```ts
+// excerpt — the real constant also carried descriptions and a TEAM_LEAD role
+export const ROLES = {
+  ADMIN: { name: "Admin", permissions: Object.values(PERMISSIONS) },
+  // …
+  MEMBER: {
+    name: "Member",
+    permissions: [
+      PERMISSIONS.ORG_MEMBER,
+      PERMISSIONS.PROJECT_READ,
+      // VARIABLE_READ is NOT included - Members need explicit
+      // per-variable permissions
+    ],
+  },
+} as const;
+
+export function hasPermission(
+  userPermissions: string[],
+  requiredPermission: Permission
+): boolean {
+  return userPermissions.includes(requiredPermission);
+}
+```
+
+**What that actually means:** the frontend decided. The API routes then re-derived the same checks inline, in their own words, hoping they matched. And the Convex mutations underneath — the code that actually touches the database — checked nothing at all.
+
+For a product whose entire job is holding other people's secrets, that isn't a design. It's a lucky streak.
+
+## Version two: move the `if` to the server, then watch what it hardcodes
+
+[#51](https://github.com/rafay99-epic/envpilot.dev/pull/51) merged on **12 April 2026** and moved the decision server-side. New `convex/authz.ts`, action-to-role maps, and two helpers — `assertOrgAction` and `assertProjectAction`.
+
+The frontend kept exactly one job: rendering. `/api/auth/me` now returns a server-computed `actions[]`, `useAuth()` exposes `canDo("org:create_project")`, and `AuthUser.permissions` was deleted from the type entirely. API routes collapsed on contact — `members/route.ts` went 4 added, 53 removed.
+
+Right call. But look at the shape of the thing it built:
+
+```ts
+// excerpt — 4 of the 16 entries
+export const ORG_ACTIONS = {
+  "org:update": ["admin"] as OrgRole[],
+  "org:invite_member": ["admin", "team_lead"] as OrgRole[],
+  "org:link_extension": ["admin", "team_lead", "member"] as OrgRole[],
+  "org:rollback_variable": ["admin"] as OrgRole[],
+  // …
+} as const;
+```
+
+**Read the values, not the keys.** Every single one of them contains a literal list of role names. Sixteen entries, each one an independent copy of "who is allowed." Add a role and you are editing sixteen arrays and hoping you got all sixteen.
+
+That is the bill that came due three months later.
+
+[#70](https://github.com/rafay99-epic/envpilot.dev/pull/70) landed on **2 July** and rebuilt the model on top of that same shape: one role per user on `organizationMembers.role`, a hierarchy of `owner > project_manager > team_lead > developer`, `projectMembers` demoted from a role to a pure assignment, per-variable grants living in `variablePermissions`, and environment scoping through `projectMembers.environments` with subset semantics — so a developer scoped to `development` cannot see, search, edit or even request a variable that touches `production`. 135 files. **+7803/−7300.**
+
+And its own PR body flagged a launch blocker it deliberately did not fix:
+
+> every Convex function trusts a client-supplied `userId`, and the browser can call the public deployment directly, so a user can impersonate any other
+
+Which is a very polite way of saying the server-side authorization I'd just built was asking the client who it was. [#83](https://github.com/rafay99-epic/envpilot.dev/pull/83) closed that on **5 July**. Today `getMyPermissions` opens with `const actor = await requireAuthedUser(ctx);` and a comment that reads "Actor comes from the verified AuthKit JWT, never from an arg".
+
+## The choke point that wasn't
+
+Here's the part I got taught the hard way, and it's the most useful thing in this post.
+
+In [#106](https://github.com/rafay99-epic/envpilot.dev/pull/106) I added **security hold** — freeze a member's access org-wide without removing them, for the "their laptop leaked" case. Membership, role, assignments and grants all stay intact, every access path just says no.
+
+My design assumed `assertOrgAction` in `lib/authz.ts` was the single choke point. One guard there, done.
+
+It wasn't.
+
+> The convex-reviewer caught it before merge: the highest-traffic _read_ queries — variable/account/share lists, project visibility, vault value reads, project-access validation, cross-org search — each read `organizationMembers` inline and never call the assert helpers.
+
+Read what that means. A guard in `authz.ts` alone would have left a suspended member — the one whose laptop I was supposedly responding to — **still able to list secrets and their vaultRefs.**
+
+The fix was two layers: `assertNotSuspended()` in the assert helpers for the mutation paths, and a shared `getActiveMembership(ctx, orgId, userId)` — returns null for suspended — swapped into every inline read-path gate across `variables/`, `accounts/queries.ts`, `sharing/`, `projects/helpers.ts` and `users/projectAccess.ts`.
+
+**The lesson:** "we centralized authorization" is a claim about a helper existing, not about anyone calling it. #106 merged on **11 July**. Six days later I'd need that lesson again.
+
+## The 57-file sweep
+
+#127 added `editor` and `viewer` to a fixed six-role union, ranked `owner > project_manager > team_lead > editor > developer > viewer`. Its own body lists what that dragged along:
+
+> Return validators extended (the 4-literal validators would otherwise make the backend THROW for viewer/editor users), legacy mappings fail toward less access, invitations/hierarchy/web pickers/badges/env-scope UI all sweep-updated.
+
+Read that first clause twice.
+
+Convex return validators look like `v.union(v.literal("owner"), v.literal("team_lead"), ...)`. They're a runtime contract on what a query is allowed to return. Miss one on any query that returns a role, and the backend throws — **but only for users holding the new role.**
+
+That failure is invisible in review. Invisible in typecheck of the call sites. It shows up as a production error for exactly the people you just onboarded. #128's body puts the general figure at roughly **79 files** carrying hardcoded role unions.
+
+Adding a role was never a config change. It was a distributed edit with a landmine per missed site.
+
+I closed #127 with one line:
+
+> Superseded: pivoting to a registry-driven role system (capability profiles + admin-panel role management + migration) planned from main. Branch preserved for reference.
+
+The work wasn't wrong. It was the right policy in the wrong medium — hardcoding the answer instead of making the question data.
+
+## Version three: split what changes from what must not
+
+The replacement draws exactly one line.
+
+A **role** is data. A row in a Convex table: slug, display name, level, colour, and a map of capability keys to booleans. Adding one is an insert.
+
+A **capability** is code. It exists only because there's an `if` somewhere enforcing it. Adding one is a feature change — review, tests, deploy.
+
+The header of `convex/lib/capabilities.ts` says it out loud:
+
+```ts
+/**
+ * Capability catalog — the vocabulary of the role system.
+ *
+ * CODE-DEFINED on purpose: every capability corresponds to enforcement that
+ * must exist in code, so adding one is a feature change (code review, tests,
+ * deploy). Adding a ROLE, by contrast, is pure data: a roleRegistry row maps
+ * these keys to booleans (see lib/roleProfiles.ts for the seeded system
+ * profiles and convex/lib/seedData.ts SEED_ROLES).
+ *
+ * Rules:
+ *  - Never compare role slugs in feature code. Ask the resolved profile.
+ *  - …
+ */
+```
+
+Now, the obvious next move is to make capabilities data too. Fully dynamic. An admin invents a permission string in a panel and attaches it to a role. It looks more general, so it must be better, right?
+
+_Wrong._
+
+Someone types `project.varaibles.update`. The panel accepts it. The role looks correct in the UI. And no code path on Earth ever checks that string. You have shipped a privilege that means nothing — and worse, a future typo'd call site might accidentally match it. **There is no such thing as a permission with no enforcement; there's only a permission you haven't noticed is fake.**
+
+Three guards keep the split honest:
+
+1. `validateCapabilityKeys()` in `convex/features/admin/roles.ts` rejects any key not in `CAPABILITY_KEYS`. You cannot invent one.
+2. `UNKNOWN_ROLE_PROFILE` — zero capabilities, level 0. An unresolvable slug denies everything.
+3. `RESERVED_SLUGS`, plus the rule that a system role can never hold `org.manage` — data can't promote itself into the owner class.
+
+```ts
+export const UNKNOWN_ROLE_PROFILE: RoleProfile = {
+  slug: "__unknown__",
+  displayName: "Unknown role",
+  description: "Role slug not found in the registry — access denied",
+  color: "zinc",
+  level: 0,
+  isSystem: false,
+  capabilities: {},
+};
+```
+
+The comment above it is my entire security posture in one clause: "for a secrets manager, lock-out beats leak."
+
+## Three eras, one picture
+
+<Mermaid name="roles-as-data-three-eras" />
+
+Follow the arrows left to right and watch the decision point walk from the browser, to a hardcoded map on the server, to a database row.
+
+The resolver is dual-mode on purpose — registry wins when it has an answer, code covers the gap when it doesn't (a fresh deployment before the seed migration runs):
+
+```ts
+export async function getRoleProfile(ctx, role): Promise<RoleProfile> {
+  const slug = normalizeOrgRole(role);
+  const row = await ctx.db
+    .query("roleRegistry")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .first();
+  if (row && row.isActive) {
+    /* registry row wins */
+  }
+  if (row && !row.isActive) {
+    // Deactivated roles fail closed even if a member still holds the slug
+    // (the admin panel blocks that, but data wins over assumptions here).
+    return UNKNOWN_ROLE_PROFILE;
+  }
+  const builtin = SYSTEM_PROFILES[slug] ?? SEEDED_CUSTOM_PROFILES[slug];
+  return builtin ?? UNKNOWN_ROLE_PROFILE;
+}
+```
+
+`SEEDED_CUSTOM_PROFILES` is where #127 went to live. I didn't delete it — `editor` and `viewer` survive as two seed rows, and the module comment says exactly that: "the #127 semantics, expressed as data."
+
+Everywhere the old code compared slugs, it now asks the profile. The most load-bearing example is four lines long:
+
+```ts
+export function bypassesAssignment(profile: RoleProfile): boolean {
+  return hasCapability(profile, "org.manage");
+}
+```
+
+That replaced every `role === "owner"` in the project-access path. Owner-class is a capability now, so a custom role can deliberately hold it — and a system role never can.
+
+## Order is a security property
+
+`assertProjectAction` checks the capability, then computes `environmentScope` as a returned field for env-scopeable roles.
+
+<Mermaid name="roles-as-data-assert-project-action" />
+
+Trace the two branches out of `getRoleProfile` and notice that both failure modes land on denial, never on a shrug.
+
+The per-resource path is a different function — `resolveResourceAccess` in `convex/lib/authz.ts`, the shared helper behind `getVariableAccess` and `getAccountAccess`. A second-pass review on #128 caught the bug it makes possible.
+
+`editor` holds `access.env_scoped` **and** blanket write capabilities. Check blanket write first, and an editor scoped to `development` can write a `production` variable it can't even see in a list.
+
+```ts
+// Environment scope FIRST: an assigned env-scopeable role never gets
+// access to an out-of-scope resource — blanket write and grants included.
+// (Ordering matters: a role holding BOTH access.env_scoped and a blanket
+// write capability — the seeded editor — must not write out-of-scope
+// resources it can't even see in lists.)
+if (
+  projectMembership &&
+  hasCapability(profile, "access.env_scoped") &&
+  !isEnvironmentScopeAllowed(
+    projectMembership.environments,
+    args.resourceEnvironments
+  )
+) {
+  return null;
+}
+if (projectMembership && hasCapability(profile, args.blanketWrite)) {
+  return "write";
+}
+```
+
+**Why this only became possible now:** no role in the original four held both flags. #127 introduced the combination with its fixed `editor`, and its own round-1 review caught an editor env-scope bypass on delete/restore/env-move. The registry then made that combination reachable for _any_ role an admin invents — which is precisely why the fix has to live in the resolver and not in the role definition. A data-defined role cannot be trusted to hold a safe combination of flags.
+
+## The half-dynamic trap, and the 34 minutes it lasted
+
+#128 merged at **20:51**. It shipped with system-role matrices locked and the seed overwriting them on every deploy.
+
+Testing it exposed the obvious thing immediately: granting Team Lead one extra capability was _still_ a code edit and a deploy. I'd built a dynamic role system and left the four roles anyone actually uses frozen inside it.
+
+[#130](https://github.com/rafay99-epic/envpilot.dev/pull/130) merged at **21:25**. Thirty-four minutes. Eight files. It turns the seed from overwrite into merge:
+
+```ts
+export function mergeSystemRoleCapabilities(
+  codeDefaults: CapabilityMap,
+  stored: Record<string, boolean>
+): CapabilityMap {
+  const merged: CapabilityMap = { ...codeDefaults };
+  for (const [key, value] of Object.entries(stored)) {
+    // Catalog membership only — `key in codeDefaults` would walk the
+    // prototype chain and admit junk keys like "toString".
+    if ((CAPABILITY_KEYS as string[]).includes(key)) {
+      merged[key as CapabilityKey] = value;
+    }
+  }
+  return merged;
+}
+```
+
+**The two rules that matter:** code defaults fill keys the stored row has never seen, so new features arrive enabled. Stored keys win, so panel edits survive every deploy. And the prototype-chain guard is a review finding, not paranoia — `key in codeDefaults` is genuinely `true` for `toString`.
+
+The cost is stated in the docstring rather than buried: removing a default from code does _not_ propagate to rows that already carry the key. Retirements are a panel action or a one-off migration, never a silent seed effect. I took that trade on purpose. The alternative — code silently revoking a capability an admin deliberately granted — is worse in a secrets product.
+
+Two locks stay, for two different reasons:
+
+```ts
+if (role.slug === "owner") {
+  throw new ConvexError("The Owner capability matrix is locked.");
+}
+if (args.key === "org.manage" && args.granted && role.isSystem) {
+  throw new ConvexError(
+    "System roles cannot hold org.manage. Create a custom role for owner-class delegation."
+  );
+}
+```
+
+Owner is locked because an editable owner is a bricked-org hazard. System roles can't become owner-class because they ship to every organization — deliberate owner-class delegates should be custom roles someone made on purpose.
+
+And because "your edit survived, the code default didn't propagate" otherwise looks identical to a boring zero-update seed run, the seed now returns a per-role drift report:
+
+<Mermaid name="roles-as-data-merge-seed" />
+
+Note that `owner` is the one path that never reaches the merge function at all.
+
+The regression fence is a golden parity suite — `apps/web/src/lib/__tests__/role-parity.test.ts` — holding a frozen snapshot of the pre-registry matrix from `main @ d908d4ff`. Seeded profiles must reproduce it exactly. Its header states the contract bluntly: a failure there always means CODE changed policy, which is only ever allowed as an explicit fixture update in the same PR. #128 reports 19 tests, #130 reports 23.
+
+## The receipts
+
+| PR                                                                                                                                                                        | What it changed                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#51](https://github.com/rafay99-epic/envpilot.dev/pull/51) — Implement backend-driven authorization system                                                               | Created `convex/authz.ts` with `ORG_ACTIONS`/`PROJECT_ACTIONS` and `assertOrgAction`/`assertProjectAction`; deleted the frontend `PERMISSIONS`/`ROLES` matrix; `useAuth().canDo(action)` became a render hint only.                                                            |
+| [#70](https://github.com/rafay99-epic/envpilot.dev/pull/70) — Unified organization-wide RBAC: env scoping, security hardening, Convex cost fixes                          | One role per user, `projectMembers` demoted to assignment-only, `projectMembers.environments` env scoping, full audit coverage, Convex free-tier cost fixes. Flagged the client-supplied `userId` hole it did not fix.                                                         |
+| [#83](https://github.com/rafay99-epic/envpilot.dev/pull/83) — feat(auth): Convex auth cutover — server-verified identity everywhere (Stage 1)                             | Server-verified identity everywhere; closed #70's impersonation blocker.                                                                                                                                                                                                       |
+| [#106](https://github.com/rafay99-epic/envpilot.dev/pull/106) — feat: security hold (suspend member access) + removal exit UX                                             | `assertNotSuspended()` in the assert helpers plus a shared `getActiveMembership()` swapped into every inline read-path gate — after review proved `assertOrgAction` was not the single choke point.                                                                            |
+| [#127](https://github.com/rafay99-epic/envpilot.dev/pull/127) — feat: RBAC hardening — request-only developers, editor & viewer roles, sharing lockdown, account requests | **Closed unmerged.** Six hardcoded roles, developer lockdown, `accountRequests` flow. 57 files. Branch preserved.                                                                                                                                                              |
+| [#128](https://github.com/rafay99-epic/envpilot.dev/pull/128) — feat(rbac): Role Registry — roles as data, capabilities as code                                           | `roleRegistry` table, 33-key capability catalog, `getRoleProfile` dual-mode resolver, `bypassesAssignment()`, admin Roles page, `seed-role-registry` + `migrate-roles` in CI, golden parity suite. Also added server-side auth to the audit module, which previously had none. |
+| [#130](https://github.com/rafay99-epic/envpilot.dev/pull/130) — feat(rbac): merge-seed — system-role capabilities editable from the admin panel (owner locked)            | Seed overwrite → merge (owner excepted), single-key capability toggle over a fresh read, system roles blocked from `org.manage`, per-role drift report.                                                                                                                        |
+| [#131](https://github.com/rafay99-epic/envpilot.dev/pull/131) — feat(platform): retire legacy client fallback — 11 shims deleted, floors raised to registry-native builds | 11 compat shims deleted, version floors raised to registry-native builds (`minCli: "1.18.0"`, `minExtension: "1.15.0"`).                                                                                                                                                       |
+
+## Now the part where I stop congratulating myself
+
+`ROLE_LEVEL` now exists in three places with different contents: `convex/lib/authz.ts` (four system slugs, editor and viewer deliberately omitted), `apps/cli/src/lib/roles.ts` (six slugs including editor 50 and viewer 20), and the extension mirror. A level edited in the admin panel does not reach the CLI copy. That's survivable only because capabilities are the real authority and levels are used for display and hierarchy comparison — but it is drift waiting to be a bug report.
+
+`roleRegistry` writes no `auditLogs` rows. The reason is structural — audit rows are org-scoped, the registry is platform-global — so capability changes are `console.log` only. Platform policy changes get audited to the Convex dashboard, not the product audit log. That needs fixing before anyone else touches that panel.
+
+And `docs/RBAC.md` is stale in the worst possible way, which is worse than absent. It still names `convex/authz.ts` as the source of truth (it's `convex/lib/authz.ts` now), lists levels as 1–4 instead of 100/80/60/40, and describes four roles. Neither #128 nor #130 updated it. The schema comment on `roleRegistry.isSystem` still reads "capability matrix immutable" — #130 made it mutable and left the comment sitting on the exact field whose meaning it changed. I did that. Twice, in one day, on a file I was already editing.
+
+Here's where I land on all of this. Three rebuilds to add two roles sounds like waste, and for the first two it was — I moved the `if` around without ever asking why the answer was in code at all.
+
+The thing that makes the third one worth it is a comment sitting on the developer profile:
+
+```ts
+// MAIN PARITY: developers CAN create variables/accounts directly today
+// (they receive an auto write-grant on creation). The request-only
+// lockdown policy is a profile edit made from the admin panel later —
+// not a hardcoded rule.
+```
+
+Developer lockdown was #127's headline feature. It was the entire reason that PR existed, and it cost 57 files.
+
+It's a checkbox now.
+
+Until then, keep your policy in the database and your enforcement in the compiler, nerds.

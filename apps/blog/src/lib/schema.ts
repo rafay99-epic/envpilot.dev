@@ -19,6 +19,9 @@ export const blogFrontmatterSchema = z
       name: z.string().min(1, "Author name is required"),
     }),
     coverImage: z.string().optional(),
+    series: z.string().min(1).optional(),
+    seriesPart: z.number().int().positive().optional(),
+    seriesTotal: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -35,6 +38,9 @@ export interface BlogPost {
   keywords: string[];
   author: { name: string };
   coverImage?: string;
+  series?: string;
+  seriesPart?: number;
+  seriesTotal?: number;
   readingTime: string;
   content: string;
 }
@@ -52,5 +58,8 @@ export interface BlogPostMeta {
   keywords: string[];
   author: { name: string };
   coverImage?: string;
+  series?: string;
+  seriesPart?: number;
+  seriesTotal?: number;
   readingTime: string;
 }

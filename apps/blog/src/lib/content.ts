@@ -65,6 +65,9 @@ function parseFrontmatter(
       keywords: parsed.data.keywords,
       author: parsed.data.author,
       coverImage: parsed.data.coverImage ?? undefined,
+      series: parsed.data.series ?? undefined,
+      seriesPart: parsed.data.seriesPart ?? undefined,
+      seriesTotal: parsed.data.seriesTotal ?? undefined,
       readingTime: computeReadingTime(body),
       content: body,
     };

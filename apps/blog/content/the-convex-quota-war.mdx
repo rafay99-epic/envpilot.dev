@@ -1,0 +1,252 @@
+---
+title: "My Database Bill Was a Closed Drawer Nobody Was Looking At"
+description: "Envpilot burned through the Convex free-tier Database I/O quota, so I went hunting. The worst offender wasn't a slow query — it was an invisible component subscribing to more than it drew. Here's every read I found and the index trick I somehow shipped three separate times."
+date: "2026-07-18"
+tags: ["engineering", "performance"]
+keywords:
+  ["convex", "database io", "query optimization", "ci cost", "playwright"]
+author:
+  name: "Abdul Rafay"
+series: "Building Envpilot"
+seriesPart: 14
+seriesTotal: 18
+---
+
+On 2026-07-10 at `22:45` UTC I merged a pull request whose body opened with exactly one sentence:
+
+> The Convex free-tier team quota (Database I/O 1.05/1 GB) is exhausted.
+
+Not a projection. Not a friendly warning email at 80%. **1.05 of 1.** Over the line, past tense.
+
+Nine hours earlier that same day I'd merged a 218-file backend restructure. Between the two I merged two more attempts to stop the CI test gate from going red. By the end of the day that gate was switched off with `if: false &&`, and it's still off.
+
+This is the story of where the reads actually were. Spoiler: not where I looked first.
+
+## What you're actually paying for, if you've never used Convex
+
+Quick detour, because the whole post falls apart if you skip this.
+
+Convex is a reactive database. You don't fetch data once and move on — a React component _subscribes_ to a query, and Convex re-runs that query and pushes fresh results down the socket whenever anything it touched changes.
+
+That's the magic. It's also the bill.
+
+Because you're not billed per API call. You're billed on **Database I/O** — the volume of documents read. And a subscribed query doesn't read once. It reads _every time_ anything it depends on gets written.
+
+So a query that scans 2,000 documents isn't a 2,000-document cost. It's 2,000 documents times every write that touches that table, times every open browser tab holding the subscription.
+
+Here's the thing about that multiplication: nothing in your code makes it visible. There's no slow query. Nothing times out. Every function returns in milliseconds and looks completely healthy in review.
+
+You just run out of gigabytes.
+
+## The audit I ran before anything was on fire
+
+Five days before the quota blew, [#81](https://github.com/rafay99-epic/envpilot.dev/pull/81) landed as a pre-emptive sweep. The framing in the body was plain: "Traffic is about to grow and the Convex free tier bills by reads/calls."
+
+Three parallel audits — hot paths, crons and background work, long tail plus dead code. **32 files, +506/−4,016.** They turned up unbounded cross-tenant table scans, a changelog-publish cron running every 5 minutes and burning roughly **49% of all cron invocations**, and about 60 dead publicly-callable Convex functions — each one free attack surface for anyone who reads a wire log.
+
+But the single most reusable finding arrived attached to a comment that was already sitting in the codebase, confidently explaining why the expensive thing was necessary.
+
+The daily permission-cleanup cron was doing this:
+
+```typescript
+// Runs at most once per day (crons.daily "cleanup expired permissions").
+// A full scan is unavoidable here: the app now creates many PERMANENT
+// grants (no expiresAt), and an expiresAt index would still scan them
+// (undefined sorts before numbers), so an index buys nothing. Instead we
+// ...
+const allPermissions = await ctx.db.query("variablePermissions").collect();
+```
+
+Read that comment carefully, because it's half right, and half right is the most dangerous thing a comment can be.
+
+`expiresAt` is optional. In Convex's index ordering, `undefined` sorts below every number. So a naive `lte(now)` range really does sweep up every permanent grant in the table, and the index really does buy you nothing.
+
+What past-me missed: you can put a **floor** under the range.
+
+Here's what lives at `convex/features/permissions/variablePermissions/cleanup.ts` now:
+
+```typescript
+const expiredPermissions = await ctx.db
+  .query("variablePermissions")
+  .withIndex("by_active_and_expires", (q) =>
+    q.eq("isActive", true).gt("expiresAt", 0).lte("expiresAt", now)
+  )
+  .take(CLEANUP_BATCH_SIZE);
+```
+
+**The Fix:** `gt("expiresAt", 0)` excludes every row where the field is undefined. Permanent grants — the common case, and the growing majority of that table — are never read at all. Not read-then-filtered. Never touched.
+
+And the genuinely embarrassing part? The codebase already relied on the identical trick in vault GC. It was there. Nobody connected it.
+
+Hold onto that, because it happens again. Twice.
+
+#81 also deleted a settings toggle called `teamLeadsCanCreateProjects` that users could happily flip and no authorization check ever consulted, plus a `usageCounters` table nothing had ever written to. Both stayed _declared_ in `convex/schema.ts` so existing rows still validate, with a `cleanup-dead-data` migration to drain them.
+
+## You cannot audit a 2,925-line file
+
+`convex/` was about 57k lines across 44 flat root files. `admin.ts` alone was **2,925 lines**.
+
+That's not a style complaint. You cannot audit read volume in a file that size, because you cannot see which page subscribes to which query. The cost lives in the wiring, and the wiring is invisible.
+
+[#95](https://github.com/rafay99-epic/envpilot.dev/pull/95) split it into `convex/features/<feature>/` across 17 areas, plus `convex/lib/` for pure helpers, and migrated every callsite to real `api.features.<feature>.<file>.<fn>` paths. No barrel layer.
+
+The constraint that made it interesting: already-published CLI and extension builds call Convex by **baked-in string paths**. Someone running CLI 1.14 has those addresses compiled into a binary on their laptop. Move the function, break their tool.
+
+So #95 left 9 legacy shims at the convex root re-exporting exactly 16 functions — the complete set, verified across both clients' git history — each documenting its own removal condition. Verification was a deployed-function-spec diff: all 16 wire-contract paths intact, all 301 functions live at feature paths. Those shims — 11 by the end — were finally deleted in [#131](https://github.com/rafay99-epic/envpilot.dev/pull/131), once `minCli` and `minExtension` passed the floors that made deletion safe. They sit at `1.18.0` and `1.15.0` today.
+
+I'll be fair to #95's own verification section, because it's the honest part. Later full-suite runs failed 11 to 17 specs with 500s and intermittent `Unauthenticated` Convex queries. So I ran a control: the identical suite against `main`. Same specs, same signature, same failures. Environment flakiness under parallel load, not the refactor.
+
+Proving that cost me pushing main's function layout onto the shared dev deployment — and then losing Convex CLI access before I could push it back.
+
+## The two red gates I'm not retelling here
+
+[#97](https://github.com/rafay99-epic/envpilot.dev/pull/97) at `15:44` UTC and [#98](https://github.com/rafay99-epic/envpilot.dev/pull/98) at `20:45` UTC were both rescue attempts on a CI end-to-end gate that kept failing. One found a real product bug — a Convex `useQuery` firing before the WorkOS JWT attached to the socket. The other found that my test suite had DoS'd itself against my own product's tier cap.
+
+Both are their own story, and I told it separately in [The Safety Net I Built and Cut Down the Same Day](/blog/the-test-gate-we-switched-off).
+
+What matters _here_ is what they cost: every one of those gate runs drove a cloud Convex deployment against the same free-tier meter as production. The tests were spending the quota that the product needed.
+
+## The number one offender was a closed drawer
+
+[#100](https://github.com/rafay99-epic/envpilot.dev/pull/100) landed two hours after #98, with the quota already blown.
+
+The worst thing in the codebase was not a slow query. It was a component subscribing to more than it rendered.
+
+<Mermaid name="the-convex-quota-war-read-fanout" />
+
+Every arrow out of that browser box is a live subscription re-running on writes you never asked it about.
+
+`getExtendedUsage` — a ~2000-document variable scan plus per-project share, rotation and account counts — was subscribed by the **global nav**. On every page. Re-running on every variable write, per open tab. It moved into a new `useExtendedUsageSync()` mounted only on `/dashboard/usage`, where somebody is actually reading the number.
+
+Then there was the drawer. Four lines fixed it:
+
+```typescript
+// Subscribe to the gate/limit queries ONLY while the drawer is open. The
+// drawer stays mounted (closed) on the project page, and checkTierLimit
+// live-counts the project's variables — an always-on subscription re-ran
+// that count on every variable write even with the drawer shut.
+const orgId = isOpen
+  ? (organizationId as Id<"organizations"> | undefined)
+  : undefined;
+```
+
+**The Revelation:** a closed, invisible, zero-pixel UI component was counting every variable in the project every time anyone anywhere saved a variable. It rendered nothing. It cost money continuously. That is the single best summary of reactive-database billing I have.
+
+Then all eight hot per-project variable reads moved from `by_project` to `by_project_deleted`, so soft-deleted rows get skipped at the index instead of read-then-filtered.
+
+That index wasn't new. `git log -S'by_project_deleted' -- convex/schema.ts` shows it arrived in [#80](https://github.com/rafay99-epic/envpilot.dev/pull/80), for the vault-GC trash listing. #100 just noticed an existing index solved a completely different problem.
+
+And it wasn't only a cost fix — on `.take(N)` reads, the trash silently ate the budget, so a trash-heavy project could return mostly-dead pages. A latent correctness bug, fixed by accident.
+
+Capping isn't free either, and I have the scar. Search tried a cap and reverted it, and the reason is now a comment in `convex/features/variables/queries.ts`:
+
+```typescript
+// Read the project's full (non-deleted) variable set. A per-project
+// .take() cap was tried for cost, but it broke search correctness:
+// .take(n) returns rows in creation order, so a project's NEWEST
+// variables silently fall out of search once it exceeds the cap —
+// a user couldn't find a variable they just created.
+// ...
+```
+
+Elsewhere I took the approximation on purpose. `VARIABLE_COUNT_CAP = 500` on project cards, with the comment stating outright that a card reading "500" instead of its true five-digit count is fine for a bounded reactive read. Tier-limit totals carry a `variablesApproximate` flag when the 2000-doc scan budget runs out.
+
+Not every audit finding survived contact, either. #100 explicitly skipped the rotation-expiry query — "already bounded by a 7-day index window, the audit overstated it" — and the `getResolvedFeatures` duplicate-subscription finding, because the Convex client already dedupes identical query+args.
+
+## The day I stopped guessing
+
+By [#109](https://github.com/rafay99-epic/envpilot.dev/pull/109) the next day I was reading the Convex dev-deployment dashboard instead of theorizing.
+
+Top functions by call count: `users.getByWorkosId` at **9.1K**, `organizations.listForUser` at 6K, `featureRegistry.checkFeature` at 3.7K, `getResolvedFeaturesBatch` at 2.8K, `auth.getMyPermissions` at 2.8K.
+
+The diagnosis in the PR body: "Four parallel investigations traced the volume to a handful of architectural habits, **not slow queries**."
+
+| Habit                                                                            | Fix                                                    |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `getResolvedFeaturesBatch` read ~60 docs/call; every caller used only `tierName` | new `getOrgTiersBatch`, ~4 docs/org                    |
+| `/api/auth/me` fetched 2× per hard load                                          | `AuthProvider` gets `initialActions`; one shared fetch |
+| org switcher refetched on every navigation                                       | one deduped `listForUser` subscription                 |
+| 2–5 per-key `checkFeature` subscriptions per page                                | `useFeatureGate` reads the store's single subscription |
+| `lastUsedAt` patched on every API pull (OCC churn)                               | 60s write throttle; audit inserts stay unconditional   |
+
+That first row was roughly **165K wasted document reads**, and swapping in the lean sibling took **−92%** off the biggest Database I/O line item. Every caller wanted one string. It was reading sixty documents to hand over one string.
+
+The fat `getResolvedFeaturesBatch` had to stay alive anyway — published CLI and extension builds call it by baked-in path — so `getOrgTiersBatch` shipped as a lean sibling rather than a replacement. Same shim problem as #95, different function.
+
+And then I opened `convex/features/sharing/cleanup.ts`.
+
+```typescript
+// The `.gt(0)` floor matters: otpExpiresAt is optional, and undefined
+// sorts BELOW all numbers in the index — a bare `.lt(now)` would read
+// every recipient row that never had an OTP set (the whole table's
+// history) on every 30-minute run. Same floor trick as
+// variablePermissions/cleanup.ts and vault/gc.ts.
+const expiredRecipients = await ctx.db
+  .query("shareRecipients")
+  .withIndex("by_otp_expires", (q) =>
+    q.gt("otpExpiresAt", 0).lt("otpExpiresAt", now)
+  )
+  .collect();
+```
+
+Third instance. Same bug shape.
+
+Vault GC had the floor. #81 added it to `variablePermissions` six days earlier and wrote a comment explaining it. And `cleanupExpiredOtps` _still_ shipped without it, reading the full history of a table every 30 minutes.
+
+Writing the pattern down twice did not stop the third one.
+
+> An optional-field index range without a floor is a full-table scan wearing an index's clothes. It looks correct in review every single time.
+
+That's the structural lesson, and it's worth more than any individual query I fixed. #81 found the same shape in one more place — a subscriptions cron doing a full `organizations` collect, justified by a stale comment, when the index it needed had existed all along.
+
+I keep finding cheap reads I already paid for.
+
+#109 also disclosed a security finding it deliberately did **not** fix: `getByWorkosId` and `getByEmail` are public, unauthenticated, and return full user PII keyed by client-supplied ids. Flagged, not fixed, needs its own PR. I'd rather write that down than quietly carry it.
+
+## The other bill, and the trick that made it vanish
+
+[#115](https://github.com/rafay99-epic/envpilot.dev/pull/115) fought a completely different quota: GitHub Actions minutes, nearly gone **12 days** into the billing cycle.
+
+About 13 jobs per push. Each billed as a rounded-up minute, each paying its own checkout plus `bun install` before doing a second of useful work — roughly 15 billed minutes per push, across dozens of pushes a day. So I collapsed 8 check jobs into one `checks` job (setup paid once, turbo parallelizes internally), cached `.turbo`, and gated the react-doctor and artifact-build jobs to main pushes only.
+
+Then that war ended by the problem ceasing to exist. I relicensed the monorepo under MIT in [#138](https://github.com/rafay99-epic/envpilot.dev/pull/138), and public repos get free Actions minutes.
+
+The CI _minutes_ problem evaporated. The Convex _Database I/O_ problem did not.
+
+Reads are priced per read regardless of who can read the source. Free CI compute did not buy free CI database reads — which is exactly why the e2e gate is still `false &&` today.
+
+## The receipts
+
+| PR                                                            | Title                                                                                          | What changed                                                                                         |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [#81](https://github.com/rafay99-epic/envpilot.dev/pull/81)   | perf: Convex usage optimization + dead-code purge (−3,500 lines)                               | `gt(0)` index floors, capped scans with an `approximate` flag, 69 functions removed (59 dead public) |
+| [#95](https://github.com/rafay99-epic/envpilot.dev/pull/95)   | refactor(convex): feature-based backend structure, dedup, dead-code removal (v1.28.2)          | 44 flat files → `convex/features/*`; 9 root shims kept for published clients                         |
+| [#97](https://github.com/rafay99-epic/envpilot.dev/pull/97)   | fix(e2e): kill pre-auth Convex query race + run gate on prod build                             | `useConvexUser` waits for `useConvexAuth()`; CI gate runs a production build                         |
+| [#98](https://github.com/rafay99-epic/envpilot.dev/pull/98)   | fix(e2e): unblock suite from tier-cap debris — pre-run purge + fail-fast + retrying assertions | `cleanup` Playwright project purges `E2E_*` debris; fail-fast on the Upgrade prompt                  |
+| [#100](https://github.com/rafay99-epic/envpilot.dev/pull/100) | perf: Convex Database I/O reduction + CI e2e gate off (web v1.33.3, ext v1.11.0)               | `useExtendedUsageSync`, `by_project_deleted` on 8 reads, gate disabled, extension idle-pause         |
+| [#109](https://github.com/rafay99-epic/envpilot.dev/pull/109) | perf: cut Convex function calls and DB I/O — wave 1 (web v1.38.1)                              | `getOrgTiersBatch`, deduped auth fetches, OTP cron floor, new compound cron indexes                  |
+| [#115](https://github.com/rafay99-epic/envpilot.dev/pull/115) | perf(ci): minutes diet — consolidate checks, cache turbo, gate PR-only jobs                    | 8 check jobs → 1, turbo cache, react-doctor + CLI tarball/VSIX gated to main-only                    |
+
+## Now the part where I stop congratulating myself
+
+The e2e gate has been disabled since that 2026-07-10 merge — the `ci.yml` note is dated `2026-07-11`, because my timezone had rolled over — and the local suite is the only gate of record. Run by a human. One at a time, because concurrent runs fight over port 3000.
+
+The replacement is researched and not built: run the suite against a self-hosted `ghcr.io/get-convex/convex-backend` in Docker, ports 3210 for the API and 3211 for HTTP actions, zero cloud quota. I explicitly ruled out the CLI's `convex dev --local` for it — that's a laptop dev-loop feature, not a CI primitive.
+
+The 30-second `workosId → user` cache in `apps/web/src/lib/convex-helpers.ts` is labeled a stopgap in its own source, with the real fix named as the auth cutover deleting those per-route lookups. The PII exposure is still queued. And several display counts are now honest approximations rather than truths — a trade I'd make again, but one you should say out loud rather than let a card lie quietly.
+
+Here's the uncomfortable part, and I'm going to say it plainly because burying it would be worse.
+
+**I never produced a per-source breakdown of the quota.**
+
+#100 called CI runs "the main burner." #109 said e2e-on-cloud-dev was "a large share" of the dev-deployment numbers. Neither of those is a measurement. They're both a confident guess wearing a number's clothes — which, yes, is the exact same failure mode as the index comment I opened this post by dunking on.
+
+I turned off the thing I believed was expensive. And #109, the very next day, still opened with "Free-tier Database I/O is burning."
+
+So the follow-through isn't a measurement either.
+
+**Convex _is_ good.** None of this is the database being bad at its job — reactivity is the feature I'd pick it for again tomorrow. It's that reactivity hands you a cost model where the expensive thing is invisible, silent, fast, and green in every review, and the only honest defense is to go look at the dashboard instead of your instincts.
+
+I went looking for a slow query. I found a closed drawer.
+
+Until then, floor your index ranges, nerds.

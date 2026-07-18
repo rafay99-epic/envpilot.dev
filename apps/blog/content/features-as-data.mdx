@@ -1,0 +1,238 @@
+---
+title: "My Paywall Used to Live in the Browser Bundle"
+description: "Envpilot's tier limits started as a TypeScript object gated by a NEXT_PUBLIC_ env var, moved to the server in PR #33, and became a database-backed feature registry one day later in PR #39 — this is what four months of running features-as-data actually cost."
+date: "2026-07-19"
+tags: ["engineering", "architecture"]
+keywords: ["feature flags", "tier gating", "billing", "convex", "saas"]
+author:
+  name: "Abdul Rafay"
+series: "Building Envpilot"
+seriesPart: 18
+seriesTotal: 18
+---
+
+For the first stretch of Envpilot's life, my entire paid-tier boundary was a TypeScript object literal in `apps/web/src/lib/tier-limits.ts`, and whether it did anything at all depended on an env var named `NEXT_PUBLIC_ENFORCE_TIER_LIMITS`.
+
+Read that variable name again. `NEXT_PUBLIC_`.
+
+That prefix means Next.js inlines the value into the browser bundle. My billing enforcement shipped to the client, alongside the numbers it was supposed to enforce. Anyone who opened devtools could read the whole pricing matrix and the switch that turned it off.
+
+This is the story of dragging that thing to the server, then dragging it into the database a day later, and what it's cost me in the four months since.
+
+## The Object Literal That Thought It Was a Paywall
+
+Here's what was actually in the file before I touched it — 129 lines, with a doc comment that told on itself:
+
+```ts
+// apps/web/src/lib/tier-limits.ts (pre-PR #33)
+/**
+ * Enforcement is controlled by NEXT_PUBLIC_ENFORCE_TIER_LIMITS env var.
+ * When disabled (default), the UI shows tier info but no actions are blocked.
+ */
+export const TIER_LIMITS: Record<Tier, TierLimits> = {
+  free: {
+    maxProjects: 3,
+    maxVariablesPerProject: 50,
+    maxTeamMembers: 3 /* … */,
+  },
+  pro: { maxProjects: null /* … */ },
+};
+
+export function isTierEnforcementEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_ENFORCE_TIER_LIMITS === "true";
+}
+```
+
+**The problem:** every check ran where the attacker lives. `Tier` was a closed union of `"free" | "pro"`, the tier itself was a plain field on the `organizations` row, and adding a new gated capability meant editing a type, editing an object, and editing every call site that cared.
+
+So [PR #33](https://github.com/rafay99-epic/envpilot.dev/pull/33) moved it. Merged **2026-03-18**, +1146/−829 across **48 files**. Its body says the goal flat out: _"Move all tier and usage enforcement logic from client-side to Convex backend for security."_ It created a locked-down `organizationTiers` table, converted every billing webhook mutation into an `internalMutation` behind a single public `processWebhookEvent` gateway, and swapped `NEXT_PUBLIC_ENFORCE_TIER_LIMITS` for a server-only `ENFORCE_TIER_LIMITS`.
+
+Fixed, right?
+
+Not really. `tier-limits.ts` survived the PR. It got demoted to a display mirror with a comment describing exactly what kind of debt it now was: _"This mirrors the tier configuration from convex/tierLimits.ts for UI display purposes only."_ Two copies of the pricing matrix, in two runtimes, synced by me remembering.
+
+Then [PR #36](https://github.com/rafay99-epic/envpilot.dev/pull/36) made tier names dynamic that same evening — merged **2026-03-18**, hours after #33 — and the display mirror grew a fallback pointed the wrong way:
+
+```ts
+export function getTierLimits(tier: string): TierLimits {
+  if (tier in SEED_TIER_DEFAULTS) return SEED_TIER_DEFAULTS[tier];
+  // Unknown tier — return unlimited as safe default
+  return { maxProjects: null /* …everything on… */ };
+}
+```
+
+Read the comment. **Unknown tier equals unlimited.** On a paywall, "safe default" means the opposite of that. I wrote the word "safe" while writing fail-open into a billing boundary.
+
+## One Day Later I Threw It All Out
+
+[PR #39](https://github.com/rafay99-epic/envpilot.dev/pull/39) merged **2026-03-19T15:53:25Z** — roughly **28 hours** after #33. It's **+6311/−2535 across 76 files**.
+
+Its opening line: _"Implements a fully dynamic, database-driven feature registry and tier enforcement system replacing all hardcoded feature flags and tier limits."_
+
+The idea is one sentence long. **Features are a vocabulary in code; their values are rows in a database.** `SEED_FEATURES` declares that `secret_rotation` exists, is a boolean, belongs to the Security category. What `secret_rotation` is worth on the free tier is a `tierFeatures` row an admin can edit in a panel without a deploy.
+
+The deletion list in that PR body is my favourite part of it, because it's one line: _"`apps/web/src/lib/tier-limits.ts` — Replaced entirely by dynamic feature registry."_
+
+And the security posture inverted, in the same PR: _"Unknown/inactive features now default to DENY (was ALLOW)."_
+
+Here's the resolver's own docstring, which is still the best summary of the whole design that exists anywhere in the repo:
+
+```ts
+// convex/features/featureRegistry/resolver.ts
+/**
+ * Universal resolver for tier-based feature gating. Features are
+ * developer-seeded (via seedFeatureRegistry), configured per-tier
+ * by admins (via tierFeatures table), and enforced via a single
+ * resolver chain:
+ *
+ *   org → org.createdBy (owner) → userTiers → tierFeatures → featureRegistry.defaultValue
+ *
+ * Adding a new gatable feature:
+ *   1. Add an entry to SEED_FEATURES below
+ *   2. Call checkBooleanFeature/checkNumericLimit at the enforcement point
+ *   3. Done. No schema migration needed.
+ */
+```
+
+That docstring says "SEED_FEATURES below". It moved to `convex/lib/seedData.ts` during the [#95](https://github.com/rafay99-epic/envpilot.dev/pull/95) restructure and the comment never followed. Four months of me reading past it.
+
+<Mermaid name="features-as-data-resolver" />
+
+Green is the only exit that consults a price. Orange never looks at the org at all. Red is what an unknown key gets.
+
+**The bit I'd defend hardest:** values are stored as strings. `"true"`, `"false"`, `"50"`, `"null"`. One column, and `parseFeatureValue` turns `"null"` into JavaScript `null`, which means unlimited. Which is also what the kill switch returns. Unlimited and un-enforced are the same value by construction — that's not a coincidence I noticed later, it's the reason the switch is one line instead of a branch in every gate.
+
+## Seven Hours Later, The Registry Got Its First Real Bill
+
+[PR #41](https://github.com/rafay99-epic/envpilot.dev/pull/41) merged **2026-03-19T23:14:00Z** — just over **seven hours** after #39. Secret rotation. And it's the PR that invented the pattern I now can't build a feature without.
+
+From its body: _"**Cron-based monitoring**: Hourly scans detect expiring/expired secrets and send email reminders"_
+
+Think about what a plain boolean gate does there. Turn `secret_rotation` on for an org, and that org can now schedule unbounded hourly cron work and unbounded outbound email through Resend. The flag says _yes you may_. Nothing says _how many_.
+
+So rotation shipped with two entries: `secret_rotation` (boolean) and `secret_rotation_limit` (numeric, free 7, pro unlimited). That's the dual gate, and it's in `CLAUDE.md` as a rule now: if a feature causes recurring background cost per row, it gets a boolean **and** a counter.
+
+```ts
+// convex/features/variables/mutations.ts
+if (args.rotationFrequencyDays && args.rotationFrequencyDays > 0) {
+  const rotationCheck = await checkBooleanFeature(
+    ctx.db,
+    project.organizationId,
+    "secret_rotation",
+    gate
+  );
+  if (!rotationCheck.allowed)
+    throw new Error("Secret rotation requires a higher tier…");
+
+  // Check rotation-enabled variable limit. Limit-first: skips the
+  // org-wide fan-out entirely when rotation is unlimited for this tier.
+  const limitCheck = await checkCountedLimit(
+    ctx.db,
+    project.organizationId,
+    "secret_rotation_limit",
+    (limit) =>
+      countRotationEnabledVariables(
+        ctx.db,
+        project.organizationId,
+        undefined,
+        limit
+      ),
+    gate
+  );
+}
+```
+
+<Mermaid name="features-as-data-dual-gate" />
+
+Follow the green branch: on an unlimited tier the counting function is never called at all.
+
+**The detail I'm quietly proud of:** `checkCountedLimit` takes a _function_, not a number, and passes the limit into it. So `countRotationEnabledVariables` can stop early — `if (limit !== undefined && count >= limit) break; // capacity provably full — no need to scan remaining projects`. You don't scan an org to discover it's over a cap of 7.
+
+Now the part where the pattern sends me its invoice.
+
+## The Dual Gate Was Reading Everything Twice
+
+Two gate calls, back to back, for the same org. Each one independently re-fetched `adminSettings`, `organizations`, and `subscriptionGracePeriods`. Every gated mutation. **Double.**
+
+[PR #81](https://github.com/rafay99-epic/envpilot.dev/pull/81) — merged **2026-07-05**, +2290/−4188 — fixed it with `resolveOrgGateContext`: resolve the org, the owner's tier, the grace-period override once per handler, then thread that `OrgGateContext` through every gate helper. Optional parameter, so nothing had to change at once.
+
+Wave two of the same effort, [#109](https://github.com/rafay99-epic/envpilot.dev/pull/109), did the frontend, which had the identical disease. `useFeatureGate` used to open one Convex subscription **per feature key**, and, in its own comment, _"a typical page held 2–5 of those, each re-executing the full org→owner→tier chain on any org write."_ Now it reads a Zustand store hydrated by one `getResolvedFeatures` subscription.
+
+**The lesson:** making features cheap to _add_ made them expensive to _check_. Nothing about the design warned me — every individual gate call looked like one line.
+
+## The Most Dangerous Switch in the Product Logs to stdout
+
+`isEnforcementEnabledFromDb` reads an `adminSettings` row keyed `tierEnforcement`, falling back to the `ENFORCE_TIER_LIMITS` Convex env var — and the env-var fallback it delegates to carries the comment _"Missing env var = disabled (pre-alpha safe)."_ No config means nobody is charged for anything.
+
+It's a `<Switch>` in the admin panel, sitting next to the payments toggle. Flip it and the entire paywall for every org evaporates. Here is its audit trail, in full:
+
+```ts
+// convex/features/admin/settings.ts
+if (args.key === "tierEnforcement" || args.key === "paymentsEnabled") {
+  console.warn(
+    `[SECURITY AUDIT] Admin setting toggled: key=${args.key}, value=${args.value}, …`
+  );
+}
+```
+
+The string says `[SECURITY AUDIT]`. It's a `console.warn`. PR #39 added `system.enforcement_toggled` to the schema's audit action union — the row type exists, and nothing writes it.
+
+That one's on me and it's still open.
+
+## Code Stopped Being the Source of Truth
+
+Every convex deploy runs a seed loop in `.github/workflows/deploy-convex.yml`, with the reasoning above it: _"a release that introduces a new gated feature (e.g. `cicd_service_tokens`) is registered the moment its code is live — otherwise gates resolve to 'denied' until someone remembers to seed manually."_ Deny-by-default plus late seeding equals an outage for the people paying you.
+
+Two of the handlers in that loop are the registry's, and only one of them is an upsert.
+
+`seed-feature-registry` genuinely upserts — six-field drift comparison, then patch or insert. `seed-tier-features` does not:
+
+```ts
+// convex/features/admin/migrations.ts
+if (existing) {
+  skipped++;
+  continue;
+}
+await ctx.db.insert("tierFeatures", {
+  tierName,
+  featureKey,
+  value,
+  updatedAt: Date.now(),
+});
+```
+
+**Insert-or-skip.** That's deliberate: an admin editing a price in the panel must not have it stomped by the next deploy. The price is that a wrong value in `tierConfigs` can never be corrected by shipping code. It only reaches a fresh deployment.
+
+I got caught by exactly that in [#125](https://github.com/rafay99-epic/envpilot.dev/pull/125), and the commit message is the confession:
+
+> Seed config: free tier `cli_access`/`extension_access` -> true (matches the values already set in the prod admin panel; a fresh reseed can no longer revert them), registry defaultValue aligned
+
+That's source code being patched to agree with a database. Which is what "features as data" means when you say it out loud.
+
+## The Sixth Step Nobody Wrote
+
+Adding a feature is now five mechanical moves in five files.
+
+<Mermaid name="features-as-data-checklist" />
+
+The red box is not a step I skipped writing about. It's a step that doesn't exist.
+
+[PR #147](https://github.com/rafay99-epic/envpilot.dev/pull/147) retired the `cicd_service_tokens` flag by deleting nine lines from `SEED_FEATURES` and two lines from `tierConfigs`. That's the whole removal. The seed handlers only insert and patch — nothing prunes, nothing deactivates. So every deployed environment still carries an orphan `featureRegistry` row and two orphan `tierFeatures` rows for a feature whose code is gone.
+
+`isActive` exists. `toggleFeatureActive` exists. Retirement uses neither.
+
+**Deleting a flag from code is a no-op on the database.** I built a system where declaring a feature is one line, and never built the inverse.
+
+There's a related tell in the same direction. PR #39 shipped with a "What Did NOT Change" list, flagging `sso_enabled` as _"Defined in registry but no enforcement or UI"_ and `priority_support` as _"No backend enforcement (informational badge only)"_. Four months later, both are still in `SEED_FEATURES` with free and pro values. A registry makes it cheap to _declare_ a feature you haven't built. That's the flip side of the whole thesis, and the pricing page reads from the registry.
+
+## Where I Actually Land
+
+The shape held. Thirty feature keys today, **35 call sites** across **18** convex files, and every one of the features I've added since March — sharing, security hold, the public API, the MCP server — was one seed entry, two config lines, and a gate call. Zero schema migrations. That's the payoff and it's real.
+
+It held so well I did it twice. [PR #128](https://github.com/rafay99-epic/envpilot.dev/pull/128) made roles data the same way — `roleRegistry` table, capabilities as a fixed code catalog, fail-closed on unknown, system roles upserted and custom roles insert-only. Same shape, four months apart. `SEED_FEATURES` and `SEED_ROLES` now literally share a file, and share a line in the deploy workflow.
+
+But the honest scorecard is that moving policy into a database moved my bugs with it. Config that can't be corrected from code. Rows that outlive the code that created them. A kill switch whose audit trail is stdout. None of those were possible when the whole thing was an object literal — that version was insecure, but it was never _ambiguous_.
+
+If you're about to build one of these: write the delete path on day one. You will not want it until you have three dead flags in production, and by then it's an archaeology job.
+
+Until then, seed your registries and prune your orphans, nerds.
