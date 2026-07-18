@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -9,6 +9,9 @@ import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Textarea";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { QueryState } from "@/components/ui/QueryState";
+import { toast } from "@/components/ui/Toast";
+import { useFilteredList } from "@/hooks/useFilteredList";
 import { timeAgo } from "@/lib/utils";
 import { ShieldBan, ShieldCheck } from "lucide-react";
 import { useConfirmStore } from "@/stores/confirm-store";
@@ -35,16 +38,11 @@ function UsersPage() {
 
   const [search, setSearch] = useState("");
 
-  const filteredUsers = useMemo(() => {
-    if (!users) return undefined;
-    if (!search.trim()) return users;
-    const term = search.toLowerCase();
-    return (users as UserRow[]).filter(
-      (u) =>
-        (u.name && u.name.toLowerCase().includes(term)) ||
-        (u.email && u.email.toLowerCase().includes(term))
-    );
-  }, [users, search]);
+  const filteredUsers = useFilteredList(
+    users as UserRow[] | undefined,
+    search,
+    (u) => [u.name, u.email]
+  );
 
   const [banModal, setBanModal] = useState<{
     userId: Id<"users">;
@@ -77,7 +75,10 @@ function UsersPage() {
     try {
       await unbanUser({ userId });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to unban user");
+      toast(
+        "error",
+        err instanceof Error ? err.message : "Failed to unban user"
+      );
     }
   };
 
@@ -167,13 +168,11 @@ function UsersPage() {
         </p>
       )}
 
-      <DataTable
-        columns={columns}
-        data={filteredUsers as unknown as UserRow[] | undefined}
-        isLoading={!users}
-        rowKey={(row) => row._id}
-        emptyMessage="No users found"
-      />
+      <QueryState data={filteredUsers} empty={{ message: "No users found" }}>
+        {(rows) => (
+          <DataTable columns={columns} data={rows} rowKey={(row) => row._id} />
+        )}
+      </QueryState>
 
       <Modal
         isOpen={!!banModal}

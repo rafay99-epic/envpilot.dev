@@ -3,7 +3,7 @@ import { useAuth } from "@workos-inc/authkit-react";
 import { api } from "@convex/_generated/api";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Layout } from "@/components/layout/Layout";
-import { Spinner } from "@/components/ui/Spinner";
+import { TerminalLoading } from "@/components/ui/Spinner";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthGate,
@@ -19,8 +19,8 @@ function AuthGate() {
 
   if (isLoading || (user && whoami === undefined)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <Spinner />
+      <div className="min-h-screen bg-zinc-950">
+        <TerminalLoading label="authenticating" fullPage />
       </div>
     );
   }

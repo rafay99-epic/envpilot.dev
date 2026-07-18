@@ -5,8 +5,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { Input } from "@/components/ui/Input";
+import { QueryState } from "@/components/ui/QueryState";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { useConfirmStore } from "@/stores/confirm-store";
 import {
@@ -22,7 +22,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  FileText,
   ArrowLeft,
   Eye,
   Code,
@@ -219,132 +218,139 @@ function ListView() {
       </div>
 
       {/* Entries */}
-      {!entries ? (
-        <Spinner />
-      ) : !filteredEntries || filteredEntries.length === 0 ? (
-        <EmptyState
-          icon={<FileText className="h-8 w-8" />}
-          title="No changelog entries"
-          description={
+      <QueryState
+        data={filteredEntries}
+        empty={{
+          message:
             filterType !== "all"
               ? `No ${TYPE_CONFIG[filterType].label.toLowerCase()} entries found.`
-              : "Create your first changelog entry to get started."
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {filteredEntries.map((entry) => {
-            const entryTypes = getEntryTypes(entry);
-            const primaryConfig = TYPE_CONFIG[entryTypes[0] as ChangelogType];
-            return (
-              <Card
-                key={entry._id}
-                className="group flex items-start gap-4 transition-colors hover:border-zinc-700"
-              >
-                {/* Timeline dot */}
-                <div className="flex flex-col items-center pt-1">
-                  <div
-                    className={cn(
-                      "h-3 w-3 rounded-full",
-                      primaryConfig?.bgColor ?? "bg-zinc-700",
-                      primaryConfig?.borderColor
-                        ? `border ${primaryConfig.borderColor}`
-                        : "border border-zinc-600"
-                    )}
-                  />
-                  <div className="mt-2 h-full w-px bg-zinc-800" />
-                </div>
-
-                {/* Content */}
-                <div className="min-w-0 flex-1">
-                  {/* Meta row */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-zinc-500">
-                      {formatDate(entry.publishedAt ?? entry._creationTime)}
-                    </span>
-                    <span className="text-zinc-700">&middot;</span>
-                    {entry.version && (
-                      <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500">
-                        {entry.version}
-                      </span>
-                    )}
-                    {/* Type badges — render all types */}
-                    {entryTypes.map((t) => {
-                      const tc = TYPE_CONFIG[t as ChangelogType];
-                      return tc ? (
-                        <Badge key={t} variant={typeBadgeVariant(t)}>
-                          {tc.prefix} {tc.label}
-                        </Badge>
-                      ) : null;
-                    })}
-                    {/* Publish status */}
-                    {entry.publishStatus === "scheduled" ? (
-                      <Badge variant="info">
-                        <CalendarClock className="mr-1 h-2.5 w-2.5" />
-                        Scheduled
-                        {entry.scheduledFor
-                          ? ` ${formatDateTime(entry.scheduledFor)}`
-                          : ""}
-                      </Badge>
-                    ) : entry.isPublished ? (
-                      <Badge variant="success">
-                        <Globe className="mr-1 h-2.5 w-2.5" />
-                        Published
-                      </Badge>
-                    ) : (
-                      <Badge variant="warning">
-                        <GlobeLock className="mr-1 h-2.5 w-2.5" />
-                        Draft
-                      </Badge>
-                    )}
+              : "Create your first changelog entry to get started.",
+        }}
+      >
+        {(list) => (
+          <div className="space-y-3">
+            {list.map((entry) => {
+              const entryTypes = getEntryTypes(entry);
+              const primaryConfig = TYPE_CONFIG[entryTypes[0] as ChangelogType];
+              return (
+                <Card
+                  key={entry._id}
+                  className="group flex items-start gap-4 transition-colors hover:border-zinc-700"
+                >
+                  {/* Timeline dot */}
+                  <div className="flex flex-col items-center pt-1">
+                    <div
+                      className={cn(
+                        "h-3 w-3 rounded-full",
+                        primaryConfig?.bgColor ?? "bg-zinc-700",
+                        primaryConfig?.borderColor
+                          ? `border ${primaryConfig.borderColor}`
+                          : "border border-zinc-600"
+                      )}
+                    />
+                    <div className="mt-2 h-full w-px bg-zinc-800" />
                   </div>
 
-                  {/* Title */}
-                  <h3 className="mt-2 flex items-center gap-1.5 font-medium text-zinc-100">
-                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
-                    {entry.title}
-                  </h3>
+                  {/* Content */}
+                  <div className="min-w-0 flex-1">
+                    {/* Meta row */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-zinc-500">
+                        {formatDate(entry.publishedAt ?? entry._creationTime)}
+                      </span>
+                      <span className="text-zinc-700">&middot;</span>
+                      {entry.version && (
+                        <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                          {entry.version}
+                        </span>
+                      )}
+                      {/* Type badges — render all types */}
+                      {entryTypes.map((t) => {
+                        const tc = TYPE_CONFIG[t as ChangelogType];
+                        return tc ? (
+                          <Badge key={t} variant={typeBadgeVariant(t)}>
+                            {tc.prefix} {tc.label}
+                          </Badge>
+                        ) : null;
+                      })}
+                      {/* Publish status */}
+                      {entry.publishStatus === "scheduled" ? (
+                        <Badge variant="info">
+                          <CalendarClock className="mr-1 h-2.5 w-2.5" />
+                          Scheduled
+                          {entry.scheduledFor
+                            ? ` ${formatDateTime(entry.scheduledFor)}`
+                            : ""}
+                        </Badge>
+                      ) : entry.isPublished ? (
+                        <Badge variant="success">
+                          <Globe className="mr-1 h-2.5 w-2.5" />
+                          Published
+                        </Badge>
+                      ) : (
+                        <Badge variant="warning">
+                          <GlobeLock className="mr-1 h-2.5 w-2.5" />
+                          Draft
+                        </Badge>
+                      )}
+                    </div>
 
-                  {/* Content preview */}
-                  <p className="mt-1.5 line-clamp-2 text-sm text-zinc-500">
-                    {entry.content.replace(/[#*`\[\]]/g, "").slice(0, 200)}
-                  </p>
-                </div>
+                    {/* Title */}
+                    <h3 className="mt-2 flex items-center gap-1.5 font-medium text-zinc-100">
+                      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                      {entry.title}
+                    </h3>
 
-                {/* Actions */}
-                <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleTogglePublish(entry._id)}
-                    title={entry.isPublished ? "Unpublish" : "Publish"}
-                  >
-                    {entry.isPublished ? (
-                      <GlobeLock className="h-3.5 w-3.5" />
-                    ) : (
-                      <Globe className="h-3.5 w-3.5 text-emerald-400" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(entry)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(entry._id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                    {/* Content preview */}
+                    <p className="mt-1.5 line-clamp-2 text-sm text-zinc-500">
+                      {entry.content.replace(/[#*`\[\]]/g, "").slice(0, 200)}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleTogglePublish(entry._id)}
+                      title={entry.isPublished ? "Unpublish" : "Publish"}
+                      aria-label={
+                        entry.isPublished
+                          ? `Unpublish ${entry.title}`
+                          : `Publish ${entry.title}`
+                      }
+                    >
+                      {entry.isPublished ? (
+                        <GlobeLock className="h-3.5 w-3.5" />
+                      ) : (
+                        <Globe className="h-3.5 w-3.5 text-emerald-400" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(entry)}
+                      title="Edit"
+                      aria-label={`Edit ${entry.title}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(entry._id)}
+                      title="Delete"
+                      aria-label={`Delete ${entry.title}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }
@@ -525,12 +531,12 @@ function EditorView() {
         {/* Left: Editor area */}
         <div className="flex min-h-0 flex-col overflow-hidden">
           {/* Title */}
-          <input
+          <Input
             type="text"
             value={form.title}
             onChange={(e) => updateField("title", e.target.value)}
             placeholder="Changelog entry title..."
-            className="mb-4 w-full border-b border-zinc-800 bg-transparent pb-3 text-xl font-semibold text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none"
+            className="mb-4 rounded-none border-x-0 border-t-0 border-b border-zinc-800 bg-transparent px-0 pb-3 text-xl font-semibold text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:ring-0"
           />
 
           {/* Editor tabs + toolbar */}
@@ -664,12 +670,12 @@ function EditorView() {
             <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-zinc-500">
               Version
             </label>
-            <input
+            <Input
               type="text"
               value={form.version}
               onChange={(e) => updateField("version", e.target.value)}
               placeholder="v1.8.0"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="bg-zinc-950"
             />
           </div>
 
@@ -758,14 +764,14 @@ function EditorView() {
             {/* Date/time picker when scheduling */}
             {form.publishMode === "scheduled" && (
               <div className="mt-3 space-y-2">
-                <input
+                <Input
                   type="datetime-local"
                   value={form.scheduledFor ?? ""}
                   onChange={(e) =>
                     updateField("scheduledFor", e.target.value || null)
                   }
                   min={new Date().toISOString().slice(0, 16)}
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:invert"
+                  className="bg-zinc-950 focus:border-blue-500 focus:ring-blue-500/30 [&::-webkit-calendar-picker-indicator]:invert"
                 />
                 {form.scheduledFor && (
                   <p className="text-[10px] text-zinc-500">

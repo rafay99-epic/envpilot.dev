@@ -6,14 +6,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { Spinner } from "@/components/ui/Spinner";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDate } from "@/lib/utils";
+import { Select } from "@/components/ui/Select";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
+import { QueryState } from "@/components/ui/QueryState";
+import { useFilteredList } from "@/hooks/useFilteredList";
+import { cn, formatDate } from "@/lib/utils";
 import {
-  Lightbulb,
   Trash2,
   Save,
-  Search,
   ThumbsUp,
   GripVertical,
   ArrowRight,
@@ -45,7 +47,7 @@ import {
   type DragOverEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/feature-requests")({
   component: FeatureRequestsPage,
@@ -53,6 +55,23 @@ export const Route = createFileRoute("/_authenticated/feature-requests")({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RequestItem = Record<string, any>;
+
+type BadgeVariant =
+  | "default"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "purple";
+
+const STATUS_BADGE_VARIANT: Record<FeatureRequestStatus, BadgeVariant> = {
+  submitted: "default",
+  under_review: "info",
+  planned: "purple",
+  in_progress: "warning",
+  completed: "success",
+  declined: "danger",
+};
 
 function FeatureRequestsPage() {
   const requests = useAdminQuery(
@@ -105,6 +124,12 @@ function FeatureRequestsPage() {
       activationConstraint: { distance: 6 },
     })
   );
+
+  const filtered = useFilteredList(requests, search, (r) => [
+    r.title,
+    r.description,
+    r.category,
+  ]);
 
   const handleSaveNotes = async (requestId: Id<"featureRequests">) => {
     setSavingNoteId(requestId);
@@ -180,133 +205,25 @@ function FeatureRequestsPage() {
     createForm.description.trim().length > 0 &&
     !isSubmitting;
 
-  // Loading
-  if (!requests) return <Spinner />;
-
-  const filtered = search.trim()
-    ? requests.filter(
-        (r) =>
-          r.title.toLowerCase().includes(search.toLowerCase()) ||
-          (r.description ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          (r.category ?? "").toLowerCase().includes(search.toLowerCase())
-      )
-    : requests;
-
-  const byStatus = (status: FeatureRequestStatus) =>
-    filtered.filter((r) => r.status === status);
-
-  const activeItem = activeId ? requests.find((r) => r._id === activeId) : null;
-
-  const activeItemCol = activeItem
-    ? STATUS_COLUMNS.find((c) => c.value === activeItem.status)
-    : null;
-
-  const targetCol = overColumnId
-    ? STATUS_COLUMNS.find((c) => c.value === overColumnId)
-    : null;
-
-  // Detail modal item
-  const detailItem = expandedId
-    ? requests.find((r) => r._id === expandedId)
-    : null;
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-    setExpandedId(null);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const overId = event.over?.id as string | undefined;
-    if (!overId) {
-      setOverColumnId(null);
-      return;
-    }
-    const col = STATUS_COLUMNS.find((c) => c.value === overId);
-    if (col) {
-      setOverColumnId(col.value);
-    } else {
-      const overItem = requests.find((r) => r._id === overId);
-      if (overItem) {
-        setOverColumnId(overItem.status);
-      }
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    setOverColumnId(null);
-
-    if (!over) return;
-
-    const draggedId = active.id as string;
-    const overId = over.id as string;
-
-    let targetStatus: FeatureRequestStatus | null = null;
-    const col = STATUS_COLUMNS.find((c) => c.value === overId);
-    if (col) {
-      targetStatus = col.value;
-    } else {
-      const overItem = requests.find((r) => r._id === overId);
-      if (overItem) {
-        targetStatus = overItem.status as FeatureRequestStatus;
-      }
-    }
-
-    if (!targetStatus) return;
-
-    const draggedItem = requests.find((r) => r._id === draggedId);
-    if (!draggedItem || draggedItem.status === targetStatus) return;
-
-    updateStatus({
-      id: draggedId as Id<"featureRequests">,
-      status: targetStatus,
-    });
-  };
-
-  const handleDragCancel = () => {
-    setActiveId(null);
-    setOverColumnId(null);
-  };
-
   const openDetail = (req: RequestItem) => {
     setExpandedId(req._id);
     initNoteForId(req._id, (req.adminNotes as string) ?? "");
   };
 
-  // Empty state with create button
-  if (requests.length === 0 && !isCreating)
-    return (
-      <div>
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-zinc-100">
-            Feature Requests
-          </h1>
-          <Button size="sm" onClick={openCreator}>
-            <Plus className="h-3.5 w-3.5" />
-            Add Feature
-          </Button>
-        </div>
-        <EmptyState
-          icon={<Lightbulb className="h-8 w-8" />}
-          title="No feature requests"
-          description="Add your first feature to get started."
-        />
-      </div>
-    );
-
   return (
-    <div>
+    <div data-wide>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-100">
           Feature Requests
         </h1>
         <div className="flex items-center gap-2">
-          <span className="mr-1 text-sm text-zinc-500">
-            {requests.length} total
-          </span>
-          {requests.length > 0 && (
+          {requests && (
+            <span className="mr-1 text-sm text-zinc-500">
+              {requests.length} total
+            </span>
+          )}
+          {requests && requests.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleClearAll}>
               <Trash2 className="h-3.5 w-3.5" />
               Clear All
@@ -333,103 +250,190 @@ function FeatureRequestsPage() {
         />
       )}
 
-      {/* Search */}
-      <div className="relative mb-6 max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-        <Input
-          placeholder="Search requests..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      {/* Kanban Board */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
+      <QueryState
+        data={requests}
+        empty={{
+          message:
+            "No feature requests. Add your first feature to get started.",
+          when: (requests?.length ?? 0) === 0 && !isCreating,
+        }}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {STATUS_COLUMNS.map((col) => {
-            const items = byStatus(col.value);
-            const isDragOverThis =
-              overColumnId === col.value &&
-              activeId !== null &&
-              !items.some((i) => i._id === activeId);
+        {(reqs) => {
+          const byStatus = (status: FeatureRequestStatus) =>
+            (filtered ?? reqs).filter((r) => r.status === status);
 
-            return (
-              <KanbanColumn
-                key={col.value}
-                col={col}
-                items={items}
-                isDragOverThis={isDragOverThis}
-                isDragActive={activeId !== null}
-                onOpenDetail={openDetail}
-                handleDelete={handleDelete}
-                activeId={activeId}
+          const activeItem = activeId
+            ? reqs.find((r) => r._id === activeId)
+            : null;
+          const activeItemCol = activeItem
+            ? STATUS_COLUMNS.find((c) => c.value === activeItem.status)
+            : null;
+          const targetCol = overColumnId
+            ? STATUS_COLUMNS.find((c) => c.value === overColumnId)
+            : null;
+          const detailItem = expandedId
+            ? reqs.find((r) => r._id === expandedId)
+            : null;
+
+          const handleDragStart = (event: DragStartEvent) => {
+            setActiveId(event.active.id as string);
+            setExpandedId(null);
+          };
+
+          const handleDragOver = (event: DragOverEvent) => {
+            const overId = event.over?.id as string | undefined;
+            if (!overId) {
+              setOverColumnId(null);
+              return;
+            }
+            const col = STATUS_COLUMNS.find((c) => c.value === overId);
+            if (col) {
+              setOverColumnId(col.value);
+            } else {
+              const overItem = reqs.find((r) => r._id === overId);
+              if (overItem) setOverColumnId(overItem.status);
+            }
+          };
+
+          const handleDragEnd = (event: DragEndEvent) => {
+            const { active, over } = event;
+            setActiveId(null);
+            setOverColumnId(null);
+
+            if (!over) return;
+
+            const draggedId = active.id as string;
+            const overId = over.id as string;
+
+            let targetStatus: FeatureRequestStatus | null = null;
+            const col = STATUS_COLUMNS.find((c) => c.value === overId);
+            if (col) {
+              targetStatus = col.value;
+            } else {
+              const overItem = reqs.find((r) => r._id === overId);
+              if (overItem)
+                targetStatus = overItem.status as FeatureRequestStatus;
+            }
+
+            if (!targetStatus) return;
+
+            const draggedItem = reqs.find((r) => r._id === draggedId);
+            if (!draggedItem || draggedItem.status === targetStatus) return;
+
+            updateStatus({
+              id: draggedId as Id<"featureRequests">,
+              status: targetStatus,
+            });
+          };
+
+          const handleDragCancel = () => {
+            setActiveId(null);
+            setOverColumnId(null);
+          };
+
+          return (
+            <>
+              {/* Search */}
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search requests..."
+                className="mb-6 max-w-sm"
               />
-            );
-          })}
-        </div>
 
-        {/* Drag Overlay */}
-        <DragOverlay dropAnimation={null}>
-          {activeItem ? (
-            <div
-              className={`w-72 rotate-[1.5deg] rounded-lg border bg-zinc-900 p-3 shadow-lg transition-transform ${
-                targetCol && targetCol.value !== activeItemCol?.value
-                  ? `${targetCol.border} ${targetCol.glowShadow}`
-                  : "border-zinc-600 shadow-zinc-900/50"
-              }`}
-              style={{ willChange: "transform" }}
-            >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <h4 className="text-xs font-semibold leading-snug text-zinc-100">
-                  {activeItem.title}
-                </h4>
-                <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="purple">
-                  {activeItem.category ?? "general"}
-                </Badge>
-                <span className="flex items-center gap-0.5 text-[10px] text-zinc-400">
-                  <ThumbsUp className="h-2.5 w-2.5" />
-                  {activeItem.voteCount ?? 0}
-                </span>
-              </div>
-              {targetCol && targetCol.value !== activeItemCol?.value && (
-                <div className="mt-2.5 flex items-center gap-1.5 border-t border-zinc-800 pt-2">
-                  <ArrowRight className={`h-3 w-3 ${targetCol.dropText}`} />
-                  <span
-                    className={`text-[10px] font-semibold ${targetCol.dropText}`}
-                  >
-                    {targetCol.label}
-                  </span>
+              {/* Kanban Board */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {STATUS_COLUMNS.map((col) => {
+                    const items = byStatus(col.value);
+                    const isDragOverThis =
+                      overColumnId === col.value &&
+                      activeId !== null &&
+                      !items.some((i) => i._id === activeId);
+
+                    return (
+                      <KanbanColumn
+                        key={col.value}
+                        col={col}
+                        items={items}
+                        isDragOverThis={isDragOverThis}
+                        isDragActive={activeId !== null}
+                        onOpenDetail={openDetail}
+                        handleDelete={handleDelete}
+                        activeId={activeId}
+                      />
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
 
-      {/* Full-Screen Detail Modal */}
-      {detailItem && (
-        <DetailModal
-          req={detailItem}
-          onClose={() => setExpandedId(null)}
-          editingNotes={editingNotes}
-          setNoteForId={setNoteForId}
-          savingNoteId={savingNoteId}
-          handleSaveNotes={handleSaveNotes}
-          handleDelete={handleDelete}
-          updateStatus={updateStatus}
-        />
-      )}
+                {/* Drag Overlay */}
+                <DragOverlay dropAnimation={null}>
+                  {activeItem ? (
+                    <div
+                      className={`w-72 rotate-[1.5deg] rounded-lg border bg-zinc-900 p-3 shadow-lg transition-transform ${
+                        targetCol && targetCol.value !== activeItemCol?.value
+                          ? `${targetCol.border} ${targetCol.glowShadow}`
+                          : "border-zinc-600 shadow-zinc-900/50"
+                      }`}
+                      style={{ willChange: "transform" }}
+                    >
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <h4 className="text-xs font-semibold leading-snug text-zinc-100">
+                          {activeItem.title}
+                        </h4>
+                        <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="purple">
+                          {activeItem.category ?? "general"}
+                        </Badge>
+                        <span className="flex items-center gap-0.5 text-[10px] text-zinc-400">
+                          <ThumbsUp className="h-2.5 w-2.5" />
+                          {activeItem.voteCount ?? 0}
+                        </span>
+                      </div>
+                      {targetCol &&
+                        targetCol.value !== activeItemCol?.value && (
+                          <div className="mt-2.5 flex items-center gap-1.5 border-t border-zinc-800 pt-2">
+                            <ArrowRight
+                              className={`h-3 w-3 ${targetCol.dropText}`}
+                            />
+                            <span
+                              className={`text-[10px] font-semibold ${targetCol.dropText}`}
+                            >
+                              {targetCol.label}
+                            </span>
+                          </div>
+                        )}
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+
+              {/* Full-Screen Detail Modal */}
+              {detailItem && (
+                <DetailModal
+                  req={detailItem}
+                  onClose={() => setExpandedId(null)}
+                  editingNotes={editingNotes}
+                  setNoteForId={setNoteForId}
+                  savingNoteId={savingNoteId}
+                  handleSaveNotes={handleSaveNotes}
+                  handleDelete={handleDelete}
+                  updateStatus={updateStatus}
+                />
+              )}
+            </>
+          );
+        }}
+      </QueryState>
     </div>
   );
 }
@@ -460,7 +464,6 @@ function DetailModal({
   handleDelete,
   updateStatus,
 }: DetailModalProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
   const { confirm } = useConfirmStore();
   const currentCol = STATUS_COLUMNS.find((c) => c.value === req.status);
 
@@ -482,196 +485,164 @@ function DetailModal({
     onClose();
   };
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") safeClose();
-    };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [hasUnsavedNotes]);
-
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === overlayRef.current) safeClose();
-      }}
-    >
-      <div className="relative mx-4 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-zinc-800/60 px-6 py-5">
-          <div className="min-w-0 flex-1 pr-4">
-            <h2 className="text-lg font-semibold leading-snug text-zinc-100">
-              {req.title}
-            </h2>
-            <div className="mt-2.5 flex flex-wrap items-center gap-3">
-              {currentCol && (
-                <div
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${currentCol.border} ${currentCol.bg} text-zinc-200`}
-                >
-                  <span className={`h-2 w-2 rounded-full ${currentCol.dot}`} />
-                  {currentCol.label}
-                </div>
-              )}
-              <Badge variant="purple">{req.category ?? "general"}</Badge>
-              <span className="flex items-center gap-1 text-xs text-zinc-500">
-                <ThumbsUp className="h-3 w-3" />
-                {req.voteCount ?? 0} votes
-              </span>
+    <Modal isOpen onClose={safeClose} title={req.title} className="max-w-3xl">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        {currentCol && (
+          <Badge variant={STATUS_BADGE_VARIANT[currentCol.value]}>
+            {currentCol.label}
+          </Badge>
+        )}
+        <Badge variant="purple">{req.category ?? "general"}</Badge>
+        <span className="flex items-center gap-1 text-xs text-zinc-500">
+          <ThumbsUp className="h-3 w-3" />
+          {req.voteCount ?? 0} votes
+        </span>
+      </div>
+
+      <div className="max-h-[60vh] overflow-y-auto pr-1">
+        <div className="grid gap-6 lg:grid-cols-[1fr,240px]">
+          {/* Left */}
+          <div className="space-y-6">
+            {/* Description */}
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Description
+              </h3>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
+                {req.description ?? "No description provided."}
+              </p>
             </div>
-          </div>
-          <button
-            onClick={safeClose}
-            className="shrink-0 rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
 
-        {/* Body — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <div className="grid gap-6 lg:grid-cols-[1fr,240px]">
-            {/* Left */}
-            <div className="space-y-6">
-              {/* Description */}
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Description
-                </h3>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
-                  {req.description ?? "No description provided."}
-                </p>
-              </div>
-
-              {/* Status — Move to */}
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Move to
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {STATUS_COLUMNS.filter((s) => s.value !== req.status).map(
-                    (s) => (
-                      <button
-                        key={s.value}
-                        onClick={() =>
-                          updateStatus({ id: req._id, status: s.value })
-                        }
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-zinc-300 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] ${s.border} hover:${s.dropBg}`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+            {/* Status — Move to */}
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Move to
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_COLUMNS.filter((s) => s.value !== req.status).map(
+                  (s) => (
+                    <button
+                      key={s.value}
+                      onClick={() =>
+                        updateStatus({ id: req._id, status: s.value })
+                      }
+                      aria-label={`Move to ${s.label}`}
+                      className="transition-transform duration-150 hover:scale-[1.05] active:scale-[0.97]"
+                    >
+                      <Badge variant={STATUS_BADGE_VARIANT[s.value]}>
                         {s.label}
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-
-              {/* Admin Notes */}
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Admin Notes
-                </h3>
-                <Textarea
-                  id={`detail-notes-${req._id}`}
-                  value={editingNotes[req._id] ?? ""}
-                  onChange={(e) => setNoteForId(req._id, e.target.value)}
-                  placeholder="Implementation details, technical notes, blockers, decisions..."
-                  rows={6}
-                  className="text-sm"
-                />
-                <div className="mt-3 flex items-center gap-3">
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveNotes(req._id)}
-                    disabled={savingNoteId === req._id || !hasUnsavedNotes}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    {savingNoteId === req._id ? "Saving..." : "Save Notes"}
-                  </Button>
-                  {hasUnsavedNotes && (
-                    <span className="text-[11px] text-amber-400/80">
-                      Unsaved changes
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Right sidebar */}
-            <div className="space-y-5">
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  <User className="h-3 w-3" />
-                  Submitter
-                </h4>
-                <p className="text-sm text-zinc-300">
-                  {req.submitterName ?? "Anonymous"}
-                </p>
-                {req.submitterEmail && (
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {req.submitterEmail}
-                  </p>
+                      </Badge>
+                    </button>
+                  )
                 )}
               </div>
+            </div>
 
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  <Tag className="h-3 w-3" />
-                  Category
-                </h4>
-                <Badge variant="purple">{req.category ?? "general"}</Badge>
-              </div>
-
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  <Calendar className="h-3 w-3" />
-                  Created
-                </h4>
-                <p className="text-sm text-zinc-400">
-                  {formatDate(req._creationTime)}
-                </p>
-              </div>
-
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  <ThumbsUp className="h-3 w-3" />
-                  Votes
-                </h4>
-                <p className="text-sm text-zinc-300">{req.voteCount ?? 0}</p>
-              </div>
-
-              {/* ID */}
-              <div>
-                <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  ID
-                </h4>
-                <p className="break-all font-mono text-[10px] text-zinc-600">
-                  {req._id}
-                </p>
+            {/* Admin Notes */}
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Admin Notes
+              </h3>
+              <Textarea
+                id={`detail-notes-${req._id}`}
+                value={editingNotes[req._id] ?? ""}
+                onChange={(e) => setNoteForId(req._id, e.target.value)}
+                placeholder="Implementation details, technical notes, blockers, decisions..."
+                rows={6}
+                className="text-sm"
+              />
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  size="sm"
+                  onClick={() => handleSaveNotes(req._id)}
+                  disabled={savingNoteId === req._id || !hasUnsavedNotes}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {savingNoteId === req._id ? "Saving..." : "Save Notes"}
+                </Button>
+                {hasUnsavedNotes && (
+                  <span className="text-[11px] text-amber-400/80">
+                    Unsaved changes
+                  </span>
+                )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-zinc-800/60 px-6 py-4">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              handleDelete(req._id);
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete Feature
-          </Button>
-          <Button variant="outline" size="sm" onClick={safeClose}>
-            Close
-          </Button>
+          {/* Right sidebar */}
+          <div className="space-y-5">
+            <div>
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                <User className="h-3 w-3" />
+                Submitter
+              </h4>
+              <p className="text-sm text-zinc-300">
+                {req.submitterName ?? "Anonymous"}
+              </p>
+              {req.submitterEmail && (
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {req.submitterEmail}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                <Tag className="h-3 w-3" />
+                Category
+              </h4>
+              <Badge variant="purple">{req.category ?? "general"}</Badge>
+            </div>
+
+            <div>
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                <Calendar className="h-3 w-3" />
+                Created
+              </h4>
+              <p className="text-sm text-zinc-400">
+                {formatDate(req._creationTime)}
+              </p>
+            </div>
+
+            <div>
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                <ThumbsUp className="h-3 w-3" />
+                Votes
+              </h4>
+              <p className="text-sm text-zinc-300">{req.voteCount ?? 0}</p>
+            </div>
+
+            {/* ID */}
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                ID
+              </h4>
+              <p className="break-all font-mono text-[10px] text-zinc-600">
+                {req._id}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="mt-5 flex items-center justify-between border-t border-zinc-800/60 pt-4">
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => {
+            handleDelete(req._id);
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete Feature
+        </Button>
+        <Button variant="outline" size="sm" onClick={safeClose}>
+          Close
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -716,6 +687,7 @@ function CreatorPanel({
         </div>
         <button
           onClick={onDiscard}
+          aria-label="Discard new feature"
           className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
         >
           <X className="h-4 w-4" />
@@ -764,34 +736,18 @@ function CreatorPanel({
               className="text-sm"
             />
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-                Initial Status
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {STATUS_COLUMNS.map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => setCreateField("status", s.value)}
-                    className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-all duration-150 ${
-                      createForm.status === s.value
-                        ? `${s.border} ${s.bg} text-zinc-100 shadow-sm ${s.glowShadow}`
-                        : "border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${s.dot} ${
-                        createForm.status === s.value
-                          ? "opacity-100"
-                          : "opacity-50"
-                      }`}
-                    />
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Select
+              label="Initial Status"
+              id="create-status"
+              value={createForm.status}
+              onChange={(e) =>
+                setCreateField("status", e.target.value as FeatureRequestStatus)
+              }
+              options={STATUS_COLUMNS.map((s) => ({
+                value: s.value,
+                label: s.label,
+              }))}
+            />
 
             <p className="text-[11px] leading-relaxed text-zinc-600">
               Team features are submitted as &quot;Envpilot Team&quot; and will
@@ -846,70 +802,70 @@ function KanbanColumn({
 
   return (
     <div className="flex w-72 min-w-[288px] shrink-0 flex-col">
-      {/* Column Header */}
-      <div
-        className={`mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 ${
-          showDrop
-            ? `${col.dropBorder} ${col.dropBg} shadow-sm ${col.glowShadow}`
-            : `${col.border} ${col.bg}`
-        }`}
-      >
-        <span
-          className={`h-2.5 w-2.5 rounded-full transition-shadow duration-200 ${col.dot} ${
-            showDrop ? `shadow-[0_0_6px] ${col.glowShadow}` : ""
-          }`}
-        />
-        <span className="text-xs font-semibold text-zinc-200">{col.label}</span>
-        <span className="ml-auto rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-          {items.length}
-        </span>
-      </div>
-
-      {/* Droppable Area */}
-      <div
-        ref={setNodeRef}
-        className={`flex flex-1 flex-col gap-2 rounded-lg transition-all duration-200 ${
-          showDrop
-            ? `border border-dashed p-1.5 ${col.dropBorder} ${col.dropBg}`
-            : isDragActive
-              ? "border border-dashed border-zinc-800/50 p-1.5"
-              : "border border-transparent p-1.5"
-        }`}
-      >
-        {items.length === 0 && !showDrop ? (
-          <div
-            className={`flex flex-1 items-center justify-center rounded-lg border border-dashed py-10 transition-colors duration-200 ${
-              isDragActive ? "border-zinc-700" : "border-zinc-800"
-            }`}
-          >
-            <p className="text-[11px] text-zinc-600">No requests</p>
-          </div>
-        ) : (
-          <>
-            {items.map((req) => (
-              <DraggableCard
-                key={req._id}
-                req={req}
-                isBeingDragged={activeId === req._id}
-                onOpenDetail={() => onOpenDetail(req)}
-                handleDelete={handleDelete}
-              />
-            ))}
-            {showDrop && (
-              <div
-                className={`flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-5 transition-all duration-200 ${col.dropBorder}`}
-              >
-                <div
-                  className={`h-1 w-1 animate-pulse rounded-full ${col.dot}`}
-                />
-                <p className={`text-[10px] font-medium ${col.dropText}`}>
-                  Drop to move here
-                </p>
-              </div>
-            )}
-          </>
+      <Card
+        title={col.label}
+        className={cn(
+          "flex-1",
+          showDrop && `${col.dropBorder} ${col.glowShadow} shadow-sm`
         )}
-      </div>
+      >
+        <div className="mb-3 flex items-center gap-2">
+          <span
+            className={`h-2 w-2 rounded-full transition-shadow duration-200 ${col.dot} ${
+              showDrop ? `shadow-[0_0_6px] ${col.glowShadow}` : ""
+            }`}
+          />
+          <Badge variant={STATUS_BADGE_VARIANT[col.value]}>
+            {items.length}
+          </Badge>
+        </div>
+
+        {/* Droppable Area */}
+        <div
+          ref={setNodeRef}
+          className={`flex min-h-40 flex-1 flex-col gap-2 rounded-lg transition-all duration-200 ${
+            showDrop
+              ? `border border-dashed p-1.5 ${col.dropBorder} ${col.dropBg}`
+              : isDragActive
+                ? "border border-dashed border-zinc-800/50 p-1.5"
+                : "border border-transparent p-1.5"
+          }`}
+        >
+          {items.length === 0 && !showDrop ? (
+            <div
+              className={`flex flex-1 items-center justify-center rounded-lg border border-dashed py-10 transition-colors duration-200 ${
+                isDragActive ? "border-zinc-700" : "border-zinc-800"
+              }`}
+            >
+              <p className="text-[11px] text-zinc-600">No requests</p>
+            </div>
+          ) : (
+            <>
+              {items.map((req) => (
+                <DraggableCard
+                  key={req._id}
+                  req={req}
+                  isBeingDragged={activeId === req._id}
+                  onOpenDetail={() => onOpenDetail(req)}
+                  handleDelete={handleDelete}
+                />
+              ))}
+              {showDrop && (
+                <div
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border border-dashed py-5 transition-all duration-200 ${col.dropBorder}`}
+                >
+                  <div
+                    className={`h-1 w-1 animate-pulse rounded-full ${col.dot}`}
+                  />
+                  <p className={`text-[10px] font-medium ${col.dropText}`}>
+                    Drop to move here
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -977,7 +933,7 @@ function DraggableCard({
               <button
                 onClick={() => handleDelete(req._id)}
                 className="rounded p-0.5 text-zinc-700 opacity-0 transition-all group-hover/card:opacity-100 hover:bg-red-500/10 hover:text-red-400"
-                aria-label="Delete"
+                aria-label="Delete feature request"
               >
                 <Trash2 className="h-3 w-3" />
               </button>

@@ -141,11 +141,11 @@ export const listMigrations = query({
       {
         name: "migrate-service-tokens",
         description:
-          "Copies every serviceTokens row into the generalized apiKeys table (scope = [projectId], environments, resources ['variables']), preserving tokenHash/createdBy/createdAt/lastUsedAt/revoked*. Idempotent — skips rows whose tokenHash already exists in apiKeys. serviceTokens is NOT dropped; cicd/pull.ts's _authorizePull looks up apiKeys first and falls back to serviceTokens for any row not yet migrated.",
-        category: "One-Time Migrations",
+          "Copies every serviceTokens row into the generalized apiKeys table (scope = [projectId], environments, resources ['variables']), preserving tokenHash/createdBy/createdAt/lastUsedAt/revoked*. Idempotent — skips rows whose tokenHash already exists in apiKeys. NOT a one-time migration: serviceTokens still receives live inserts from the CI/CD tab, so re-run this whenever new tokens are created there. Retiring serviceTokens creation is a separate decision.",
+        category: "Active Bridge",
         priority: 4,
         destructive: false,
-        runOnce: true,
+        runOnce: false,
       },
     ] as Array<{
       name: string;

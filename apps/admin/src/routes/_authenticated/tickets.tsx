@@ -1,19 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useState, useMemo } from "react";
+import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Select";
-import { Spinner } from "@/components/ui/Spinner";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { QueryState } from "@/components/ui/QueryState";
+import { DataTable, type Column } from "@/components/ui/DataTable";
 import { formatDateTime } from "@/lib/utils";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { toast } from "@/components/ui/Toast";
+import { useFilteredList } from "@/hooks/useFilteredList";
 import { Ticket } from "lucide-react";
+import type { Doc } from "@convex/_generated/dataModel";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
   component: TicketsPage,
 });
 
+type TicketDoc = Doc<"supportTickets">;
 type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 
 const STATUS_OPTIONS = [
@@ -47,8 +51,6 @@ function priorityBadgeVariant(priority: string) {
       return "danger" as const;
     case "medium":
       return "warning" as const;
-    case "low":
-      return "default" as const;
     default:
       return "default" as const;
   }
@@ -62,8 +64,6 @@ function statusBadgeVariant(status: string) {
       return "warning" as const;
     case "resolved":
       return "success" as const;
-    case "closed":
-      return "default" as const;
     default:
       return "default" as const;
   }
@@ -92,41 +92,87 @@ function TicketsPage() {
       })
     : undefined;
 
-  const filteredTickets = useMemo(() => {
-    if (!tickets) return undefined;
-    if (!search.trim()) return tickets;
-    const term = search.toLowerCase();
-    return tickets.filter(
-      (t) =>
-        (t.subject && t.subject.toLowerCase().includes(term)) ||
-        (t.email && t.email.toLowerCase().includes(term)) ||
-        (t.status && t.status.toLowerCase().includes(term))
-    );
-  }, [tickets, search]);
+  const filteredTickets = useFilteredList(tickets, search, (t) => [
+    t.subject,
+    t.email,
+    t.status,
+  ]);
+
+  const handleStatusChange = async (
+    ticket: TicketDoc,
+    status: TicketStatus
+  ) => {
+    try {
+      await updateStatus({ id: ticket._id, status });
+    } catch (err) {
+      toast(
+        "error",
+        err instanceof Error ? err.message : "Failed to update ticket status"
+      );
+    }
+  };
+
+  const columns: Column<TicketDoc>[] = [
+    { key: "name", header: "Name" },
+    { key: "email", header: "Email", className: "text-zinc-400" },
+    {
+      key: "category",
+      header: "Category",
+      render: (t) => <Badge variant="purple">{t.category}</Badge>,
+    },
+    { key: "subject", header: "Subject" },
+    {
+      key: "priority",
+      header: "Priority",
+      render: (t) => (
+        <Badge variant={priorityBadgeVariant(t.priority)}>{t.priority}</Badge>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (t) => (
+        <div
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Badge variant={statusBadgeVariant(t.status)}>{t.status}</Badge>
+          <Select
+            aria-label={`Change status for ticket ${t.subject}`}
+            options={STATUS_CHANGE_OPTIONS}
+            value={t.status}
+            onChange={(e) =>
+              handleStatusChange(t, e.target.value as TicketStatus)
+            }
+            className="w-auto py-1 text-xs"
+          />
+        </div>
+      ),
+    },
+    {
+      key: "_creationTime",
+      header: "Date",
+      className: "text-zinc-400",
+      render: (t) => formatDateTime(t._creationTime),
+    },
+  ];
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
+      <h1 className="mb-6 font-mono text-2xl font-semibold text-zinc-100">
         Support Tickets
       </h1>
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <SearchInput
           value={search}
           onChange={setSearch}
           placeholder="Search tickets..."
           className="w-72"
         />
-        <span className="text-xs text-zinc-500">
-          {search.trim()
-            ? `${filteredTickets?.length ?? 0} of ${tickets?.length ?? 0} tickets`
-            : `${tickets?.length ?? 0} tickets`}
-        </span>
-      </div>
-
-      <div className="mb-4 flex gap-4">
         <div className="w-48">
           <Select
+            aria-label="Filter by status"
             options={STATUS_OPTIONS}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -134,103 +180,43 @@ function TicketsPage() {
         </div>
         <div className="w-48">
           <Select
+            aria-label="Filter by category"
             options={CATEGORY_OPTIONS}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           />
         </div>
+        <span className="font-mono text-xs uppercase tracking-wider text-zinc-500">
+          {search.trim()
+            ? `${filteredTickets?.length ?? 0} of ${tickets?.length ?? 0} tickets`
+            : `${tickets?.length ?? 0} tickets`}
+        </span>
       </div>
 
-      {!filteredTickets ? (
-        <Spinner />
-      ) : filteredTickets.length === 0 ? (
-        <EmptyState
-          icon={<Ticket className="h-8 w-8" />}
-          title="No tickets found"
-        />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/50">
-              <tr>
-                <th className="px-4 py-3 font-medium text-zinc-400">Name</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Email</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">
-                  Category
-                </th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Subject</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">
-                  Priority
-                </th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Status</th>
-                <th className="px-4 py-3 font-medium text-zinc-400">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filteredTickets.map((ticket) => (
-                <Fragment key={ticket._id}>
-                  <tr
-                    className="cursor-pointer transition-colors hover:bg-zinc-800/30"
-                    onClick={() =>
-                      setExpandedId(
-                        expandedId === ticket._id ? null : ticket._id
-                      )
-                    }
-                  >
-                    <td className="px-4 py-3 text-zinc-300">{ticket.name}</td>
-                    <td className="px-4 py-3 text-zinc-400">{ticket.email}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="purple">{ticket.category}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">
-                      {ticket.subject}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={priorityBadgeVariant(ticket.priority)}>
-                        {ticket.priority}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={ticket.status}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          updateStatus({
-                            id: ticket._id,
-                            status: e.target.value as TicketStatus,
-                          });
-                        }}
-                        className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
-                      >
-                        {STATUS_CHANGE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400">
-                      {formatDateTime(ticket._creationTime)}
-                    </td>
-                  </tr>
-                  {expandedId === ticket._id && (
-                    <tr key={`${ticket._id}-body`}>
-                      <td colSpan={7} className="bg-zinc-900/30 px-6 py-4">
-                        <p className="mb-1 text-xs font-medium text-zinc-400">
-                          Message
-                        </p>
-                        <p className="whitespace-pre-wrap text-sm text-zinc-300">
-                          {ticket.message}
-                        </p>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <QueryState
+        data={filteredTickets}
+        empty={{ message: "No tickets found" }}
+      >
+        {(rows) => (
+          <DataTable
+            columns={columns}
+            data={rows}
+            rowKey={(t) => t._id}
+            expandedId={expandedId}
+            onExpandedChange={setExpandedId}
+            renderExpanded={(t) => (
+              <div>
+                <p className="mb-1 font-mono text-xs uppercase tracking-wider text-zinc-500">
+                  Message
+                </p>
+                <p className="whitespace-pre-wrap text-sm text-zinc-300">
+                  {t.message}
+                </p>
+              </div>
+            )}
+          />
+        )}
+      </QueryState>
     </div>
   );
 }

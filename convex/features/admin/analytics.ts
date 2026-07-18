@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "../../_generated/server";
 import { requireAdminAction } from "./auth";
 
@@ -8,7 +8,9 @@ function getUmamiConfig() {
   const apiKey = process.env.UMAMI_API_KEY;
   const websiteId = process.env.UMAMI_WEBSITE_ID;
   if (!apiKey || !websiteId) {
-    throw new Error(
+    // ConvexError so the message survives prod redaction — the client's
+    // "not configured" detection depends on reading this text.
+    throw new ConvexError(
       "Umami analytics not configured. Set UMAMI_API_KEY and UMAMI_WEBSITE_ID in Convex environment variables."
     );
   }
@@ -21,7 +23,7 @@ async function umamiGet(path: string, apiKey: string): Promise<unknown> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Umami API error ${res.status}: ${text}`);
+    throw new ConvexError(`Umami API error ${res.status}: ${text}`);
   }
   return res.json();
 }
