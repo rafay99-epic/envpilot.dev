@@ -17,17 +17,17 @@ export function toast(type: ToastType, message: string) {
 }
 
 const icons: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle2 className="h-4 w-4 text-emerald-400" />,
+  success: <CheckCircle2 className="h-4 w-4 text-green-400" />,
   error: <XCircle className="h-4 w-4 text-red-400" />,
   warning: <AlertTriangle className="h-4 w-4 text-amber-400" />,
   info: <Info className="h-4 w-4 text-blue-400" />,
 };
 
 const bgColors: Record<ToastType, string> = {
-  success: "border-emerald-600/30 bg-emerald-900/20",
-  error: "border-red-600/30 bg-red-900/20",
-  warning: "border-amber-600/30 bg-amber-900/20",
-  info: "border-blue-600/30 bg-blue-900/20",
+  success: "border-green-500/30 bg-zinc-900/90",
+  error: "border-red-500/30 bg-zinc-900/90",
+  warning: "border-amber-500/30 bg-zinc-900/90",
+  info: "border-blue-500/30 bg-zinc-900/90",
 };
 
 export function ToastContainer() {

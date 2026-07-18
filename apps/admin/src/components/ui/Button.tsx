@@ -3,15 +3,21 @@ import { cn } from "@/lib/utils";
 import type { ButtonHTMLAttributes } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-emerald-600 text-white hover:bg-emerald-700",
-        destructive: "bg-red-600 text-white hover:bg-red-700",
+        // primary — green tint
+        default:
+          "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
+        // danger — red tint
+        destructive:
+          "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
+        // secondary — zinc outline
         outline:
-          "border border-zinc-700 bg-transparent text-zinc-300 hover:bg-zinc-800",
-        ghost: "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+          "border-zinc-700 bg-transparent text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+        ghost:
+          "border-transparent text-zinc-400 hover:bg-green-500/5 hover:text-green-400",
       },
       size: {
         sm: "h-8 px-3 text-xs",

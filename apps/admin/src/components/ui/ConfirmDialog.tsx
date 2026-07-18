@@ -8,19 +8,19 @@ const VARIANT_STYLES = {
     icon: <Trash2 className="h-5 w-5 text-red-400" />,
     iconBg: "bg-red-500/10 border-red-500/20",
     confirmBtn:
-      "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500",
+      "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20",
   },
   warning: {
     icon: <AlertTriangle className="h-5 w-5 text-amber-400" />,
     iconBg: "bg-amber-500/10 border-amber-500/20",
     confirmBtn:
-      "bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500",
+      "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20",
   },
   default: {
     icon: <Info className="h-5 w-5 text-blue-400" />,
     iconBg: "bg-blue-500/10 border-blue-500/20",
     confirmBtn:
-      "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500",
+      "border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20",
   },
 };
 
@@ -65,7 +65,7 @@ export function ConfirmDialog() {
         if (e.target === overlayRef.current) close();
       }}
     >
-      <div className="w-full max-w-md animate-in fade-in zoom-in-95 rounded-lg border border-zinc-800 bg-zinc-900 shadow-2xl">
+      <div className="w-full max-w-md animate-in fade-in zoom-in-95 rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-2xl">
         <div className="p-6">
           {/* Icon + Title */}
           <div className="flex items-start gap-4">
@@ -87,10 +87,10 @@ export function ConfirmDialog() {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 border-t border-zinc-800 px-6 py-4">
+        <div className="flex justify-end gap-2 border-t border-zinc-700/50 px-6 py-4">
           <button
             onClick={() => onCancel?.()}
-            className="rounded-md border border-zinc-700 bg-transparent px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            className="rounded-lg border border-zinc-700 bg-transparent px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-300"
           >
             {cancelLabel}
           </button>
@@ -98,7 +98,7 @@ export function ConfirmDialog() {
             ref={confirmBtnRef}
             onClick={() => onConfirm?.()}
             className={cn(
-              "rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2",
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
               styles.confirmBtn
             )}
           >

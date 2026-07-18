@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,9 @@ interface ModalProps {
   className?: string;
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   isOpen,
   onClose,
@@ -18,13 +21,44 @@ export function Modal({
   className,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    if (!isOpen) return;
+
+    // Move focus into the dialog on open.
+    const dialog = dialogRef.current;
+    requestAnimationFrame(() => {
+      const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
+      (first ?? dialog)?.focus();
+    });
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialog) return;
+      // Trap focus within the dialog.
+      const nodes = dialog.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (nodes.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    if (isOpen) document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -38,16 +72,23 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
-          "w-full max-w-lg rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl",
+          "w-full max-w-lg rounded-lg border border-zinc-700/50 bg-zinc-900/90 shadow-xl focus:outline-none",
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
+        <div className="flex items-center justify-between border-b border-zinc-700/50 px-6 py-4">
+          <h2 id={titleId} className="text-lg font-semibold text-zinc-100">
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            className="rounded-md p-1 text-zinc-400 hover:bg-green-500/5 hover:text-green-400"
           >
             <X className="h-4 w-4" />
           </button>
