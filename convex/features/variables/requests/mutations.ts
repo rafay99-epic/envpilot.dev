@@ -386,22 +386,26 @@ export const cancelStaleMachineRequests = internalMutation({
   returns: v.number(),
   handler: async (ctx) => {
     const STALE_MS = 30 * 24 * 60 * 60 * 1000;
-    // Bounded batch per run — an unbounded collect() over all pendings
-    // could exceed transaction limits and roll the whole sweep back. The
-    // index's ascending _creationTime order puts the OLDEST pendings first,
-    // so daily runs always chew through the stale end of the queue.
+    // Bounded WRITE batch per run — an unbounded sweep could exceed
+    // transaction limits and roll the whole run back. The machine-origin
+    // filter runs inside the query so human pendings can never occupy the
+    // batch and starve stale machine rows behind them; ascending
+    // _creationTime order puts the OLDEST machine pendings first, so daily
+    // runs always chew through the stale end of the queue.
     const SWEEP_BATCH = 200;
     const cutoff = Date.now() - STALE_MS;
     const pending = await ctx.db
       .query("environmentVariableRequests")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .filter((q) => q.neq(q.field("requestedByKeyId"), undefined))
       .order("asc")
       .take(SWEEP_BATCH);
 
     let canceled = 0;
     for (const request of pending) {
-      if (request.requestedByKeyId === undefined) continue;
-      if (request.createdAt > cutoff) continue;
+      // Ordered oldest-first: the first fresh row means everything after
+      // it is fresher too.
+      if (request.createdAt > cutoff) break;
       await ctx.db.patch(request._id, {
         status: "canceled",
         reviewReason: "Auto-canceled: pending for more than 30 days",
