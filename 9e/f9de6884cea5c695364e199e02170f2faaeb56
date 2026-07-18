@@ -1,0 +1,21 @@
+apps/vscode-extension/src/services/tokenManager.ts
+  s_935701b4ac2c32::t_362aada061bade 37-41,47-49,54-56,70,79-87,91,112-113
+apps/vscode-extension/src/utils/singleFlight.ts
+  s_935701b4ac2c32::t_eb60bc0f52c29f 29-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9ef9de6884cea5c695364e199e02170f2faaeb56",
+  "prompts": {},
+  "sessions": {
+    "s_935701b4ac2c32": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad80fade59548214c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
