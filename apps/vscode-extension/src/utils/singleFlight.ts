@@ -27,6 +27,14 @@ export class SingleFlight {
   }
 
   /**
+   * Forget ONE tracked request so new callers for that key start fresh work.
+   * A promise already returned still settles for its original callers.
+   */
+  delete(key: string): void {
+    this.inflight.delete(key);
+  }
+
+  /**
    * Forget all tracked requests so new callers won't join one that is already
    * in flight (used when the session/token changes). Promises already returned
    * still settle for their original callers.

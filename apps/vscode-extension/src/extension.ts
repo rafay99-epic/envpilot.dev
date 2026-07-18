@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { existsSync } from "fs";
+import { chmod } from "fs/promises";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -550,9 +551,19 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Check for extension updates (non-blocking)
+  // Check for extension updates (non-blocking), then hourly — a window left
+  // open for days must still learn about a new hard block. refreshManifest's
+  // own hourly throttle keeps the actual fetches bounded.
   const versionCheckService = new VersionCheckService(context);
   versionCheckService.checkForUpdate();
+  const versionCheckTimer = setInterval(
+    () => void versionCheckService.checkForUpdate(),
+    60 * 60 * 1000
+  );
+  versionCheckTimer.unref?.();
+  context.subscriptions.push({
+    dispose: () => clearInterval(versionCheckTimer),
+  });
 
   // Subscribe to real-time revocation events for UI updates
   realTimeSyncService.onRevocationDetected(({ project, reason }) => {
@@ -692,6 +703,24 @@ async function handleSignIn(): Promise<void> {
   }
 }
 
+/**
+ * Release every managed file's local locks after a FULL sign-out: stop the
+ * revert watcher, restore normal permissions, drop the clipboard guard. Files
+ * stay on disk — sign-out is not revocation — but a signed-out user must not
+ * be left with read-only, clipboard-blocked files and no way to release them.
+ */
+async function releaseAllProtection(): Promise<void> {
+  for (const entry of await readManifest(getManifestPath())) {
+    fileProtectionService.unwatchFile(entry.path);
+    try {
+      await chmod(entry.path, 0o644);
+    } catch {
+      // File may already be gone.
+    }
+    clipboardGuardService.unprotectFile(entry.path);
+  }
+}
+
 async function handleSignOut(): Promise<void> {
   await authService.signOut();
   clearSentryUser();
@@ -729,6 +758,7 @@ async function handleSignOut(): Promise<void> {
       `Envpilot: Now signed in as ${remainingSession.user.email}.`
     );
   } else {
+    await releaseAllProtection();
     vscode.window.showInformationMessage("Signed out.");
   }
 }
@@ -816,6 +846,9 @@ async function switchToAccount(accountId: string): Promise<void> {
   }
 
   apiService.clearCache();
+  // The Convex socket is still authenticated as the PREVIOUS account — force
+  // it to re-run the token fetch so subscriptions come up under the new one.
+  convexService?.reauthenticate();
 
   await vscode.window.withProgress(
     {
@@ -893,6 +926,7 @@ async function handleSignOutAll(): Promise<void> {
   statusBarProvider.update();
   dashboardPanelProvider.refresh();
   await updateContextFlags();
+  await releaseAllProtection();
 
   vscode.window.showInformationMessage("Signed out of all Envpilot accounts.");
 }

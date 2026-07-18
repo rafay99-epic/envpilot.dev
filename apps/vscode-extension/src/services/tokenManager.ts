@@ -34,17 +34,26 @@ export class TokenManager {
    * first when it is expired or about to expire (<60s left). Returns null when
    * there is no session (signed out) or when a refresh definitively fails.
    *
+   * `force` skips the expiry shortcut and always refreshes (still single-
+   * flight) — used when the SERVER rejected a token that looks fresh locally.
+   * Accepts Convex's AuthTokenFetcher arg shape so this method can be passed
+   * directly to `client.setAuth`.
+   *
    * On a rejected refresh grant (`access_denied` — token revoked/expired) the
    * active account's credentials are cleared so the UI drops to signed-out. A
    * transient refresh failure (network/5xx/429) keeps the credentials and
    * returns null so the caller retries later.
    */
-  async getFreshToken(): Promise<string | null> {
+  async getFreshToken(
+    force?: boolean | { forceRefreshToken: boolean }
+  ): Promise<string | null> {
     const session = await this.storage.getAuthSession();
     if (!session) {
       return null;
     }
-    return this.freshTokenFor(session);
+    const forceRefresh =
+      typeof force === "object" ? force.forceRefreshToken : (force ?? false);
+    return this.freshTokenFor(session, forceRefresh);
   }
 
   /**
@@ -58,7 +67,7 @@ export class TokenManager {
   }
 
   /**
-   * Abandon any in-flight refreshes. Called from sign-out before clearing
+   * Abandon any in-flight refreshes. Called from sign-out-all before clearing
    * storage so a refresh that is mid-flight can't hand a stale token to a new
    * caller after the account is gone. (updateAccountTokens already refuses to
    * resurrect a removed account, so this is belt-and-braces.)
@@ -67,11 +76,19 @@ export class TokenManager {
     this.refresh.clear();
   }
 
-  private async freshTokenFor(session: AuthSession): Promise<string | null> {
+  /** Abandon ONE account's in-flight refresh (single-account sign-out). */
+  clearInflightFor(userId: string): void {
+    this.refresh.delete(`refresh:${userId}`);
+  }
+
+  private async freshTokenFor(
+    session: AuthSession,
+    force = false
+  ): Promise<string | null> {
     if (!session.accessToken) {
       return null;
     }
-    if (!isTokenExpiring(session.accessToken)) {
+    if (!force && !isTokenExpiring(session.accessToken)) {
       return session.accessToken;
     }
     if (!session.refreshToken) {
@@ -92,8 +109,9 @@ export class TokenManager {
       } catch (err) {
         if (err instanceof WorkosAuthError && err.code === "access_denied") {
           // Refresh token revoked/expired — the session is genuinely dead.
+          // (The .finally in SingleFlight.run removes this key; other
+          // accounts' in-flight refreshes are unaffected.)
           output.warn("Session refresh rejected — signing out.");
-          this.refresh.clear();
           await this.storage.removeAccount(session.user.id);
           return null;
         }

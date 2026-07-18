@@ -161,8 +161,10 @@ export class ApiService {
       return config;
     });
 
-    // On a 401 the token was already fresh, so a rejected request means the
-    // session is dead server-side — surface a single reauth prompt.
+    // On a 401, force-refresh the token and retry the request ONCE — the
+    // server may have rejected a token that still looked fresh locally. Only
+    // when the retry also 401s (or the forced refresh fails) is the session
+    // genuinely dead — then surface the single reauth prompt.
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<{ error?: string }>) => {
@@ -171,8 +173,15 @@ export class ApiService {
           | (InternalAxiosRequestConfig & { _envpilotRetried?: boolean })
           | undefined;
 
-        if (status === 401 && config && !config._envpilotRetried) {
-          config._envpilotRetried = true;
+        if (status === 401 && config) {
+          if (!config._envpilotRetried) {
+            config._envpilotRetried = true;
+            const token = await this.tokenManager.getFreshToken(true);
+            if (token) {
+              config.headers.Authorization = `Bearer ${token}`;
+              return this.client.request(config);
+            }
+          }
           void this.promptReauth();
         }
 

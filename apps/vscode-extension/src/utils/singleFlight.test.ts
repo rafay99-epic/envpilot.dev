@@ -69,6 +69,31 @@ describe("SingleFlight", () => {
     expect(calls).toBe(2);
   });
 
+  it("delete() forgets only the given key", async () => {
+    const sf = new SingleFlight();
+    const resolvers: Array<(v: number) => void> = [];
+    const fn = () =>
+      new Promise<number>((r) => {
+        resolvers.push(r);
+      });
+
+    const a = sf.run("a", fn);
+    const b = sf.run("b", fn);
+    sf.delete("a");
+    const a2 = sf.run("a", fn); // fresh run, not joined to `a`
+    const b2 = sf.run("b", fn); // still coalesced with `b`
+
+    expect(resolvers).toHaveLength(3);
+
+    resolvers[0](1);
+    resolvers[1](2);
+    resolvers[2](3);
+    await expect(a).resolves.toBe(1);
+    await expect(b).resolves.toBe(2);
+    await expect(a2).resolves.toBe(3);
+    await expect(b2).resolves.toBe(2);
+  });
+
   it("clear() stops new callers from joining an in-flight request", async () => {
     const sf = new SingleFlight();
     const resolvers: Array<(v: number) => void> = [];

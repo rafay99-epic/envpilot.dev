@@ -165,7 +165,15 @@ export class RealTimeSyncService {
    */
   private async checkConnectionAndReconnect(): Promise<void> {
     if (!this.desiredRunning || this.reconnecting) return;
-    if (this.convexService && this.isRunning) return; // already healthy
+    // "Client exists but its auth died" (transient refresh failure — a null
+    // token is terminal for the Convex client) counts as UNHEALTHY, not just
+    // "no client at all".
+    if (
+      this.convexService &&
+      this.isRunning &&
+      this.convexService.isAuthenticated
+    )
+      return; // already healthy
 
     this.reconnecting = true;
     this.syncService.setConnectionState("reconnecting");
@@ -179,6 +187,8 @@ export class RealTimeSyncService {
         const convexService = new ConvexService(convexUrl, this.getFreshToken);
         this.setConvexService(convexService);
         this.syncService.setConvexService(convexService);
+      } else if (!this.convexService.isAuthenticated) {
+        this.convexService.reauthenticate();
       }
 
       // Let startRealTimeSync (re-)establish subscriptions now that a
