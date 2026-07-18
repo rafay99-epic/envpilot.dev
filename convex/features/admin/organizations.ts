@@ -1,11 +1,10 @@
-import { v } from "convex/values";
 import { query } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listOrganizations = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const organizations = await ctx.db
       .query("organizations")

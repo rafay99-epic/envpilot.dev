@@ -1,20 +1,16 @@
 "use node";
 
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "../../_generated/server";
-
-function verifyAdmin(secret: string) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || secret !== adminSecret) {
-    throw new Error("Unauthorized: Invalid admin secret");
-  }
-}
+import { requireAdminAction } from "./auth";
 
 function getUmamiConfig() {
   const apiKey = process.env.UMAMI_API_KEY;
   const websiteId = process.env.UMAMI_WEBSITE_ID;
   if (!apiKey || !websiteId) {
-    throw new Error(
+    // ConvexError so the message survives prod redaction — the client's
+    // "not configured" detection depends on reading this text.
+    throw new ConvexError(
       "Umami analytics not configured. Set UMAMI_API_KEY and UMAMI_WEBSITE_ID in Convex environment variables."
     );
   }
@@ -27,7 +23,7 @@ async function umamiGet(path: string, apiKey: string): Promise<unknown> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Umami API error ${res.status}: ${text}`);
+    throw new ConvexError(`Umami API error ${res.status}: ${text}`);
   }
   return res.json();
 }
@@ -50,9 +46,9 @@ function statVal(field: unknown): number {
 // getWebTrafficStats — summary stats + active visitors
 // --------------------------------------------------------------------------
 export const getWebTrafficStats = action({
-  args: { secret: v.string() },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdminAction(ctx);
     const { apiKey, websiteId } = getUmamiConfig();
 
     const now = Date.now();
@@ -118,11 +114,10 @@ export const getWebTrafficStats = action({
 // --------------------------------------------------------------------------
 export const getWebTrafficPageviews = action({
   args: {
-    secret: v.string(),
     range: v.union(v.literal("today"), v.literal("7d"), v.literal("30d")),
   },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  handler: async (ctx, args) => {
+    await requireAdminAction(ctx);
     const { apiKey, websiteId } = getUmamiConfig();
 
     const now = Date.now();
@@ -161,9 +156,9 @@ export const getWebTrafficPageviews = action({
 // getShareUrl — returns the Umami public share dashboard URL
 // --------------------------------------------------------------------------
 export const getShareUrl = action({
-  args: { secret: v.string() },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdminAction(ctx);
     return process.env.UMAMI_SHARE_URL ?? null;
   },
 });

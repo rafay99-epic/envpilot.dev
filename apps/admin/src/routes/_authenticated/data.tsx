@@ -7,12 +7,14 @@ import { useState } from "react";
 import {
   useAdminMutation,
   useAdminPaginatedQuery,
+  useAdminQuery,
 } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Select } from "@/components/ui/Select";
+import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { QueryState } from "@/components/ui/QueryState";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { KebabMenu, type KebabMenuItem } from "@/components/ui/KebabMenu";
 import { PaginationControls } from "@/components/ui/PaginationControls";
@@ -26,49 +28,10 @@ import {
   Trash2,
   Columns3,
   RefreshCw,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const BROWSABLE_TABLES = [
-  { value: "", label: "Select a table..." },
-  { value: "users", label: "users" },
-  { value: "userPreferences", label: "userPreferences" },
-  { value: "organizations", label: "organizations" },
-  { value: "organizationMembers", label: "organizationMembers" },
-  { value: "organizationTiers", label: "organizationTiers" },
-  { value: "projects", label: "projects" },
-  { value: "favoriteProjects", label: "favoriteProjects" },
-  { value: "projectMembers", label: "projectMembers" },
-  { value: "environmentVariables", label: "environmentVariables" },
-  {
-    value: "environmentVariableRequests",
-    label: "environmentVariableRequests",
-  },
-  { value: "variableVersions", label: "variableVersions" },
-  { value: "variablePermissions", label: "variablePermissions" },
-  { value: "projectAccess", label: "projectAccess" },
-  { value: "invitations", label: "invitations" },
-  { value: "featureRequests", label: "featureRequests" },
-  { value: "featureVotes", label: "featureVotes" },
-  { value: "changelog", label: "changelog" },
-  { value: "auditLogs", label: "auditLogs" },
-  { value: "subscriptions", label: "subscriptions" },
-  { value: "polarCustomers", label: "polarCustomers" },
-  { value: "cliSessions", label: "cliSessions" },
-  { value: "cliTokens", label: "cliTokens" },
-  { value: "environmentTemplates", label: "environmentTemplates" },
-  { value: "templateVariables", label: "templateVariables" },
-  {
-    value: "permissionRevocationEvents",
-    label: "permissionRevocationEvents",
-  },
-  { value: "supportTickets", label: "supportTickets" },
-  { value: "contactMessages", label: "contactMessages" },
-  { value: "tierDefinitions", label: "tierDefinitions" },
-  { value: "adminSettings", label: "adminSettings" },
-  { value: "paymentProducts", label: "paymentProducts" },
-  { value: "processedWebhookEvents", label: "processedWebhookEvents" },
-];
 
 const PAGE_SIZE = 50;
 
@@ -85,6 +48,17 @@ function DataBrowserPage() {
   const { table } = useSearch({ from: "/_authenticated/data" });
   const navigate = useNavigate();
   const { confirm } = useConfirmStore();
+
+  // Server is the single source of truth for which tables are browsable —
+  // the old hardcoded copy here had drifted from the backend allowlist.
+  const browsableTables = useAdminQuery(
+    api.features.admin.tables.listBrowsableTables,
+    {}
+  );
+  const tableOptions = [
+    { value: "", label: "Select a table..." },
+    ...(browsableTables ?? []).map((t) => ({ value: t, label: t })),
+  ];
 
   // Paginated data fetch
   const {
@@ -228,7 +202,7 @@ function DataBrowserPage() {
   };
 
   return (
-    <div>
+    <div data-wide>
       <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
         Data Browser
       </h1>
@@ -239,7 +213,7 @@ function DataBrowserPage() {
           <Select
             label="Table"
             id="table-select"
-            options={BROWSABLE_TABLES}
+            options={tableOptions}
             value={table ?? ""}
             onChange={(e) => handleTableChange(e.target.value)}
           />
@@ -247,18 +221,23 @@ function DataBrowserPage() {
 
         {table && (
           <>
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Filter loaded rows..."
-              className="w-64"
-            />
+            <div className="flex w-64 flex-col gap-1">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Filter loaded rows..."
+              />
+              <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
+                filters loaded rows only
+              </span>
+            </div>
 
             {/* Column visibility */}
             <div className="relative">
               <Button
                 variant="outline"
                 size="sm"
+                aria-label="Toggle column visibility"
                 onClick={() => setShowColumnPicker(!showColumnPicker)}
               >
                 <Columns3 className="h-3.5 w-3.5" />
@@ -278,8 +257,9 @@ function DataBrowserPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleTableChange(table)}
+              aria-label="Refresh table data"
               title="Refresh"
+              onClick={() => handleTableChange(table)}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
@@ -289,7 +269,7 @@ function DataBrowserPage() {
 
       {/* Row count summary */}
       {table && rows && (
-        <p className="mb-3 text-xs text-zinc-500">
+        <p className="mb-3 font-mono text-xs uppercase tracking-wider text-zinc-500">
           {search.trim()
             ? `${displayRows.length} of ${rows.length} loaded rows match filter`
             : `${rows.length} rows loaded`}
@@ -304,72 +284,75 @@ function DataBrowserPage() {
           title="Select a table to browse"
           description="Choose a table from the dropdown above to view its data."
         />
-      ) : status === "LoadingFirstPage" ? (
-        <Spinner />
-      ) : !rows || rows.length === 0 ? (
-        <EmptyState title={`No rows in ${table}`} />
-      ) : displayRows.length === 0 ? (
-        <EmptyState
-          title="No matching rows"
-          description="Try adjusting your search filter or load more rows."
-        />
       ) : (
-        <>
-          <div className="max-h-[calc(100vh-280px)] overflow-auto rounded-lg border border-zinc-800">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900">
-                <tr>
-                  {visibleKeys.map((key) => (
-                    <th
-                      key={key}
-                      className="cursor-pointer select-none whitespace-nowrap px-3 py-2.5 text-xs font-medium text-zinc-400 hover:text-zinc-200"
-                      onClick={() => handleSort(key)}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        {key}
-                        {sortKey === key && (
-                          <span className="text-emerald-400">
-                            {sortDir === "asc" ? "↑" : "↓"}
+        <QueryState
+          data={status === "LoadingFirstPage" ? undefined : rows}
+          empty={{
+            when: displayRows.length === 0,
+            message: search.trim() ? "No matching rows" : `No rows in ${table}`,
+            command: search.trim() ? undefined : `browse ${table}`,
+          }}
+        >
+          {() => (
+            <>
+              <div className="max-h-[calc(100vh-280px)] overflow-auto rounded-lg border border-zinc-700/50">
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900">
+                    <tr>
+                      {visibleKeys.map((key) => (
+                        <th
+                          key={key}
+                          className="cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+                          onClick={() => handleSort(key)}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            {key}
+                            {sortKey === key &&
+                              (sortDir === "asc" ? (
+                                <ChevronUp className="h-3 w-3 text-green-400" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3 text-green-400" />
+                              ))}
                           </span>
-                        )}
-                      </span>
-                    </th>
-                  ))}
-                  <th className="sticky right-0 w-10 bg-zinc-900 px-2 py-2.5" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {displayRows.map((row, i) => (
-                  <tr
-                    key={(row._id as string) ?? i}
-                    className="cursor-pointer transition-colors hover:bg-zinc-800/30"
-                    onClick={() => setEditRow(row)}
-                  >
-                    {visibleKeys.map((key) => (
-                      <td
-                        key={key}
-                        className="max-w-[240px] whitespace-nowrap px-3 py-2 text-sm text-zinc-300"
+                        </th>
+                      ))}
+                      <th className="sticky right-0 w-10 bg-zinc-900 px-2 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {displayRows.map((row, i) => (
+                      <tr
+                        key={(row._id as string) ?? i}
+                        className="cursor-pointer transition-colors hover:bg-green-500/5"
+                        onClick={() => setEditRow(row)}
                       >
-                        <CellValue value={row[key]} fieldKey={key} />
-                      </td>
+                        {visibleKeys.map((key) => (
+                          <td
+                            key={key}
+                            className="max-w-[240px] whitespace-nowrap px-3 py-2 text-sm text-zinc-300"
+                          >
+                            <CellValue value={row[key]} fieldKey={key} />
+                          </td>
+                        ))}
+                        <td className="sticky right-0 bg-zinc-950 px-2 py-2">
+                          <KebabMenu items={getRowActions(row)} />
+                        </td>
+                      </tr>
                     ))}
-                    <td className="sticky right-0 bg-zinc-950 px-2 py-2">
-                      <KebabMenu items={getRowActions(row)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
 
-          {/* Pagination */}
-          <PaginationControls
-            status={status}
-            loadMore={loadMore}
-            numItems={PAGE_SIZE}
-            loadedCount={rows.length}
-          />
-        </>
+              {/* Pagination */}
+              <PaginationControls
+                status={status}
+                loadMore={loadMore}
+                numItems={PAGE_SIZE}
+                loadedCount={rows.length}
+              />
+            </>
+          )}
+        </QueryState>
       )}
 
       {/* Edit drawer */}
@@ -413,20 +396,16 @@ function ColumnPicker({
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-56 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
         {sorted.map((key) => (
-          <label
-            key={key}
-            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            <input
-              type="checkbox"
+          <div key={key} className="px-3 py-1.5 hover:bg-zinc-800">
+            <Switch
+              id={`col-${key}`}
+              size="sm"
               checked={!hiddenColumns.has(key)}
               onChange={() => onToggle(key)}
-              className="rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+              label={key}
+              className={cn(hiddenColumns.has(key) && "text-zinc-500")}
             />
-            <span className={cn(hiddenColumns.has(key) && "text-zinc-500")}>
-              {key}
-            </span>
-          </label>
+          </div>
         ))}
       </div>
     </>

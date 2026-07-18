@@ -1,20 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useState, useMemo } from "react";
+import { useState } from "react";
 import { useAdminQuery, useAdminMutation } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { DataTable, type Column } from "@/components/ui/DataTable";
+import { QueryState } from "@/components/ui/QueryState";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { toast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
 import { useConfirmStore } from "@/stores/confirm-store";
-import { SearchInput } from "@/components/ui/SearchInput";
-import { Mail, Eye, EyeOff, Trash2 } from "lucide-react";
+import { useFilteredList } from "@/hooks/useFilteredList";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/messages")({
   component: MessagesPage,
 });
+
+interface MessageRow extends Record<string, unknown> {
+  _id: Id<"contactMessages">;
+  _creationTime: number;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  isRead: boolean;
+}
 
 function MessagesPage() {
   const messages = useAdminQuery(
@@ -32,31 +44,97 @@ function MessagesPage() {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const filteredMessages = useMemo(() => {
-    if (!messages) return undefined;
-    if (!search.trim()) return messages;
-    const term = search.toLowerCase();
-    return messages.filter(
-      (m) =>
-        (m.name && m.name.toLowerCase().includes(term)) ||
-        (m.email && m.email.toLowerCase().includes(term)) ||
-        (m.subject && m.subject.toLowerCase().includes(term))
-    );
-  }, [messages, search]);
+  const filteredMessages = useFilteredList(
+    messages as MessageRow[] | undefined,
+    search,
+    (m) => [m.name, m.email, m.subject]
+  );
 
-  if (!messages) return <Spinner />;
-  if (messages.length === 0)
-    return (
-      <div>
-        <h1 className="mb-6 text-2xl font-semibold text-zinc-100">
-          Contact Messages
-        </h1>
-        <EmptyState
-          icon={<Mail className="h-8 w-8" />}
-          title="No messages yet"
-        />
-      </div>
-    );
+  const handleToggleRead = async (msg: MessageRow) => {
+    try {
+      await toggleRead({ id: msg._id, isRead: !msg.isRead });
+    } catch {
+      toast("error", "Failed to update message status");
+    }
+  };
+
+  const handleDelete = async (msg: MessageRow) => {
+    const ok = await confirm({
+      title: "Delete Message",
+      message: "This message will be permanently deleted.",
+      confirmLabel: "Delete",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await deleteMessage({ id: msg._id });
+    } catch {
+      toast("error", "Failed to delete message");
+    }
+  };
+
+  const columns: Column<MessageRow>[] = [
+    { key: "name", header: "Name" },
+    {
+      key: "email",
+      header: "Email",
+      render: (m) => <span className="text-zinc-400">{m.email}</span>,
+    },
+    { key: "subject", header: "Subject" },
+    {
+      key: "_creationTime",
+      header: "Date",
+      sortable: true,
+      render: (m) => (
+        <span className="text-zinc-400">{formatDateTime(m._creationTime)}</span>
+      ),
+    },
+    {
+      key: "isRead",
+      header: "Status",
+      render: (m) => (
+        <Badge variant={m.isRead ? "default" : "info"}>
+          {m.isRead ? "Read" : "Unread"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (m) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={m.isRead ? "Mark unread" : "Mark read"}
+            title={m.isRead ? "Mark unread" : "Mark read"}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleRead(m);
+            }}
+          >
+            {m.isRead ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Delete message"
+            title="Delete message"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(m);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-red-400" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -71,99 +149,39 @@ function MessagesPage() {
           placeholder="Search messages..."
           className="w-72"
         />
-        <span className="text-xs text-zinc-500">
-          {search.trim()
-            ? `${filteredMessages?.length ?? 0} of ${messages.length} messages`
-            : `${messages.length} messages`}
-        </span>
+        {messages && (
+          <span className="text-xs text-zinc-500">
+            {search.trim()
+              ? `${filteredMessages?.length ?? 0} of ${messages.length} messages`
+              : `${messages.length} messages`}
+          </span>
+        )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-zinc-800 bg-zinc-900/50">
-            <tr>
-              <th className="px-4 py-3 font-medium text-zinc-400">Name</th>
-              <th className="px-4 py-3 font-medium text-zinc-400">Email</th>
-              <th className="px-4 py-3 font-medium text-zinc-400">Subject</th>
-              <th className="px-4 py-3 font-medium text-zinc-400">Date</th>
-              <th className="px-4 py-3 font-medium text-zinc-400">Status</th>
-              <th className="px-4 py-3 font-medium text-zinc-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/50">
-            {filteredMessages?.map((msg) => (
-              <Fragment key={msg._id}>
-                <tr
-                  className="cursor-pointer transition-colors hover:bg-zinc-800/30"
-                  onClick={() =>
-                    setExpandedId(expandedId === msg._id ? null : msg._id)
-                  }
-                >
-                  <td className="px-4 py-3 text-zinc-300">{msg.name}</td>
-                  <td className="px-4 py-3 text-zinc-400">{msg.email}</td>
-                  <td className="px-4 py-3 text-zinc-300">{msg.subject}</td>
-                  <td className="px-4 py-3 text-zinc-400">
-                    {formatDateTime(msg._creationTime)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={msg.isRead ? "default" : "info"}>
-                      {msg.isRead ? "Read" : "Unread"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleRead({ id: msg._id, isRead: !msg.isRead });
-                        }}
-                        title={msg.isRead ? "Mark unread" : "Mark read"}
-                      >
-                        {msg.isRead ? (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const ok = await confirm({
-                            title: "Delete Message",
-                            message:
-                              "This message will be permanently deleted.",
-                            confirmLabel: "Delete",
-                            variant: "danger",
-                          });
-                          if (ok) deleteMessage({ id: msg._id });
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-                {expandedId === msg._id && (
-                  <tr key={`${msg._id}-body`}>
-                    <td colSpan={6} className="bg-zinc-900/30 px-6 py-4">
-                      <p className="mb-1 text-xs font-medium text-zinc-400">
-                        Message
-                      </p>
-                      <p className="whitespace-pre-wrap text-sm text-zinc-300">
-                        {msg.message}
-                      </p>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <QueryState
+        data={filteredMessages}
+        empty={{ command: "list messages", message: "No messages yet" }}
+      >
+        {(rows) => (
+          <DataTable
+            columns={columns}
+            data={rows}
+            rowKey={(m) => m._id}
+            expandedId={expandedId}
+            onExpandedChange={setExpandedId}
+            renderExpanded={(m) => (
+              <div>
+                <p className="mb-1 font-mono text-[0.68rem] uppercase tracking-wider text-zinc-500">
+                  Message
+                </p>
+                <p className="whitespace-pre-wrap text-sm text-zinc-300">
+                  {m.message}
+                </p>
+              </div>
+            )}
+          />
+        )}
+      </QueryState>
     </div>
   );
 }

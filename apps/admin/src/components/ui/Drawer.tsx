@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,9 @@ interface DrawerProps {
   onBeforeClose?: () => boolean | Promise<boolean>;
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+
 export function Drawer({
   isOpen,
   onClose,
@@ -25,6 +28,8 @@ export function Drawer({
   onBeforeClose,
 }: DrawerProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const [mounted, setMounted] = useState(false);
   const [entering, setEntering] = useState(false);
 
@@ -43,7 +48,11 @@ export function Drawer({
       // Force a layout flush before applying the enter class
       const raf = requestAnimationFrame(() => {
         // Second rAF ensures the browser has painted the initial (off-screen) state
-        requestAnimationFrame(() => setEntering(true));
+        requestAnimationFrame(() => {
+          setEntering(true);
+          const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+          (first ?? panelRef.current)?.focus();
+        });
       });
       return () => cancelAnimationFrame(raf);
     } else {
@@ -53,18 +62,36 @@ export function Drawer({
     }
   }, [isOpen]);
 
-  // Escape key & body scroll lock
+  // Escape key, Tab focus trap & body scroll lock
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const nodes = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (nodes.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleKey);
     document.body.style.overflow = "hidden";
 
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
   }, [isOpen, handleClose]);
@@ -85,8 +112,13 @@ export function Drawer({
       }}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
-          "absolute inset-y-0 right-0 flex w-full flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl",
+          "absolute inset-y-0 right-0 flex w-full flex-col border-l border-zinc-700/50 bg-zinc-900 shadow-2xl focus:outline-none",
           "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
           width,
           entering ? "translate-x-0" : "translate-x-full",
@@ -94,16 +126,18 @@ export function Drawer({
         )}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-zinc-800 px-6 py-5">
+        <div className="flex items-start justify-between border-b border-zinc-700/50 px-6 py-5">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-zinc-100">
+              {title}
+            </h2>
             {description && (
               <p className="mt-0.5 text-sm text-zinc-500">{description}</p>
             )}
           </div>
           <button
             onClick={handleClose}
-            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-green-500/5 hover:text-green-400"
           >
             <X className="h-4 w-4" />
           </button>

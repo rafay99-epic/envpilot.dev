@@ -9,8 +9,6 @@
  */
 
 import type * as crons from "../crons.js";
-import type * as deviceSessions from "../deviceSessions.js";
-import type * as featureRegistry from "../featureRegistry.js";
 import type * as features_accounts_mutations from "../features/accounts/mutations.js";
 import type * as features_accounts_queries from "../features/accounts/queries.js";
 import type * as features_accounts_values from "../features/accounts/values.js";
@@ -111,15 +109,6 @@ import type * as lib_roleCompat from "../lib/roleCompat.js";
 import type * as lib_roleProfiles from "../lib/roleProfiles.js";
 import type * as lib_seedData from "../lib/seedData.js";
 import type * as lib_users from "../lib/users.js";
-import type * as organizations from "../organizations.js";
-import type * as permissionRevocationEvents from "../permissionRevocationEvents.js";
-import type * as projectAccess from "../projectAccess.js";
-import type * as projectMembers from "../projectMembers.js";
-import type * as projects from "../projects.js";
-import type * as tierLimits from "../tierLimits.js";
-import type * as variableRequests from "../variableRequests.js";
-import type * as variableValues from "../variableValues.js";
-import type * as variables from "../variables.js";
 
 import type {
   ApiFromModules,
@@ -129,8 +118,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
-  deviceSessions: typeof deviceSessions;
-  featureRegistry: typeof featureRegistry;
   "features/accounts/mutations": typeof features_accounts_mutations;
   "features/accounts/queries": typeof features_accounts_queries;
   "features/accounts/values": typeof features_accounts_values;
@@ -231,15 +218,6 @@ declare const fullApi: ApiFromModules<{
   "lib/roleProfiles": typeof lib_roleProfiles;
   "lib/seedData": typeof lib_seedData;
   "lib/users": typeof lib_users;
-  organizations: typeof organizations;
-  permissionRevocationEvents: typeof permissionRevocationEvents;
-  projectAccess: typeof projectAccess;
-  projectMembers: typeof projectMembers;
-  projects: typeof projects;
-  tierLimits: typeof tierLimits;
-  variableRequests: typeof variableRequests;
-  variableValues: typeof variableValues;
-  variables: typeof variables;
 }>;
 
 /**

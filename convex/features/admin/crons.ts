@@ -1,6 +1,6 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 /**
  * List all registered cron jobs with their pause status.
@@ -8,9 +8,9 @@ import { verifyAdmin } from "./auth";
  * metadata + runtime pause state from adminSettings.
  */
 export const listCronJobs = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     // Static cron registry — mirrors convex/crons.ts
     const cronRegistry = [
@@ -76,15 +76,14 @@ export const listCronJobs = query({
  */
 export const toggleCronPause = mutation({
   args: {
-    secret: v.string(),
     settingKey: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     // Validate it's a known cron setting key
     if (!args.settingKey.startsWith("cron_pause_")) {
-      throw new Error("Invalid cron setting key");
+      throw new ConvexError("Invalid cron setting key");
     }
 
     const existing = await ctx.db

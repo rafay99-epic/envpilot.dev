@@ -14,8 +14,8 @@ import {
   Globe,
   ShieldCheck,
 } from "lucide-react";
+import { useAuth } from "@workos-inc/authkit-react";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/stores/auth-store";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -34,16 +34,13 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const logout = useAuthStore((s) => s.logout);
+  const { signOut } = useAuth();
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-zinc-800 bg-zinc-950">
-      <div className="flex h-14 items-center gap-2 border-b border-zinc-800 px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-xs font-bold text-white">
-          E
-        </div>
-        <span className="text-sm font-semibold text-zinc-100">
-          Envpilot Admin
+    <aside className="flex h-screen w-60 flex-col border-r border-zinc-700/50 bg-[#0f172a]">
+      <div className="flex h-14 items-center border-b border-zinc-700/50 px-4">
+        <span className="font-mono text-xs lowercase tracking-wide text-zinc-500">
+          <span className="text-green-400">$</span> envpilot admin
         </span>
       </div>
 
@@ -59,10 +56,10 @@ export function Sidebar() {
                 <Link
                   to={item.to}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-3 border-l-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-emerald-500/10 text-emerald-400"
-                      : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                      ? "border-green-400 bg-green-500/10 text-green-400"
+                      : "border-transparent text-zinc-500 hover:bg-green-500/5 hover:text-green-400"
                   )}
                 >
                   <item.icon className="h-4 w-4" />
@@ -74,10 +71,10 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-zinc-800 p-3">
+      <div className="border-t border-zinc-700/50 p-3">
         <button
-          onClick={logout}
-          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+          onClick={() => void signOut({ returnTo: window.location.origin })}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:bg-green-500/5 hover:text-green-400"
         >
           <LogOut className="h-4 w-4" />
           Logout

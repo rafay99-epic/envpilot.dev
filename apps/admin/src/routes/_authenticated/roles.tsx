@@ -8,9 +8,9 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Spinner } from "@/components/ui/Spinner";
 import { Drawer } from "@/components/ui/Drawer";
 import { Select } from "@/components/ui/Select";
+import { QueryState } from "@/components/ui/QueryState";
 import { toast } from "@/components/ui/Toast";
 import { useConfirmStore } from "@/stores/confirm-store";
 import {
@@ -24,6 +24,7 @@ import {
   Power,
   Layers,
   Tag,
+  Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/roles")({
@@ -286,17 +287,13 @@ function RolesPage() {
   // DERIVED
   // ==========================================
 
-  const capabilitiesByCategory: Record<string, Capability[]> = {};
-  if (capabilities) {
-    for (const cap of capabilities) {
-      (capabilitiesByCategory[cap.category] ??= []).push(cap);
-    }
-  }
-
   const levelClash =
     roles?.find(
       (r) => r.level === form.level && r.slug !== editingRole?.slug
     ) ?? null;
+
+  const matrixData =
+    roles && capabilities ? { roles, capabilities } : undefined;
 
   // ==========================================
   // RENDER
@@ -316,110 +313,127 @@ function RolesPage() {
           SECTION 1: ROLE CARDS
           ========================================== */}
       <div className="mb-8">
-        {!roles ? (
-          <Spinner />
-        ) : roles.length === 0 ? (
-          <Card>
-            <p className="text-center text-sm text-zinc-400">
-              No roles in the registry. Run the seed-role-registry migration to
-              create the system roles.
-            </p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {roles.map((role) => (
-              <Card key={role._id} className="relative">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-3 w-3 rounded-full"
-                      style={{
-                        backgroundColor: colorHex(role.color),
-                        boxShadow: `0 0 0 2px var(--color-zinc-900), 0 0 0 3px ${colorHex(role.color)}`,
-                      }}
-                    />
-                    <h3 className="font-semibold text-zinc-100">
-                      {role.displayName}
-                    </h3>
-                    <Badge variant={role.isSystem ? "purple" : "default"}>
-                      {role.isSystem ? "System" : "Custom"}
-                    </Badge>
-                    {!role.isActive && <Badge variant="danger">Inactive</Badge>}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEdit(role)}
-                      disabled={role.isSystem}
-                      className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                      title={
-                        role.isSystem
-                          ? "System role identity is code-defined — only capabilities are editable (in the matrix)"
-                          : "Edit role"
-                      }
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleToggleActive(role)}
-                      disabled={role.isSystem || togglingId === role._id}
-                      className={`rounded p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-30 ${
-                        role.isActive
-                          ? "hover:text-amber-400"
-                          : "hover:text-emerald-400"
-                      }`}
-                      title={
-                        role.isSystem
-                          ? "System roles cannot be deactivated"
-                          : role.isActive
-                            ? "Deactivate role"
-                            : "Activate role"
-                      }
-                    >
-                      {togglingId === role._id ? (
-                        <Spinner />
-                      ) : (
-                        <Power className="h-3.5 w-3.5" />
+        <QueryState
+          data={roles}
+          empty={{
+            command: "migrate-roles",
+            message:
+              "No roles in the registry. Run the seed-role-registry migration to create the system roles.",
+          }}
+        >
+          {(loadedRoles) => (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {loadedRoles.map((role) => (
+                <Card key={role._id} className="relative">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{
+                          backgroundColor: colorHex(role.color),
+                          boxShadow: `0 0 0 2px var(--color-zinc-900), 0 0 0 3px ${colorHex(role.color)}`,
+                        }}
+                      />
+                      <h3 className="font-semibold text-zinc-100">
+                        {role.displayName}
+                      </h3>
+                      <Badge variant={role.isSystem ? "purple" : "default"}>
+                        {role.isSystem ? "System" : "Custom"}
+                      </Badge>
+                      {!role.isActive && (
+                        <Badge variant="danger">Inactive</Badge>
                       )}
-                    </button>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(role)}
+                        disabled={role.isSystem}
+                        aria-label={
+                          role.isSystem
+                            ? "System role identity is code-defined — only capabilities are editable in the matrix"
+                            : "Edit role"
+                        }
+                        title={
+                          role.isSystem
+                            ? "System role identity is code-defined — only capabilities are editable (in the matrix)"
+                            : "Edit role"
+                        }
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleActive(role)}
+                        disabled={role.isSystem || togglingId === role._id}
+                        className={
+                          role.isActive
+                            ? "hover:text-amber-400"
+                            : "hover:text-emerald-400"
+                        }
+                        aria-label={
+                          role.isSystem
+                            ? "System roles cannot be deactivated"
+                            : role.isActive
+                              ? "Deactivate role"
+                              : "Activate role"
+                        }
+                        title={
+                          role.isSystem
+                            ? "System roles cannot be deactivated"
+                            : role.isActive
+                              ? "Deactivate role"
+                              : "Activate role"
+                        }
+                      >
+                        {togglingId === role._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Power className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                {role.description && (
-                  <p className="mb-3 text-xs text-zinc-400">
-                    {role.description}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-4 text-xs text-zinc-400">
-                  <span className="font-mono text-zinc-500">{role.slug}</span>
-                  <span className="flex items-center gap-1" title="Level">
-                    <Layers className="h-3 w-3" />
-                    {role.level}
-                  </span>
-                  <span className="flex items-center gap-1" title="Members">
-                    <Users className="h-3 w-3" />
-                    {role.memberCount}
-                  </span>
-                  {role.pendingInvitationCount > 0 && (
-                    <span
-                      className="flex items-center gap-1"
-                      title="Pending invitations"
-                    >
-                      <Mail className="h-3 w-3" />
-                      {role.pendingInvitationCount}
-                    </span>
+                  {role.description && (
+                    <p className="mb-3 text-xs text-zinc-400">
+                      {role.description}
+                    </p>
                   )}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+
+                  <div className="flex items-center gap-4 text-xs text-zinc-400">
+                    <span className="font-mono text-zinc-500">{role.slug}</span>
+                    <span className="flex items-center gap-1" title="Level">
+                      <Layers className="h-3 w-3" />
+                      {role.level}
+                    </span>
+                    <span className="flex items-center gap-1" title="Members">
+                      <Users className="h-3 w-3" />
+                      {role.memberCount}
+                    </span>
+                    {role.pendingInvitationCount > 0 && (
+                      <span
+                        className="flex items-center gap-1"
+                        title="Pending invitations"
+                      >
+                        <Mail className="h-3 w-3" />
+                        {role.pendingInvitationCount}
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </QueryState>
       </div>
 
       {/* ==========================================
           SECTION 2: ROLE x CAPABILITY MATRIX
           ========================================== */}
-      <div className="mb-8">
+      <div className="mb-8" data-wide>
         <h2 className="mb-1 text-lg font-semibold text-zinc-100">
           Capability Matrix
         </h2>
@@ -429,58 +443,64 @@ function RolesPage() {
           defaults only fill in capabilities you haven&apos;t touched.
         </p>
 
-        {!roles || !capabilities ? (
-          <Spinner />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-zinc-800">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-sm">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400">
-                    Capability
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-zinc-400">
-                    Risk
-                  </th>
-                  {roles.map((role) => (
-                    <th
-                      key={role._id}
-                      className="px-4 py-3 text-center text-xs font-medium text-zinc-400"
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: colorHex(role.color) }}
+        <QueryState data={matrixData} loadingLabel="loading matrix">
+          {({ roles: matrixRoles, capabilities: matrixCapabilities }) => {
+            const capabilitiesByCategory: Record<string, Capability[]> = {};
+            for (const cap of matrixCapabilities) {
+              (capabilitiesByCategory[cap.category] ??= []).push(cap);
+            }
+            return (
+              <div className="overflow-x-auto rounded-lg border border-zinc-700/50">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="sticky top-0 z-10 border-b border-zinc-800/50 bg-zinc-900/95 backdrop-blur-sm">
+                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500">
+                        Capability
+                      </th>
+                      <th className="px-4 py-3 font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500">
+                        Risk
+                      </th>
+                      {matrixRoles.map((role) => (
+                        <th
+                          key={role._id}
+                          className="px-4 py-3 text-center font-mono text-[0.68rem] font-medium uppercase tracking-wider text-zinc-500"
+                        >
+                          <div className="flex items-center justify-center gap-1.5">
+                            <div
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: colorHex(role.color) }}
+                            />
+                            {role.displayName}
+                            {role.slug === "owner" && (
+                              <Lock
+                                className="h-3 w-3 text-zinc-500"
+                                aria-label="Locked (owner always holds everything)"
+                              />
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {Object.entries(capabilitiesByCategory).map(
+                      ([category, caps]) => (
+                        <RoleCategoryGroup
+                          key={category}
+                          category={category}
+                          caps={caps}
+                          roles={matrixRoles}
+                          savingCell={savingCell}
+                          onToggle={handleCapabilityToggle}
                         />
-                        {role.displayName}
-                        {role.slug === "owner" && (
-                          <Lock
-                            className="h-3 w-3 text-zinc-500"
-                            aria-label="Locked (owner always holds everything)"
-                          />
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(capabilitiesByCategory).map(
-                  ([category, caps]) => (
-                    <RoleCategoryGroup
-                      key={category}
-                      category={category}
-                      caps={caps}
-                      roles={roles}
-                      savingCell={savingCell}
-                      onToggle={handleCapabilityToggle}
-                    />
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          }}
+        </QueryState>
       </div>
 
       {/* ==========================================
@@ -519,24 +539,22 @@ function RolesPage() {
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <label
                       htmlFor="role-slug"
-                      className="text-sm font-medium text-zinc-300"
+                      className="flex items-center gap-1.5 text-sm font-medium text-zinc-300"
                     >
+                      <Tag className="h-3.5 w-3.5" />
                       Slug
                     </label>
                     <span className="text-[10px] text-zinc-500">
                       (auto-generated, immutable after creation)
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 shrink-0 text-zinc-500" />
-                    <input
-                      id="role-slug"
-                      value={form.slug}
-                      onChange={(e) => updateFormField("slug", e.target.value)}
-                      placeholder="e.g. release_manager"
-                      className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
+                  <Input
+                    id="role-slug"
+                    value={form.slug}
+                    onChange={(e) => updateFormField("slug", e.target.value)}
+                    placeholder="e.g. release_manager"
+                    className="font-mono"
+                  />
                 </div>
               )}
 
@@ -563,7 +581,10 @@ function RolesPage() {
                 {ROLE_COLORS.map((preset) => (
                   <button
                     key={preset.token}
+                    type="button"
                     onClick={() => updateFormField("color", preset.token)}
+                    aria-label={`Color: ${preset.token}`}
+                    aria-pressed={form.color === preset.token}
                     title={preset.token}
                     className={`h-7 w-7 rounded-full border-2 transition-all ${
                       form.color === preset.token
@@ -592,7 +613,7 @@ function RolesPage() {
                     <Layers className="h-3.5 w-3.5" />
                     Level
                   </label>
-                  <input
+                  <Input
                     id="role-level"
                     type="number"
                     value={form.level}
@@ -603,7 +624,6 @@ function RolesPage() {
                         parseInt(e.target.value, 10) || 0
                       )
                     }
-                    className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   <p className="mt-1 text-[10px] text-zinc-500">
                     Higher = more authority. Invite/role-change rules compare
@@ -618,27 +638,19 @@ function RolesPage() {
                 </div>
 
                 {drawerMode === "edit" && (
-                  <div>
-                    <label
-                      htmlFor="role-sort-order"
-                      className="mb-1.5 block text-sm font-medium text-zinc-300"
-                    >
-                      Sort Order
-                    </label>
-                    <input
-                      id="role-sort-order"
-                      type="number"
-                      min={0}
-                      value={form.sortOrder}
-                      onChange={(e) =>
-                        updateFormField(
-                          "sortOrder",
-                          parseInt(e.target.value, 10) || 0
-                        )
-                      }
-                      className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
+                  <Input
+                    label="Sort Order"
+                    id="role-sort-order"
+                    type="number"
+                    min={0}
+                    value={form.sortOrder}
+                    onChange={(e) =>
+                      updateFormField(
+                        "sortOrder",
+                        parseInt(e.target.value, 10) || 0
+                      )
+                    }
+                  />
                 )}
               </div>
 
@@ -703,19 +715,16 @@ function RoleCategoryGroup({
 }) {
   return (
     <>
-      <tr className="border-b border-zinc-800 bg-zinc-900/60">
+      <tr className="bg-zinc-900/60">
         <td
           colSpan={2 + roles.length}
-          className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400"
+          className="px-4 py-2 font-mono text-[0.68rem] font-semibold uppercase tracking-wider text-zinc-400"
         >
           {category}
         </td>
       </tr>
       {caps.map((cap) => (
-        <tr
-          key={cap.key}
-          className="border-b border-zinc-800/30 hover:bg-zinc-800/20"
-        >
+        <tr key={cap.key} className="transition-colors hover:bg-green-500/5">
           <td className="px-4 py-2">
             <div className="text-xs text-zinc-300" title={cap.description}>
               {cap.label}
@@ -734,7 +743,7 @@ function RoleCategoryGroup({
               <td key={role._id} className="px-4 py-2 text-center">
                 {role.slug === "owner" ? (
                   granted ? (
-                    <Check className="mx-auto h-3.5 w-3.5 text-emerald-500/70" />
+                    <Check className="mx-auto h-3.5 w-3.5 text-green-500/70" />
                   ) : (
                     <span className="text-zinc-600">&mdash;</span>
                   )
@@ -744,8 +753,9 @@ function RoleCategoryGroup({
                     checked={granted}
                     disabled={savingCell === cellId}
                     onChange={(e) => onToggle(role, cap.key, e.target.checked)}
+                    aria-label={`${role.displayName}: ${cap.label}`}
                     title={`${role.displayName}: ${cap.label}`}
-                    className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 disabled:opacity-50"
+                    className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-green-500 focus:ring-green-500/50 disabled:opacity-50"
                   />
                 )}
               </td>

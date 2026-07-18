@@ -65,20 +65,19 @@ for var in WORKOS_CLIENT_ID WORKOS_API_KEY BILLING_WEBHOOK_BRIDGE_SECRET RESEND_
   fi
 done
 
-# Local deployments get their own admin secret (never reuse cloud's).
-if ! bunx convex env get ADMIN_SECRET >/dev/null 2>&1; then
-  ADMIN_SECRET=$(openssl rand -hex 16)
-  bunx convex env set ADMIN_SECRET "$ADMIN_SECRET" >/dev/null
-  echo "   ✓ ADMIN_SECRET (generated: $ADMIN_SECRET — needed for the admin panel)"
+# Admin panel access: set ADMIN_EMAILS (comma-separated) on the deployment.
+if ! bunx convex env get ADMIN_EMAILS >/dev/null 2>&1; then
+  echo "   – ADMIN_EMAILS not set; set it to your email(s) to use the admin panel:"
+  echo "     bunx convex env set ADMIN_EMAILS you@example.com"
 else
-  ADMIN_SECRET=$(bunx convex env get ADMIN_SECRET)
-  echo "   ✓ ADMIN_SECRET (already set)"
+  echo "   ✓ ADMIN_EMAILS (already set)"
 fi
 
 echo "→ seeding tiers, feature registry, and tier overrides"
+# Internal entrypoint — runs with the deploy/dev key, no admin secret needed.
 for migration in seed-tier-definitions seed-feature-registry seed-tier-features; do
-  bunx convex run features/admin/migrations:runMigration \
-    "$(jq -cn --arg secret "$ADMIN_SECRET" --arg name "$migration" '{secret: $secret, name: $name}')" >/dev/null
+  bunx convex run features/admin/migrations:run \
+    "$(jq -cn --arg name "$migration" '{name: $name}')" >/dev/null
   echo "   ✓ $migration"
 done
 

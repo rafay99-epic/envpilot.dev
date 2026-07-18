@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Switch } from "@/components/ui/Switch";
 import { useConfirmStore } from "@/stores/confirm-store";
 import { Copy, Trash2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -239,13 +241,12 @@ export function RowEditDrawer({
                         onChange={(v) => handleFieldChange(key, v)}
                       />
                     ) : (
-                      <input
+                      <Input
                         type="number"
                         value={value}
                         onChange={(e) =>
                           handleFieldChange(key, Number(e.target.value))
                         }
-                        className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     )
                   ) : Array.isArray(value) ? (
@@ -271,11 +272,10 @@ export function RowEditDrawer({
                       </Button>
                     </div>
                   ) : (
-                    <input
+                    <Input
                       type="text"
                       value={String(value)}
                       onChange={(e) => handleFieldChange(key, e.target.value)}
-                      className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   )}
                 </div>
@@ -340,17 +340,18 @@ function ReadOnlyField({
       : str;
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+    <div className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-2">
       <span className="flex-1 truncate font-mono text-xs text-zinc-500">
         {displayValue}
       </span>
       <button
         onClick={() => onCopy(str, fieldKey)}
         className="flex-shrink-0 text-zinc-500 hover:text-zinc-300"
+        aria-label={`Copy ${fieldKey}`}
         title="Copy"
       >
         {copied ? (
-          <Check className="h-3.5 w-3.5 text-emerald-400" />
+          <Check className="h-3.5 w-3.5 text-green-400" />
         ) : (
           <Copy className="h-3.5 w-3.5" />
         )}
@@ -367,27 +368,12 @@ function BooleanField({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <button
-      onClick={() => onChange(!value)}
-      className="flex items-center gap-2"
-    >
-      <div
-        className={cn(
-          "relative h-5 w-9 rounded-full transition-colors",
-          value ? "bg-emerald-600" : "bg-zinc-700"
-        )}
-      >
-        <div
-          className={cn(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform",
-            value ? "translate-x-4" : "translate-x-0.5"
-          )}
-        />
-      </div>
+    <div className="flex items-center gap-2">
+      <Switch checked={value} onChange={onChange} />
       <Badge variant={value ? "success" : "danger"}>
         {value ? "true" : "false"}
       </Badge>
-    </button>
+    </div>
   );
 }
 
@@ -402,11 +388,10 @@ function TimestampField({
   const dateStr = new Date(value).toISOString().slice(0, 16);
   return (
     <div className="space-y-1">
-      <input
+      <Input
         type="datetime-local"
         value={dateStr}
         onChange={(e) => onChange(new Date(e.target.value).getTime())}
-        className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
       />
       <p className="text-xs text-zinc-600">{timeAgo(value)}</p>
     </div>
@@ -456,6 +441,7 @@ function ArrayField({
             <button
               onClick={() => onChange(value.filter((_, idx) => idx !== i))}
               className="ml-0.5 text-zinc-500 hover:text-red-400"
+              aria-label={`Remove ${item}`}
             >
               ×
             </button>
@@ -463,7 +449,7 @@ function ArrayField({
         ))}
       </div>
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
@@ -474,7 +460,7 @@ function ArrayField({
             }
           }}
           placeholder="Add item..."
-          className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="flex-1"
         />
         <Button
           variant="outline"

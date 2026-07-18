@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listContactMessages = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     return await ctx.db
       .query("contactMessages")
@@ -17,23 +17,21 @@ export const listContactMessages = query({
 
 export const markContactMessageRead = mutation({
   args: {
-    secret: v.string(),
     id: v.id("contactMessages"),
     isRead: v.boolean(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.patch(args.id, { isRead: args.isRead });
   },
 });
 
 export const deleteContactMessage = mutation({
   args: {
-    secret: v.string(),
     id: v.id("contactMessages"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.delete(args.id);
   },
 });
@@ -43,9 +41,9 @@ export const deleteContactMessage = mutation({
 // ==========================================
 
 export const listSupportTickets = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     return await ctx.db
       .query("supportTickets")
@@ -57,7 +55,6 @@ export const listSupportTickets = query({
 
 export const updateSupportTicketStatus = mutation({
   args: {
-    secret: v.string(),
     id: v.id("supportTickets"),
     status: v.union(
       v.literal("open"),
@@ -67,7 +64,7 @@ export const updateSupportTicketStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.patch(args.id, {
       status: args.status,
       updatedAt: Date.now(),

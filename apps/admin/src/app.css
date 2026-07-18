@@ -1,1 +1,176 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Terminal design system — dark only. Mirrors apps/web dashboard theme. */
+:root {
+  /* The whole panel renders dark surfaces — tell the browser so native
+     controls, scrollbars, and form widgets match. */
+  color-scheme: dark;
+
+  --terminal-bg: #0f172a;
+  --terminal-card: rgba(24, 24, 27, 0.9);
+  --terminal-border: rgba(113, 113, 122, 0.5);
+  --terminal-green: #22c55e;
+  --terminal-amber: #fbbf24;
+  --terminal-red: #ef5350;
+
+  --font-geist-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  font-family: var(--font-geist-sans);
+}
+
+/* Custom checkbox styling */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  border: 1.5px solid #52525b;
+  background-color: #18181b;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+input[type="checkbox"]:checked {
+  background-color: #22c55e;
+  border-color: #22c55e;
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #0a0a0a;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Custom radio button styling */
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1.5px solid #52525b;
+  background-color: #18181b;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+input[type="radio"]:hover {
+  border-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  transform: translate(-50%, -50%);
+}
+
+input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+}
+
+/* Thin zinc scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #52525b;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::selection {
+  background: rgba(34, 197, 94, 0.25);
+  color: #f4f4f5;
+}
+
+/* Terminal cursor blink (used by TerminalLoading) */
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Keyboard focus must always be visible on dark surfaces. */
+:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.6);
+  outline-offset: 2px;
+}
+
+/* Global kill-switch: disables all CSS animations/transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

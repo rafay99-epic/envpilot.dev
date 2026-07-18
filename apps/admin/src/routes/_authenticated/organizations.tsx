@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { api } from "@convex/_generated/api";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { QueryState } from "@/components/ui/QueryState";
+import { useFilteredList } from "@/hooks/useFilteredList";
 import { formatDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/organizations")({
@@ -18,17 +20,11 @@ function OrganizationsPage() {
   );
   const [search, setSearch] = useState("");
 
-  const filteredOrgs = useMemo(() => {
-    if (!organizations) return undefined;
-    if (!search.trim()) return organizations;
-    const term = search.toLowerCase();
-    return (organizations as Record<string, unknown>[]).filter(
-      (org) =>
-        (typeof org.name === "string" &&
-          org.name.toLowerCase().includes(term)) ||
-        (typeof org.slug === "string" && org.slug.toLowerCase().includes(term))
-    );
-  }, [organizations, search]);
+  const filteredOrgs = useFilteredList(
+    organizations as Record<string, unknown>[] | undefined,
+    search,
+    (org) => [org.name as string, org.slug as string]
+  );
 
   const columns: Column<Record<string, unknown>>[] = [
     { key: "name", header: "Name", sortable: true },
@@ -86,13 +82,18 @@ function OrganizationsPage() {
             : `${(organizations as Record<string, unknown>[]).length} organizations`}
         </p>
       )}
-      <DataTable
-        columns={columns}
-        data={filteredOrgs as unknown as Record<string, unknown>[] | undefined}
-        isLoading={!organizations}
-        rowKey={(row) => row._id as string}
-        emptyMessage="No organizations found"
-      />
+      <QueryState
+        data={filteredOrgs}
+        empty={{ message: "No organizations found" }}
+      >
+        {(rows) => (
+          <DataTable
+            columns={columns}
+            data={rows}
+            rowKey={(row) => row._id as string}
+          />
+        )}
+      </QueryState>
     </div>
   );
 }

@@ -1,11 +1,11 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listTierDefinitions = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const tiers = await ctx.db.query("tierDefinitions").collect();
     // Sort by sortOrder
@@ -15,7 +15,6 @@ export const listTierDefinitions = query({
 
 export const createTierDefinition = mutation({
   args: {
-    secret: v.string(),
     name: v.string(),
     displayName: v.string(),
     description: v.optional(v.string()),
@@ -26,7 +25,7 @@ export const createTierDefinition = mutation({
     isComingSoon: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     // Validate unique name
     const existing = await ctx.db
@@ -35,7 +34,7 @@ export const createTierDefinition = mutation({
       .first();
 
     if (existing) {
-      throw new Error(`A tier with name "${args.name}" already exists.`);
+      throw new ConvexError(`A tier with name "${args.name}" already exists.`);
     }
 
     const now = Date.now();
@@ -67,7 +66,6 @@ export const createTierDefinition = mutation({
 
 export const updateTierDefinition = mutation({
   args: {
-    secret: v.string(),
     id: v.id("tierDefinitions"),
     displayName: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -78,11 +76,11 @@ export const updateTierDefinition = mutation({
     isComingSoon: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Tier definition not found");
+      throw new ConvexError("Tier definition not found");
     }
 
     const now = Date.now();
@@ -114,20 +112,19 @@ export const updateTierDefinition = mutation({
 
 export const deleteTierDefinition = mutation({
   args: {
-    secret: v.string(),
     id: v.id("tierDefinitions"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const tierDef = await ctx.db.get(args.id);
     if (!tierDef) {
-      throw new Error("Tier definition not found");
+      throw new ConvexError("Tier definition not found");
     }
 
     // Prevent deleting the default tier
     if (tierDef.isDefault) {
-      throw new Error(
+      throw new ConvexError(
         "Cannot delete the default tier. Set another tier as default first."
       );
     }
@@ -136,7 +133,7 @@ export const deleteTierDefinition = mutation({
     const userTiers = await ctx.db.query("userTiers").collect();
     const usedBy = userTiers.filter((ut) => ut.tier === tierDef.name);
     if (usedBy.length > 0) {
-      throw new Error(
+      throw new ConvexError(
         `Cannot delete tier "${tierDef.name}": ${usedBy.length} user(s) are using it. Reassign them first.`
       );
     }
@@ -159,9 +156,9 @@ export const deleteTierDefinition = mutation({
 // ==========================================
 
 export const listPaymentProducts = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
     const products = await ctx.db.query("paymentProducts").collect();
     return products.sort((a, b) => a.tierName.localeCompare(b.tierName));
   },
@@ -169,7 +166,6 @@ export const listPaymentProducts = query({
 
 export const createPaymentProduct = mutation({
   args: {
-    secret: v.string(),
     tierName: v.string(),
     provider: v.string(),
     productId: v.string(),
@@ -177,7 +173,7 @@ export const createPaymentProduct = mutation({
     label: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     // Validate tier exists
     const tier = await ctx.db
@@ -185,7 +181,7 @@ export const createPaymentProduct = mutation({
       .withIndex("by_name", (q) => q.eq("name", args.tierName))
       .first();
     if (!tier) {
-      throw new Error(`Tier "${args.tierName}" does not exist`);
+      throw new ConvexError(`Tier "${args.tierName}" does not exist`);
     }
 
     // Check for duplicate tier+provider mapping
@@ -196,7 +192,7 @@ export const createPaymentProduct = mutation({
       )
       .first();
     if (existing) {
-      throw new Error(
+      throw new ConvexError(
         `A product mapping already exists for tier "${args.tierName}" with provider "${args.provider}"`
       );
     }
@@ -216,18 +212,17 @@ export const createPaymentProduct = mutation({
 
 export const updatePaymentProduct = mutation({
   args: {
-    secret: v.string(),
     id: v.id("paymentProducts"),
     productId: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     label: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Payment product not found");
+      throw new ConvexError("Payment product not found");
     }
 
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
@@ -241,15 +236,14 @@ export const updatePaymentProduct = mutation({
 
 export const deletePaymentProduct = mutation({
   args: {
-    secret: v.string(),
     id: v.id("paymentProducts"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const existing = await ctx.db.get(args.id);
     if (!existing) {
-      throw new Error("Payment product not found");
+      throw new ConvexError("Payment product not found");
     }
 
     await ctx.db.delete(args.id);
@@ -262,9 +256,9 @@ export const deletePaymentProduct = mutation({
  * paymentProducts table. Safe to run multiple times (idempotent).
  */
 export const seedPaymentProducts = mutation({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const tiers = await ctx.db.query("tierDefinitions").collect();
     const existingProducts = await ctx.db.query("paymentProducts").collect();
@@ -308,9 +302,9 @@ export const seedPaymentProducts = mutation({
 });
 
 export const seedDefaultTiers = mutation({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const existing = await ctx.db.query("tierDefinitions").collect();
     const existingByName = new Map(existing.map((t) => [t.name, t]));

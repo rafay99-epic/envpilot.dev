@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const getAdminSettings = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const settings = await ctx.db.query("adminSettings").collect();
     const result: Record<string, string> = {};
@@ -18,12 +18,11 @@ export const getAdminSettings = query({
 
 export const updateAdminSetting = mutation({
   args: {
-    secret: v.string(),
     key: v.string(),
     value: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const existing = await ctx.db
       .query("adminSettings")
