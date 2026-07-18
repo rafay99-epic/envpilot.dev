@@ -1,0 +1,31 @@
+apps/vscode-extension/THIRD_PARTY_NOTICES.md
+  s_75f22a3110bb4b::t_0647c4ab7bf2d3 1-25
+apps/vscode-extension/package.json
+  s_75f22a3110bb4b::t_6b87a66d36c540 402-411
+apps/vscode-extension/src/extension.ts
+  s_75f22a3110bb4b::t_8afa8d57ddd2b5 24-25,354-363,449-453
+apps/vscode-extension/src/providers/autocomplete.ts
+  s_75f22a3110bb4b::t_69104954bb817d 1-247
+apps/vscode-extension/src/providers/envHover.ts
+  s_75f22a3110bb4b::t_cfd3d91037422b 1-156
+apps/vscode-extension/src/utils/envKeyMatch.test.ts
+  s_75f22a3110bb4b::t_30dc5abc6a2886 1-89
+apps/vscode-extension/src/utils/envKeyMatch.ts
+  s_75f22a3110bb4b::t_f751012054b62e 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7e5d2028c9bde38b931568fefa04fd8986ac251d",
+  "prompts": {},
+  "sessions": {
+    "s_75f22a3110bb4b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9170a81f8042d17c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
