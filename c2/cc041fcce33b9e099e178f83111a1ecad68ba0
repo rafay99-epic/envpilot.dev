@@ -1,0 +1,19 @@
+README.md
+  s_8d79f2bb6db198::t_fc609a5eda1400 7-8,26-93,108-113,138-140,143,148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c2cc041fcce33b9e099e178f83111a1ecad68ba0",
+  "prompts": {},
+  "sessions": {
+    "s_8d79f2bb6db198": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a13690c-b595-4d39-8e52-79e370dd4553",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
