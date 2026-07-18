@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -15,6 +15,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { DrawerPanel } from "@/components/ui";
 import {
   TerminalCard,
   TerminalButton,
@@ -35,7 +36,7 @@ import { ENVIRONMENTS, type Environment } from "@/constants/project";
 function reportApiKeysUiError(error: unknown, action: "create" | "revoke") {
   const message = error instanceof Error ? error.message : String(error);
   if (
-    /pro plan|not authorized|only the organization|at most|at least one (environment|project|resource)|must be 1-100|expiresAt must be in the future|project not found|unknown "(environment|resource)"/i.test(
+    /pro plan|not authorized|only the organization|at most|at least one (environment|project|resource|surface)|must be 1-100|expiresAt must be in the future|project not found|unknown "(environment|resource)"|github action key/i.test(
       message
     )
   ) {
@@ -46,12 +47,6 @@ function reportApiKeysUiError(error: unknown, action: "create" | "revoke") {
   });
 }
 
-const ENV_BADGE_COLOR: Record<Environment, "blue" | "amber" | "green"> = {
-  development: "blue",
-  staging: "amber",
-  production: "green",
-};
-
 const ENV_CHIP_SELECTED: Record<Environment, string> = {
   development: "border-blue-500/40 bg-blue-500/10 text-blue-400",
   staging: "border-amber-500/40 bg-amber-500/10 text-amber-400",
@@ -60,6 +55,15 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
 
 const RESOURCES = ["variables", "accounts", "projects"] as const;
 type Resource = (typeof RESOURCES)[number];
+
+const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
+type Surface = (typeof SURFACES)[number];
+
+const SURFACE_LABEL: Record<Surface, string> = {
+  rest_api: "REST API",
+  mcp_server: "MCP server",
+  github_action: "GitHub Action",
+};
 
 const CHIP_BASE =
   "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors";
@@ -131,39 +135,27 @@ function ApiKeysSectionInner({
           <div>
             <h2 className="text-base font-semibold text-zinc-100">API Keys</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Scoped, read-only keys for the public REST API and MCP server.
+              Scoped, read-only keys for the public REST API, MCP server, and
+              GitHub Action.
             </p>
           </div>
           <TerminalButton
             type="button"
-            variant={showCreate ? "secondary" : "primary"}
-            onClick={() => setShowCreate((prev) => !prev)}
-            aria-expanded={showCreate}
+            variant="primary"
+            onClick={() => setShowCreate(true)}
           >
-            {showCreate ? "Close" : "New Key"}
+            New Key
           </TerminalButton>
         </div>
 
-        <AnimatePresence initial={false}>
-          {showCreate && organizationId && (
-            <motion.div
-              key="create-panel"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="overflow-hidden"
-            >
-              <div className="mt-6">
-                <CreateKeyPanel
-                  organizationId={organizationId}
-                  isOwner={isOwner}
-                  onDone={() => setShowCreate(false)}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {organizationId && (
+          <CreateKeyDrawer
+            organizationId={organizationId}
+            isOwner={isOwner}
+            isOpen={showCreate}
+            onClose={() => setShowCreate(false)}
+          />
+        )}
 
         <div className="mt-6">
           {isLoading ? (
@@ -201,6 +193,7 @@ interface ApiKeyListItem {
   scopeProjects: "all" | Id<"projects">[];
   scopeEnvironments: "all" | string[];
   scopeResources: string[];
+  surfaces: Surface[] | null;
   createdAt: number;
   createdByName: string;
   lastUsedAt: number | null;
@@ -259,36 +252,41 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
               {keyItem.name}
             </span>
             {isRevoked && <TerminalBadge color="red">Revoked</TerminalBadge>}
-            <TerminalBadge color="purple">
-              {keyItem.scopeProjects === "all"
-                ? "all projects"
-                : `${keyItem.scopeProjects.length} project${
-                    keyItem.scopeProjects.length === 1 ? "" : "s"
-                  }`}
-            </TerminalBadge>
-            {keyItem.scopeEnvironments === "all" ? (
-              <TerminalBadge color="blue">all environments</TerminalBadge>
-            ) : (
-              keyItem.scopeEnvironments.map((env) => (
-                <TerminalBadge
-                  key={env}
-                  color={ENV_BADGE_COLOR[env as Environment] ?? "zinc"}
-                >
-                  {env}
-                </TerminalBadge>
-              ))
+            {!isRevoked && expiryExpired && (
+              <TerminalBadge color="red">Expired</TerminalBadge>
             )}
-            {keyItem.scopeResources.map((resource) => (
-              <TerminalBadge key={resource} color="zinc">
-                {resource}
-              </TerminalBadge>
-            ))}
-            {!isRevoked && expiryMsLeft !== null && (
-              <TerminalBadge color={expiryUrgent ? "red" : "amber"}>
-                {expiryExpired ? "Expired" : `expires in ${expiryDaysLeft}d`}
+            {!isRevoked && !expiryExpired && expiryUrgent && (
+              <TerminalBadge color="red">
+                expires in {expiryDaysLeft}d
               </TerminalBadge>
             )}
           </div>
+          {/* One quiet scope line instead of a badge per datum — status is
+              the only thing that earns a colored pill. */}
+          <p className="mt-1 font-mono text-xs text-zinc-400">
+            {keyItem.scopeProjects === "all"
+              ? "all projects"
+              : `${keyItem.scopeProjects.length} project${
+                  keyItem.scopeProjects.length === 1 ? "" : "s"
+                }`}
+            {" · "}
+            {keyItem.scopeEnvironments === "all"
+              ? "all environments"
+              : keyItem.scopeEnvironments.join(", ")}
+            {" · "}
+            {keyItem.scopeResources.join(", ")}
+            {" · "}
+            {keyItem.surfaces === null
+              ? "all surfaces"
+              : keyItem.surfaces
+                  .map((surface) => SURFACE_LABEL[surface])
+                  .join(", ")}
+            {!isRevoked &&
+              expiryMsLeft !== null &&
+              !expiryExpired &&
+              !expiryUrgent &&
+              ` · expires in ${expiryDaysLeft}d`}
+          </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
             <span>
               Created by {keyItem.createdByName}{" "}
@@ -392,14 +390,16 @@ type ExpiryMode = "none" | "30d" | "90d" | "custom";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
-function CreateKeyPanel({
+function CreateKeyDrawer({
   organizationId,
   isOwner,
-  onDone,
+  isOpen,
+  onClose,
 }: {
   organizationId: Id<"organizations">;
   isOwner: boolean;
-  onDone: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }) {
   const createKey = useAction(api.features.api.keys.create);
   const projects = useOrganizationProjects(organizationId);
@@ -417,6 +417,9 @@ function CreateKeyPanel({
   const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
     new Set<Resource>(["variables"])
   );
+  const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
+    new Set<Surface>(["rest_api", "mcp_server"])
+  );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
 
@@ -425,6 +428,26 @@ function CreateKeyPanel({
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSnippet, setShowSnippet] = useState(false);
+
+  // Fresh form every open — the drawer only unmounts its children, so the
+  // previous run's state (including a revealed key) must not linger.
+  useEffect(() => {
+    if (!isOpen) return;
+    setName("");
+    setProjectMode("specific");
+    setSelectedProjectIds(new Set());
+    setEnvMode("specific");
+    setSelectedEnvs(new Set<Environment>(["production"]));
+    setSelectedResources(new Set<Resource>(["variables"]));
+    setSelectedSurfaces(new Set<Surface>(["rest_api", "mcp_server"]));
+    setExpiryMode("none");
+    setCustomExpiry("");
+    setIsSubmitting(false);
+    setError(null);
+    setCreatedToken(null);
+    setCopied(false);
+    setShowSnippet(false);
+  }, [isOpen]);
 
   const toggleProject = (id: Id<"projects">) => {
     setSelectedProjectIds((prev) => {
@@ -463,10 +486,36 @@ function CreateKeyPanel({
     });
   };
 
-  const projectSelectionValid =
-    projectMode === "all" || selectedProjectIds.size > 0;
+  const toggleSurface = (surface: Surface) => {
+    const adding = !selectedSurfaces.has(surface);
+    setSelectedSurfaces((prev) => {
+      const next = new Set(prev);
+      if (next.has(surface)) {
+        next.delete(surface);
+      } else {
+        next.add(surface);
+      }
+      return next;
+    });
+    // The Action pull path only accepts single-project, exactly-variables
+    // keys — steer the form into that shape instead of failing at submit.
+    if (adding && surface === "github_action") {
+      setProjectMode("specific");
+      setSelectedResources(new Set<Resource>(["variables"]));
+    }
+  };
+
+  const githubActionSelected = selectedSurfaces.has("github_action");
+
+  const projectSelectionValid = githubActionSelected
+    ? projectMode === "specific" && selectedProjectIds.size === 1
+    : projectMode === "all" || selectedProjectIds.size > 0;
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
-  const resourceSelectionValid = selectedResources.size > 0;
+  const resourceSelectionValid =
+    selectedResources.size > 0 &&
+    (!githubActionSelected ||
+      (selectedResources.size === 1 && selectedResources.has("variables")));
+  const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
     (customExpiry.length > 0 && new Date(customExpiry).getTime() > Date.now());
@@ -476,6 +525,7 @@ function CreateKeyPanel({
     projectSelectionValid &&
     envSelectionValid &&
     resourceSelectionValid &&
+    surfaceSelectionValid &&
     customExpiryValid &&
     !isSubmitting;
 
@@ -505,6 +555,7 @@ function CreateKeyPanel({
         scopeProjects,
         scopeEnvironments,
         scopeResources,
+        surfaces: Array.from(selectedSurfaces),
         expiresAt,
       });
       // Held only in this panel's local state — never persisted, never
@@ -534,12 +585,15 @@ function CreateKeyPanel({
   };
 
   return (
-    <div
-      className={`rounded-lg border p-4 ${
-        createdToken
-          ? "border-green-500/30 bg-green-500/5"
-          : "border-zinc-700 bg-zinc-950/40"
-      }`}
+    <DrawerPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="New API Key"
+      width="lg"
+      // While creating, and once the one-time plaintext is on screen, only
+      // the explicit Done button may close — a stray backdrop click must
+      // never eat the only copy of the key.
+      preventClose={isSubmitting || createdToken !== null}
     >
       {createdToken ? (
         <div className="space-y-4">
@@ -628,15 +682,13 @@ function CreateKeyPanel({
           </div>
 
           <div className="flex justify-end">
-            <TerminalButton type="button" onClick={onDone}>
+            <TerminalButton type="button" onClick={onClose}>
               Done
             </TerminalButton>
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <h3 className="text-sm font-semibold text-zinc-200">New API Key</h3>
-
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
               <p className="text-sm text-red-400">{error}</p>
@@ -664,10 +716,40 @@ function CreateKeyPanel({
 
           <div>
             <label className="block text-sm font-medium text-zinc-300">
+              Surfaces
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SURFACES.map((surface) => {
+                const selected = selectedSurfaces.has(surface);
+                return (
+                  <button
+                    key={surface}
+                    type="button"
+                    data-testid={`api-key-surface-${surface}`}
+                    aria-pressed={selected}
+                    onClick={() => toggleSurface(surface)}
+                    className={`${CHIP_BASE} normal-case ${
+                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                    }`}
+                  >
+                    {SURFACE_LABEL[surface]}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              {githubActionSelected
+                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
+                : "Where this key may be used. The GitHub Action pulls variables for a single project."}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300">
               Projects
             </label>
             <div className="mt-2 flex gap-1 rounded-lg bg-zinc-800 p-1">
-              {isOwner && (
+              {isOwner && !githubActionSelected && (
                 <button
                   type="button"
                   aria-pressed={projectMode === "all"}
@@ -771,15 +853,23 @@ function CreateKeyPanel({
             <div className="mt-2 flex flex-wrap gap-2">
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
+                const disabled =
+                  githubActionSelected && resource !== "variables";
                 return (
                   <button
                     key={resource}
                     type="button"
                     aria-pressed={selected}
+                    disabled={disabled}
+                    title={
+                      disabled
+                        ? "GitHub Action keys carry exactly the variables resource"
+                        : undefined
+                    }
                     onClick={() => toggleResource(resource)}
                     className={`${CHIP_BASE} ${
                       selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
-                    }`}
+                    } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
                   >
                     {resource}
                   </button>
@@ -834,7 +924,7 @@ function CreateKeyPanel({
             <TerminalButton
               type="button"
               variant="secondary"
-              onClick={onDone}
+              onClick={onClose}
               disabled={isSubmitting}
             >
               Cancel
@@ -845,6 +935,6 @@ function CreateKeyPanel({
           </div>
         </form>
       )}
-    </div>
+    </DrawerPanel>
   );
 }

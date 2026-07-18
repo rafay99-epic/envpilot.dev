@@ -100,15 +100,18 @@ export function TerminalButtonLink({
   className = "",
   children,
   href,
+  "data-testid": dataTestId,
 }: {
   variant?: ButtonVariant;
   className?: string;
   children: React.ReactNode;
   href: string;
+  "data-testid"?: string;
 }) {
   return (
     <Link
       href={href}
+      data-testid={dataTestId}
       className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${buttonVariants[variant]} ${className}`}
     >
       {children}

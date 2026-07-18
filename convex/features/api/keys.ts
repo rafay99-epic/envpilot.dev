@@ -40,6 +40,21 @@ export const VALID_ENVIRONMENTS = ["development", "staging", "production"];
 export const VALID_RESOURCES = ["variables", "accounts", "projects"];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
+export const surfaceValidator = v.union(
+  v.literal("github_action"),
+  v.literal("rest_api"),
+  v.literal("mcp_server")
+);
+type Surface = "github_action" | "rest_api" | "mcp_server";
+
+// Which registry flag gates minting a key for a surface. github_action rides
+// public_api — the Action pulls through /api/v1/secrets (⚖️ PLAN D2).
+const SURFACE_GATE: Record<Surface, "public_api" | "mcp_server"> = {
+  github_action: "public_api",
+  rest_api: "public_api",
+  mcp_server: "mcp_server",
+};
+
 function assertValidName(name: string): void {
   if (name.trim().length === 0 || name.length > 100) {
     throw new ConvexError("Key name must be 1-100 characters");
@@ -74,6 +89,37 @@ function assertValidResources(resources: string[]): void {
 function assertValidExpiry(expiresAt: number | undefined): void {
   if (expiresAt !== undefined && expiresAt <= Date.now()) {
     throw new ConvexError("expiresAt must be in the future");
+  }
+}
+
+/**
+ * Surfaces are required and explicit on every new key. A github_action key
+ * must be shaped like the one credential the Action pull path accepts: a
+ * single project with the "variables" resource — anything else would mint
+ * fine and then fail only at CI time (⚖️ PLAN G3).
+ */
+function assertValidSurfaces(
+  surfaces: Surface[],
+  scopeProjects: "all" | unknown[],
+  scopeResources: string[]
+): void {
+  if (surfaces.length === 0) {
+    throw new ConvexError("Key must be enabled for at least one surface");
+  }
+  if (new Set(surfaces).size !== surfaces.length) {
+    throw new ConvexError("Duplicate surface");
+  }
+  if (surfaces.includes("github_action")) {
+    if (scopeProjects === "all" || scopeProjects.length !== 1) {
+      throw new ConvexError(
+        "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter, the key IS the project scope"
+      );
+    }
+    if (scopeResources.length !== 1 || scopeResources[0] !== "variables") {
+      throw new ConvexError(
+        'A GitHub Action key must have exactly the "variables" resource — that is all the Action pulls, and an Action credential must not double as broader REST/MCP access'
+      );
+    }
   }
 }
 
@@ -122,6 +168,7 @@ export const _store = internalMutation({
     scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
     scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
     scopeResources: v.array(v.string()),
+    surfaces: v.array(surfaceValidator),
     expiresAt: v.optional(v.number()),
     tokenHash: v.string(),
   },
@@ -131,6 +178,7 @@ export const _store = internalMutation({
     assertValidName(args.name);
     assertValidEnvironments(args.scopeEnvironments);
     assertValidResources(args.scopeResources);
+    assertValidSurfaces(args.surfaces, args.scopeProjects, args.scopeResources);
     assertValidExpiry(args.expiresAt);
 
     const org = await ctx.db.get(args.organizationId);
@@ -175,15 +223,22 @@ export const _store = internalMutation({
       }
     }
 
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      args.organizationId,
-      "public_api"
-    );
-    if (!gate.allowed) {
-      throw new ConvexError(
-        "The public API is available on the Pro plan. Upgrade to create API keys."
+    // Every selected surface's gate must pass — a key minted for a surface
+    // the org's plan doesn't include would be dead on arrival there.
+    const gates = [...new Set(args.surfaces.map((s) => SURFACE_GATE[s]))];
+    for (const gateFeature of gates) {
+      const gate = await checkBooleanFeature(
+        ctx.db,
+        args.organizationId,
+        gateFeature
       );
+      if (!gate.allowed) {
+        throw new ConvexError(
+          gateFeature === "mcp_server"
+            ? "The MCP server is available on the Pro plan. Upgrade to create MCP keys."
+            : "The public API is available on the Pro plan. Upgrade to create API keys."
+        );
+      }
     }
 
     const existing = await ctx.db
@@ -207,6 +262,7 @@ export const _store = internalMutation({
       scopeProjects: args.scopeProjects,
       scopeEnvironments: args.scopeEnvironments,
       scopeResources: args.scopeResources,
+      surfaces: args.surfaces,
       createdBy: actor._id,
       createdAt: now,
       expiresAt: args.expiresAt,
@@ -222,6 +278,7 @@ export const _store = internalMutation({
         scopeProjects: args.scopeProjects,
         scopeEnvironments: args.scopeEnvironments,
         scopeResources: args.scopeResources,
+        surfaces: args.surfaces,
         expiresAt: args.expiresAt,
       }),
       createdAt: now,
@@ -244,6 +301,10 @@ export const create = action({
     scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
     scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
     scopeResources: v.array(v.string()),
+    // Optional ONLY for the deploy window where the previous web bundle
+    // (which doesn't send surfaces) is still serving — those creates get
+    // the pre-surfaces default below. The UI always passes it explicitly.
+    surfaces: v.optional(v.array(surfaceValidator)),
     expiresAt: v.optional(v.number()),
   },
   returns: v.object({
@@ -276,6 +337,7 @@ export const create = action({
       scopeProjects: args.scopeProjects,
       scopeEnvironments: args.scopeEnvironments,
       scopeResources: args.scopeResources,
+      surfaces: args.surfaces ?? ["rest_api", "mcp_server"],
       expiresAt: args.expiresAt,
       tokenHash,
     });
@@ -301,6 +363,8 @@ export const listForOrganization = query({
       scopeProjects: v.union(v.literal("all"), v.array(v.id("projects"))),
       scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
       scopeResources: v.array(v.string()),
+      // null = pre-surfaces key, valid on every surface
+      surfaces: v.union(v.array(surfaceValidator), v.null()),
       createdAt: v.number(),
       createdByName: v.string(),
       lastUsedAt: v.union(v.number(), v.null()),
@@ -346,6 +410,7 @@ export const listForOrganization = query({
         scopeProjects: k.scopeProjects,
         scopeEnvironments: k.scopeEnvironments,
         scopeResources: k.scopeResources,
+        surfaces: k.surfaces ?? null,
         createdAt: k.createdAt,
         createdByName,
         lastUsedAt: k.lastUsedAt ?? null,

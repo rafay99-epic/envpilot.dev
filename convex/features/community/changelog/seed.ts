@@ -1186,4 +1186,28 @@ Nothing else changes — projects, variables, and roles are untouched.`,
 - Greets you by name, sent exactly once when your account is first created
 - A failed email can never interfere with your signup`,
   },
+
+  // ============================================================
+  // v1.50.0 — One Token Model (2026-07-18)
+  // ============================================================
+  {
+    title: "One Token Model: A Single API Key for Every Machine Surface",
+    version: "v1.50.0",
+    type: "feature",
+    publishedAt: ts("2026-07-18T21:00:00Z"),
+    content: `Every machine credential — REST API, MCP server, and the GitHub Action — is now one kind of API key, minted from one place.
+
+### Surfaces on Every Key
+- New keys declare exactly where they may be used: **REST API**, **MCP server**, and/or **GitHub Action**
+- A leaked key is now useless outside the surfaces it was minted for; existing keys keep working everywhere they did before
+- The key list shows each key's surfaces at a glance
+
+### GitHub Action Keys, Locked Down
+- An Action credential is an API key with the GitHub Action surface — locked to exactly **one project** and the **variables** resource, the only shape CI pulls need
+- The wizard steers you into that shape automatically; the backend enforces it independently
+
+### One Place to Mint
+- The project-settings CI/CD Tokens tab no longer creates tokens — it lists legacy ones for revocation and points to **Organization Settings → API Keys**
+- Existing CI tokens keep working unchanged: same \`envpk_\` secret, same endpoint, nothing to rotate`,
+  },
 ];

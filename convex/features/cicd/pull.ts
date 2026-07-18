@@ -56,7 +56,10 @@ export const _authorizePull = internalMutation({
       denied: v.union(
         v.literal("invalid_token"),
         v.literal("environment_scope"),
-        v.literal("tier_gate")
+        v.literal("tier_gate"),
+        // apiKeys credentials gate on public_api, not cicd_service_tokens —
+        // distinct value so the thrown message names the right feature.
+        v.literal("tier_gate_public_api")
       ),
     })
   ),
@@ -107,6 +110,17 @@ export const _authorizePull = internalMutation({
         return { ok: false as const, denied: "invalid_token" as const };
       }
 
+      // Surface scope: keys minted before the surfaces field (absent array)
+      // stay valid here; explicit keys must include github_action. Same
+      // uniform "invalid" answer as every other shape mismatch below.
+      if (
+        apiKey.surfaces !== undefined &&
+        !apiKey.surfaces.includes("github_action")
+      ) {
+        await logApiKeyDenied("surface_out_of_scope");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+
       // This legacy surface has no projectId argument — the project comes
       // entirely from the credential's scope, and it can only ever act on
       // ONE project's variables. Keys scoped to "all"/multiple projects, or
@@ -138,18 +152,18 @@ export const _authorizePull = internalMutation({
         return { ok: false as const, denied: "invalid_token" as const };
       }
 
-      // Same tier gate as the serviceTokens path below — this compat surface
-      // stays gated by `cicd_service_tokens` regardless of which table the
-      // underlying credential lives in; `public_api` gates the new REST/MCP
-      // surfaces, not this one.
+      // apiKeys credentials gate on `public_api` — the Action surface rides
+      // the same flag as the REST API it pulls through (⚖️ PLAN D2). Only
+      // the legacy serviceTokens fallback below still checks the
+      // `cicd_service_tokens` flag, until both retire together.
       const gate = await checkBooleanFeature(
         ctx.db,
         apiKey.organizationId,
-        "cicd_service_tokens"
+        "public_api"
       );
       if (!gate.allowed) {
         await logApiKeyDenied("tier_gate");
-        return { ok: false as const, denied: "tier_gate" as const };
+        return { ok: false as const, denied: "tier_gate_public_api" as const };
       }
 
       await ctx.db.patch(apiKey._id, { lastUsedAt: now });
@@ -340,7 +354,11 @@ export const pullSecrets = action({
         }
       | {
           ok: false;
-          denied: "invalid_token" | "environment_scope" | "tier_gate";
+          denied:
+            | "invalid_token"
+            | "environment_scope"
+            | "tier_gate"
+            | "tier_gate_public_api";
         } = await ctx.runMutation(internal.features.cicd.pull._authorizePull, {
       tokenHash,
       environment: args.environment,
@@ -358,6 +376,13 @@ export const pullSecrets = action({
       if (authorization.denied === "tier_gate") {
         throw new Error(
           "CI/CD service tokens are available on the Pro plan — this organization's plan no longer includes them"
+        );
+      }
+      if (authorization.denied === "tier_gate_public_api") {
+        // Same "Pro plan" phrase — the /api/v1/secrets route's 403 regex
+        // matches it — but naming the gate that actually denied the pull.
+        throw new Error(
+          "The public API is available on the Pro plan — this organization's plan no longer includes it"
         );
       }
       throw new Error("Invalid or revoked service token");

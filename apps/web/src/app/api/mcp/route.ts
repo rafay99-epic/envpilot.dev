@@ -20,10 +20,11 @@ import { APP_VERSIONS } from "@/lib/versions";
  * `verifyToken` below is DELIBERATELY cheap — a shape check only — because
  * the real authorization (hash lookup, revocation/expiry, scope, tier gate,
  * rate limit, audit) happens per-tool-call inside the Convex actions via
- * `_authorizeRequest`. Passing gateFeature: "mcp_server" makes the tier gate
- * check the `mcp_server` registry flag rather than the REST surface's
- * `public_api` flag, so the two surfaces can be priced/toggled independently
- * even though they share every other line of enforcement logic.
+ * `_authorizeRequest`. Passing surface: "mcp_server" enforces the key's
+ * surfaces scope AND makes the tier gate check the `mcp_server` registry
+ * flag rather than the REST surface's `public_api` flag, so the two
+ * surfaces stay independently priced/toggled while sharing every other
+ * line of enforcement logic.
  *
  * Stateless Streamable HTTP (mcp-handler 1.1.0 / SDK 1.29.0, the current
  * stable v1.x line — see mcp-research.md §6 on the unreleased v2): no
@@ -112,7 +113,10 @@ const baseHandler = createMcpHandler(
           const convex = new ConvexHttpClient(requireConvexUrl());
           const projects = await convex.action(
             api.features.api.reads.listProjects,
-            { token: authInfo.token, gateFeature: "mcp_server" }
+            {
+              token: authInfo.token,
+              surface: "mcp_server",
+            }
           );
           return {
             content: [{ type: "text", text: JSON.stringify({ projects }) }],
@@ -169,7 +173,7 @@ const baseHandler = createMcpHandler(
               keys: args.keys,
               prefix: args.prefix,
               metadataOnly: args.metadata_only,
-              gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           return {
@@ -208,7 +212,7 @@ const baseHandler = createMcpHandler(
               projectSlug: args.project,
               environment: args.environment,
               keys: [args.key],
-              gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           const variable = rows[0] ?? null;
@@ -250,7 +254,7 @@ const baseHandler = createMcpHandler(
               token: authInfo.token,
               projectSlug: args.project,
               environment: args.environment,
-              gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           return {
@@ -305,7 +309,10 @@ const baseHandler = createMcpHandler(
           const convex = new ConvexHttpClient(requireConvexUrl());
           const projects = await convex.action(
             api.features.api.reads.listProjects,
-            { token: authInfo.token, gateFeature: "mcp_server" }
+            {
+              token: authInfo.token,
+              surface: "mcp_server",
+            }
           );
 
           const query = args.query.toLowerCase();
@@ -338,7 +345,7 @@ const baseHandler = createMcpHandler(
                   token: authInfo.token,
                   projectSlug: project.slug,
                   metadataOnly: true,
-                  gateFeature: "mcp_server",
+                  surface: "mcp_server",
                 }
               );
               for (const variable of variables) {

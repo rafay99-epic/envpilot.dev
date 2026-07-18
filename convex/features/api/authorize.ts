@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
+import { surfaceValidator } from "./keys";
 
 /**
  * THE single enforcement core for the public API key platform.
@@ -39,9 +40,17 @@ export const _authorizeRequest = internalMutation({
     // Which registry flag gates this surface: REST checks public_api
     // (default), the MCP server passes "mcp_server". Both are pro-tier but
     // separately priceable (⚖️ PLAN §7.1).
+    // DEPRECATED in favor of `surface` (which implies the gate) — kept so
+    // web builds deployed before this convex deploy keep working; callers
+    // migrated to `surface` may omit it.
     gateFeature: v.optional(
       v.union(v.literal("public_api"), v.literal("mcp_server"))
     ),
+    // Which surface is presenting the key. Enforced against the key's
+    // `surfaces` array (absent array = grandfathered key, valid everywhere).
+    // Optional only for the deploy window where older web builds don't pass
+    // it — those calls fall back to inferring the surface from gateFeature.
+    surface: v.optional(surfaceValidator),
   },
   returns: v.union(
     v.object({
@@ -59,6 +68,7 @@ export const _authorizeRequest = internalMutation({
         v.literal("resource_scope"),
         v.literal("environment_scope"),
         v.literal("project_scope"),
+        v.literal("surface_scope"),
         v.literal("tier_gate")
       ),
     })
@@ -107,6 +117,27 @@ export const _authorizeRequest = internalMutation({
       return { ok: false as const, denied: "invalid_key" as const };
     }
 
+    // Surface scope. Keys minted before the surfaces field exist without it
+    // and stay valid on every surface (they were minted under that
+    // behavior); new keys are always explicit. Older web builds may not
+    // pass `surface` yet — infer it from gateFeature (the only pre-surface
+    // caller that isn't plain REST is the MCP server).
+    //
+    // KNOWN LIMIT: `surface` is caller-asserted, not transport-derived —
+    // the reads/requests actions are the shared backend of both HTTP
+    // surfaces, so a key holder calling Convex directly can claim either
+    // surface. The field segments well-behaved surfaces (a leaked Action
+    // key stays useless on REST/MCP routes); the hard security boundary
+    // remains the key's resource/environment/project scope + tier gates,
+    // which no claimed surface can widen.
+    const surface =
+      args.surface ??
+      (args.gateFeature === "mcp_server" ? "mcp_server" : "rest_api");
+    if (key.surfaces !== undefined && !key.surfaces.includes(surface)) {
+      await logDenied(key, "surface_out_of_scope");
+      return { ok: false as const, denied: "surface_scope" as const };
+    }
+
     // "organization" is a PSEUDO-RESOURCE: org-level metadata (name, slug,
     // plan, bounded counts) is readable by ANY valid key of the org — the
     // key holder inherently knows which org their key belongs to, and the
@@ -138,11 +169,20 @@ export const _authorizeRequest = internalMutation({
     }
 
     // Tier gate re-checked on every request: a downgraded org's keys stop
-    // working rather than grandfathering silent access forever.
+    // working rather than grandfathering silent access forever. When a
+    // surface is given it ALONE decides the gate (github_action rides
+    // public_api — the Action hits /api/v1/secrets); gateFeature is only a
+    // fallback for pre-surface callers. Never honor a mismatched pair — a
+    // caller must not check the mcp_server surface against the public_api
+    // gate (or vice versa) to outlive its own surface's gate being off.
     const gate = await checkBooleanFeature(
       ctx.db,
       key.organizationId,
-      args.gateFeature ?? "public_api"
+      args.surface !== undefined
+        ? args.surface === "mcp_server"
+          ? "mcp_server"
+          : "public_api"
+        : (args.gateFeature ?? "public_api")
     );
     if (!gate.allowed) {
       await logDenied(key, "tier_gate");

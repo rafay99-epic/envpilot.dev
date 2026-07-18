@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { normalizeOrgRole } from "../../lib/authz";
 import { SEED_CHANGELOG } from "../community/changelog/seed";
 import { SEED_FEATURE_REQUESTS } from "../community/featureRequests/seed";
@@ -74,7 +75,7 @@ export const listMigrations = query({
       {
         name: "seed-changelog",
         description:
-          "Seeds all historical changelog entries (v0.1.0 through v1.40.0). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
+          "Seeds all historical changelog entries (v0.1.0 through v1.50.0). Idempotent — skips entries that already exist, removes duplicates. Safe to run multiple times.",
         category: "Content Seeding",
         priority: 1,
         destructive: false,
@@ -1070,6 +1071,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     const serviceTokens = await ctx.db.query("serviceTokens").collect();
     let migrated = 0;
     let skipped = 0;
+    let backfilled = 0;
 
     for (const token of serviceTokens) {
       const existing = await ctx.db
@@ -1077,7 +1079,16 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         .withIndex("by_token_hash", (q) => q.eq("tokenHash", token.tokenHash))
         .first();
       if (existing) {
-        skipped++;
+        // Rows copied by earlier runs predate the surfaces field and would
+        // otherwise stay grandfathered onto EVERY surface — a leaked CI
+        // token must never widen into a REST/MCP credential. Same tokenHash
+        // = same credential, so stamping is always correct here.
+        if (existing.surfaces === undefined) {
+          await ctx.db.patch(existing._id, { surfaces: ["github_action"] });
+          backfilled++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -1088,6 +1099,9 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         scopeProjects: [token.projectId],
         scopeEnvironments: token.environments,
         scopeResources: ["variables"],
+        // Service tokens were only ever an Action credential — stamp the
+        // surface explicitly instead of grandfathering them onto all three.
+        surfaces: ["github_action"],
         createdBy: token.createdBy,
         createdAt: token.createdAt,
         lastUsedAt: token.lastUsedAt,
@@ -1097,11 +1111,32 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
       migrated++;
     }
 
+    // Migrated rows bypass keys.ts's MAX_KEYS_PER_ORG hygiene cap (25) —
+    // report each touched org's LIVE key count so an over-cap org is
+    // visible instead of silently blocked from minting new keys later.
+    // Rerun-stable: recomputed from apiKeys, not from this run's inserts.
+    const liveKeysByOrg: Record<string, number> = {};
+    for (const orgId of new Set(
+      serviceTokens.map((t) => t.organizationId as string)
+    )) {
+      const keys = await ctx.db
+        .query("apiKeys")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", orgId as Id<"organizations">)
+        )
+        .collect();
+      liveKeysByOrg[orgId] = keys.filter(
+        (k) => k.revokedAt === undefined
+      ).length;
+    }
+
     return {
       success: true,
       total: serviceTokens.length,
       migrated,
+      backfilled,
       skipped,
+      liveKeysByOrg,
     };
   }
 

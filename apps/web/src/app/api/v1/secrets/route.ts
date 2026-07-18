@@ -78,13 +78,11 @@ export async function GET(request: Request) {
       );
     }
     if (/pro plan/i.test(message)) {
-      return NextResponse.json(
-        {
-          error:
-            "CI/CD service tokens require the Pro plan — this organization's plan no longer includes them",
-        },
-        { status: 403 }
-      );
+      // Pass the action's wording through — it names the gate that actually
+      // denied the pull (cicd_service_tokens for legacy tokens, public_api
+      // for apiKeys credentials), and rewriting it here pointed users at
+      // the wrong feature to fix.
+      return NextResponse.json({ error: message }, { status: 403 });
     }
     if (/rate ?limit/i.test(message)) {
       return NextResponse.json(

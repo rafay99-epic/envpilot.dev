@@ -89,6 +89,19 @@ test.describe.serial("API keys", () => {
     });
     await expect(variablesChip).toBeVisible();
 
+    // Surfaces: REST API + MCP server are the pre-selected defaults —
+    // assert; GitHub Action is opt-in.
+    await expect(page.getByTestId("api-key-surface-rest_api")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(
+      page.getByTestId("api-key-surface-mcp_server")
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByTestId("api-key-surface-github_action")
+    ).toHaveAttribute("aria-pressed", "false");
+
     await page.getByRole("button", { name: /^Create Key$/i }).click();
 
     // Immediate, unambiguous feedback that the create succeeded (a sonner
@@ -115,9 +128,10 @@ test.describe.serial("API keys", () => {
       .locator("li")
       .filter({ hasText: keyName });
     await expect(row).toBeVisible({ timeout: 10_000 });
-    await expect(row.getByText(/^1 project$/)).toBeVisible();
-    await expect(row.getByText(/^production$/)).toBeVisible();
-    await expect(row.getByText(/^variables$/)).toBeVisible();
+    // Scope renders as one quiet line, not a badge per datum.
+    await expect(
+      row.getByText(/1 project · production · variables · REST API, MCP server/)
+    ).toBeVisible();
 
     expect(
       clientErrors,

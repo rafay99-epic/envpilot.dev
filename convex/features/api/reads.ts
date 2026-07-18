@@ -97,6 +97,7 @@ type Denied =
   | "resource_scope"
   | "environment_scope"
   | "project_scope"
+  | "surface_scope"
   | "tier_gate";
 
 type Authorization =
@@ -133,6 +134,9 @@ function throwForDenial(denied: Denied): never {
   }
   if (denied === "project_scope") {
     throw new Error("Project not found");
+  }
+  if (denied === "surface_scope") {
+    throw new Error("This API key is not enabled for this surface");
   }
   // tier_gate
   throw new Error(
@@ -319,8 +323,17 @@ const gateFeatureArg = v.optional(
   v.union(v.literal("public_api"), v.literal("mcp_server"))
 );
 
+// Which surface is presenting the key — enforced against the key's
+// `surfaces` array in authorize.ts. The MCP server passes "mcp_server";
+// REST routes omit it and rely on authorize.ts's inference fallback
+// (surface absent + no mcp gateFeature = "rest_api"), which also covers
+// calls from web builds predating this field.
+const surfaceArg = v.optional(
+  v.union(v.literal("rest_api"), v.literal("mcp_server"))
+);
+
 export const getOrganization = action({
-  args: { token: v.string(), gateFeature: gateFeatureArg },
+  args: { token: v.string(), gateFeature: gateFeatureArg, surface: surfaceArg },
   returns: v.object({
     name: v.string(),
     slug: v.string(),
@@ -346,6 +359,7 @@ export const getOrganization = action({
         tokenHash,
         requirement: { resource: "organization" },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!authorization.ok) throwForDenial(authorization.denied);
@@ -360,7 +374,7 @@ export const getOrganization = action({
 });
 
 export const listProjects = action({
-  args: { token: v.string(), gateFeature: gateFeatureArg },
+  args: { token: v.string(), gateFeature: gateFeatureArg, surface: surfaceArg },
   returns: v.array(
     v.object({
       name: v.string(),
@@ -382,6 +396,7 @@ export const listProjects = action({
         tokenHash,
         requirement: { resource: "projects" },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!authorization.ok) throwForDenial(authorization.denied);
@@ -398,6 +413,7 @@ export const getProject = action({
     token: v.string(),
     projectSlug: v.string(),
     gateFeature: gateFeatureArg,
+    surface: surfaceArg,
   },
   returns: v.object({
     name: v.string(),
@@ -418,6 +434,7 @@ export const getProject = action({
         tokenHash,
         requirement: { resource: "projects" },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
@@ -437,6 +454,7 @@ export const getProject = action({
         tokenHash,
         requirement: { resource: "projects", projectId: projectDoc._id },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!scoped.ok) throwForDenial(scoped.denied);
@@ -463,6 +481,7 @@ export const getProjectVariables = action({
     prefix: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
     gateFeature: gateFeatureArg,
+    surface: surfaceArg,
   },
   returns: v.array(
     v.object({
@@ -507,6 +526,7 @@ export const getProjectVariables = action({
         tokenHash,
         requirement: { resource: "variables", environment: args.environment },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
@@ -532,6 +552,7 @@ export const getProjectVariables = action({
           projectId: projectDoc._id,
         },
         gateFeature: args.gateFeature,
+        surface: args.surface,
         recordUse: metadataOnly
           ? undefined
           : {
@@ -619,6 +640,7 @@ export const getProjectAccounts = action({
     environment: v.optional(v.string()),
     metadataOnly: v.optional(v.boolean()),
     gateFeature: gateFeatureArg,
+    surface: surfaceArg,
   },
   returns: v.array(
     v.object({
@@ -659,6 +681,7 @@ export const getProjectAccounts = action({
         tokenHash,
         requirement: { resource: "accounts", environment: args.environment },
         gateFeature: args.gateFeature,
+        surface: args.surface,
       }
     );
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
@@ -682,6 +705,7 @@ export const getProjectAccounts = action({
           projectId: projectDoc._id,
         },
         gateFeature: args.gateFeature,
+        surface: args.surface,
         recordUse: metadataOnly
           ? undefined
           : {

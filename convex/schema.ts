@@ -604,6 +604,20 @@ export default defineSchema({
     scopeEnvironments: v.union(v.literal("all"), v.array(v.string())),
     // Subset of ["variables", "accounts", "projects"]
     scopeResources: v.array(v.string()),
+    // Which machine surfaces may present this key. Absent = key predates the
+    // surfaces field and is valid on EVERY surface (grandfathered — exactly
+    // the behavior it was minted under). New keys always set it explicitly.
+    // github_action keys are constrained at create time to a single project
+    // + the "variables" resource (the only shape the Action pull accepts).
+    surfaces: v.optional(
+      v.array(
+        v.union(
+          v.literal("github_action"),
+          v.literal("rest_api"),
+          v.literal("mcp_server")
+        )
+      )
+    ),
     createdBy: v.id("users"),
     createdAt: v.number(),
     // Set on every successful authorized use that opts into recording it
