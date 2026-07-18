@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { normalizePath, pathsEqual, isPathInside } from "./paths";
+import { normalizePath, pathKey, pathsEqual, isPathInside } from "./paths";
 
 const caseInsensitive =
   process.platform === "darwin" || process.platform === "win32";
@@ -41,15 +41,17 @@ describe("normalizePath", () => {
     expect(normalized.endsWith("gone.env")).toBe(true);
   });
 
-  it("lowercases on case-insensitive platforms only", () => {
+  it("normalizePath preserves case; pathKey folds it on case-insensitive platforms", () => {
     const mixed = path.join(tmpDir, "Mixed", "Case.ENV");
-    const normalized = normalizePath(mixed);
+
+    // Storage/IO identity never case-folds — the result is used as an fs path.
+    expect(normalizePath(mixed).endsWith("Mixed/Case.ENV")).toBe(true);
 
     if (caseInsensitive) {
-      expect(normalized).toBe(normalized.toLowerCase());
+      expect(pathKey(mixed)).toBe(pathKey(mixed.toLowerCase()));
       expect(pathsEqual(mixed, mixed.toLowerCase())).toBe(true);
     } else {
-      expect(normalized.endsWith("Mixed/Case.ENV")).toBe(true);
+      expect(pathKey(mixed).endsWith("Mixed/Case.ENV")).toBe(true);
     }
   });
 

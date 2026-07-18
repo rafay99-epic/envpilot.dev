@@ -73,9 +73,12 @@ async function hover(
   // The value itself is NEVER rendered here — only the mask. Revealing goes
   // through the envpilot.revealHoverValue command, which re-checks the role.
   const markdown = new vscode.MarkdownString();
-  markdown.appendMarkdown(
-    `**Envpilot**\n\nProject: ${resolved.project.projectName}\n\nEnvironment: ${envs.join(", ")}`
-  );
+  // Project/environment names are server-controlled — append as TEXT so a
+  // crafted name can't smuggle markdown (e.g. a command link) into the hover.
+  markdown.appendMarkdown("**Envpilot**\n\nProject: ");
+  markdown.appendText(resolved.project.projectName);
+  markdown.appendMarkdown("\n\nEnvironment: ");
+  markdown.appendText(envs.join(", "));
   markdown.appendCodeblock(MASK, "text");
   const args = encodeURIComponent(
     JSON.stringify({
@@ -87,8 +90,9 @@ async function hover(
   markdown.appendMarkdown(
     `\n[Reveal value](command:envpilot.revealHoverValue?${args})`
   );
-  // Required for the command link to be clickable.
-  markdown.isTrusted = true;
+  // Trust ONLY the one command the hover needs — never blanket-trust, which
+  // would let any command URI in interpolated content execute on click.
+  markdown.isTrusted = { enabledCommands: ["envpilot.revealHoverValue"] };
   return new vscode.Hover(markdown);
 }
 

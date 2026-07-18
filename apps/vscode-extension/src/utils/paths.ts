@@ -3,11 +3,12 @@ import * as os from "os";
 import * as fs from "fs";
 
 /**
- * Normalize a path for consistent storage and comparison across platforms.
- * Always uses forward slashes internally. Symlinks are resolved so two
- * spellings of the same file (e.g. /tmp vs /private/tmp on macOS) compare
- * equal, and the result is lowercased on the case-insensitive platforms
- * (darwin/win32) so casing differences can't bypass path-keyed guards.
+ * Normalize a path for storage, display, and filesystem I/O. Always uses
+ * forward slashes internally. Symlinks are resolved so two spellings of the
+ * same file (e.g. /tmp vs /private/tmp on macOS) normalize identically.
+ * Case is PRESERVED — the result may be handed back to fs.* calls, and
+ * case-folding would break on case-sensitive volumes (which process.platform
+ * cannot detect). Use {@link pathKey} for case-insensitive matching.
  */
 export function normalizePath(inputPath: string): string {
   // Resolve to absolute path
@@ -18,11 +19,19 @@ export function normalizePath(inputPath: string): string {
     // File doesn't exist (yet) — lexical resolution is the best we can do.
   }
   // Convert to forward slashes for consistent storage
-  let normalized = resolved.replace(/\\/g, "/");
-  if (process.platform === "darwin" || process.platform === "win32") {
-    normalized = normalized.toLowerCase();
-  }
-  return normalized;
+  return resolved.replace(/\\/g, "/");
+}
+
+/**
+ * Comparison key for path-keyed guards/maps: normalizePath plus case-folding
+ * on the case-insensitive platforms (darwin/win32), so casing differences
+ * can't bypass a lookup. Never persist this value or pass it to fs.* calls.
+ */
+export function pathKey(inputPath: string): string {
+  const normalized = normalizePath(inputPath);
+  return process.platform === "darwin" || process.platform === "win32"
+    ? normalized.toLowerCase()
+    : normalized;
 }
 
 /**
@@ -39,7 +48,7 @@ export function toPlatformPath(normalizedPath: string): string {
  * Check if two paths point to the same location
  */
 export function pathsEqual(path1: string, path2: string): boolean {
-  return normalizePath(path1) === normalizePath(path2);
+  return pathKey(path1) === pathKey(path2);
 }
 
 /**
@@ -47,8 +56,8 @@ export function pathsEqual(path1: string, path2: string): boolean {
  * Uses proper path segment comparison to prevent bypass attacks
  */
 export function isPathInside(childPath: string, parentPath: string): boolean {
-  const normalizedChild = normalizePath(childPath);
-  const normalizedParent = normalizePath(parentPath);
+  const normalizedChild = pathKey(childPath);
+  const normalizedParent = pathKey(parentPath);
 
   // Ensure parent ends with separator for proper prefix matching
   const parentWithSep = normalizedParent.endsWith("/")

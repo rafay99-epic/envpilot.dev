@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { existsSync } from "fs";
-import { chmod } from "fs/promises";
+import { chmod, unlink } from "fs/promises";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -50,6 +50,7 @@ import { envFileNamesFor } from "./utils/envFiles";
 import {
   purgeManagedFilesFiltered,
   readManifest,
+  renameManagedFile,
   getManifestPath,
 } from "./utils/managedFiles";
 import {
@@ -280,10 +281,20 @@ export async function activate(context: vscode.ExtensionContext) {
   clipboardGuardService.activate();
   // Re-arm the clipboard guard from the managed-files manifest BEFORE the
   // first sync — a managed file must never sit unguarded between window
-  // reload and the sync that would re-register it.
+  // reload and the sync that would re-register it. Gated on an auth session
+  // so a signed-out reload doesn't re-lock files releaseAllProtection() just
+  // released. Entries recorded by older builds lack `mode` — fail closed
+  // with the restrictive default; the next sync corrects it.
+  const rearmAuthenticated = await authService.isAuthenticated();
   for (const entry of await readManifest(getManifestPath())) {
-    if (entry.mode && existsSync(entry.path)) {
-      clipboardGuardService.protectFile(entry.path, entry.mode);
+    // Sweep a stale atomic-write temp a crash may have left beside the file
+    // (it holds plaintext secrets and is not itself in the manifest).
+    void unlink(`${entry.path}.tmp-envpilot`).catch(() => {});
+    if (rearmAuthenticated && existsSync(entry.path)) {
+      clipboardGuardService.protectFile(
+        entry.path,
+        entry.mode ?? "readonly-with-request"
+      );
     }
   }
   cloakService = new CloakService((fsPath) =>
@@ -475,6 +486,9 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidRenameFiles((e) => {
       for (const { oldUri, newUri } of e.files) {
         clipboardGuardService.handleRename(oldUri.fsPath, newUri.fsPath);
+        // Re-key the manifest too, or the renamed file's protection is lost
+        // on reload (re-arm) and never cleaned up by purge/release.
+        void renameManagedFile(oldUri.fsPath, newUri.fsPath);
       }
     })
   );
@@ -681,6 +695,10 @@ export async function activate(context: vscode.ExtensionContext) {
 async function handleSignIn(): Promise<void> {
   const success = await authService.signIn();
   if (success) {
+    // The Convex socket may still be authenticated as a previous account (or
+    // unauthenticated) — force it to re-run the token fetch before any
+    // subscriptions start, same as switchToAccount.
+    convexService?.reauthenticate();
     // If sign-in added a new account alongside existing ones, point the user
     // at the switcher — AuthService.signIn() already showed the plain
     // "Signed in as <email>" toast for the single-account case.
@@ -732,6 +750,9 @@ async function releaseAllProtection(): Promise<void> {
     }
     clipboardGuardService.unprotectFile(entry.path);
   }
+  // Unmask already-open editors immediately — cloaking keys off the guard's
+  // managed map, which the loop above just emptied.
+  cloakService.refresh();
 }
 
 async function handleSignOut(): Promise<void> {
@@ -749,6 +770,9 @@ async function handleSignOut(): Promise<void> {
   // handler just applied.
   const remainingSession = await storageService.getAuthSession();
   if (remainingSession) {
+    // The Convex socket is still authenticated as the signed-out account —
+    // force a token re-fetch before subscriptions restart under the new one.
+    convexService?.reauthenticate();
     setSentryUser(remainingSession.user.id, remainingSession.user.email);
     vscode.commands.executeCommand(
       "setContext",

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { normalizePath as sharedNormalizePath } from "../utils/paths";
+import { pathKey } from "../utils/paths";
 import * as output from "../utils/outputChannel";
 import { shouldBlock, type ClipboardGuardScope } from "../utils/clipboardScope";
 import type { ProtectionMode } from "./fileProtection";
@@ -188,7 +188,8 @@ export class ClipboardGuardService {
   }
 
   private normalizePath(filePath: string): string {
-    return sharedNormalizePath(filePath);
+    // Case-folded comparison key — casing differences must not bypass the map.
+    return pathKey(filePath);
   }
 
   dispose(): void {

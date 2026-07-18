@@ -94,6 +94,27 @@ export async function recordManagedFile(
   }
 }
 
+/**
+ * Re-key a manifest entry after a rename/move (keeps sha256/mode) so
+ * protection, purge, and release still find the file. Best-effort.
+ */
+export async function renameManagedFile(
+  oldPath: string,
+  newPath: string,
+  manifestPath: string = getManifestPath()
+): Promise<void> {
+  try {
+    const resolvedOld = path.resolve(oldPath);
+    const entries = await readManifest(manifestPath);
+    const entry = entries.find((e) => e.path === resolvedOld);
+    if (!entry) return;
+    entry.path = path.resolve(newPath);
+    await writeManifest(manifestPath, entries);
+  } catch {
+    // Never let manifest bookkeeping break a rename.
+  }
+}
+
 /** Drop a file the extension deliberately deleted. Best-effort. */
 export async function forgetManagedFile(
   filePath: string,

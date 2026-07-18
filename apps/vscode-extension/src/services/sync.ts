@@ -14,6 +14,8 @@ import {
 } from "../utils/config";
 import {
   normalizePath,
+  pathKey,
+  pathsEqual,
   toPlatformPath,
   getDisplayPath,
   isPathInside,
@@ -182,7 +184,10 @@ export class SyncService {
             const hash = JSON.stringify(
               metadata.map((m) => `${m.key}:${m.version}`)
             );
-            const key = `${project.projectId}:${directory.directoryPath}`;
+            const key = this.hashKey(
+              project.projectId,
+              directory.directoryPath
+            );
             const prevHash = this.lastMetadataHash.get(key);
 
             if (prevHash !== undefined && prevHash !== hash) {
@@ -206,7 +211,7 @@ export class SyncService {
     project: LinkedProjectV2,
     directory: LinkedDirectory
   ): void {
-    const key = `${project.projectId}:${directory.directoryPath}`;
+    const key = this.hashKey(project.projectId, directory.directoryPath);
     const existing = this.syncDebounceTimers.get(key);
     if (existing) {
       clearTimeout(existing);
@@ -264,13 +269,22 @@ export class SyncService {
   }
 
   /**
+   * Key for lastMetadataHash/syncDebounceTimers — pathKey collapses every
+   * spelling of a directory (stored vs freshly picked, any casing) to one
+   * key, so set-time and prune-time keys always match.
+   */
+  private hashKey(projectId: string, directoryPath: string): string {
+    return `${projectId}:${pathKey(directoryPath)}`;
+  }
+
+  /**
    * Drop cached metadata hashes for an unlinked project (all directories) or
    * a single removed directory.
    */
   private pruneMetadataHashes(projectId: string, directoryPath?: string): void {
     const exact =
       directoryPath !== undefined
-        ? `${projectId}:${normalizePath(directoryPath)}`
+        ? this.hashKey(projectId, directoryPath)
         : undefined;
     for (const key of this.lastMetadataHash.keys()) {
       if (!key.startsWith(`${projectId}:`)) continue;
@@ -868,6 +882,7 @@ export class SyncService {
    * used for the file header. See {@link mergeDirectory} for the fan-out.
    */
   async mergeEnvFiles(
+    projectId: string,
     directoryPath: string,
     targetFile: string,
     projectName: string,
@@ -909,8 +924,44 @@ export class SyncService {
       } catch {
         // File may not exist yet
       }
+      // A merged file carries pulled secret values, so it gets the exact same
+      // protection as the overwrite path (writeEnvFileToDirectory): mode in
+      // the manifest (for the activation re-arm), clipboard guard, read-only
+      // chmod + revert watcher for non-writable roles.
+      const protectionMode = this.resolveProtectionMode(
+        projectId,
+        newVariables
+      );
       await atomicWriteFile(envFilePath, mergedContent);
-      await recordManagedFile(envFilePath, mergedContent);
+      await recordManagedFile(
+        envFilePath,
+        mergedContent,
+        undefined,
+        protectionMode
+      );
+
+      if (this.clipboardGuard) {
+        this.clipboardGuard.protectFile(envFilePath, protectionMode);
+      }
+
+      if (protectionMode !== "writable") {
+        await fs.chmod(envFilePath, 0o444);
+        if (this.fileProtection) {
+          this.fileProtection.watchFile(
+            envFilePath,
+            async () => {
+              const project = await this.storage.getLinkedProjectV2(projectId);
+              const dir = project?.directories.find((d) =>
+                pathsEqual(d.directoryPath, directoryPath)
+              );
+              if (project && dir) {
+                await this.syncDirectory(project, dir);
+              }
+            },
+            protectionMode
+          );
+        }
+      }
     } finally {
       this.fileProtection?.setSyncing(false);
     }
@@ -937,6 +988,7 @@ export class SyncService {
     await Promise.all(
       envs.map((env, i) =>
         this.mergeEnvFiles(
+          projectId,
           directory.directoryPath,
           envToFile.get(env) as string,
           projectName,
@@ -956,9 +1008,8 @@ export class SyncService {
     project: LinkedProjectV2,
     directory: LinkedDirectory
   ): Promise<SyncResult> {
-    return this.syncFlight.run(
-      `sync:${normalizePath(directory.directoryPath)}`,
-      () => this.doSyncDirectory(project, directory)
+    return this.syncFlight.run(`sync:${pathKey(directory.directoryPath)}`, () =>
+      this.doSyncDirectory(project, directory)
     );
   }
 

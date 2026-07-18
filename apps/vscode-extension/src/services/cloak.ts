@@ -43,6 +43,10 @@ export class CloakService {
   activate(): void {
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor(() => this.refresh()),
+      // Decorations are per-TextEditor: an editor surfaced without an
+      // active-editor change (showTextDocument with preserveFocus, layout
+      // changes) starts undecorated and must be re-cloaked.
+      vscode.window.onDidChangeVisibleTextEditors(() => this.refresh()),
       vscode.workspace.onDidOpenTextDocument(() => this.refresh()),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (!this.isManaged(e.document.uri.fsPath)) return;
