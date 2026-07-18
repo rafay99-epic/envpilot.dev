@@ -1,17 +1,16 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { query, mutation } from "../../_generated/server";
-import { BROWSABLE_TABLES, verifyAdmin } from "./auth";
+import { BROWSABLE_TABLES, requireAdmin } from "./auth";
 
 export const updateTableRow = mutation({
   args: {
-    secret: v.string(),
     tableName: v.string(),
     id: v.string(),
     fields: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     if (
       !BROWSABLE_TABLES.includes(
@@ -33,12 +32,11 @@ export const updateTableRow = mutation({
 
 export const deleteTableRow = mutation({
   args: {
-    secret: v.string(),
     tableName: v.string(),
     id: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     if (
       !BROWSABLE_TABLES.includes(
@@ -59,12 +57,11 @@ export const deleteTableRow = mutation({
 
 export const browseTablePaginated = query({
   args: {
-    secret: v.string(),
     tableName: v.string(),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     if (
       !BROWSABLE_TABLES.includes(
         args.tableName as (typeof BROWSABLE_TABLES)[number]

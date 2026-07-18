@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listAllChangelog = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     return await ctx.db.query("changelog").order("desc").collect();
   },
@@ -13,7 +13,6 @@ export const listAllChangelog = query({
 
 export const createChangelog = mutation({
   args: {
-    secret: v.string(),
     title: v.string(),
     content: v.string(),
     version: v.string(),
@@ -39,7 +38,7 @@ export const createChangelog = mutation({
     scheduledFor: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const now = Date.now();
     const typesArray = args.types ?? [args.type];
@@ -78,7 +77,6 @@ export const createChangelog = mutation({
 
 export const updateChangelog = mutation({
   args: {
-    secret: v.string(),
     id: v.id("changelog"),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
@@ -107,7 +105,7 @@ export const updateChangelog = mutation({
     isPublished: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const now = Date.now();
     const entry = await ctx.db.get(args.id);
@@ -154,11 +152,10 @@ export const updateChangelog = mutation({
 
 export const toggleChangelogPublish = mutation({
   args: {
-    secret: v.string(),
     id: v.id("changelog"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const entry = await ctx.db.get(args.id);
     if (!entry) {
@@ -179,11 +176,10 @@ export const toggleChangelogPublish = mutation({
 
 export const deleteChangelog = mutation({
   args: {
-    secret: v.string(),
     id: v.id("changelog"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.delete(args.id);
   },
 });

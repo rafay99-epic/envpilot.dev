@@ -1,13 +1,12 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 /**
  * Update expiry time on a variable — for testing rotation workflows.
  */
 export const updateVariableExpiry = mutation({
   args: {
-    secret: v.string(),
     variableId: v.id("environmentVariables"),
     expiresAt: v.number(),
     rotationStatus: v.optional(
@@ -19,7 +18,7 @@ export const updateVariableExpiry = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const variable = await ctx.db.get(args.variableId);
     if (!variable) throw new Error("Variable not found");
@@ -42,9 +41,9 @@ export const updateVariableExpiry = mutation({
  * List all rotation-enabled variables across the system (admin view).
  */
 export const listRotationVariables = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     // Fetch all non-deleted variables and filter in JS —
     // Convex filters on optional fields can be unreliable with undefined checks

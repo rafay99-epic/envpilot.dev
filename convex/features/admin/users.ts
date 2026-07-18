@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
 import { normalizeOrgRole } from "../../lib/authz";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listUsers = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const users = await ctx.db.query("users").order("desc").take(500);
 
@@ -26,17 +26,16 @@ export const listUsers = query({
 
 export const banUser = mutation({
   args: {
-    secret: v.string(),
     userId: v.id("users"),
     banReason: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    const admin = await requireAdmin(ctx);
 
     await ctx.db.patch(args.userId, {
       isBanned: true,
       bannedAt: Date.now(),
-      bannedBy: "admin",
+      bannedBy: admin.email,
       banReason: args.banReason,
     });
 
@@ -71,11 +70,10 @@ export const banUser = mutation({
 
 export const unbanUser = mutation({
   args: {
-    secret: v.string(),
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     await ctx.db.patch(args.userId, {
       isBanned: false,
@@ -88,9 +86,9 @@ export const unbanUser = mutation({
 
 /** List all user tiers with user info and owned org count */
 export const listUserTiers = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
     const userTierRecords = await ctx.db.query("userTiers").take(200);
 
     return await Promise.all(
@@ -128,13 +126,12 @@ export const listUserTiers = query({
 /** Assign tier to a user */
 export const updateUserTier = mutation({
   args: {
-    secret: v.string(),
     userId: v.id("users"),
     tier: v.string(),
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     const now = Date.now();
 
     // Validate tier exists

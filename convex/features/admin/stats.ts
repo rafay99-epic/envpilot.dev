@@ -1,6 +1,5 @@
-import { v } from "convex/values";
 import { query } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 // Admin dashboard reads are reactive (re-run on every write to any of these
 // tables platform-wide). This cap bounds worst-case read cost per render and
@@ -11,9 +10,9 @@ import { verifyAdmin } from "./auth";
 const ADMIN_DASHBOARD_SCAN_CAP = 10000;
 
 export const getStats = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const users = await ctx.db.query("users").take(ADMIN_DASHBOARD_SCAN_CAP);
     const organizations = await ctx.db
@@ -64,9 +63,9 @@ export const getStats = query({
 });
 
 export const getPaymentReadiness = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const paymentProducts = await ctx.db.query("paymentProducts").collect();
     const tierDefinitions = await ctx.db.query("tierDefinitions").collect();
@@ -110,9 +109,9 @@ export const getPaymentReadiness = query({
 });
 
 export const getAnalytics = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     // Get all users with creation times for growth chart
     const users = await ctx.db.query("users").take(ADMIN_DASHBOARD_SCAN_CAP);

@@ -1,44 +1,26 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { useConvex } from "convex/react";
+import { useEffect } from "react";
+import { useAuth } from "@workos-inc/authkit-react";
 import { api } from "@convex/_generated/api";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
 function LoginPage() {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const login = useAuthStore((s) => s.login);
+  const { isLoading, user, signIn, signOut } = useAuth();
+  const whoami = useAdminQuery(api.features.admin.auth.whoami, {});
   const navigate = useNavigate();
-  const convex = useConvex();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
+  const isAdmin = user && whoami?.isAdmin;
+  useEffect(() => {
+    if (isAdmin) navigate({ to: "/" });
+  }, [isAdmin, navigate]);
 
-    try {
-      const result = await convex.query(api.features.admin.auth.verifySecret, {
-        secret: password,
-      });
-      if (result.valid) {
-        login(password);
-        navigate({ to: "/" });
-      } else {
-        setError("Invalid admin secret");
-      }
-    } catch {
-      setError("Failed to verify secret. Check your connection.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const pending = isLoading || (user && whoami === undefined);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -51,27 +33,28 @@ function LoginPage() {
             Envpilot Admin
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Enter your admin secret to continue
+            Sign in with your Envpilot account
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            type="password"
-            placeholder="Admin secret"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-          />
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || !password}
-          >
-            {isLoading ? "Verifying..." : "Sign In"}
+        {pending ? (
+          <div className="flex justify-center">
+            <Spinner />
+          </div>
+        ) : user && whoami && !whoami.isAdmin ? (
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-red-400">
+              {whoami.email ?? "This account"} is not an admin.
+            </p>
+            <Button className="w-full" onClick={() => void signOut()}>
+              Sign out
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full" onClick={() => void signIn()}>
+            Sign In with WorkOS
           </Button>
-        </form>
+        )}
       </div>
     </div>
   );

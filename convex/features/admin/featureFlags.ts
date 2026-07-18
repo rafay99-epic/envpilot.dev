@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 /** List all registered features (developer-seeded, admin can only toggle active) */
 export const listFeatureRegistry = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
     const features = await ctx.db.query("featureRegistry").collect();
     return features.sort((a, b) => a.sortOrder - b.sortOrder);
   },
@@ -15,12 +15,11 @@ export const listFeatureRegistry = query({
 /** Toggle a feature active/inactive */
 export const toggleFeatureActive = mutation({
   args: {
-    secret: v.string(),
     featureId: v.id("featureRegistry"),
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.patch(args.featureId, {
       isActive: args.isActive,
       updatedAt: Date.now(),
@@ -34,9 +33,9 @@ export const toggleFeatureActive = mutation({
 
 /** Get all tier-feature overrides, optionally filtered by tier */
 export const listTierFeatures = query({
-  args: { secret: v.string(), tierName: v.optional(v.string()) },
+  args: { tierName: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     if (args.tierName) {
       return await ctx.db
         .query("tierFeatures")
@@ -50,13 +49,12 @@ export const listTierFeatures = query({
 /** Set a single tier-feature value (the core admin action) */
 export const setTierFeatureValue = mutation({
   args: {
-    secret: v.string(),
     tierName: v.string(),
     featureKey: v.string(),
     value: v.string(), // "true", "false", "50", "null"
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     const now = Date.now();
 
     // Validate feature exists
@@ -122,12 +120,11 @@ export const setTierFeatureValue = mutation({
 /** Remove a tier-feature override (reverts to default from featureRegistry) */
 export const removeTierFeatureOverride = mutation({
   args: {
-    secret: v.string(),
     tierName: v.string(),
     featureKey: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const existing = await ctx.db
       .query("tierFeatures")

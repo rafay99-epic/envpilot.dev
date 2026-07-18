@@ -1,6 +1,6 @@
 import { v, ConvexError } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 import { CAPABILITIES, CAPABILITY_KEYS } from "../../lib/capabilities";
 
 const SLUG_PATTERN = /^[a-z][a-z0-9_]{1,30}$/;
@@ -32,9 +32,9 @@ function validateCapabilityKeys(capabilities: Record<string, boolean>) {
 
 /** All roles sorted by sortOrder, with member + pending invitation counts */
 export const listRoles = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
     const roles = await ctx.db.query("roleRegistry").collect();
 
     // ponytail: full-table collects — fine at admin-panel scale, index by
@@ -64,9 +64,9 @@ export const listRoles = query({
 
 /** The code-defined capability catalog (lib/capabilities.ts) */
 export const listCapabilities = query({
-  args: { secret: v.string() },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
     return CAPABILITY_KEYS.map((key) => ({ key, ...CAPABILITIES[key] }));
   },
 });
@@ -74,7 +74,6 @@ export const listCapabilities = query({
 /** Create a custom (non-system) role */
 export const createRole = mutation({
   args: {
-    secret: v.string(),
     slug: v.string(),
     displayName: v.string(),
     description: v.string(),
@@ -83,7 +82,7 @@ export const createRole = mutation({
     capabilities: v.record(v.string(), v.boolean()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     if (!SLUG_PATTERN.test(args.slug)) {
       throw new ConvexError(
@@ -136,7 +135,6 @@ export const createRole = mutation({
 /** Edit display metadata; level is editable for non-system roles only */
 export const updateRoleMeta = mutation({
   args: {
-    secret: v.string(),
     roleId: v.id("roleRegistry"),
     displayName: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -145,7 +143,7 @@ export const updateRoleMeta = mutation({
     level: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     const targetRole = await ctx.db.get(args.roleId);
     if (!targetRole) throw new ConvexError("Role not found");
     // System-role identity (name, description, color, level, sort) is
@@ -182,13 +180,12 @@ export const updateRoleMeta = mutation({
 /** Toggle one capability on any role except Owner (single-key, race-free) */
 export const updateRoleCapabilities = mutation({
   args: {
-    secret: v.string(),
     roleId: v.id("roleRegistry"),
     key: v.string(),
     granted: v.boolean(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     const role = await ctx.db.get(args.roleId);
     if (!role) throw new ConvexError("Role not found");
     // Owner is the only locked matrix: it must always hold every capability
@@ -224,12 +221,11 @@ export const updateRoleCapabilities = mutation({
 /** Activate/deactivate a non-system role; deactivation blocked while in use */
 export const setRoleActive = mutation({
   args: {
-    secret: v.string(),
     roleId: v.id("roleRegistry"),
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     const role = await ctx.db.get(args.roleId);
     if (!role) throw new ConvexError("Role not found");
     if (role.isSystem) {

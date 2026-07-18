@@ -14,8 +14,8 @@ import {
   Globe,
   ShieldCheck,
 } from "lucide-react";
+import { useAuth } from "@workos-inc/authkit-react";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/stores/auth-store";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -34,7 +34,7 @@ const navItems = [
 
 export function Sidebar() {
   const location = useLocation();
-  const logout = useAuthStore((s) => s.logout);
+  const { signOut } = useAuth();
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-zinc-800 bg-zinc-950">
@@ -76,7 +76,7 @@ export function Sidebar() {
 
       <div className="border-t border-zinc-800 p-3">
         <button
-          onClick={logout}
+          onClick={() => void signOut()}
           className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
         >
           <LogOut className="h-4 w-4" />

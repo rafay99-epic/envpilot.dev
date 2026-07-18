@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { query, mutation } from "../../_generated/server";
-import { verifyAdmin } from "./auth";
+import { requireAdmin } from "./auth";
 
 export const listFeatureRequests = query({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     return await ctx.db
       .query("featureRequests")
@@ -17,7 +17,6 @@ export const listFeatureRequests = query({
 
 export const updateFeatureRequestStatus = mutation({
   args: {
-    secret: v.string(),
     id: v.id("featureRequests"),
     status: v.union(
       v.literal("submitted"),
@@ -29,7 +28,7 @@ export const updateFeatureRequestStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.patch(args.id, {
       status: args.status,
       updatedAt: Date.now(),
@@ -39,19 +38,17 @@ export const updateFeatureRequestStatus = mutation({
 
 export const updateFeatureRequestAdminNotes = mutation({
   args: {
-    secret: v.string(),
     id: v.id("featureRequests"),
     adminNotes: v.string(),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
     await ctx.db.patch(args.id, { adminNotes: args.adminNotes });
   },
 });
 
 export const createFeatureRequest = mutation({
   args: {
-    secret: v.string(),
     title: v.string(),
     description: v.string(),
     category: v.optional(v.string()),
@@ -68,7 +65,7 @@ export const createFeatureRequest = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     const title = args.title.trim();
     const description = args.description.trim();
@@ -82,6 +79,7 @@ export const createFeatureRequest = mutation({
     return await ctx.db.insert("featureRequests", {
       title,
       description,
+      // Public board — keep the team label, never the admin's email.
       submitterName: "Envpilot Team",
       status: args.status ?? "planned",
       category: args.category?.trim() || undefined,
@@ -95,11 +93,10 @@ export const createFeatureRequest = mutation({
 
 export const deleteFeatureRequest = mutation({
   args: {
-    secret: v.string(),
     id: v.id("featureRequests"),
   },
   handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+    await requireAdmin(ctx);
 
     // Delete all associated votes first
     const votes = await ctx.db
@@ -117,9 +114,9 @@ export const deleteFeatureRequest = mutation({
 });
 
 export const clearAllFeatureRequests = mutation({
-  args: { secret: v.string() },
-  handler: async (ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
 
     const allRequests = await ctx.db.query("featureRequests").collect();
     const allVotes = await ctx.db.query("featureVotes").collect();

@@ -3,56 +3,36 @@ import {
   usePaginatedQuery,
   useMutation,
   useAction,
+  useConvexAuth,
 } from "convex/react";
-import { useAuthStore } from "@/stores/auth-store";
-import type {
-  FunctionReference,
-  FunctionArgs,
-  FunctionReturnType,
-} from "convex/server";
+import type { FunctionReference, FunctionArgs } from "convex/server";
 
+/**
+ * Thin wrappers kept for one reason: queries must skip until the WorkOS JWT
+ * is attached to the Convex client, or they'd fire unauthenticated and throw.
+ * Mutations/actions need no gating (they're user-triggered after load).
+ */
 export function useAdminQuery<F extends FunctionReference<"query">>(
   query: F,
-  args: Omit<FunctionArgs<F>, "secret"> | "skip"
-): FunctionReturnType<F> | undefined {
-  const secret = useAuthStore((s) => s.secret);
-  const shouldSkip = !secret || args === "skip";
-  const queryArgs = (shouldSkip ? "skip" : { ...args, secret }) as
-    | FunctionArgs<F>
-    | "skip";
-  return useQuery(query, queryArgs) as FunctionReturnType<F> | undefined;
+  args: FunctionArgs<F> | "skip"
+) {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(query, isAuthenticated ? args : "skip");
 }
 
 export function useAdminPaginatedQuery<F extends FunctionReference<"query">>(
   queryRef: F,
-  args: Omit<FunctionArgs<F>, "secret" | "paginationOpts"> | "skip",
+  args: Omit<FunctionArgs<F>, "paginationOpts"> | "skip",
   options: { initialNumItems: number }
 ) {
-  const secret = useAuthStore((s) => s.secret);
-  const shouldSkip = !secret || args === "skip";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const queryArgs = (shouldSkip ? "skip" : { ...args, secret }) as any;
-  return usePaginatedQuery(queryRef, queryArgs, options);
+  const { isAuthenticated } = useConvexAuth();
+  return usePaginatedQuery(
+    queryRef,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (isAuthenticated ? args : "skip") as any,
+    options
+  );
 }
 
-export function useAdminMutation<F extends FunctionReference<"mutation">>(
-  mutation: F
-) {
-  const secret = useAuthStore((s) => s.secret);
-  const mutate = useMutation(mutation);
-  return (args: Omit<FunctionArgs<F>, "secret">) => {
-    if (!secret) throw new Error("Not authenticated");
-    return mutate({ ...args, secret } as FunctionArgs<F>);
-  };
-}
-
-export function useAdminAction<F extends FunctionReference<"action">>(
-  actionRef: F
-) {
-  const secret = useAuthStore((s) => s.secret);
-  const act = useAction(actionRef);
-  return (args: Omit<FunctionArgs<F>, "secret">) => {
-    if (!secret) throw new Error("Not authenticated");
-    return act({ ...args, secret } as FunctionArgs<F>);
-  };
-}
+export const useAdminMutation = useMutation;
+export const useAdminAction = useAction;

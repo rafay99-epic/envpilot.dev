@@ -2,13 +2,7 @@
 
 import { v } from "convex/values";
 import { action } from "../../_generated/server";
-
-function verifyAdmin(secret: string) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || secret !== adminSecret) {
-    throw new Error("Unauthorized: Invalid admin secret");
-  }
-}
+import { requireAdminAction } from "./auth";
 
 function getUmamiConfig() {
   const apiKey = process.env.UMAMI_API_KEY;
@@ -50,9 +44,9 @@ function statVal(field: unknown): number {
 // getWebTrafficStats — summary stats + active visitors
 // --------------------------------------------------------------------------
 export const getWebTrafficStats = action({
-  args: { secret: v.string() },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdminAction(ctx);
     const { apiKey, websiteId } = getUmamiConfig();
 
     const now = Date.now();
@@ -118,11 +112,10 @@ export const getWebTrafficStats = action({
 // --------------------------------------------------------------------------
 export const getWebTrafficPageviews = action({
   args: {
-    secret: v.string(),
     range: v.union(v.literal("today"), v.literal("7d"), v.literal("30d")),
   },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  handler: async (ctx, args) => {
+    await requireAdminAction(ctx);
     const { apiKey, websiteId } = getUmamiConfig();
 
     const now = Date.now();
@@ -161,9 +154,9 @@ export const getWebTrafficPageviews = action({
 // getShareUrl — returns the Umami public share dashboard URL
 // --------------------------------------------------------------------------
 export const getShareUrl = action({
-  args: { secret: v.string() },
-  handler: async (_ctx, args) => {
-    verifyAdmin(args.secret);
+  args: {},
+  handler: async (ctx) => {
+    await requireAdminAction(ctx);
     return process.env.UMAMI_SHARE_URL ?? null;
   },
 });
