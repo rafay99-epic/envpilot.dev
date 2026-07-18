@@ -1,23 +1,40 @@
 ---
-title: "Deletion That Is Actually Deletion: Vault GC, Trash, and Honest Rollback"
-description: "Rollback flipped a pointer at itself and claimed success, and no delete path had ever removed a secret from WorkOS Vault. Three PRs in under ninety minutes made both operations mean what the UI said they meant."
+title: "My Delete Button Was a Liar, and So Was My Rollback"
+description: "Envpilot's UI said secrets were deleted and versions were restored. Neither was true — deletion never touched WorkOS Vault, and rollback flipped a pointer at itself. Three PRs in eighty-seven minutes made both words mean something."
 date: "2026-07-08"
 tags: ["engineering", "security"]
 keywords:
   ["workos vault", "garbage collection", "soft delete", "rollback", "convex"]
+series: "Building Envpilot"
+seriesPart: 3
+seriesTotal: 18
 author:
-  name: "Envpilot Team"
+  name: "Abdul Rafay"
 ---
 
-Envpilot stores secrets in two places at once. Convex holds the metadata — the `environmentVariables` row, its `variableVersions` history, its `variablePermissions` grants — plus an opaque string called `vaultRef`. WorkOS Vault holds the ciphertext that `vaultRef` points at. Every interesting bug we shipped in the first week of July 2026 lived at that seam, and they all had the same shape: the UI operated on the Convex side and made a claim about the Vault side that was not true.
+On July 4th, 2026, I shipped three PRs to Envpilot in the space of eighty-seven minutes, because two of my buttons were lying.
 
-Two claims in particular. "Rolled back to version 3." And "Deleted."
+One said "Deleted." One said "Rolled back to version 3."
+
+Neither of them was doing the thing the word meant.
+
+Let me explain how a secrets manager ends up in that position, because it isn't stupidity — it's a seam. And the seam is where every bug in this story lived.
+
+## Two databases, one lie
+
+Envpilot stores your secrets in two places at once, and that's on purpose.
+
+**Convex** holds the boring half: the `environmentVariables` row, its `variableVersions` history, its `variablePermissions` grants. It also holds an opaque string called `vaultRef`. **WorkOS Vault** holds the half that actually matters — the ciphertext that `vaultRef` points at.
+
+The split is a security property. My database never sees a plaintext secret. It only ever sees a pointer.
+
+Here's the thing about pointers though: a pointer will happily point at something that has changed, or something that was never what you thought it was. Every interesting bug I shipped in the first week of July had exactly one shape — **the UI operated on the Convex side and made a confident claim about the Vault side that was not true.**
 
 ## The pointer that pointed at itself
 
-Version history looked correct from the outside. Every write inserted a `variableVersions` row snapshotting the description, the environments, the version number, and the `vaultRef`. Rollback was a pointer flip: patch the variable's `vaultRef` to the target version's `vaultRef`, bump the version, log it.
+Version history _looked_ perfect. Every write inserted a `variableVersions` row snapshotting the description, the environments, the version number, and the `vaultRef`. Rollback was a clean little pointer flip: patch the variable's `vaultRef` to the target version's `vaultRef`, bump the version number, log it to the audit trail.
 
-The problem was on the write path. The web PATCH route called WorkOS Vault's in-place update:
+The rollback code was fine. The problem was three files away, on the write path. The web PATCH route called WorkOS Vault's in-place update:
 
 ```ts
 let vaultRef: string | undefined;
@@ -27,15 +44,29 @@ if (value !== undefined) {
 }
 ```
 
-`updateSecret` overwrites the object in place. Same object id, new contents. So every version row for a given variable stored the _same_ `vaultRef` — the live one. Rollback flipped a pointer to itself and reported success.
+Read that call carefully.
 
-Before #78, every version row aimed at the same object:
+`updateSecret` overwrites the object **in place**. Same object id, new contents. Which means every version row for a given variable stored the _same_ `vaultRef` — the live one. Version 1, version 2, version 7, all aiming at one object holding today's value.
+
+So rollback flipped a pointer to itself, changed some metadata, and reported success.
 
 <Mermaid name="deletion-that-is-real-shared-vaultref" />
 
-The obvious fix is to use the vendor's own versioning. WorkOS Vault does retain versions server-side, so before designing anything we probed the live API with a disposable object: create, update twice, list versions, then try to read an old one. Versions are retained. But no API surface returns a historical version's _value_ — reads by version id 404, version query params are ignored. Native versioning was legible and useless.
+Follow the arrows: every version row is an arrow into the same box. That's the whole bug in one picture.
 
-Which left one design, and it was already in our codebase. The CLI bulk-push route had always minted a fresh Vault object per write. [PR #78](https://github.com/rafay99-epic/envpilot.dev/pull/78) unified the web PATCH path onto that behavior. The diff is two words:
+## I asked WorkOS nicely, and WorkOS said no
+
+The obvious fix is: don't build your own versioning, use the vendor's. WorkOS Vault _does_ retain versions server-side. Great.
+
+So before designing anything, I probed the live API with a disposable object — create it, update it twice, list the versions, then try to read an old one.
+
+Versions are retained. You can list them. You can see them sitting right there.
+
+But there is no API surface that returns a historical version's _value_. Reads by version id 404. Version query params get ignored. The native versioning was perfectly legible and completely useless to me.
+
+Which left exactly one design. And — this is the annoying part — it was already sitting in my codebase. The CLI bulk-push route had always minted a fresh Vault object per write. The web path was the odd one out.
+
+[PR #78](https://github.com/rafay99-epic/envpilot.dev/pull/78) unified them. The functional diff is two words:
 
 ```diff
 -      const vaultResult = await updateSecret(variable.vaultRef, value);
@@ -45,13 +76,17 @@ Which left one design, and it was already in our codebase. The CLI bulk-push rou
 +      });
 ```
 
-Now old refs stay referenced by earlier version rows as genuine immutable snapshots, and rollback remains a pointer flip — which means the server still never handles plaintext during a rollback. That property was worth keeping.
+**The Fix:** stop overwriting, start appending. Old refs stay referenced by their earlier version rows, which turns them into genuine immutable snapshots. And rollback is still just a pointer flip — meaning the server still never touches plaintext during a rollback. That property was worth protecting.
 
-## The versions we could not fix
+## The versions I can never get back
 
-Every version row written _before_ #78 still shares one ref. Those values are gone from every reachable version, permanently. There is no backfill that can invent ciphertext that was overwritten.
+Now the part I couldn't engineer my way out of.
 
-So the question became what to tell the user. We picked disclosure over silence. The rollback mutation computes a single boolean and refuses to hide it:
+Every version row written _before_ #78 still shares one ref. Those old values are gone from every reachable version, permanently. There is no backfill, no migration, no clever join that invents ciphertext which was overwritten months ago.
+
+So the question stopped being "how do I fix this" and became "what do I tell the person clicking the button".
+
+I picked disclosure over silence. The rollback mutation computes one boolean and refuses to hide it:
 
 ```ts
 // Versions created since value updates started minting a fresh vault
@@ -62,9 +97,15 @@ So the question became what to tell the user. We picked disclosure over silence.
 const valueRestored = targetVersionRecord.vaultRef !== variable.vaultRef;
 ```
 
-`valueRestored` goes into the `variable.rollback` audit log `details` and comes back in the mutation's return value. #78 shipped it to the API response and stopped there — because the app had no toast system at all. The one toast component in the tree was dead code, never rendered.
+If the target version's ref is the same object the variable is already pointing at, nothing was restored. That's not a heuristic — it's the definition of the bug, written as a comparison.
 
-[PR #79](https://github.com/rafay99-epic/envpilot.dev/pull/79), merged 25 minutes later, added `sonner` and wired the disclosure:
+`valueRestored` goes into the `variable.rollback` audit log `details` and comes back in the mutation's return value.
+
+And then #78 stopped there. Because the app had **no toast system at all**. The one toast component in the tree was dead code that was never rendered anywhere. I had built an honest API response that no human being would ever see.
+
+## Nobody could hear the app scream
+
+[PR #79](https://github.com/rafay99-epic/envpilot.dev/pull/79) merged twenty-five minutes after #78. It added `sonner` and wired the disclosure to a place with eyeballs on it:
 
 ```tsx
 if (valueRestored) {
@@ -79,7 +120,7 @@ if (valueRestored) {
 }
 ```
 
-While we were in there we solved the other half of the silence problem without auditing every call site. The Convex request manager routes every mutation and action failure through the client logger regardless of whether the caller catches the promise, so we hooked the logger instead:
+While I was in there I fixed the bigger version of the same disease — errors dying silently — without auditing every call site in the app. The Convex request manager routes every mutation and action failure through the client logger whether or not the caller bothers to catch the promise. So I hooked the logger instead of the callers:
 
 ```ts
 error(...args: unknown[]) {
@@ -89,21 +130,29 @@ error(...args: unknown[]) {
   const isFunctionFailure = /\[CONVEX [MA]\(/.test(message);
 ```
 
-One hook, deduped by message id. Query failures do not pass through here — they throw into React render and get caught by the `error.tsx` boundaries.
+One hook, deduped by message id. Query failures don't come through here — those throw into React render and get caught by the `error.tsx` boundaries, which is where they belong.
 
-## Delete had never deleted anything
+## "Deleted" had never deleted anything
 
-#78's body flagged its own debt: no delete path had ever removed a secret from WorkOS Vault, and minting a fresh object per value edit made that leak _worse_ by a factor of however many times you had edited the variable.
+#78's own body flagged its debt, and it's the uglier of the two lies.
 
-Deleting a variable set `deletedAt` and hid the row. The ciphertext stayed in Vault forever. And because there was no user-facing restore, the soft delete was not buying the user anything either — it was pure downside on both ends.
+No delete path in Envpilot had **ever** removed a secret from WorkOS Vault. Not one.
 
-[PR #80](https://github.com/rafay99-epic/envpilot.dev/pull/80) landed 87 minutes after #78 and defined the model: delete is a 7-day trash window, then the row and every Vault object behind it are destroyed for real. The ordering is the entire design.
+Deleting a variable set `deletedAt` and hid the row. That's it. The ciphertext sat in Vault forever. And #78 — my nice clean fix — had just made the leak _worse_ by a factor of however many times you'd edited that variable, because now every edit minted a whole new object to leave behind.
+
+Here's the kicker: the soft delete wasn't even buying the user anything, because there was no user-facing restore either. The row was hidden from you and the secret was kept from nobody. Pure downside on both ends.
+
+[PR #80](https://github.com/rafay99-epic/envpilot.dev/pull/80) landed eighty-seven minutes after #78 and defined the actual model. Delete is a **7-day trash window**. After that, the row and every Vault object behind it get destroyed for real.
 
 <Mermaid name="deletion-that-is-real-trash-gc" />
 
-Two details in there carry most of the safety.
+The ordering in that diagram is the entire design. Vault first, then the row — never the other way around.
 
-The first is the direction of the failure bias. If `WORKOS_API_KEY` is missing from the Convex deployment environment, we abort having deleted nothing:
+## Pick the direction you want to fail in
+
+Two details carry most of the safety here, and the first one is a bias, not a check.
+
+If `WORKOS_API_KEY` is missing from the Convex deployment environment, the job aborts having deleted nothing:
 
 ```ts
 const apiKey = process.env.WORKOS_API_KEY;
@@ -123,29 +172,43 @@ if (!apiKey) {
 }
 ```
 
-A leaked ciphertext is recoverable debt: the row still points at it, so a later run can find and destroy it. A DB row deleted while the ciphertext survives is an unreferenced secret nobody can ever find again. Given a choice, leak.
+**The Insight:** a leaked ciphertext is recoverable debt. The row still points at it, so tomorrow's run can find it and finish the job. A DB row deleted while the ciphertext survives is an unreferenced secret that nobody can ever locate again — invisible, undeletable, permanent.
 
-The second is that 404 and 410 count as success. That is what makes "retry on the next run" safe — a doc whose refs were half-deleted before a failure can finish next time without the already-gone refs blocking it forever.
+Given the choice, leak.
 
-And the `Set` around the refs exists purely because of the bug from #78. Legacy version rows share one ref, so a naive loop would issue N DELETEs for the same object. The old bug shaped the cleanup code that outlived it.
+The second detail: 404 and 410 count as **success**. That's what makes "just retry tomorrow" safe. A doc whose refs got half-deleted before a failure can finish next run instead of being blocked forever by refs that are already gone.
 
-Audit logs survive the purge. `hardDeleteVariable` removes versions, permissions, and the doc — never `auditLogs`. The record that a secret existed and was destroyed outlives the secret.
+And the `Set` wrapped around the refs? That exists purely because of the bug from #78. Legacy version rows share one ref, so a naive loop would fire N identical DELETEs at the same object. The old bug shaped the cleanup code that outlived it.
 
-### Two cascade bugs we only found by asking
+One thing the purge never touches: `hardDeleteVariable` removes versions, permissions, and the doc, but never `auditLogs`. **The record that a secret existed and was destroyed outlives the secret.**
 
-Building trash forced the question "what happens to children when you delete a project?", and the answer was two real bugs. Version rows were _hard_-deleted immediately with no Vault cleanup, so restoring a project lost its history and leaked the ciphertext at the same time. Shared accounts were never touched at all — they stayed active under a deleted project. Both fixed in #80.
+## Two bugs I only found by asking one question
 
-Our automated reviewer earned its keep here too. `getDeleted` was originally `by_project` + `take(500)` + an in-memory `deletedAt` filter, which silently hides the entire trash for any project with more than 500 active variables. We fixed it with a compound `by_project_deleted` index, and rejected the suggested fix of reusing the global `by_deleted_at` — that is a worse range scan.
+Building trash forced a question: what happens to the children when you delete a project?
+
+The answer was two real bugs.
+
+Version rows were _hard_-deleted immediately, with no Vault cleanup — so restoring a project lost its history and leaked the ciphertext in the same move. Nice. And shared accounts were never touched at all; they just stayed active under a project that was supposedly deleted. Both fixed in #80.
+
+My automated reviewer earned its keep here too. `getDeleted` was originally `by_project` + `take(500)` + an in-memory `deletedAt` filter — which silently hides the _entire_ trash for any project with more than 500 active variables. I fixed it with a compound `by_project_deleted` index, and rejected the suggested fix of reusing the global `by_deleted_at`, because that's a worse range scan.
 
 ## Moving the crypto behind the wall
 
-[PR #86](https://github.com/rafay99-epic/envpilot.dev/pull/86) ("Stage 3") deleted `apps/web/src/lib/vault.ts`, `lib/vault-config.ts`, the `useVault` hook, and the `/api/vault/{keys,encrypt}` routes, and made `convex/vault.ts` the only home for `createSecret` / `readSecret` / `updateSecret` / `deleteSecret` as internal-only actions over the raw Vault REST API. Net −3504 lines against +2385.
+[PR #86](https://github.com/rafay99-epic/envpilot.dev/pull/86) — "Stage 3" — deleted `apps/web/src/lib/vault.ts`, `lib/vault-config.ts`, the `useVault` hook, and the `/api/vault/{keys,encrypt}` routes. `convex/vault.ts` became the only home for `createSecret` / `readSecret` / `updateSecret` / `deleteSecret`, as internal-only actions over the raw Vault REST API. Net **−3504 lines against +2385**.
 
-The interesting part is the mistake. The PR notes the initial pass deleted `/api/vault` believing it was dead, but five live callers used it and dashboard reveals 404'd. The naive recovery — restore the route as it was — would have exposed `readSecret`, which has no authorization of its own. So the route came back as a thin session-authenticated wrapper that forwards the caller's JWT (same response shape, callers unchanged), and the authorization moved behind it into `canRevealVaultRef`: reverse-look-up the row that owns the ref via new `by_vaultRef` indexes on `environmentVariables`, `variableVersions`, and `projectAccounts`, then run the same per-resource check the rest of the app uses. Authorization by resource, not by a client-supplied org id. Unknown refs fail closed. And soft-deleted variables refuse to reveal even inside their restore window.
+The interesting part is the mistake I made inside it.
 
-## Where orphans can still come from
+The first pass deleted `/api/vault` believing it was dead code. It wasn't. Five live callers used it and dashboard reveals started 404'ing.
 
-The value-write actions are two-phase — Vault first, Convex second — so a failure between them orphans a secret. `createWithValue` has two guards:
+The naive recovery would have been to restore the route exactly as it was. That would have re-exposed `readSecret`, which has no authorization of its own — it reads whatever ref you hand it.
+
+So the route came back as a thin session-authenticated wrapper that forwards the caller's JWT (same response shape, callers unchanged), and the real authorization moved behind it into `canRevealVaultRef`: reverse-look-up the row that owns the ref via new `by_vaultRef` indexes on `environmentVariables`, `variableVersions`, and `projectAccounts`, then run the same per-resource check the rest of the app already uses.
+
+Authorization by resource, not by a client-supplied org id. Unknown refs fail closed. Soft-deleted variables refuse to reveal even inside their restore window.
+
+## The comment in my own code that lies
+
+The value-write actions are two-phase — Vault first, Convex second — so a failure between the two orphans a secret. `createWithValue` has two guards against that:
 
 ```ts
 // Reject environment clashes BEFORE writing the value to the vault — the
@@ -168,11 +231,13 @@ try {
 }
 ```
 
-A pre-check for the common failure, a compensating delete for everything else. `updateWithValue` carries the same pattern with the comment `// Best-effort — vaultGc reconciles any straggler.`
+A pre-check for the common failure, a compensating delete for everything else. `updateWithValue` carries the same pattern, with the comment `// Best-effort — vaultGc reconciles any straggler.`
 
-Reading the GC, that last sentence does not hold. `listPurgeEligible` gathers refs _from Convex rows_ — an object no row points at is by definition not enumerable that way. If the compensating delete fails, nothing we shipped will ever find that object. We have not written the reconciliation job that would, and there is no obvious cheap way to do it without a full Vault listing.
+Except it doesn't.
 
-## What landed
+I went back and read the GC to confirm that claim, and it's false. `listPurgeEligible` gathers refs _from Convex rows_ — and an object that no row points at is, by definition, not enumerable that way. If the compensating delete fails, **nothing I have shipped will ever find that object again.** I haven't written the reconciliation job that would, and I don't see a cheap way to do it without a full Vault listing.
+
+## What actually landed
 
 | PR                                                                                                                            | What it changed                                                                                                                                                                                                                |
 | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -184,12 +249,20 @@ Reading the GC, that last sentence does not hold. `listPurgeEligible` gathers re
 
 [PR #95](https://github.com/rafay99-epic/envpilot.dev/pull/95) later moved these into the feature-based layout: `convex/features/vault/gc.ts`, `vault.ts`, `reveal.ts`.
 
-## What this still does not solve
+## What I still haven't fixed
 
-Pre-#78 versions stay metadata-only forever. That is permanent, disclosed at the moment of use, and one-time.
+Pre-#78 versions stay metadata-only forever. Permanent, disclosed at the moment of use, one-time. I can live with that one.
 
-Shared accounts still have no version history — there is no versions table for `projectAccounts`, so account credential updates are still in-place overwrites. You can see the asymmetry in the GC itself: variables get a deduplicated ref set, accounts get `vaultRefs: [account.vaultRef]`, a single-element array. Named as a follow-up in #78, still true.
+Shared accounts still have no version history — there's no versions table for `projectAccounts`, so account credential updates are still in-place overwrites. You can literally see the asymmetry in the GC code: variables get a deduplicated ref set, accounts get `vaultRefs: [account.vaultRef]`, a single-element array. Named as a follow-up in #78. Still true.
 
-Restoring a project does not auto-restore its children; they stay individually restorable from trash within their own windows. And `PURGE_BATCH_SIZE = 25` with `MAX_RESCHEDULE_DEPTH = 20` caps a run at roughly 500 docs per type before it waits for tomorrow. That is a deliberate ceiling on external calls, not a limit anyone has hit.
+Restoring a project doesn't auto-restore its children; they stay individually restorable from trash within their own windows. And `PURGE_BATCH_SIZE = 25` with `MAX_RESCHEDULE_DEPTH = 20` caps a run at roughly 500 docs per type before it waits for tomorrow — a deliberate ceiling on external calls, not a limit anyone has hit.
 
-The orphan reconciliation gap above is the one that bothers us most, because the comment in the code currently claims a backstop that does not exist.
+But the orphan reconciliation gap is the one that gets under my skin, and not because it's the most dangerous. It's because of _how_ I found it. I only caught it by going back and reading a comment I wrote myself and checking whether it was true.
+
+It wasn't.
+
+Here's where I land. A secrets manager that says "Deleted" and means "hidden from you specifically" is worse than one with no delete button at all, because the second one is honest about what it can't do. Same for rollback. The word on the button is a promise, and if you can't keep it, the least you owe someone is a warning toast that says so out loud.
+
+Go read the comments in your own codebase. Check if they're still true. Mine weren't.
+
+Until then, peace out, nerds.

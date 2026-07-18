@@ -1,0 +1,267 @@
+---
+title: "Born and Buried: The 3,500-Line Feature That Only Ever Had Two Commits"
+description: "I shipped a full behavioral anomaly detection system into Envpilot in April 2026 and deleted every line of it in July. This is what git history says about why — an hourly nested table scan, a detection pass fired on every variable access and every security event, and a 20-minute window that gives the whole thing away."
+date: "2026-07-02"
+tags: ["engineering", "product"]
+keywords:
+  ["anomaly detection", "feature removal", "convex", "technical debt", "cost"]
+author:
+  name: "Abdul Rafay"
+series: "Building Envpilot"
+seriesPart: 2
+seriesTotal: 18
+---
+
+Run this in the Envpilot repo:
+
+```bash
+git log --follow --format='%h %ad %s' --date=short -- convex/anomalyDetection.ts
+```
+
+You get two lines back. Two. One creates the file, one deletes it, and there is nothing in between.
+
+```
+e0818f7f 2026-07-02  Unified organization-wide RBAC ... (#70)     <- deleted it
+20f45e43 2026-04-21  Add comprehensive anomaly detection ... (#62) <- created it
+```
+
+**72 days. Zero edits.** Not a bug fix, not a threshold tweak, not a typo in a log line. I wrote 1,570 lines of behavioral security tooling, merged it, and never opened the file again until the commit that removed it.
+
+This is the story of what I built, why it was doomed before it merged, and the one artifact in the git history that explains the whole thing without ever saying so out loud.
+
+## What I actually shipped
+
+Envpilot already had an audit log. Every variable read, copy, and export writes an `auditLogs` row with `ipAddress`, `userAgent`, and `involvesSensitiveData`. Sitting on top of that data, anomaly detection looks free. The raw material is already there. You're just… reading it.
+
+[PR #62](https://github.com/rafay99-epic/envpilot.dev/pull/62) merged on 2026-04-21 at 15:21 UTC. **+5,505 / −517.**
+
+Four new Convex tables. A 1,570-line detection engine. A 1,020-line admin console. Two dashboard pages plus a loading skeleton. A `useAnomalyDetection` hook. Transactional email alerts via an `internalAction` called `sendAnomalyAlertEmail`. Two admin migrations, `seed-anomaly-rules` and `test-anomaly-detection`.
+
+And six rules, defined as data:
+
+| `ruleId`               | severity | cooldown |
+| ---------------------- | -------- | -------- |
+| `new_ip`               | warning  | 240 min  |
+| `off_hours`            | warning  | 480 min  |
+| `first_prod_bulk_pull` | critical | 60 min   |
+| `velocity_spike`       | warning  | 120 min  |
+| `new_device_sensitive` | info     | 1440 min |
+| `cross_org_burst`      | critical | 60 min   |
+
+The "behavioral" part was a per-user profile table, `accessBaselines`, rebuilt hourly:
+
+```typescript
+accessBaselines: defineTable({
+  userId: v.id("users"),
+  organizationId: v.id("organizations"),
+  // Known IP addresses from last 30 days (capped at 50)
+  knownIps: v.array(v.string()),
+  // Known user agents from last 30 days (capped at 20)
+  knownUserAgents: v.array(v.string()),
+  // Typical working hours (UTC)
+  typicalHoursStart: v.number(),
+  typicalHoursEnd: v.number(),
+  // typicalDays, accessedEnvironments ...
+  hasPulledProd: v.boolean(),
+  avgDailyAccesses: v.number(),
+  // ...
+});
+```
+
+Those "typical working hours" weren't hand-waved either:
+
+```typescript
+// Compute typical hours (10th/90th percentile)
+const sortedHours = [...hours].sort((a, b) => a - b);
+const p10Index = Math.floor(sortedHours.length * 0.1);
+const p90Index = Math.floor(sortedHours.length * 0.9);
+```
+
+**The point:** this wasn't a stub. It had percentile math, per-rule cooldowns, dismissals with a `suppressFuturePattern` field for "this was me" learning, and a self-seeding test harness that fabricated a baseline, fabricated velocity logs, and ran positive _and_ negative scenarios through the real `evaluateRule` before cleaning up after itself. I built the thing properly. That's exactly why deleting it stings.
+
+## I knew it was expensive. I have receipts.
+
+Here's the part that makes this a real post instead of a shrug.
+
+The repo's own `CLAUDE.md` has a rule about gating features. It asks one question: does this feature run recurring background work per resource? If yes, it needs a numeric limit on top of the boolean gate. The dual-gate pattern.
+
+I followed it. `anomaly_detection` (boolean) and `anomaly_detection_limit` (numeric). Free tier got `"false"` and `"0"` — completely off. Pro got `"true"` and `"null"`.
+
+Then I went further and wired a kill switch into the admin cron list:
+
+```typescript
+{
+  name: "build anomaly detection baselines",
+  function: "anomalyDetection.buildBaselines",
+  interval: "Every 1 hour",
+  settingKey: "cron_pause_anomaly_baselines",
+}
+```
+
+Read that again. **On day one, before the feature had detected a single thing, I shipped a button to turn it off.** I disabled it entirely on the free tier. I capped it. I gave it a pause switch.
+
+Knowing what something costs is not the same as being able to afford it.
+
+## Two cost paths, both unbounded
+
+This is where it actually went wrong, and it's worse than "there was a cron."
+
+<Mermaid name="the-feature-that-lived-72-days-cost" />
+
+Left branch is the hourly job. Right branch is what fired on every variable access and every security event.
+
+**Path 1** was one line in `crons.ts` and a nested scan behind it:
+
+```typescript
+const orgs = await ctx.db.query("organizations").collect();
+
+for (const org of orgs) {
+  const gate = await checkBooleanFeature(ctx.db, org._id, "anomaly_detection");
+  if (!gate.allowed) continue;
+  orgsProcessed++;
+
+  const members = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_organization", (q) => q.eq("organizationId", org._id))
+    .collect();
+
+  for (const member of members) {
+    const logs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_user_and_created", (q) =>
+        q.eq("userId", member.userId).gte("createdAt", thirtyDaysAgo)
+      )
+      .collect();
+
+    // Filter to this org's logs
+    const orgLogs = logs.filter((log) => log.organizationId === org._id);
+```
+
+The gate spares free orgs — free tier is `"false"`, so the inner two loops never ran for them. For pro orgs it's O(members × 30 days of logs), every hour, forever, and the outer `organizations.collect()` is unbounded regardless of who pays. And look at that `.filter()` — it runs in JavaScript, _after_ the read. A user in three orgs gets their entire 30-day audit history pulled three times an hour so I can throw away two thirds of it each time. Convex bills per document read. I was paying full price for data I was deliberately discarding.
+
+**Path 2** is the one I'd defend less. Two of the five audit helpers — `logVariableAccess` and `logSecurityEvent` — scheduled a detection pass:
+
+```typescript
+// Schedule anomaly detection (non-blocking, separate transaction)
+await ctx.scheduler.runAfter(
+  0,
+  internal.anomalyDetection.detectAnomaliesAfterAudit,
+  {
+    auditLogId,
+    userId: input.userId,
+    organizationId: input.organizationId,
+    action,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    involvesSensitiveData: input.isSensitive,
+    createdAt: Date.now(),
+    details: JSON.stringify({
+      /* ... */
+    }),
+    projectId: input.projectId,
+  }
+);
+```
+
+"Non-blocking" is doing a lot of work in that comment. Non-blocking isn't free. Each pass did a feature-gate read, a `collect()` of enabled rules, a baseline read, then a cooldown query _per rule_. And two of the six rules went straight back to `auditLogs`:
+
+```typescript
+const recentLogs = await ctx.db
+  .query("auditLogs")
+  .withIndex("by_user_and_created", (q) =>
+    q.eq("userId", args.userId).gte("createdAt", windowStart)
+  )
+  .collect();
+
+const recentCount = recentLogs.length;
+const expectedHourlyRate = baseline.avgDailyAccesses / 8; // 8-hour workday
+```
+
+**Here's the kicker:** `velocity_spike` detects a high rate of access. Which means the most expensive rule to evaluate is the rule that fires exactly when the system is already under the heaviest write load. Each access schedules one pass, and that pass re-reads a 60-minute window of `auditLogs` — a window that is bigger precisely because the other accesses happened.
+
+One pass per access is linear. The cost of a pass is not fixed: it grows with concurrent activity. That's the shape you don't want on a watchdog attached to precisely the behavior the product exists to encourage.
+
+## Twenty minutes
+
+On 2026-07-02, commit `8615b7b5` landed at **03:33:26**. It deleted anomaly detection.
+
+At **03:53:59** — twenty minutes and thirty-three seconds later, same branch — commit `9b1d4526` landed: `perf(convex): bound read costs for free-tier + migration grant backfill`. The cron section of its message, verbatim:
+
+> Cron scans (recurring, biggest drain) now index-bounded instead of full-table:
+>
+> - processRotationExpiry: by_expires_at range (was: all variables hourly)
+> - cleanupExpiredOtps: by_otp_expires (was: all shareRecipients every 30m)
+> - projectAccess cleanup: by_active_and_expires (was: full scan hourly)
+> - cleanupProcessedWebhooks: by_processed_at (was: full scan every 6h)
+>
+> …
+
+<Mermaid name="the-feature-that-lived-72-days-window" />
+
+Green got an index. Red got a gravestone twenty minutes earlier — which is why it isn't on the list.
+
+**The reveal:** that commit triaged unbounded crons three different ways. Four full-table scans got an index. A fifth — `permissions.cleanupExpired` — got a comment explaining why an index wouldn't help, because `expiresAt` is undefined on most rows and undefined sorts before numbers, so the scan happens either way. `buildBaselines` got neither. It was a nested scan over three tables plus a per-access fan-out across six rules, and there is no one-line index that fixes that shape.
+
+Indexed, excused, or deleted. Anomaly detection was the only thing in the third bucket.
+
+I have to be honest about the limits of this. The deletion commit says **"per product decision"** — not "because it cost too much." No document in the repo states cost as the reason. What I have is circumstantial: [PR #70](https://github.com/rafay99-epic/envpilot.dev/pull/70) lists Convex free-tier cost fixes as one of its six workstreams, the two commits are twenty minutes apart, anomaly is conspicuously missing from a list of every _other_ cron that got fixed, and the dual-gate plus kill switch prove I understood the bill from day one. That's reconstruction, not testimony. But I'd argue it in front of a jury.
+
+## What I never tried
+
+Nothing. That's the honest answer.
+
+There is no commit that index-bounds `buildBaselines`. None that throttles `detectAnomaliesAfterAudit`. None that flips `cron_pause_anomaly_baselines` — the pause button I built specifically for this, and never pressed.
+
+<Mermaid name="the-feature-that-lived-72-days-lifespan" />
+
+Top track is the file. Bottom track is the repo carrying on without it — #63, #65, #66, #67, #69 all merged in that gap and not one of them touched anything matching `anomal`.
+
+The feature didn't fail. **Nobody ever came back to it.** Those are different diseases and the second one is worse, because a failing feature at least tells you it's there.
+
+## The two lines that hurt most
+
+The public-facing trace of ~3,500 lines of security engineering was one hardcoded string on the landing page:
+
+```diff
+-      { text: "✓ 142 events · 0 anomalies detected", tone: "ok" },
++      { text: "✓ 142 events across 6 team members", tone: "ok" },
+```
+
+A marketing line advertising that the system had found nothing. One diff hunk and the product forgot it ever had anomaly detection.
+
+And the roadmap entry that spawned the whole thing, deleted from `docs/FEATURES.md`:
+
+```diff
+-- **Anomaly detection**
+-  - Flag unusual access patterns:
+-    - user pulling all prod secrets for first time
+-    - off-hours access
+-    - new IP
+-  - Send email alerts.
+```
+
+Seven lines of roadmap. Three and a half thousand lines of code. One two-line paragraph in an eight-paragraph commit message, buried between environment-scope enforcement and per-page role guards, is where it died.
+
+## The thing that actually settles the argument
+
+The same commit that deleted the anomaly detector also added `docs/CONVEX_AUTH_MIGRATION.md`, `requireAuthedUser` in `identity.ts`, and an inert `auth.config.ts` placeholder. PR #70's body flags a known launch blocker: every Convex function trusted a client-supplied `userId`, and the browser could call the public deployment directly.
+
+Sit with that for a second.
+
+I built a system to detect _suspicious_ access on top of an identity layer that could not verify _who was accessing at all_. `accessBaselines` was computing 10th-percentile working hours per user from a `userId` a browser could type in by hand.
+
+**I was measuring statistical deviations in a signal that wasn't authenticated.** The cutover plan for fixing that spans 91 actor args across 23 files. That's the work that deserved the 3,500 lines.
+
+## What I'd tell April-me
+
+Detection features are cheap to write and expensive to run forever. The writing was one PR. The bill arrives every hour and on every user action, indefinitely, and it grows with engagement — the one variable you're supposed to want to grow.
+
+Here's where I land: I don't regret writing it, and I'd delete it again. Both things are true. That code taught me what the audit log actually costs to read, which is knowledge I now use everywhere in this repo. But shipping a watchdog before shipping authentication is building the alarm system before the walls.
+
+One loose end I'm not going to pretend isn't there. The four tables were removed from `schema.ts` and from `BROWSABLE_TABLES`, but no migration purges existing rows. Any deployment where `seed-anomaly-rules` ever ran still has `anomalyEvents`, `accessBaselines`, `anomalyRules`, and `anomalyDismissals` sitting in it, unreferenced by any code. The tombstone is silent. I still need to write that purge.
+
+And one last craft note, aimed at me. PR #62's description names two rules that never existed in the diff, states the tier config backwards — it says free was enabled when the code disabled it — and advertises a `@envpilot/github-action` package that the merged diff does not contain. That package actually shipped 81 days later in [PR #101](https://github.com/rafay99-epic/envpilot.dev/pull/101). The branch even has a commit literally titled `removing github-action`, and I never went back to fix the body.
+
+The diff is the record. Everything else is a story I told about the diff.
+
+Until then, index your crons and authenticate your users, nerds.

@@ -1,0 +1,250 @@
+---
+title: "The Four Lines of Metadata That Deleted My Site From Google"
+description: "Envpilot's auth middleware was 307-redirecting Googlebot off /faq and /feed.xml while a root-level canonical tag told Google every other page was a duplicate of the homepage — two unrelated bugs, one Search Console readout, fixed in PR #67 and finally killed structurally in PR #116."
+date: "2026-06-12"
+tags: ["engineering", "seo"]
+keywords: ["seo", "canonical urls", "middleware", "nextjs", "search console"]
+author:
+  name: "Abdul Rafay"
+series: "Building Envpilot"
+seriesPart: 1
+seriesTotal: 18
+---
+
+Before PR #67 shipped, I ran `curl` against my own production site the way a crawler would. Not the browser. No cookies, no session, nothing. Just a dumb GET, like Googlebot does it.
+
+`/faq` came back `307`. `/feed.xml` came back `307`. `/llms.txt` came back `307`. All of them pointed at a WorkOS sign-in page.
+
+Those are public pages. They have been public the entire time. They are linked from the footer.
+
+And the pages that _did_ return `200` — `/pricing`, `/changelog` — were all shipping a `<link rel="canonical">` pointing at the homepage. Every single one of them was politely telling Google: _ignore me, I'm a copy of `/`._
+
+So I had built a marketing site that either slammed the door on the crawler or told it the room was empty. Two completely unrelated bugs, and they arrived at the same destination.
+
+This is the story of both of them, why the second one was worse, and why I eventually stopped patching the first one and deleted the entire category instead.
+
+## The design that makes forgetting fatal
+
+Envpilot's Next.js app doesn't have a `middleware.ts`. It has `apps/web/src/proxy.ts` (Next 16 naming), and the whole file is one call to `authkitMiddleware` from `@workos-inc/authkit-nextjs`, with a flag that matters more than anything else in the file:
+
+```ts
+middlewareAuth: {
+  enabled: true,
+  unauthenticatedPaths: [ /* ... */ ],
+}
+```
+
+**Default-deny.** Every path that is not literally in that array gets a `307` to sign-in. That is exactly what you want for a secrets platform. It means a new dashboard route can never accidentally ship unauthenticated, because "unauthenticated" is something you have to type out by hand.
+
+And the matcher is deliberately greedy, so almost nothing escapes it:
+
+```ts
+export const config = {
+  matcher: [
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+  ],
+};
+```
+
+Read that regex for a second. Static extensions and `_next` get out. Everything else — every page, every API route — falls into the funnel.
+
+<Mermaid name="how-our-own-auth-hid-us-from-google-funnel" />
+
+Notice which branch is the default. You don't opt _into_ the 307; you opt out of it, once, by hand, and you only find out you forgot when something external tells you.
+
+**The Insight:** a default-deny auth layer is the correct security posture and a terrible discovery posture. It fails safe for secrets and fails silent for everything else. The same property that makes it good is the property that hid my site.
+
+## The warning shot I filed as a typo
+
+Here's the part where I get to blame myself, because I had already been told.
+
+On **March 18th, 2026**, I merged [PR #38](https://github.com/rafay99-epic/envpilot.dev/pull/38). Title: `Fix sitemap and robots.txt access`. Size: **+3 −0**. Two lines added to the array, plus one unrelated line in `.prettierignore`.
+
+The body said, in my own words:
+
+> Add sitemap.xml and robots.txt to unauthenticatedPaths in the auth middleware. This allows search engines to access these files without authentication, resolving the HTTP 401 errors Google Search Console was reporting. The sitemap was previously returning authentication errors, preventing proper indexing.
+
+Search Console had literally reported the class of bug to me. In March. With error codes.
+
+And I fixed the two files it named.
+
+I did not go look at the rest of the public surface. I treated a **structural** problem as a config typo, patched the exact two strings in the complaint, and moved on. That is the whole mistake, right there, three months before the expensive version of it showed up.
+
+## The second bug, which was quieter and worse
+
+Middleware at least tells you something. A `307` is loud if you go looking.
+
+The other bug returned `200 OK` and served perfect HTML.
+
+```ts
+// apps/web/src/app/layout.tsx — before
+export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
+  alternates: {
+    canonical: "/",
+  },
+  // ...
+};
+```
+
+Four lines. Looks like housekeeping. In Next.js App Router, `metadata` in the root layout is **inherited** by every page that doesn't override it — and none of mine overrode it.
+
+So `/pricing` rendered `<link rel="canonical" href="https://www.envpilot.dev/">`. So did `/changelog`. So did `/faq`, on the rare occasion anything reached it.
+
+**The Revelation:** I hadn't set a canonical URL for the homepage. I'd set the canonical URL for the entire site, to the homepage. Every subpage was signing an affidavit that it was a duplicate of `/`.
+
+Google honoured it. Which is the infuriating part — nothing was broken. The system worked _exactly_ as instructed. In the PR body I wrote down what Search Console was showing me at the time: **1 indexed, 3 excluded.**
+
+Here's the kicker: those two bugs produce nearly identical damage through completely different mechanisms, and Search Console reports them as two unrelated categories that neither name the cause.
+
+<Mermaid name="how-our-own-auth-hid-us-from-google-invisible" />
+
+Left column is the middleware bug, right column is the canonical bug. Same bottom line, nothing in the report pointing at either root cause.
+
+## The fix, and how small it actually was
+
+[PR #67](https://github.com/rafay99-epic/envpilot.dev/pull/67) merged on **2026-06-12 at 08:33 UTC**: 58 files, +6314 −5557. But the part that fixed the indexing is about a dozen lines.
+
+The array:
+
+```diff
+       "/changelog",
++      "/docs",
++      "/docs/(.*)",
++      "/faq",
+       "/wishlist",
+@@
+       "/sitemap.xml",
+       "/robots.txt",
++      "/feed.xml",
++      "/llms.txt",
++      "/llms-full.txt",
+       "/api/health",
+       "/api/config",
++      "/api/status",
++      // Returns 401 JSON for signed-out users; must not redirect to WorkOS
++      // (a cross-origin redirect makes client fetches throw on public pages)
++      "/api/auth/me",
+```
+
+A follow-up commit in the same PR added `"/vs/(.*)"` for the new comparison pages.
+
+And the canonical, replaced with a comment I want to survive every future refactor:
+
+```ts
+  metadataBase: new URL(baseUrl),
+  // NOTE: no root-level `alternates.canonical` — it would be inherited by
+  // every page that doesn't override it, telling crawlers all subpages are
+  // duplicates of the homepage. Each page sets its own canonical instead.
+```
+
+Then per page, which is where it belonged all along:
+
+```ts
+// apps/web/src/app/pricing/page.tsx
+export const metadata: Metadata = {
+  title: "Pricing | Envpilot",
+  description: "Simple, transparent pricing for Envpilot. ...",
+  alternates: { canonical: "/pricing" },
+};
+```
+
+**The Fix:** stop declaring a global truth about identity. Identity is per-page or it is wrong.
+
+Look at `/api/auth/me` in that diff again, though, because it's the sneaky one. That's not a crawler path. It's the endpoint the client calls on every page to figure out who you are. Signed out, it was supposed to return `401` JSON — instead it got a cross-origin redirect to WorkOS, so the `fetch` threw. Every public pageview was throwing `fetch_user_failed` in the console. **The same misconfiguration had been producing a visible JS error on the marketing site the whole time, and I never connected the two.** One entry in one array fixed a crawler problem and a browser problem simultaneously.
+
+## While I was in there, I found ~600KB of nothing
+
+Same PR, unrelated crime.
+
+```diff
+-    "@react-three/drei": "^10.7.7",
+-    "@react-three/fiber": "^9.5.0",
+-    "@types/three": "^0.183.0",
+-    "three": "^0.183.1",
+```
+
+A full 3D rendering stack. And it wasn't dead-in-the-obvious-way — four real components imported it: `HeroScene.tsx` (169 lines), `FeatureShowcase.tsx` (272), `UseCasesSection.tsx` (239), `WorkflowVisualization.tsx` (303). All WebGL, all `useFrame`, all lazily loaded with `next/dynamic` and `ssr: false`, three of them wrapped in a hand-written skeleton component so the loading state looked nice.
+
+All four were reachable only through `LandingPageClient.tsx` and a `landing/index.ts` barrel — neither of which anything imported.
+
+`git grep LandingPageClient` across `apps/web/src` at the commit before the fix returns **zero importers**. Here was the actual homepage:
+
+```tsx
+import TerminalLanding from "@/components/landing/variants/TerminalLanding";
+
+export default function HomePage() {
+  return <TerminalLanding />;
+}
+```
+
+So: ~983 lines of WebGL components, three bespoke loading skeletons, and four npm packages, held alive in `package.json` and `bun.lock` by a single wrapper file that no route imported. `git log -S'@react-three/fiber' -- apps/web/package.json` gives exactly two commits — moved into the monorepo, deleted. Today `grep -rn "react-three" --include=package.json` across the repo returns nothing.
+
+One more honest note on that PR, since I'd rather correct myself than be quoted: the body says web went `1.13.0 → 1.14.0`. The diff says `1.12.0 → 1.14.0`. Trust the diff.
+
+## The sting: same array, different victim
+
+I'd love to end there. But **July 6th**, [PR #89](https://github.com/rafay99-epic/envpilot.dev/pull/89), doing two-tier client version enforcement, turned up this:
+
+> **`/api/version` was not public** — it wasn't in `unauthenticatedPaths`, so signed-out clients got a WorkOS HTML redirect instead of JSON. Every version check silently failed.
+
+Same file. Same array. Same `307`. Not a crawler this time — the CLI and the VS Code extension, polling to find out whether they're too old to run.
+
+The version endpoint is what powers the hard-block. It was answering with a sign-in page. Enforcement had never worked, and it had never once complained, because the CLI fails open on a bad response. Correct behaviour, by the way — a flaky network should never brick someone's CLI. It also means the bug had perfect cover.
+
+That one at least left a guard behind:
+
+```ts
+test("is public and returns JSON, not a WorkOS redirect", async ({
+  request,
+}) => {
+  const response = await request.get("/api/version", { maxRedirects: 0 });
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("application/json");
+});
+```
+
+Three incidents. Same root cause. Three different consumers — crawlers, browsers, machine clients.
+
+## Where I actually stopped patching
+
+<Mermaid name="how-our-own-auth-hid-us-from-google-timeline" />
+
+Read that left to right: patch, patch, patch, then delete the category.
+
+[PR #116](https://github.com/rafay99-epic/envpilot.dev/pull/116) on **July 16th** split the blog and docs into standalone Next apps at `blog.envpilot.dev` and `docs.envpilot.dev`. Run `find apps/blog apps/docs -name middleware.ts -o -name proxy.ts` and you get nothing back. There is no auth layer to forget an entry in, because there is no auth layer.
+
+The legacy paths get handled a full stage earlier:
+
+```ts
+  // Permanent redirects preserve inbound links and SEO equity. These run
+  // BEFORE middleware, so proxy.ts never sees these paths.
+  async redirects() {
+    return [
+      { source: "/blog", destination: blogUrl, permanent: true },
+      { source: "/docs", destination: docsUrl, permanent: true },
+      // ...
+    ];
+  },
+```
+
+That PR also removed `/docs`, `/docs/(.*)`, `/feed.xml`, `/llms.txt` and `/llms-full.txt` from `unauthenticatedPaths` — the fix from #67, deleted, because the content it protected no longer lives behind the thing it was protecting it from.
+
+**The real fix wasn't the array entry. It was moving the public content out from under the auth layer entirely.**
+
+## What I'd tell March-me
+
+Here's where I land.
+
+Default-deny is right. I'd build it that way again tomorrow — for a platform that stores other people's secrets, "you must explicitly name what is public" is not negotiable. The problem was never the posture. It was that I let content that has _no business being near authentication_ sit inside the blast radius, and then maintained a hand-written list as the only thing standing between it and a sign-in redirect.
+
+That array is 28 entries today, with a comment block for nearly every non-obvious one. `/api/v1/(.*)` even carries a note saying the wildcard exists so new endpoints never need a proxy change — which means I already learned this lesson and applied it to the API surface while leaving the marketing surface hand-enumerated.
+
+And I still don't have a test that a public marketing route is reachable signed out. `version-endpoint.spec.ts` covers exactly one JSON route. `/faq` and `/vs/(.*)` are still in there on trust. Add a marketing page tomorrow, forget the array, and it 307s to WorkOS in silence all over again.
+
+So the lesson isn't "remember to update the list." It's that **a system where correctness depends on someone remembering will eventually be wrong**, and the only durable fix is to move the thing somewhere the mistake is unrepresentable.
+
+Go `curl` your own production site. No cookies. Right now. You will find something.
+
+Until then, check your canonicals, nerds.
