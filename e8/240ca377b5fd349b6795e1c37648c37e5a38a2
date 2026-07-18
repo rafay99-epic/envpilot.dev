@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_b6d88f9b1d7316::t_3448abe72e9fa2 7-11,127,164-165,457-469,474,486-501,504,507,521,524
+.github/workflows/deploy-vercel.yml
+  s_b6d88f9b1d7316::t_12bf33c0f08289 3-17,23,64-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e8240ca377b5fd349b6795e1c37648c37e5a38a2",
+  "prompts": {},
+  "sessions": {
+    "s_b6d88f9b1d7316": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "059bddc1-25ad-45e5-a477-1af35420967f",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
