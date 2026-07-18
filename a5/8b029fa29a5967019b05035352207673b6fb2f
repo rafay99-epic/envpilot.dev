@@ -1,0 +1,19 @@
+apps/web/src/components/ui/drawer-panel.tsx
+  s_74a8cf9e9767a8::t_f10e6a5579ddcc 55-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a58b029fa29a5967019b05035352207673b6fb2f",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
