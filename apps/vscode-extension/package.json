@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "MIT",
@@ -347,16 +347,6 @@
             "Skip conflicting directories"
           ],
           "description": "Default action when existing .env files are found"
-        },
-        "envpilot.enableMultiDirectorySync": {
-          "type": "boolean",
-          "default": true,
-          "description": "Allow linking multiple directories to the same project"
-        },
-        "envpilot.syncOnDirectoryOpen": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically sync when opening a linked directory"
         },
         "envpilot.convexUrl": {
           "type": "string",

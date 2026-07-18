@@ -163,6 +163,19 @@ async function updateContextFlags(): Promise<void> {
         ? meta.capabilities["project.requests.submit"] === true
         : normalizeOrgRole(meta?.unifiedRole ?? role) === "developer"
     );
+  } else {
+    // No linked projects — clear stale role flags from a previous link
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.userRole",
+      undefined
+    );
+    vscode.commands.executeCommand(
+      "setContext",
+      "envpilot.projectRole",
+      undefined
+    );
+    vscode.commands.executeCommand("setContext", "envpilot.isDeveloper", false);
   }
 }
 
@@ -1232,14 +1245,51 @@ async function handleAddDirectory(item?: ProjectTreeItem): Promise<void> {
   }
 }
 
-async function handleRemoveDirectory(item?: ProjectTreeItem): Promise<void> {
-  if (!item?.directory || !item.project) {
-    vscode.window.showWarningMessage("Select a directory to remove");
-    return;
+async function handleRemoveDirectory(
+  item?: ProjectTreeItem | { projectId?: string; directoryPath?: string }
+): Promise<void> {
+  let projectId: string | undefined;
+  let projectName: string | undefined;
+  let directoryPath: string | undefined;
+
+  if (item instanceof ProjectTreeItem) {
+    projectId = item.project?._id;
+    projectName = item.project?.name;
+    directoryPath = item.directory?.directoryPath;
+  } else if (item?.projectId && item.directoryPath) {
+    projectId = item.projectId;
+    directoryPath = item.directoryPath;
+    const linked = await storageService.getLinkedProjectsV2();
+    projectName = linked.find((p) => p.projectId === projectId)?.projectName;
+  }
+
+  if (!projectId || !directoryPath) {
+    // No usable context — let the user pick from all linked directories
+    const linked = await storageService.getLinkedProjectsV2();
+    const picks = linked.flatMap((p) =>
+      p.directories.map((d) => ({
+        label: getDisplayPath(d.directoryPath),
+        description: p.projectName,
+        projectId: p.projectId,
+        projectName: p.projectName,
+        directoryPath: d.directoryPath,
+      }))
+    );
+    if (picks.length === 0) {
+      vscode.window.showWarningMessage("No linked directories to remove");
+      return;
+    }
+    const pick = await vscode.window.showQuickPick(picks, {
+      placeHolder: "Select a directory to remove",
+    });
+    if (!pick) return;
+    projectId = pick.projectId;
+    projectName = pick.projectName;
+    directoryPath = pick.directoryPath;
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    `Remove "${getDisplayPath(item.directory.directoryPath)}" from ${item.project.name}?`,
+    `Remove "${getDisplayPath(directoryPath)}" from ${projectName ?? "this project"}?`,
     "Remove",
     "Cancel"
   );
@@ -1249,10 +1299,7 @@ async function handleRemoveDirectory(item?: ProjectTreeItem): Promise<void> {
   }
 
   try {
-    await syncService.removeDirectoryFromProject(
-      item.project._id,
-      item.directory.directoryPath
-    );
+    await syncService.removeDirectoryFromProject(projectId, directoryPath);
 
     vscode.window.showInformationMessage("Directory removed");
     projectsTreeProvider.refresh();
@@ -1499,61 +1546,67 @@ async function handlePullVariables(): Promise<void> {
     return;
   }
 
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Envpilot: Pulling variables...",
-    },
-    async () => {
-      statusBarProvider.setSyncing(true);
-      dashboardPanelProvider.notifySyncStarted();
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Envpilot: Pulling variables...",
+      },
+      async () => {
+        statusBarProvider.setSyncing(true);
+        dashboardPanelProvider.notifySyncStarted();
 
-      // Sync all linked projects (V2) in parallel
-      const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
-      if (allLinkedProjects.length > 0) {
-        const resultsPerProject = await Promise.all(
-          allLinkedProjects.map((project) =>
-            syncService.syncAllDirectories(project)
-          )
-        );
+        // Sync all linked projects (V2) in parallel
+        const allLinkedProjects = await syncService.getAllLinkedProjectsV2();
+        if (allLinkedProjects.length > 0) {
+          const resultsPerProject = await Promise.all(
+            allLinkedProjects.map((project) =>
+              syncService.syncAllDirectories(project)
+            )
+          );
 
-        let totalSuccessful = 0;
-        let totalDirs = 0;
-        for (const results of resultsPerProject) {
-          totalSuccessful += results.filter((r) => r.success).length;
-          totalDirs += results.length;
+          let totalSuccessful = 0;
+          let totalDirs = 0;
+          for (const results of resultsPerProject) {
+            totalSuccessful += results.filter((r) => r.success).length;
+            totalDirs += results.length;
+          }
+
+          statusBarProvider.setSyncing(false);
+
+          if (totalDirs > 0) {
+            const projectCount = allLinkedProjects.length;
+            const projectLabel =
+              projectCount > 1 ? ` across ${projectCount} projects` : "";
+            if (totalSuccessful === totalDirs) {
+              vscode.window.showInformationMessage(
+                `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
+              );
+            } else {
+              vscode.window.showWarningMessage(
+                `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
+              );
+            }
+            variablesTreeProvider.refresh();
+          }
+          return;
         }
+
+        // Fallback to V1
+        const result = await syncService.syncCurrentWorkspace();
 
         statusBarProvider.setSyncing(false);
 
-        if (totalDirs > 0) {
-          const projectCount = allLinkedProjects.length;
-          const projectLabel =
-            projectCount > 1 ? ` across ${projectCount} projects` : "";
-          if (totalSuccessful === totalDirs) {
-            vscode.window.showInformationMessage(
-              `Synced ${totalSuccessful} director${totalSuccessful === 1 ? "y" : "ies"}${projectLabel}`
-            );
-          } else {
-            vscode.window.showWarningMessage(
-              `Synced ${totalSuccessful}/${totalDirs} directories${projectLabel}. Some failed.`
-            );
-          }
+        if (result) {
           variablesTreeProvider.refresh();
         }
-        return;
       }
-
-      // Fallback to V1
-      const result = await syncService.syncCurrentWorkspace();
-
-      statusBarProvider.setSyncing(false);
-
-      if (result) {
-        variablesTreeProvider.refresh();
-      }
-    }
-  );
+    );
+  } finally {
+    // A pull that ends without an onSyncComplete firing (no dirs, early
+    // return, error) must still clear the dashboard spinner — idempotent.
+    dashboardPanelProvider.notifySyncCompleted();
+  }
 }
 
 function handleRefresh(): void {

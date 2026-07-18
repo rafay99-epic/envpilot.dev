@@ -60,6 +60,7 @@ export class RequestVariableDialog {
       title: title(2),
       prompt: `Enter the value for ${key}`,
       placeHolder: "Variable value",
+      password: true,
       validateInput: (v) => {
         if (!v) {
           return "Value is required";

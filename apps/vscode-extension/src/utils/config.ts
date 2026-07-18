@@ -77,6 +77,13 @@ export function shouldPreventCopyOnRevoke(): boolean {
   return getConfig().preventCopyOnRevoke;
 }
 
+/** "prompt" or a preselected conflict strategy (overwrite|backup|merge|skip) */
+export function getDefaultConflictResolution(): string {
+  return vscode.workspace
+    .getConfiguration(CONFIG_SECTION)
+    .get<string>("defaultConflictResolution", "prompt");
+}
+
 /**
  * Minutes the window must stay unfocused before real-time Convex
  * subscriptions are paused. 0 disables idle-pausing entirely.

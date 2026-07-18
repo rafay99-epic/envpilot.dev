@@ -8,7 +8,11 @@ import type {
   ConflictCheckResult,
 } from "../types";
 import { getDisplayPath, normalizePath } from "../utils/paths";
-import { getEnvironment, getTargetFile } from "../utils/config";
+import {
+  getDefaultConflictResolution,
+  getEnvironment,
+  getTargetFile,
+} from "../utils/config";
 import { envFileNamesFor } from "../utils/envFiles";
 
 const AVAILABLE_ENVIRONMENTS = ["development", "staging", "production"];
@@ -152,6 +156,12 @@ export class LinkProjectDialog {
   async resolveConflict(
     conflict: ConflictCheckResult
   ): Promise<ConflictStrategy | undefined> {
+    // Honor the configured default and skip the prompt entirely
+    const configured = getDefaultConflictResolution();
+    if (configured !== "prompt") {
+      return configured as ConflictStrategy;
+    }
+
     const items: vscode.QuickPickItem[] = [
       {
         label: "$(replace) Overwrite",
