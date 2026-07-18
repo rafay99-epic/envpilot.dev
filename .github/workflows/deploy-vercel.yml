@@ -63,5 +63,7 @@ jobs:
 
       - name: Deploy to production (build runs on Vercel)
         run: |
-          npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+          # Pinned CLI: prod deploy behavior must not change under us via
+          # a silent @latest bump. Upgrade deliberately.
+          npx vercel@56.3.1 deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
           echo "${{ inputs.app }} deployed at \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"

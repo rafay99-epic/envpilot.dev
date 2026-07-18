@@ -604,12 +604,18 @@ jobs:
       - build-extension
       - e2e
       - deploy-convex
+      - deploy-web
+      - deploy-admin
+      - deploy-blog
+      - deploy-docs
       - deploy-cli
       - deploy-extension
       - deploy-homebrew
     # Skipped deploys (surface unchanged) must not block the release,
     # so check for failure/cancelled explicitly instead of success().
     # A failed e2e gate DOES block the release — nothing shipped.
+    # A failed Vercel deploy also blocks: a tagged release must never
+    # advertise a revision whose site never reached production.
     #
     # deploy-homebrew is listed in needs only for its status row in the
     # release notes — a failed Homebrew push must NOT block the release.
@@ -622,6 +628,14 @@ jobs:
       (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') &&
       needs.deploy-convex.result != 'failure' &&
       needs.deploy-convex.result != 'cancelled' &&
+      needs.deploy-web.result != 'failure' &&
+      needs.deploy-web.result != 'cancelled' &&
+      needs.deploy-admin.result != 'failure' &&
+      needs.deploy-admin.result != 'cancelled' &&
+      needs.deploy-blog.result != 'failure' &&
+      needs.deploy-blog.result != 'cancelled' &&
+      needs.deploy-docs.result != 'failure' &&
+      needs.deploy-docs.result != 'cancelled' &&
       needs.deploy-cli.result != 'failure' &&
       needs.deploy-cli.result != 'cancelled' &&
       needs.deploy-extension.result != 'failure' &&
@@ -670,8 +684,10 @@ jobs:
             [ -n "$PR_LINE" ] && echo "$PR_LINE" && echo ""
             echo "| Surface | Version | Status |"
             echo "|---------|---------|--------|"
-            echo "| Web | ${{ needs.changes.outputs.web_version }} | 🌐 Vercel |"
-            echo "| Admin | ${{ needs.changes.outputs.admin_version }} | 🌐 Vercel |"
+            echo "| Web | ${{ needs.changes.outputs.web_version }} | $(status '${{ needs.deploy-web.result }}') |"
+            echo "| Admin | ${{ needs.changes.outputs.admin_version }} | $(status '${{ needs.deploy-admin.result }}') |"
+            echo "| Blog | — | $(status '${{ needs.deploy-blog.result }}') |"
+            echo "| Docs | — | $(status '${{ needs.deploy-docs.result }}') |"
             echo "| Convex | — | $(status '${{ needs.deploy-convex.result }}') |"
             echo "| CLI | ${{ needs.changes.outputs.cli_version }} | $(status '${{ needs.deploy-cli.result }}') |"
             echo "| Extension | ${{ needs.changes.outputs.ext_version }} | $(status '${{ needs.deploy-extension.result }}') |"
