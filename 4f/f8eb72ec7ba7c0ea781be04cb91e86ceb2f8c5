@@ -1,0 +1,153 @@
+apps/blog/content/deleting-backwards-compatibility.mdx
+  s_54162922d279f6::t_7c31f2635a5128 52,88,141
+apps/blog/content/deletion-that-is-real.mdx
+  s_547cd532204e8a::t_e7d8baccabaabd 32-34,102
+apps/blog/content/one-core-three-faces.mdx
+  s_bc136f2e9cf2f0::t_efe4f65aac500c 94,147
+apps/blog/content/one-key-two-environments.mdx
+  s_aa728bb86088bc::t_fd04532555be83 27,134-136,195
+apps/blog/content/one-token-model.mdx
+  s_3f8985f96876a3::t_d4ca6abfc133de 15-17,184
+apps/blog/content/roles-as-data.mdx
+  s_e7c395af5921dc::t_16eeb71698b65d 135,175,246
+apps/blog/content/six-prs-to-find-one-bug.mdx
+  s_ab33046d06832c::t_b90afbd2cbb1f0 34
+apps/blog/content/the-auth-cutover.mdx
+  s_54162922d279f6::t_c7a87954d60288 35,124-130,225
+apps/blog/content/the-convex-quota-war.mdx
+  s_aa728bb86088bc::t_e8f4b7d544f906 64
+apps/blog/content/the-extension-that-leaked.mdx
+  s_6aa7c8ba364897::t_8c936e4f1d77bd 57,103
+apps/blog/package.json
+  s_b9e919195283b6::t_33299977c5ff03 3
+apps/blog/src/app/[slug]/page.tsx
+  s_b9e919195283b6::t_907cd1f3b74590 18,22-24,197
+apps/blog/src/components/Mermaid.tsx
+  s_b9e919195283b6::t_572025a20d87d7 1-13
+apps/blog/src/components/diagrams/deleting-backwards-compatibility.ts
+  s_89039f85e7686c::t_c37806f15a0a59 1-36
+apps/blog/src/components/diagrams/deletion-that-is-real.ts
+  s_89039f85e7686c::t_2c8302f9f6daae 1-33
+apps/blog/src/components/diagrams/index.ts
+  s_b9e919195283b6::t_ca6ab89a5a1b6d 1-30
+apps/blog/src/components/diagrams/one-core-three-faces.ts
+  s_ab33046d06832c::t_41ea595316602d 1-33
+apps/blog/src/components/diagrams/one-key-two-environments.ts
+  s_89039f85e7686c::t_a41c8233759802 1-47
+apps/blog/src/components/diagrams/one-token-model.ts
+  s_3f8985f96876a3::t_6fca8586f27353 1-31
+apps/blog/src/components/diagrams/roles-as-data.ts
+  s_f952c56a407c99::t_2389f242acb695 1-52
+apps/blog/src/components/diagrams/six-prs-to-find-one-bug.ts
+  s_ab33046d06832c::t_b6db6d9fa06030 1-17
+apps/blog/src/components/diagrams/the-auth-cutover.ts
+  s_3f8985f96876a3::t_5a233ed1d1201e 1-51
+apps/blog/src/components/diagrams/the-convex-quota-war.ts
+  s_f952c56a407c99::t_a53d0fcb4a2467 1-23
+apps/blog/src/components/diagrams/the-extension-that-leaked.ts
+  s_3f8985f96876a3::t_3db98f77a88475 1-21
+apps/docs/src/components/Mermaid.tsx
+  s_b9e919195283b6::t_bbfbae3ee64089 1,40
+packages/ui/package.json
+  s_b9e919195283b6::t_af65d42334bfd7 3,20-21
+packages/ui/src/docs/MermaidChart.tsx
+  s_b9e919195283b6::t_018820937a4d7d 1-72
+packages/ui/src/docs/index.ts
+  s_b9e919195283b6::t_89526ee285fe34 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4ff8eb72ec7ba7c0ea781be04cb91e86ceb2f8c5",
+  "prompts": {},
+  "sessions": {
+    "s_3f8985f96876a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9934d6ba5bced4de",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_54162922d279f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9a516d624ecdf45f",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_547cd532204e8a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a78ab74c732b72ead",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_6aa7c8ba364897": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a4046bc3475eaab7c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_89039f85e7686c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a34fc0f57cc4ec1dc",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_aa728bb86088bc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af100d530521c9d4d",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_ab33046d06832c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a4637dc23bf595ee3",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_b9e919195283b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e00dc84d-57fa-41f7-be5b-f80cd6b67e4a",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_bc136f2e9cf2f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae09df93183a66f2c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_e7c395af5921dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3ab8bc1d0ac589c1",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_f952c56a407c99": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a5edb0b8b8b84008d",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
