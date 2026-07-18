@@ -7,15 +7,16 @@
  */
 export const ENV_KEY_REGEX: Record<string, RegExp> = {
   javascript:
-    /(?:process\.env\.([A-Z][A-Z_0-9]+))|(?:process\.env\[["'`]([A-Z][A-Z_0-9]+)["'`]\])/g,
-  ruby: /ENV\[['"]([A-Z][A-Z_0-9]+)['"]\]/g,
+    /(?:process\.env\.([A-Za-z_][A-Za-z0-9_]*))|(?:process\.env\[["'`]([A-Za-z_][A-Za-z0-9_]*)["'`]\])/g,
+  ruby: /ENV\[['"]([A-Za-z_][A-Za-z0-9_]*)['"]\]/g,
   python:
-    /os\.(?:(?:environ(?:(?:\.get\(["']([A-Z][A-Z_0-9]+)["']\))|(?:\[["']([A-Z][A-Z_0-9]+)["']\])))|(?:getenv\(["']([A-Z][A-Z_0-9]+)["']\)))/g,
-  php: /(?:(?:\$_(?:SERVER|ENV)\[["']([A-Z][A-Z_0-9]+)["']\])|(?:getenv\(["']([A-Z][A-Z_0-9]+)["']\)))/g,
-  go: /os.Getenv\(["']([A-Z][A-Z_0-9]+)["']\)/g,
-  java: /dotenv.get\(["']([A-Z][A-Z_0-9]+)["']\)/g,
-  csharp: /Environment.GetEnvironmentVariable\(["']([A-Z][A-Z_0-9]+)["']\)/g,
-  rust: /std::env::(?:var|var_os)\(["']([A-Z][A-Z_0-9]+)["']\)/g,
+    /os\.(?:(?:environ(?:(?:\.get\(["']([A-Za-z_][A-Za-z0-9_]*)["']\))|(?:\[["']([A-Za-z_][A-Za-z0-9_]*)["']\])))|(?:getenv\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)))/g,
+  php: /(?:(?:\$_(?:SERVER|ENV)\[["']([A-Za-z_][A-Za-z0-9_]*)["']\])|(?:getenv\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)))/g,
+  go: /os.Getenv\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)/g,
+  java: /dotenv.get\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)/g,
+  csharp:
+    /Environment.GetEnvironmentVariable\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)/g,
+  rust: /std::env::(?:var|var_os)\(["']([A-Za-z_][A-Za-z0-9_]*)["']\)/g,
 };
 
 export interface EnvKeyMatch {
@@ -47,7 +48,11 @@ export function findEnvKeyMatches(
     if (key === undefined || match.index === undefined) {
       continue;
     }
-    const start = match.index + match[0].indexOf(key);
+    // lastIndexOf: the captured key always sits at the END of the matched
+    // expression (before the closing quote/paren/bracket), so this anchors
+    // correctly even when the key string also appears in the access prefix
+    // (ENV['ENV'], process.env.env).
+    const start = match.index + match[0].lastIndexOf(key);
     results.push({ key, start, end: start + key.length });
   }
   return results;

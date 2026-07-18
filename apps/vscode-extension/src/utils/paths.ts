@@ -10,14 +10,35 @@ import * as fs from "fs";
  * case-folding would break on case-sensitive volumes (which process.platform
  * cannot detect). Use {@link pathKey} for case-insensitive matching.
  */
-export function normalizePath(inputPath: string): string {
-  // Resolve to absolute path
-  let resolved = path.resolve(inputPath);
+// ponytail: successful realpath resolutions are cached forever — symlink
+// topology changing mid-session is the accepted ceiling (add TTL/invalidation
+// if that ever bites). Failures stay uncached so a not-yet-existing file
+// re-resolves once created.
+const realpathCache = new Map<string, string>();
+
+/**
+ * realpath with an upward fallback: when `absPath` does not exist (yet, or
+ * was just renamed away), symlinks are still resolved through its nearest
+ * existing ancestor so the result keys identically to when the file existed
+ * — regardless of how many trailing segments are missing.
+ */
+function resolveRealPath(absPath: string): string {
+  const cached = realpathCache.get(absPath);
+  if (cached !== undefined) return cached;
   try {
-    resolved = fs.realpathSync(resolved);
+    const real = fs.realpathSync(absPath);
+    realpathCache.set(absPath, real);
+    return real;
   } catch {
-    // File doesn't exist (yet) — lexical resolution is the best we can do.
+    const parent = path.dirname(absPath);
+    if (parent === absPath) return absPath; // filesystem root
+    return path.join(resolveRealPath(parent), path.basename(absPath));
   }
+}
+
+export function normalizePath(inputPath: string): string {
+  // Resolve to absolute path, then through symlinks
+  const resolved = resolveRealPath(path.resolve(inputPath));
   // Convert to forward slashes for consistent storage
   return resolved.replace(/\\/g, "/");
 }

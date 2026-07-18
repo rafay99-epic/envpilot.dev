@@ -159,7 +159,7 @@ export class LinkProjectDialog {
     // Honor the configured default and skip the prompt entirely
     const configured = getDefaultConflictResolution();
     if (configured !== "prompt") {
-      return configured as ConflictStrategy;
+      return configured;
     }
 
     const items: vscode.QuickPickItem[] = [

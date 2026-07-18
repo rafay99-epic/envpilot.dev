@@ -142,6 +142,25 @@ interface LanguageSpec {
   match: (linePrefix: string) => string | null;
 }
 
+/**
+ * Matchers are anchored to the END of the line prefix and return the CAPTURED
+ * delimiter (or the opening bracket/paren fallback), never `p.slice(-1)` —
+ * completions fire only immediately after the opening delimiter/quote, and
+ * the returned trigger always equals the char the item range replaces. An
+ * unanchored test would also fire after a COMPLETED reference earlier on the
+ * line, and a mismatched trigger corrupts the code on accept.
+ */
+const anchored =
+  (...regexes: RegExp[]) =>
+  (fallback: string) =>
+  (p: string): string | null => {
+    for (const re of regexes) {
+      const m = re.exec(p);
+      if (m) return m[1] ?? fallback;
+    }
+    return null;
+  };
+
 const LANGUAGE_SPECS: LanguageSpec[] = [
   {
     languages: [
@@ -154,61 +173,47 @@ const LANGUAGE_SPECS: LanguageSpec[] = [
     triggerCharacters: ["'", "`", '"', "[", "."],
     match: (p) => {
       if (p.endsWith("process.env.")) return ".";
-      if (/.*?process\.env\[(["'`])?/.test(p)) return p.slice(-1);
-      return null;
+      return anchored(/process\.env\[(["'`])?$/)("[")(p);
     },
   },
   {
     languages: ["ruby"],
     triggerCharacters: ["'", '"', "["],
-    match: (p) => (/.*?ENV\[(["'])?/.test(p) ? p.slice(-1) : null),
+    match: anchored(/ENV\[(["'])?$/)("["),
   },
   {
     languages: ["python"],
     triggerCharacters: ["'", '"', "(", "["],
     match: (p) =>
-      /.*?os\.environ.get\((["'])?/.test(p) ||
-      /.*?os\.getenv\((["'])?/.test(p) ||
-      /.*?os\.environ\[(["'])?/.test(p)
-        ? p.slice(-1)
-        : null,
+      anchored(/os\.environ\.get\((["'])?$/, /os\.getenv\((["'])?$/)("(")(p) ??
+      anchored(/os\.environ\[(["'])?$/)("[")(p),
   },
   {
     languages: ["php"],
     triggerCharacters: ["'", '"', "[", "("],
     match: (p) =>
-      /.*?\$_SERVER\[(["'])?/.test(p) ||
-      /.*?\$_ENV\[(["'])?/.test(p) ||
-      /.*?getenv\((["'])?/.test(p)
-        ? p.slice(-1)
-        : null,
+      anchored(/\$_(?:SERVER|ENV)\[(["'])?$/)("[")(p) ??
+      anchored(/getenv\((["'])?$/)("(")(p),
   },
   {
     languages: ["go"],
     triggerCharacters: ["'", '"', "("],
-    match: (p) => (/.*?os\.Getenv\((["'])?/.test(p) ? p.slice(-1) : null),
+    match: anchored(/os\.Getenv\((["'])?$/)("("),
   },
   {
     languages: ["java"],
     triggerCharacters: ["'", '"', "("],
-    match: (p) => (/.*?dotenv\.get\((["'])?/.test(p) ? p.slice(-1) : null),
+    match: anchored(/dotenv\.get\((["'])?$/)("("),
   },
   {
     languages: ["csharp"],
     triggerCharacters: ["'", '"', "("],
-    match: (p) =>
-      /.*?Environment\.GetEnvironmentVariable\((["'])?/.test(p)
-        ? p.slice(-1)
-        : null,
+    match: anchored(/Environment\.GetEnvironmentVariable\((["'])?$/)("("),
   },
   {
     languages: ["rust"],
     triggerCharacters: ["'", '"', "("],
-    match: (p) =>
-      /.*?std::env::var\((["'])?/.test(p) ||
-      /.*?std::env::var_os\((["'])?/.test(p)
-        ? p.slice(-1)
-        : null,
+    match: anchored(/std::env::(?:var|var_os)\((["'])?$/)("("),
   },
 ];
 

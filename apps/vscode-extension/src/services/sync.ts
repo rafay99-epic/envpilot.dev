@@ -84,11 +84,12 @@ async function atomicWriteFile(
   content: string
 ): Promise<void> {
   const tmpPath = `${filePath}.tmp-envpilot`;
-  await fs.writeFile(tmpPath, content, "utf-8");
   try {
+    await fs.writeFile(tmpPath, content, "utf-8");
     await fs.rename(tmpPath, filePath);
   } catch (err) {
-    // Never leave a secrets-bearing temp file behind.
+    // Never leave a secrets-bearing temp file behind (a failed write can
+    // still have created a partial temp).
     await fs.unlink(tmpPath).catch(() => {});
     throw err;
   }
@@ -155,7 +156,13 @@ export class SyncService {
    * triggers an HTTP fetch for decrypted values from WorkOS Vault.
    */
   startPeriodicSync(): void {
-    this.setupMetadataSubscriptions();
+    // Enqueue on the refreshSubscriptions queue so setup can't interleave
+    // with an in-flight doRefreshSubscriptions and double-subscribe — the
+    // metadataSubIds idempotence guard is only race-free on this queue.
+    const task = this.refreshSubscriptionsQueue.then(() =>
+      this.setupMetadataSubscriptions()
+    );
+    this.refreshSubscriptionsQueue = task.catch(() => {});
   }
 
   /**
@@ -1008,8 +1015,11 @@ export class SyncService {
     project: LinkedProjectV2,
     directory: LinkedDirectory
   ): Promise<SyncResult> {
-    return this.syncFlight.run(`sync:${pathKey(directory.directoryPath)}`, () =>
-      this.doSyncDirectory(project, directory)
+    // Key includes the project: the same directory can be linked to two
+    // projects, and one project's sync must not serve the other's result.
+    return this.syncFlight.run(
+      `sync:${project.projectId}:${pathKey(directory.directoryPath)}`,
+      () => this.doSyncDirectory(project, directory)
     );
   }
 
@@ -1372,6 +1382,9 @@ export class SyncService {
     expiresAt: number,
     options: LinkDirectoryOptions
   ): Promise<LinkedProjectV2 | null> {
+    // Fail BEFORE any backup or storage mutation — a link persisted in
+    // Restricted Mode would overwrite the user's .env once trust is granted.
+    assertTrustedWorkspace();
     const directory: LinkedDirectory = {
       directoryPath: normalizePath(options.directoryPath),
       targetFile: options.targetFile || getTargetFile(),
@@ -1436,6 +1449,8 @@ export class SyncService {
     project: LinkedProjectV2,
     options: LinkDirectoryOptions
   ): Promise<void> {
+    // Same upfront trust gate as linkProjectWithDirectory.
+    assertTrustedWorkspace();
     const directory: LinkedDirectory = {
       directoryPath: normalizePath(options.directoryPath),
       targetFile: options.targetFile || getTargetFile(),

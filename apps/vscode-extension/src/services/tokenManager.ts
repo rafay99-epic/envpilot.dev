@@ -96,8 +96,19 @@ export class TokenManager {
     }
 
     return this.refresh.run(`refresh:${session.user.id}`, async () => {
+      // Compare-and-swap guard: a refresh can outlive a sign-out and land
+      // after the SAME user signs back in with a fresh session. Persisting or
+      // removing based on this stale session would clobber the new one — only
+      // proceed when the stored refresh token is still the one we used.
+      const isCurrent = async () => {
+        const current = (await this.storage.listAccounts()).find(
+          (a) => a.user.id === session.user.id
+        );
+        return current?.refreshToken === session.refreshToken;
+      };
       try {
         const result = await refreshAccessToken(session.refreshToken);
+        if (!(await isCurrent())) return null;
         // Patch THIS account's tokens in place — never changes the active
         // account and never resurrects an account removed mid-refresh.
         await this.storage.updateAccountTokens(session.user.id, {
@@ -111,6 +122,7 @@ export class TokenManager {
           // Refresh token revoked/expired — the session is genuinely dead.
           // (The .finally in SingleFlight.run removes this key; other
           // accounts' in-flight refreshes are unaffected.)
+          if (!(await isCurrent())) return null;
           output.warn("Session refresh rejected — signing out.");
           await this.storage.removeAccount(session.user.id);
           return null;

@@ -86,4 +86,28 @@ describe("findEnvKeyMatches", () => {
       { key: "DB_URL", start: 5, end: 11 },
     ]);
   });
+
+  it("matches lowercase, single-char and leading-underscore keys", () => {
+    expect(findEnvKeyMatches("javascript", "process.env.myKey")).toEqual([
+      { key: "myKey", start: 12, end: 17 },
+    ]);
+    expect(findEnvKeyMatches("javascript", 'process.env["X"]')).toEqual([
+      { key: "X", start: 13, end: 14 },
+    ]);
+    expect(findEnvKeyMatches("python", "os.getenv('_TOKEN')")).toEqual([
+      { key: "_TOKEN", start: 11, end: 17 },
+    ]);
+  });
+
+  it("anchors to the quoted key when it also appears in the access prefix", () => {
+    expect(findEnvKeyMatches("ruby", "ENV['ENV']")).toEqual([
+      { key: "ENV", start: 5, end: 8 },
+    ]);
+    expect(findEnvKeyMatches("php", "$_ENV['ENV']")).toEqual([
+      { key: "ENV", start: 7, end: 10 },
+    ]);
+    expect(findEnvKeyMatches("javascript", "process.env.env")).toEqual([
+      { key: "env", start: 12, end: 15 },
+    ]);
+  });
 });

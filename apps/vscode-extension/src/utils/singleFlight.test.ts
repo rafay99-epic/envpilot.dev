@@ -94,6 +94,29 @@ describe("SingleFlight", () => {
     await expect(b2).resolves.toBe(2);
   });
 
+  it("a deleted run's settle does not evict its replacement", async () => {
+    const sf = new SingleFlight();
+    const resolvers: Array<(v: number) => void> = [];
+    const fn = () =>
+      new Promise<number>((r) => {
+        resolvers.push(r);
+      });
+
+    const a = sf.run("k", fn);
+    sf.delete("k");
+    const b = sf.run("k", fn); // replacement registered under the same key
+
+    resolvers[0](1); // settle the deleted run — must not remove `b`'s entry
+    await expect(a).resolves.toBe(1);
+
+    const c = sf.run("k", fn); // must join `b`, not start fresh work
+    expect(resolvers).toHaveLength(2);
+
+    resolvers[1](2);
+    await expect(b).resolves.toBe(2);
+    await expect(c).resolves.toBe(2);
+  });
+
   it("clear() stops new callers from joining an in-flight request", async () => {
     const sf = new SingleFlight();
     const resolvers: Array<(v: number) => void> = [];

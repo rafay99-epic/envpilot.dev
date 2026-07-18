@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ExtensionConfig } from "../types";
+import type { ConflictStrategy, ExtensionConfig } from "../types";
 
 const CONFIG_SECTION = "envpilot";
 
@@ -77,11 +77,24 @@ export function shouldPreventCopyOnRevoke(): boolean {
   return getConfig().preventCopyOnRevoke;
 }
 
-/** "prompt" or a preselected conflict strategy (overwrite|backup|merge|skip) */
-export function getDefaultConflictResolution(): string {
-  return vscode.workspace
+/**
+ * "prompt" or a preselected conflict strategy (overwrite|backup|merge|skip).
+ * The package.json enum only constrains the settings UI — a hand-edited or
+ * synced settings.json can hold anything, and an unknown value must fall back
+ * to "prompt" (never silently overwrite an existing .env).
+ */
+export function getDefaultConflictResolution(): "prompt" | ConflictStrategy {
+  const raw = vscode.workspace
     .getConfiguration(CONFIG_SECTION)
     .get<string>("defaultConflictResolution", "prompt");
+  const allowed: ReadonlyArray<"prompt" | ConflictStrategy> = [
+    "prompt",
+    "overwrite",
+    "backup",
+    "merge",
+    "skip",
+  ];
+  return allowed.find((v) => v === raw) ?? "prompt";
 }
 
 /**

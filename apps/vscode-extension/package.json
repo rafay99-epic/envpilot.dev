@@ -386,6 +386,7 @@
         },
         "envpilot.cloakValues": {
           "type": "boolean",
+          "scope": "application",
           "default": true,
           "description": "Visually mask variable values in Envpilot-managed .env files (the file content on disk is unchanged). Masking uses editor decorations, so values may still be visible in surfaces VS Code renders directly: the minimap (with editor.minimap.renderCharacters on), peek views, and diff editors."
         },

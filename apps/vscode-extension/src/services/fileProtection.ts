@@ -57,47 +57,39 @@ export class FileProtectionService {
 
     const fileWatcher = vscode.workspace.createFileSystemWatcher(filePath);
 
-    fileWatcher.onDidChange(async () => {
-      if (this.isSyncing) {
-        return;
-      }
-
-      // Debounce to avoid multiple triggers
-      const existing = this.debounceTimers.get(filePath);
-      if (existing) {
-        clearTimeout(existing);
-      }
-
-      this.debounceTimers.set(
-        filePath,
-        setTimeout(async () => {
-          this.debounceTimers.delete(filePath);
-          await this.handleUnauthorizedEdit(filePath, resyncCallback);
-        }, 500)
-      );
-    });
-
+    fileWatcher.onDidChange(() => this.scheduleCheck(filePath, resyncCallback));
     // Also handle deletion — if someone deletes a protected file, re-sync it
-    fileWatcher.onDidDelete(async () => {
-      if (this.isSyncing) {
-        return;
-      }
-
-      const existing = this.debounceTimers.get(filePath);
-      if (existing) {
-        clearTimeout(existing);
-      }
-
-      this.debounceTimers.set(
-        filePath,
-        setTimeout(async () => {
-          this.debounceTimers.delete(filePath);
-          await this.handleUnauthorizedEdit(filePath, resyncCallback);
-        }, 500)
-      );
-    });
+    fileWatcher.onDidDelete(() => this.scheduleCheck(filePath, resyncCallback));
 
     this.watchers.set(filePath, fileWatcher);
+  }
+
+  /**
+   * Debounced verification of a watcher event. Events delivered mid-sync are
+   * NOT dropped (a genuine external edit can land inside the per-env fan-out
+   * window) — the timer re-arms until the sync settles, then the manifest-hash
+   * check in handleUnauthorizedEdit suppresses our own writes.
+   */
+  private scheduleCheck(
+    filePath: string,
+    resyncCallback: () => Promise<void>
+  ): void {
+    const existing = this.debounceTimers.get(filePath);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    this.debounceTimers.set(
+      filePath,
+      setTimeout(async () => {
+        this.debounceTimers.delete(filePath);
+        if (this.isSyncing) {
+          this.scheduleCheck(filePath, resyncCallback);
+          return;
+        }
+        await this.handleUnauthorizedEdit(filePath, resyncCallback);
+      }, 500)
+    );
   }
 
   /**

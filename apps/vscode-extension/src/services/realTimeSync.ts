@@ -439,10 +439,21 @@ export class RealTimeSyncService {
       if (!token) return null;
       const client = new ConvexHttpClient(url);
       client.setAuth(token);
-      const records = (await client.query(
-        anyApi.features.users.projectAccess.listForCaller as never,
-        {} as never
-      )) as CallerProjectAccess[] | null;
+      // Bounded: this await runs while isProcessingRevocation holds — a
+      // stalled query must not block revocation handling for minutes. A
+      // timeout degrades to the fail-safe null (skip cleanup this round).
+      const records = (await Promise.race([
+        client.query(
+          anyApi.features.users.projectAccess.listForCaller as never,
+          {} as never
+        ),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Access re-check timed out")),
+            10000
+          )
+        ),
+      ])) as CallerProjectAccess[] | null;
       return new Set((records ?? []).map((r) => r.projectId));
     } catch (err) {
       captureError(err, { phase: "access-recheck" });

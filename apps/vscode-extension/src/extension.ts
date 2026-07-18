@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { existsSync } from "fs";
-import { chmod, unlink } from "fs/promises";
+import { chmod, stat, unlink } from "fs/promises";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -219,6 +219,21 @@ async function initializeConvexService(): Promise<void> {
   }
 }
 
+/**
+ * Fire-and-forget removal of a crash-leftover atomic-write temp, but only
+ * when it is old enough that no live window can still be mid-write on it.
+ */
+async function sweepStaleTemp(tmpPath: string): Promise<void> {
+  try {
+    const s = await stat(tmpPath);
+    if (Date.now() - s.mtimeMs > 60_000) {
+      await unlink(tmpPath);
+    }
+  } catch {
+    // Missing temp (the common case) — nothing to sweep.
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   initSentry();
 
@@ -289,7 +304,10 @@ export async function activate(context: vscode.ExtensionContext) {
   for (const entry of await readManifest(getManifestPath())) {
     // Sweep a stale atomic-write temp a crash may have left beside the file
     // (it holds plaintext secrets and is not itself in the manifest).
-    void unlink(`${entry.path}.tmp-envpilot`).catch(() => {});
+    // Age-gated: the manifest is shared across extension hosts, and another
+    // live window may be mid-atomic-write on this very path — its temp is
+    // milliseconds old, a crash leftover is minutes+.
+    void sweepStaleTemp(`${entry.path}.tmp-envpilot`);
     if (rearmAuthenticated && existsSync(entry.path)) {
       clipboardGuardService.protectFile(
         entry.path,
@@ -594,6 +612,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Subscribe to real-time revocation events for UI updates
   realTimeSyncService.onRevocationDetected(({ project, reason }) => {
+    // Drop every ApiService cache (responses, access metadata, roles) so a
+    // hover/reveal opened pre-revocation can't pass its role check or read
+    // variables from a stale cache — the refetch hits the server, which
+    // denies the revoked caller.
+    apiService.clearCache();
     projectsTreeProvider.refresh();
     variablesTreeProvider.refresh();
     statusBarProvider.update();

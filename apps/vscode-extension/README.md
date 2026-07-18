@@ -75,8 +75,10 @@ Open VS Code settings and search for "Envpilot" to configure:
 | `envpilot.environment`                 | Default environment                                | `development` |
 | `envpilot.preventCopyOnRevoke`         | Delete .env when permissions revoked               | `true`        |
 | `envpilot.defaultConflictResolution`   | Action when existing .env files found              | `prompt`      |
-| `envpilot.enableMultiDirectorySync`    | Allow linking multiple directories                 | `true`        |
-| `envpilot.syncOnDirectoryOpen`         | Auto-sync when opening a linked directory          | `true`        |
+| `envpilot.clipboardGuard.scope`        | Which managed files block clipboard copy/cut       | `all-managed` |
+| `envpilot.cloakValues`                 | Mask secret values in open .env editors            | `true`        |
+| `envpilot.autocomplete.enable`         | Env key autocomplete in code                       | `true`        |
+| `envpilot.hover.enable`                | Env key hover info in code                         | `true`        |
 | `envpilot.enableCodeLens`              | Show CodeLens annotations above .env files         | `true`        |
 | `envpilot.commitGuard.enabled`         | Enable dual-layer .env commit protection           | `true`        |
 | `envpilot.commitGuard.autoInstallHook` | Auto-install pre-commit hook to block .env commits | `true`        |
