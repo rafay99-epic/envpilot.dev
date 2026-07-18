@@ -4,7 +4,8 @@
 
 <h1 align="center">Envpilot</h1>
 
-<p align="center">Secure environment variable management for teams. Bun + Turborepo monorepo powering the web dashboard, blog, docs site, CLI, and VS Code extension.</p>
+<p align="center"><strong>Open-source environment variable &amp; secrets manager for teams.</strong><br />
+CLI, VS Code extension, web dashboard, GitHub Action — and an MCP server that gives AI agents scoped, audited access to secrets without ever exposing your <code>.env</code>.</p>
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="License: MIT" /></a>
@@ -22,14 +23,74 @@
   <a href="https://www.npmjs.com/package/@envpilot/cli"><img src="https://img.shields.io/npm/dm/@envpilot/cli?style=flat-square&logo=npm&logoColor=white&label=downloads" alt="npm Downloads" /></a>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Bun-111111?style=flat-square&logo=bun&logoColor=white" alt="Bun" />
-  <img src="https://img.shields.io/badge/Turborepo-0f172a?style=flat-square&logo=turborepo&logoColor=white" alt="Turborepo" />
-  <img src="https://img.shields.io/badge/Next.js-111111?style=flat-square&logo=nextdotjs&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Convex-2563eb?style=flat-square&logo=databricks&logoColor=white" alt="Convex" />
-  <img src="https://img.shields.io/badge/TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-06b6d4?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
-</p>
+---
+
+## Why Envpilot
+
+Most teams still share `.env` files over Slack and hope for the best. Envpilot
+replaces that with one encrypted source of truth your whole team — and your AI
+tooling — pulls from:
+
+- **Encrypted end to end** — secret values live in WorkOS Vault (AES-256-GCM).
+  The database stores only opaque reference IDs; a database breach yields zero
+  plaintext secrets.
+- **Every surface you work in** — web dashboard, CLI, VS Code extension,
+  GitHub Action, REST API, and an MCP server.
+- **Per-environment variables** — `DATABASE_URL` for development and
+  production are separate values with one deterministic resolution rule.
+- **Role-based access control** — admin / team lead / member, down to
+  per-variable permissions, with a full audit log.
+- **Built for the AI-agent era** — agents (Claude Code, Cursor, anything
+  MCP-capable) get scoped, audited, revocable access to exactly the secrets
+  you grant. Your raw `.env` never enters a prompt.
+- **Open source (MIT)** — read the code, audit how your secrets are handled,
+  or [run your own instance](docs/SELF_HOSTING.md). No trust-me-bro security.
+
+## Get started
+
+**Cloud (fastest):** sign up free at [envpilot.dev](https://www.envpilot.dev) —
+3 projects, 3 teammates, no credit card.
+
+```bash
+# Install the CLI
+npm install -g @envpilot/cli
+
+# Authenticate and pull your variables
+envpilot login
+envpilot pull
+
+# Or run a command with your variables injected — no .env file on disk
+envpilot run -- npm run dev
+```
+
+**VS Code:** install
+[Envpilot from the Marketplace](https://marketplace.visualstudio.com/items?itemName=EnvPilot.envpilot)
+(or [Open VSX](https://open-vsx.org/extension/envpilot/envpilot)) and your
+variables sync in-editor.
+
+**CI/CD:** use the
+[GitHub Action](https://github.com/rafay99-epic/envpilot-action) to pull
+variables into any pipeline, with values masked in workflow logs.
+
+**AI agents:** point any MCP client at the
+[Envpilot MCP server](https://docs.envpilot.dev/mcp-server) with a scoped API
+key — the agent reads the secrets you allow, every access is audit-logged.
+
+**Self-host:** the whole platform runs as your own instance — see
+[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+## Security model
+
+Envpilot is a secrets manager, so the boring details matter:
+
+- Secret values are stored encrypted in WorkOS Vault; the database holds only
+  vault reference IDs — never plaintext.
+- API keys and service tokens are stored as SHA-256 hashes, org-scoped, with
+  dynamic scopes and optional expiry.
+- Every read, write, share, and denial is audit-logged. Reads fail loudly —
+  never partial data, never sentinel values.
+- Found a vulnerability? Please report it privately — see
+  [SECURITY.md](SECURITY.md).
 
 ## Docs
 
@@ -43,9 +104,13 @@
 - [Features](docs/FEATURES.md) (full feature inventory)
 - [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
 - [Self-Hosting](docs/SELF_HOSTING.md) (run your own instance)
-- [Security TODO](docs/SECURITY-TODO.md) (pre-launch security checklist)
 
-## Quick Start
+Product docs for users live at [docs.envpilot.dev](https://docs.envpilot.dev).
+
+## Contributing & development
+
+Envpilot is a Bun + Turborepo monorepo: Next.js web app, Convex backend, CLI,
+VS Code extension, and shared packages.
 
 ```bash
 bun install
@@ -53,8 +118,6 @@ bun run setup
 # edit .env.local with your credentials
 bun run dev
 ```
-
-## Repo Layout
 
 ```
 apps/
@@ -72,14 +135,17 @@ packages/
   prettier-config/    # Shared Prettier config
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow — issues and PRs
+welcome.
+
 ## License
 
-This project is proprietary software. See [LICENSE](./LICENSE) for details.
+[MIT](./LICENSE) © Syntax Lab Technology and Rafay.
 
 ---
 
 <p align="center">
-  Built by the Envpilot team &middot; <a href="https://www.envpilot.dev">envpilot.dev</a>
+  Built in the open &middot; <a href="https://www.envpilot.dev">envpilot.dev</a>
   <br />
   <sub>Developed at <a href="https://syntaxlabtechnology.com">Syntax Lab Technology</a> &middot; Lead dev <a href="https://rafay99.com">rafay99.com</a></sub>
 </p>
