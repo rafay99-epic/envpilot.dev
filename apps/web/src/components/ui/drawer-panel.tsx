@@ -52,7 +52,13 @@ export function DrawerPanel({
         const focusables = Array.from(
           panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
         ).filter((el) => el.offsetParent !== null);
-        if (focusables.length === 0) return;
+        if (focusables.length === 0) {
+          // Nothing focusable inside — keep focus pinned to the panel
+          // rather than letting Tab leak to the page behind the modal.
+          e.preventDefault();
+          panelRef.current.focus();
+          return;
+        }
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
         const active = document.activeElement as HTMLElement | null;
