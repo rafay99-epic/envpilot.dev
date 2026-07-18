@@ -128,11 +128,10 @@ test.describe.serial("API keys", () => {
       .locator("li")
       .filter({ hasText: keyName });
     await expect(row).toBeVisible({ timeout: 10_000 });
-    await expect(row.getByText(/^1 project$/)).toBeVisible();
-    await expect(row.getByText(/^production$/)).toBeVisible();
-    await expect(row.getByText(/^variables$/)).toBeVisible();
-    await expect(row.getByText(/^REST API$/)).toBeVisible();
-    await expect(row.getByText(/^MCP server$/)).toBeVisible();
+    // Scope renders as one quiet line, not a badge per datum.
+    await expect(
+      row.getByText(/1 project · production · variables · REST API, MCP server/)
+    ).toBeVisible();
 
     expect(
       clientErrors,

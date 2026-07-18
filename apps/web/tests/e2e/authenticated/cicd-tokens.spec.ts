@@ -129,7 +129,9 @@ test.describe.serial("GitHub Action keys (CI/CD)", () => {
       .locator("li")
       .filter({ hasText: keyName });
     await expect(row).toBeVisible({ timeout: 10_000 });
-    await expect(row.getByText(/^GitHub Action$/)).toBeVisible();
+    await expect(
+      row.getByText(/1 project · production · variables · GitHub Action/)
+    ).toBeVisible();
 
     expect(
       clientErrors,

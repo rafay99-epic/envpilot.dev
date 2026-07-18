@@ -47,12 +47,6 @@ function reportApiKeysUiError(error: unknown, action: "create" | "revoke") {
   });
 }
 
-const ENV_BADGE_COLOR: Record<Environment, "blue" | "amber" | "green"> = {
-  development: "blue",
-  staging: "amber",
-  production: "green",
-};
-
 const ENV_CHIP_SELECTED: Record<Environment, string> = {
   development: "border-blue-500/40 bg-blue-500/10 text-blue-400",
   staging: "border-amber-500/40 bg-amber-500/10 text-amber-400",
@@ -258,45 +252,41 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
               {keyItem.name}
             </span>
             {isRevoked && <TerminalBadge color="red">Revoked</TerminalBadge>}
-            <TerminalBadge color="purple">
-              {keyItem.scopeProjects === "all"
-                ? "all projects"
-                : `${keyItem.scopeProjects.length} project${
-                    keyItem.scopeProjects.length === 1 ? "" : "s"
-                  }`}
-            </TerminalBadge>
-            {keyItem.scopeEnvironments === "all" ? (
-              <TerminalBadge color="blue">all environments</TerminalBadge>
-            ) : (
-              keyItem.scopeEnvironments.map((env) => (
-                <TerminalBadge
-                  key={env}
-                  color={ENV_BADGE_COLOR[env as Environment] ?? "zinc"}
-                >
-                  {env}
-                </TerminalBadge>
-              ))
+            {!isRevoked && expiryExpired && (
+              <TerminalBadge color="red">Expired</TerminalBadge>
             )}
-            {keyItem.scopeResources.map((resource) => (
-              <TerminalBadge key={resource} color="zinc">
-                {resource}
-              </TerminalBadge>
-            ))}
-            {keyItem.surfaces === null ? (
-              <TerminalBadge color="amber">all surfaces</TerminalBadge>
-            ) : (
-              keyItem.surfaces.map((surface) => (
-                <TerminalBadge key={surface} color="amber">
-                  {SURFACE_LABEL[surface]}
-                </TerminalBadge>
-              ))
-            )}
-            {!isRevoked && expiryMsLeft !== null && (
-              <TerminalBadge color={expiryUrgent ? "red" : "amber"}>
-                {expiryExpired ? "Expired" : `expires in ${expiryDaysLeft}d`}
+            {!isRevoked && !expiryExpired && expiryUrgent && (
+              <TerminalBadge color="red">
+                expires in {expiryDaysLeft}d
               </TerminalBadge>
             )}
           </div>
+          {/* One quiet scope line instead of a badge per datum — status is
+              the only thing that earns a colored pill. */}
+          <p className="mt-1 truncate font-mono text-xs text-zinc-400">
+            {keyItem.scopeProjects === "all"
+              ? "all projects"
+              : `${keyItem.scopeProjects.length} project${
+                  keyItem.scopeProjects.length === 1 ? "" : "s"
+                }`}
+            {" · "}
+            {keyItem.scopeEnvironments === "all"
+              ? "all environments"
+              : keyItem.scopeEnvironments.join(", ")}
+            {" · "}
+            {keyItem.scopeResources.join(", ")}
+            {" · "}
+            {keyItem.surfaces === null
+              ? "all surfaces"
+              : keyItem.surfaces
+                  .map((surface) => SURFACE_LABEL[surface])
+                  .join(", ")}
+            {!isRevoked &&
+              expiryMsLeft !== null &&
+              !expiryExpired &&
+              !expiryUrgent &&
+              ` · expires in ${expiryDaysLeft}d`}
+          </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500">
             <span>
               Created by {keyItem.createdByName}{" "}
