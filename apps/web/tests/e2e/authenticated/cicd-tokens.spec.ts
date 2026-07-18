@@ -10,12 +10,12 @@ import {
 } from "./support";
 
 // Authenticated e2e — the GitHub Action credential, post-unification: an
-// Action credential is now an API key minted in org settings with the
-// github_action surface (locked to one project + variables). The legacy
-// project-settings CI/CD tab no longer creates tokens — it points at the
-// unified API Keys section. This spec drives the real create flow, pulls
-// through the real machine endpoint (the exact call the GitHub Action
-// makes), verifies scoping, and revokes.
+// Action credential is an API key minted in org settings with the
+// github_action surface (locked to one project + variables); the legacy
+// serviceTokens table and its project-settings CI/CD tab are gone. This
+// spec drives the real create flow, pulls through the real machine
+// endpoint (the exact call the GitHub Action makes), verifies scoping,
+// and revokes.
 // Serial: the pull/reject/revoke tests consume state the first test creates.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
@@ -26,42 +26,6 @@ test.describe.serial("GitHub Action keys (CI/CD)", () => {
   let plaintextToken = "";
   let projectSlug = "";
 
-  test("the CI/CD tab redirects token creation to API Keys", async ({
-    page,
-  }) => {
-    test.setTimeout(90_000);
-    projectSlug = await getWorkerProjectSlug(page);
-
-    await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
-      waitUntil: "domcontentloaded",
-    });
-    await expect(
-      page.getByRole("button", { name: /^General$/i }).first()
-    ).toBeVisible({ timeout: 20_000 });
-
-    const tokensTab = page
-      .getByRole("button", { name: /CI\/CD Tokens/i })
-      .first();
-    const tabVisible = await tokensTab
-      .waitFor({ state: "visible", timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false);
-    test.skip(
-      !tabVisible,
-      "CI/CD Tokens tab not visible — cicd_service_tokens is gated off for this org/tier"
-    );
-    await tokensTab.click();
-
-    // No create form here anymore — a pointer to the unified API Keys UI.
-    await expect(page.getByText(/Tokens are now created as/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByTestId("cicd-goto-api-keys")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^New Token$/i })
-    ).toHaveCount(0);
-  });
-
   test("create a GitHub Action key via org settings API Keys", async ({
     page,
   }) => {
@@ -69,7 +33,7 @@ test.describe.serial("GitHub Action keys (CI/CD)", () => {
     const clientErrors = trackClientErrors(page);
 
     const orgSlug = await getOwnedOrgSlug(page);
-    projectSlug = projectSlug || (await getWorkerProjectSlug(page));
+    projectSlug = await getWorkerProjectSlug(page);
 
     // A production-scoped variable for the pull to return.
     await page.goto(`/dashboard/projects/${projectSlug}`, {

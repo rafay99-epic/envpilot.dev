@@ -12,8 +12,17 @@ The REST API, MCP server, and GitHub Action all authenticate with the **same key
 
 - A new key is generated as `envpk_...` and shown **exactly once**, at creation time.
 - Envpilot stores only a **SHA-256 hash** of the key, never the plaintext. If you lose a key, there's no way to recover it — revoke it and issue a new one.
-- Every key is scoped along three dimensions: **projects** (all or a specific list), **environments** (all or a specific list), and **resources** (`variables`, `accounts`, `projects`). A request for anything outside a key's scope is treated as if it doesn't exist.
+- Every key is scoped along three dimensions: **projects** (all or a specific list), **environments** (all or a specific list), and **resources** (`variables`, `accounts`, `projects`, and optionally `requests`). A request for anything outside a key's scope is treated as if it doesn't exist.
+- Every key also declares its **surfaces** — which faces it may authenticate on: `rest_api`, `mcp_server`, `github_action`. All three route through one enforcement core (`_authorizeRequest`); see [Architecture](/architecture).
 - Keys can optionally have an **expiry date** (`expiresAt`). An expired key returns the same uniform "invalid or revoked" error as a bad or revoked key — the API never tells a caller _why_ a key stopped working.
+
+## Machine credentials never write secrets
+
+Every machine credential — REST API, MCP server, or GitHub Action key — is fundamentally **read-only**. No API key can create, edit, or delete a variable's value. The blast radius of a leaked key is bounded to reads within its scope, never a silent change to what a deploy pulls.
+
+There is exactly one escalation path, and it's **opt-in per key**: a key whose scope includes the `requests` resource can **file a variable request** — an ask, with a required justification, that lands in a human reviewer's dashboard queue. This is not a write. The agent never proposes a value; if the reviewer approves, **the reviewer supplies the value**. Keys without the `requests` resource (including every GitHub Action key) can't file requests at all.
+
+This is the trust model in one line: **read-only keys, human-approved escalation.** Request creation is additionally throttled per key — 5 per hour (burst 2), a standing cap of 5 open pending requests, and a 24-hour cooldown after a rejection — so a retry-looping agent can't flood reviewers. See [Rate limits](/rate-limits) and [Architecture](/architecture).
 
 ## Revocation is immediate
 

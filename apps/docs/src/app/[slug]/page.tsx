@@ -17,7 +17,11 @@ import {
 import { DocsSidebar, DOC_ICONS } from "@/components/DocsSidebar";
 import { DocsShell } from "@/components/shell";
 import { LLMActions } from "@/components/LLMActions";
+import { Mermaid } from "@/components/Mermaid";
 import Link from "next/link";
+
+// Shared MDX overrides plus doc-app-only components (Mermaid diagrams).
+const mdxComponents = { ...docsComponents, Mermaid };
 
 const mdxOptions = {
   mdxOptions: {
@@ -167,7 +171,7 @@ export default async function DocPage({ params }: PageProps) {
               <article className="mt-10">
                 <MDXRemote
                   source={doc.content}
-                  components={docsComponents}
+                  components={mdxComponents}
                   options={mdxOptions as never}
                 />
               </article>

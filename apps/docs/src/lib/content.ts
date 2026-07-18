@@ -68,9 +68,11 @@ export function getAllDocs(): Omit<DocPage, "content">[] {
     // Public API, MCP server, and CI/CD integrations
     "api-quickstart",
     "api-reference",
+    "architecture",
     "mcp-server",
     "github-action",
     "api-security",
+    "rate-limits",
   ];
 
   const files = readdirSync(CONTENT_DIR)

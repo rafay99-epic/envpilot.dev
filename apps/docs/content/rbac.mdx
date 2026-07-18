@@ -78,6 +78,10 @@ When a Member or Viewer needs a variable they cannot see:
 
 All requests and approvals are recorded in the audit log.
 
+### Machine-filed requests
+
+Requests don't only come from people. An API key with the `requests` resource — used by an AI agent over the [MCP server](/mcp-server) — can file a variable request too. These land in the **same reviewer queue** and are governed by the **same** `project.requests.review` capability: an Admin, a Manager, or a Team Lead can review them. As with human requests, the **approver supplies the value** — a machine credential never proposes one. See [Architecture](/architecture) for the "agent requests, human approves" model.
+
 ## How push behavior changes by role
 
 ```bash

@@ -3,6 +3,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import { getConvexUrl } from "@/lib/public-api";
 import { APP_VERSIONS } from "@/lib/versions";
 
@@ -260,6 +261,119 @@ const baseHandler = createMcpHandler(
           return {
             content: [{ type: "text", text: JSON.stringify({ accounts }) }],
             structuredContent: { accounts },
+          };
+        } catch (err) {
+          return toolError(err);
+        }
+      }
+    );
+
+    const requestStatusShape = {
+      requestId: z.string(),
+      key: z.string(),
+      environments: z.array(z.string()),
+      status: z.enum(["pending", "approved", "rejected", "canceled"]),
+      reviewReason: z.string().nullable(),
+      createdAt: z.number(),
+    };
+
+    server.registerTool(
+      "envpilot_request_variable",
+      {
+        title: "Request a Variable",
+        description:
+          "File a request for an environment variable this key cannot read — a HUMAN reviewer must approve it in the Envpilot dashboard and supply the secret value; nothing is created until they do. Requires the key to carry the 'requests' resource. Include a clear justification (shown to the reviewer as their only context, e.g. 'I wired up Stripe billing in staging — please add STRIPE_KEY so you can run and test it'). After filing, tell the user to approve it in the dashboard, then poll envpilot_get_request_status or retry the read. Never proposes secret values. Strictly rate limited — do NOT retry in a loop.",
+        inputSchema: {
+          project: z.string().describe("Project slug"),
+          key: z
+            .string()
+            .describe("Variable key in UPPER_SNAKE_CASE, e.g. STRIPE_KEY"),
+          environments: z
+            .array(environmentEnum)
+            .min(1)
+            .describe("Environments the variable is needed in"),
+          justification: z
+            .string()
+            .min(1)
+            .max(500)
+            .describe(
+              "Why the variable is needed — the reviewer's only context"
+            ),
+          is_sensitive: z
+            .boolean()
+            .optional()
+            .describe("Mark the variable sensitive (default false)"),
+        },
+        outputSchema: {
+          requestId: z.string(),
+          status: z.literal("pending"),
+          message: z.string(),
+        },
+        // A write, but a benign one: creates a pending review row only.
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async (args, extra) => {
+        const authInfo = extra.authInfo as AuthInfo | undefined;
+        if (!authInfo) return unauthorizedResult;
+        try {
+          const convex = new ConvexHttpClient(requireConvexUrl());
+          const result = await convex.action(
+            api.features.api.requests.createVariableRequest,
+            {
+              token: authInfo.token,
+              projectSlug: args.project,
+              key: args.key,
+              environments: args.environments,
+              justification: args.justification,
+              isSensitive: args.is_sensitive,
+              surface: "mcp_server",
+            }
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result,
+          };
+        } catch (err) {
+          return toolError(err);
+        }
+      }
+    );
+
+    server.registerTool(
+      "envpilot_get_request_status",
+      {
+        title: "Get Variable Request Status",
+        description:
+          "Check the status of variable requests filed by THIS key. Pass request_id for one request, or omit it to list the key's recent requests. A 'rejected' status includes the reviewer's reason — do not re-file a rejected request; relay the reason to the user instead.",
+        inputSchema: {
+          request_id: z
+            .string()
+            .optional()
+            .describe("A requestId returned by envpilot_request_variable"),
+        },
+        outputSchema: {
+          requests: z.array(z.object(requestStatusShape)),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args, extra) => {
+        const authInfo = extra.authInfo as AuthInfo | undefined;
+        if (!authInfo) return unauthorizedResult;
+        try {
+          const convex = new ConvexHttpClient(requireConvexUrl());
+          const requests = await convex.action(
+            api.features.api.requests.getRequestStatus,
+            {
+              token: authInfo.token,
+              requestId: args.request_id as
+                | Id<"environmentVariableRequests">
+                | undefined,
+              surface: "mcp_server",
+            }
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify({ requests }) }],
+            structuredContent: { requests },
           };
         } catch (err) {
           return toolError(err);

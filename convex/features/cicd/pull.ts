@@ -11,7 +11,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
 /**
  * CI/CD secret pull — the GitHub Action's read path.
  *
- * Public action authenticated by the service token itself (the plaintext is
+ * Public action authenticated by the API key itself (the plaintext is
  * hashed here and looked up by the by_token_hash index — one indexed doc
  * read). Everything is one-shot HTTP: no reactive subscription ever holds
  * this read set open, so pulls cost exactly what they read, once.
@@ -19,7 +19,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
  * Per pull: 1 token doc + 1 project doc + gate resolution (~5 tiny docs) +
  * the project's ACTIVE variables in the requested environment (indexed,
  * bounded) + one vault decrypt per variable + 1 audit insert + 1 lastUsedAt
- * patch. Rate limited per token (cicdPull).
+ * patch. Rate limited per key (cicdPull).
  */
 
 /**
@@ -27,14 +27,9 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
  * credential validation, tier gate, audit entry, and lastUsedAt update are
  * one atomic, cheap write — the action then only reads/decrypts.
  *
- * COMPAT LAYER: the generalized `apiKeys` table (features/api/keys.ts)
- * supersedes `serviceTokens` as the token platform, and `migrate-service-
- * tokens` copies every serviceTokens row into apiKeys. This looks up
- * apiKeys FIRST by hash so a migrated (or freshly minted) apiKeys row
- * always wins; serviceTokens is checked as a fallback for any row the
- * migration hasn't reached yet (it is never dropped). Both branches
- * preserve the EXACT same return shape and denial semantics so
- * /api/v1/secrets and the GitHub Action keep working unchanged either way.
+ * The credential is an apiKeys row (surfaces includes github_action) —
+ * the legacy serviceTokens table was drained into apiKeys and retired, so
+ * migrated and freshly minted credentials authenticate identically here.
  */
 export const _authorizePull = internalMutation({
   args: {
@@ -56,9 +51,8 @@ export const _authorizePull = internalMutation({
       denied: v.union(
         v.literal("invalid_token"),
         v.literal("environment_scope"),
-        v.literal("tier_gate"),
-        // apiKeys credentials gate on public_api, not cicd_service_tokens —
-        // distinct value so the thrown message names the right feature.
+        // apiKeys credentials gate on public_api (the Action rides the
+        // REST surface's flag)
         v.literal("tier_gate_public_api")
       ),
     })
@@ -153,9 +147,7 @@ export const _authorizePull = internalMutation({
       }
 
       // apiKeys credentials gate on `public_api` — the Action surface rides
-      // the same flag as the REST API it pulls through (⚖️ PLAN D2). Only
-      // the legacy serviceTokens fallback below still checks the
-      // `cicd_service_tokens` flag, until both retire together.
+      // the same flag as the REST API it pulls through (⚖️ PLAN D2).
       const gate = await checkBooleanFeature(
         ctx.db,
         apiKey.organizationId,
@@ -189,86 +181,10 @@ export const _authorizePull = internalMutation({
       };
     }
 
-    // ── serviceTokens fallback (rows not yet migrated) ───────────────────
-    const token = await ctx.db
-      .query("serviceTokens")
-      .withIndex("by_token_hash", (q) => q.eq("tokenHash", args.tokenHash))
-      .first();
-
-    const logDenied = async (
-      t: NonNullable<typeof token>,
-      reason: string
-    ): Promise<void> => {
-      await ctx.db.insert("auditLogs", {
-        organizationId: t.organizationId,
-        userId: t.createdBy,
-        action: "cicd.pull_denied",
-        details: JSON.stringify({
-          tokenId: t._id,
-          tokenName: t.name,
-          projectId: t.projectId,
-          environment: args.environment,
-          reason,
-        }),
-        createdAt: now,
-      });
-    };
-
-    // Unknown hash: nothing to attribute the attempt to — no audit possible.
-    if (!token) {
-      return { ok: false as const, denied: "invalid_token" as const };
-    }
-
-    // A REVOKED token being presented is the highest-signal denial: someone
-    // (or some pipeline) is still holding a credential that was cut off.
-    if (token.revokedAt !== undefined) {
-      await logDenied(token, "revoked_token_used");
-      return { ok: false as const, denied: "invalid_token" as const };
-    }
-
-    if (!token.environments.includes(args.environment)) {
-      await logDenied(token, "environment_out_of_scope");
-      return { ok: false as const, denied: "environment_scope" as const };
-    }
-
-    const project = await ctx.db.get(token.projectId);
-    if (!project || project.deletedAt !== undefined) {
-      await logDenied(token, "project_deleted");
-      return { ok: false as const, denied: "invalid_token" as const };
-    }
-
-    // Tier gate re-checked on every pull: a downgraded org's tokens stop
-    // working rather than grandfathering silent access forever.
-    const gate = await checkBooleanFeature(
-      ctx.db,
-      token.organizationId,
-      "cicd_service_tokens"
-    );
-    if (!gate.allowed) {
-      await logDenied(token, "tier_gate");
-      return { ok: false as const, denied: "tier_gate" as const };
-    }
-
-    await ctx.db.patch(token._id, { lastUsedAt: now });
-    await ctx.db.insert("auditLogs", {
-      organizationId: token.organizationId,
-      userId: token.createdBy,
-      action: "cicd.secrets_pulled",
-      details: JSON.stringify({
-        tokenId: token._id,
-        tokenName: token.name,
-        projectId: token.projectId,
-        environment: args.environment,
-      }),
-      createdAt: now,
-    });
-
-    return {
-      ok: true as const,
-      projectId: token.projectId,
-      projectName: project.name,
-      projectSlug: project.slug,
-    };
+    // Unknown hash: nothing to attribute the attempt to — no audit
+    // possible. The serviceTokens fallback that used to live here is gone:
+    // the table was drained into apiKeys before its retirement.
+    return { ok: false as const, denied: "invalid_token" as const };
   },
 });
 
@@ -357,7 +273,6 @@ export const pullSecrets = action({
           denied:
             | "invalid_token"
             | "environment_scope"
-            | "tier_gate"
             | "tier_gate_public_api";
         } = await ctx.runMutation(internal.features.cicd.pull._authorizePull, {
       tokenHash,
@@ -373,14 +288,9 @@ export const pullSecrets = action({
           `This token is not scoped to the "${args.environment}" environment`
         );
       }
-      if (authorization.denied === "tier_gate") {
-        throw new Error(
-          "CI/CD service tokens are available on the Pro plan — this organization's plan no longer includes them"
-        );
-      }
       if (authorization.denied === "tier_gate_public_api") {
-        // Same "Pro plan" phrase — the /api/v1/secrets route's 403 regex
-        // matches it — but naming the gate that actually denied the pull.
+        // "Pro plan" phrase — the /api/v1/secrets route's 403 regex matches
+        // it — naming the gate that actually denied the pull.
         throw new Error(
           "The public API is available on the Pro plan — this organization's plan no longer includes it"
         );

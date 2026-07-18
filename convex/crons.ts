@@ -101,6 +101,15 @@ crons.interval(
   internal.features.billing.webhooks.cleanupProcessedWebhooks
 );
 
+// Auto-cancel machine-originated variable requests pending > 30 days —
+// abandoned agent runs are routine and must not rot the reviewer feed.
+crons.daily(
+  "cancel stale machine variable requests",
+  { hourUTC: 3, minuteUTC: 30 },
+  internal.features.variables.requests.mutations.cancelStaleMachineRequests,
+  {}
+);
+
 // Permanently purge trashed variables/accounts past the 7-day retention window
 // — destroys their WorkOS Vault objects AND Convex rows. Runs after the 3:xx
 // permission cleanups so it operates on freshly-settled state.

@@ -8,6 +8,8 @@ import {
   createVariable,
   deleteVariableByKey,
   getWorkerProjectSlug,
+  parseMcpBody,
+  postMcp,
   trackClientErrors,
 } from "./support";
 
@@ -46,13 +48,6 @@ const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 const VAR_KEY = `E2E_MCP_VAR_${Date.now()}`;
 const VAR_VALUE = `mcp-value-${Date.now()}`;
 
-interface JsonRpcResponse {
-  jsonrpc: "2.0";
-  id: number | string | null;
-  result?: unknown;
-  error?: { code: number; message: string };
-}
-
 /** Same rationale as public-api.spec.ts's identical helper. */
 async function fetchOwnerAccessToken(): Promise<string> {
   const state = JSON.parse(readFileSync(STORAGE_STATE_PATH, "utf-8")) as {
@@ -75,45 +70,6 @@ async function fetchOwnerAccessToken(): Promise<string> {
     throw new Error("/api/auth/me returned no accessToken for the e2e owner.");
   }
   return me.accessToken;
-}
-
-/** Extract the single JSON-RPC message from an SSE-framed body, or parse it
- * directly if the server ever responds with plain JSON. */
-function parseMcpBody(contentType: string, text: string): JsonRpcResponse {
-  if (contentType.includes("text/event-stream")) {
-    const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
-    if (!dataLine) {
-      throw new Error(`No SSE "data:" line found in MCP response: ${text}`);
-    }
-    return JSON.parse(dataLine.slice("data: ".length)) as JsonRpcResponse;
-  }
-  return JSON.parse(text) as JsonRpcResponse;
-}
-
-/**
- * POST one JSON-RPC request to /api/mcp with the headers Streamable HTTP
- * requires, returning the parsed response and the raw HTTP status (a 401
- * auth denial never reaches the JSON-RPC layer at all).
- */
-async function postMcp(
-  request: import("@playwright/test").APIRequestContext,
-  token: string | null,
-  body: Record<string, unknown>
-): Promise<{ status: number; json: JsonRpcResponse | null }> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream",
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const response = await request.post("/api/mcp", { headers, data: body });
-  const status = response.status();
-  if (status >= 400) {
-    return { status, json: null };
-  }
-  const contentType = response.headers()["content-type"] ?? "";
-  const text = await response.text();
-  return { status, json: parseMcpBody(contentType, text) };
 }
 
 test.describe.serial("MCP server (/api/mcp)", () => {
@@ -206,7 +162,7 @@ test.describe.serial("MCP server (/api/mcp)", () => {
     expect(result?.serverInfo?.version?.length ?? 0).toBeGreaterThan(0);
   });
 
-  test("tools/list returns exactly the 5 documented tools", async ({
+  test("tools/list returns exactly the 7 documented tools", async ({
     request,
   }) => {
     test.skip(!plaintextToken, "no key from the mint test");
@@ -223,10 +179,12 @@ test.describe.serial("MCP server (/api/mcp)", () => {
     const names = (result?.tools ?? []).map((t) => t.name).sort();
     expect(names).toEqual(
       [
+        "envpilot_get_request_status",
         "envpilot_get_variable",
         "envpilot_get_variables",
         "envpilot_list_accounts",
         "envpilot_list_projects",
+        "envpilot_request_variable",
         "envpilot_search",
       ].sort()
     );

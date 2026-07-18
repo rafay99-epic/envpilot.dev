@@ -12,32 +12,42 @@ import { requireAuthedUser } from "../../lib/identity";
 import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { assertOrgMembership, hasCapability } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
+import { getRetentionCutoff } from "../audit/helpers";
 
 /**
  * API keys — the generalized token platform.
  *
- * Evolves the project-scoped `serviceTokens` (CI/CD-only, variables-only)
- * into a scoped key platform serving the public REST API, the MCP server,
- * and (via a compat lookup) the legacy CI/CD pull surface. A key is a
- * long-lived, READ-ONLY credential scoped to:
+ * THE machine credential: one scoped key platform serving the public REST
+ * API, the MCP server, and the GitHub Action pull surface (the legacy
+ * serviceTokens table was drained into this one and retired). A key is a
+ * long-lived credential scoped to:
  *   - project(s): "all" (org-wide) or an explicit project id list
  *   - environment(s): "all" or an explicit environment list
- *   - resource(s): a subset of ["variables", "accounts", "projects"]
+ *   - resource(s): a subset of VALID_RESOURCES — all reads except
+ *     "requests", the one mutating capability (file a variable request
+ *     for a human to approve; keys never write secrets)
  *
  * Only its SHA-256 hash is stored; the plaintext (`envpk_<40 hex>`) is
  * returned exactly once from `create`. Minting an org-wide key is an
  * owner-only power (it grants read access across every current AND future
  * project in the org); minting a project-scoped key requires
- * `project:manage_permissions` on every project named in scope — the same
- * bar as creating a CI/CD service token, since minting a key IS granting
- * read access.
+ * `project:manage_permissions` on every project named in scope — minting a
+ * key IS granting read access.
  *
  * Pro-gated via the `public_api` registry feature, enforced both here
  * (creation) and on every authorize call (authorize.ts).
  */
 
 export const VALID_ENVIRONMENTS = ["development", "staging", "production"];
-export const VALID_RESOURCES = ["variables", "accounts", "projects"];
+// "requests" is the ONE mutating capability a key can carry: filing a
+// variable request for a human to approve. scopeResources semantics are
+// "may DO X", not just "may read X". Never grant it by default.
+export const VALID_RESOURCES = [
+  "variables",
+  "accounts",
+  "projects",
+  "requests",
+];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
 
 export const surfaceValidator = v.union(
@@ -118,6 +128,11 @@ function assertValidSurfaces(
     if (scopeResources.length !== 1 || scopeResources[0] !== "variables") {
       throw new ConvexError(
         'A GitHub Action key must have exactly the "variables" resource — that is all the Action pulls, and an Action credential must not double as broader REST/MCP access'
+      );
+    }
+    if (scopeResources.includes("requests")) {
+      throw new ConvexError(
+        'A GitHub Action key cannot carry the "requests" resource — CI cannot wait on human approval; the Action stays pure read'
       );
     }
   }
@@ -426,6 +441,119 @@ export const listForOrganization = query({
       if (aRevoked !== bRevoked) return aRevoked - bRevoked;
       return b.createdAt - a.createdAt;
     });
+  },
+});
+
+/**
+ * Recent per-key usage, derived from audit logs — NOT a counter. keyId
+ * lives inside auditLogs.details (a JSON string, unreachable by any index),
+ * so this reads a bounded newest-first window per action on
+ * by_org_and_action and groups in memory. Deliberately NOT a counter table:
+ * authorize.ts throttles even its lastUsedAt patch to 60s granularity to
+ * dodge OCC contention on parallel pulls — an unconditional counter row
+ * would reinstate exactly that. The window also shrinks to the org's
+ * audit_log_retention_days — the UI labels this "recent activity", never
+ * "all time". ponytail: day-bucket counter rows if orgs outgrow the window.
+ */
+export const usageForOrganization = query({
+  args: {
+    organizationId: v.id("organizations"),
+    // The keys the caller is already showing (from listForOrganization) —
+    // each is re-authorized here, so this can't widen visibility.
+    keyIds: v.array(v.id("apiKeys")),
+  },
+  returns: v.object({
+    windowOldest: v.union(v.number(), v.null()),
+    usage: v.record(
+      v.string(),
+      v.object({
+        pulls: v.number(),
+        denials: v.number(),
+        requestsFiled: v.number(),
+      })
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+    await assertOrgMembership(ctx, actor._id, args.organizationId);
+    // Bound the work, never throw: revoked rows are kept forever, so an
+    // org's TOTAL key count legitimately exceeds the live-key mint cap —
+    // valid caller input must not crash the keys UI.
+    const keyIds = args.keyIds.slice(0, 200);
+
+    const allowed = new Set<string>();
+    for (const keyId of keyIds) {
+      const key = await ctx.db.get(keyId);
+      if (!key || key.organizationId !== args.organizationId) continue;
+      try {
+        await assertCanManageKey(ctx, actor._id, key);
+        allowed.add(keyId as string);
+      } catch {
+        // Not this caller's key to see — omit rather than fail the query.
+      }
+    }
+
+    const WINDOWS: Array<{
+      action:
+        | "api.secrets_pulled"
+        | "api.request_denied"
+        | "variable.requested";
+      take: number;
+      bucket: "pulls" | "denials" | "requestsFiled";
+    }> = [
+      { action: "api.secrets_pulled", take: 500, bucket: "pulls" },
+      { action: "api.request_denied", take: 200, bucket: "denials" },
+      { action: "variable.requested", take: 200, bucket: "requestsFiled" },
+    ];
+
+    const usage: Record<
+      string,
+      { pulls: number; denials: number; requestsFiled: number }
+    > = {};
+    let windowOldest: number | null = null;
+
+    // Retention is enforced query-side everywhere audit logs are read —
+    // usage derived from them must honor the same entitlement window.
+    const retentionCutoff = await getRetentionCutoff(
+      ctx.db,
+      args.organizationId
+    );
+
+    for (const window of WINDOWS) {
+      const rows = await ctx.db
+        .query("auditLogs")
+        .withIndex("by_org_and_action", (q) =>
+          q
+            .eq("organizationId", args.organizationId)
+            .eq("action", window.action)
+        )
+        .order("desc")
+        .take(window.take);
+      for (const row of rows) {
+        if (retentionCutoff !== null && row.createdAt < retentionCutoff) {
+          continue;
+        }
+        if (windowOldest === null || row.createdAt < windowOldest) {
+          windowOldest = row.createdAt;
+        }
+        if (!row.details) continue;
+        let keyId: string | undefined;
+        try {
+          const parsed = JSON.parse(row.details) as {
+            keyId?: string;
+            requestedByKeyId?: string;
+          };
+          keyId = parsed.keyId ?? parsed.requestedByKeyId;
+        } catch {
+          continue;
+        }
+        if (!keyId || !allowed.has(keyId)) continue;
+        usage[keyId] ??= { pulls: 0, denials: 0, requestsFiled: 0 };
+        usage[keyId][window.bucket] += 1;
+      }
+    }
+
+    return { windowOldest, usage };
   },
 });
 

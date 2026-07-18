@@ -18,7 +18,7 @@ const suspendSchema = z.object({
   revokeCredentials: z
     .array(
       z.object({
-        type: z.enum(["api_key", "service_token"]),
+        type: z.literal("api_key"),
         id: z.string().regex(CONVEX_ID_PATTERN),
       })
     )
@@ -85,15 +85,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     const credentialErrors: string[] = [];
     for (const cred of parsed.data.revokeCredentials ?? []) {
       try {
-        if (cred.type === "api_key") {
-          await client.mutation(api.features.api.keys.revoke, {
-            keyId: cred.id as Id<"apiKeys">,
-          });
-        } else {
-          await client.mutation(api.features.cicd.tokens.revoke, {
-            tokenId: cred.id as Id<"serviceTokens">,
-          });
-        }
+        await client.mutation(api.features.api.keys.revoke, {
+          keyId: cred.id as Id<"apiKeys">,
+        });
       } catch (err) {
         reportApiError(
           err,

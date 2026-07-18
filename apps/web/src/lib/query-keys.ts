@@ -49,13 +49,6 @@ export const queryKeys = {
     list: (orgId: string) => ["tags", "list", orgId] as const,
   },
 
-  variableRequests: {
-    all: ["variable-requests"] as const,
-    list: (projectId: string) =>
-      ["variable-requests", "list", projectId] as const,
-    detail: (id: string) => ["variable-requests", "detail", id] as const,
-  },
-
   billing: {
     all: ["billing"] as const,
     subscription: (orgId: string) =>

@@ -24,7 +24,9 @@ Every key has three independent scope dimensions:
 
 - **Projects** — `all` (every project in the org) or a specific list of projects
 - **Environments** — `all` (development, staging, production) or a specific list
-- **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`
+- **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
+
+A key also carries **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/architecture).
 
 A request outside a key's scope behaves the same as if the resource didn't exist — you'll get a `404`, never a `403`. This is deliberate: see [API Security](/api-security) for why.
 
@@ -88,5 +90,7 @@ curl "https://www.envpilot.dev/api/v1/projects/backend/variables?environment=pro
 ## Next steps
 
 - [API Reference](/api-reference) — every endpoint, filter, and error code
+- [Architecture](/architecture) — the five client surfaces and the one auth core
 - [MCP Server](/mcp-server) — connect an AI agent (Claude, Cursor) directly to your variables
+- [Rate limits](/rate-limits) — every per-key bucket and what happens when you exceed it
 - [API Security](/api-security) — key model, scoping, revocation, and audit
