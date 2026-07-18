@@ -1070,6 +1070,10 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
     const serviceTokens = await ctx.db.query("serviceTokens").collect();
     let migrated = 0;
     let skipped = 0;
+    // Migrated rows bypass keys.ts's MAX_KEYS_PER_ORG hygiene cap — surface
+    // per-org counts in the result so an over-cap org is visible instead of
+    // silently blocked from minting new keys later.
+    const migratedByOrg: Record<string, number> = {};
 
     for (const token of serviceTokens) {
       const existing = await ctx.db
@@ -1088,6 +1092,9 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         scopeProjects: [token.projectId],
         scopeEnvironments: token.environments,
         scopeResources: ["variables"],
+        // Service tokens were only ever an Action credential — stamp the
+        // surface explicitly instead of grandfathering them onto all three.
+        surfaces: ["github_action"],
         createdBy: token.createdBy,
         createdAt: token.createdAt,
         lastUsedAt: token.lastUsedAt,
@@ -1095,6 +1102,8 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         revokedBy: token.revokedBy,
       });
       migrated++;
+      migratedByOrg[token.organizationId as string] =
+        (migratedByOrg[token.organizationId as string] ?? 0) + 1;
     }
 
     return {
@@ -1102,6 +1111,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
       total: serviceTokens.length,
       migrated,
       skipped,
+      migratedByOrg,
     };
   }
 

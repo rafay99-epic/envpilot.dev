@@ -112,7 +112,11 @@ const baseHandler = createMcpHandler(
           const convex = new ConvexHttpClient(requireConvexUrl());
           const projects = await convex.action(
             api.features.api.reads.listProjects,
-            { token: authInfo.token, gateFeature: "mcp_server" }
+            {
+              token: authInfo.token,
+              gateFeature: "mcp_server",
+              surface: "mcp_server",
+            }
           );
           return {
             content: [{ type: "text", text: JSON.stringify({ projects }) }],
@@ -170,6 +174,7 @@ const baseHandler = createMcpHandler(
               prefix: args.prefix,
               metadataOnly: args.metadata_only,
               gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           return {
@@ -209,6 +214,7 @@ const baseHandler = createMcpHandler(
               environment: args.environment,
               keys: [args.key],
               gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           const variable = rows[0] ?? null;
@@ -251,6 +257,7 @@ const baseHandler = createMcpHandler(
               projectSlug: args.project,
               environment: args.environment,
               gateFeature: "mcp_server",
+              surface: "mcp_server",
             }
           );
           return {
@@ -305,7 +312,11 @@ const baseHandler = createMcpHandler(
           const convex = new ConvexHttpClient(requireConvexUrl());
           const projects = await convex.action(
             api.features.api.reads.listProjects,
-            { token: authInfo.token, gateFeature: "mcp_server" }
+            {
+              token: authInfo.token,
+              gateFeature: "mcp_server",
+              surface: "mcp_server",
+            }
           );
 
           const query = args.query.toLowerCase();
@@ -339,6 +350,7 @@ const baseHandler = createMcpHandler(
                   projectSlug: project.slug,
                   metadataOnly: true,
                   gateFeature: "mcp_server",
+                  surface: "mcp_server",
                 }
               );
               for (const variable of variables) {

@@ -35,7 +35,7 @@ import { ENVIRONMENTS, type Environment } from "@/constants/project";
 function reportApiKeysUiError(error: unknown, action: "create" | "revoke") {
   const message = error instanceof Error ? error.message : String(error);
   if (
-    /pro plan|not authorized|only the organization|at most|at least one (environment|project|resource)|must be 1-100|expiresAt must be in the future|project not found|unknown "(environment|resource)"/i.test(
+    /pro plan|not authorized|only the organization|at most|at least one (environment|project|resource|surface)|must be 1-100|expiresAt must be in the future|project not found|unknown "(environment|resource)"|github action key/i.test(
       message
     )
   ) {
@@ -60,6 +60,15 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
 
 const RESOURCES = ["variables", "accounts", "projects"] as const;
 type Resource = (typeof RESOURCES)[number];
+
+const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
+type Surface = (typeof SURFACES)[number];
+
+const SURFACE_LABEL: Record<Surface, string> = {
+  rest_api: "REST API",
+  mcp_server: "MCP server",
+  github_action: "GitHub Action",
+};
 
 const CHIP_BASE =
   "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors";
@@ -131,7 +140,8 @@ function ApiKeysSectionInner({
           <div>
             <h2 className="text-base font-semibold text-zinc-100">API Keys</h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Scoped, read-only keys for the public REST API and MCP server.
+              Scoped, read-only keys for the public REST API, MCP server, and
+              GitHub Action.
             </p>
           </div>
           <TerminalButton
@@ -201,6 +211,7 @@ interface ApiKeyListItem {
   scopeProjects: "all" | Id<"projects">[];
   scopeEnvironments: "all" | string[];
   scopeResources: string[];
+  surfaces: Surface[] | null;
   createdAt: number;
   createdByName: string;
   lastUsedAt: number | null;
@@ -283,6 +294,15 @@ function KeyRow({ keyItem }: { keyItem: ApiKeyListItem }) {
                 {resource}
               </TerminalBadge>
             ))}
+            {keyItem.surfaces === null ? (
+              <TerminalBadge color="amber">all surfaces</TerminalBadge>
+            ) : (
+              keyItem.surfaces.map((surface) => (
+                <TerminalBadge key={surface} color="amber">
+                  {SURFACE_LABEL[surface]}
+                </TerminalBadge>
+              ))
+            )}
             {!isRevoked && expiryMsLeft !== null && (
               <TerminalBadge color={expiryUrgent ? "red" : "amber"}>
                 {expiryExpired ? "Expired" : `expires in ${expiryDaysLeft}d`}
@@ -417,6 +437,9 @@ function CreateKeyPanel({
   const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
     new Set<Resource>(["variables"])
   );
+  const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
+    new Set<Surface>(["rest_api", "mcp_server"])
+  );
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>("none");
   const [customExpiry, setCustomExpiry] = useState("");
 
@@ -463,10 +486,38 @@ function CreateKeyPanel({
     });
   };
 
-  const projectSelectionValid =
-    projectMode === "all" || selectedProjectIds.size > 0;
+  const toggleSurface = (surface: Surface) => {
+    setSelectedSurfaces((prev) => {
+      const next = new Set(prev);
+      if (next.has(surface)) {
+        next.delete(surface);
+      } else {
+        next.add(surface);
+        // The Action pull path only accepts single-project, variables keys —
+        // steer the form into that shape instead of failing at submit.
+        if (surface === "github_action") {
+          setProjectMode("specific");
+          setSelectedResources((resources) =>
+            resources.has("variables")
+              ? resources
+              : new Set(resources).add("variables")
+          );
+        }
+      }
+      return next;
+    });
+  };
+
+  const githubActionSelected = selectedSurfaces.has("github_action");
+
+  const projectSelectionValid = githubActionSelected
+    ? projectMode === "specific" && selectedProjectIds.size === 1
+    : projectMode === "all" || selectedProjectIds.size > 0;
   const envSelectionValid = envMode === "all" || selectedEnvs.size > 0;
-  const resourceSelectionValid = selectedResources.size > 0;
+  const resourceSelectionValid =
+    selectedResources.size > 0 &&
+    (!githubActionSelected || selectedResources.has("variables"));
+  const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
     (customExpiry.length > 0 && new Date(customExpiry).getTime() > Date.now());
@@ -476,6 +527,7 @@ function CreateKeyPanel({
     projectSelectionValid &&
     envSelectionValid &&
     resourceSelectionValid &&
+    surfaceSelectionValid &&
     customExpiryValid &&
     !isSubmitting;
 
@@ -505,6 +557,7 @@ function CreateKeyPanel({
         scopeProjects,
         scopeEnvironments,
         scopeResources,
+        surfaces: Array.from(selectedSurfaces),
         expiresAt,
       });
       // Held only in this panel's local state — never persisted, never
@@ -664,10 +717,40 @@ function CreateKeyPanel({
 
           <div>
             <label className="block text-sm font-medium text-zinc-300">
+              Surfaces
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SURFACES.map((surface) => {
+                const selected = selectedSurfaces.has(surface);
+                return (
+                  <button
+                    key={surface}
+                    type="button"
+                    data-testid={`api-key-surface-${surface}`}
+                    aria-pressed={selected}
+                    onClick={() => toggleSurface(surface)}
+                    className={`${CHIP_BASE} normal-case ${
+                      selected ? CHIP_SELECTED_GENERIC : CHIP_UNSELECTED
+                    }`}
+                  >
+                    {SURFACE_LABEL[surface]}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              {githubActionSelected
+                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
+                : "Where this key may be used. The GitHub Action pulls variables for a single project."}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300">
               Projects
             </label>
             <div className="mt-2 flex gap-1 rounded-lg bg-zinc-800 p-1">
-              {isOwner && (
+              {isOwner && !githubActionSelected && (
                 <button
                   type="button"
                   aria-pressed={projectMode === "all"}

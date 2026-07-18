@@ -107,6 +107,17 @@ export const _authorizePull = internalMutation({
         return { ok: false as const, denied: "invalid_token" as const };
       }
 
+      // Surface scope: keys minted before the surfaces field (absent array)
+      // stay valid here; explicit keys must include github_action. Same
+      // uniform "invalid" answer as every other shape mismatch below.
+      if (
+        apiKey.surfaces !== undefined &&
+        !apiKey.surfaces.includes("github_action")
+      ) {
+        await logApiKeyDenied("surface_out_of_scope");
+        return { ok: false as const, denied: "invalid_token" as const };
+      }
+
       // This legacy surface has no projectId argument — the project comes
       // entirely from the credential's scope, and it can only ever act on
       // ONE project's variables. Keys scoped to "all"/multiple projects, or
@@ -138,14 +149,14 @@ export const _authorizePull = internalMutation({
         return { ok: false as const, denied: "invalid_token" as const };
       }
 
-      // Same tier gate as the serviceTokens path below — this compat surface
-      // stays gated by `cicd_service_tokens` regardless of which table the
-      // underlying credential lives in; `public_api` gates the new REST/MCP
-      // surfaces, not this one.
+      // apiKeys credentials gate on `public_api` — the Action surface rides
+      // the same flag as the REST API it pulls through (⚖️ PLAN D2). Only
+      // the legacy serviceTokens fallback below still checks the
+      // `cicd_service_tokens` flag, until both retire together.
       const gate = await checkBooleanFeature(
         ctx.db,
         apiKey.organizationId,
-        "cicd_service_tokens"
+        "public_api"
       );
       if (!gate.allowed) {
         await logApiKeyDenied("tier_gate");

@@ -4,48 +4,37 @@ import { hasE2ECredentials, SKIP_REASON } from "../env";
 import {
   createVariable,
   deleteVariableByKey,
+  getOwnedOrgSlug,
   getWorkerProjectSlug,
   trackClientErrors,
 } from "./support";
 
-// Authenticated e2e — CI/CD service tokens end to end: create a token
-// through the real settings UI, pull secrets with it through the real
-// machine endpoint (the exact call the GitHub Action makes), verify
-// environment scoping is enforced, then revoke and verify the token dies.
-// Serial: the pull/reject/revoke tests all consume state the first test
-// creates within this worker's own fixture project.
+// Authenticated e2e — the GitHub Action credential, post-unification: an
+// Action credential is now an API key minted in org settings with the
+// github_action surface (locked to one project + variables). The legacy
+// project-settings CI/CD tab no longer creates tokens — it points at the
+// unified API Keys section. This spec drives the real create flow, pulls
+// through the real machine endpoint (the exact call the GitHub Action
+// makes), verifies scoping, and revokes.
+// Serial: the pull/reject/revoke tests consume state the first test creates.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
-test.describe.serial("CI/CD service tokens", () => {
-  const tokenName = `E2E token ${Date.now()}`;
+test.describe.serial("GitHub Action keys (CI/CD)", () => {
+  const keyName = `E2E Action key ${Date.now()}`;
   const variableKey = `E2E_CICD_${Date.now()}`;
   let plaintextToken = "";
   let projectSlug = "";
 
-  test("create a production-scoped token via project settings", async ({
+  test("the CI/CD tab redirects token creation to API Keys", async ({
     page,
   }) => {
-    test.setTimeout(120_000);
-    const clientErrors = trackClientErrors(page);
-
+    test.setTimeout(90_000);
     projectSlug = await getWorkerProjectSlug(page);
-
-    // A production-scoped variable for the pull to return.
-    await page.goto(`/dashboard/projects/${projectSlug}`, {
-      waitUntil: "domcontentloaded",
-    });
-    await createVariable(page, {
-      key: variableKey,
-      value: `cicd-value-${Date.now()}`,
-      environments: ["production"],
-    });
 
     await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
       waitUntil: "domcontentloaded",
     });
-    // Settings tabs render after the project + auth context resolve — wait
-    // for a stable anchor before sampling for the role-gated CI/CD tab.
     await expect(
       page.getByRole("button", { name: /^General$/i }).first()
     ).toBeVisible({ timeout: 20_000 });
@@ -63,31 +52,70 @@ test.describe.serial("CI/CD service tokens", () => {
     );
     await tokensTab.click();
 
-    await page.getByRole("button", { name: /New Token/i }).click();
-
-    // The create panel is inline — no dialog. It expands in place above
-    // the token list.
-    const nameInput = page.locator("#cicd-token-name");
-    await expect(
-      nameInput,
-      "inline create panel should be visible"
-    ).toBeVisible({ timeout: 10_000 });
-    await nameInput.fill(tokenName);
-
-    // Production is the pre-selected recommended default chip — assert,
-    // don't click.
-    const productionChip = page.getByRole("button", {
-      name: /^production$/i,
-      pressed: true,
+    // No create form here anymore — a pointer to the unified API Keys UI.
+    await expect(page.getByText(/Tokens are now created as/i)).toBeVisible({
+      timeout: 10_000,
     });
-    await expect(productionChip).toBeVisible();
+    await expect(page.getByTestId("cicd-goto-api-keys")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^New Token$/i })
+    ).toHaveCount(0);
+  });
 
-    await page.getByRole("button", { name: /^Create Token$/i }).click();
+  test("create a GitHub Action key via org settings API Keys", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const clientErrors = trackClientErrors(page);
 
-    // One-time reveal swaps the panel in place: the plaintext appears
-    // exactly once.
+    const orgSlug = await getOwnedOrgSlug(page);
+    projectSlug = projectSlug || (await getWorkerProjectSlug(page));
+
+    // A production-scoped variable for the pull to return.
+    await page.goto(`/dashboard/projects/${projectSlug}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await createVariable(page, {
+      key: variableKey,
+      value: `cicd-value-${Date.now()}`,
+      environments: ["production"],
+    });
+
+    await page.goto(`/organizations/${orgSlug}/settings?tab=apiKeys`, {
+      waitUntil: "domcontentloaded",
+    });
+    const apiKeysTab = page
+      .getByRole("button", { name: /^API Keys$/i })
+      .first();
+    const tabVisible = await apiKeysTab
+      .waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    test.skip(!tabVisible, "API Keys tab not visible — public_api gated off");
+    await apiKeysTab.click();
+
+    await page.getByRole("button", { name: /^New Key$/i }).click();
+    await page.locator("#api-key-name").fill(keyName);
+
+    // Selecting the GitHub Action surface locks the form to a single
+    // project + variables — the only key shape the Action pull accepts.
+    await page.getByTestId("api-key-surface-github_action").click();
+    await expect(
+      page.getByText(/locked to exactly one project/i)
+    ).toBeVisible();
+
+    await page
+      .getByTestId(`api-key-project-${projectSlug}`)
+      .locator('input[type="checkbox"]')
+      .check();
+
+    await page.getByRole("button", { name: /^Create Key$/i }).click();
+    await expect(
+      page.locator("[data-sonner-toaster]").getByText(/created/i)
+    ).toBeVisible({ timeout: 10_000 });
+
     const tokenCode = page.locator("code", { hasText: /^envpk_[0-9a-f]+$/ });
-    await expect(tokenCode, "plaintext token should be revealed").toBeVisible({
+    await expect(tokenCode, "plaintext key should be revealed").toBeVisible({
       timeout: 20_000,
     });
     plaintextToken = (await tokenCode.textContent())?.trim() ?? "";
@@ -95,8 +123,13 @@ test.describe.serial("CI/CD service tokens", () => {
 
     await page.getByRole("button", { name: /^Done$/i }).click();
 
-    // The list shows the token with its scope; the hash never appears.
-    await expect(page.getByText(tokenName)).toBeVisible({ timeout: 10_000 });
+    // The row carries the GitHub Action surface badge.
+    const row = page
+      .getByTestId("api-keys-list")
+      .locator("li")
+      .filter({ hasText: keyName });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText(/^GitHub Action$/)).toBeVisible();
 
     expect(
       clientErrors,
@@ -104,10 +137,10 @@ test.describe.serial("CI/CD service tokens", () => {
     ).toEqual([]);
   });
 
-  test("the machine endpoint serves scoped secrets for the token", async ({
+  test("the machine endpoint serves scoped secrets for the key", async ({
     page,
   }) => {
-    test.skip(!plaintextToken, "no token from the create test");
+    test.skip(!plaintextToken, "no key from the create test");
 
     const response = await page.request.get(
       "/api/v1/secrets?environment=production",
@@ -129,13 +162,13 @@ test.describe.serial("CI/CD service tokens", () => {
   test("out-of-scope environments and bad tokens are rejected", async ({
     page,
   }) => {
-    test.skip(!plaintextToken, "no token from the create test");
+    test.skip(!plaintextToken, "no key from the create test");
 
     const wrongEnv = await page.request.get(
       "/api/v1/secrets?environment=development",
       { headers: { Authorization: `Bearer ${plaintextToken}` } }
     );
-    expect(wrongEnv.status(), "token is production-only").toBe(403);
+    expect(wrongEnv.status(), "key is production-only").toBe(403);
 
     const badToken = await page.request.get(
       "/api/v1/secrets?environment=production",
@@ -149,36 +182,37 @@ test.describe.serial("CI/CD service tokens", () => {
     expect(noToken.status(), "missing bearer must 401").toBe(401);
   });
 
-  test("revoking the token kills it immediately", async ({ page }) => {
+  test("revoking the key kills it immediately", async ({ page }) => {
     test.setTimeout(90_000);
-    test.skip(!plaintextToken, "no token from the create test");
+    test.skip(!plaintextToken, "no key from the create test");
 
-    await page.goto(`/dashboard/projects/${projectSlug}/settings`, {
+    const orgSlug = await getOwnedOrgSlug(page);
+    await page.goto(`/organizations/${orgSlug}/settings?tab=apiKeys`, {
       waitUntil: "domcontentloaded",
     });
     await page
-      .getByRole("button", { name: /CI\/CD Tokens/i })
+      .getByRole("button", { name: /^API Keys$/i })
       .first()
       .click();
 
-    const row = page.locator("li").filter({ hasText: tokenName });
+    const row = page
+      .getByTestId("api-keys-list")
+      .locator("li")
+      .filter({ hasText: keyName });
     await expect(row).toBeVisible({ timeout: 15_000 });
 
     await row.getByRole("button", { name: /^Revoke$/i }).click();
-
-    // Inline confirm strip swaps in *within the row* — no ConfirmDialog.
     await expect(
-      row.getByText(/Revoke this token\? CI using it will stop working/i)
+      row.getByText(/Revoke this key\? Anything using it will stop working/i)
     ).toBeVisible({ timeout: 10_000 });
     await row.getByRole("button", { name: /^Revoke$/i }).click();
-
     await expect(row.getByText(/Revoked/i)).toBeVisible({ timeout: 15_000 });
 
     const afterRevoke = await page.request.get(
       "/api/v1/secrets?environment=production",
       { headers: { Authorization: `Bearer ${plaintextToken}` } }
     );
-    expect(afterRevoke.status(), "revoked token must 401").toBe(401);
+    expect(afterRevoke.status(), "revoked key must 401").toBe(401);
 
     // Cleanup the test variable.
     await page.goto(`/dashboard/projects/${projectSlug}`, {
