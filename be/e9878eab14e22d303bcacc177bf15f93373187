@@ -1,0 +1,47 @@
+apps/blog/content/deleting-backwards-compatibility.mdx
+  s_b9e919195283b6::t_6c118cedd61bf5 1-239
+apps/blog/content/deletion-that-is-real.mdx
+  s_b9e919195283b6::t_dd032ae5f95d78 1-238
+apps/blog/content/one-core-three-faces.mdx
+  s_b9e919195283b6::t_ad44d9f6d033f0 1-251
+apps/blog/content/one-key-two-environments.mdx
+  s_b9e919195283b6::t_deeb7c5b5e2ec5 1-350
+apps/blog/content/one-token-model.mdx
+  s_b9e919195283b6::t_23b7acd488803f 1-328
+apps/blog/content/roles-as-data.mdx
+  s_b9e919195283b6::t_f3baf9d303b4ec 1-327
+apps/blog/content/six-prs-to-find-one-bug.mdx
+  s_98ba0775f996d5::t_71f41dd2536d10 1-195
+apps/blog/content/the-auth-cutover.mdx
+  s_b9e919195283b6::t_58918877f7c1cd 1-313
+apps/blog/content/the-convex-quota-war.mdx
+  s_b9e919195283b6::t_64b5fc87620b1d 1-191
+apps/blog/content/the-extension-that-leaked.mdx
+  s_b9e919195283b6::t_b87dacb1bc91f1 1-243
+apps/blog/package.json
+  s_b9e919195283b6::t_2a76af0750dc6e 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bee9878eab14e22d303bcacc177bf15f93373187",
+  "prompts": {},
+  "sessions": {
+    "s_98ba0775f996d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a7bd968e27a651320",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_b9e919195283b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e00dc84d-57fa-41f7-be5b-f80cd6b67e4a",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
