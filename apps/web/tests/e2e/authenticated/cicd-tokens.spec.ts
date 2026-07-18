@@ -10,13 +10,12 @@ import {
 } from "./support";
 
 // Authenticated e2e — the GitHub Action credential, post-unification: an
-// Action credential is now an API key minted in org settings with the
-// github_action surface (locked to one project + variables). The legacy
-// project-settings CI/CD tab no longer creates tokens — it points at the
-// unified API Keys section. This spec drives the real create flow, pulls
-// through the real machine endpoint (the exact call the GitHub Action
-// makes), verifies scoping, and revokes. The legacy project-settings CI/CD
-// tab is gone entirely — serviceTokens are retired.
+// Action credential is an API key minted in org settings with the
+// github_action surface (locked to one project + variables); the legacy
+// serviceTokens table and its project-settings CI/CD tab are gone. This
+// spec drives the real create flow, pulls through the real machine
+// endpoint (the exact call the GitHub Action makes), verifies scoping,
+// and revokes.
 // Serial: the pull/reject/revoke tests consume state the first test creates.
 
 test.skip(!hasE2ECredentials, SKIP_REASON);

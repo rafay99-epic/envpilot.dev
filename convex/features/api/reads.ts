@@ -3,10 +3,15 @@ import { action, internalQuery } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
-import { rateLimiter } from "../../lib/rateLimits";
-import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { countActiveProjects } from "../featureRegistry/gates";
 import { resolveOrgGateContext } from "../featureRegistry/resolver";
+import {
+  hashToken,
+  assertKeyFormat,
+  consumeRateLimit,
+  throwForDenial,
+  type Authorization,
+} from "./helpers";
 
 /**
  * Public REST API v1 — read actions.
@@ -48,101 +53,6 @@ const MAX_PULL_ROWS = 1000;
 // Mirrors projects/helpers.ts's listWithStatsCore VARIABLE_COUNT_CAP — a
 // bounded reactive-safe count, not an exact total for pathological projects.
 const VARIABLE_COUNT_CAP = 500;
-
-async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(token)
-  );
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Cheap format guard before any hashing/rate-limiting — mirrors cicd/pull.ts. */
-function assertKeyFormat(token: string): void {
-  if (!token.startsWith("envpk_")) {
-    throw new Error("Invalid or revoked API key");
-  }
-}
-
-type RateBucket = "apiMetadata" | "cicdPull";
-
-/**
- * Consume one unit of the given bucket, keyed by the token hash. Re-throws a
- * plain Error carrying the retry-after duration in its message (rather than
- * letting the rate limiter's ConvexError cross the action/HTTP boundary
- * unchanged) so the Next.js route can regex-match it exactly like every
- * other denial and set a `Retry-After` header from the embedded ms value.
- */
-async function consumeRateLimit(
-  ctx: ActionCtx,
-  bucket: RateBucket,
-  tokenHash: string
-): Promise<void> {
-  try {
-    await rateLimiter.limit(ctx, bucket, { key: tokenHash, throws: true });
-  } catch (error) {
-    if (isRateLimitError(error)) {
-      throw new Error(
-        `Rate limit exceeded — retry after ${error.data.retryAfter}ms`
-      );
-    }
-    throw error;
-  }
-}
-
-type Denied =
-  | "invalid_key"
-  | "resource_scope"
-  | "environment_scope"
-  | "project_scope"
-  | "surface_scope"
-  | "tier_gate";
-
-type Authorization =
-  | {
-      ok: true;
-      organizationId: Id<"organizations">;
-      scopeProjects: "all" | Id<"projects">[];
-      scopeEnvironments: "all" | string[];
-      scopeResources: string[];
-      keyId: Id<"apiKeys">;
-    }
-  | { ok: false; denied: Denied };
-
-/**
- * Map a denial from `_authorizeRequest` onto the SAME uniform error strings
- * the routes regex-match (PLAN §2's denial mapping). `project_scope` maps to
- * the SAME "Project not found" error as an unknown slug — PLAN §2/§5: an
- * out-of-scope project must never be distinguishable from a nonexistent one.
- * (In practice only the slug-resolved endpoints' second authorize call can
- * ever produce `project_scope` — the bootstrap call never sets
- * `requirement.projectId` — but handling it uniformly here means every call
- * site can just do `if (!x.ok) throwForDenial(x.denied)` without a
- * bespoke special case.)
- */
-function throwForDenial(denied: Denied): never {
-  if (denied === "invalid_key") {
-    throw new Error("Invalid or revoked API key");
-  }
-  if (denied === "resource_scope") {
-    throw new Error("That resource is not in this API key's scope");
-  }
-  if (denied === "environment_scope") {
-    throw new Error("That environment is not in this API key's scope");
-  }
-  if (denied === "project_scope") {
-    throw new Error("Project not found");
-  }
-  if (denied === "surface_scope") {
-    throw new Error("This API key is not enabled for this surface");
-  }
-  // tier_gate
-  throw new Error(
-    "The public API is available on the Pro plan — this organization's plan no longer includes it"
-  );
-}
 
 function environmentAllowedByScope(
   variableEnvironments: string[],

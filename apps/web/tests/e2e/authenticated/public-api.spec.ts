@@ -17,22 +17,14 @@ import {
  * all three resources), then drive every new /api/v1 route through it — the
  * exact surface an integration would hit.
  *
- * No `ApiKeysSection` UI exists yet (checked apps/web/src/components/ —
- * absent), so the credential is minted directly via
- * `features/api/keys:create`, authenticated as the fixture OWNER through the
- * same saved-session → /api/auth/me → ConvexHttpClient.setAuth pattern
- * variable-requests.spec.ts uses. This is NOT a test-only shortcut around
- * the product: `create` is the real action the (not-yet-built) API Keys
- * settings UI will call, with the real create-time authorization
+ * The credential is minted directly via `features/api/keys:create` — the
+ * SAME action the ApiKeysSection settings UI calls — authenticated as the
+ * fixture OWNER through the saved-session → /api/auth/me →
+ * ConvexHttpClient.setAuth pattern variable-requests.spec.ts uses. This is
+ * NOT a test-only shortcut: the real create-time authorization
  * (assertOrgMembership/authorizeVariableAccess) and the real `public_api`
- * tier gate — only the click-through UI step is skipped.
- *
- * The CI/CD Tokens tab (project settings) is NOT used here: it writes to the
- * separate `serviceTokens` table (convex/features/cicd/tokens.ts), not
- * `apiKeys` — and the public API's `_authorizeRequest` enforcement core
- * (convex/features/api/authorize.ts) only ever looks up `apiKeys` by hash.
- * A serviceTokens-only credential would 401 against every /api/v1/* route
- * below (only the legacy /api/v1/secrets compat endpoint reads both tables).
+ * tier gate run; only the click-through UI step is skipped (api-keys.spec.ts
+ * covers the UI itself).
  *
  * Serial: later tests reuse the token/project/variables the first test
  * creates within this worker's own fixture project.

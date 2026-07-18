@@ -328,3 +328,58 @@ export async function deleteVariableByKey(
     await expect(confirmHeading).toBeHidden({ timeout: 15_000 });
   }
 }
+
+// ============================================================
+// MCP transport helpers (shared by mcp.spec.ts + machine-requests.spec.ts)
+// ============================================================
+
+export interface JsonRpcResponse {
+  jsonrpc: "2.0";
+  id: number | string | null;
+  result?: unknown;
+  error?: { code: number; message: string };
+}
+
+/** Extract the single JSON-RPC message from an SSE-framed body, or parse it
+ * directly if the server ever responds with plain JSON. mcp-handler 1.1.0
+ * SSE-frames EVERY successful response (one `data: {...}` event), so a bare
+ * response.json() would throw. */
+export function parseMcpBody(
+  contentType: string,
+  text: string
+): JsonRpcResponse {
+  if (contentType.includes("text/event-stream")) {
+    const dataLine = text.split("\n").find((line) => line.startsWith("data: "));
+    if (!dataLine) {
+      throw new Error(`No SSE "data:" line found in MCP response: ${text}`);
+    }
+    return JSON.parse(dataLine.slice("data: ".length)) as JsonRpcResponse;
+  }
+  return JSON.parse(text) as JsonRpcResponse;
+}
+
+/**
+ * POST one JSON-RPC request to /api/mcp with the headers Streamable HTTP
+ * requires, returning the parsed response and the raw HTTP status (a 401
+ * auth denial never reaches the JSON-RPC layer at all).
+ */
+export async function postMcp(
+  request: import("@playwright/test").APIRequestContext,
+  token: string | null,
+  body: Record<string, unknown>
+): Promise<{ status: number; json: JsonRpcResponse | null }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await request.post("/api/mcp", { headers, data: body });
+  const status = response.status();
+  if (status >= 400) {
+    return { status, json: null };
+  }
+  const contentType = response.headers()["content-type"] ?? "";
+  const text = await response.text();
+  return { status, json: parseMcpBody(contentType, text) };
+}

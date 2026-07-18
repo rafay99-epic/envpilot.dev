@@ -11,7 +11,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
 /**
  * CI/CD secret pull — the GitHub Action's read path.
  *
- * Public action authenticated by the service token itself (the plaintext is
+ * Public action authenticated by the API key itself (the plaintext is
  * hashed here and looked up by the by_token_hash index — one indexed doc
  * read). Everything is one-shot HTTP: no reactive subscription ever holds
  * this read set open, so pulls cost exactly what they read, once.
@@ -19,7 +19,7 @@ import { checkBooleanFeature } from "../featureRegistry/gates";
  * Per pull: 1 token doc + 1 project doc + gate resolution (~5 tiny docs) +
  * the project's ACTIVE variables in the requested environment (indexed,
  * bounded) + one vault decrypt per variable + 1 audit insert + 1 lastUsedAt
- * patch. Rate limited per token (cicdPull).
+ * patch. Rate limited per key (cicdPull).
  */
 
 /**

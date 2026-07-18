@@ -25,14 +25,15 @@ import { getProjectAndOrgRole, canReviewRequests } from "./helpers";
 const VALID_ENVIRONMENTS = ["development", "staging", "production"] as const;
 
 /**
- * Validate a reviewer-supplied environment override on approve.
- * Requires a non-empty array of known environments with no duplicates.
+ * Validate an environment list: non-empty, known names, no duplicates.
+ * Used for BOTH the reviewer's approve-time override AND every request
+ * create path (insertRequest) — an unknown environment name inserted here
+ * would make the request unapprovable (the override validation rejects it)
+ * or, worse, create a variable tagged with a nonexistent environment.
  */
-function assertValidEnvironmentOverride(environments: string[]): void {
+function assertValidEnvironments(environments: string[]): void {
   if (environments.length === 0) {
-    throw new ConvexError(
-      "environments override must contain at least one environment"
-    );
+    throw new ConvexError("At least one environment is required");
   }
 
   const seen = new Set<string>();
@@ -43,9 +44,7 @@ function assertValidEnvironmentOverride(environments: string[]): void {
       );
     }
     if (seen.has(environment)) {
-      throw new ConvexError(
-        `Duplicate environment "${environment}" in override`
-      );
+      throw new ConvexError(`Duplicate environment "${environment}"`);
     }
     seen.add(environment);
   }
@@ -103,6 +102,7 @@ async function insertRequest(
   }
 
   assertValidRequestInput(args.key, args.description);
+  assertValidEnvironments(args.environments);
 
   // Per-environment uniqueness (same rule as direct creation): the key may
   // exist for other environments, but not for any of the requested ones.
@@ -417,24 +417,75 @@ export const cancelStaleMachineRequests = internalMutation({
   },
 });
 
+const reviewArgs = {
+  requestId: v.id("environmentVariableRequests"),
+  action: v.union(v.literal("approve"), v.literal("reject")),
+  reviewReason: v.optional(v.string()),
+  // Reviewer may override the approved environments (approve only).
+  environments: v.optional(v.array(v.string())),
+};
+
 export const review = mutation({
+  args: reviewArgs,
+  handler: async (ctx, args) => reviewCore(ctx, args),
+});
+
+/**
+ * Approve carrying a reviewer-supplied encrypted value for a VALUELESS
+ * (machine) request. INTERNAL so no client can attach an arbitrary
+ * vaultRef (a capability handle) to a variable — only the
+ * approveWithValue action, which just encrypted the reviewer's plaintext,
+ * can reach this. The caller's JWT identity propagates through
+ * runMutation, so reviewCore's authorization applies unchanged.
+ */
+export const _approveWithSuppliedRef = internalMutation({
   args: {
     requestId: v.id("environmentVariableRequests"),
-    action: v.union(v.literal("approve"), v.literal("reject")),
     reviewReason: v.optional(v.string()),
-    // Reviewer may override the approved environments (approve only).
     environments: v.optional(v.array(v.string())),
-    // Reviewer-supplied encrypted value for VALUELESS (machine) requests —
-    // set only by the approveWithValue action, which encrypts it first.
-    vaultRef: v.optional(v.string()),
+    vaultRef: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args) => reviewCore(ctx, { ...args, action: "approve" }),
+});
+
+async function reviewCore(
+  ctx: MutationCtx,
+  args: {
+    requestId: Id<"environmentVariableRequests">;
+    action: "approve" | "reject";
+    reviewReason?: string;
+    environments?: string[];
+    vaultRef?: string;
+  }
+) {
+  {
     const actor = await requireAuthedUser(ctx);
     const now = Date.now();
 
     const request = await ctx.db.get(args.requestId);
     if (!request) {
       throw new ConvexError("Variable request not found");
+    }
+
+    // Authorization FIRST — before any state is disclosed. Without this
+    // order, a caller from another org could distinguish pending vs
+    // resolved requests (and probe origin-key liveness) from the error.
+    const { project } = await getProjectAndOrgRole(
+      ctx,
+      request.projectId,
+      actor._id
+    );
+
+    // Reviewers: owner, or PM/team lead assigned to the project
+    const canReview = await canReviewRequests(
+      ctx,
+      actor._id,
+      request.projectId
+    );
+    if (!canReview) {
+      throw new ConvexError(
+        "Only owners, project managers, and team leads can review variable requests"
+      );
     }
 
     if (request.status !== "pending") {
@@ -450,10 +501,7 @@ export const review = mutation({
 
     // A supplied value only makes sense approving a valueless request; a
     // request that carries the requester's proposed value keeps it.
-    if (
-      args.vaultRef !== undefined &&
-      (args.action !== "approve" || request.vaultRef !== undefined)
-    ) {
+    if (args.vaultRef !== undefined && request.vaultRef !== undefined) {
       throw new ConvexError(
         "A value can only be supplied when approving a request that has none"
       );
@@ -474,24 +522,6 @@ export const review = mutation({
           "The API key that filed this request has been revoked or expired — reject the request instead"
         );
       }
-    }
-
-    const { project } = await getProjectAndOrgRole(
-      ctx,
-      request.projectId,
-      actor._id
-    );
-
-    // Reviewers: owner, or PM/team lead assigned to the project
-    const canReview = await canReviewRequests(
-      ctx,
-      actor._id,
-      request.projectId
-    );
-    if (!canReview) {
-      throw new ConvexError(
-        "Only owners, project managers, and team leads can review variable requests"
-      );
     }
 
     if (args.action === "reject") {
@@ -536,7 +566,7 @@ export const review = mutation({
     // an override, validate it and use it in place of the requested set.
     let approvedEnvironments = request.environments;
     if (args.environments !== undefined) {
-      assertValidEnvironmentOverride(args.environments);
+      assertValidEnvironments(args.environments);
       approvedEnvironments = args.environments;
     }
 
@@ -676,8 +706,8 @@ export const review = mutation({
       status: "approved" as const,
       variableId,
     };
-  },
-});
+  }
+}
 
 /**
  * Email the requester the approve/reject verdict. Best-effort + scheduled — a

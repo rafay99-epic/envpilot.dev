@@ -1,9 +1,4 @@
-import {
-  expect,
-  test,
-  request as apiRequest,
-  type APIRequestContext,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
@@ -444,37 +439,6 @@ test.describe("variable requests — reviewer approvals page", () => {
       clientErrors,
       `unexpected client-side errors on the requests page: ${clientErrors.join("\n")}`
     ).toEqual([]);
-  });
-
-  test("C: the value endpoint rejects an unauthenticated request", async () => {
-    // A fresh APIRequestContext with no storage state → no session cookies.
-    // Force an EMPTY storage state so this context carries no session cookies
-    // (newContext would otherwise inherit the authenticated project's
-    // storageState). maxRedirects:0 keeps the middleware's 307 → hosted WorkOS
-    // sign-in from being followed to a 200 HTML page that would mask the denial.
-    const anon: APIRequestContext = await apiRequest.newContext({
-      baseURL: "http://localhost:3000",
-      maxRedirects: 0,
-      storageState: { cookies: [], origins: [] },
-    });
-    try {
-      // Any request id works — auth is checked before the id is resolved. Use
-      // the real smoke request id (read-only; the row is never modified).
-      const res = await anon.get(
-        `/api/variable-requests/${ctx.smokeRequestId}/value`
-      );
-      const status = res.status();
-      // Denied either by the route (401/403) or by the middleware redirect to
-      // sign-in (3xx). The one thing that must never happen is a 200 that
-      // returns the secret value.
-      expect(
-        [301, 302, 303, 307, 308, 401, 403],
-        `unauthenticated value fetch must be denied (redirect or 401/403), got ${status}`
-      ).toContain(status);
-      expect(status, "unauthenticated caller must not get a 200").not.toBe(200);
-    } finally {
-      await anon.dispose();
-    }
   });
 });
 

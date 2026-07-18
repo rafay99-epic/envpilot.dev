@@ -134,11 +134,15 @@ function ApiKeysSectionInner({
   const keyList = keys ?? [];
 
   // Recent activity per key, derived from bounded audit-log reads (window
-  // = the org's audit retention, labeled as such in the row).
+  // = the org's audit retention, labeled as such in the row). Live keys
+  // only — revoked rows accumulate forever and their usage renders empty.
+  const liveKeyIds = keyList
+    .filter((k) => k.revokedAt === null)
+    .map((k) => k._id);
   const usageResult = useQuery(
     api.features.api.keys.usageForOrganization,
-    organizationId && keyList.length > 0
-      ? { organizationId, keyIds: keyList.map((k) => k._id) }
+    organizationId && liveKeyIds.length > 0
+      ? { organizationId, keyIds: liveKeyIds }
       : "skip"
   );
 

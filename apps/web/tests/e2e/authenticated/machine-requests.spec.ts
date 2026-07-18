@@ -5,6 +5,7 @@ import {
   deleteVariableByKey,
   getOwnedOrgSlug,
   getWorkerProjectSlug,
+  postMcp,
   trackClientErrors,
 } from "./support";
 
@@ -18,7 +19,7 @@ import {
 
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
-/** One stateless MCP JSON-RPC tools/call against the real /api/mcp route. */
+/** One tools/call via the shared Streamable-HTTP helper (SSE unwrap incl.). */
 async function mcpToolCall(
   page: Page,
   token: string,
@@ -29,30 +30,19 @@ async function mcpToolCall(
   structuredContent?: Record<string, unknown>;
   content?: Array<{ type: string; text: string }>;
 }> {
-  const response = await page.request.post("/api/mcp", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    data: {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name: tool, arguments: args },
-    },
+  const { status, json } = await postMcp(page.request, token, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: tool, arguments: args },
   });
-  expect(response.status(), await response.text()).toBe(200);
-  const body = (await response.json()) as {
-    result?: {
-      isError?: boolean;
-      structuredContent?: Record<string, unknown>;
-      content?: Array<{ type: string; text: string }>;
-    };
-    error?: { message: string };
+  expect(status, JSON.stringify(json)).toBe(200);
+  expect(json?.error, JSON.stringify(json?.error)).toBeUndefined();
+  return (json?.result ?? {}) as {
+    isError?: boolean;
+    structuredContent?: Record<string, unknown>;
+    content?: Array<{ type: string; text: string }>;
   };
-  expect(body.error, JSON.stringify(body.error)).toBeUndefined();
-  return body.result ?? {};
 }
 
 test.describe.serial("Machine variable requests (MCP)", () => {

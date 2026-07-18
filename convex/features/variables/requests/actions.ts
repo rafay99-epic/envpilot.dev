@@ -270,10 +270,9 @@ export const approveWithValue = action({
     let result;
     try {
       result = await ctx.runMutation(
-        api.features.variables.requests.mutations.review,
+        internal.features.variables.requests.mutations._approveWithSuppliedRef,
         {
           requestId: args.requestId,
-          action: "approve",
           reviewReason: args.reviewReason,
           environments: args.environments,
           vaultRef: vault.id,

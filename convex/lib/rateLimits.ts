@@ -15,7 +15,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // AUTH ENDPOINTS (strict — prevent brute force)
   // ==========================================
 
-  // CI/CD secret pulls: 30 per minute per service token. Deploys are
+  // CI/CD secret pulls: 30 per minute per API key. Deploys are
   // bursty (matrix builds fan out), so the full capacity is available as
   // a burst while the sustained rate stays modest.
   cicdPull: {

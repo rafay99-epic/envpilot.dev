@@ -1,10 +1,14 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { action, internalQuery } from "../../_generated/server";
-import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
-import { rateLimiter } from "../../lib/rateLimits";
-import { isRateLimitError } from "@convex-dev/rate-limiter";
+import {
+  hashToken,
+  assertKeyFormat,
+  consumeRateLimit,
+  throwForDenial,
+  type Authorization,
+} from "./helpers";
 
 /**
  * Machine-initiated variable requests — the ONE mutating capability a key
@@ -24,114 +28,27 @@ import { isRateLimitError } from "@convex-dev/rate-limiter";
  * must not receive a capability handle for a value it may not read.
  */
 
-async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(token)
-  );
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function assertKeyFormat(token: string): void {
-  if (!token.startsWith("envpk_")) {
-    throw new Error("Invalid or revoked API key");
-  }
-}
-
-type Denied =
-  | "invalid_key"
-  | "resource_scope"
-  | "environment_scope"
-  | "project_scope"
-  | "surface_scope"
-  | "tier_gate";
-
-type Authorization =
-  | {
-      ok: true;
-      organizationId: Id<"organizations">;
-      scopeProjects: "all" | Id<"projects">[];
-      scopeEnvironments: "all" | string[];
-      scopeResources: string[];
-      keyId: Id<"apiKeys">;
-    }
-  | { ok: false; denied: Denied };
-
-function throwForDenial(denied: Denied): never {
-  if (denied === "invalid_key") {
-    throw new Error("Invalid or revoked API key");
-  }
-  if (denied === "resource_scope") {
-    throw new Error(
-      'That resource is not in this API key\'s scope — filing requests needs the "requests" resource'
-    );
-  }
-  if (denied === "environment_scope") {
-    throw new Error("That environment is not in this API key's scope");
-  }
-  if (denied === "project_scope") {
-    throw new Error("Project not found");
-  }
-  if (denied === "surface_scope") {
-    throw new Error("This API key is not enabled for this surface");
-  }
-  throw new Error(
-    "The public API is available on the Pro plan — this organization's plan no longer includes it"
-  );
-}
+const REQUESTS_RESOURCE_DENIAL =
+  'That resource is not in this API key\'s scope — filing requests needs the "requests" resource';
 
 const surfaceArg = v.optional(
   v.union(v.literal("rest_api"), v.literal("mcp_server"))
-);
-
-const requestStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("approved"),
-  v.literal("rejected"),
-  v.literal("canceled")
 );
 
 const machineRequestShape = v.object({
   requestId: v.id("environmentVariableRequests"),
   key: v.string(),
   environments: v.array(v.string()),
-  status: requestStatusValidator,
+  status: v.union(
+    v.literal("pending"),
+    v.literal("approved"),
+    v.literal("rejected"),
+    v.literal("canceled")
+  ),
   reviewReason: v.union(v.string(), v.null()),
   createdAt: v.number(),
 });
-
-type MachineRequest = {
-  requestId: Id<"environmentVariableRequests">;
-  key: string;
-  environments: string[];
-  status: "pending" | "approved" | "rejected" | "canceled";
-  reviewReason: string | null;
-  createdAt: number;
-};
-
-/**
- * Consume one unit of a bucket, keyed by the token hash — mirrors
- * reads.ts's consumeRateLimit (rate limiting always runs BEFORE any
- * authorize/DB work, capping brute-force probing too).
- */
-async function consumeRateLimit(
-  ctx: ActionCtx,
-  bucket: "apiMetadata" | "machineRequestCreate",
-  tokenHash: string
-): Promise<void> {
-  try {
-    await rateLimiter.limit(ctx, bucket, { key: tokenHash, throws: true });
-  } catch (error) {
-    if (isRateLimitError(error)) {
-      throw new Error(
-        `Rate limit exceeded — retry after ${error.data.retryAfter}ms`
-      );
-    }
-    throw error;
-  }
-}
+type MachineRequest = Infer<typeof machineRequestShape>;
 
 export const createVariableRequest = action({
   args: {
@@ -161,6 +78,9 @@ export const createVariableRequest = action({
 
     // Strict per-key bucket BEFORE any authorize/DB work — a retry-looping
     // agent is blocked at the door, not after fanning out reviewer email.
+    // (Keyed by the presented hash: this throttles a misbehaving CLIENT;
+    // invalid-key probing is bounded the same way every other surface
+    // bounds it — one cheap indexed miss per attempt.)
     await consumeRateLimit(ctx, "machineRequestCreate", tokenHash);
 
     // Bootstrap authorize (no project yet), then resolve slug → projectId
@@ -174,7 +94,10 @@ export const createVariableRequest = action({
         surface: args.surface,
       }
     );
-    if (!bootstrap.ok) throwForDenial(bootstrap.denied);
+    if (!bootstrap.ok)
+      throwForDenial(bootstrap.denied, {
+        resourceScope: REQUESTS_RESOURCE_DENIAL,
+      });
 
     const projectDoc = await ctx.runQuery(
       api.features.projects.queries.getBySlug,
@@ -190,19 +113,22 @@ export const createVariableRequest = action({
         surface: args.surface,
       }
     );
-    if (!scoped.ok) throwForDenial(scoped.denied);
+    if (!scoped.ok)
+      throwForDenial(scoped.denied, {
+        resourceScope: REQUESTS_RESOURCE_DENIAL,
+      });
 
     // Requested environments must all fall inside the key's scope — the
     // scope data comes from _authorizeRequest, which only checks a single
-    // environment per call.
+    // environment per call. (Environment NAME validity is enforced in the
+    // shared insertRequest core.)
     if (args.environments.length === 0) {
       throw new Error("At least one environment is required");
     }
-    if (scoped.scopeEnvironments !== "all") {
+    const envScope = scoped.scopeEnvironments;
+    if (envScope !== "all") {
       const outOfScope = args.environments.filter(
-        (env) =>
-          scoped.scopeEnvironments !== "all" &&
-          !scoped.scopeEnvironments.includes(env)
+        (env) => !envScope.includes(env)
       );
       if (outOfScope.length > 0) {
         throw new Error("That environment is not in this API key's scope");
@@ -230,6 +156,13 @@ export const createVariableRequest = action({
   },
 });
 
+const REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+  "canceled",
+] as const;
+
 /**
  * A key may read the status of ITS OWN requests only — never another
  * key's, never a human's, and never any vaultRef.
@@ -240,37 +173,49 @@ export const _readKeyRequests = internalQuery({
     requestId: v.optional(v.id("environmentVariableRequests")),
   },
   returns: v.array(machineRequestShape),
-  handler: async (ctx, args) => {
-    if (args.requestId !== undefined) {
-      const request = await ctx.db.get(args.requestId);
-      if (!request || request.requestedByKeyId !== args.keyId) return [];
-      return [
-        {
-          requestId: request._id,
-          key: request.key,
-          environments: request.environments,
-          status: request.status,
-          reviewReason: request.reviewReason ?? null,
-          createdAt: request.createdAt,
-        },
-      ];
-    }
-    // Newest 20 of this key's requests — enough for any agent loop.
-    const rows = await ctx.db
-      .query("environmentVariableRequests")
-      .withIndex("by_requested_key_and_status", (q) =>
-        q.eq("requestedByKeyId", args.keyId)
-      )
-      .order("desc")
-      .take(20);
-    return rows.map((request) => ({
+  handler: async (ctx, args): Promise<MachineRequest[]> => {
+    const toShape = (request: {
+      _id: Id<"environmentVariableRequests">;
+      key: string;
+      environments: string[];
+      status: "pending" | "approved" | "rejected" | "canceled";
+      reviewReason?: string;
+      createdAt: number;
+    }): MachineRequest => ({
       requestId: request._id,
       key: request.key,
       environments: request.environments,
       status: request.status,
       reviewReason: request.reviewReason ?? null,
       createdAt: request.createdAt,
-    }));
+    });
+
+    if (args.requestId !== undefined) {
+      const request = await ctx.db.get(args.requestId);
+      if (!request || request.requestedByKeyId !== args.keyId) return [];
+      return [toShape(request)];
+    }
+
+    // Newest 20 of this key's requests. The index is (requestedByKeyId,
+    // status), so a single unbound-status scan would order by STATUS before
+    // recency — instead take a bounded newest-first window per status and
+    // merge, so old rejected rows can never shadow a live pending one.
+    const perStatus = await Promise.all(
+      REQUEST_STATUSES.map((status) =>
+        ctx.db
+          .query("environmentVariableRequests")
+          .withIndex("by_requested_key_and_status", (q) =>
+            q.eq("requestedByKeyId", args.keyId).eq("status", status)
+          )
+          .order("desc")
+          .take(20)
+      )
+    );
+    return perStatus
+      .flat()
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 20)
+      .map(toShape);
   },
 });
 
@@ -296,7 +241,10 @@ export const getRequestStatus = action({
         surface: args.surface,
       }
     );
-    if (!authorization.ok) throwForDenial(authorization.denied);
+    if (!authorization.ok)
+      throwForDenial(authorization.denied, {
+        resourceScope: REQUESTS_RESOURCE_DENIAL,
+      });
 
     return await ctx.runQuery(internal.features.api.requests._readKeyRequests, {
       keyId: authorization.keyId,

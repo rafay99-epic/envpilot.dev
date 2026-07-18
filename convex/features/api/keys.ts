@@ -475,12 +475,13 @@ export const usageForOrganization = query({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
     await assertOrgMembership(ctx, actor._id, args.organizationId);
-    if (args.keyIds.length > MAX_KEYS_PER_ORG) {
-      throw new ConvexError("Too many keys requested");
-    }
+    // Bound the work, never throw: revoked rows are kept forever, so an
+    // org's TOTAL key count legitimately exceeds the live-key mint cap —
+    // valid caller input must not crash the keys UI.
+    const keyIds = args.keyIds.slice(0, 200);
 
     const allowed = new Set<string>();
-    for (const keyId of args.keyIds) {
+    for (const keyId of keyIds) {
       const key = await ctx.db.get(keyId);
       if (!key || key.organizationId !== args.organizationId) continue;
       try {

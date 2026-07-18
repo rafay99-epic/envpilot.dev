@@ -1,14 +1,14 @@
 ---
 title: "Architecture: the machine surfaces"
-description: How Envpilot's four client surfaces share one auth core, and why machine credentials can read secrets but never write them.
+description: How Envpilot's five client surfaces share one auth core, and why machine credentials can read secrets but never write them.
 icon: network
 ---
 
 # Architecture: the machine surfaces
 
-Envpilot exposes your projects and variables through four client surfaces. Two are driven by a human at a keyboard, two are driven by programs, and one is a hard-locked CI reader. They differ in how they authenticate and in what they are allowed to do — but they all funnel through a **single enforcement core**, so there is exactly one place where scope, plan, and audit are decided.
+Envpilot exposes your projects and variables through five client surfaces. Two are driven by a human at a keyboard, two are driven by programs, and one is a hard-locked CI reader. They differ in how they authenticate and in what they are allowed to do — but they all funnel through a **single enforcement core**, so there is exactly one place where scope, plan, and audit are decided.
 
-## The four surfaces
+## The five surfaces
 
 | Surface           | Who drives it | Auth                               | What it can do               |
 | ----------------- | ------------- | ---------------------------------- | ---------------------------- |
@@ -30,16 +30,17 @@ A key carries:
 - **Scope** — projects (all or a list), environments (all or a list), and resources (`variables`, `accounts`, `projects`, and optionally `requests`).
 - **Surfaces** — which faces the key may use: `rest_api`, `mcp_server`, `github_action`.
 
-Because all three surfaces route through one authorizer, there is no second implementation of "is this key allowed" to drift out of sync. Denials are **returned, not thrown**, so the audit write always survives; an unknown, revoked, or expired key gets one uniform answer; and the plan gate (`public_api` / `mcp_server` per surface) is re-checked on **every** request.
+Because all three machine surfaces route through one authorizer, there is no second implementation of "is this key allowed" to drift out of sync. Denials are **returned, not thrown**, so the audit write always survives; an unknown, revoked, or expired key gets one uniform answer; and the plan gate (`public_api` / `mcp_server` per surface) is re-checked on **every** request.
 
 <Mermaid
   chart={`flowchart TD
-    A[CLI] --> C
-    B[VS Code extension] --> C
+    A[CLI] --> W[WorkOS identity<br/>human auth]
+    B[VS Code extension] --> W
     D[REST API] --> C
     E[MCP server] --> C
     F[GitHub Action] --> C
-    C[_authorizeRequest<br/>one enforcement core] --> G[(Convex<br/>metadata + refs)]
+    C[_authorizeRequest<br/>one enforcement core for API keys] --> G[(Convex<br/>metadata + refs)]
+    W --> G
     C --> H[(WorkOS Vault<br/>encrypted values)]`}
 />
 
