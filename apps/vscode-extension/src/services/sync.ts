@@ -433,14 +433,20 @@ export class SyncService {
     }
 
     // Write file
-    await fs.writeFile(envFilePath, content, "utf-8");
-    await recordManagedFile(envFilePath, content);
-
-    // Apply role-based file protection
     const protectionMode = this.resolveProtectionMode(
       project.projectId,
       variables
     );
+    await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content, undefined, protectionMode);
+
+    // Register EVERY managed file (including writable) with the clipboard
+    // guard — the clipboardGuard.scope setting decides which modes block.
+    if (this.clipboardGuard) {
+      this.clipboardGuard.protectFile(envFilePath, protectionMode);
+    }
+
+    // Apply role-based file protection
     if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
       if (this.fileProtection) {
@@ -451,15 +457,6 @@ export class SyncService {
           },
           protectionMode
         );
-      }
-      // Register clipboard protection for non-writable files
-      if (this.clipboardGuard) {
-        this.clipboardGuard.protectFile(envFilePath, protectionMode);
-      }
-    } else {
-      // Ensure writable files are unprotected from clipboard guard
-      if (this.clipboardGuard) {
-        this.clipboardGuard.unprotectFile(envFilePath);
       }
     }
   }
@@ -1075,13 +1072,19 @@ export class SyncService {
       // File may not exist yet
     }
 
-    await fs.writeFile(envFilePath, content, "utf-8");
-    await recordManagedFile(envFilePath, content);
-
-    // Apply role-based file protection
     const protectionMode = projectId
       ? this.resolveProtectionMode(projectId, variables)
       : "readonly-with-request";
+    await fs.writeFile(envFilePath, content, "utf-8");
+    await recordManagedFile(envFilePath, content, undefined, protectionMode);
+
+    // Register EVERY managed file (including writable) with the clipboard
+    // guard — the clipboardGuard.scope setting decides which modes block.
+    if (this.clipboardGuard) {
+      this.clipboardGuard.protectFile(envFilePath, protectionMode);
+    }
+
+    // Apply role-based file protection
     if (protectionMode !== "writable") {
       await fs.chmod(envFilePath, 0o444);
       if (this.fileProtection) {
@@ -1106,15 +1109,6 @@ export class SyncService {
           syncCallback,
           protectionMode
         );
-      }
-      // Register clipboard protection for non-writable files
-      if (this.clipboardGuard) {
-        this.clipboardGuard.protectFile(envFilePath, protectionMode);
-      }
-    } else {
-      // Ensure writable files are unprotected from clipboard guard
-      if (this.clipboardGuard) {
-        this.clipboardGuard.unprotectFile(envFilePath);
       }
     }
   }

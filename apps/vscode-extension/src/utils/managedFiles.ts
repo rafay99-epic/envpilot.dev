@@ -24,6 +24,13 @@ import * as path from "path";
 export interface ManagedFileEntry {
   path: string;
   sha256: string;
+  /**
+   * Protection mode at write time — lets activation re-arm the clipboard
+   * guard before the first sync. Optional: older manifests (and entries the
+   * uninstall hook reads) simply lack it. Type is inlined so this module
+   * stays vscode-free for the uninstall bundle.
+   */
+  mode?: "strict-readonly" | "readonly-with-request" | "writable";
 }
 
 // ponytail: one manifest shared by all VS Code forks (Code/Cursor/VSCodium).
@@ -69,13 +76,18 @@ async function writeManifest(
 export async function recordManagedFile(
   filePath: string,
   content: string,
-  manifestPath: string = getManifestPath()
+  manifestPath: string = getManifestPath(),
+  mode?: ManagedFileEntry["mode"]
 ): Promise<void> {
   try {
     const resolved = path.resolve(filePath);
     const entries = await readManifest(manifestPath);
     const next = entries.filter((e) => e.path !== resolved);
-    next.push({ path: resolved, sha256: hashContent(content) });
+    next.push({
+      path: resolved,
+      sha256: hashContent(content),
+      ...(mode ? { mode } : {}),
+    });
     await writeManifest(manifestPath, next);
   } catch {
     // Never let manifest bookkeeping break a sync.

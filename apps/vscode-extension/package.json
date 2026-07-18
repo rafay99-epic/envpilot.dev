@@ -150,6 +150,18 @@
         "title": "Sign Out of All Accounts",
         "category": "Envpilot",
         "icon": "$(close-all)"
+      },
+      {
+        "command": "envpilot.toggleCloaking",
+        "title": "Toggle Value Cloaking",
+        "category": "Envpilot",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "envpilot.revealValues",
+        "title": "Reveal Values for 30 Seconds",
+        "category": "Envpilot",
+        "icon": "$(eye)"
       }
     ],
     "viewsContainers": {
@@ -366,6 +378,26 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically install a pre-commit hook to block .env file commits"
+        },
+        "envpilot.clipboardGuard.scope": {
+          "type": "string",
+          "default": "all-managed",
+          "enum": [
+            "all-managed",
+            "readonly-roles",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Block copy/cut in every Envpilot-managed .env file, regardless of your role",
+            "Block copy/cut only in read-only files (viewer and request-only roles)",
+            "Never block copy/cut"
+          ],
+          "description": "Which Envpilot-managed .env files block clipboard copy/cut"
+        },
+        "envpilot.cloakValues": {
+          "type": "boolean",
+          "default": true,
+          "description": "Visually mask variable values in Envpilot-managed .env files (the file content on disk is unchanged)"
         },
         "envpilot.idlePauseMinutes": {
           "type": "number",

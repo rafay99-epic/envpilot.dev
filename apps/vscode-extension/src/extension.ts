@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { existsSync } from "fs";
 import { AuthService } from "./services/auth";
 import { ApiService } from "./services/api";
 import { SyncService } from "./services/sync";
@@ -17,6 +18,7 @@ import { LinkProjectDialog } from "./ui/linkProjectDialog";
 import { RequestVariableDialog } from "./ui/requestVariableDialog";
 import { FileProtectionService } from "./services/fileProtection";
 import { ClipboardGuardService } from "./services/clipboardGuard";
+import { CloakService } from "./services/cloak";
 import { GitCommitGuardService } from "./services/gitCommitGuard";
 import { EnvCodeLensProvider } from "./providers/envCodeLensProvider";
 import { DashboardPanelProvider } from "./providers/dashboardPanel";
@@ -42,7 +44,11 @@ import {
 } from "./utils/config";
 import { getDisplayPath } from "./utils/paths";
 import { envFileNamesFor } from "./utils/envFiles";
-import { purgeManagedFilesFiltered } from "./utils/managedFiles";
+import {
+  purgeManagedFilesFiltered,
+  readManifest,
+  getManifestPath,
+} from "./utils/managedFiles";
 import {
   writeSessionMarker,
   clearSessionMarker,
@@ -102,6 +108,7 @@ let convexService: ConvexService | null = null;
 let storageService: StorageService;
 let fileProtectionService: FileProtectionService;
 let clipboardGuardService: ClipboardGuardService;
+let cloakService: CloakService;
 let gitCommitGuardService: GitCommitGuardService;
 let envCodeLensProvider: EnvCodeLensProvider;
 let dashboardPanelProvider: DashboardPanelProvider;
@@ -255,6 +262,18 @@ export async function activate(context: vscode.ExtensionContext) {
   fileProtectionService = new FileProtectionService();
   clipboardGuardService = new ClipboardGuardService();
   clipboardGuardService.activate();
+  // Re-arm the clipboard guard from the managed-files manifest BEFORE the
+  // first sync — a managed file must never sit unguarded between window
+  // reload and the sync that would re-register it.
+  for (const entry of await readManifest(getManifestPath())) {
+    if (entry.mode && existsSync(entry.path)) {
+      clipboardGuardService.protectFile(entry.path, entry.mode);
+    }
+  }
+  cloakService = new CloakService((fsPath) =>
+    clipboardGuardService.isManaged(fsPath)
+  );
+  cloakService.activate();
   gitCommitGuardService = new GitCommitGuardService();
   syncService = new SyncService(apiService, storageService);
   syncService.setFileProtection(fileProtectionService);
@@ -404,7 +423,29 @@ export async function activate(context: vscode.ExtensionContext) {
       wrapCommand(async () => {
         dashboardPanelProvider.show();
       })
+    ),
+    // Value cloaking commands
+    vscode.commands.registerCommand(
+      "envpilot.toggleCloaking",
+      wrapCommand(async () => cloakService.toggle())
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.revealValues",
+      wrapCommand(async () => {
+        cloakService.reveal();
+      })
     )
+  );
+
+  // Keep clipboard protection attached to a guarded file when it is
+  // renamed/moved (fileProtection's onDidDelete on the old path already
+  // triggers a resync of the original).
+  context.subscriptions.push(
+    vscode.workspace.onDidRenameFiles((e) => {
+      for (const { oldUri, newUri } of e.files) {
+        clipboardGuardService.handleRename(oldUri.fsPath, newUri.fsPath);
+      }
+    })
   );
 
   // Subscribe to auth state changes
@@ -499,6 +540,8 @@ export async function activate(context: vscode.ExtensionContext) {
   syncService.onSyncComplete(() => {
     envCodeLensProvider.refresh();
     dashboardPanelProvider.notifySyncCompleted();
+    // Sync may have registered new managed files — re-apply cloaking.
+    cloakService.refresh();
     void maybeShowUnsyncNotice(context);
   });
 
@@ -571,6 +614,7 @@ export async function activate(context: vscode.ExtensionContext) {
       convexService?.dispose();
       fileProtectionService.dispose();
       clipboardGuardService.dispose();
+      cloakService.dispose();
       gitCommitGuardService.dispose();
       envCodeLensProvider.dispose();
       dashboardPanelProvider.dispose();

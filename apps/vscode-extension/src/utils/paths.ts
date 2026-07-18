@@ -1,15 +1,28 @@
 import * as path from "path";
 import * as os from "os";
+import * as fs from "fs";
 
 /**
- * Normalize a path for consistent storage across platforms
- * Always uses forward slashes internally
+ * Normalize a path for consistent storage and comparison across platforms.
+ * Always uses forward slashes internally. Symlinks are resolved so two
+ * spellings of the same file (e.g. /tmp vs /private/tmp on macOS) compare
+ * equal, and the result is lowercased on the case-insensitive platforms
+ * (darwin/win32) so casing differences can't bypass path-keyed guards.
  */
 export function normalizePath(inputPath: string): string {
   // Resolve to absolute path
-  const resolved = path.resolve(inputPath);
+  let resolved = path.resolve(inputPath);
+  try {
+    resolved = fs.realpathSync(resolved);
+  } catch {
+    // File doesn't exist (yet) — lexical resolution is the best we can do.
+  }
   // Convert to forward slashes for consistent storage
-  return resolved.replace(/\\/g, "/");
+  let normalized = resolved.replace(/\\/g, "/");
+  if (process.platform === "darwin" || process.platform === "win32") {
+    normalized = normalized.toLowerCase();
+  }
+  return normalized;
 }
 
 /**
