@@ -1140,6 +1140,38 @@ Nothing else changes — projects, variables, and roles are untouched.`,
   },
 
   // ============================================================
+  // v1.49.1 — VS Code Clipboard Lockdown & IntelliSense (2026-07-18)
+  // ============================================================
+  {
+    title: "VS Code: Clipboard Lockdown, Value Cloaking & Secret IntelliSense",
+    version: "v1.49.1",
+    type: "feature",
+    publishedAt: ts("2026-07-18T20:00:00Z"),
+    content: `The VS Code extension (v1.16.0) gets its biggest security and productivity update yet: secrets are now locked down inside the editor, masked on screen, and available as IntelliSense — without ever showing a value.
+
+### Clipboard Lockdown
+- Copy and cut are now **blocked in every Envpilot-synced .env file, for all roles** — no more accidental secrets on the clipboard
+- Covers the hidden paths too: context-menu copy and "Copy With Syntax Highlighting", with protection that survives window reloads, file renames, symlinks, and case changes
+- Fully configurable: \`envpilot.clipboardGuard.scope\` — every managed file (default), read-only roles only, or off
+
+### Value Cloaking
+- Secret values render as masked bullets in synced .env files — safe for screen shares and pair programming
+- "Reveal values" shows them for 30 seconds, then re-masks automatically
+
+### Secret IntelliSense
+- Your project's variable names now autocomplete inside \`process.env.\`, \`os.environ\`, \`ENV[\`, \`getenv(...)\` and more — 13 languages supported
+- Hover any env reference to see its project and environments with a **masked** value; revealing requires an explicit click and the right role
+- Names only, served from the local cache — values are never rendered into the editor
+
+### Reliability Round
+- Remote variable changes no longer flash a false "You cannot edit it directly" warning for read-only teammates
+- Changes made while your window was idle are picked up on focus — no more silently stale .env files
+- Multi-root workspaces restore every linked folder on startup, env file writes are atomic, and account switching takes effect on the live connection immediately
+- Expired sessions self-heal with an automatic refresh-and-retry instead of a sign-in prompt
+- Dashboard panel fixes: the per-directory Remove button works and the sync indicator no longer sticks`,
+  },
+
+  // ============================================================
   // v1.40.0 — Launch & Welcome (2026-07-12)
   // ============================================================
   {
