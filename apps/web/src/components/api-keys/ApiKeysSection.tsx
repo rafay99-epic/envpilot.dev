@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -15,6 +15,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import * as Sentry from "@sentry/nextjs";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { DrawerPanel } from "@/components/ui";
 import {
   TerminalCard,
   TerminalButton,
@@ -146,34 +147,21 @@ function ApiKeysSectionInner({
           </div>
           <TerminalButton
             type="button"
-            variant={showCreate ? "secondary" : "primary"}
-            onClick={() => setShowCreate((prev) => !prev)}
-            aria-expanded={showCreate}
+            variant="primary"
+            onClick={() => setShowCreate(true)}
           >
-            {showCreate ? "Close" : "New Key"}
+            New Key
           </TerminalButton>
         </div>
 
-        <AnimatePresence initial={false}>
-          {showCreate && organizationId && (
-            <motion.div
-              key="create-panel"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="overflow-hidden"
-            >
-              <div className="mt-6">
-                <CreateKeyPanel
-                  organizationId={organizationId}
-                  isOwner={isOwner}
-                  onDone={() => setShowCreate(false)}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {organizationId && (
+          <CreateKeyDrawer
+            organizationId={organizationId}
+            isOwner={isOwner}
+            isOpen={showCreate}
+            onClose={() => setShowCreate(false)}
+          />
+        )}
 
         <div className="mt-6">
           {isLoading ? (
@@ -412,14 +400,16 @@ type ExpiryMode = "none" | "30d" | "90d" | "custom";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
-function CreateKeyPanel({
+function CreateKeyDrawer({
   organizationId,
   isOwner,
-  onDone,
+  isOpen,
+  onClose,
 }: {
   organizationId: Id<"organizations">;
   isOwner: boolean;
-  onDone: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }) {
   const createKey = useAction(api.features.api.keys.create);
   const projects = useOrganizationProjects(organizationId);
@@ -448,6 +438,26 @@ function CreateKeyPanel({
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSnippet, setShowSnippet] = useState(false);
+
+  // Fresh form every open — the drawer only unmounts its children, so the
+  // previous run's state (including a revealed key) must not linger.
+  useEffect(() => {
+    if (!isOpen) return;
+    setName("");
+    setProjectMode("specific");
+    setSelectedProjectIds(new Set());
+    setEnvMode("specific");
+    setSelectedEnvs(new Set<Environment>(["production"]));
+    setSelectedResources(new Set<Resource>(["variables"]));
+    setSelectedSurfaces(new Set<Surface>(["rest_api", "mcp_server"]));
+    setExpiryMode("none");
+    setCustomExpiry("");
+    setIsSubmitting(false);
+    setError(null);
+    setCreatedToken(null);
+    setCopied(false);
+    setShowSnippet(false);
+  }, [isOpen]);
 
   const toggleProject = (id: Id<"projects">) => {
     setSelectedProjectIds((prev) => {
@@ -585,12 +595,15 @@ function CreateKeyPanel({
   };
 
   return (
-    <div
-      className={`rounded-lg border p-4 ${
-        createdToken
-          ? "border-green-500/30 bg-green-500/5"
-          : "border-zinc-700 bg-zinc-950/40"
-      }`}
+    <DrawerPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="New API Key"
+      width="lg"
+      // While creating, and once the one-time plaintext is on screen, only
+      // the explicit Done button may close — a stray backdrop click must
+      // never eat the only copy of the key.
+      preventClose={isSubmitting || createdToken !== null}
     >
       {createdToken ? (
         <div className="space-y-4">
@@ -679,15 +692,13 @@ function CreateKeyPanel({
           </div>
 
           <div className="flex justify-end">
-            <TerminalButton type="button" onClick={onDone}>
+            <TerminalButton type="button" onClick={onClose}>
               Done
             </TerminalButton>
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <h3 className="text-sm font-semibold text-zinc-200">New API Key</h3>
-
           {error && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
               <p className="text-sm text-red-400">{error}</p>
@@ -923,7 +934,7 @@ function CreateKeyPanel({
             <TerminalButton
               type="button"
               variant="secondary"
-              onClick={onDone}
+              onClick={onClose}
               disabled={isSubmitting}
             >
               Cancel
@@ -934,6 +945,6 @@ function CreateKeyPanel({
           </div>
         </form>
       )}
-    </div>
+    </DrawerPanel>
   );
 }
