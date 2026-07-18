@@ -1,0 +1,19 @@
+apps/vscode-extension/src/ui/linkProjectDialog.ts
+  s_ed0aa86c7b0008::t_d9e2e5cafbde6b 11-15,159-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "246309c93b721277a45d96baa1ee1c7e6a2d32e1",
+  "prompts": {},
+  "sessions": {
+    "s_ed0aa86c7b0008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a996a1c98734ede79",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
