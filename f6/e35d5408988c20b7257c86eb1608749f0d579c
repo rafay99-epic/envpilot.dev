@@ -1,0 +1,37 @@
+apps/vscode-extension/src/extension.ts
+  s_cbd79cae86dc5c::t_f040f589ad416e 47,513-526,722,835
+apps/vscode-extension/src/services/api.ts
+  s_cbd79cae86dc5c::t_1cae7c25d7d847 142-144,333,368,397-399,414,419-426,429-430,558,569-573,682,693-697,783,848-850
+apps/vscode-extension/src/services/fileProtection.ts
+  s_907f6a06f3322f::t_bcbfe37cae8e4b 3-8,26-28,34-38,61,82,129-145,164,182
+apps/vscode-extension/src/services/realTimeSync.ts
+  s_cbd79cae86dc5c::t_5ef72a045ceff1 2-3,8,371-392,419-442
+apps/vscode-extension/src/services/sync.ts
+  s_cbd79cae86dc5c::t_876b063e4b9f0b 15-21,76-94,107-108,164-166,255-258,266-282,478-479,481-486,488-494,496-500,502-513,515-516,877,903-916,951-953,958-967,1149-1150,1152-1157,1159-1163,1165-1169,1171-1187,1190-1196,1198-1199,1208-1209,1461,1474-1475,1478-1479,1482-1489,1503,1508
+apps/vscode-extension/src/utils/paths.test.ts
+  s_cbd79cae86dc5c::t_c9ab7e279e9a00 5,56-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f6e35d5408988c20b7257c86eb1608749f0d579c",
+  "prompts": {},
+  "sessions": {
+    "s_907f6a06f3322f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-acb425c1ad8948d13",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_cbd79cae86dc5c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a6471bef7f3359d23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
