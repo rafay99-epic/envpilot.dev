@@ -1,0 +1,35 @@
+apps/web/src/app/api/mcp/route.ts
+  s_74a8cf9e9767a8::t_163f6651dfa5b6 23-27
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_7153fc56b0ec9b 490,500-509
+apps/web/src/lib/public-api.ts
+  s_74a8cf9e9767a8::t_1c9885110ff549 61-63
+convex/features/admin/migrations.ts
+  s_74a8cf9e9767a8::t_16814f56c64874 5,1074,1082-1091,1112-1130,1137,1139
+convex/features/api/authorize.ts
+  s_74a8cf9e9767a8::t_5409d1d2dbf171 4,53
+convex/features/api/keys.ts
+  s_74a8cf9e9767a8::t_0a0f225f82f587 43,304-307,340
+convex/features/api/reads.ts
+  s_74a8cf9e9767a8::t_03ef2f46d4775a 327-330
+convex/features/cicd/pull.ts
+  s_74a8cf9e9767a8::t_8a091e3fe41d55 59-62,166,357-361,381-387
+convex/features/cicd/tokens.ts
+  s_74a8cf9e9767a8::t_b0c66d36a5a73a 49-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2f776bb440d86d216accdd2afb9910c2c299ba87",
+  "prompts": {},
+  "sessions": {
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
