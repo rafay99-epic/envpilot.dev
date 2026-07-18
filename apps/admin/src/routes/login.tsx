@@ -45,7 +45,9 @@ function LoginPage() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => void signOut()}
+                onClick={() =>
+                  void signOut({ returnTo: window.location.origin })
+                }
               >
                 Sign out
               </Button>
