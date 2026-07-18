@@ -1,0 +1,140 @@
+apps/web/src/app/api/mcp/route.ts
+  s_00274c67c32790::t_b12f1f48c5347d 117-118,119-120,177,216,258,426-427,428-429,462
+  s_74a8cf9e9767a8::t_163f6651dfa5b6 24-28
+  s_74a8cf9e9767a8::t_6a05591945e309 6,271-383
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_74a8cf9e9767a8::t_cf1d32399de005 38,71-79,159-160,234,329-337,488-490,537,539-544,545-547,555-561,563-564,567,577,607,765-794,800
+  s_74a8cf9e9767a8::t_7153fc56b0ec9b 538,551-552,554
+  s_74a8cf9e9767a8::t_0309018782ad10 548,553,565-566,904-905,912-915,917,921
+  s_74a8cf9e9767a8::t_fe33d65790e882 61,64-70,101-103,141-149,214-218,242-254,366-381,904,910,912-914,916-917,921,928-934
+apps/web/tests/e2e/authenticated/api-keys.spec.ts
+  s_74a8cf9e9767a8::t_0140918f8507f6 92-104,134-135
+apps/web/tests/e2e/authenticated/cicd-tokens.spec.ts
+  s_74a8cf9e9767a8::t_ed7c3febb201ed 7,12-17,20,24-25,30-36,39-50,52-75,77-80,83,91-97,105,108,130,136,150,152,154-155,159,163-166,171,180
+  s_74a8cf9e9767a8::t_6a3708090a3aeb 18-19,37
+convex/features/api/authorize.ts
+  s_00274c67c32790::t_c4c28027376de9 43-45,49-52,71,120-124,133-140
+  s_74a8cf9e9767a8::t_5409d1d2dbf171 4,53
+  s_74a8cf9e9767a8::t_3e452997f2d5fa 125-132,172-177,181-185
+convex/features/api/keys.ts
+  s_74a8cf9e9767a8::t_befab3810b309d 53-66,104-126,128,135-139,185,195,240-247,249-255,279,295,380-381,427
+  s_74a8cf9e9767a8::t_0a0f225f82f587 52,318-321,354
+  s_74a8cf9e9767a8::t_3d4ca7558cb681 127,129
+  s_0d442c987731a4::t_561683b977e032 19-22,25-27,33-34,41-49,132-136,446-547
+convex/features/api/reads.ts
+  s_74a8cf9e9767a8::t_c69e7adf128bd7 100,138-140,326,331-334,336,362,377,399,416,437,457,484,529,555,643,684,708
+  s_74a8cf9e9767a8::t_03ef2f46d4775a 327-330
+convex/features/cicd/pull.ts
+  s_74a8cf9e9767a8::t_4182dc62ba784b 107-117,149,154
+  s_74a8cf9e9767a8::t_8a091e3fe41d55 56,158,273-275,276,291,294-297
+  s_74a8cf9e9767a8::t_c8d20c6796b4dd 30-32,54-55,150,184-187,292-293
+convex/schema.ts
+  s_71342a3bd8a300::t_f4ca9bbc2269fa 601-614
+  s_74a8cf9e9767a8::t_327bf364dba5ac 340-345,355-357,359-363,389-391,572-576
+apps/web/src/lib/public-api.ts
+  s_74a8cf9e9767a8::t_1c9885110ff549 61-63
+apps/web/src/app/api/v1/secrets/route.ts
+  s_74a8cf9e9767a8::t_38a7633a279334 81-85
+apps/web/src/components/dashboard/terminal-ui.tsx
+  s_74a8cf9e9767a8::t_3eebacf2e55b35 103,109,114
+apps/docs/content/api-quickstart.mdx
+  s_0d442c987731a4::t_f4b45460c1c7b0 27-29,93,95
+apps/docs/content/api-reference.mdx
+  s_0d442c987731a4::t_d0d47f96291358 11-12,133
+apps/docs/content/api-security.mdx
+  s_0d442c987731a4::t_44df05ed02bd28 15-16,19-26
+apps/docs/content/architecture.mdx
+  s_74a8cf9e9767a8::t_2aa1d98fc8359b 1-79
+apps/docs/content/github-action.mdx
+  s_74a8cf9e9767a8::t_969e7269ca8f6f 11-20,31,37,81-84
+apps/docs/content/mcp-server.mdx
+  s_74a8cf9e9767a8::t_041e332d69c8ed 27,37-55
+apps/docs/content/rate-limits.mdx
+  s_74a8cf9e9767a8::t_12dd59ef6f0bab 1-44
+apps/docs/content/rbac.mdx
+  s_0d442c987731a4::t_4fb535f2f4c127 81-84
+apps/docs/package.json
+  s_0d442c987731a4::t_28079686a8dbfb 3,20
+apps/docs/src/app/[slug]/page.tsx
+  s_0d442c987731a4::t_c680a600cab4aa 20,23-25,174
+apps/docs/src/components/DocsSidebar.tsx
+  s_0d442c987731a4::t_51bc626b5c5bef 14-15,36-37
+apps/docs/src/components/Mermaid.tsx
+  s_74a8cf9e9767a8::t_e9b46643ce42cc 1,3-5,8,10-12,14,16-29,31-42
+apps/docs/src/lib/content.ts
+  s_0d442c987731a4::t_6c011751eddfba 71,75
+apps/web/package.json
+  s_74a8cf9e9767a8::t_00be42744a27d5 3
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/requests/page.tsx
+  s_74a8cf9e9767a8::t_f793af50617438 196-200
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/settings/page.tsx
+  s_74a8cf9e9767a8::t_2274e9a110591d 85
+apps/web/src/app/(dashboard)/dashboard/requests/page.tsx
+  s_0d442c987731a4::t_edcf55f99358c0 4,42-45,129-134,141,144,165-166,172-187,355-356,397,405-406,422,443-463,502-503,505-549,551,566-575,595-601
+apps/web/src/app/api/organizations/[slug]/members/[userId]/suspend/route.ts
+  s_74a8cf9e9767a8::t_fd5aae27cced7f 21,88-90
+apps/web/src/lib/versions.ts
+  s_74a8cf9e9767a8::t_96e880e67d17d7 17
+apps/web/tests/e2e/authenticated/machine-requests.spec.ts
+  s_74a8cf9e9767a8::t_1aa5504744da50 1-3,5-9,11-71,73-74,76-84,86-87,89-93,95-115,117-120,122-125,127-131,134-144,146-147,149-158,160-162,164-168,170-175,177-204,206-212,214-217,219-221,224-231,233-259
+bun.lock
+  s_74a8cf9e9767a8::t_cf485529fea9a1 24,125,130,176,300-301,370-373,502-505,608-609,978-979,982-987,990-999,1002-1011,1016-1021,1024-1027,1032-1033,1036-1039,1052-1053,1086-1087,1156-1157,1478-1479,1488-1495,1498-1503,1506-1515,1518-1521,1524-1527,1532-1539,1542-1545,1554-1559,1570-1571,1600-1601,1624-1625,1872-1873,1942-1943,2114-2115,2120-2121,2128-2129,2176-2177,2216-2217,2266-2267,2462-2463,2484-2485,2530-2533,2672-2673,2676-2677,2686-2687,2842-2843,2914-2915,3018,3124-3125,3242-3251,3296-3297,3384-3385,3538-3543
+convex/_generated/api.d.ts
+  s_74a8cf9e9767a8::t_2b1b2c3efa7a24 35,144
+convex/crons.ts
+  s_74a8cf9e9767a8::t_a49c4f00bb2bf3 104-112
+convex/features/api/requests.ts
+  s_74a8cf9e9767a8::t_3f663053c503d5 2-4,6-7,10-15,17-21,23-24,27-35,37-39,43-49,51-58,60,62-68,70-83,85-87,89-94,96-102,105-113,115-117,119-136,138-140,142-144,147-149,154-177,179-181,183,185-186,189-220,224-229,234-235,237-242,244-256,258-273,277-289,291-299,301-303
+convex/features/organizations/securityHold.ts
+  s_74a8cf9e9767a8::t_e8f1d8ae0e1f6b 239-243,253,291,301-306,308-314
+convex/features/variables/requests/actions.ts
+  s_74a8cf9e9767a8::t_043d01c9146be8 205-209,221-302
+convex/features/variables/requests/mutations.ts
+  s_74a8cf9e9767a8::t_190c43279f51ac 2-6,63-85,89,93,95-96,105,125-128,132-133,142,153,155,170-175,178,182-184,192,201-252,261-419,427-429,451-478,570-578,581,596,605-618
+convex/features/variables/requests/queries.ts
+  s_74a8cf9e9767a8::t_36bd55cc87110e 254,287-291,351-357,359,362,377-381,396-399
+convex/lib/rateLimits.ts
+  s_74a8cf9e9767a8::t_a63147c2aff2da 38-49
+package.json
+  s_74a8cf9e9767a8::t_fd32500b7cef33 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3acc42bdf8e8f721741edd282dca85fece58903b",
+  "prompts": {},
+  "sessions": {
+    "s_00274c67c32790": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae30227602127c930",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_0d442c987731a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae7a76e0788089e28",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_71342a3bd8a300": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a1c25f4e01ebe26df",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_74a8cf9e9767a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e76ab192-c00c-483c-aad9-259fca1ebc01",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
