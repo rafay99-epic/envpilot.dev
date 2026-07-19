@@ -15,6 +15,8 @@ export default authkitMiddleware({
       "/sign-up",
       "/callback",
       "/changelog",
+      // /blog and /docs moved to blog.envpilot.dev / docs.envpilot.dev —
+      // next.config redirects() 301s them before this middleware runs.
       "/faq",
       "/vs/(.*)",
       "/wishlist",
@@ -28,13 +30,36 @@ export default authkitMiddleware({
       "/api/health",
       "/api/config",
       "/api/status",
+      // Release-version manifest polled by signed-out clients (CLI, extension,
+      // web boot) for update/enforcement checks — must return JSON, never a
+      // WorkOS redirect.
       "/api/version",
+      // Returns 401 JSON for signed-out users; must not redirect to WorkOS
+      // (a cross-origin redirect makes client fetches throw on public pages)
       "/api/auth/me",
       "/api/telemetry-envelope",
       "/api/webhooks/polar",
+      // Public REST API v1 (organization/projects/variables/accounts) AND the
+      // legacy CI/CD secrets pull all authenticate with a Bearer API key, not
+      // a browser session — a WorkOS redirect here would hand a machine
+      // client an HTML sign-in page instead of JSON. The wildcard covers
+      // every current and future /api/v1/* route (secrets, organization,
+      // projects, projects/[slug], projects/[slug]/variables,
+      // projects/[slug]/accounts) so new endpoints never need a proxy change.
       "/api/v1/(.*)",
+      // Remote MCP server (Streamable HTTP, stateless) — authenticates with
+      // the SAME Bearer envpk_ API keys as /api/v1/* via its own withMcpAuth
+      // wrapper, never a WorkOS session cookie. No sub-path variants: the
+      // route only lives at this exact path (SSE is disabled).
       "/api/mcp",
+      // The CLI now calls Convex directly for everything, including secret
+      // VALUES (Stage 3): the last /api/cli/* vault routes were deleted, so no
+      // CLI path needs an unauthenticated bypass anymore.
+      // Extension API endpoints use bearer token auth, not browser session auth
+      // (only /api/extension/config survives — variables/requests moved to
+      // direct Convex actions in Stage 3).
       "/api/extension/(.*)",
+      // Secret sharing public pages (email-verified, no browser session needed)
       "/s/(.*)",
       "/api/shares/shr_(.*)/verify-email",
       "/api/shares/shr_(.*)/verify-otp",

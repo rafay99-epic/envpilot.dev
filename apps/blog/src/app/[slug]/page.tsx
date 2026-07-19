@@ -115,7 +115,7 @@ export default async function BlogPostPage({ params }: PageProps) {
       <div className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-28rem overflow-hidden mask-[linear-gradient(to_bottom,black,transparent)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]"
         >
           <AuroraGlow />
           <GridLines />

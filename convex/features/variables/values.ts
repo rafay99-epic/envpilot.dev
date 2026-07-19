@@ -645,6 +645,14 @@ export const updateWithValue = action({
   },
   returns: v.object({ _id: v.id("environmentVariables") }),
   handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
+    // Fine-grained write authorization lives in the update mutation, but
+    // don't let anonymous callers mint vault objects first: require a
+    // verified identity before any vault write.
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated: no verified user identity on request");
+    }
+
     let vaultRef: string | undefined;
 
     // Mint a new vault object only when the value is actually changing. Needs
@@ -835,6 +843,15 @@ export const importValues = action({
       api.features.auth.queries.resolveLegacyRoles,
       { projectId: args.projectId }
     );
+    // Capabilities come from the org-role profile and are NOT
+    // assignment-aware — without this gate an unassigned team lead could
+    // import into (and diff against) a project they cannot even see.
+    // `assigned` is already true for roles that bypass assignment (owners).
+    if (!importLegacy.assigned) {
+      throw new ConvexError(
+        "You do not have permission to import variables into this project."
+      );
+    }
     const canWriteDirectly =
       importLegacy.capabilities["project.variables.update"] === true;
     if (

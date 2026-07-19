@@ -52,6 +52,17 @@ export const listByOrganization = query({
   handler: async (ctx, args) => {
     const actor = await requireAuthedUser(ctx);
 
+    // Same visibility rule as listWithStatsCore: non-members see nothing,
+    // roles without the assignment bypass only see assigned projects.
+    // Membership resolves FIRST so a non-member never triggers the full
+    // per-org table read.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) return [];
+
     const projects = await ctx.db
       .query("projects")
       .withIndex("by_organization", (q) =>
@@ -59,15 +70,6 @@ export const listByOrganization = query({
       )
       .collect()
       .then((rows) => rows.filter((doc) => doc.deletedAt === undefined));
-
-    // Same visibility rule as listWithStatsCore: non-members see nothing,
-    // roles without the assignment bypass only see assigned projects.
-    const membership = await getActiveMembership(
-      ctx,
-      args.organizationId,
-      actor._id
-    );
-    if (!membership) return [];
 
     const profile = await getRoleProfile(ctx, membership.role);
     if (bypassesAssignment(profile)) return projects;

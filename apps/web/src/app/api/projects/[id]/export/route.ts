@@ -59,23 +59,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Sync the Convex user BEFORE any identity-authed query — a first-time
+    // WorkOS session has no users row yet, so authed queries would fail
+    // server-side before the row is created.
+    const convexUser = await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+
     // Get the project
-    const project = await createAuthedConvexClient(accessToken!).query(
-      api.features.projects.queries.getById,
-      {
-        projectId: id as Id<"projects">,
-      }
-    );
+    const project = await authed.query(api.features.projects.queries.getById, {
+      projectId: id as Id<"projects">,
+    });
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get or create Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
     // Check org membership
-    const membership = await createAuthedConvexClient(accessToken!).query(
+    const membership = await authed.query(
       api.features.organizations.queries.getMembership,
       {
         organizationId: project.organizationId,
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Fetch + decrypt the caller's accessible, in-scope variable values via the
     // composed Convex action (access control + Vault reads live in Convex; a
     // per-variable decrypt failure yields "[DECRYPTION_FAILED]" for that key).
-    const { values } = await createAuthedConvexClient(accessToken!).action(
+    const { values } = await authed.action(
       api.features.variables.values.exportValues,
       {
         projectId: id as Id<"projects">,

@@ -61,17 +61,16 @@ export async function POST(request: Request) {
       environments,
     } = validation.data;
 
-    // Resolve the Convex user and the project's organization concurrently —
-    // the two lookups are independent. The project's own organizationId is
+    // Sequential on purpose: the project lookup runs as the caller's JWT
+    // identity, which needs the users row that getOrCreateConvexUser creates
+    // on a first-time session. The project's own organizationId is
     // authoritative for the Vault key context and Convex mutation — never the
     // client-supplied organizationId — to prevent cross-tenant key confusion.
-    const [convexUser, { project, organizationId }] = await Promise.all([
-      getOrCreateConvexUser(convex, user),
-      getProjectOrganization(
-        createAuthedConvexClient(accessToken!),
-        projectId as Id<"projects">
-      ),
-    ]);
+    const convexUser = await getOrCreateConvexUser(convex, user);
+    const { project, organizationId } = await getProjectOrganization(
+      createAuthedConvexClient(accessToken!),
+      projectId as Id<"projects">
+    );
 
     if (!project || !organizationId) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
