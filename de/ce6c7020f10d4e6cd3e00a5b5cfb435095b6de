@@ -1,0 +1,37 @@
+apps/web/next.config.ts
+  s_398158d5eab6ae::t_c36da36a779348 78-82,84
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/shared/page.tsx
+  s_b5f581b59533b4::t_12bfd243194615 29,361-363
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/trash/page.tsx
+  s_398158d5eab6ae::t_c90c6663c59c84 17,56-58
+apps/web/src/app/(dashboard)/dashboard/requests/page.tsx
+  s_b5f581b59533b4::t_3954b7739f7e74 425-426,428,624
+apps/web/src/app/(dashboard)/dashboard/variables/page.tsx
+  s_b5f581b59533b4::t_c8d26e0c29882f 589-591,695
+apps/web/src/app/globals.css
+  s_b5f581b59533b4::t_68efd22dc3cb45 175-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "dece6c7020f10d4e6cd3e00a5b5cfb435095b6de",
+  "prompts": {},
+  "sessions": {
+    "s_398158d5eab6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8c5cc4a23e76a0e4",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
