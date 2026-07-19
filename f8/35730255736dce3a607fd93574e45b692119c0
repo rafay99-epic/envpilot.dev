@@ -1,0 +1,25 @@
+apps/blog/next.config.ts
+  s_b5f581b59533b4::t_bd9c91250f057f 5-10
+apps/docs/next.config.ts
+  s_b5f581b59533b4::t_198f3a0b75f407 5-10
+apps/web/src/app/api/organizations/[slug]/members/route.ts
+  s_b5f581b59533b4::t_94085a399ea489 14,167,181-184,190,205
+apps/web/src/lib/share-emails.ts
+  s_b5f581b59533b4::t_f753f0b6d7af4d 3-5,51,129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f835730255736dce3a607fd93574e45b692119c0",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
