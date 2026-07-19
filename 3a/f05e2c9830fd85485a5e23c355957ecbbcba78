@@ -1,0 +1,33 @@
+apps/blog/src/app/error.tsx
+  s_398158d5eab6ae::t_817961a06afa48 1-27
+apps/docs/src/app/error.tsx
+  s_398158d5eab6ae::t_87824ce2321a87 1-27
+apps/docs/src/app/not-found.tsx
+  s_398158d5eab6ae::t_98c859143e745e 1-48
+apps/web/src/app/(dashboard)/dashboard/loading.tsx
+  s_398158d5eab6ae::t_0e85c8382e3af9 1-49
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/loading.tsx
+  s_398158d5eab6ae::t_66cbaabfb8eb85 1-44
+apps/web/src/app/(dashboard)/dashboard/requests/loading.tsx
+  s_398158d5eab6ae::t_81808988e98fcb 1-38
+apps/web/src/app/(dashboard)/dashboard/team/loading.tsx
+  s_398158d5eab6ae::t_ea2017a8997b76 1-30
+apps/web/src/app/(dashboard)/dashboard/variables/loading.tsx
+  s_398158d5eab6ae::t_4de009539f35c8 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3af05e2c9830fd85485a5e23c355957ecbbcba78",
+  "prompts": {},
+  "sessions": {
+    "s_398158d5eab6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8c5cc4a23e76a0e4",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
