@@ -1,0 +1,25 @@
+apps/cli/src/commands/run.ts
+  s_b5f581b59533b4::t_bb60f6b7560df5 28-29,31-36,92-94,134-138,154-159,163,169-187,197,201-206,209,214,216,226-227,229-231,236,238-240,246-247,256,262-263,283-292,328-333,335,337-350,369-374,376-379,387,391,397-402,404-424
+apps/cli/src/lib/api.ts
+  s_b5f581b59533b4::t_5005665210695b 229-239,550-553,559,561-563,565-569,577-582
+apps/cli/src/lib/variables-cache.ts
+  s_b5f581b59533b4::t_3095d673914925 59-69,206-208,225-228
+convex/features/variables/helpers.ts
+  s_b5f581b59533b4::t_65817b2c95cd7f 1,259-267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c5383a5623b1b7127e1e0731234e00b02f2297b8",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
