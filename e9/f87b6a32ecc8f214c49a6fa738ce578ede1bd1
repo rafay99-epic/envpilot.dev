@@ -1,0 +1,31 @@
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/error.tsx
+  s_b5f581b59533b4::t_63adb9098b848b 3,13-23
+apps/web/src/app/(dashboard)/invitations/[token]/error.tsx
+  s_b5f581b59533b4::t_dca8eac24d7458 3,13-25
+apps/web/src/app/(dashboard)/organizations/[slug]/error.tsx
+  s_b5f581b59533b4::t_b0383d7c9bcf2d 3,13-23
+apps/web/src/components/dashboard/animated-list.tsx
+  s_b5f581b59533b4::t_7566825ce42a3c 94-95
+apps/web/src/components/error/segment-error.tsx
+  s_b5f581b59533b4::t_04e74badb8cd1e 1-76
+convex/features/projects/queries.ts
+  s_b5f581b59533b4::t_91e24473e267ce 4-8,95-96,104-127
+packages/ui/src/docs/MermaidChart.tsx
+  s_b5f581b59533b4::t_83e0f3cb1a9429 12-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e9f87b6a32ecc8f214c49a6fa738ce578ede1bd1",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
