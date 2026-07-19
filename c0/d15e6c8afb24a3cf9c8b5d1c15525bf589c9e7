@@ -1,0 +1,37 @@
+apps/cli/package.json
+  s_b5f581b59533b4::t_a7e5501cf063f5 3
+apps/cli/src/commands/diff.ts
+  s_b5f581b59533b4::t_9e0e3570add4af 1-116
+apps/cli/src/commands/requests.ts
+  s_b5f581b59533b4::t_ff94381e22c38e 2,20-87,93-105,107-109,111-112,114,116-119,121-130,132-141,143-147,149-157,162-182
+apps/cli/src/commands/var.ts
+  s_b5f581b59533b4::t_01648e4f9340eb 1-167
+apps/cli/src/lib/api.ts
+  s_b5f581b59533b4::t_1328ba0d57ecee 340-359,789-874
+apps/cli/src/lib/command-catalog.ts
+  s_b5f581b59533b4::t_79955910648964 20-21,226,228-229,231-240,242-244,246,250-299
+apps/cli/src/lib/variable-requests.ts
+  s_b5f581b59533b4::t_61a2a9f34759e0 302,314,318,331
+apps/cli/tests/var.test.ts
+  s_b5f581b59533b4::t_525fbb672cf171 1-34
+apps/web/src/lib/versions.ts
+  s_b5f581b59533b4::t_a81e7a66490ba9 18
+convex/features/community/changelog/seed.ts
+  s_b5f581b59533b4::t_563bd220e4b32f 1303-1346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c0d15e6c8afb24a3cf9c8b5d1c15525bf589c9e7",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
