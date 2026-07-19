@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
     // Get project and verify membership
     const { project, organizationId } = await getProjectOrganization(
-      convex,
+      createAuthedConvexClient(accessToken!),
       projectId as Id<"projects">
     );
 
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     // Get project and verify membership
     const { project, organizationId } = await getProjectOrganization(
-      convex,
+      createAuthedConvexClient(accessToken!),
       projectId as Id<"projects">
     );
 
@@ -179,6 +179,7 @@ export async function POST(request: Request) {
       convexUser._id,
       key,
       projectId as Id<"projects">,
+      project.name,
       organizationId,
       convexUser.name || convexUser.email || "A team member",
       "created"
@@ -207,22 +208,18 @@ async function notifyVariableChange(
   changerUserId: Id<"users">,
   variableName: string,
   projectId: Id<"projects">,
+  projectName: string,
   organizationId: Id<"organizations">,
   changedByName: string,
   changeType: "created" | "updated" | "deleted"
 ) {
   try {
-    const project = await convex.query(api.features.projects.queries.getById, {
-      projectId,
-    });
     const members = await convex.query(
       api.features.organizations.queries.getMembers,
       {
         organizationId,
       }
     );
-
-    const projectName = project?.name || "Unknown project";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === changerUserId) continue;

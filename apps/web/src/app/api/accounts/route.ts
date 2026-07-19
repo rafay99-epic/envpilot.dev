@@ -67,7 +67,10 @@ export async function POST(request: Request) {
     // client-supplied organizationId — to prevent cross-tenant key confusion.
     const [convexUser, { project, organizationId }] = await Promise.all([
       getOrCreateConvexUser(convex, user),
-      getProjectOrganization(convex, projectId as Id<"projects">),
+      getProjectOrganization(
+        createAuthedConvexClient(accessToken!),
+        projectId as Id<"projects">
+      ),
     ]);
 
     if (!project || !organizationId) {

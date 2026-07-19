@@ -78,9 +78,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get the project
-    const project = await convex.query(api.features.projects.queries.getById, {
-      projectId: id as Id<"projects">,
-    });
+    const project = await createAuthedConvexClient(accessToken!).query(
+      api.features.projects.queries.getById,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });

@@ -131,9 +131,12 @@ export async function POST(request: Request) {
       }
     );
 
-    const project = await convex.query(api.features.projects.queries.getById, {
-      projectId,
-    });
+    const project = await createAuthedConvexClient(accessToken!).query(
+      api.features.projects.queries.getById,
+      {
+        projectId,
+      }
+    );
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {

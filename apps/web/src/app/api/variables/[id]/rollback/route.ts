@@ -62,7 +62,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     // Verify user has access to the project
     const { organizationId } = await getProjectOrganization(
-      convex,
+      createAuthedConvexClient(accessToken!),
       variable.projectId
     );
 

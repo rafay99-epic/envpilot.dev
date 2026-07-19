@@ -144,9 +144,12 @@ export const pullValues = action({
     }),
   }),
   handler: async (ctx, args): Promise<PullResult> => {
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new Error("Project not found");
     }
@@ -310,9 +313,12 @@ export const createWithValue = action({
   },
   returns: v.object({ _id: v.id("environmentVariables") }),
   handler: async (ctx, args): Promise<{ _id: Id<"environmentVariables"> }> => {
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new Error("Project not found");
     }
@@ -434,9 +440,12 @@ export const pushBulk = action({
   handler: async (ctx, args): Promise<PushResult> => {
     const mode = args.mode ?? "merge";
 
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new Error("Project not found");
     }
@@ -651,7 +660,7 @@ export const updateWithValue = action({
         throw new Error("Variable not found");
       }
       const project = await ctx.runQuery(
-        api.features.projects.queries.getById,
+        internal.features.projects.queries._getById,
         {
           projectId: variable.projectId,
         }
@@ -798,9 +807,12 @@ export const importValues = action({
     requested: number;
     skipped: number;
   }> => {
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new Error("Project not found");
     }
