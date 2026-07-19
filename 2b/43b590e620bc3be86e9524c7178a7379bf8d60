@@ -1,0 +1,33 @@
+apps/cli/README.md
+  s_b5f581b59533b4::t_484fcc72548d96 62-82,87-88,90-96,100-104
+apps/cli/src/commands/diff.ts
+  s_b5f581b59533b4::t_1c4dfd4e3c27be 3,56-104
+apps/cli/src/commands/requests.ts
+  s_b5f581b59533b4::t_e3c70455ad01bf 29-37,129-133,135-148,150-154,156,160-195,197-199,202
+apps/cli/src/commands/run.ts
+  s_b5f581b59533b4::t_bbaf7421e6a9d8 133-135,242-247,253,338-339
+apps/cli/src/commands/secrets.ts
+  s_b5f581b59533b4::t_720d0123fee016 52,82-83,137-140,207-238,368-369,371,378-384,387,394,404-423
+apps/cli/src/lib/api.ts
+  s_b5f581b59533b4::t_24b8d4433d4643 360-364,879-882,904-913,918-920,922,926-932,939-978
+apps/cli/src/lib/command-catalog.ts
+  s_b5f581b59533b4::t_429b33a8d8ad06 231,243-244,259,271-272
+apps/cli/tests/secrets.test.ts
+  s_b5f581b59533b4::t_0802e76d1d48fc 35-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "2b43b590e620bc3be86e9524c7178a7379bf8d60",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
