@@ -244,6 +244,11 @@ export const docsComponents = {
 
   // ── Media ─────────────────────────────────────────────────────────────
 
+  // Deliberately a raw <img>, not next/image: MDX content embeds images
+  // from arbitrary external hosts, which the next/image optimizer rejects
+  // unless every host is allowlisted in images.remotePatterns. lazy-loading
+  // covers the main win; revisit only if content images become a CLS/LCP
+  // problem.
   img: (props: P<"img">) => (
     <figure className="mb-5">
       <img
