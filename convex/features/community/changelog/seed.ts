@@ -1300,4 +1300,50 @@ Nothing else changes — projects, variables, and roles are untouched.`,
 - Unassigned members: project-scoped API endpoints now answer "not found", consistent with the dashboard
 - CLI, VS Code extension, public API, MCP, and the GitHub Action: unaffected — machine flows keep their own authorization pipeline`,
   },
+
+  // ============================================================
+  // CLI v1.19.0 — Terminal-First Workflow (2026-07-20)
+  // ============================================================
+  {
+    title: "envpilot run Picks Up Variable Changes Instantly",
+    version: "v1.19.0",
+    type: "fix",
+    publishedAt: ts("2026-07-20T09:00:00Z"),
+    content: `\`envpilot run\` used to cache decrypted secrets for an hour and make no server contact within that window — so a variable you changed in the dashboard could stay invisible to \`run\` for up to an hour.
+
+### What Changed
+- Every run now does one cheap freshness check (metadata only, no secret decryption) and re-decrypts only when a variable actually changed — dashboard edits show up on the very next run
+- run now tells you when accessible variables live only in another environment: "Injected 8 of 12 — 4 not in development: FOO, BAR" instead of silently dropping them
+- The \`-e\` flag is validated against development / staging / production
+- Decryption failures and role-scope restrictions are surfaced on every run, including cache-served ones
+
+### Compatibility
+- Pass \`--cache-ttl <seconds>\` to restore the old skip-the-check behavior for a fixed window
+- Offline fallback is unchanged — a cached run still works without network, and says so`,
+  },
+  {
+    title: "Manage Variables and Approve Requests Without Leaving the Terminal",
+    version: "v1.19.0",
+    type: "feature",
+    publishedAt: ts("2026-07-20T09:30:00Z"),
+    content: `The CLI grew the commands a terminal-first workflow was missing — no more bouncing to the dashboard for everyday changes.
+
+### Single-Secret Edits, the Safe Way
+- \`envpilot secrets set\` — a guided two-step flow: the key is validated first, then the value is typed into a MASKED prompt, so secrets never land in your shell history or on screen (\`KEY=VALUE\` inline still works for CI)
+- Role-aware: if your role can't write directly, the same flow files a variable request for review instead of rejecting you
+- \`envpilot secrets rm KEY\` moves a single secret to trash (recoverable from the dashboard)
+- Named \`secrets\` to match what your fingers already know from other tools; \`var\` works as an alias
+- Plan limits and permissions are enforced server-side and reported in plain language
+
+### Review Requests in the Terminal
+- \`envpilot requests approve|reject|cancel <id>\` — close the request-approval loop without opening the web app
+- Approving a machine (valueless) request prompts for the secret MASKED and encrypts it server-side; \`--value\` exists for CI
+- The request list now shows an ID column to act on
+
+### Compare Environments
+- \`envpilot diff staging production\` shows which keys differ between two environments; add \`--values\` to compare values too
+
+### Scripting
+- \`--json\` output on \`requests\` and \`diff\` for piping into other tools`,
+  },
 ];

@@ -17,6 +17,8 @@ import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
 import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
+import { secretsCommand } from "../commands/secrets.js";
+import { diffCommand } from "../commands/diff.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -221,20 +223,78 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
   },
   {
     id: "requests",
-    title: "List variable requests",
+    title: "List and review variable requests",
     category: "Browse",
-    description: "List pending and past variable requests for a project.",
+    description:
+      "List variable requests, or approve/reject/cancel them without leaving the terminal.",
     argv: ["requests"],
-    args: "[--project <name-or-id>] [--status <status>]",
-    examples: [["requests"], ["requests", "--status", "pending"]],
-    websiteSurface: "Maps to `/api/cli/variable-requests` (GET).",
-    notes: [
-      "Reviewers (owner, assigned project manager/team lead) see every request for the project.",
-      "Developers see only their own requests.",
+    args: "[list] [--project <p>] [--status <s>] [--json] | approve <id> [--value <v>|--value-stdin] [--reason <t>] | reject <id> [--reason <t>] | cancel <id>",
+    examples: [
+      ["requests"],
+      ["requests", "--status", "pending"],
+      ["requests", "approve", "<id>"],
+      ["requests", "approve", "<id>", "--value", "sk_live_…"],
+      ["requests", "reject", "<id>", "--reason", "use the shared key"],
+      ["requests", "cancel", "<id>"],
     ],
-    keywords: ["requests", "approval", "review", "pending"],
+    websiteSurface: "Convex features/variables/requests (review/cancel).",
+    notes: [
+      "Reviewers (owner, assigned project manager/team lead) see every request; developers see only their own.",
+      "--status/--json apply to listing only; --value/--value-stdin/--reason apply to review subcommands only.",
+      "Approving a machine (valueless) request prompts MASKED for the value; --value-stdin reads it from stdin for CI (keeps it out of argv), --value is a last resort that lands in shell history.",
+      "Get the <id> from the ID column of `envpilot requests`.",
+    ],
+    keywords: ["requests", "approval", "review", "approve", "reject", "cancel"],
     topLevel: true,
     createCommand: () => requestsCommand,
+  },
+  {
+    id: "secrets",
+    title: "Set or delete a single secret",
+    category: "Sync",
+    description:
+      "Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history).",
+    argv: ["secrets"],
+    aliases: [["var"]],
+    args: "set [<key>|<key=value>] [-e <env>] [-p <project>] [-d <text>] [--sensitive] [--all-envs] | rm <key> [-e <env>] [-p <project>] [--yes]",
+    examples: [
+      ["secrets", "set"],
+      ["secrets", "set", "STRIPE_SECRET_KEY", "--env", "production"],
+      ["secrets", "set", "API_URL=https://api.example.com"],
+      ["secrets", "rm", "OLD_FLAG", "--env", "staging", "--yes"],
+    ],
+    websiteSurface: "Convex features/variables (bulk upsert / remove).",
+    notes: [
+      "Interactive by default: the key is validated first, then the value is prompted masked so it never lands in shell history — KEY=VALUE inline is for CI and prints a history warning.",
+      "Role-aware: direct-write roles set immediately; request-only roles are offered the request workflow instead (a reviewer approves with `requests approve`).",
+      "Plan limits are enforced server-side and reported readably; check `envpilot usage` for your tier.",
+      "set upserts one key in one environment (merge); updating a value shared across environments requires confirmation (--all-envs non-interactively).",
+      "rm on a single-environment secret moves it to trash (recoverable from the dashboard); on a shared secret it only removes THIS environment — the value stays live in the others.",
+      "`envpilot var …` still works as an alias.",
+    ],
+    keywords: ["secrets", "var", "set", "delete", "remove", "variable", "edit"],
+    topLevel: true,
+    createCommand: () => secretsCommand,
+  },
+  {
+    id: "diff",
+    title: "Compare two environments",
+    category: "Browse",
+    description:
+      "Show which variable keys differ between two environments (add --values to compare values).",
+    argv: ["diff"],
+    args: "<envA> <envB> [--values] [--project <name-or-id>] [--json]",
+    examples: [
+      ["diff", "staging", "production"],
+      ["diff", "development", "staging", "--values"],
+    ],
+    websiteSurface: "Convex features/variables (client-side compare).",
+    notes: [
+      "Default is a metadata-only key comparison; --values decrypts both environments.",
+    ],
+    keywords: ["diff", "compare", "environments", "drift"],
+    topLevel: true,
+    createCommand: () => diffCommand,
   },
   {
     id: "run",

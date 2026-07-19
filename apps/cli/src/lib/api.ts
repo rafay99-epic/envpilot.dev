@@ -226,6 +226,17 @@ type PullMeta = {
   capabilities?: Record<string, boolean>;
 };
 type PullValuesResult = { variables: PulledVariableRow[]; meta: PullMeta };
+
+/** Result of the metadata-only fingerprint check used by `run`. */
+export interface FingerprintCheck {
+  fingerprint: string;
+  /** Accessible variables in the project across ALL environments. */
+  totalAccessible: number;
+  /** Accessible variables matching the requested environment. */
+  matchingCount: number;
+  /** Accessible variables that exist only in other environments. */
+  otherEnvKeys: Array<{ key: string; environments: string[] }>;
+}
 type PushBulkResult = {
   created: number;
   updated: number;
@@ -326,6 +337,47 @@ const refs = {
     },
     VariableRequest
   >("features/variables/requests/actions:createWithValue"),
+  reviewRequest: fnRef<
+    "mutation",
+    {
+      requestId: string;
+      action: "approve" | "reject";
+      reviewReason?: string;
+    },
+    unknown
+  >("features/variables/requests/mutations:review"),
+  approveRequestWithValue: fnRef<
+    "action",
+    { requestId: string; value: string; reviewReason?: string },
+    unknown
+  >("features/variables/requests/actions:approveWithValue"),
+  cancelRequest: fnRef<"mutation", { requestId: string }, unknown>(
+    "features/variables/requests/mutations:cancel"
+  ),
+  removeVariable: fnRef<"mutation", { variableId: string }, unknown>(
+    "features/variables/mutations:remove"
+  ),
+  removeVariableFromEnvironment: fnRef<
+    "mutation",
+    { variableId: string; environment: string },
+    unknown
+  >("features/variables/mutations:removeFromEnvironment"),
+  resolveProjectRoles: fnRef<
+    "query",
+    { projectId: string },
+    {
+      role: string;
+      assigned: boolean;
+      grantOnly: boolean;
+      environmentScope: string[] | null;
+      capabilities: Record<string, boolean>;
+    }
+  >("features/auth/queries:resolveLegacyRoles"),
+  getVariableRequest: fnRef<
+    "query",
+    { requestId: string },
+    { vaultRef?: string; status: string; key: string } | null
+  >("features/variables/requests/queries:getById"),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(
@@ -536,19 +588,26 @@ export class APIClient {
    * Byte-compatible with the fingerprint writeCache stores from a full fetch:
    * both hash `${_id}:${version}:${updatedAt}` over the accessible variables in
    * the requested environment.
+   *
+   * Also reports how the environment filter carved up the accessible set, so
+   * `run` can say "injected 8 of 12 — 4 exist only in staging" instead of
+   * silently dropping variables that live in other environments.
    */
   async checkFingerprint(
     projectId: string,
     environment?: string,
     _organizationId?: string
-  ): Promise<string> {
+  ): Promise<FingerprintCheck> {
     const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
-    const filtered = rows.filter(
-      (row) =>
-        row.hasAccess &&
-        (!environment || row.environments.includes(environment))
+    const accessible = rows.filter((row) => row.hasAccess);
+    const matching = accessible.filter(
+      (row) => !environment || row.environments.includes(environment)
     );
-    const asVariables = filtered.map(
+    const otherEnvKeys = accessible
+      .filter((row) => environment && !row.environments.includes(environment))
+      .map((row) => ({ key: row.key, environments: row.environments }));
+
+    const asVariables = matching.map(
       (row) =>
         ({
           _id: row._id,
@@ -556,7 +615,12 @@ export class APIClient {
           updatedAt: row.updatedAt,
         }) as Variable
     );
-    return computeFingerprint(asVariables);
+    return {
+      fingerprint: computeFingerprint(asVariables),
+      totalAccessible: accessible.length,
+      matchingCount: matching.length,
+      otherEnvKeys,
+    };
   }
 
   /** List variable requests for a project (Convex). */
@@ -742,6 +806,176 @@ export class APIClient {
       throw new APIError("No variable request returned by server", 500);
     }
     return created;
+  }
+
+  /** Approve or reject a request that already carries a value (developer flow). */
+  async reviewRequest(
+    requestId: string,
+    action: "approve" | "reject",
+    reviewReason?: string
+  ): Promise<void> {
+    await convexMutation(refs.reviewRequest, {
+      requestId,
+      action,
+      reviewReason,
+    });
+  }
+
+  /**
+   * Approve a VALUELESS (machine) request by supplying the secret value —
+   * the server encrypts it into the vault at approval time.
+   */
+  async approveRequestWithValue(
+    requestId: string,
+    value: string,
+    reviewReason?: string
+  ): Promise<void> {
+    await convexAction(refs.approveRequestWithValue, {
+      requestId,
+      value,
+      reviewReason,
+    });
+  }
+
+  /** Cancel a pending request (requester or a reviewer). */
+  async cancelRequest(requestId: string): Promise<void> {
+    await convexMutation(refs.cancelRequest, { requestId });
+  }
+
+  /**
+   * Role + capability snapshot for the caller in one project. Used by the
+   * CLI ONLY to route flows (direct write vs request) and phrase denials —
+   * the Convex mutations remain the enforcement boundary.
+   */
+  async resolveProjectRoles(projectId: string): Promise<{
+    role: string;
+    assigned: boolean;
+    grantOnly: boolean;
+    environmentScope: string[] | null;
+    capabilities: Record<string, boolean>;
+  }> {
+    return convexQuery(refs.resolveProjectRoles, { projectId });
+  }
+
+  /**
+   * One request by id — enough to know whether it is pending and whether it
+   * carries a value (machine requests don't; approval must supply one).
+   */
+  async getVariableRequest(
+    requestId: string
+  ): Promise<{ vaultRef?: string; status: string; key: string } | null> {
+    return convexQuery(refs.getVariableRequest, { requestId });
+  }
+
+  /** Soft-delete a single variable by id (moves it to trash). */
+  async removeVariable(variableId: string): Promise<void> {
+    await convexMutation(refs.removeVariable, { variableId });
+  }
+
+  /**
+   * Set a single variable's value in one environment — upsert via the bulk
+   * vault path with merge semantics (creates if absent, updates if present;
+   * leaves every other variable untouched).
+   *
+   * Throws when the server accepted the call but wrote nothing (the single
+   * entry was skipped/denied by variable-level authorization) — a silent
+   * "success" here would lie to the user.
+   */
+  async setVariable(
+    projectId: string,
+    environment: string,
+    key: string,
+    value: string,
+    opts?: { description?: string; isSensitive?: boolean }
+  ): Promise<{ created: number; updated: number; unchanged: boolean }> {
+    const result = await convexAction(refs.pushBulk, {
+      projectId,
+      environment,
+      variables: [
+        {
+          key,
+          value,
+          description: opts?.description,
+          isSensitive: opts?.isSensitive,
+        },
+      ],
+      mode: "merge",
+    });
+    if (result.deniedKeys?.includes(key)) {
+      throw new APIError(
+        `You do not have write access to ${key}.`,
+        403,
+        "PERMISSION_DENIED"
+      );
+    }
+    // created 0 + updated 0 without a denial means the requested state was
+    // already satisfied (unchanged value) — idempotent success, not an error.
+    return {
+      created: result.created,
+      updated: result.updated,
+      unchanged: result.created === 0 && result.updated === 0,
+    };
+  }
+
+  /**
+   * Metadata for the active variable holding `key` in `environment` (id +
+   * the FULL environments list, so single-env commands can detect that the
+   * variable is shared across environments). Returns null if absent.
+   */
+  async findVariable(
+    projectId: string,
+    environment: string,
+    key: string
+  ): Promise<{ _id: string; environments: string[] } | null> {
+    // High limit: the default 500-row window would silently miss keys in
+    // large projects and report them as "not found".
+    const rows = await convexQuery(refs.listVariablesWithAccess, {
+      projectId,
+      limit: 5000,
+    });
+    const match = rows.find(
+      (row) =>
+        row.key === key &&
+        row.hasAccess &&
+        row.environments.includes(environment)
+    );
+    return match ? { _id: match._id, environments: match.environments } : null;
+  }
+
+  /**
+   * Metadata-only variable listing for an environment (no vault reads, no
+   * value-access audit entries). Used by `diff` without --values.
+   */
+  async listVariableKeys(
+    projectId: string,
+    environment: string
+  ): Promise<{ keys: string[]; truncated: boolean }> {
+    const limit = 5000;
+    const rows = await convexQuery(refs.listVariablesWithAccess, {
+      projectId,
+      limit,
+    });
+    return {
+      keys: rows
+        .filter((row) => row.environments.includes(environment))
+        .map((row) => row.key),
+      truncated: rows.length >= limit,
+    };
+  }
+
+  /**
+   * Re-scope a shared variable: atomically detach `environment` from it
+   * server-side (the mutation re-reads the row, so a concurrent edit can't
+   * be clobbered by a stale client-side array).
+   */
+  async removeVariableFromEnvironment(
+    variableId: string,
+    environment: string
+  ): Promise<void> {
+    await convexMutation(refs.removeVariableFromEnvironment, {
+      variableId,
+      environment,
+    });
   }
 }
 

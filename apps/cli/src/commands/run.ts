@@ -25,10 +25,15 @@ import {
   deleteCache,
   formatAge,
 } from "../lib/variables-cache.js";
+import { validateEnvironment } from "../lib/validators.js";
+import type { FingerprintCheck } from "../lib/api.js";
 
-// 1 hour: vault decryptions only happen on first run or when vars actually change.
-// Stale checks use the cheap fingerprint endpoint (no vault calls).
-const DEFAULT_TTL = 3600;
+// 0 = fingerprint-check every run (one cheap metadata query, ~50-100ms, no
+// vault calls) so a variable changed in the dashboard is picked up on the
+// very next run. Vault decryption still only happens when vars actually
+// changed. Pass --cache-ttl <s> to skip even the fingerprint check for s
+// seconds (the old behavior; anything cached is then blind to changes).
+const DEFAULT_TTL = 0;
 
 interface RunOptions {
   env?: string;
@@ -84,8 +89,9 @@ export const runCommand = new Command("run")
   .option("--no-cache", "Skip cache and always fetch fresh secrets from server")
   .option(
     "--cache-ttl <seconds>",
-    "How long cached secrets stay fresh before a fingerprint check " +
-      "(default: 3600s / 1h; 0 = always fingerprint-check)",
+    "How long cached secrets are served without even a fingerprint check " +
+      "(default: 0 = verify freshness on every run; the check is one cheap " +
+      "metadata query, secrets are only re-decrypted when they changed)",
     String(DEFAULT_TTL)
   )
   .passThroughOptions()
@@ -124,7 +130,13 @@ export const runCommand = new Command("run")
         throw notInitialized();
       }
 
-      const environment = options.env || project.environment;
+      const environment =
+        options.env !== undefined ? options.env : project.environment;
+      if (options.env !== undefined && !validateEnvironment(options.env)) {
+        throw invalidInput(
+          `Unknown environment "${options.env}". Valid environments: development, staging, production.`
+        );
+      }
       const organizationId = options.organization || project.organizationId;
       // Parse the TTL honestly: 0 is a valid value meaning "always
       // fingerprint-check", so we must NOT fall back to the default on 0.
@@ -140,16 +152,40 @@ export const runCommand = new Command("run")
       let variables: Variable[];
       let cacheHit = false;
       let cacheAge = "";
+      // Warnings to emit once, whether the run is served from cache or a
+      // fresh fetch: keys that live only in OTHER environments, keys that
+      // failed to decrypt, and whether the caller's role scoped the set.
+      let otherEnvKeys: FingerprintCheck["otherEnvKeys"] = [];
+      let decryptionFailures: string[] = [];
+      let scopeRestricted = false;
 
       if (options.cache === false) {
         // --no-cache: bypass cache, always hit the API
-        variables = await doFetch(
+        const fetched = await doFetch(
           project,
           environment,
           organizationId,
           options.quiet
         );
-        writeCache(project.projectId, environment, organizationId, variables);
+        variables = fetched.variables;
+        decryptionFailures = fetched.decryptionFailures;
+        scopeRestricted = fetched.scopeRestricted;
+        otherEnvKeys = await fetchOtherEnvKeys(
+          project.projectId,
+          environment,
+          organizationId
+        );
+        writeCache(
+          project.projectId,
+          environment,
+          organizationId,
+          variables,
+          undefined,
+          {
+            decryptionFailures,
+            scopeRestricted,
+          }
+        );
       } else {
         const probe = probeCache(
           project.projectId,
@@ -159,23 +195,26 @@ export const runCommand = new Command("run")
         );
 
         if (probe.hit && probe.fresh) {
-          // ── FRESH: zero API calls ──────────────────────────────────────
+          // ── FRESH: zero API calls (only when --cache-ttl > 0) ──────────
           variables = probe.entry.variables;
           cacheHit = true;
           cacheAge = formatAge(probe.entry.fetchedAt);
-        } else if (probe.hit && !probe.fresh) {
-          // ── STALE: fingerprint check (no vault decryption) ─────────────
-          // Ask the server if anything changed using only Convex metadata.
-          // Only do the expensive vault fetch when vars actually changed.
+          decryptionFailures = probe.entry.decryptionFailures ?? [];
+          scopeRestricted = probe.entry.scopeRestricted ?? false;
+        } else {
+          // ── MISS or STALE: one metadata fingerprint check ──────────────
+          // The check is cheap (no vault decryption) and also tells us which
+          // accessible keys live only in other environments, so we can warn.
           try {
             const api = createAPIClient();
-            const serverFingerprint = await api.checkFingerprint(
+            const check = await api.checkFingerprint(
               project.projectId,
               environment,
               organizationId
             );
+            otherEnvKeys = check.otherEnvKeys;
 
-            if (serverFingerprint === probe.entry.fingerprint) {
+            if (probe.hit && check.fingerprint === probe.entry.fingerprint) {
               // Nothing changed — reset TTL, serve from cache for free.
               extendCacheFreshness(
                 project.projectId,
@@ -185,23 +224,34 @@ export const runCommand = new Command("run")
               variables = probe.entry.variables;
               cacheHit = true;
               cacheAge = formatAge(probe.entry.fetchedAt);
+              decryptionFailures = probe.entry.decryptionFailures ?? [];
+              scopeRestricted = probe.entry.scopeRestricted ?? false;
             } else {
-              // Variables changed — full fetch required. Store the server's
-              // fingerprint verbatim so the next stale check is guaranteed to
-              // match (no divergent client-side recomputation).
-              variables = await doFetch(
+              // First run, cache cleared, or vars changed — full fetch. Store
+              // the server's fingerprint verbatim so the next check matches.
+              const fetched = await doFetch(
                 project,
                 environment,
                 organizationId,
                 options.quiet,
-                "Secrets updated, refreshing"
+                probe.hit ? "Secrets updated, refreshing" : "Loading"
               );
+              variables = fetched.variables;
+              decryptionFailures = fetched.decryptionFailures;
+              scopeRestricted = fetched.scopeRestricted;
+              // When a key failed to decrypt it is MISSING from `variables`.
+              // Storing the server fingerprint would make the next fingerprint
+              // check "match" and pin the incomplete set until metadata
+              // changes. Omitting it stores a client-computed fingerprint that
+              // cannot match the server's, so every run retries the fetch
+              // until the vault heals.
               writeCache(
                 project.projectId,
                 environment,
                 organizationId,
                 variables,
-                serverFingerprint
+                decryptionFailures.length > 0 ? undefined : check.fingerprint,
+                { decryptionFailures, scopeRestricted }
               );
             }
           } catch (err) {
@@ -210,12 +260,14 @@ export const runCommand = new Command("run")
             // lost) must fail CLOSED: purge the cached secrets and surface the
             // error — otherwise a suspended/removed user keeps being served
             // decrypted secrets from disk for up to the hard max-age.
-            if (isConnectivityError(err)) {
+            if (probe.hit && isConnectivityError(err)) {
               // Offline — fall back to stale cache, but say so out loud.
               // readCache already refuses entries past the hard max-age.
               variables = probe.entry.variables;
               cacheHit = true;
               cacheAge = formatAge(probe.entry.fetchedAt);
+              decryptionFailures = probe.entry.decryptionFailures ?? [];
+              scopeRestricted = probe.entry.scopeRestricted ?? false;
               if (!options.quiet) {
                 warning(
                   `Using offline cache (age ${cacheAge}) — could not reach the server to verify freshness.`
@@ -226,15 +278,6 @@ export const runCommand = new Command("run")
               throw err;
             }
           }
-        } else {
-          // ── MISS: first run or cache cleared ──────────────────────────
-          variables = await doFetch(
-            project,
-            environment,
-            organizationId,
-            options.quiet
-          );
-          writeCache(project.projectId, environment, organizationId, variables);
         }
       }
 
@@ -242,6 +285,16 @@ export const runCommand = new Command("run")
         warning(
           `No variables found for ${environment}. Running command without injected secrets.`
         );
+      }
+
+      // Repeat decryption-failure warnings even on cache-served runs — the
+      // affected keys are NOT injected, and a user needs to know every time.
+      if (!options.quiet && decryptionFailures.length > 0) {
+        for (const key of decryptionFailures) {
+          warning(
+            `Could not decrypt ${chalk.bold(key)} — skipped (vault error, check server logs)`
+          );
+        }
       }
 
       // Build the env to inject
@@ -279,9 +332,30 @@ export const runCommand = new Command("run")
       if (!options.quiet) {
         const injectedCount = Object.keys(secrets).length;
         const cacheTag = cacheHit ? chalk.dim(` ⚡ cache (${cacheAge})`) : "";
+        // "of M" only when the fingerprint check told us the total — the
+        // fresh-cache path (--cache-ttl > 0) skips that check, so we can't
+        // honestly claim a denominator there.
+        const total =
+          injectedCount + decryptionFailures.length + otherEnvKeys.length;
+        const ofTotal =
+          otherEnvKeys.length > 0 ? chalk.dim(` of ${total}`) : "";
         info(
-          `Injected ${chalk.bold(injectedCount)} ${injectedCount === 1 ? "variable" : "variables"} from ${chalk.bold(`${project.projectName || project.projectId}/${environment}`)}${cacheTag}`
+          `Injected ${chalk.bold(injectedCount)}${ofTotal} ${injectedCount === 1 ? "variable" : "variables"} from ${chalk.bold(`${project.projectName || project.projectId}/${environment}`)}${cacheTag}`
         );
+        if (otherEnvKeys.length > 0) {
+          const names = otherEnvKeys.slice(0, 5).map((v) => v.key);
+          const more =
+            otherEnvKeys.length > 5 ? `, +${otherEnvKeys.length - 5} more` : "";
+          warning(
+            `${otherEnvKeys.length} variable${otherEnvKeys.length === 1 ? "" : "s"} not in ${chalk.bold(environment)}, not injected: ${names.join(", ")}${more}`
+          );
+          info(`Use -e <environment> to load a different environment.`);
+        }
+        if (scopeRestricted) {
+          warning(
+            `Your role restricts which variables you can see — some may be withheld for ${chalk.bold(environment)}.`
+          );
+        }
         if (overridden.length > 0) {
           warning(
             `Overriding ${overridden.length} shell var${overridden.length === 1 ? "" : "s"}: ${overridden.slice(0, 3).join(", ")}${overridden.length > 3 ? `, +${overridden.length - 3} more` : ""}`
@@ -300,9 +374,17 @@ export const runCommand = new Command("run")
     }
   });
 
+interface FetchResult {
+  variables: Variable[];
+  decryptionFailures: string[];
+  scopeRestricted: boolean;
+}
+
 /**
- * Fetch variables from the API with an optional spinner and decryption-failure warnings.
- * Returns only the successfully decrypted variables; warns the user about any that failed.
+ * Fetch variables from the API (vault decryption path). Returns the
+ * successfully decrypted variables plus the metadata `run` repeats as
+ * warnings (decryption failures, role scope). The caller emits the warnings
+ * once, so they fire identically whether the run is fresh or cache-served.
  */
 async function doFetch(
   project: { projectId: string; projectName: string },
@@ -310,27 +392,44 @@ async function doFetch(
   organizationId: string,
   quiet: boolean | undefined,
   labelPrefix = "Loading"
-): Promise<Variable[]> {
+): Promise<FetchResult> {
   const label = `${labelPrefix} ${chalk.bold(environment)} secrets for ${chalk.bold(project.projectName || project.projectId)}...`;
   const api = createAPIClient();
 
-  const { variables, decryptionFailures } = quiet
+  const { variables, meta, decryptionFailures } = quiet
     ? await api.listVariables(project.projectId, environment, organizationId)
     : await withSpinner(label, () =>
         api.listVariables(project.projectId, environment, organizationId)
       );
 
-  // Warn about any vault decryption failures so the user knows which
-  // variables were NOT injected — these are skipped, not silently broken.
-  if (decryptionFailures.length > 0) {
-    for (const key of decryptionFailures) {
-      warning(
-        `Could not decrypt ${chalk.bold(key)} — skipped (vault error, check server logs)`
-      );
-    }
-  }
+  return {
+    variables,
+    decryptionFailures,
+    scopeRestricted: meta?.scopeRestricted ?? false,
+  };
+}
 
-  return variables;
+/**
+ * Which accessible keys exist ONLY in other environments — used to tell the
+ * user "4 variables not in development" instead of silently dropping them.
+ * Best-effort: on any error we simply report none (the notice is advisory).
+ */
+async function fetchOtherEnvKeys(
+  projectId: string,
+  environment: string,
+  organizationId: string
+): Promise<FingerprintCheck["otherEnvKeys"]> {
+  try {
+    const api = createAPIClient();
+    const check = await api.checkFingerprint(
+      projectId,
+      environment,
+      organizationId
+    );
+    return check.otherEnvKeys;
+  } catch {
+    return [];
+  }
 }
 
 function printInjectionPreview(

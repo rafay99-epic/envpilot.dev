@@ -299,6 +299,7 @@ export function formatRequestsListHeader(input: {
  * `Record<string, string | number | boolean | undefined>[]`.
  */
 export interface VariableRequestRow {
+  id: string;
   key: string;
   environments: string;
   status: VariableRequestStatus;
@@ -310,10 +311,11 @@ export interface VariableRequestRow {
 export function formatRequestRow(
   request: Pick<
     VariableRequest,
-    "key" | "environments" | "status" | "createdAt" | "reviewReason"
+    "_id" | "key" | "environments" | "status" | "createdAt" | "reviewReason"
   >
 ): VariableRequestRow {
   return {
+    id: request._id,
     key: request.key,
     environments: request.environments.join(", "),
     status: request.status,
@@ -326,7 +328,7 @@ export function formatRequestRows(
   requests: Array<
     Pick<
       VariableRequest,
-      "key" | "environments" | "status" | "createdAt" | "reviewReason"
+      "_id" | "key" | "environments" | "status" | "createdAt" | "reviewReason"
     >
   >
 ): VariableRequestRow[] {

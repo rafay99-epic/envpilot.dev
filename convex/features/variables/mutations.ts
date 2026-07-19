@@ -638,6 +638,73 @@ async function removeCore(
   return args.variableId;
 }
 
+/**
+ * Atomically detach ONE environment from a shared variable — the value stays
+ * live in the remaining environments. Reads and patches inside the mutation
+ * (Convex serializable), so a concurrent environments edit can't be
+ * clobbered by a stale client-side array. Refuses to detach the last
+ * environment (use remove — trash — for that).
+ */
+export const removeFromEnvironment = mutation({
+  args: {
+    variableId: v.id("environmentVariables"),
+    environment: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
+    const variable = await ctx.db.get(args.variableId);
+    if (!variable || variable.deletedAt !== undefined) {
+      throw new ConvexError("Variable not found");
+    }
+    const project = await ctx.db.get(variable.projectId);
+    if (!project) {
+      throw new ConvexError("Project not found");
+    }
+
+    await authorizeVariableAccess(ctx, {
+      userId: actor._id,
+      projectId: variable.projectId,
+      action: "project:delete_variable",
+      preloadedProject: project,
+    });
+
+    if (!variable.environments.includes(args.environment)) {
+      throw new ConvexError(
+        `${variable.key} is not in ${args.environment} (current: ${variable.environments.join(", ")})`
+      );
+    }
+    if (variable.environments.length === 1) {
+      throw new ConvexError(
+        `${variable.key} exists only in ${args.environment} — delete it instead`
+      );
+    }
+
+    const now = Date.now();
+    const environments = variable.environments.filter(
+      (env) => env !== args.environment
+    );
+    await ctx.db.patch(args.variableId, { environments, updatedAt: now });
+
+    await createAuditLog(ctx, {
+      organizationId: project.organizationId,
+      projectId: variable.projectId,
+      variableId: args.variableId,
+      userId: actor._id,
+      action: "variable.updated",
+      details: {
+        key: variable.key,
+        removedEnvironment: args.environment,
+        environments,
+      },
+      involvesSensitiveData: variable.isSensitive,
+      resourceType: "variable",
+    });
+
+    return args.variableId;
+  },
+});
+
 const removeArgs = {
   variableId: v.id("environmentVariables"),
 };
