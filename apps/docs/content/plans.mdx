@@ -1,0 +1,104 @@
+---
+title: Plans & Limits
+description: The full Free vs Pro feature matrix — what's gated, what's capped, and how enforcement works.
+icon: gauge
+---
+
+# Plans & Limits
+
+Envpilot has two tiers, Free and Pro. Every gatable feature — resource caps, tool access, security controls — is defined once in a dynamic feature registry and resolved per-organization on every request. This page lists every feature and its value on each tier.
+
+> Limits are enforced server-side and can change independently of this page. Check `envpilot usage` (add `--json` for scripting) or the dashboard **Usage** page for your organization's live numbers against its actual limits.
+
+No pricing is listed here — see the website for current pricing.
+
+## Resources
+
+| Feature                   | What it does                                           | Free | Pro       |
+| ------------------------- | ------------------------------------------------------ | ---- | --------- |
+| Max Projects              | Number of active projects an organization can create   | 3    | Unlimited |
+| Max Variables per Project | Number of active variables allowed in a single project | 50   | Unlimited |
+| Max Organizations         | Number of organizations a user can create              | 1    | Unlimited |
+
+## Team
+
+| Feature                 | What it does                                                  | Free | Pro       |
+| ----------------------- | ------------------------------------------------------------- | ---- | --------- |
+| Max Team Members        | Active members plus pending invitations, counted together     | 3    | Unlimited |
+| Max Pending Invitations | Outstanding invitations an organization can have open at once | 5    | Unlimited |
+
+## Variables
+
+| Feature                  | What it does                                         | Free | Pro |
+| ------------------------ | ---------------------------------------------------- | ---- | --- |
+| Variable Version History | Keep and roll back to prior values of a variable     | No   | Yes |
+| Bulk Import              | Import a `.env` file as many variables in one action | No   | Yes |
+| Bulk Delete              | Delete multiple variables in one action              | Yes  | Yes |
+| Bulk Export              | Export multiple variables in one action              | No   | Yes |
+| Variable Tags            | Tag variables for organization and filtering         | Yes  | Yes |
+
+## Tools
+
+| Feature                      | What it does                                           | Free | Pro |
+| ---------------------------- | ------------------------------------------------------ | ---- | --- |
+| API Access                   | Use the REST API surface at all                        | Yes  | Yes |
+| VS Code Extension            | Use the VS Code extension to sync variables            | Yes  | Yes |
+| CLI Access                   | Use the `envpilot` CLI                                 | Yes  | Yes |
+| VS Code Unsync Customization | Customize which files the extension excludes from sync | No   | Yes |
+
+## Security
+
+| Feature                               | What it does                                                    | Free | Pro       |
+| ------------------------------------- | --------------------------------------------------------------- | ---- | --------- |
+| Granular Permissions                  | Per-variable read/write grants beyond role defaults             | Yes  | Yes       |
+| Audit Log Retention (days)            | How many days of audit log history stay queryable               | 7    | 365       |
+| SSO                                   | Single sign-on                                                  | No   | No        |
+| Secret Rotation & Expiry              | Scheduled rotation reminders and expiry on variables            | No   | Yes       |
+| Max Rotation-Enabled Variables        | Number of variables that can have rotation enabled              | 7    | Unlimited |
+| Secret Sharing Links                  | Create expiring links to share a secret externally              | No   | Yes       |
+| Security Hold (Suspend Member Access) | Freeze a member's org-wide access without removing them         | No   | Yes       |
+| Max Active Shares                     | Number of active secret-sharing links allowed at once           | 0    | Unlimited |
+| Shared Accounts                       | Store credentials for a shared third-party account on a project | Yes  | Yes       |
+| Max Shared Accounts                   | Number of shared accounts an organization can store             | 5    | Unlimited |
+
+> SSO shows `No` on both tiers today — the feature is registered but not yet enabled for any tier.
+
+## Customization
+
+| Feature                   | What it does                                  | Free | Pro |
+| ------------------------- | --------------------------------------------- | ---- | --- |
+| Custom Keyboard Shortcuts | Rebind CLI TUI / dashboard keyboard shortcuts | Yes  | Yes |
+| Custom Branding           | Replace default branding in the dashboard     | No   | Yes |
+
+## Analytics
+
+| Feature                    | What it does                              | Free | Pro |
+| -------------------------- | ----------------------------------------- | ---- | --- |
+| Analytics Retention (days) | How many days of usage analytics are kept | 7    | 30  |
+
+## Support
+
+| Feature          | What it does                        | Free | Pro |
+| ---------------- | ----------------------------------- | ---- | --- |
+| Priority Support | Priority queue for support requests | No   | Yes |
+
+## Integrations
+
+| Feature         | What it does                                               | Free | Pro |
+| --------------- | ---------------------------------------------------------- | ---- | --- |
+| Public REST API | Programmatic access via API keys to `/api/v1/*`            | No   | Yes |
+| MCP Server      | Access via the Model Context Protocol server for AI agents | No   | Yes |
+
+## How enforcement works
+
+Every gatable feature lives in one dynamic feature registry, resolved fresh on every request — never a hardcoded per-tier check scattered through the app.
+
+**Resolution chain.** A boolean feature resolves: organization → owner → the owner's tier → an active billing grace period (if downgrading) → the tier's feature override → the registry default. Numeric features resolve the same way, returning either a number or `null` for unlimited.
+
+**Where it's checked.** Backend mutations and queries check the resolved value at the exact point of the write or read they're gating — e.g. creating a project checks the project limit against the organization's current active project count before inserting. The dashboard mirrors the same check so the UI reflects what the backend will actually allow, and CLI/extension calls route through the same registry over the API.
+
+**Dual gates.** Features with recurring background cost (rotation reminders, scheduled scans) pair a boolean gate with a numeric limit — e.g. secret rotation being available at all, plus how many variables can have it enabled. Both are checked before the feature runs.
+
+**At a limit.** A denied check returns a readable, user-facing error — "Limit reached (3/3). Upgrade your tier for more." — never a silent no-op or a generic server error, and nothing is written before the check passes.
+
+**Pre-alpha bypass.** All enforcement is gated behind a platform-wide admin toggle. When it's off, every boolean check resolves to allowed and every numeric limit resolves to unlimited — RBAC role checks are unaffected either way.

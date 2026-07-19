@@ -9,8 +9,58 @@ export interface DocPage {
   description: string;
   icon: string;
   version?: string;
+  category: string; // sidebar group label, derived from CATEGORIES
   content: string; // raw MDX body (no frontmatter)
 }
+
+/**
+ * Single source of truth for the sidebar's information architecture:
+ * group labels, group order, and page order within each group. A page on
+ * disk that isn't listed here still renders — it lands in "More" at the
+ * bottom — so adding a doc never silently hides it.
+ */
+export const CATEGORIES: { label: string; slugs: string[] }[] = [
+  {
+    label: "Start Here",
+    slugs: ["getting-started", "architecture", "plans"],
+  },
+  {
+    label: "Clients",
+    slugs: ["cli", "extension", "web-dashboard"],
+  },
+  {
+    label: "Platform",
+    slugs: [
+      "rbac",
+      "security",
+      "sharing",
+      "shared-accounts",
+      "variable-lifecycle",
+    ],
+  },
+  {
+    label: "API & Integrations",
+    slugs: [
+      "api-quickstart",
+      "api-reference",
+      "api-security",
+      "mcp-server",
+      "github-action",
+      "rate-limits",
+    ],
+  },
+  {
+    label: "Guides",
+    slugs: [
+      "share-environment-variables-securely",
+      "nextjs-environment-variables",
+    ],
+  },
+];
+
+const CATEGORY_BY_SLUG = new Map(
+  CATEGORIES.flatMap(({ label, slugs }) => slugs.map((slug) => [slug, label]))
+);
 
 // Content lives at the app root → apps/docs/content/
 const CONTENT_DIR = resolve(process.cwd(), "content");
@@ -48,6 +98,7 @@ export const getDocBySlug = cache(function getDocBySlug(
       description: (data.description as string) ?? "",
       icon: (data.icon as string) ?? "file-text",
       version: (data.version as string) ?? undefined,
+      category: CATEGORY_BY_SLUG.get(slug) ?? "More",
       content: interpolate(content, data),
     };
   } catch (error) {
@@ -56,28 +107,9 @@ export const getDocBySlug = cache(function getDocBySlug(
   }
 });
 
-/** Ordered slugs for every doc page on disk. */
+/** Ordered slugs for every doc page on disk — CATEGORIES order, then extras. */
 function getSortedSlugs(): string[] {
-  // Ordered explicitly so the sidebar has a logical flow
-  const order = [
-    "getting-started",
-    "cli",
-    "extension",
-    "web-dashboard",
-    "security",
-    "rbac",
-    // Guides — SEO entry points targeting problem-first searches
-    "share-environment-variables-securely",
-    "nextjs-environment-variables",
-    // Public API, MCP server, and CI/CD integrations
-    "api-quickstart",
-    "api-reference",
-    "architecture",
-    "mcp-server",
-    "github-action",
-    "api-security",
-    "rate-limits",
-  ];
+  const order = CATEGORIES.flatMap((c) => c.slugs);
 
   const files = readdirSync(CONTENT_DIR)
     .filter((f) => f.endsWith(".mdx"))

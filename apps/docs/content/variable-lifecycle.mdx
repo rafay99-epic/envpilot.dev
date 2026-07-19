@@ -1,0 +1,62 @@
+---
+title: Variable Lifecycle
+description: Version history and rollback, soft-delete trash and restore, scheduled rotation and expiry reminders, and the per-environment key uniqueness rule that underlies all of it.
+icon: file-text
+---
+
+# Variable Lifecycle
+
+An environment variable in Envpilot isn't a single row that gets overwritten in place — every change is versioned, deletions are recoverable, and values can be put on a rotation schedule with automated reminders. This page covers what happens to a variable from creation through deletion.
+
+## Per-environment key uniqueness
+
+Before anything else, one rule underlies every write path: **the same key may exist on multiple active variables in a project only if their environment sets are disjoint.** `DATABASE_URL` scoped to `[development]` and `DATABASE_URL` scoped to `[production]` are two independent variables; `DATABASE_URL` scoped to `[development, staging]` conflicts with one already scoped to `[staging]` because they overlap on `staging`. Attempting to create, update, or restore a variable into an overlapping environment fails with an error naming the clashing environment(s).
+
+This keeps every (key, environment) pair resolving to exactly one active variable — which is what makes `envpilot pull`, extension sync, and the public API deterministic. The check runs on every write path: create, update (when environments change), variable-request approval, and restore from trash.
+
+## Version history
+
+Every value or metadata change to a variable inserts a new row into its version history: who changed it, when, which environments and description applied, and (for updates) an optional reason you can type in — up to 200 characters. The very first version is recorded automatically as "Initial creation."
+
+The history view (opened from a variable's detail panel) lets you filter to updates vs. rollbacks and compare versions side by side. It's driven entirely by these version records, so nothing is inferred after the fact.
+
+Version history is a Pro-tier feature (`variable_version_history`) — on Free tier the history list is empty.
+
+## Rollback
+
+Rolling back restores a variable to an earlier version's value, description, and environments, and — like every other write — records a new version (`"Rolled back to version N"`) rather than deleting anything, so the history stays a complete, append-only log. Rollback is restricted to organization **Admins**; Team Leads, Developers, and Members cannot roll back a variable even if they can otherwise edit it.
+
+If the target version's secret value was written before per-change vault objects existed, only its metadata (description, environments) is restored, not the value — the mutation reports whether the value itself was actually restored.
+
+## Trash and restore
+
+Deleting a variable is a soft delete: it's hidden from the active list, every active grant on it is revoked, and any live [share links](/sharing) pointing at it are revoked too — a deleted variable can't leave a working external link behind. It then shows up in the project's **Trash** page for **7 days**, alongside any soft-deleted [shared accounts](/shared-accounts), each labeled with how long ago it was deleted and how many days remain.
+
+Restoring re-runs the per-environment uniqueness check described above — if a new variable with the same key and an overlapping environment was created while the old one sat in the trash, the restore is rejected rather than silently creating a conflict. Restoring does **not** re-grant permissions or shares that were revoked on delete; those have to be re-created explicitly.
+
+Past the 7-day window, a background sweep purges the variable (and its vault object) permanently, and it's no longer restorable. Anyone with delete access to a project can also **Empty trash** to purge everything early, which destroys the underlying vault values immediately.
+
+## Rotation and expiry reminders
+
+A variable can carry a rotation schedule: `rotationFrequencyDays` (1–3650 days), set on creation or update. Enabling it stamps an `expiresAt` timestamp and a `rotationStatus` of `active`. An hourly cron (`processRotationExpiry`) then:
+
+- Transitions a variable to **`expiring_soon`** once it's within 7 days of expiry, and sends a reminder email.
+- Sends a second reminder at the **1-day** mark.
+- Transitions it to **`expired`** once the expiry timestamp passes, with a final email — and won't re-send a reminder for the same variable more than once every 24 hours.
+
+The dashboard's "expiring soon" list only shows variables inside that 7-day window that the caller has access to — env-scoped Developers only see ones inside their scope.
+
+Rotation is Pro-gated (`secret_rotation`) with a companion numeric cap on Free tier (`secret_rotation_limit`):
+
+| Gate                                                     | Free                          | Pro       |
+| -------------------------------------------------------- | ----------------------------- | --------- |
+| `secret_rotation` (feature on/off)                       | Disabled                      | Enabled   |
+| `secret_rotation_limit` (max rotation-enabled variables) | 7 (only reachable if enabled) | Unlimited |
+
+On Free tier the boolean gate is off, so rotation schedules can't be created at all regardless of the numeric cap. See [Plans & Feature Availability](/plans) for the full matrix.
+
+## See also
+
+- [Roles & Permissions](/rbac) — who can restore, rollback, and manage trash.
+- [Secret Sharing Links](/sharing) — how shares interact with deletion.
+- [Shared Accounts](/shared-accounts) — the parallel trash/restore behavior for accounts.

@@ -2,8 +2,8 @@
 title: CLI Tool
 description: Install, authenticate, and manage environment variables from your terminal with the Envpilot CLI.
 icon: terminal
-generatedAt: "2026-04-17T00:00:00.000Z"
-version: "1.6.0"
+generatedAt: "2026-07-20T00:00:00.000Z"
+version: "1.19.0"
 ---
 
 # CLI Tool
@@ -41,6 +41,12 @@ envpilot pull
 
 # Inject secrets at runtime without writing a .env file
 envpilot run -- bun dev
+
+# Set one secret — key first, value typed into a masked prompt
+envpilot secrets set
+
+# Compare two environments
+envpilot diff staging production
 ```
 
 ## Interactive TUI
@@ -224,19 +230,21 @@ envpilot run --env staging --print
 | `--print`                    | off            | Preview what would be injected and exit — no command runs                       |
 | `--shell`                    | off            | Run via the user's shell (enables pipes, `&&`, `$VAR` expansion)                |
 | `--no-cache`                 | off            | Skip the cache and always fetch fresh secrets                                   |
-| `--cache-ttl <seconds>`      | `3600`         | How long cached secrets stay fresh before a fingerprint check                   |
+| `--cache-ttl <seconds>`      | `0`            | Serve cached secrets without even a fingerprint check for this many seconds     |
 | `-q, --quiet`                | off            | Suppress informational output                                                   |
 
 **How the cache works**
 
-`envpilot run` uses a fingerprint-gated local cache to avoid hitting the vault on every invocation:
+`envpilot run` verifies freshness on **every run** with one cheap metadata fingerprint check (~50-100 ms, no vault decryption) — a variable changed in the dashboard shows up on your very next run. The expensive vault decryption only happens when something actually changed:
 
-| Cache state               | What happens                               | Vault calls |
-| ------------------------- | ------------------------------------------ | ----------- |
-| Fresh (< 1 h)             | Serve from disk                            | **0**       |
-| Stale, vars unchanged     | Cheap metadata check → extend TTL          | **0**       |
-| Stale, vars changed       | Metadata check detects change → full fetch | 1×          |
-| First run / cache cleared | Full fetch, write cache                    | 1×          |
+| State                     | What happens                             | Vault calls |
+| ------------------------- | ---------------------------------------- | ----------- |
+| Vars unchanged            | Fingerprint check matches → serve cache  | **0**       |
+| Vars changed              | Fingerprint check detects change → fetch | 1×          |
+| First run / cache cleared | Full fetch, write cache                  | 1×          |
+| Offline                   | Serve cache with a loud offline notice   | **0**       |
+
+Pass `--cache-ttl <seconds>` to skip even the fingerprint check for a window (fastest, but blind to changes for that long). `run` also tells you when accessible variables exist only in **other** environments — `Injected 8 of 12 — 4 not in development: FOO, BAR` — instead of silently dropping them.
 
 Cache files are stored at `~/.config/envpilot/run-cache/` with `0600` permissions (owner read/write only). A different account, server URL, or token automatically invalidates the cache.
 
@@ -274,7 +282,97 @@ envpilot run --env production --quiet --no-cache -- ./scripts/deploy.sh
 
 ---
 
+### Secrets
+
+#### `envpilot secrets set [KEY | KEY=VALUE]`
+
+Set (create or update) **one** secret — no pull → edit → push round-trip. Two-step by default: the key is validated first, then the value is typed into a **masked prompt**, so it never lands in your shell history or `ps` output. Alias: `envpilot var`.
+
+```bash
+envpilot secrets set                          # guided: key → masked value → sensitive?
+envpilot secrets set STRIPE_KEY -e production # key given, value prompted masked
+envpilot secrets set API_URL=https://api.example.com  # CI only — lands in shell history
+```
+
+**Options:** `-e, --env <environment>` · `-p, --project <name-or-id>` · `-d, --description <text>` · `--sensitive` · `--all-envs`
+
+> Role-aware: if your role can't write variables directly, the same flow files a **variable request** for review instead of rejecting you.
+
+> A value shared across multiple environments lives on one variable — updating it changes all of them, so the CLI asks for confirmation first (`--all-envs` non-interactively).
+
+> Setting a key to its current value is an idempotent no-op, reported as "already has this value".
+
+---
+
+#### `envpilot secrets rm <KEY>`
+
+Delete one secret from one environment.
+
+```bash
+envpilot secrets rm OLD_FLAG
+envpilot secrets rm OLD_FLAG -e staging --yes
+```
+
+> A secret that exists **only** in the selected environment moves to trash (recoverable from the dashboard).
+
+> A secret **shared** across environments is re-scoped instead: the selected environment is detached, and the value stays live in the others.
+
+---
+
+### Variable Requests
+
+Developers (and any custom role with the request capability) submit requests; reviewers approve them — now entirely from the terminal.
+
+#### `envpilot request`
+
+Interactive wizard to submit a new-variable request (key → masked value → description → environments).
+
+---
+
+#### `envpilot requests [list] [--status <s>] [--json]`
+
+List requests for the linked project, with an ID column for review actions.
+
+```bash
+envpilot requests
+envpilot requests --status pending --json
+```
+
+---
+
+#### `envpilot requests approve <id>` / `reject <id>` / `cancel <id>`
+
+Close the review loop without opening the dashboard.
+
+```bash
+envpilot requests approve k5738xq2…
+envpilot requests reject k5738xq2… --reason "use the shared key"
+envpilot requests cancel k5738xq2…
+
+# Machine (valueless) requests: you supply the secret at approval —
+# interactively via a masked prompt, or from stdin in CI:
+printf %s "$SECRET" | envpilot requests approve k5738xq2… --value-stdin
+```
+
+> Approving a valueless machine request prompts **masked** for the value and encrypts it server-side. `--value` exists for CI without stdin and is rejected in interactive sessions (it would land in shell history).
+
+---
+
 ### Browse
+
+#### `envpilot diff <envA> <envB> [--values] [--json]`
+
+Compare variables between two environments — the drift check before a deploy.
+
+```bash
+envpilot diff staging production           # keys only: no decryption, no audit noise
+envpilot diff staging production --values  # also compare decrypted values
+envpilot diff staging production --json    # single parseable JSON document
+```
+
+> Default is metadata-only. With `--values`, keys that fail decryption are reported as an explicit "comparison unknown" bucket — never a false "only in" result.
+
+---
 
 #### `envpilot list [resource]`
 
