@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import {
@@ -255,6 +256,15 @@ export async function findEnvironmentConflicts(
     excludeVariableId?: Id<"environmentVariables">;
   }
 ): Promise<string[]> {
+  // Defense-in-depth at the shared write-path choke point: an empty
+  // environments array would make the variable invisible to every
+  // environment-filtered read (CLI run/pull, extension sync, public API)
+  // while still appearing in the dashboard. Web/MCP zod already rejects
+  // this; Convex validators alone would not.
+  if (args.environments.length === 0) {
+    throw new ConvexError("At least one environment is required");
+  }
+
   const sameKey = await ctx.db
     .query("environmentVariables")
     .withIndex("by_project_and_key", (q) =>

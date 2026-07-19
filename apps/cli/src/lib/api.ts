@@ -226,6 +226,17 @@ type PullMeta = {
   capabilities?: Record<string, boolean>;
 };
 type PullValuesResult = { variables: PulledVariableRow[]; meta: PullMeta };
+
+/** Result of the metadata-only fingerprint check used by `run`. */
+export interface FingerprintCheck {
+  fingerprint: string;
+  /** Accessible variables in the project across ALL environments. */
+  totalAccessible: number;
+  /** Accessible variables matching the requested environment. */
+  matchingCount: number;
+  /** Accessible variables that exist only in other environments. */
+  otherEnvKeys: Array<{ key: string; environments: string[] }>;
+}
 type PushBulkResult = {
   created: number;
   updated: number;
@@ -536,19 +547,26 @@ export class APIClient {
    * Byte-compatible with the fingerprint writeCache stores from a full fetch:
    * both hash `${_id}:${version}:${updatedAt}` over the accessible variables in
    * the requested environment.
+   *
+   * Also reports how the environment filter carved up the accessible set, so
+   * `run` can say "injected 8 of 12 — 4 exist only in staging" instead of
+   * silently dropping variables that live in other environments.
    */
   async checkFingerprint(
     projectId: string,
     environment?: string,
     _organizationId?: string
-  ): Promise<string> {
+  ): Promise<FingerprintCheck> {
     const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
-    const filtered = rows.filter(
-      (row) =>
-        row.hasAccess &&
-        (!environment || row.environments.includes(environment))
+    const accessible = rows.filter((row) => row.hasAccess);
+    const matching = accessible.filter(
+      (row) => !environment || row.environments.includes(environment)
     );
-    const asVariables = filtered.map(
+    const otherEnvKeys = accessible
+      .filter((row) => environment && !row.environments.includes(environment))
+      .map((row) => ({ key: row.key, environments: row.environments }));
+
+    const asVariables = matching.map(
       (row) =>
         ({
           _id: row._id,
@@ -556,7 +574,12 @@ export class APIClient {
           updatedAt: row.updatedAt,
         }) as Variable
     );
-    return computeFingerprint(asVariables);
+    return {
+      fingerprint: computeFingerprint(asVariables),
+      totalAccessible: accessible.length,
+      matchingCount: matching.length,
+      otherEnvKeys,
+    };
   }
 
   /** List variable requests for a project (Convex). */

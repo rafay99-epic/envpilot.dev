@@ -56,6 +56,17 @@ export interface CacheEntry {
    * Optional for backwards compat with old cache files.
    */
   fingerprint?: string;
+  /**
+   * Keys that failed vault decryption at fetch time (and were therefore NOT
+   * cached). Stored so cache-served runs can repeat the warning instead of
+   * silently omitting the keys. Optional for backwards compat.
+   */
+  decryptionFailures?: string[];
+  /**
+   * True when the server filtered the variable set to the caller's
+   * environment scope. Stored so cache-served runs can repeat the notice.
+   */
+  scopeRestricted?: boolean;
 }
 
 /**
@@ -192,7 +203,9 @@ export function writeCache(
    * match. When omitted, we compute it locally with the server-identical
    * formula.
    */
-  serverFingerprint?: string
+  serverFingerprint?: string,
+  /** Fetch-time warnings to repeat on cache-served runs. */
+  meta?: { decryptionFailures?: string[]; scopeRestricted?: boolean }
 ): void {
   try {
     const cacheDir = getCacheDir();
@@ -209,6 +222,10 @@ export function writeCache(
       organizationId,
       apiUrl: getApiUrl(),
       fingerprint: serverFingerprint ?? computeFingerprint(variables),
+      ...(meta?.decryptionFailures?.length
+        ? { decryptionFailures: meta.decryptionFailures }
+        : {}),
+      ...(meta?.scopeRestricted ? { scopeRestricted: true } : {}),
     };
     writeFileSync(path, JSON.stringify(entry, null, 2), {
       encoding: "utf-8",
