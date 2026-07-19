@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAssignment } from "../src/commands/var.js";
+import { parseAssignment } from "../src/commands/secrets.js";
 
 describe("parseAssignment", () => {
   it("splits on the first = only (values may contain =)", () => {

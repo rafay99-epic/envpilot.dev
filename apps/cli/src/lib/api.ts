@@ -357,6 +357,22 @@ const refs = {
   removeVariable: fnRef<"mutation", { variableId: string }, unknown>(
     "features/variables/mutations:remove"
   ),
+  resolveProjectRoles: fnRef<
+    "query",
+    { projectId: string },
+    {
+      role: string;
+      assigned: boolean;
+      grantOnly: boolean;
+      environmentScope: string[] | null;
+      capabilities: Record<string, boolean>;
+    }
+  >("features/auth/queries:resolveLegacyRoles"),
+  getVariableRequest: fnRef<
+    "query",
+    { requestId: string },
+    { vaultRef?: string; status: string; key: string } | null
+  >("features/variables/requests/queries:getById"),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(
@@ -819,6 +835,31 @@ export class APIClient {
   /** Cancel a pending request (requester or a reviewer). */
   async cancelRequest(requestId: string): Promise<void> {
     await convexMutation(refs.cancelRequest, { requestId });
+  }
+
+  /**
+   * Role + capability snapshot for the caller in one project. Used by the
+   * CLI ONLY to route flows (direct write vs request) and phrase denials —
+   * the Convex mutations remain the enforcement boundary.
+   */
+  async resolveProjectRoles(projectId: string): Promise<{
+    role: string;
+    assigned: boolean;
+    grantOnly: boolean;
+    environmentScope: string[] | null;
+    capabilities: Record<string, boolean>;
+  }> {
+    return convexQuery(refs.resolveProjectRoles, { projectId });
+  }
+
+  /**
+   * One request by id — enough to know whether it is pending and whether it
+   * carries a value (machine requests don't; approval must supply one).
+   */
+  async getVariableRequest(
+    requestId: string
+  ): Promise<{ vaultRef?: string; status: string; key: string } | null> {
+    return convexQuery(refs.getVariableRequest, { requestId });
   }
 
   /** Soft-delete a single variable by id (moves it to trash). */

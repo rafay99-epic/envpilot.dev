@@ -1328,14 +1328,16 @@ Nothing else changes — projects, variables, and roles are untouched.`,
     publishedAt: ts("2026-07-20T09:30:00Z"),
     content: `The CLI grew the commands a terminal-first workflow was missing — no more bouncing to the dashboard for everyday changes.
 
-### Single-Variable Edits
-- \`envpilot var set KEY=VALUE\` creates or updates one variable in one environment (no more pull → edit → push for a one-line change)
-- \`envpilot var rm KEY\` moves a single variable to trash
-- Mark secrets with \`--sensitive\`, target any environment with \`-e\`
+### Single-Secret Edits, the Safe Way
+- \`envpilot secrets set\` — a guided two-step flow: the key is validated first, then the value is typed into a MASKED prompt, so secrets never land in your shell history or on screen (\`KEY=VALUE\` inline still works for CI)
+- Role-aware: if your role can't write directly, the same flow files a variable request for review instead of rejecting you
+- \`envpilot secrets rm KEY\` moves a single secret to trash (recoverable from the dashboard)
+- Named \`secrets\` to match what your fingers already know from other tools; \`var\` works as an alias
+- Plan limits and permissions are enforced server-side and reported in plain language
 
 ### Review Requests in the Terminal
 - \`envpilot requests approve|reject|cancel <id>\` — close the request-approval loop without opening the web app
-- Machine (valueless) requests approve with \`--value\`; the server encrypts it at approval time
+- Approving a machine (valueless) request prompts for the secret MASKED and encrypts it server-side; \`--value\` exists for CI
 - The request list now shows an ID column to act on
 
 ### Compare Environments

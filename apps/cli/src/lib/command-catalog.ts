@@ -17,7 +17,7 @@ import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
 import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
-import { varCommand } from "../commands/var.js";
+import { secretsCommand } from "../commands/secrets.js";
 import { diffCommand } from "../commands/diff.js";
 
 export type CommandCategory =
@@ -248,34 +248,31 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     createCommand: () => requestsCommand,
   },
   {
-    id: "var",
-    title: "Set or delete a single variable",
+    id: "secrets",
+    title: "Set or delete a single secret",
     category: "Sync",
     description:
-      "Change one variable without pull/edit/push: envpilot var set KEY=VALUE, or var rm KEY.",
-    argv: ["var"],
-    args: "set <key=value> | rm <key> [--env <environment>] [--project <name-or-id>]",
+      "Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history).",
+    argv: ["secrets"],
+    aliases: [["var"]],
+    args: "set [<key>|<key=value>] | rm <key> [--env <environment>] [--project <name-or-id>]",
     examples: [
-      ["var", "set", "API_URL=https://api.example.com"],
-      [
-        "var",
-        "set",
-        "DB_PASSWORD=secret",
-        "--env",
-        "production",
-        "--sensitive",
-      ],
-      ["var", "rm", "OLD_FLAG", "--env", "staging", "--yes"],
+      ["secrets", "set"],
+      ["secrets", "set", "STRIPE_SECRET_KEY", "--env", "production"],
+      ["secrets", "set", "API_URL=https://api.example.com"],
+      ["secrets", "rm", "OLD_FLAG", "--env", "staging", "--yes"],
     ],
     websiteSurface: "Convex features/variables (bulk upsert / remove).",
     notes: [
-      "set upserts one key in one environment (merge) — every other variable is untouched.",
-      "rm moves the variable to trash; recover it from the dashboard.",
-      "Keys must be UPPER_SNAKE_CASE.",
+      "Interactive by default: the key is validated first, then the value is prompted masked so it never lands in shell history — KEY=VALUE inline is for CI and prints a history warning.",
+      "Role-aware: direct-write roles set immediately; request-only roles are offered the request workflow instead (a reviewer approves with `requests approve`).",
+      "Plan limits are enforced server-side and reported readably; check `envpilot usage` for your tier.",
+      "set upserts one key in one environment (merge); rm moves the secret to trash (recoverable from the dashboard).",
+      "`envpilot var …` still works as an alias.",
     ],
-    keywords: ["var", "set", "delete", "remove", "variable", "edit"],
+    keywords: ["secrets", "var", "set", "delete", "remove", "variable", "edit"],
     topLevel: true,
-    createCommand: () => varCommand,
+    createCommand: () => secretsCommand,
   },
   {
     id: "diff",

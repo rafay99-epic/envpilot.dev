@@ -1,5 +1,14 @@
 import { Command } from "commander";
-import { error, header, info, success, table, withSpinner } from "../lib/ui.js";
+import inquirer from "inquirer";
+import {
+  error,
+  header,
+  info,
+  success,
+  table,
+  warning,
+  withSpinner,
+} from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
@@ -105,25 +114,62 @@ const approveSub = new Command("approve")
   .argument("<id>", "Request id (from `envpilot requests`)")
   .option(
     "--value <value>",
-    "Secret value — REQUIRED for machine requests that carry no value; " +
-      "the server encrypts it at approval time"
+    "Secret value for a machine (valueless) request — CI only; interactively " +
+      "you are prompted MASKED instead so the value stays out of shell history"
   )
   .option("--reason <text>", "Optional review note")
   .action(async (id: string, options: { value?: string; reason?: string }) => {
     try {
       if (!isAuthenticated()) throw notAuthenticated();
       const api = createAPIClient();
+
+      // A machine (valueless) request needs the reviewer to supply the
+      // secret at approval. Detect that up front so interactive users get a
+      // masked prompt instead of an error — and never put the secret in argv.
+      const request = await withSpinner("Loading request...", () =>
+        api.getVariableRequest(id)
+      );
+      if (!request) {
+        error("Request not found (or you lack access to it).");
+        process.exit(1);
+      }
+      if (request.status !== "pending") {
+        error(
+          `Only pending requests can be approved (current: ${request.status}).`
+        );
+        process.exit(1);
+      }
+
+      let value = options.value;
+      if (request.vaultRef === undefined && value === undefined) {
+        if (!process.stdin.isTTY) {
+          error(
+            `Request ${request.key} carries no value — non-interactive approval needs --value.`
+          );
+          process.exit(1);
+        }
+        warning(
+          `${request.key} is a machine request with no value — you supply it now (encrypted server-side).`
+        );
+        const answer = await inquirer.prompt<{ value: string }>([
+          {
+            type: "password",
+            name: "value",
+            message: `Value for ${request.key}:`,
+            mask: "*",
+            validate: (input: string) =>
+              input.length > 0 || "Value cannot be empty.",
+          },
+        ]);
+        value = answer.value;
+      }
+
       await withSpinner("Approving request...", () =>
-        options.value !== undefined
-          ? api.approveRequestWithValue(id, options.value, options.reason)
+        request.vaultRef === undefined && value !== undefined
+          ? api.approveRequestWithValue(id, value, options.reason)
           : api.reviewRequest(id, "approve", options.reason)
       );
-      success("Request approved.");
-      if (options.value === undefined) {
-        info(
-          "If the server reports the request had no value, re-run with --value <secret>."
-        );
-      }
+      success(`Request approved: ${request.key}.`);
     } catch (err) {
       await handleError(err);
     }
