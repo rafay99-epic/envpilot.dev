@@ -8,9 +8,6 @@ import {
   docsComponents,
   GlowCard,
   GlowDivider,
-  AuroraGlow,
-  GridLines,
-  Noise,
   Reveal,
   SITE_URLS,
   MermaidChart,
@@ -113,15 +110,9 @@ export default async function DocPage({ params }: PageProps) {
   return (
     <DocsShell>
       <div className="relative overflow-hidden">
-        {/* ── Ambient backdrop (fades out below the article header) ── */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[28rem] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]"
-        >
-          <AuroraGlow />
-          <GridLines />
-        </div>
-        <Noise />
+        {/* Deliberately no ambient backdrop here: docs are a reading
+            surface — glow/grid/noise layers behind body text hurt
+            legibility. Decorative effects stay on non-reading pages. */}
 
         {/* ── 3-zone layout: sidebar / article / on-this-page rail ── */}
         <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 pb-20 sm:px-6 lg:px-8 lg:pt-14">
