@@ -1,0 +1,50 @@
+apps/blog/src/app/[slug]/page.tsx
+  h_1e0ba4a9f2a4b4 118
+apps/web/src/app/api/accounts/route.ts
+  s_b5f581b59533b4::t_d175053556b690 70-73
+apps/web/src/app/api/projects/[id]/export/route.ts
+  s_b5f581b59533b4::t_7d139ae612f019 63-68
+apps/web/src/app/api/projects/[id]/import/route.ts
+  s_b5f581b59533b4::t_a9481722e7b801 81-86
+apps/web/src/app/api/projects/[id]/members/route.ts
+  s_b5f581b59533b4::t_0ce3ee225ec802 51-56
+apps/web/src/app/api/projects/[id]/move/route.ts
+  s_b5f581b59533b4::t_61344b113f43ea 47-52
+apps/web/src/app/api/projects/[id]/route.ts
+  s_b5f581b59533b4::t_52f6081233c0ec 48-53,168-173
+apps/web/src/app/api/projects/route.ts
+  s_b5f581b59533b4::t_7d8cf11f9244c4 134-139
+apps/web/src/app/api/variables/[id]/history/route.ts
+  s_b5f581b59533b4::t_98af8692041d12 53
+apps/web/src/app/api/variables/[id]/rollback/route.ts
+  s_b5f581b59533b4::t_515a470efdbffb 65
+apps/web/src/app/api/variables/[id]/route.ts
+  s_b5f581b59533b4::t_a41508b21e9bca 65-66,167-168,229,287-288,326,349
+apps/web/src/app/api/variables/bulk-delete/route.ts
+  s_b5f581b59533b4::t_8474c43a315b21 44
+apps/web/src/app/api/variables/route.ts
+  s_b5f581b59533b4::t_48fb242bfc737d 63,138,182,211
+convex/features/projects/queries.ts
+  s_b5f581b59533b4::t_296d7c7deecd6b 3,21-49,53-55,62-80,84-89,98-111,200-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "bdc105bd4f3363a6733a08d78a1ce335e2a5bc34",
+  "prompts": {},
+  "humans": {
+    "h_1e0ba4a9f2a4b4": {
+      "author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
