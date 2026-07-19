@@ -1,0 +1,29 @@
+apps/cli/src/commands/diff.ts
+  s_b5f581b59533b4::t_61770796e405e4 56-75,77-81,83-85,87,90-91,97-98,101-108,114-115,117-130,135-140,147-151,153-158
+apps/cli/src/commands/requests.ts
+  s_b5f581b59533b4::t_c4150db5d2227d 162-167
+apps/cli/src/commands/secrets.ts
+  s_b5f581b59533b4::t_c664b64b39bf6d 292-301,412
+apps/cli/src/lib/api.ts
+  s_b5f581b59533b4::t_520926a304f67e 360,362,364,890,904,906,911-917,960,967-969,975,977
+convex/features/variables/mutations.ts
+  s_b5f581b59533b4::t_8efe8220651d81 641-707
+convex/features/variables/requests/mutations.ts
+  s_b5f581b59533b4::t_6e1cee577a1100 18,20,228-233,235-240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "15f48066238c7d5c1015bfadbbe439d59183386b",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
