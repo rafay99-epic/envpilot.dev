@@ -14,10 +14,8 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
-import { staggeredRow } from "@/components/dashboard/animated-list";
 import { ConfirmDialog } from "@/components/ui";
 import { ENVIRONMENTS } from "@/constants/project";
-import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, Lock, Check, X } from "lucide-react";
 import { createLogger } from "@/lib/logger";
 
@@ -424,10 +422,10 @@ function RequestRow({
   const requesterEmail = request.requester?.email;
 
   return (
-    <motion.tr
-      className="align-top transition-colors hover:bg-green-500/5"
+    <tr
+      className="animate-row-in align-top transition-colors hover:bg-green-500/5"
       data-testid="request-row"
-      {...staggeredRow(index)}
+      style={{ animationDelay: `${index * 40}ms` }}
     >
       {/* Request: key, project, requester */}
       <td className="px-5 py-3">
@@ -623,6 +621,6 @@ function RequestRow({
           </div>
         )}
       </td>
-    </motion.tr>
+    </tr>
   );
 }

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useProjects, useConvexUser } from "@/hooks";
+import { useProjectBySlug, useConvexUser } from "@/hooks";
 import { useAuthContext } from "@/components/auth";
 import { ConfirmDialog } from "@/components/ui";
 
@@ -53,9 +53,9 @@ export default function TrashPage({ params }: TrashPageProps) {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { convexUserId } = useConvexUser(user?.id);
 
-  const project = useProjects(orgId, convexUserId ?? undefined)?.projects.find(
-    (p) => p.slug === slug
-  );
+  // Direct by-slug lookup — no dependency on the full project list (and on
+  // convexUserId resolving first) just to find one project.
+  const project = useProjectBySlug(orgId, slug);
   const projectId = project?._id as Id<"projects"> | undefined;
 
   const deletedVariables = useQuery(
