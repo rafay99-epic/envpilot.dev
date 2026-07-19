@@ -1,5 +1,8 @@
 import { Resend } from "resend";
 import * as Sentry from "@sentry/nextjs";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("share-emails");
 
 /**
  * Email templates for Secret Sharing.
@@ -45,9 +48,7 @@ export async function sendShareNotificationEmail(params: {
   resourceType?: "variable" | "account";
 }): Promise<void> {
   if (emailsDisabled()) {
-    console.log(
-      `[EMAIL] Skipped share notification (DISABLE_EMAILS=true) → ${params.recipientEmail}`
-    );
+    log.info("share_notification_skipped_emails_disabled");
     return;
   }
   const resend = getResendClient();
@@ -125,9 +126,7 @@ export async function sendShareOtpEmail(params: {
   otp: string;
 }): Promise<void> {
   if (emailsDisabled()) {
-    console.log(
-      `[EMAIL] Skipped share OTP (DISABLE_EMAILS=true) → ${params.recipientEmail}`
-    );
+    log.info("share_otp_skipped_emails_disabled");
     return;
   }
   const resend = getResendClient();

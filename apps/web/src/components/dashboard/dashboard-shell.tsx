@@ -1,5 +1,3 @@
-"use client";
-
 import { AuthErrorBoundary } from "@/components/auth/auth-error-boundary";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { CommandPalette } from "@/components/command-palette";

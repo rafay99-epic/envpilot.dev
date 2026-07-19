@@ -11,7 +11,7 @@ import {
 import { z } from "zod";
 
 import { getOrCreateConvexUser } from "@/lib/convex-helpers";
-import { createLogger } from "@/lib/logger";
+import { createLogger, tokenPrefix } from "@/lib/logger";
 import { resolveOrgBySlug } from "@/lib/org-slug-resolver";
 import { roleLabel } from "@/lib/roles";
 
@@ -164,14 +164,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    console.log(
-      "[INVITE] Creating invitation for:",
-      email,
-      "role:",
-      role,
-      "org:",
-      organizationId
-    );
+    log.info("invite_create_start", { role, organizationId });
 
     const result = await createAuthedConvexClient(accessToken!).mutation(
       api.features.organizations.invitations.create,
@@ -185,25 +178,16 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     );
 
-    console.log(
-      "[INVITE] Invitation created:",
-      result.invitationId,
-      "token:",
-      result.token
-    );
+    log.info("invite_created", {
+      invitationId: result.invitationId,
+      token: tokenPrefix(result.token),
+    });
 
     // Send invitation email
     const inviterName = convexUser.name || convexUser.email || "A team member";
     const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days default
 
-    console.log(
-      "[INVITE] Sending email to:",
-      email,
-      "from:",
-      inviterName,
-      "org:",
-      organization.name
-    );
+    log.info("invite_email_send", { organizationId });
 
     const emailResult = await convex.action(
       api.features.emails.emails.sendInvitationEmail,
@@ -217,13 +201,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     );
 
-    console.log("[INVITE] Email result:", JSON.stringify(emailResult));
-
     if (!emailResult.success) {
-      console.error(
-        "[INVITE] Failed to send invitation email:",
-        emailResult.error
-      );
+      log.error("invite_email_failed", { error: emailResult.error });
     }
 
     return NextResponse.json(

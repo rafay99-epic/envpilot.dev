@@ -1,5 +1,3 @@
-"use client";
-
 import { calculateLimitPercentage } from "@/hooks/useTierLimits";
 import { Infinity } from "lucide-react";
 

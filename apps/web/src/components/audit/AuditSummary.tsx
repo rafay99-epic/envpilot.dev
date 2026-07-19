@@ -1,5 +1,3 @@
-"use client";
-
 interface AuditSummaryData {
   totalEvents: number;
   actionCounts: Record<string, number>;
