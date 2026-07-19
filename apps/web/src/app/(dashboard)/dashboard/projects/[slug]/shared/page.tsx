@@ -26,7 +26,7 @@ import {
 import { AnimatedList } from "@/components/dashboard/animated-list";
 import { FeatureGate } from "@/components/tier/FeatureGate";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
-import { useProjects, useConvexUser } from "@/hooks";
+import { useProjectBySlug, useConvexUser } from "@/hooks";
 import { useRevokeShare } from "@/hooks/useShareSecret";
 import { ConfirmDialog } from "@/components/ui";
 import { roleLevel, ROLE_LEVEL } from "@/lib/roles";
@@ -358,9 +358,9 @@ export default function SharedVariablesPage({ params }: SharedPageProps) {
   const orgId = organization?.id as Id<"organizations"> | undefined;
   const { allowed: canShare } = useFeatureGate(orgId, "secret_sharing");
 
-  const project = useProjects(orgId, convexUserId ?? undefined)?.projects.find(
-    (p) => p.slug === slug
-  );
+  // Direct by-slug lookup — no dependency on the full project list (and on
+  // convexUserId resolving first) just to find one project.
+  const project = useProjectBySlug(orgId, slug);
   const isLoadingProject = project === undefined && !!slug;
   const projectError = project === null ? new Error("Project not found") : null;
 

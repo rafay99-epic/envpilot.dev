@@ -100,7 +100,7 @@ export const createVariableRequest = action({
       });
 
     const projectDoc = await ctx.runQuery(
-      api.features.projects.queries.getBySlug,
+      internal.features.projects.queries._getBySlug,
       { organizationId: bootstrap.organizationId, slug: args.projectSlug }
     );
     if (!projectDoc) throw new Error("Project not found");

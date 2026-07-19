@@ -130,9 +130,16 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-        <Script id="config-shim" strategy="beforeInteractive">
-          {`globalThis.CONFIG = globalThis.CONFIG || {};`}
-        </Script>
+        {/* Inline code must go via dangerouslySetInnerHTML: React never
+            executes text children of a <script> rendered client-side, and
+            React 19.2 raises a console error for them. */}
+        <Script
+          id="config-shim"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: "globalThis.CONFIG = globalThis.CONFIG || {};",
+          }}
+        />
         <ConvexClientProvider>{children}</ConvexClientProvider>
         <Analytics />
         {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID && (

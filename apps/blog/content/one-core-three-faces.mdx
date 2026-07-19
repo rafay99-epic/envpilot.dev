@@ -130,7 +130,29 @@ const gate = await checkBooleanFeature(
 
 `public_api` and `mcp_server` are separate flags in the feature registry, so I can price and toggle the two surfaces independently — and a caller can't check the MCP surface against the REST gate to outlive its own gate being switched off.
 
-<Mermaid name="one-core-three-faces-authorize-pipeline" />
+```mermaid
+flowchart TD
+    T["Authorization: Bearer envpk_ plus 40 hex"] --> F["assertKeyFormat<br/>cheap reject before hashing"]
+    F --> H["hashToken SHA-256<br/>plaintext never stored or logged"]
+    H --> R["consumeRateLimit by hash<br/>invalid keys burn budget too,<br/>deliberately outside the core"]
+    R --> C["_authorizeRequest<br/>internalMutation, an atomic write"]
+    C -->|"no row"| NK["invalid_key<br/>no audit: no org to attribute to"]
+    C -->|"revoked"| IK["audit write<br/>invalid_key"]
+    C -->|"expired"| IK
+    C -->|"bad surface"| SS["audit write<br/>surface_scope"]
+    C -->|"bad scope"| PS["audit write<br/>resource, environment<br/>or project_scope"]
+    C -->|"gate off"| TG["audit write<br/>tier_gate"]
+    IK --> D["denial returned"]
+    SS --> D
+    PS --> D
+    TG --> D
+    D -.-> N["RETURNED, never thrown: a throw rolls back<br/>the mutation and the denial audit row with it"]
+    C -->|"ok"| P["lastUsedAt patch if over 60s stale<br/>+ audit"]
+    P --> B["bounded read<br/>take MAX_PULL_ROWS + 1"]
+    B -->|"more than 1000 rows"| O["throw: 422 OVERFLOW<br/>never partial"]
+    B -->|"vault decrypt fails"| X["throw: 503 DECRYPT_FAILED<br/>never a sentinel"]
+    B -->|"within cap"| OK["rows returned"]
+```
 
 Read it top to bottom: every arrow that leaves the pipeline early writes an audit row on the way out — except the unknown hash, which has no org to attribute it to.
 
@@ -203,7 +225,18 @@ The GitHub Action path is not in the list.
 
 Same shape, line by line. Different function.
 
-<Mermaid name="one-core-three-faces-core-fork" />
+```mermaid
+flowchart LR
+    REST["REST client"] --> V1["/api/v1/**"]
+    MCPC["MCP client"] --> MCPR["/api/mcp"]
+    V1 --> RD["api/reads.ts"]
+    MCPR --> RD
+    RD --> CORE["_authorizeRequest<br/>the core"]
+    GA["GitHub Action"] --> SEC["/api/v1/secrets"]
+    SEC --> PULL["cicd/pull.ts<br/>_authorizePull"]
+    PULL --> DUP["re-implements the same checks"]
+    PULL -.->|"does NOT call it"| CORE
+```
 
 Two boxes doing the same job is the whole diagram.
 

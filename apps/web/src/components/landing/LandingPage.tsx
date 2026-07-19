@@ -957,11 +957,15 @@ function TrustSection() {
                     </p>
                   </div>
                 </div>
+                {/* Single string expression on purpose: multi-line JSX text
+                    mixing HTML entities produced different text-node
+                    segmentation on server vs client under Next 16.2
+                    (hydration mismatch in TrustSection). One JS string is
+                    one deterministic text node on both sides. */}
                 <p className="mt-5 max-w-xl font-sans text-base leading-relaxed text-zinc-300">
-                  &ldquo;I built Envpilot after watching one too many production
-                  keys get pasted into Slack channels half the company could
-                  scroll. It&apos;s the tool I wanted: encrypted, synced, and
-                  boring to use.&rdquo;
+                  {
+                    "“I built Envpilot after watching one too many production keys get pasted into Slack channels half the company could scroll. It’s the tool I wanted: encrypted, synced, and boring to use.”"
+                  }
                 </p>
               </div>
 

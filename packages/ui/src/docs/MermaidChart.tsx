@@ -9,10 +9,10 @@ let initialized = false;
 /**
  * Renders one mermaid diagram from its source text.
  *
- * Consumers do NOT use this directly from MDX: next-mdx-remote silently drops
- * JSX brace expressions, so a template-literal `chart` prop written in .mdx
- * never reaches the component. Each app wraps this in a `<Mermaid name="..." />`
- * that looks the source up in a local registry — a plain string attribute is
+ * Authors write standard ```mermaid fenced code blocks in MDX; the shared
+ * remarkMermaid plugin (./remark-mermaid.ts) rewrites those fences into
+ * <MermaidChart chart="..."> nodes at the remark phase. The chart text
+ * travels as a plain string attribute, which is the only shape that
  * the only shape that survives the pipeline.
  */
 export function MermaidChart({ chart }: { chart: string | undefined }) {

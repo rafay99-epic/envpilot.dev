@@ -79,7 +79,13 @@ Before that PR: zero tests.
 
 Fine. `deactivate()` no longer deletes anything. Now walk this through with me:
 
-<Mermaid name="the-extension-that-leaked-uninstall-hole" />
+```mermaid
+flowchart LR
+    I["install"] --> S["sign in"]
+    S --> Y["sync"]
+    Y --> U["uninstall"]
+    U -->|"nothing left running to clean up"| D["~/project/.env still on disk<br/>plaintext, forever"]
+```
 
 Follow the path to the end: the extension is gone, so nothing is left running that could ever clean up. The secrets just sit there.
 
@@ -129,7 +135,21 @@ With a hash guard in hand I could finally put deletion back into `deactivate()` 
 
 Four guards, not one. One guard is precisely what got me here.
 
-<Mermaid name="the-extension-that-leaked-purge-guards" />
+```mermaid
+flowchart TD
+    F["File F in manifest<br/>window W closing"] --> SC{"SCOPE<br/>F under a workspace folder of W?"}
+    SC -->|"no"| KEEP["keep"]
+    SC -->|"yes"| OO{"OPT-OUT<br/>project autoUnsyncOnClose is false?"}
+    OO -->|"yes"| KEEP
+    OO -->|"no"| NE{"Nested opt-out wins<br/>F under any opted-out project?"}
+    NE -->|"yes"| KEEP
+    NE -->|"no"| LW{"LIVE-WINDOW GUARD<br/>folder claimed by another live<br/>extension host pid?"}
+    LW -->|"yes"| KEEP
+    LW -->|"no"| RD["read F"]
+    RD -->|"ENOENT"| DROP["drop stale manifest entry"]
+    RD -->|"sha256 mismatch"| SP["THE HASH GUARD<br/>spared++"]
+    RD -->|"sha256 match"| DEL["chmod 0o644, unlink<br/>deleted++"]
+```
 
 Read it top to bottom: a file has to survive all four gates before anything is allowed to touch it.
 

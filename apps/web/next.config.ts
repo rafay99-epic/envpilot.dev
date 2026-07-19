@@ -75,9 +75,13 @@ const nextConfig: NextConfig = {
 
     // ── Client-side router cache ─────────────────────────────────────
     // Keep navigated pages in memory so back/forward is instant.
-    // Dynamic pages stay fresh for 30 s; static pages for 5 min.
+    // Dashboard pages are client components whose data comes from live
+    // Convex subscriptions, so the cached RSC payload is just the shell —
+    // a long TTL cannot serve stale data. 30 s meant almost every nav
+    // re-ran the dynamic (dashboard) layout (auth + 3 Convex round trips)
+    // server-side; 180 s makes repeat navigation instant.
     staleTimes: {
-      dynamic: 30,
+      dynamic: 180,
       static: 300,
     },
   },

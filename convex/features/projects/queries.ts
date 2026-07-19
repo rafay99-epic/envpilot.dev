@@ -1,6 +1,11 @@
 import { v } from "convex/values";
-import { query } from "../../_generated/server";
+import { query, internalQuery } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
+import {
+  getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+} from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { listWithStatsCore, listForUserCore } from "./helpers";
 
@@ -81,7 +86,13 @@ export const resolveUnsyncOnClose = query({
   },
 });
 
-export const getBySlug = query({
+/**
+ * Bare org+slug lookup with NO user-identity check — for machine surfaces
+ * (public API / MCP actions) that have already authorized the request via
+ * _authorizeRequest and re-check project scope afterwards. Dashboard
+ * clients must use getBySlug, which enforces membership + assignment.
+ */
+export const _getBySlug = internalQuery({
   args: {
     organizationId: v.id("organizations"),
     slug: v.string(),
@@ -94,7 +105,50 @@ export const getBySlug = query({
       )
       .first();
 
-    if (project?.deletedAt) return null;
+    if (!project || project.deletedAt) return null;
+    return project;
+  },
+});
+
+export const getBySlug = query({
+  args: {
+    organizationId: v.id("organizations"),
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
+    const project = await ctx.db
+      .query("projects")
+      .withIndex("by_org_and_slug", (q) =>
+        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
+      )
+      .first();
+
+    if (!project || project.deletedAt) return null;
+
+    // Visibility mirrors listWithStatsCore: non-members (and suspended
+    // members) see nothing; roles without the assignment bypass must hold a
+    // projectMembers row. Returns null instead of throwing so callers keep
+    // their "not found" handling.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) return null;
+
+    const profile = await getRoleProfile(ctx, membership.role);
+    if (!bypassesAssignment(profile)) {
+      const assignment = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", project._id).eq("userId", actor._id)
+        )
+        .first();
+      if (!assignment) return null;
+    }
+
     return project;
   },
 });

@@ -16,7 +16,6 @@ import {
   TerminalEmptyState,
   TerminalBadge,
 } from "@/components/dashboard/terminal-ui";
-import { staggeredRow } from "@/components/dashboard/animated-list";
 import {
   VariableEditModal,
   ExportDialog,
@@ -27,7 +26,6 @@ import {
 } from "@/components/variables";
 import { useOrganizationTags, useCreateTag } from "@/hooks";
 import { ConfirmDialog } from "@/components/ui";
-import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -588,9 +586,9 @@ function VariableRow({
 
   return (
     <>
-      <motion.tr
-        className="transition-colors hover:bg-green-500/5"
-        {...staggeredRow(index)}
+      <tr
+        className="animate-row-in transition-colors hover:bg-green-500/5"
+        style={{ animationDelay: `${index * 40}ms` }}
       >
         <td className="whitespace-nowrap px-5 py-3">
           <div className="flex items-center gap-2">
@@ -694,7 +692,7 @@ function VariableRow({
             )}
           </div>
         </td>
-      </motion.tr>
+      </tr>
     </>
   );
 }

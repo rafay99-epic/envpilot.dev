@@ -13,19 +13,20 @@ import {
   Noise,
   Reveal,
   SITE_URLS,
+  MermaidChart,
+  remarkMermaid,
 } from "@envpilot/ui";
 import { DocsSidebar, DOC_ICONS } from "@/components/DocsSidebar";
 import { DocsShell } from "@/components/shell";
 import { LLMActions } from "@/components/LLMActions";
-import { Mermaid } from "@/components/Mermaid";
 import Link from "next/link";
 
-// Shared MDX overrides plus doc-app-only components (Mermaid diagrams).
-const mdxComponents = { ...docsComponents, Mermaid };
+// Shared MDX overrides plus the mermaid renderer for ```mermaid fences.
+const mdxComponents = { ...docsComponents, MermaidChart };
 
 const mdxOptions = {
   mdxOptions: {
-    remarkPlugins: [remarkGfm],
+    remarkPlugins: [remarkGfm, remarkMermaid],
     rehypePlugins: [
       [
         rehypePrettyCode,

@@ -23,7 +23,17 @@ This is the story of what I actually built, why it can't be merged now, and the 
 
 The diff stat looks impressive until you break it down by directory. So let me break it down by directory.
 
-<Mermaid name="the-mobile-app-that-never-shipped-composition" />
+```mermaid
+flowchart LR
+    B["PR 64 branch<br/>+22,941 / -65"] --> AG[".agents/ vendored docs<br/>87 files, +13,057 — 57%"]
+    B --> MO["apps/mobile/<br/>57 files, +7,779 — 34%"]
+    B --> LK["bun.lock<br/>+1,464"]
+    B --> WEB["apps/web/ auth surface<br/>4 files, +393"]
+    B --> CVX["convex/<br/>3 files, +219"]
+    style AG fill:#f0a500,color:#fff
+    style WEB fill:#e05252,color:#fff
+    style CVX fill:#e05252,color:#fff
+```
 
 Read the top branch first, because it's the biggest one: **87 files and 13,057 lines — 57% of the branch — are not the app.**
 
@@ -208,7 +218,30 @@ To be precise about blame: this is not a mobile-branch bug. It is a live charact
 
 Read that again, because it's the worst sentence in this post: **fixing the security gap would have silently broken my app.** That's what building a surface on top of an unaudited assumption buys you — a feature that quietly votes against ever hardening the backend.
 
-<Mermaid name="the-mobile-app-that-never-shipped-two-auths" />
+```mermaid
+flowchart TD
+    subgraph MERGED["Merged: one enforcement core"]
+      K["Bearer key"] --> H["SHA-256 hash"]
+      H --> T["apiKeys.by_token_hash"]
+      T --> A["_authorizeRequest"]
+      A --> OK["ok: scopeProjects<br/>scopeEnvironments<br/>scopeResources, keyId"]
+      A --> D["Denials: invalid_key<br/>resource_scope, project_scope<br/>surface_scope, tier_gate"]
+      OK --> S["REST / MCP / GitHub Action"]
+    end
+    subgraph BRANCH["Branch: PR 64"]
+      M["mob_ token"] --> P["mobileTokens.by_access_token<br/>plaintext, indexed"]
+      P --> V["validateToken"]
+      V --> R["valid: true, userId"]
+      R --> VR["POST /api/mobile/vault<br/>decrypts any vaultRef"]
+      C["ConvexReactClient"] --> DB["Convex queries<br/>no auth at all"]
+    end
+    style A fill:#3cb371,color:#fff
+    style OK fill:#3cb371,color:#fff
+    style D fill:#f0a500,color:#fff
+    style P fill:#e05252,color:#fff
+    style VR fill:#e05252,color:#fff
+    style DB fill:#e05252,color:#fff
+```
 
 Two lanes, same platform. Count the green boxes on each side.
 
@@ -231,7 +264,18 @@ It doesn't need a rebase. It needs a rewrite.
 
 ## What shipped instead, five minutes apart
 
-<Mermaid name="the-mobile-app-that-never-shipped-timeline" />
+```mermaid
+flowchart LR
+    D1["2026-05-08<br/>PR 64 opened<br/>surface 4 proposed"] --> D2["2026-06-07<br/>commit 4bcb31e5<br/>last code"]
+    D2 --> D3["2026-07-06<br/>PR last touched"]
+    D3 --> D4["2026-07-18 15:33<br/>PR 146 merges<br/>surfaces field"]
+    D4 --> D5["2026-07-18 15:38<br/>PR 147 merges<br/>serviceTokens deleted"]
+    D5 --> D6["architecture.mdx<br/>five surfaces<br/>mobile is not one"]
+    style D1 fill:#f0a500,color:#fff
+    style D4 fill:#3cb371,color:#fff
+    style D5 fill:#3cb371,color:#fff
+    style D6 fill:#e05252,color:#fff
+```
 
 Follow the bottom-right: the two PRs that landed while #64 sat open.
 
