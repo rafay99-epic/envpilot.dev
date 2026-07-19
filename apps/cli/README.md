@@ -59,26 +59,49 @@ The TUI returns after each command finishes, so you can run multiple commands in
 
 ### Syncing Variables
 
-| Command                   | Description                             |
-| ------------------------- | --------------------------------------- |
-| `envpilot pull [options]` | Pull variables into a local `.env` file |
-| `envpilot push [options]` | Push local `.env` changes to Envpilot   |
+| Command                       | Description                                                      |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `envpilot pull [options]`     | Pull variables into a local `.env` file                          |
+| `envpilot push [options]`     | Push local `.env` changes to Envpilot                            |
+| `envpilot secrets set [key]`  | Set ONE secret — key first, value prompted masked (alias: `var`) |
+| `envpilot secrets rm <key>`   | Delete one secret (env-scoped for shared variables)              |
+| `envpilot diff <envA> <envB>` | Compare variable keys between two environments                   |
+
+```bash
+envpilot secrets set                       # guided: key → masked value → sensitive?
+envpilot secrets set STRIPE_KEY -e production
+envpilot secrets set API_URL=https://api.example.com   # CI only — lands in shell history
+envpilot secrets rm OLD_FLAG --yes
+envpilot diff staging production           # keys only (no decryption)
+envpilot diff staging production --values  # also compare values
+```
+
+`secrets set` is role-aware: if your role can't write directly, the same
+flow files a variable request for review instead of rejecting you. Updating
+or deleting a value shared across environments asks for explicit
+confirmation and only detaches the selected environment on `rm`.
 
 ### Variable Requests
 
 Developers don't have direct write access — instead they submit a request,
-and an owner, project manager, or team lead reviews it on the dashboard
-(choosing the final environments on approval).
+and an owner, project manager, or team lead reviews it from the terminal or
+the dashboard.
 
-| Command                       | Description                                                            |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `envpilot request [options]`  | Request a new variable (interactive: key, value, environments)         |
-| `envpilot requests [options]` | List variable requests for the linked project with their review status |
+| Command                          | Description                                                            |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `envpilot request [options]`     | Request a new variable (interactive: key, value, environments)         |
+| `envpilot requests [options]`    | List variable requests for the linked project with their review status |
+| `envpilot requests approve <id>` | Approve a pending request (machine requests prompt masked for a value) |
+| `envpilot requests reject <id>`  | Reject a pending request (`--reason` shown to the requester)           |
+| `envpilot requests cancel <id>`  | Cancel a pending request (your own, or as a reviewer)                  |
 
 ```bash
 envpilot request                     # guided prompt: key → value → description → environments
-envpilot requests                    # all requests for the linked project
-envpilot requests --status pending   # filter: pending | approved | rejected | canceled
+envpilot requests                    # all requests for the linked project (ID column for review)
+envpilot requests --status pending --json
+envpilot requests approve k5738…     # valueless machine request → masked value prompt
+printf %s "$SECRET" | envpilot requests approve k5738… --value-stdin   # CI-safe
+envpilot requests reject k5738… --reason "use the shared key"
 ```
 
 Environment choices are limited to the environments you have access to —

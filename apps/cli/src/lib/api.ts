@@ -357,6 +357,11 @@ const refs = {
   removeVariable: fnRef<"mutation", { variableId: string }, unknown>(
     "features/variables/mutations:remove"
   ),
+  updateVariable: fnRef<
+    "mutation",
+    { variableId: string; environments?: string[]; changeReason?: string },
+    unknown
+  >("features/variables/mutations:update"),
   resolveProjectRoles: fnRef<
     "query",
     { projectId: string },
@@ -871,6 +876,10 @@ export class APIClient {
    * Set a single variable's value in one environment — upsert via the bulk
    * vault path with merge semantics (creates if absent, updates if present;
    * leaves every other variable untouched).
+   *
+   * Throws when the server accepted the call but wrote nothing (the single
+   * entry was skipped/denied by variable-level authorization) — a silent
+   * "success" here would lie to the user.
    */
   async setVariable(
     projectId: string,
@@ -892,26 +901,81 @@ export class APIClient {
       ],
       mode: "merge",
     });
+    if (result.created === 0 && result.updated === 0) {
+      const denied = result.deniedKeys?.includes(key);
+      throw new APIError(
+        denied
+          ? `You do not have write access to ${key}.`
+          : `${key} was not written (skipped by the server).`,
+        403,
+        "PERMISSION_DENIED"
+      );
+    }
     return { created: result.created, updated: result.updated };
   }
 
   /**
-   * Find the id of an active variable by key in a given environment, so a
-   * single-variable operation (rm) can target it. Returns null if absent.
+   * Metadata for the active variable holding `key` in `environment` (id +
+   * the FULL environments list, so single-env commands can detect that the
+   * variable is shared across environments). Returns null if absent.
    */
-  async findVariableId(
+  async findVariable(
     projectId: string,
     environment: string,
     key: string
-  ): Promise<string | null> {
-    const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
+  ): Promise<{ _id: string; environments: string[] } | null> {
+    // High limit: the default 500-row window would silently miss keys in
+    // large projects and report them as "not found".
+    const rows = await convexQuery(refs.listVariablesWithAccess, {
+      projectId,
+      limit: 5000,
+    });
     const match = rows.find(
       (row) =>
         row.key === key &&
         row.hasAccess &&
         row.environments.includes(environment)
     );
-    return match?._id ?? null;
+    return match ? { _id: match._id, environments: match.environments } : null;
+  }
+
+  /**
+   * Metadata-only variable listing for an environment (no vault reads, no
+   * value-access audit entries). Used by `diff` without --values.
+   */
+  async listVariableKeys(
+    projectId: string,
+    environment: string
+  ): Promise<{ keys: string[]; truncated: boolean }> {
+    const limit = 5000;
+    const rows = await convexQuery(refs.listVariablesWithAccess, {
+      projectId,
+      limit,
+    });
+    return {
+      keys: rows
+        .filter(
+          (row) => row.hasAccess && row.environments.includes(environment)
+        )
+        .map((row) => row.key),
+      truncated: rows.length >= limit,
+    };
+  }
+
+  /**
+   * Re-scope a shared variable: drop `environment` from its environments
+   * list, leaving its value live in the remaining environments.
+   */
+  async removeVariableFromEnvironment(
+    variableId: string,
+    environments: string[],
+    environment: string
+  ): Promise<void> {
+    await convexMutation(refs.updateVariable, {
+      variableId,
+      environments: environments.filter((env) => env !== environment),
+      changeReason: `Removed from ${environment} via CLI`,
+    });
   }
 }
 

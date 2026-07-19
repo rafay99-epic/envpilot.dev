@@ -228,7 +228,7 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     description:
       "List variable requests, or approve/reject/cancel them without leaving the terminal.",
     argv: ["requests"],
-    args: "[list|approve|reject|cancel] [<id>] [--status <status>] [--json]",
+    args: "[list] [--project <p>] [--status <s>] [--json] | approve <id> [--value <v>|--value-stdin] [--reason <t>] | reject <id> [--reason <t>] | cancel <id>",
     examples: [
       ["requests"],
       ["requests", "--status", "pending"],
@@ -240,7 +240,8 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     websiteSurface: "Convex features/variables/requests (review/cancel).",
     notes: [
       "Reviewers (owner, assigned project manager/team lead) see every request; developers see only their own.",
-      "Machine (valueless) requests need --value on approve — the server encrypts it at approval time.",
+      "--status/--json apply to listing only; --value/--value-stdin/--reason apply to review subcommands only.",
+      "Approving a machine (valueless) request prompts MASKED for the value; --value-stdin reads it from stdin for CI (keeps it out of argv), --value is a last resort that lands in shell history.",
       "Get the <id> from the ID column of `envpilot requests`.",
     ],
     keywords: ["requests", "approval", "review", "approve", "reject", "cancel"],
@@ -255,7 +256,7 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
       "Change one secret without pull/edit/push. Two-step by default: key first, value prompted MASKED (never in shell history).",
     argv: ["secrets"],
     aliases: [["var"]],
-    args: "set [<key>|<key=value>] | rm <key> [--env <environment>] [--project <name-or-id>]",
+    args: "set [<key>|<key=value>] [-e <env>] [-p <project>] [-d <text>] [--sensitive] [--all-envs] | rm <key> [-e <env>] [-p <project>] [--yes]",
     examples: [
       ["secrets", "set"],
       ["secrets", "set", "STRIPE_SECRET_KEY", "--env", "production"],
@@ -267,7 +268,8 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
       "Interactive by default: the key is validated first, then the value is prompted masked so it never lands in shell history — KEY=VALUE inline is for CI and prints a history warning.",
       "Role-aware: direct-write roles set immediately; request-only roles are offered the request workflow instead (a reviewer approves with `requests approve`).",
       "Plan limits are enforced server-side and reported readably; check `envpilot usage` for your tier.",
-      "set upserts one key in one environment (merge); rm moves the secret to trash (recoverable from the dashboard).",
+      "set upserts one key in one environment (merge); updating a value shared across environments requires confirmation (--all-envs non-interactively).",
+      "rm on a single-environment secret moves it to trash (recoverable from the dashboard); on a shared secret it only removes THIS environment — the value stays live in the others.",
       "`envpilot var …` still works as an alias.",
     ],
     keywords: ["secrets", "var", "set", "delete", "remove", "variable", "edit"],

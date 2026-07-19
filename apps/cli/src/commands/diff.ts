@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { error, header, info, withSpinner } from "../lib/ui.js";
+import { error, header, info, warning, withSpinner } from "../lib/ui.js";
 import { createAPIClient } from "../lib/api.js";
 import { isAuthenticated } from "../lib/config.js";
 import { readProjectConfigV2, resolveProject } from "../lib/project-config.js";
@@ -53,15 +53,55 @@ export const diffCommand = new Command("diff")
       }
 
       const api = createAPIClient();
-      const [a, b] = await withSpinner(`Comparing ${envA} vs ${envB}...`, () =>
-        Promise.all([
-          api.listVariables(project.projectId, envA, project.organizationId),
-          api.listVariables(project.projectId, envB, project.organizationId),
-        ])
-      );
-
-      const mapA = new Map(a.variables.map((v) => [v.key, v.value]));
-      const mapB = new Map(b.variables.map((v) => [v.key, v.value]));
+      // Default is METADATA-ONLY: no vault decryption, no value-read audit
+      // noise, and a decryption failure can't misreport a key as missing.
+      // Only --values pays for the two decrypting fetches.
+      let mapA: Map<string, string | null>;
+      let mapB: Map<string, string | null>;
+      if (options.values) {
+        const [a, b] = await withSpinner(
+          `Comparing ${envA} vs ${envB} (values)...`,
+          () =>
+            Promise.all([
+              api.listVariables(
+                project.projectId,
+                envA,
+                project.organizationId
+              ),
+              api.listVariables(
+                project.projectId,
+                envB,
+                project.organizationId
+              ),
+            ])
+        );
+        mapA = new Map(a.variables.map((v) => [v.key, v.value]));
+        mapB = new Map(b.variables.map((v) => [v.key, v.value]));
+        const failures = [
+          ...new Set([...a.decryptionFailures, ...b.decryptionFailures]),
+        ];
+        if (failures.length > 0) {
+          warning(
+            `Could not decrypt: ${failures.join(", ")} — value comparison for these keys is unreliable.`
+          );
+        }
+      } else {
+        const [a, b] = await withSpinner(
+          `Comparing ${envA} vs ${envB}...`,
+          () =>
+            Promise.all([
+              api.listVariableKeys(project.projectId, envA),
+              api.listVariableKeys(project.projectId, envB),
+            ])
+        );
+        mapA = new Map(a.keys.map((k) => [k, null]));
+        mapB = new Map(b.keys.map((k) => [k, null]));
+        if (a.truncated || b.truncated) {
+          warning(
+            "Project exceeds the 5000-variable read window — this diff may be incomplete."
+          );
+        }
+      }
       const allKeys = [...new Set([...mapA.keys(), ...mapB.keys()])].sort();
 
       const onlyA: string[] = [];

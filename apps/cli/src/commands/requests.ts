@@ -26,6 +26,15 @@ import {
   type VariableRequestStatus,
 } from "../types/index.js";
 
+/** Read all of stdin (for --value-stdin approvals in CI). */
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
 interface ListOptions {
   project?: string;
   status?: string;
@@ -117,63 +126,80 @@ const approveSub = new Command("approve")
     "Secret value for a machine (valueless) request — CI only; interactively " +
       "you are prompted MASKED instead so the value stays out of shell history"
   )
+  .option(
+    "--value-stdin",
+    "Read the secret value from stdin (CI-safe: keeps it out of argv), e.g. " +
+      'printf %s "$SECRET" | envpilot requests approve <id> --value-stdin'
+  )
   .option("--reason <text>", "Optional review note")
-  .action(async (id: string, options: { value?: string; reason?: string }) => {
-    try {
-      if (!isAuthenticated()) throw notAuthenticated();
-      const api = createAPIClient();
+  .action(
+    async (
+      id: string,
+      options: { value?: string; valueStdin?: boolean; reason?: string }
+    ) => {
+      try {
+        if (!isAuthenticated()) throw notAuthenticated();
+        const api = createAPIClient();
 
-      // A machine (valueless) request needs the reviewer to supply the
-      // secret at approval. Detect that up front so interactive users get a
-      // masked prompt instead of an error — and never put the secret in argv.
-      const request = await withSpinner("Loading request...", () =>
-        api.getVariableRequest(id)
-      );
-      if (!request) {
-        error("Request not found (or you lack access to it).");
-        process.exit(1);
-      }
-      if (request.status !== "pending") {
-        error(
-          `Only pending requests can be approved (current: ${request.status}).`
+        // A machine (valueless) request needs the reviewer to supply the
+        // secret at approval. Detect that up front so interactive users get a
+        // masked prompt instead of an error — and never put the secret in argv.
+        const request = await withSpinner("Loading request...", () =>
+          api.getVariableRequest(id)
         );
-        process.exit(1);
-      }
-
-      let value = options.value;
-      if (request.vaultRef === undefined && value === undefined) {
-        if (!process.stdin.isTTY) {
+        if (!request) {
+          error("Request not found (or you lack access to it).");
+          process.exit(1);
+        }
+        if (request.status !== "pending") {
           error(
-            `Request ${request.key} carries no value — non-interactive approval needs --value.`
+            `Only pending requests can be approved (current: ${request.status}).`
           );
           process.exit(1);
         }
-        warning(
-          `${request.key} is a machine request with no value — you supply it now (encrypted server-side).`
-        );
-        const answer = await inquirer.prompt<{ value: string }>([
-          {
-            type: "password",
-            name: "value",
-            message: `Value for ${request.key}:`,
-            mask: "*",
-            validate: (input: string) =>
-              input.length > 0 || "Value cannot be empty.",
-          },
-        ]);
-        value = answer.value;
-      }
 
-      await withSpinner("Approving request...", () =>
-        request.vaultRef === undefined && value !== undefined
-          ? api.approveRequestWithValue(id, value, options.reason)
-          : api.reviewRequest(id, "approve", options.reason)
-      );
-      success(`Request approved: ${request.key}.`);
-    } catch (err) {
-      await handleError(err);
+        let value = options.value;
+        if (options.valueStdin) {
+          value = (await readStdin()).replace(/\r?\n$/, "");
+          if (!value) {
+            error("--value-stdin was passed but stdin was empty.");
+            process.exit(1);
+          }
+        }
+        if (request.vaultRef === undefined && value === undefined) {
+          if (!process.stdin.isTTY) {
+            error(
+              `Request ${request.key} carries no value — non-interactive approval needs --value.`
+            );
+            process.exit(1);
+          }
+          warning(
+            `${request.key} is a machine request with no value — you supply it now (encrypted server-side).`
+          );
+          const answer = await inquirer.prompt<{ value: string }>([
+            {
+              type: "password",
+              name: "value",
+              message: `Value for ${request.key}:`,
+              mask: "*",
+              validate: (input: string) =>
+                input.length > 0 || "Value cannot be empty.",
+            },
+          ]);
+          value = answer.value;
+        }
+
+        await withSpinner("Approving request...", () =>
+          request.vaultRef === undefined && value !== undefined
+            ? api.approveRequestWithValue(id, value, options.reason)
+            : api.reviewRequest(id, "approve", options.reason)
+        );
+        success(`Request approved: ${request.key}.`);
+      } catch (err) {
+        await handleError(err);
+      }
     }
-  });
+  );
 
 const rejectSub = new Command("reject")
   .description("Reject a pending request")

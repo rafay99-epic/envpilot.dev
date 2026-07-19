@@ -49,6 +49,7 @@ interface SecretsOptions {
   description?: string;
   sensitive?: boolean;
   yes?: boolean;
+  allEnvs?: boolean;
 }
 
 /**
@@ -78,7 +79,8 @@ function resolveTarget(options: SecretsOptions): {
 
   // Validates BOTH the -e flag and the stored config value (guards against a
   // hand-edited .envpilot), and narrows the type for the request path.
-  const environment = options.env || project.environment;
+  const environment =
+    options.env !== undefined ? options.env : project.environment;
   if (!validateEnvironment(environment)) {
     throw invalidInput(
       `Unknown environment "${environment}". Valid environments: development, staging, production.`
@@ -132,6 +134,10 @@ const setCommand = new Command("set")
   .option("-p, --project <name-or-id>", "Linked project (defaults to active)")
   .option("-d, --description <text>", "Optional description")
   .option("--sensitive", "Mark the secret as sensitive")
+  .option(
+    "--all-envs",
+    "Confirm updating a variable whose value is shared across multiple environments"
+  )
   .action(
     async (keyOrAssignment: string | undefined, options: SecretsOptions) => {
       try {
@@ -196,6 +202,38 @@ const setCommand = new Command("set")
             },
           ]);
           key = answer.key;
+        }
+
+        // Shared-variable guard: a value can be shared by several
+        // environments on ONE variable — updating it here updates all of
+        // them. Detect that BEFORE the value is typed and require explicit
+        // consent (--all-envs, or an interactive confirm).
+        const existing = await withSpinner(`Checking ${key}...`, () =>
+          createAPIClient().findVariable(projectId, environment, key)
+        );
+        if (existing && existing.environments.length > 1 && !options.allEnvs) {
+          const envList = existing.environments.join(", ");
+          if (process.stdin.isTTY) {
+            const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
+              {
+                type: "confirm",
+                name: "proceed",
+                message: `${key}'s value is shared across [${envList}] — updating it changes ALL of them. Continue?`,
+                default: false,
+              },
+            ]);
+            if (!proceed) {
+              info(
+                "Nothing changed. To give this environment its own value, edit the variable's environments in the dashboard first."
+              );
+              return;
+            }
+          } else {
+            error(
+              `${key} is shared across [${envList}] — updating it changes all of them. Re-run with --all-envs to confirm.`
+            );
+            process.exit(1);
+          }
         }
 
         // Step 2 — the value, masked (never echoed, never in history).
@@ -327,28 +365,33 @@ const rmCommand = new Command("rm")
         process.exit(3);
       }
 
-      const variableId = await withSpinner(`Finding ${key}...`, () =>
-        api.findVariableId(projectId, environment, key)
+      const found = await withSpinner(`Finding ${key}...`, () =>
+        api.findVariable(projectId, environment, key)
       );
-      if (!variableId) {
+      if (!found) {
         error(
           `No variable ${key} found in ${projectName}/${environment} (or you lack access).`
         );
         process.exit(1);
       }
 
+      // A variable shared across environments is RE-SCOPED (this environment
+      // is removed from it), not deleted — its value stays live elsewhere.
+      const shared = found.environments.length > 1;
+      const consequence = shared
+        ? `remove ${key} from ${environment} (still live in: ${found.environments.filter((e) => e !== environment).join(", ")})`
+        : `move ${key} (${environment}) to trash`;
+
       if (!options.yes) {
         if (!process.stdin.isTTY) {
-          warning(
-            `This moves ${key} (${environment}) to trash. Re-run with --yes to confirm.`
-          );
+          warning(`This will ${consequence}. Re-run with --yes to confirm.`);
           return;
         }
         const { proceed } = await inquirer.prompt<{ proceed: boolean }>([
           {
             type: "confirm",
             name: "proceed",
-            message: `Move ${key} (${projectName}/${environment}) to trash?`,
+            message: `${consequence[0].toUpperCase()}${consequence.slice(1)} — continue?`,
             default: false,
           },
         ]);
@@ -358,11 +401,26 @@ const rmCommand = new Command("rm")
         }
       }
 
-      await withSpinner(`Deleting ${key}...`, () =>
-        api.removeVariable(variableId)
-      );
-      success(`Deleted ${chalk.bold(key)} from ${projectName}/${environment}.`);
-      info("Recover it from the dashboard trash if this was a mistake.");
+      if (shared) {
+        await withSpinner(`Removing ${key} from ${environment}...`, () =>
+          api.removeVariableFromEnvironment(
+            found._id,
+            found.environments,
+            environment
+          )
+        );
+        success(
+          `Removed ${chalk.bold(key)} from ${environment} — still live in: ${found.environments.filter((e) => e !== environment).join(", ")}.`
+        );
+      } else {
+        await withSpinner(`Deleting ${key}...`, () =>
+          api.removeVariable(found._id)
+        );
+        success(
+          `Deleted ${chalk.bold(key)} from ${projectName}/${environment}.`
+        );
+        info("Recover it from the dashboard trash if this was a mistake.");
+      }
     } catch (err) {
       await handleError(err);
     }

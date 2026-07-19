@@ -130,8 +130,9 @@ export const runCommand = new Command("run")
         throw notInitialized();
       }
 
-      const environment = options.env || project.environment;
-      if (options.env && !validateEnvironment(options.env)) {
+      const environment =
+        options.env !== undefined ? options.env : project.environment;
+      if (options.env !== undefined && !validateEnvironment(options.env)) {
         throw invalidInput(
           `Unknown environment "${options.env}". Valid environments: development, staging, production.`
         );
@@ -238,12 +239,18 @@ export const runCommand = new Command("run")
               variables = fetched.variables;
               decryptionFailures = fetched.decryptionFailures;
               scopeRestricted = fetched.scopeRestricted;
+              // When a key failed to decrypt it is MISSING from `variables`.
+              // Storing the server fingerprint would make the next fingerprint
+              // check "match" and pin the incomplete set until metadata
+              // changes. Omitting it stores a client-computed fingerprint that
+              // cannot match the server's, so every run retries the fetch
+              // until the vault heals.
               writeCache(
                 project.projectId,
                 environment,
                 organizationId,
                 variables,
-                check.fingerprint,
+                decryptionFailures.length > 0 ? undefined : check.fingerprint,
                 { decryptionFailures, scopeRestricted }
               );
             }
@@ -328,7 +335,8 @@ export const runCommand = new Command("run")
         // "of M" only when the fingerprint check told us the total — the
         // fresh-cache path (--cache-ttl > 0) skips that check, so we can't
         // honestly claim a denominator there.
-        const total = injectedCount + otherEnvKeys.length;
+        const total =
+          injectedCount + decryptionFailures.length + otherEnvKeys.length;
         const ofTotal =
           otherEnvKeys.length > 0 ? chalk.dim(` of ${total}`) : "";
         info(

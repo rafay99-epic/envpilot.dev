@@ -32,3 +32,13 @@ describe("parseAssignment", () => {
     expect(parseAssignment("1BAD=x").ok).toBe(false);
   });
 });
+
+describe("parseAssignment key length", () => {
+  it("rejects a key longer than 100 chars", () => {
+    expect(parseAssignment("A" + "X".repeat(100) + "=v").ok).toBe(false);
+  });
+
+  it("accepts a key of exactly 100 chars", () => {
+    expect(parseAssignment("A" + "X".repeat(99) + "=v").ok).toBe(true);
+  });
+});
