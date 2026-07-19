@@ -1,89 +1,87 @@
 ---
 title: Web Dashboard
-description: Create projects, manage variables, invite your team, and audit every action from the browser.
+description: A page-by-page tour of the authenticated dashboard — projects, requests, diff, trash, sharing, tags, and settings.
 icon: monitor
 ---
 
 # Web Dashboard
 
-The web dashboard at [envpilot.dev](https://www.envpilot.dev) is the central interface for managing everything in Envpilot. Sign in with your SSO provider, then navigate using the sidebar.
+The web dashboard at [envpilot.dev](https://www.envpilot.dev) is the full management UI. Sign in through WorkOS AuthKit (Google, GitHub, or email SSO), then use the sidebar to move between an organization's projects, team, audit trail, and settings.
 
-## Signing in
+## Dashboard home
 
-Go to [envpilot.dev/sign-in](https://www.envpilot.dev/sign-in). Authentication is handled through WorkOS AuthKit, which supports Google, GitHub, and email-based SSO. After signing in, you land on the dashboard home page.
+The landing page (`/dashboard`) shows a system-status summary (project, variable, team, and event counts), a **Getting Started** checklist for brand-new organizations (create a project → add a variable → invite your team → install the extension), your **Recent Projects**, a **Recent Activity** feed linking into the audit log, and a **Team Members** quick-view panel. Two conditional widgets appear when the relevant feature is enabled for your plan: an **Expiring Secrets** widget listing variables with a rotation schedule expiring within 7 days, and a shared-secrets widget summarizing any active share links you've sent.
 
-## Dashboard navigation
+## Projects and the project page
 
-| Route                  | What it does                                 |
-| ---------------------- | -------------------------------------------- |
-| `/dashboard`           | Overview with recent activity                |
-| `/dashboard/projects`  | List, create, and manage projects            |
-| `/dashboard/variables` | Browse variables across all projects         |
-| `/dashboard/team`      | Invite members, assign organization roles    |
-| `/dashboard/audit`     | Full audit log with filters and export       |
-| `/dashboard/analytics` | Usage analytics and trends                   |
-| `/dashboard/usage`     | Current plan limits and feature availability |
-| `/dashboard/settings`  | Profile, integrations, active sessions       |
+**Projects** (`/dashboard/projects`) lists every project you have access to; **Create Project** offers an optional framework template (Next.js, T3 Stack, Django, Rails, and ~20 others) that pre-fills a starter variable set with placeholder values for you to fill in.
 
-## Projects
+Opening a project lands on its variable table, with tabs for **All** plus each of the three environments (development/staging/production), a search box (server-side, debounced, capped at the first 100 matches with a banner if you hit that limit), and — if your organization has tags enabled — a tag-filter chip row. Each variable row supports edit, delete, reveal, version history with rollback, and (if sharing is enabled) sending a share link. Deleting warns that the variable is recoverable **for 7 days**, after which it's purged permanently along with its vault value. Selected rows can be bulk-deleted via a floating action bar. The header row links out to **Compare** (diff), **Members**, and **Trash** for the project.
 
-Each project holds environment variables for three environments: **development**, **staging**, and **production**. Create a project from the dashboard, then add variables through the UI or push them from the CLI.
+Depending on your role, the create button reads **Add Variable** (writes immediately) or **Request Variable** (files a pending request) — see [Roles & Permissions](/rbac).
 
-Projects support role-based access at the project level:
+## Variable requests
 
-- **Manager** — full read/write, can manage project members
-- **Developer** — can view and edit variables, cannot manage members
-- **Viewer** — read-only access to variables they have explicit permission to see
+The requests inbox lives at `/dashboard/requests`, reachable from a project's own (read-only) requests list via a **Review** link. It's tabbed by status — **Pending / Approved / Rejected / Canceled** — and only reviewers (Team Lead level and above) can act on a request.
 
-## Variables
+For each pending request, a reviewer can adjust which environments to approve for (toggle chips, at least one required) before accepting. The interesting case is a **machine-filed request with no proposed value** — filed by an API key over the MCP server rather than a person. Its row shows a masked password input with the placeholder _"Enter the value to approve"_: the reviewer types the actual secret in, and Accept stays disabled until both an environment and a value are supplied. This is the "agent requests, human approves" model — the value is encrypted client-side before the approval mutation runs, so a machine can propose that a secret should exist without ever being trusted to supply it.
 
-The variables page shows every variable across all projects you have access to. Each variable entry displays:
+> Rejecting a request is a plain confirm dialog — there's no free-text reason field for the reviewer to fill in on this screen.
 
-- Key name and environment
-- Tags for organization
-- Masked or revealed value (toggle visibility)
-- Version history with rollback (Admin only)
-- Last modified timestamp and author
+## Secret rotation and expiry
 
-Variables are encrypted at rest in WorkOS Vault. The dashboard retrieves and decrypts them on demand — values are never stored in plaintext on the server.
+If your plan includes it, the variable create/edit form gets an extra "Enable rotation schedule" checkbox with a preset dropdown — every 30, 60, 90 (default), 180, or 365 days. A variable with rotation enabled shows up in the **Expiring Secrets** widget on the dashboard home once it's within 7 days of its expiry date, and reminder emails go out on the same schedule. Rotation itself isn't automatic — Envpilot doesn't generate or rotate the value for you, it tracks the date and nags until someone updates it. Rotation-enabled variable counts are capped on the free tier (see Usage below).
 
-## Team management
+## Environment diff
 
-Invite team members by email from the Team page. Each member gets an organization-level role:
+The diff page (`/dashboard/projects/[slug]/diff`) compares two or more environments side by side (default: development vs. production), classifying each key as matching, changed, or missing per environment based on vault references — not decrypted content, until you reveal it. If two references differ but the actual decrypted values are byte-identical, a "content match" badge flags that instead of reporting a false diff. You can search, filter to sensitive-only, sort by status or key, reveal individual values or everything at once, and export the comparison as per-environment `.env` files or as a JSON/Markdown report. For keys missing from one environment, a **copy-from** helper copies the value from where it exists so you can paste it into the target — there's no one-click sync mutation.
 
-- **Admin** — full access to everything, including billing and deletion
-- **Team Lead** — manages projects, variables, and approves member requests
-- **Member** — read-only by default, must request access to variables
+## Trash and restore
 
-See [Roles & Permissions](/rbac) for the full breakdown.
+Each project's Trash page lists soft-deleted variables and shared accounts separately, each restorable individually. Retention is **7 days**, shown per row as "Deleted N days ago — M days left" (turning red at 1 day or less); after that window the vault value is permanently destroyed. An **Empty trash** action is available to purge everything immediately, skipping the rest of the retention window.
+
+## Shared accounts
+
+Beyond variables, a project can hold **shared accounts** (`/dashboard/projects/[slug]/accounts`) — credential pairs for things like a shared Stripe dashboard login or a database admin account, kept separate from environment variables. Creating one asks for a name, optional website URL, username/email, password (masked), description, and which environments it applies to. Accounts support the same edit/delete/reveal actions as variables (with the same 7-day trash retention), plus **Manage Permissions** for granting project members access and **Share** for sending an external share link.
+
+## Sharing
+
+The Sharing page (`/dashboard/projects/[slug]/shared`) is a management view for **share links** — one-time or time-limited links that reveal a single variable or account value to someone outside the project (or outside Envpilot entirely), gated by email verification. It shows stats (total/active/viewed/expired/revoked), and each card shows the resource type, whether it's one-time or time-limited, recipient view status, and a countdown to expiry. The only action on this page is **Revoke** — links are created from the share button on a variable or account row, not from here.
+
+## Team and members
+
+An organization's **Members** page is where you invite people (see [Getting Started](/getting-started)), change existing members' roles, and remove them. Each member row also carries a **Suspend access** action — Security Hold — which freezes a member's access everywhere (web, CLI, extension, API) without touching their role or project assignments, and optionally lets you revoke any API keys or CI/CD tokens they created. A suspended row flips to **Reinstate**, which restores exactly what was frozen. Full mechanics are in [Roles & Permissions](/rbac).
+
+A project also has its own **Members** page for assigning existing org members to that project; for roles that are environment-scoped, an additional checklist restricts which environments they can see within the project.
 
 ## Audit log
 
-Every action is recorded: variable reads, writes, permission changes, authentication events, team invitations, and more. The audit log captures:
+`/dashboard/audit` is a searchable, filterable log of every recorded action — variable reads/writes, permission changes, authentication, team changes, billing, and CI/CD events across 14 categories. Filter by free-text search, category, and a date range (24h/7d/30d/90d), and export the filtered results as CSV or JSON. Audit logs are retained for 90 days on the free tier and 365 days on Pro.
 
-- Action type and category
-- User who performed it
-- IP address and user agent
-- Timestamp
+## Analytics
 
-Filter by action type, user, date range, or category. Export logs as JSON for SOC 2 compliance. Admins can access the full audit trail; Team Leads see project-scoped logs.
+`/dashboard/analytics` (Project Manager role and above) shows six panels: an activity-overview chart, project-activity and variable-changes-by-project breakdowns, team activity (most active users), a resource breakdown, and security insights (security-event counts, sensitive-access counts, and permission-change counts). The time-range selector (7/30/90 days) is capped by your plan's analytics retention.
 
-## Settings and integrations
+## Usage
 
-From the Settings page:
+`/dashboard/usage` (organization owner only) is the plan page: a strip showing your current tier, price, and upgrade/billing links; an alert zone for anything at or near its limit; a "Quotas & limits" section with meters for organizations, projects, team members, variables per project, invitations, active shares, rotation-enabled variables, and shared accounts, plus your audit-log and analytics retention windows; and a "Plan features" section comparing what's available on your current tier against Pro. If tier enforcement is off (pre-alpha mode), the page shows a badge saying so.
 
-- **Profile** — update your name and email
-- **Integrations** — install the VS Code extension, generate CLI tokens
-- **Active Sessions** — view and revoke CLI/extension sessions
-- **Organization** — manage organization details, billing, and plan upgrades
-- **Security** — review authentication settings and session policies
+## Organization settings
 
-## Version history
+Organization Settings has four tabs: **General**, **Tags**, **API Keys**, and **Danger Zone**. General and Danger Zone (transfer or delete the organization) are owner-only.
 
-Every variable edit creates a new version. The version history shows:
+- **Tags** — full CRUD for the organization's color-coded tag set (create, bulk-paste, edit, delete), used to filter and organize variables across projects. Deleting a tag strips it from every variable that used it.
+- **API Keys** — create org-scoped API keys for the REST API, MCP server, and GitHub Action, choosing which surfaces, which projects (owners only can pick "all projects, including future ones" — team leads are limited to specific projects), environments, and resources the key can reach. Each key row shows who created it, when it was last used, pull/denial/request counts, and a **Revoke** action (there's no rotate-in-place — revoke and create a new one). See [API Quickstart](/api-quickstart) for using a key.
 
-- What changed (old value → new value, masked)
-- Who made the change
-- When it happened
+> Billing and plan upgrades live on the personal account settings page (`/dashboard/settings`), not here.
 
-Admins can roll back any variable to a previous version per environment.
+## Project settings
+
+A project's Settings page has two tabs: **General** (name, description, icon/color, and VS Code auto-unsync behavior) and **Danger Zone** (transfer the project to another organization, or delete it — deletion gives variables and accounts the same 7-day trash retention as a manual delete). There's no separate CI/CD Tokens tab in the current dashboard: legacy CI/CD service tokens still work through a compatibility fallback, but new automation should use an API key created from Organization Settings → API Keys instead.
+
+## Where to go next
+
+- [Roles & Permissions](/rbac) — the full role, capability, and Security Hold model
+- [CLI Tool](/cli) and [VS Code Extension](/extension) — the same data from your terminal or editor
+- [API Quickstart](/api-quickstart) — read variables and accounts over REST
+- [Security](/security) — encryption, audit, and revocation model

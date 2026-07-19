@@ -56,7 +56,26 @@ export interface SidebarItem {
   slug: string;
   title: string;
   icon: string;
+  category: string;
   description?: string;
+}
+
+/** Group items by category, preserving the incoming (already sorted) order. */
+function groupByCategory(
+  items: SidebarItem[]
+): { label: string; items: SidebarItem[] }[] {
+  const groups: { label: string; items: SidebarItem[] }[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.label === item.category) {
+      last.items.push(item);
+    } else {
+      const existing = groups.find((g) => g.label === item.category);
+      if (existing) existing.items.push(item);
+      else groups.push({ label: item.category, items: [item] });
+    }
+  }
+  return groups;
 }
 
 export function DocsSidebar({
@@ -66,6 +85,7 @@ export function DocsSidebar({
   items: SidebarItem[];
   activeSlug: string;
 }) {
+  const groups = groupByCategory(items);
   return (
     <>
       {/* ── Desktop sticky rail ───────────────────────────────────── */}
@@ -76,34 +96,41 @@ export function DocsSidebar({
             {"// documentation"}
           </p>
 
-          <ul className="mt-4 space-y-1">
-            {items.map((item) => {
-              const active = item.slug === activeSlug;
-              const Icon = DOC_ICONS[item.icon] ?? DOC_ICONS["file-text"];
-              return (
-                <li key={item.slug} className="relative">
-                  {active && (
-                    <span
-                      aria-hidden
-                      className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
-                    />
-                  )}
-                  <Link
-                    href={`/${item.slug}`}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                      active
-                        ? "bg-green-500/5 text-green-400"
-                        : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    {item.title}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          {groups.map((group) => (
+            <div key={group.label} className="mt-5">
+              <p className="px-3 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+                {group.label}
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {group.items.map((item) => {
+                  const active = item.slug === activeSlug;
+                  const Icon = DOC_ICONS[item.icon] ?? DOC_ICONS["file-text"];
+                  return (
+                    <li key={item.slug} className="relative">
+                      {active && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-green-400"
+                        />
+                      )}
+                      <Link
+                        href={`/${item.slug}`}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          active
+                            ? "bg-green-500/5 text-green-400"
+                            : "text-zinc-500 hover:bg-zinc-900/60 hover:text-zinc-200"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        {item.title}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
 
           <div className="mt-8 border-t border-zinc-800/60 pt-4">
             <p className="px-3 font-mono text-[10px] tracking-widest text-zinc-600">
