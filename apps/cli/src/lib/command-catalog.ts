@@ -17,6 +17,8 @@ import { createManCommand } from "../commands/man.js";
 import { createUICommand } from "../commands/ui.js";
 import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
+import { varCommand } from "../commands/var.js";
+import { diffCommand } from "../commands/diff.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -221,20 +223,79 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
   },
   {
     id: "requests",
-    title: "List variable requests",
+    title: "List and review variable requests",
     category: "Browse",
-    description: "List pending and past variable requests for a project.",
+    description:
+      "List variable requests, or approve/reject/cancel them without leaving the terminal.",
     argv: ["requests"],
-    args: "[--project <name-or-id>] [--status <status>]",
-    examples: [["requests"], ["requests", "--status", "pending"]],
-    websiteSurface: "Maps to `/api/cli/variable-requests` (GET).",
-    notes: [
-      "Reviewers (owner, assigned project manager/team lead) see every request for the project.",
-      "Developers see only their own requests.",
+    args: "[list|approve|reject|cancel] [<id>] [--status <status>] [--json]",
+    examples: [
+      ["requests"],
+      ["requests", "--status", "pending"],
+      ["requests", "approve", "<id>"],
+      ["requests", "approve", "<id>", "--value", "sk_live_…"],
+      ["requests", "reject", "<id>", "--reason", "use the shared key"],
+      ["requests", "cancel", "<id>"],
     ],
-    keywords: ["requests", "approval", "review", "pending"],
+    websiteSurface: "Convex features/variables/requests (review/cancel).",
+    notes: [
+      "Reviewers (owner, assigned project manager/team lead) see every request; developers see only their own.",
+      "Machine (valueless) requests need --value on approve — the server encrypts it at approval time.",
+      "Get the <id> from the ID column of `envpilot requests`.",
+    ],
+    keywords: ["requests", "approval", "review", "approve", "reject", "cancel"],
     topLevel: true,
     createCommand: () => requestsCommand,
+  },
+  {
+    id: "var",
+    title: "Set or delete a single variable",
+    category: "Sync",
+    description:
+      "Change one variable without pull/edit/push: envpilot var set KEY=VALUE, or var rm KEY.",
+    argv: ["var"],
+    args: "set <key=value> | rm <key> [--env <environment>] [--project <name-or-id>]",
+    examples: [
+      ["var", "set", "API_URL=https://api.example.com"],
+      [
+        "var",
+        "set",
+        "DB_PASSWORD=secret",
+        "--env",
+        "production",
+        "--sensitive",
+      ],
+      ["var", "rm", "OLD_FLAG", "--env", "staging", "--yes"],
+    ],
+    websiteSurface: "Convex features/variables (bulk upsert / remove).",
+    notes: [
+      "set upserts one key in one environment (merge) — every other variable is untouched.",
+      "rm moves the variable to trash; recover it from the dashboard.",
+      "Keys must be UPPER_SNAKE_CASE.",
+    ],
+    keywords: ["var", "set", "delete", "remove", "variable", "edit"],
+    topLevel: true,
+    createCommand: () => varCommand,
+  },
+  {
+    id: "diff",
+    title: "Compare two environments",
+    category: "Browse",
+    description:
+      "Show which variable keys differ between two environments (add --values to compare values).",
+    argv: ["diff"],
+    args: "<envA> <envB> [--values] [--project <name-or-id>] [--json]",
+    examples: [
+      ["diff", "staging", "production"],
+      ["diff", "development", "staging", "--values"],
+    ],
+    websiteSurface: "Convex features/variables (client-side compare).",
+    notes: [
+      "Default is a metadata-only key comparison; --values decrypts both environments.",
+    ],
+    keywords: ["diff", "compare", "environments", "drift"],
+    topLevel: true,
+    createCommand: () => diffCommand,
   },
   {
     id: "run",

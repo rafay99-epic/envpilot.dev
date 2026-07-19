@@ -337,6 +337,26 @@ const refs = {
     },
     VariableRequest
   >("features/variables/requests/actions:createWithValue"),
+  reviewRequest: fnRef<
+    "mutation",
+    {
+      requestId: string;
+      action: "approve" | "reject";
+      reviewReason?: string;
+    },
+    unknown
+  >("features/variables/requests/mutations:review"),
+  approveRequestWithValue: fnRef<
+    "action",
+    { requestId: string; value: string; reviewReason?: string },
+    unknown
+  >("features/variables/requests/actions:approveWithValue"),
+  cancelRequest: fnRef<"mutation", { requestId: string }, unknown>(
+    "features/variables/requests/mutations:cancel"
+  ),
+  removeVariable: fnRef<"mutation", { variableId: string }, unknown>(
+    "features/variables/mutations:remove"
+  ),
 };
 
 async function convexQuery<Ref extends FunctionReference<"query">>(
@@ -765,6 +785,92 @@ export class APIClient {
       throw new APIError("No variable request returned by server", 500);
     }
     return created;
+  }
+
+  /** Approve or reject a request that already carries a value (developer flow). */
+  async reviewRequest(
+    requestId: string,
+    action: "approve" | "reject",
+    reviewReason?: string
+  ): Promise<void> {
+    await convexMutation(refs.reviewRequest, {
+      requestId,
+      action,
+      reviewReason,
+    });
+  }
+
+  /**
+   * Approve a VALUELESS (machine) request by supplying the secret value —
+   * the server encrypts it into the vault at approval time.
+   */
+  async approveRequestWithValue(
+    requestId: string,
+    value: string,
+    reviewReason?: string
+  ): Promise<void> {
+    await convexAction(refs.approveRequestWithValue, {
+      requestId,
+      value,
+      reviewReason,
+    });
+  }
+
+  /** Cancel a pending request (requester or a reviewer). */
+  async cancelRequest(requestId: string): Promise<void> {
+    await convexMutation(refs.cancelRequest, { requestId });
+  }
+
+  /** Soft-delete a single variable by id (moves it to trash). */
+  async removeVariable(variableId: string): Promise<void> {
+    await convexMutation(refs.removeVariable, { variableId });
+  }
+
+  /**
+   * Set a single variable's value in one environment — upsert via the bulk
+   * vault path with merge semantics (creates if absent, updates if present;
+   * leaves every other variable untouched).
+   */
+  async setVariable(
+    projectId: string,
+    environment: string,
+    key: string,
+    value: string,
+    opts?: { description?: string; isSensitive?: boolean }
+  ): Promise<{ created: number; updated: number }> {
+    const result = await convexAction(refs.pushBulk, {
+      projectId,
+      environment,
+      variables: [
+        {
+          key,
+          value,
+          description: opts?.description,
+          isSensitive: opts?.isSensitive,
+        },
+      ],
+      mode: "merge",
+    });
+    return { created: result.created, updated: result.updated };
+  }
+
+  /**
+   * Find the id of an active variable by key in a given environment, so a
+   * single-variable operation (rm) can target it. Returns null if absent.
+   */
+  async findVariableId(
+    projectId: string,
+    environment: string,
+    key: string
+  ): Promise<string | null> {
+    const rows = await convexQuery(refs.listVariablesWithAccess, { projectId });
+    const match = rows.find(
+      (row) =>
+        row.key === key &&
+        row.hasAccess &&
+        row.environments.includes(environment)
+    );
+    return match?._id ?? null;
   }
 }
 
