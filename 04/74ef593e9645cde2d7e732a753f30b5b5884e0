@@ -1,0 +1,47 @@
+apps/blog/package.json
+  s_b5f581b59533b4::t_de3d2cf81982bf 38
+apps/blog/src/app/error.tsx
+  s_b5f581b59533b4::t_96e78e394451eb 3,7,13-18,22,27-29
+apps/docs/package.json
+  s_b5f581b59533b4::t_15706d2068b762 37
+apps/docs/src/app/error.tsx
+  s_b5f581b59533b4::t_7b834cc99d534b 3,7,13-18,22,27-29
+apps/web/package.json
+  s_b5f581b59533b4::t_c5437d798d8678 63
+apps/web/src/app/(dashboard)/dashboard/loading.tsx
+  s_b5f581b59533b4::t_74c00227d82270 3-4
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/loading.tsx
+  s_b5f581b59533b4::t_6daf1c59c0e113 3-4
+apps/web/src/app/(dashboard)/dashboard/requests/loading.tsx
+  s_b5f581b59533b4::t_635b773173de9b 3-4
+apps/web/src/app/(dashboard)/dashboard/team/loading.tsx
+  s_b5f581b59533b4::t_9e8ff39c06ca99 3-4
+apps/web/src/app/(dashboard)/dashboard/variables/loading.tsx
+  s_b5f581b59533b4::t_954f386d0caee4 3-4
+apps/web/src/components/error/segment-error.tsx
+  s_b5f581b59533b4::t_1e12653d2e3d7d 3,5-7,38-47
+apps/web/src/components/ui/chart.tsx
+  s_b5f581b59533b4::t_e672dd06320245 58-64
+convex/features/api/reads.ts
+  s_b5f581b59533b4::t_4db4a52e1bbf13 353,445,600
+convex/features/api/requests.ts
+  s_b5f581b59533b4::t_34ca54bed1da0f 103
+convex/features/projects/queries.ts
+  s_b5f581b59533b4::t_22ec0a778dc886 2,89-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0474ef593e9645cde2d7e732a753f30b5b5884e0",
+  "prompts": {},
+  "sessions": {
+    "s_b5f581b59533b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f643da90-8027-4a24-9688-4ebb87b81cd9",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
