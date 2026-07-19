@@ -159,6 +159,12 @@ const approveSub = new Command("approve")
         }
 
         let value = options.value;
+        if (value !== undefined && process.stdin.isTTY) {
+          error(
+            "--value is for CI only — interactively you are prompted masked so the secret stays out of shell history. Re-run without --value."
+          );
+          process.exit(1);
+        }
         if (options.valueStdin) {
           value = (await readStdin()).replace(/\r?\n$/, "");
           if (!value) {

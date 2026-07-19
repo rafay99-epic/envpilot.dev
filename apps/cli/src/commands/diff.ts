@@ -53,76 +53,89 @@ export const diffCommand = new Command("diff")
       }
 
       const api = createAPIClient();
-      // Default is METADATA-ONLY: no vault decryption, no value-read audit
-      // noise, and a decryption failure can't misreport a key as missing.
-      // Only --values pays for the two decrypting fetches.
-      let mapA: Map<string, string | null>;
-      let mapB: Map<string, string | null>;
-      if (options.values) {
-        const [a, b] = await withSpinner(
-          `Comparing ${envA} vs ${envB} (values)...`,
-          () =>
-            Promise.all([
-              api.listVariables(
-                project.projectId,
-                envA,
-                project.organizationId
-              ),
-              api.listVariables(
-                project.projectId,
-                envB,
-                project.organizationId
-              ),
-            ])
-        );
-        mapA = new Map(a.variables.map((v) => [v.key, v.value]));
-        mapB = new Map(b.variables.map((v) => [v.key, v.value]));
-        const failures = [
-          ...new Set([...a.decryptionFailures, ...b.decryptionFailures]),
-        ];
-        if (failures.length > 0) {
-          warning(
-            `Could not decrypt: ${failures.join(", ")} — value comparison for these keys is unreliable.`
-          );
-        }
-      } else {
-        const [a, b] = await withSpinner(
-          `Comparing ${envA} vs ${envB}...`,
-          () =>
-            Promise.all([
-              api.listVariableKeys(project.projectId, envA),
-              api.listVariableKeys(project.projectId, envB),
-            ])
-        );
-        mapA = new Map(a.keys.map((k) => [k, null]));
-        mapB = new Map(b.keys.map((k) => [k, null]));
-        if (a.truncated || b.truncated) {
-          warning(
-            "Project exceeds the 5000-variable read window — this diff may be incomplete."
-          );
-        }
-      }
-      const allKeys = [...new Set([...mapA.keys(), ...mapB.keys()])].sort();
+      // Existence ALWAYS comes from metadata (no vault decryption, no
+      // value-read audit noise, and a decryption failure can't misreport a
+      // key as missing). --values additionally fetches decrypted values for
+      // comparison; keys that fail to decrypt land in `undecryptable` — an
+      // explicit unknown, never a false "only in" or "different".
+      const [metaA, metaB] = await withSpinner(
+        `Comparing ${envA} vs ${envB}...`,
+        () =>
+          Promise.all([
+            api.listVariableKeys(project.projectId, envA),
+            api.listVariableKeys(project.projectId, envB),
+          ])
+      );
+      const keysA = new Set(metaA.keys);
+      const keysB = new Set(metaB.keys);
+      const truncated = metaA.truncated || metaB.truncated;
 
+      let valsA = new Map<string, string>();
+      let valsB = new Map<string, string>();
+      let undecryptable: string[] = [];
+      if (options.values) {
+        const [a, b] = await withSpinner(`Decrypting values...`, () =>
+          Promise.all([
+            api.listVariables(project.projectId, envA, project.organizationId),
+            api.listVariables(project.projectId, envB, project.organizationId),
+          ])
+        );
+        valsA = new Map(a.variables.map((v) => [v.key, v.value]));
+        valsB = new Map(b.variables.map((v) => [v.key, v.value]));
+        undecryptable = [
+          ...new Set([...a.decryptionFailures, ...b.decryptionFailures]),
+        ].sort();
+      }
+
+      const allKeys = [...new Set([...keysA, ...keysB])].sort();
+      const unknown = new Set(undecryptable);
       const onlyA: string[] = [];
       const onlyB: string[] = [];
       const differing: string[] = [];
       const same: string[] = [];
       for (const key of allKeys) {
-        const inA = mapA.has(key);
-        const inB = mapB.has(key);
+        const inA = keysA.has(key);
+        const inB = keysB.has(key);
         if (inA && !inB) onlyA.push(key);
         else if (!inA && inB) onlyB.push(key);
-        else if (options.values && mapA.get(key) !== mapB.get(key))
+        else if (unknown.has(key))
+          continue; // reported separately
+        else if (
+          options.values &&
+          valsA.has(key) &&
+          valsB.has(key) &&
+          valsA.get(key) !== valsB.get(key)
+        )
           differing.push(key);
         else same.push(key);
       }
 
       if (options.json) {
+        // Nothing else may touch stdout in JSON mode — the document must
+        // stay parseable. Caveats travel as fields, not warnings.
         console.log(
-          JSON.stringify({ envA, envB, onlyA, onlyB, differing, same }, null, 2)
+          JSON.stringify(
+            {
+              envA,
+              envB,
+              onlyA,
+              onlyB,
+              differing,
+              same,
+              undecryptable,
+              truncated,
+            },
+            null,
+            2
+          )
         );
         return;
+      }
+
+      if (truncated) {
+        warning(
+          "Project exceeds the 5000-variable read window — this diff may be incomplete."
+        );
       }
 
       header(`Diff: ${chalk.bold(envA)} vs ${chalk.bold(envB)}`);
@@ -131,8 +144,18 @@ export const diffCommand = new Command("diff")
       printGroup(`Only in ${envB}`, onlyB, chalk.cyan);
       if (options.values) {
         printGroup("Different values", differing, chalk.red);
+        printGroup(
+          "Could not decrypt (comparison unknown)",
+          undecryptable,
+          chalk.magenta
+        );
       }
-      if (onlyA.length === 0 && onlyB.length === 0 && differing.length === 0) {
+      if (
+        onlyA.length === 0 &&
+        onlyB.length === 0 &&
+        differing.length === 0 &&
+        undecryptable.length === 0
+      ) {
         info(
           options.values
             ? "Environments are identical (keys and values)."

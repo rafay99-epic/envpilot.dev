@@ -357,11 +357,11 @@ const refs = {
   removeVariable: fnRef<"mutation", { variableId: string }, unknown>(
     "features/variables/mutations:remove"
   ),
-  updateVariable: fnRef<
+  removeVariableFromEnvironment: fnRef<
     "mutation",
-    { variableId: string; environments?: string[]; changeReason?: string },
+    { variableId: string; environment: string },
     unknown
-  >("features/variables/mutations:update"),
+  >("features/variables/mutations:removeFromEnvironment"),
   resolveProjectRoles: fnRef<
     "query",
     { projectId: string },
@@ -887,7 +887,7 @@ export class APIClient {
     key: string,
     value: string,
     opts?: { description?: string; isSensitive?: boolean }
-  ): Promise<{ created: number; updated: number }> {
+  ): Promise<{ created: number; updated: number; unchanged: boolean }> {
     const result = await convexAction(refs.pushBulk, {
       projectId,
       environment,
@@ -901,17 +901,20 @@ export class APIClient {
       ],
       mode: "merge",
     });
-    if (result.created === 0 && result.updated === 0) {
-      const denied = result.deniedKeys?.includes(key);
+    if (result.deniedKeys?.includes(key)) {
       throw new APIError(
-        denied
-          ? `You do not have write access to ${key}.`
-          : `${key} was not written (skipped by the server).`,
+        `You do not have write access to ${key}.`,
         403,
         "PERMISSION_DENIED"
       );
     }
-    return { created: result.created, updated: result.updated };
+    // created 0 + updated 0 without a denial means the requested state was
+    // already satisfied (unchanged value) — idempotent success, not an error.
+    return {
+      created: result.created,
+      updated: result.updated,
+      unchanged: result.created === 0 && result.updated === 0,
+    };
   }
 
   /**
@@ -954,27 +957,24 @@ export class APIClient {
     });
     return {
       keys: rows
-        .filter(
-          (row) => row.hasAccess && row.environments.includes(environment)
-        )
+        .filter((row) => row.environments.includes(environment))
         .map((row) => row.key),
       truncated: rows.length >= limit,
     };
   }
 
   /**
-   * Re-scope a shared variable: drop `environment` from its environments
-   * list, leaving its value live in the remaining environments.
+   * Re-scope a shared variable: atomically detach `environment` from it
+   * server-side (the mutation re-reads the row, so a concurrent edit can't
+   * be clobbered by a stale client-side array).
    */
   async removeVariableFromEnvironment(
     variableId: string,
-    environments: string[],
     environment: string
   ): Promise<void> {
-    await convexMutation(refs.updateVariable, {
+    await convexMutation(refs.removeVariableFromEnvironment, {
       variableId,
-      environments: environments.filter((env) => env !== environment),
-      changeReason: `Removed from ${environment} via CLI`,
+      environment,
     });
   }
 }

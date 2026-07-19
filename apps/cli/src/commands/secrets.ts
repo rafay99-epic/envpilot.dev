@@ -289,10 +289,16 @@ const setCommand = new Command("set")
                 isSensitive,
               })
           );
-          const verb = result.created > 0 ? "Created" : "Updated";
-          success(
-            `${verb} ${chalk.bold(key)} in ${projectName}/${environment}.`
-          );
+          if (result.unchanged) {
+            success(
+              `${chalk.bold(key)} already has this value in ${projectName}/${environment} — nothing to change.`
+            );
+          } else {
+            const verb = result.created > 0 ? "Created" : "Updated";
+            success(
+              `${verb} ${chalk.bold(key)} in ${projectName}/${environment}.`
+            );
+          }
           return;
         }
 
@@ -403,11 +409,7 @@ const rmCommand = new Command("rm")
 
       if (shared) {
         await withSpinner(`Removing ${key} from ${environment}...`, () =>
-          api.removeVariableFromEnvironment(
-            found._id,
-            found.environments,
-            environment
-          )
+          api.removeVariableFromEnvironment(found._id, environment)
         );
         success(
           `Removed ${chalk.bold(key)} from ${environment} — still live in: ${found.environments.filter((e) => e !== environment).join(", ")}.`

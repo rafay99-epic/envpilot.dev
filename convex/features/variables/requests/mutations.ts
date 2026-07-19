@@ -15,7 +15,9 @@ import { requireAuthedUser } from "../../../lib/identity";
 import {
   assertProjectAction,
   isEnvironmentScopeAllowed,
+  getRoleProfile,
 } from "../../../lib/authz";
+import { hasCapability } from "../../../lib/roleProfiles";
 import {
   checkCountedLimit,
   countActiveVariables,
@@ -223,9 +225,19 @@ async function createCore(
     "project:read"
   );
 
-  if (orgRole !== "developer") {
+  // Capability-based, not slug-based: custom registry roles that hold the
+  // requests.submit capability may file requests; roles with direct-write
+  // capability are told to create directly (the old `orgRole !== "developer"`
+  // check rejected every custom role slug outright).
+  const requesterProfile = await getRoleProfile(ctx, orgRole);
+  if (hasCapability(requesterProfile, "project.variables.update")) {
     throw new ConvexError(
-      "Only developers can create variable requests — owners, project managers, and team leads can create variables directly"
+      "Your role can create variables directly — no request needed"
+    );
+  }
+  if (!hasCapability(requesterProfile, "project.requests.submit")) {
+    throw new ConvexError(
+      "Your role does not have permission to submit variable requests"
     );
   }
 
