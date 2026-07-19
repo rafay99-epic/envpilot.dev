@@ -32,7 +32,17 @@ A key carries:
 
 Because all three machine surfaces route through one authorizer, there is no second implementation of "is this key allowed" to drift out of sync. Denials are **returned, not thrown**, so the audit write always survives; an unknown, revoked, or expired key gets one uniform answer; and the plan gate (`public_api` / `mcp_server` per surface) is re-checked on **every** request.
 
-<Mermaid name="surfaces" />
+```mermaid
+flowchart TD
+    A[CLI] --> W[WorkOS identity<br/>human auth]
+    B[VS Code extension] --> W
+    D[REST API] --> C
+    E[MCP server] --> C
+    F[GitHub Action] --> C
+    C[_authorizeRequest<br/>one enforcement core for API keys] --> G[(Convex<br/>metadata + refs)]
+    W --> G
+    C --> H[(WorkOS Vault<br/>encrypted values)]
+```
 
 ## The trust model: agents request, humans approve
 
@@ -48,7 +58,22 @@ GitHub Action keys are the strict case: they are locked to a single project and 
 
 When an agent needs a value it can't see, the round trip looks like this:
 
-<Mermaid name="request-flow" />
+```mermaid
+sequenceDiagram
+    participant Agent
+    participant MCP as MCP server
+    participant Reviewer as Human reviewer
+    Agent->>MCP: envpilot_request_variable(key, justification)
+    MCP-->>Agent: request filed (status: pending)
+    Note over Reviewer: Sees the request in the dashboard
+    Reviewer->>Reviewer: Approve and supply the value
+    loop Poll
+      Agent->>MCP: envpilot_get_request_status
+      MCP-->>Agent: pending / approved / rejected
+    end
+    Agent->>MCP: envpilot_get_variable(key)
+    MCP-->>Agent: value (now readable)
+```
 
 If the reviewer rejects instead, `envpilot_get_request_status` returns `rejected` along with the reviewer's reason, so the agent can report back why it was turned down rather than silently retrying.
 

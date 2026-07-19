@@ -131,7 +131,20 @@ The signature verification was real. `validateEvent(body, headers, webhookSecret
 
 It was also a lock on a door nobody had to walk through.
 
-<Mermaid name="billing-when-stripe-is-not-an-option-trust-boundary" />
+```mermaid
+flowchart TD
+    P["Polar sends event"] --> R["POST /api/webhooks/polar"]
+    R --> V["validateEvent(body, headers, secret)"]
+    V --> A["processWebhookEvent (public action)"]
+    X["Anyone with NEXT_PUBLIC_CONVEX_URL"] -->|"forged subscription.active"| A
+    A --> G["bridgeSecret check<br/>timingSafeEqual vs env var"]
+    G -->|"match"| OK["dispatch to internal mutations"]
+    G -->|"no match or var unset"| D["throw, refuse the event"]
+    style V fill:#3cb371,color:#fff
+    style X fill:#e05252,color:#fff
+    style G fill:#3cb371,color:#fff
+    style D fill:#f0a500,color:#fff
+```
 
 Trace the red lane: it never touches the green signature check at all.
 
@@ -194,7 +207,23 @@ The trust-boundary hole was the headline. The one that matters more is this one,
 
 Polar redelivers a webhook only on a non-2xx response. My route returned 200 the moment it dispatched. So if the handler couldn't map the product ID to a tier — say, because I hadn't seeded the production product yet — it fell back to the default tier and logged an error into the void.
 
-<Mermaid name="billing-when-stripe-is-not-an-option-ack200" />
+```mermaid
+flowchart TD
+    C["Customer pays"] --> E["Polar emits subscription.active"]
+    E --> R["Route returns 200 immediately"]
+    R --> H["activateSubscriptionFromEvent"]
+    H --> M["Product not seeded in paymentProducts"]
+    M -->|"old: mapProductIdToTier"| F["falls back to default tier: free"]
+    F --> L["console.error, then nothing"]
+    L --> T["Paid: yes / Tier: free / Retry: never"]
+    M -->|"new: mapProductIdToTierStrict"| TH["throw, action rejects"]
+    TH --> R5["Route returns 500"]
+    R5 --> RD["Polar redelivers with backoff"]
+    style T fill:#e05252,color:#fff
+    style F fill:#f0a500,color:#fff
+    style TH fill:#3cb371,color:#fff
+    style RD fill:#3cb371,color:#fff
+```
 
 Follow the orange branch to its terminal state and read the three words in the red box.
 
@@ -218,7 +247,17 @@ There were six more in the same sweep, and my favourite is the anti-abuse check 
 
 Three separate bugs also came from `.first()` in Convex returning the **oldest** row, not the newest. A stale revoked subscription shadowed a live one, which let a subscriber buy twice.
 
-<Mermaid name="billing-when-stripe-is-not-an-option-113-days" />
+```mermaid
+flowchart LR
+    A["2026-03-19<br/>SECURITY-TODO filed<br/>Critical, unchecked"] --> B["2026-03-21<br/>PR 45 merged<br/>Stripe to Polar"]
+    B --> C["2026-03-22<br/>PR 48<br/>event-ordering race"]
+    C --> D["2026-04-05<br/>PR 49 (+3813)<br/>then PR 50 to main"]
+    D --> E["2026-04-18<br/>file moved to docs/<br/>box still unchecked"]
+    E --> F["2026-07-10<br/>PR 99<br/>box finally checked"]
+    style A fill:#e05252,color:#fff
+    style E fill:#f0a500,color:#fff
+    style F fill:#3cb371,color:#fff
+```
 
 Note the middle of that line — the file moved to `docs/` in April with the box still empty — 113 days of a critical item surviving two migrations and a directory move.
 

@@ -13,18 +13,19 @@ import {
   GridLines,
   Noise,
   Reveal,
+  MermaidChart,
+  remarkMermaid,
 } from "@envpilot/ui";
 import { BlogShell } from "@/components/shell";
-import { Mermaid } from "@/components/Mermaid";
 import Link from "next/link";
 import { ArrowLeft, Clock, Layers } from "lucide-react";
 
-// Shared MDX overrides plus blog-only components (Mermaid diagrams).
-const mdxComponents = { ...docsComponents, Mermaid };
+// Shared MDX overrides plus the mermaid renderer for ```mermaid fences.
+const mdxComponents = { ...docsComponents, MermaidChart };
 
 const mdxOptions = {
   mdxOptions: {
-    remarkPlugins: [remarkGfm],
+    remarkPlugins: [remarkGfm, remarkMermaid],
     rehypePlugins: [
       [
         rehypePrettyCode,

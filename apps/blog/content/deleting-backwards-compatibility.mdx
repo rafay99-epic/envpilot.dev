@@ -76,7 +76,18 @@ A single version floor is coarse. It blocks a 1.17 client from commands that wou
 
 Coarse is the point. One number, one place, one thing to reason about on merge day.
 
-<Mermaid name="deleting-backwards-compatibility-version-manifest" />
+```mermaid
+flowchart TD
+    V["versions.ts<br/>APP_VERSIONS"] --> R["app/api/version/route.ts<br/>NextResponse.json(APP_VERSIONS)"]
+    P["proxy.ts unauthenticatedPaths<br/>includes /api/version"] -->|"without it: 302 to WorkOS HTML,<br/>checks no-op"| R
+    R --> G["GET /api/version<br/>public JSON"]
+    G --> C["CLI: lib/version-check.ts<br/>enforceVersion in preAction"]
+    G --> X["VS Code: services/versionCheck.ts<br/>checkForUpdate"]
+    G --> W["Web: dashboard/update-banner.tsx"]
+    C -->|"blocked"| CB["printHardBlock, exit 1"]
+    X -->|"blocked"| XB["outdated latch, setContext, modal<br/>wrapCommand refuses every command"]
+    W --> WS["soft notice only"]
+```
 
 Follow the signed-out path and notice it's the only path that matters.
 
@@ -122,7 +133,22 @@ The disk.
 
 Twice in one PR I had to walk the same thing back toward "advisory unless it is certain."
 
-<Mermaid name="deleting-backwards-compatibility-enforce-version" />
+```mermaid
+flowchart TD
+    S["envpilot cmd"] --> H["preAction hook"]
+    H --> E["enforceVersion"]
+    E --> F{"cache state"}
+    F -->|"fresh, under 1h"| D["decide from disk<br/>no network"]
+    F -->|"stale with data"| D2["decide from disk,<br/>void refreshCache in background"]
+    F -->|"stale, no data"| D3["await refreshCache<br/>3s cap, timer unref'd"]
+    D --> EV["evaluateVersion"]
+    D2 --> EV
+    D3 --> EV
+    EV -->|"current below min"| B["hard block, exit 1"]
+    EV -->|"current below latest"| N["soft notice, proceed"]
+    EV -->|"otherwise"| OK["proceed"]
+    E -->|"throw: corrupt cache, disk error"| FO["catch returns false<br/>FAIL OPEN, never blocks"]
+```
 
 Count how many arrows lead to "run the command anyway" — that's deliberate.
 
@@ -185,7 +211,16 @@ By the time I came to remove them, there were **eleven** shim files, not nine.
 
 The floor and the deletion have to move together, in one commit. Raise the floor without deleting and you're just carrying dead code around. Delete without raising the floor and old clients get `function not found` instead of an upgrade prompt — which is the original bug, faithfully reintroduced by its own fix.
 
-<Mermaid name="deleting-backwards-compatibility-shim-lifecycle" />
+```mermaid
+flowchart TD
+    A["PR #95, 2026-07-10<br/>convex restructured, root shims born"] --> A2["re-export only, keeps<br/>variables:listWithAccess alive"]
+    A2 --> G1{"gate 1: npm has @envpilot/cli 1.18.0?"}
+    G1 -->|"yes"| G2{"gate 2: Open VSX has extension 1.15.0?"}
+    G2 -->|"yes"| G3{"gate 3: convex logs show zero calls<br/>to variables:* / projects:*?"}
+    G3 -->|"yes"| M["PR #131, 2026-07-17<br/>minCli 1.18.0, minExtension 1.15.0"]
+    M --> D["11 shims deleted<br/>213 lines across 17 files"]
+    M --> U["older builds get an upgrade prompt,<br/>not a stack trace"]
+```
 
 Notice the shim's whole life is bounded by a number in a different repo directory.
 

@@ -106,7 +106,26 @@ Knowing what something costs is not the same as being able to afford it.
 
 This is where it actually went wrong, and it's worse than "there was a cron."
 
-<Mermaid name="the-feature-that-lived-72-days-cost" />
+```mermaid
+flowchart TD
+    subgraph P1["Path 1 - hourly cron"]
+      C["crons.interval 1 hour"] --> B["buildBaselines"]
+      B --> O["organizations.collect()"]
+      O --> M["per org: members.collect()"]
+      M --> L["per member: 30d auditLogs.collect()"]
+      L --> F["JS .filter() by org"]
+    end
+    subgraph P2["Path 2 - every variable access / security event"]
+      V["variable viewed / copied / exported"] --> A["logVariableAccess / logSecurityEvent"]
+      A --> S["scheduler.runAfter 0"]
+      S --> D["detectAnomaliesAfterAudit"]
+      D --> R["6 rules, each a cooldown query"]
+      R --> Y["velocity_spike + cross_org_burst<br/>re-scan 60m of auditLogs"]
+    end
+    style F fill:#e05252,color:#fff
+    style Y fill:#e05252,color:#fff
+    style A fill:#f0a500,color:#fff
+```
 
 Left branch is the hourly job. Right branch is what fired on every variable access and every security event.
 
@@ -196,7 +215,19 @@ At **03:53:59** — twenty minutes and thirty-three seconds later, same branch �
 >
 > …
 
-<Mermaid name="the-feature-that-lived-72-days-window" />
+```mermaid
+flowchart LR
+    T1["03:33:26 · 8615b7b5<br/>delete buildBaselines"] --> T2["03:53:59 · 9b1d4526<br/>bound read costs"]
+    T2 --> F1["processRotationExpiry<br/>by_expires_at"]
+    T2 --> F2["cleanupExpiredOtps<br/>by_otp_expires"]
+    T2 --> F3["projectAccess cleanup<br/>by_active_and_expires"]
+    T2 --> F4["cleanupProcessedWebhooks<br/>by_processed_at"]
+    style T1 fill:#e05252,color:#fff
+    style F1 fill:#3cb371,color:#fff
+    style F2 fill:#3cb371,color:#fff
+    style F3 fill:#3cb371,color:#fff
+    style F4 fill:#3cb371,color:#fff
+```
 
 Green got an index. Red got a gravestone twenty minutes earlier — which is why it isn't on the list.
 
@@ -212,7 +243,17 @@ Nothing. That's the honest answer.
 
 There is no commit that index-bounds `buildBaselines`. None that throttles `detectAnomaliesAfterAudit`. None that flips `cron_pause_anomaly_baselines` — the pause button I built specifically for this, and never pressed.
 
-<Mermaid name="the-feature-that-lived-72-days-lifespan" />
+```mermaid
+flowchart LR
+    A["Apr 21 · 20f45e43<br/>+1570 lines"] --> B["72 days<br/>zero commits"]
+    B --> C["Jul 2 · 8615b7b5<br/>-1570 lines"]
+    D["#63 sentry"] --> E["#65 CLI TUI"]
+    E --> F["#66 CI publish"]
+    F --> G["#67 marketing"]
+    G --> H["#69 extension perf"]
+    style B fill:#f0a500,color:#fff
+    style C fill:#e05252,color:#fff
+```
 
 Top track is the file. Bottom track is the repo carrying on without it — #63, #65, #66, #67, #69 all merged in that gap and not one of them touched anything matching `anomal`.
 

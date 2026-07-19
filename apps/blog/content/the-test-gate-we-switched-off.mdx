@@ -26,7 +26,25 @@ CLI `1.16.0` and extension `1.10.0` were the first client builds compiled agains
 
 So the gate. `bunx convex deploy --yes` to a throwaway deployment, run the suite against it, and wire `needs.e2e.result == 'success'` into deploy-convex, deploy-cli, deploy-extension and the GitHub release.
 
-<Mermaid name="the-test-gate-we-switched-off-chain" />
+```mermaid
+flowchart TD
+    A["changes"] --> B["checks-passed"]
+    B --> C["e2e gate (Playwright)"]
+    C --> D["Deploy Convex"]
+    D --> E["Deploy CLI"]
+    D --> F["Deploy extension"]
+    E --> G["Deploy Homebrew formula"]
+    G --> H["GitHub Release"]
+    F --> H
+    style A fill:#3cb371,color:#fff
+    style B fill:#3cb371,color:#fff
+    style C fill:#e05252,color:#fff
+    style D fill:#f0a500,color:#fff
+    style E fill:#f0a500,color:#fff
+    style F fill:#f0a500,color:#fff
+    style G fill:#f0a500,color:#fff
+    style H fill:#f0a500,color:#fff
+```
 
 Red at the top means nothing below it moves — that's the whole design, and on the first two runs it worked exactly as drawn.
 
@@ -116,7 +134,17 @@ Here's the branch in `variable-create-drawer.tsx` that deleted my locator:
     <VariableForm
 ```
 
-<Mermaid name="the-test-gate-we-switched-off-key" />
+```mermaid
+flowchart TD
+    A["Add Variable drawer opens"] --> B{"varBlocked?"}
+    B -->|"under the cap"| C["VariableForm renders #key"]
+    B -->|"at 50 of 50"| D["UpgradePrompt<br/>You have reached the variable limit."]
+    E["Playwright waits on<br/>getByRole(dialog).locator(#key)"] -.-> C
+    D --> F["#key never exists<br/>locator times out"]
+    style C fill:#3cb371,color:#fff
+    style D fill:#f0a500,color:#fff
+    style F fill:#e05252,color:#fff
+```
 
 Follow the right-hand branch: nothing on it is broken, and `#key` is nowhere on it.
 
@@ -128,7 +156,21 @@ That is the most humbling class of test failure there is. The test was wrong and
 
 The worst part isn't that it happened. It's that it was self-feeding.
 
-<Mermaid name="the-test-gate-we-switched-off-ratchet" />
+```mermaid
+flowchart TD
+    A["spec fails"] --> B["its finally cleanup is skipped"]
+    B --> C["stale E2E_* rows survive"]
+    C --> D["active variable count climbs"]
+    D --> E["count hits 50 of 50"]
+    E --> F["drawer renders UpgradePrompt"]
+    F --> A
+    G["cleanup.setup.ts pre-run sweep"] --> C
+    H["STALE_AGE_MS = 30 min guard<br/>spares a concurrent run"] --> G
+    style A fill:#e05252,color:#fff
+    style F fill:#e05252,color:#fff
+    style G fill:#3cb371,color:#fff
+    style H fill:#f0a500,color:#fff
+```
 
 Follow the loop clockwise — every failing run makes the next run more likely to fail.
 
