@@ -48,7 +48,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const project = await convex.query(api.features.projects.queries.getById, {
+    // Sync the Convex user BEFORE any identity-authed query — a first-time
+    // WorkOS session has no users row yet, so authed queries would fail
+    // server-side before the row is created.
+    const convexUser = await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+
+    const project = await authed.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -56,10 +62,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       project.organizationId
     );
 
@@ -103,7 +107,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // team_lead — Convex enforces project-assignment scoping for non-owners).
     let assignableMembers = null;
     if (roleLevel(membership.role) >= ROLE_LEVEL.team_lead) {
-      assignableMembers = await createAuthedConvexClient(accessToken!).query(
+      assignableMembers = await authed.query(
         api.features.projects.members.getAssignableOrgMembers,
         {
           projectId: id as Id<"projects">,

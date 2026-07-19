@@ -14,25 +14,26 @@ import { ConvexHttpClient } from "convex/browser";
 export const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
- * Per-request authenticated Convex client factory — DORMANT until the auth
- * cutover (see docs/CONVEX_AUTH_MIGRATION.md).
+ * Per-request authenticated Convex client factory — the REQUIRED path for
+ * any Convex call that runs as the signed-in user. Identity-enforced
+ * functions (requireAuthedUser/getAuthedUser — e.g. projects.getById,
+ * getBySlug, listByOrganization, all mutations) reject calls made through
+ * the unauthenticated singleton above.
  *
- * The shared `convex` singleton above must NEVER have `setAuth()` called on it:
- * it is reused across all 71+ API routes and concurrent requests, so mutating
- * its auth state per-request would leak one caller's identity into another's
- * request. When a route needs to make an *authenticated* Convex call on behalf
- * of the signed-in user, create a fresh client bound to that caller's token:
+ * The shared `convex` singleton must NEVER have `setAuth()` called on it:
+ * it is reused across all API routes and concurrent requests, so mutating
+ * its auth state per-request would leak one caller's identity into
+ * another's request. Instead, bind a fresh client to the caller's token:
  *
- *   const { accessToken } = await withAuth();
- *   const authed = createAuthedConvexClient(accessToken);
- *   await authed.mutation(api.someModule.someFn, { ...argsWithoutUserId });
+ *   const { user, accessToken } = await withAuth();
+ *   await getOrCreateConvexUser(convex, user); // users row must exist FIRST
+ *   const authed = createAuthedConvexClient(accessToken!);
+ *   await authed.query(api.someModule.someFn, args);
  *
- * The `token` is the WorkOS AuthKit access token (JWT) from `withAuth()`.
- * Until convex/auth.config.ts is active AND functions read identity via
- * convex/identity.ts, passing a token here is harmless — functions still
- * accept their existing `userId` args and ignore the request identity.
- *
- * This factory is intentionally NOT wired into any route yet.
+ * The `token` is the WorkOS AuthKit access token (JWT) from `withAuth()`;
+ * its `sub` maps to `users.workosId`, which is why the getOrCreateConvexUser
+ * sync must precede the first authed call on a first-time session.
+ * Reuse ONE authed client per handler — don't re-create it per call.
  */
 export function createAuthedConvexClient(token: string): ConvexHttpClient {
   const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);

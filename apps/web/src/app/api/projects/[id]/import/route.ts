@@ -77,18 +77,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Sync the Convex user BEFORE any identity-authed query — a first-time
+    // WorkOS session has no users row yet, so authed queries would fail
+    // server-side before the row is created.
+    await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+
     // Get the project
-    const project = await convex.query(api.features.projects.queries.getById, {
+    const project = await authed.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-
-    // Ensure the `users` row exists so the session JWT resolves server-side.
-    await getOrCreateConvexUser(convex, user);
-    const authed = createAuthedConvexClient(accessToken!);
 
     // Check org membership and role
     const membership = await authed.query(

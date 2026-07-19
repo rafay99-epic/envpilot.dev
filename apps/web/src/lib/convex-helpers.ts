@@ -83,7 +83,11 @@ export async function checkOrganizationMembership(
 }
 
 /**
- * Get the organization that owns a project
+ * Get the organization that owns a project.
+ *
+ * Pass an AUTHED client (createAuthedConvexClient) — projects.getById
+ * requires the caller's JWT identity and org membership, so the
+ * unauthenticated singleton gets "not found" for every project.
  */
 export async function getProjectOrganization(
   convex: ConvexHttpClient,

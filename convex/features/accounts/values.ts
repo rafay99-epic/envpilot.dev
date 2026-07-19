@@ -63,9 +63,12 @@ export const createWithCredentials = action({
   handler: async (ctx, args): Promise<{ accountId: Id<"projectAccounts"> }> => {
     const userId = await requireCurrentUserId(ctx);
 
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new Error("Project not found");
     }

@@ -62,8 +62,8 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     // Verify user has access to the project
-    const { organizationId } = await getProjectOrganization(
-      convex,
+    const { project, organizationId } = await getProjectOrganization(
+      createAuthedConvexClient(accessToken!),
       variable.projectId
     );
 
@@ -164,8 +164,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     // Verify user has access to the project
-    const { organizationId } = await getProjectOrganization(
-      convex,
+    const { project, organizationId } = await getProjectOrganization(
+      createAuthedConvexClient(accessToken!),
       variable.projectId
     );
 
@@ -226,6 +226,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       convexUser._id,
       variable.key,
       variable.projectId,
+      project?.name || "Unknown project",
       organizationId,
       convexUser.name || convexUser.email || "A team member",
       "updated"
@@ -283,8 +284,8 @@ export async function DELETE(request: Request, context: RouteContext) {
     }
 
     // Verify user has access to the project
-    const { organizationId } = await getProjectOrganization(
-      convex,
+    const { project, organizationId } = await getProjectOrganization(
+      createAuthedConvexClient(accessToken!),
       variable.projectId
     );
 
@@ -322,6 +323,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       convexUser._id,
       variable.key,
       variable.projectId,
+      project?.name || "Unknown project",
       organizationId,
       convexUser.name || convexUser.email || "A team member",
       "deleted"
@@ -344,22 +346,18 @@ async function notifyVariableChange(
   changerUserId: Id<"users">,
   variableName: string,
   projectId: Id<"projects">,
+  projectName: string,
   organizationId: Id<"organizations">,
   changedByName: string,
   changeType: "created" | "updated" | "deleted"
 ) {
   try {
-    const project = await convex.query(api.features.projects.queries.getById, {
-      projectId,
-    });
     const members = await convex.query(
       api.features.organizations.queries.getMembers,
       {
         organizationId,
       }
     );
-
-    const projectName = project?.name || "Unknown project";
 
     for (const member of members) {
       if (!member?.user?.email || member.user._id === changerUserId) continue;

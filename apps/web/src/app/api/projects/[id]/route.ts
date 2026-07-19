@@ -44,8 +44,14 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Sync the Convex user BEFORE any identity-authed query — a first-time
+    // WorkOS session has no users row yet, so authed queries would fail
+    // server-side before the row is created.
+    const convexUser = await getOrCreateConvexUser(convex, user);
+    const authed = createAuthedConvexClient(accessToken!);
+
     // Get the project
-    const project = await convex.query(api.features.projects.queries.getById, {
+    const project = await authed.query(api.features.projects.queries.getById, {
       projectId: id as Id<"projects">,
     });
 
@@ -53,12 +59,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get or create the Convex user
-    const convexUser = await getOrCreateConvexUser(convex, user);
-
     // Verify user is a member of the project's organization
     const membership = await checkOrganizationMembership(
-      createAuthedConvexClient(accessToken!),
+      authed,
       project.organizationId
     );
 
@@ -68,11 +71,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     // Owners bypass assignment; everyone else needs a project assignment
     if (normalizeOrgRole(membership.role) !== "owner") {
-      const projectMembership = await createAuthedConvexClient(
-        accessToken!
-      ).query(api.features.projects.members.getProjectMembership, {
-        projectId: id as Id<"projects">,
-      });
+      const projectMembership = await authed.query(
+        api.features.projects.members.getProjectMembership,
+        {
+          projectId: id as Id<"projects">,
+        }
+      );
 
       if (!projectMembership) {
         return NextResponse.json(
@@ -162,9 +166,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       vscodeAutoUnsyncOnClose,
     });
 
-    const project = await convex.query(api.features.projects.queries.getById, {
-      projectId: id as Id<"projects">,
-    });
+    const project = await createAuthedConvexClient(accessToken!).query(
+      api.features.projects.queries.getById,
+      {
+        projectId: id as Id<"projects">,
+      }
+    );
 
     return NextResponse.json({ project });
   } catch (error) {

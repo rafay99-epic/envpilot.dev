@@ -1240,4 +1240,64 @@ Nothing else changes — projects, variables, and roles are untouched.`,
 ### Under the Hood
 - The legacy CI/CD service-token system is fully retired — every machine credential is an API key now`,
   },
+
+  // ============================================================
+  // v1.52.0 — Faster Navigation & Next.js 16.2 (2026-07-19)
+  // ============================================================
+  {
+    title: "Faster Dashboard Navigation on Next.js 16.2",
+    version: "v1.52.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-19T14:00:00Z"),
+    content: `Moving around the dashboard is noticeably lighter — repeat navigations are instant and route bundles got smaller.
+
+### Snappier Navigation
+- Visited dashboard pages are now kept warm for three minutes instead of thirty seconds — switching between projects, variables, and team no longer re-runs the server layout on every hop
+- The Trash and Shared pages resolve their project directly instead of waiting on the full project list first
+- The Variables and Requests tables animate with plain CSS — a whole animation library dropped out of both routes
+
+### Platform Upgrade
+- All three apps now run **Next.js 16.2** — 25-60% faster server rendering plus smarter layout deduplication and prefetching on navigation, for free
+
+### Polish
+- Tailored loading skeletons for the data-heavy dashboard pages, shaped like the content they precede
+- Dedicated error screens for project, organization, and invitation pages that distinguish "not found" from a transient failure
+- The blog and docs finally have styled 404 pages — a broken link lands in the site shell with a way back, not a bare browser error
+- Blog and docs pages build faster: every article and doc is parsed exactly once per build, and \`llms-full.txt\` now includes the full source of every architecture diagram`,
+  },
+  {
+    title: "Project Lookup Hardening",
+    version: "v1.52.0",
+    type: "security",
+    publishedAt: ts("2026-07-19T14:30:00Z"),
+    content: `A defense-in-depth pass on how projects are looked up and how server logs treat credentials.
+
+### Membership-Gated Project Lookup
+- The by-slug project lookup now requires an authenticated caller with an active organization membership; members without the assignment bypass must be assigned to the project
+- Machine surfaces (public API, MCP, GitHub Action) are unaffected — they authorize through their own API-key pipeline as before
+
+### Log Hygiene
+- Invitation emails and tokens no longer appear in server logs; invitation tokens are logged as a short non-reusable prefix, only for correlation`,
+  },
+
+  // ============================================================
+  // v1.52.1 — Project Metadata Reads Enforce Membership (2026-07-19)
+  // ============================================================
+  {
+    title: "Project Metadata Reads Now Enforce Membership",
+    version: "v1.52.1",
+    type: "security",
+    publishedAt: ts("2026-07-19T20:00:00Z"),
+    content: `The remaining project read paths now enforce the same visibility rule as the project list.
+
+### What Changed
+- Fetching a project by id and listing an organization's projects both require an authenticated caller with an active membership in that organization
+- Members without the assignment bypass only see projects they are assigned to — matching what the dashboard already shows
+- Web API routes resolve projects as the signed-in caller instead of a server-side service identity
+
+### Who Is Affected
+- Owners and admins: nothing changes
+- Unassigned members: project-scoped API endpoints now answer "not found", consistent with the dashboard
+- CLI, VS Code extension, public API, MCP, and the GitHub Action: unaffected — machine flows keep their own authorization pipeline`,
+  },
 ];

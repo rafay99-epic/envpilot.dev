@@ -71,9 +71,12 @@ export const createWithValue = action({
     requester: { _id: Id<"users">; email: string; name?: string } | null;
     reviewer: { _id: Id<"users">; email: string; name?: string } | null;
   }> => {
-    const project = await ctx.runQuery(api.features.projects.queries.getById, {
-      projectId: args.projectId,
-    });
+    const project = await ctx.runQuery(
+      internal.features.projects.queries._getById,
+      {
+        projectId: args.projectId,
+      }
+    );
     if (!project) {
       throw new ConvexError("Project not found");
     }

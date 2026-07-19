@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Verify project exists and get org
     const { organizationId } = await getProjectOrganization(
-      convex,
+      createAuthedConvexClient(accessToken!),
       projectId as Id<"projects">
     );
 
