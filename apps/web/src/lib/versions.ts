@@ -14,7 +14,7 @@
  * device-flow auth cutover broke every pre-1.12.1 CLI / pre-1.7.2 extension).
  */
 export const APP_VERSIONS = {
-  web: "1.51.0",
+  web: "1.52.0",
   cli: "1.18.0",
   extension: "1.16.0",
   // Registry-native floors: 1.18.0 (CLI) / 1.15.0 (extension) are the first
