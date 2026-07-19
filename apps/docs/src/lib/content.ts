@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve, basename } from "node:path";
+import { cache } from "react";
 import matter from "gray-matter";
 
 export interface DocPage {
@@ -31,8 +32,13 @@ function interpolate(content: string, vars: Record<string, unknown>): string {
 
 /**
  * Read and parse a single MDX file by slug.
+ *
+ * Wrapped in React cache() so generateMetadata, the page body, and
+ * prev/next lookups within one request parse each file exactly once.
  */
-export function getDocBySlug(slug: string): DocPage | null {
+export const getDocBySlug = cache(function getDocBySlug(
+  slug: string
+): DocPage | null {
   try {
     const raw = readFileSync(resolve(CONTENT_DIR, `${slug}.mdx`), "utf-8");
     const { data, content } = matter(raw);
@@ -48,12 +54,10 @@ export function getDocBySlug(slug: string): DocPage | null {
     console.error("[docs/content] doc_load_failed", slug, error);
     return null;
   }
-}
+});
 
-/**
- * Return metadata for every doc page (for the sidebar and static params).
- */
-export function getAllDocs(): Omit<DocPage, "content">[] {
+/** Ordered slugs for every doc page on disk. */
+function getSortedSlugs(): string[] {
   // Ordered explicitly so the sidebar has a logical flow
   const order = [
     "getting-started",
@@ -80,20 +84,28 @@ export function getAllDocs(): Omit<DocPage, "content">[] {
     .map((f) => basename(f, ".mdx"));
 
   // Ensure ordered slugs come first, then any extras alphabetically
-  const sorted = [
+  return [
     ...order.filter((s) => files.includes(s)),
     ...files.filter((s) => !order.includes(s)).sort(),
   ];
-
-  return sorted.map((slug) => {
-    const raw = readFileSync(resolve(CONTENT_DIR, `${slug}.mdx`), "utf-8");
-    const { data } = matter(raw);
-    return {
-      slug,
-      title: (data.title as string) ?? slug,
-      description: (data.description as string) ?? "",
-      icon: (data.icon as string) ?? "file-text",
-      version: (data.version as string) ?? undefined,
-    };
-  });
 }
+
+/**
+ * Every doc page including its MDX body — one read+parse per file
+ * (shared with getDocBySlug via cache()).
+ */
+export const getAllDocsFull = cache(function getAllDocsFull(): DocPage[] {
+  return getSortedSlugs()
+    .map((slug) => getDocBySlug(slug))
+    .filter((doc): doc is DocPage => doc !== null);
+});
+
+/**
+ * Return metadata for every doc page (for the sidebar and static params).
+ */
+export const getAllDocs = cache(function getAllDocs(): Omit<
+  DocPage,
+  "content"
+>[] {
+  return getAllDocsFull().map(({ content: _content, ...meta }) => meta);
+});

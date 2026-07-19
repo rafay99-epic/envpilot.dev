@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
+import { cache } from "react";
 import matter from "gray-matter";
 import {
   blogFrontmatterSchema,
@@ -77,7 +78,10 @@ function parseFrontmatter(
   }
 }
 
-export function getPostBySlug(slug: string): BlogPost | null {
+// cache(): generateMetadata + the page body share one parse per request.
+export const getPostBySlug = cache(function getPostBySlug(
+  slug: string
+): BlogPost | null {
   const filePath = resolve(CONTENT_DIR, `${slug}.mdx`);
   if (!existsSync(filePath)) return null;
 
@@ -91,9 +95,9 @@ export function getPostBySlug(slug: string): BlogPost | null {
     console.error("[blog/content] post_load_failed", { slug }, error);
     return null;
   }
-}
+});
 
-export function getAllPosts(): BlogPostMeta[] {
+export const getAllPosts = cache(function getAllPosts(): BlogPostMeta[] {
   if (!existsSync(CONTENT_DIR)) return [];
 
   const slugs = readdirSync(CONTENT_DIR)
@@ -117,4 +121,4 @@ export function getAllPosts(): BlogPostMeta[] {
   return posts.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
-}
+});

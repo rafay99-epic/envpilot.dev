@@ -1,4 +1,4 @@
-import { getAllDocs, getDocBySlug } from "@/lib/content";
+import { getAllDocsFull } from "@/lib/content";
 import { SITE_URLS } from "@envpilot/ui";
 
 // Disk-based content only changes at deploy time — render at build, serve from CDN.
@@ -14,13 +14,10 @@ export const dynamic = "force-static";
  * Follows the llms-full.txt convention from https://llmstxt.org/.
  */
 export async function GET() {
-  const docs = getAllDocs();
+  const docs = getAllDocsFull();
 
   const sections = docs
-    .map((meta) => {
-      const doc = getDocBySlug(meta.slug);
-      if (!doc) return null;
-
+    .map((doc) => {
       // Strip import statements and JSX components from MDX
       const cleaned = doc.content
         .replace(/^import\s+.*$/gm, "")
