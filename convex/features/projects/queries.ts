@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { query } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
+import {
+  getActiveMembership,
+  getRoleProfile,
+  bypassesAssignment,
+} from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { listWithStatsCore, listForUserCore } from "./helpers";
 
@@ -87,6 +92,8 @@ export const getBySlug = query({
     slug: v.string(),
   },
   handler: async (ctx, args) => {
+    const actor = await requireAuthedUser(ctx);
+
     const project = await ctx.db
       .query("projects")
       .withIndex("by_org_and_slug", (q) =>
@@ -94,7 +101,30 @@ export const getBySlug = query({
       )
       .first();
 
-    if (project?.deletedAt) return null;
+    if (!project || project.deletedAt) return null;
+
+    // Visibility mirrors listWithStatsCore: non-members (and suspended
+    // members) see nothing; roles without the assignment bypass must hold a
+    // projectMembers row. Returns null instead of throwing so callers keep
+    // their "not found" handling.
+    const membership = await getActiveMembership(
+      ctx,
+      args.organizationId,
+      actor._id
+    );
+    if (!membership) return null;
+
+    const profile = await getRoleProfile(ctx, membership.role);
+    if (!bypassesAssignment(profile)) {
+      const assignment = await ctx.db
+        .query("projectMembers")
+        .withIndex("by_project_and_user", (q) =>
+          q.eq("projectId", project._id).eq("userId", actor._id)
+        )
+        .first();
+      if (!assignment) return null;
+    }
+
     return project;
   },
 });

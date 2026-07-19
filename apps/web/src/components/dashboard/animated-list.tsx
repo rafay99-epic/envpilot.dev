@@ -91,16 +91,5 @@ export function AnimatedGrid({
   );
 }
 
-/**
- * Staggered animation variants for table rows.
- * Use with motion.tr directly in your row components.
- *
- * Usage:
- *   <motion.tr {...staggeredRow(index)}> ... </motion.tr>
- */
-export const staggeredRow = (index: number) => ({
-  custom: index,
-  variants: itemVariants,
-  initial: "hidden" as const,
-  animate: "visible" as const,
-});
+// Table-row stagger now lives in CSS: use the `animate-row-in` class
+// (globals.css) with an inline animationDelay — no framer-motion needed.
