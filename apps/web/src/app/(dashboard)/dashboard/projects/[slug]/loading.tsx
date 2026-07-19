@@ -1,6 +1,7 @@
 export default function ProjectDetailLoading() {
   return (
-    <div className="space-y-6">
+    <div role="status" aria-busy="true" className="space-y-6">
+      <span className="sr-only">Loading…</span>
       {/* Project header skeleton */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

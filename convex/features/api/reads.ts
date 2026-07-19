@@ -350,7 +350,7 @@ export const getProject = action({
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
 
     const projectDoc = await ctx.runQuery(
-      api.features.projects.queries.getBySlug,
+      internal.features.projects.queries._getBySlug,
       {
         organizationId: bootstrap.organizationId,
         slug: args.projectSlug,
@@ -442,7 +442,7 @@ export const getProjectVariables = action({
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
 
     const projectDoc = await ctx.runQuery(
-      api.features.projects.queries.getBySlug,
+      internal.features.projects.queries._getBySlug,
       {
         organizationId: bootstrap.organizationId,
         slug: args.projectSlug,
@@ -597,7 +597,7 @@ export const getProjectAccounts = action({
     if (!bootstrap.ok) throwForDenial(bootstrap.denied);
 
     const projectDoc = await ctx.runQuery(
-      api.features.projects.queries.getBySlug,
+      internal.features.projects.queries._getBySlug,
       {
         organizationId: bootstrap.organizationId,
         slug: args.projectSlug,

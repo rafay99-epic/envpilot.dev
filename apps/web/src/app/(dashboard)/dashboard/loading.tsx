@@ -1,6 +1,7 @@
 export default function DashboardHomeLoading() {
   return (
-    <div className="space-y-6">
+    <div role="status" aria-busy="true" className="space-y-6">
+      <span className="sr-only">Loading…</span>
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <div>

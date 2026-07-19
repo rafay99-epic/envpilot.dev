@@ -1,6 +1,7 @@
 export default function RequestsLoading() {
   return (
-    <div className="space-y-6">
+    <div role="status" aria-busy="true" className="space-y-6">
+      <span className="sr-only">Loading…</span>
       {/* Header skeleton */}
       <div>
         <div className="h-6 w-32 animate-pulse rounded bg-zinc-800" />

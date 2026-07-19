@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("segment-error");
 
 /**
  * Shared terminal-styled error card for route-segment error boundaries.
@@ -30,6 +34,16 @@ export function SegmentError({
   backLabel: string;
 }) {
   const isNotFound = notFoundPattern.test(error.message);
+
+  // A segment boundary intercepts errors before the parent (dashboard)
+  // error.tsx can log them — report here or they vanish from observability.
+  useEffect(() => {
+    log.error(
+      "segment_error_boundary",
+      { digest: error.digest, notFound: isNotFound },
+      error
+    );
+  }, [error, isNotFound]);
 
   return (
     <div className="flex flex-col items-center justify-center py-12">

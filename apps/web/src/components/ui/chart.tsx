@@ -55,7 +55,13 @@ const ChartContainer = React.forwardRef<
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
+        {/* initialDimension: recharts measures the container before the
+            ResizeObserver's first tick and logs "width(-1) and height(-1)"
+            warnings for every chart without it. Real size takes over on
+            the first observed layout. */}
+        <RechartsPrimitive.ResponsiveContainer
+          initialDimension={{ width: 520, height: 280 }}
+        >
           {children}
         </RechartsPrimitive.ResponsiveContainer>
       </div>

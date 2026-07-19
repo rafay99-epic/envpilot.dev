@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "../../_generated/server";
+import { query, internalQuery } from "../../_generated/server";
 import { requireAuthedUser } from "../../lib/identity";
 import {
   getActiveMembership,
@@ -83,6 +83,30 @@ export const resolveUnsyncOnClose = query({
     return (
       member?.vscodeAutoUnsyncOnClose ?? project.vscodeAutoUnsyncOnClose ?? true
     );
+  },
+});
+
+/**
+ * Bare org+slug lookup with NO user-identity check — for machine surfaces
+ * (public API / MCP actions) that have already authorized the request via
+ * _authorizeRequest and re-check project scope afterwards. Dashboard
+ * clients must use getBySlug, which enforces membership + assignment.
+ */
+export const _getBySlug = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    slug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db
+      .query("projects")
+      .withIndex("by_org_and_slug", (q) =>
+        q.eq("organizationId", args.organizationId).eq("slug", args.slug)
+      )
+      .first();
+
+    if (!project || project.deletedAt) return null;
+    return project;
   },
 });
 
