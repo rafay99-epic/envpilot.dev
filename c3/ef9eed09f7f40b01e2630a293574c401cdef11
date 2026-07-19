@@ -1,0 +1,71 @@
+apps/blog/content/billing-when-stripe-is-not-an-option.mdx
+  s_aad14584249367::t_d85d55e613b233 134-147,210-226,250-260
+apps/blog/content/deleting-backwards-compatibility.mdx
+  s_aad14584249367::t_c01c3d31a90da7 79-90,136-151,214-223
+apps/blog/content/deletion-that-is-real.mdx
+  s_aad14584249367::t_361b11bf6916ed 53-69,163-180
+apps/blog/content/features-as-data.mdx
+  s_398158d5eab6ae::t_e65d41516ffdf5 99-116,162-179,250-264
+apps/blog/content/how-our-own-auth-hid-us-from-google.mdx
+  s_aad14584249367::t_a20569573c91cc 52-68,117-136,247-258
+apps/blog/content/one-core-three-faces.mdx
+  s_aad14584249367::t_8d03d27bb32edd 133-155,228-239
+apps/blog/content/one-key-two-environments.mdx
+  s_aad14584249367::t_6c6cadcc6a6445 46-61,186-202,275-290
+apps/blog/content/one-secret-guarded-everything.mdx
+  s_aad14584249367::t_0ca97e258af520 64-78,210-218,224-239
+apps/blog/content/one-token-model.mdx
+  s_aad14584249367::t_708b1be81466f1 38-50,241-259
+apps/blog/content/roles-as-data.mdx
+  s_aad14584249367::t_b37db143b1cc56 183-205,247-264,341-355
+apps/blog/content/six-prs-to-find-one-bug.mdx
+  s_aad14584249367::t_26ad3086cc668e 59-75
+apps/blog/content/the-auth-cutover.mdx
+  s_aad14584249367::t_49ff07fdc1d2cf 145-154,251-265,269-287,387-396
+apps/blog/content/the-ci-round-trip.mdx
+  s_aad14584249367::t_cfee906e286c92 76-101,236-248,267-280
+apps/blog/content/the-convex-quota-war.mdx
+  s_aad14584249367::t_0d7d231bfac7f6 115-137
+apps/blog/content/the-extension-that-leaked.mdx
+  s_aad14584249367::t_b5ce62d1971688 82-88,138-152
+apps/blog/content/the-feature-that-lived-72-days.mdx
+  s_aad14584249367::t_337f0a7e7428a7 109-128,218-230,246-256
+apps/blog/content/the-mobile-app-that-never-shipped.mdx
+  s_aad14584249367::t_faa81be5f90786 26-36,221-244,267-278
+apps/blog/content/the-test-gate-we-switched-off.mdx
+  s_aad14584249367::t_f52bdd494961b5 29-47,137-147,159-173
+apps/blog/src/app/[slug]/page.tsx
+  s_aad14584249367::t_f0aeacc84add7a 16-17,23-24,28
+apps/docs/content/architecture.mdx
+  s_aad14584249367::t_c5d40d9ab2506f 35-45,61-76
+apps/docs/src/app/[slug]/page.tsx
+  s_aad14584249367::t_c660cc0ac606bc 16-17,24-25,29
+packages/ui/src/docs/index.ts
+  s_aad14584249367::t_edc013d69e269c 5
+packages/ui/src/docs/remark-mermaid.ts
+  s_aad14584249367::t_a35a23e45fe762 1-17,19-23,25-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c3ef9eed09f7f40b01e2630a293574c401cdef11",
+  "prompts": {},
+  "sessions": {
+    "s_398158d5eab6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8c5cc4a23e76a0e4",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    },
+    "s_aad14584249367": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a74f5a9d11cf896c5",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
