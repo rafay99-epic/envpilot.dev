@@ -26,12 +26,17 @@ Authorization: Bearer envpk_your_key_here
 
 ### Claude Code
 
+Export your key, then reference it — don't paste it inline:
+
 ```bash
+export ENVPILOT_API_KEY=envpk_your_key_here
 claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp \
-  --header "Authorization: Bearer <your-api-key>"
+  --header 'Authorization: Bearer ${ENVPILOT_API_KEY}'
 ```
 
-By default the server is saved to the current project, private to you. Add `-s` to change where the config lives: `-s project` writes a shared `.mcp.json` you can commit to the repo, `-s user` makes it available across all your projects. Verify the connection with `claude mcp list` (or `/mcp` inside a session, which also lists the tools), and manage it later with `claude mcp get envpilot` / `claude mcp remove envpilot`.
+The **single quotes matter**: they keep `${ENVPILOT_API_KEY}` literal in the saved config, and Claude Code expands it from your environment at connect time — so the secret itself never lands in a file. That makes the shared scope safe: `-s project` writes a committable `.mcp.json` holding only the variable reference, `-s user` makes the server available across all your projects, and the default `-s local` keeps it to this project. (Never commit a config with the raw `envpk_...` key in it.)
+
+`claude mcp list` confirms the server is **registered** — a revoked or wrong key still shows as listed. To verify the connection is actually live and its tools loaded, run `/mcp` inside a session. Manage it later with `claude mcp get envpilot` / `claude mcp remove envpilot`.
 
 ### Codex CLI
 

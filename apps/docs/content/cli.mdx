@@ -69,12 +69,13 @@ envpilot pull --format docker-compose # Docker Compose
 
 ## Push behavior by role
 
-| Role                                | Push behavior                                                         |
-| ----------------------------------- | --------------------------------------------------------------------- |
-| Owner / Project Manager / Team Lead | Writes every key in the project                                       |
-| Developer                           | Writes only keys they hold a write grant for — other keys are skipped |
+| Role                                | Push behavior                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| Owner / Project Manager / Team Lead | Writes every key in the project                                                       |
+| Developer (with write grants)       | Writes the keys they hold a grant for; keys without one are reported as denied, not written |
+| Developer (no access to the env)    | Push is refused with an error — nothing is written                                   |
 
-Push never creates approval requests: keys you cannot write are simply skipped. To propose a **brand-new** variable for review, use [`envpilot request`](#variable-requests) instead.
+Push **never creates approval requests**. If you hold at least one write grant, the keys you cannot write are listed as denied and skipped while the rest go through; if your role has no write access to the target environment at all, the whole push is refused rather than written partially. To propose a **brand-new** variable for review, use [`envpilot request`](#variable-requests) instead.
 
 ## Command reference
 
@@ -188,14 +189,14 @@ envpilot pull --env staging --dry-run
 
 #### `envpilot push [--env <environment>] [--file <path>] [--merge|--replace] [--format <format>] [--prefix <prefix>] [--project <name-or-id>] [--dry-run] [--force]`
 
-Upload local variables back to Envpilot with approval-aware write behavior.
+Upload local variables back to Envpilot with access-aware write behavior.
 
 ```bash
 envpilot push
 envpilot push --replace
 ```
 
-> Managers/admins write directly; lower roles create requests for approval.
+> Writes only the keys you have access to — denied keys are listed, never silently dropped. Push does not create approval requests; see [Push behavior by role](#push-behavior-by-role).
 
 > Compares local and remote variables before applying changes.
 
@@ -498,6 +499,6 @@ envpilot logout --all   # log out of every authenticated account
 
 > Clears local tokens even if the revoke call fails.
 
-> `--all` signs out every account added via `envpilot login`, not just the active one.
+> `--all` targets every account added via `envpilot login`, not just the active one. If a remote revoke fails partway through (e.g. offline), the run stops at that account — re-run `envpilot logout --all` to clear the rest.
 
 ---
