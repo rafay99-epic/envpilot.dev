@@ -1,0 +1,29 @@
+apps/docs/content/notifications.mdx
+  s_2ef6990c48d878::t_c1b5a4ab91b9f7 1-77
+apps/docs/package.json
+  s_2ef6990c48d878::t_c41826f14f513a 3
+apps/docs/src/lib/content.ts
+  s_2ef6990c48d878::t_b66bf01a62ffeb 49
+apps/web/package.json
+  s_2ef6990c48d878::t_857cb1aa6fe818 3
+apps/web/src/lib/versions.ts
+  s_2ef6990c48d878::t_2e97edd8e2f0bb 17
+package.json
+  s_2ef6990c48d878::t_fb05326031e100 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5863a30aaecdac5550170aff97e540e20f048d2c",
+  "prompts": {},
+  "sessions": {
+    "s_2ef6990c48d878": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da0bb6f3-15e4-406e-a3b7-b7568c6b6e23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
