@@ -1,0 +1,19 @@
+convex/_generated/api.d.ts
+  s_2ef6990c48d878::t_7be1e11679541b 61-63,174-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f3b76f29ab92ac683d74de889ae9be7e449ff9fe",
+  "prompts": {},
+  "sessions": {
+    "s_2ef6990c48d878": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da0bb6f3-15e4-406e-a3b7-b7568c6b6e23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
