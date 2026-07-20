@@ -311,6 +311,22 @@ export async function countRotationEnabledVariables(
 }
 
 /**
+ * Count an organization's notification webhooks (Slack/Discord). Disabled
+ * rows still occupy a slot — the limit caps configured endpoints, not
+ * currently-firing ones. Used by the team_notifications_limit gate.
+ */
+export async function countActiveWebhooks(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">
+): Promise<number> {
+  const hooks = await db
+    .query("orgWebhooks")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+  return hooks.length;
+}
+
+/**
  * Count active (non-deleted) shared accounts across an organization.
  * Iterates the org's live projects and their by_project account rows,
  * excluding soft-deleted accounts — used by the shared_accounts_limit gate.

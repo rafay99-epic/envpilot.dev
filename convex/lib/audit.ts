@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "../_generated/server";
 import { Id, Doc } from "../_generated/dataModel";
+import { maybeNotifyWebhooks } from "../features/integrations/notify";
 
 /**
  * Audit Log Helper Functions
@@ -84,6 +85,10 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "account.permission_granted": "info",
   "account.permission_revoked": "warning",
   "account.permission_updated": "info",
+  // Notification webhooks
+  "integration.webhook_created": "info",
+  "integration.webhook_updated": "info",
+  "integration.webhook_deleted": "warning",
 };
 
 // Resource type mapping for different action types
@@ -184,6 +189,10 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "account.permission_granted": "account",
   "account.permission_revoked": "account",
   "account.permission_updated": "account",
+  // Notification webhooks (org-scoped config)
+  "integration.webhook_created": "organization",
+  "integration.webhook_updated": "organization",
+  "integration.webhook_deleted": "organization",
 };
 
 export interface AuditLogInput {
@@ -219,6 +228,11 @@ export async function createAuditLog(
 
   // Auto-derive resource type if not provided
   const resourceType = input.resourceType ?? ACTION_RESOURCE_MAP[input.action];
+
+  // Fan notifiable events out to the org's Slack/Discord webhooks. This is
+  // the single hook point for ALL webhook notifications — never wire
+  // per-mutation. Swallows its own errors; see maybeNotifyWebhooks.
+  await maybeNotifyWebhooks(ctx, input);
 
   return await ctx.db.insert("auditLogs", {
     organizationId: input.organizationId,
