@@ -1,0 +1,23 @@
+apps/docs/content/mcp-server.mdx
+  s_2a3cee437dce4a::t_196c4c4bbf0caf 13,116,138-149
+apps/web/src/components/api-keys/ApiKeysSection.tsx
+  s_2a3cee437dce4a::t_5c75e30f16a223 71-72
+convex/features/cicd/pull.ts
+  s_2a3cee437dce4a::t_0e53d63f7f927b 9,65-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "c217c3b7b7c9102458c462331b9cfc32fdf54cc2",
+  "prompts": {},
+  "sessions": {
+    "s_2a3cee437dce4a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50b29d61-b378-4f3a-8c61-c0de2c599548",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
