@@ -86,7 +86,9 @@ test.describe.serial("Notification webhooks", () => {
       .fill(FAKE_SLACK_URL);
 
     // Variables + Requests are the pre-checked defaults
-    const checkboxes = page.locator('input[type="checkbox"]');
+    const checkboxes = page
+      .getByTestId("manual-webhook-form")
+      .locator('input[type="checkbox"]');
     await expect(checkboxes.nth(0)).toBeChecked(); // variables
     await expect(checkboxes.nth(1)).toBeChecked(); // requests
     await expect(checkboxes.nth(2)).not.toBeChecked(); // members
