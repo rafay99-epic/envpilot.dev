@@ -85,6 +85,17 @@ Add a remote server entry to `.cursor/mcp.json`:
 }
 ```
 
+## Rotating or updating a key
+
+A key's scopes are fixed at creation — to change what an existing MCP setup can do (say, adding the `projects` resource), create a new key with the right scopes and swap it into your client config. Where the swap happens depends on how you connected:
+
+- **Claude Code / Codex CLI (env-var reference, as above)**: the saved config only holds `${ENVPILOT_API_KEY}` — update the exported variable (in your shell profile) to the new key and restart the session. The config file itself needs no change.
+- **Claude Code (key pasted inline)**: `claude mcp remove envpilot`, then re-run the `claude mcp add` command with the new key — `claude mcp add` refuses to overwrite an existing server name, so remove first. (Or edit the `Authorization` header in the config file directly: `.mcp.json`, or `.claude.json` for `-s local` servers.)
+- **Claude Desktop**: Settings → Connectors → edit the Envpilot connector's `Authorization` header.
+- **Cursor**: edit the `Authorization` header in `.cursor/mcp.json`.
+
+Rotate safely: create the new key, swap it in, confirm a tool call works, **then** revoke the old key in **Organization → Settings → API Keys**. Revocation is instant — anything still using the old key stops working on its next call.
+
 ## Tools
 
 The read tools share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited. **Resource** is the API key resource each tool requires — see [Understand scope](/api-quickstart#understand-scope).

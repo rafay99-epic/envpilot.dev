@@ -705,6 +705,25 @@ function CreateKeyDrawer({
             </div>
           </div>
 
+          {mcpSelected && (
+            <p
+              data-testid="api-key-mcp-rotation-hint"
+              className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-zinc-400"
+            >
+              Replacing a key in an existing MCP setup? Swap this key into your
+              client&apos;s Authorization header (or the exported{" "}
+              <code className="rounded bg-zinc-800 px-1 py-0.5">
+                ENVPILOT_API_KEY
+              </code>
+              ), confirm a tool call works, then revoke the old key below.
+              Claude Code refuses to re-add an existing server — run{" "}
+              <code className="rounded bg-zinc-800 px-1 py-0.5">
+                claude mcp remove envpilot
+              </code>{" "}
+              first.
+            </p>
+          )}
+
           <div>
             <button
               type="button"

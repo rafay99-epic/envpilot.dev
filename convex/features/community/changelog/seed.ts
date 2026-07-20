@@ -1346,4 +1346,42 @@ Nothing else changes — projects, variables, and roles are untouched.`,
 ### Scripting
 - \`--json\` output on \`requests\` and \`diff\` for piping into other tools`,
   },
+
+  // ============================================================
+  // v1.53.0 — MCP Key Guidance & Real API Error Messages (2026-07-20)
+  // ============================================================
+  {
+    title: "Public API and MCP Errors Say What Actually Went Wrong",
+    version: "v1.53.0",
+    type: "fix",
+    publishedAt: ts("2026-07-20T14:00:00Z"),
+    content: `In production, every denied REST or MCP request answered with an opaque error — an invalid key, a missing scope, and a rate limit all looked identical. Fixed across the whole machine-credential surface.
+
+### What Changed
+- MCP tool calls now return the real reason: \`Invalid or revoked API key\`, \`That resource is not in this API key's scope\`, \`This API key is not enabled for this surface\`, rate limits with a retry delay — instead of a generic \`Server Error\`
+- REST API denials return their proper status codes again: 401 for a bad key, 403 for scope/surface/plan denials, 404 for out-of-scope projects, 429 with \`Retry-After\` for rate limits — previously all of these surfaced as 500
+- The GitHub Action's secret pulls get the same treatment — a denied pull now fails with an actionable message instead of a generic server error
+
+### Why It Was Invisible
+The bug only existed in production, where the platform redacts internal error details; development builds always showed the real message. A new [Troubleshooting section](https://docs.envpilot.dev/mcp-server) in the MCP docs lists every error string and its fix.`,
+  },
+  {
+    title: "API Key Creation Now Explains What MCP Needs",
+    version: "v1.53.0",
+    type: "improvement",
+    publishedAt: ts("2026-07-20T14:30:00Z"),
+    content: `A fresh API key could pass every form check and still fail on its first MCP call — the default scopes didn't include the \`projects\` resource that every MCP session starts with. The create-key form now makes MCP requirements impossible to miss.
+
+### Create-Key Form
+- Selecting the MCP server surface shows a live checklist mapping each resource to the MCP tools it unlocks (\`projects\` → \`envpilot_list_projects\`/\`envpilot_search\`, \`variables\` → variable reads, \`accounts\` → shared accounts, \`requests\` → variable requests)
+- A warning appears when the \`projects\` resource is deselected — assistants open every session by listing projects, so a key without it fails immediately
+- New keys default to \`variables + projects\` so the out-of-the-box key works with MCP clients
+
+### Rotating a Key
+- The one-time key reveal now includes guidance for swapping a new key into an existing MCP client setup — including the \`claude mcp remove\` step Claude Code requires before re-adding a server
+- The MCP docs gained a [Rotating or updating a key](https://docs.envpilot.dev/mcp-server) section covering Claude Code, Codex, Claude Desktop, and Cursor
+
+### Docs
+- Both MCP tool tables now show the API-key resource each tool requires, and a required-scopes callout sits next to the setup instructions`,
+  },
 ];

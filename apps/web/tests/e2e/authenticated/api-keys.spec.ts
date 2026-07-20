@@ -126,6 +126,12 @@ test.describe.serial("API keys", () => {
     const plaintextKey = (await keyCode.textContent())?.trim() ?? "";
     expect(plaintextKey).toMatch(/^envpk_[0-9a-f]{40}$/);
 
+    // MCP surface keys get rotation guidance on the one-time reveal —
+    // how to swap the key into an already-configured MCP client.
+    await expect(page.getByTestId("api-key-mcp-rotation-hint")).toContainText(
+      /claude mcp remove/i
+    );
+
     await page.getByRole("button", { name: /^Done$/i }).click();
 
     // The list shows the key with its scope badges; the hash never appears.
