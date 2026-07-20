@@ -69,11 +69,11 @@ envpilot pull --format docker-compose # Docker Compose
 
 ## Push behavior by role
 
-| Role                                | Push behavior                                                                        |
-| ----------------------------------- | ------------------------------------------------------------------------------------ |
-| Owner / Project Manager / Team Lead | Writes every key in the project                                                       |
+| Role                                | Push behavior                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| Owner / Project Manager / Team Lead | Writes every key in the project                                                             |
 | Developer (with write grants)       | Writes the keys they hold a grant for; keys without one are reported as denied, not written |
-| Developer (no access to the env)    | Push is refused with an error — nothing is written                                   |
+| Developer (no access to the env)    | Push is refused with an error — nothing is written                                          |
 
 Push **never creates approval requests**. If you hold at least one write grant, the keys you cannot write are listed as denied and skipped while the rest go through; if your role has no write access to the target environment at all, the whole push is refused rather than written partially. To propose a **brand-new** variable for review, use [`envpilot request`](#variable-requests) instead.
 
