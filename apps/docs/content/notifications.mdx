@@ -1,0 +1,77 @@
+---
+title: Slack & Discord Notifications
+description: Send organization activity — variable changes, access requests, security events — to the channels your team already lives in.
+icon: plug
+---
+
+# Slack & Discord Notifications
+
+When a secret changes in production, the team should find out in the channel they already watch — not by checking the dashboard the next morning. Envpilot posts organization activity to Slack and Discord channels: variable changes, access requests, membership changes, and security events.
+
+Notifications carry **key names, environments, and actor names — never secret values**. A notification channel is never a place where a secret can leak.
+
+> Slack & Discord notifications are a **Pro** feature. See [Plans](/plans).
+
+## Connect a channel
+
+Connecting takes one click — Envpilot uses each platform's OAuth flow, which creates the webhook for you:
+
+1. Go to **Organization Settings → Integrations** (owner only).
+2. Click **Connect Slack** or **Connect Discord**.
+3. On the platform's consent screen, pick the channel to post to and approve.
+4. You land back on the Integrations tab, and a test message arrives in the channel immediately.
+
+There is nothing to copy out of Slack or Discord admin screens — the platform hands Envpilot the webhook URL during consent. Envpilot keeps only that URL (and the channel name for display); the OAuth access token is discarded, never stored.
+
+## Add a webhook manually
+
+If the Connect buttons aren't available (a locked-down Slack workspace, or a self-hosted Envpilot without OAuth apps configured), paste a webhook URL instead:
+
+- **Slack**: in the target channel → **Integrations → Add an app → Incoming Webhooks** → create and copy the URL (`https://hooks.slack.com/services/…`).
+- **Discord**: channel settings → **Integrations → Webhooks → New Webhook** → **Copy Webhook URL** (`https://discord.com/api/webhooks/…`).
+
+Then **Organization Settings → Integrations → Add manually**, pick the platform, paste the URL, and choose event groups. Manually added URLs are treated as credentials: the UI only ever shows a masked preview.
+
+## Event groups
+
+Each webhook subscribes to event groups, editable inline at any time:
+
+| Group     | Covers                                                     | Default |
+| --------- | ---------------------------------------------------------- | ------- |
+| Variables | created, updated, deleted, exported                        | on      |
+| Requests  | access requested, approved, rejected                       | on      |
+| Members   | invitations, removals, permission grants/revocations       | off     |
+| Security  | access denials, unauthorized attempts, API token lifecycle | off     |
+
+## Delivery behavior
+
+- Delivery is fire-and-forget: a webhook outage never slows or fails the action that triggered it.
+- After **20 consecutive failures** a webhook auto-disables instead of hammering a dead endpoint. Re-enabling it (Resume) resets the counter.
+- **Send test** posts a test message on demand; every newly added webhook also sends one immediately.
+- Up to 10 webhooks per organization.
+
+## Self-hosting: enabling the Connect buttons
+
+The one-click Connect flow needs OAuth apps you register once per platform. Without these env vars the buttons hide and manual entry still works.
+
+**Slack** — [api.slack.com/apps](https://api.slack.com/apps) → Create New App:
+
+1. Under **OAuth & Permissions**, add the redirect URL `https://<your-domain>/api/integrations/slack/callback` and the bot scope `incoming-webhook`.
+2. Copy the **Client ID** and **Client Secret** into your environment:
+
+```bash
+SLACK_CLIENT_ID=...
+SLACK_CLIENT_SECRET=...
+```
+
+**Discord** — [discord.com/developers/applications](https://discord.com/developers/applications) → New Application:
+
+1. Under **OAuth2**, add the redirect `https://<your-domain>/api/integrations/discord/callback`.
+2. Copy the **Client ID** and **Client Secret**:
+
+```bash
+DISCORD_CLIENT_ID=...
+DISCORD_CLIENT_SECRET=...
+```
+
+The consent screens use the `incoming-webhook` (Slack) and `webhook.incoming` (Discord) scopes — channel-post capability only, no read access to anything.
