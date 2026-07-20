@@ -10,6 +10,8 @@ MCP (Model Context Protocol) is an open standard that lets AI assistants like Cl
 
 Requires the **Pro** plan (`mcp_server` feature) and an [API key](/api-quickstart).
 
+> **Required key scopes**: an MCP key needs at minimum the `projects` and `variables` resources. Assistants start every session by calling `envpilot_list_projects`, so a key without `projects` fails immediately with "That resource is not in this API key's scope." The create-key form in **Organization → Settings → API Keys** shows this checklist live as you pick resources.
+
 ## Endpoint
 
 ```
@@ -85,22 +87,22 @@ Add a remote server entry to `.cursor/mcp.json`:
 
 ## Tools
 
-The read tools share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited.
+The read tools share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited. **Resource** is the API key resource each tool requires — see [Understand scope](/api-quickstart#understand-scope).
 
-| Tool                     | Description                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| `envpilot_list_projects` | List every project in the key's scope                                                            |
-| `envpilot_get_variables` | Get variables for a project + environment, with optional `keys`/`prefix`/`metadata_only` filters |
-| `envpilot_get_variable`  | Get a single variable by exact key                                                               |
-| `envpilot_list_accounts` | List shared accounts for a project, optionally filtered by environment                           |
-| `envpilot_search`        | Search across the key's projects for a matching variable or account                              |
+| Tool                     | Description                                                                                                                     | Resource                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `envpilot_list_projects` | List every project in the key's scope                                                                                           | `projects`                                    |
+| `envpilot_get_variables` | Get variables for a project + environment, with optional `keys`/`prefix`/`metadata_only` filters                                | `variables`                                   |
+| `envpilot_get_variable`  | Get a single variable by exact key                                                                                              | `variables`                                   |
+| `envpilot_list_accounts` | List shared accounts (with credentials) for a project, optionally filtered by environment                                       | `accounts`                                    |
+| `envpilot_search`        | Search project names/slugs and variable **keys** (never values) across the key's projects, bounded to 20 projects / 100 matches | `projects` (plus `variables` for key matches) |
 
 Two additional tools cover the **only** write path a machine credential has — filing a variable request for a human to approve. They are available only if the key's scope includes the `requests` resource:
 
-| Tool                          | Description                                                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `envpilot_request_variable`   | File a request for a variable, with a **required justification**. A human must approve it and supply the value. |
-| `envpilot_get_request_status` | Poll a filed request — returns `pending`, `approved`, or `rejected` (with the reviewer's reason when rejected). |
+| Tool                          | Description                                                                                                     | Resource   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------- |
+| `envpilot_request_variable`   | File a request for a variable, with a **required justification**. A human must approve it and supply the value. | `requests` |
+| `envpilot_get_request_status` | Poll a filed request — returns `pending`, `approved`, or `rejected` (with the reviewer's reason when rejected). | `requests` |
 
 ## Requesting variables
 
@@ -119,3 +121,20 @@ Request creation is deliberately strict: it is rate-limited to 5 per hour per ke
 MCP tool calls draw from the **same rate-limit buckets** as the REST API for that key — `envpilot_get_variables` and `envpilot_list_accounts` count against the 30/min value-pull bucket, everything else against the 120/min metadata bucket. A key's project/environment/resource scope applies identically: a tool call for a project outside the key's scope behaves as if it doesn't exist.
 
 See [API Reference](/api-reference) for the underlying limits and error semantics, and [API Security](/api-security) for the auth and audit model shared across the REST API, MCP server, and GitHub Action.
+
+## Troubleshooting
+
+An MCP tool call that fails returns the exact error text below in its result — no separate error code, since tool clients only see a message. Fix the cause on the left with the fix on the right:
+
+| Message                                                                                        | Meaning / fix                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired — create a new key.                                                                                                         |
+| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs — edit the key's scopes (see the [Tools](#tools) table for which resource each needs).                               |
+| `That environment is not in this API key's scope`                                              | The key is limited to other environments — add the environment, or use one already in scope.                                                                      |
+| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's scope — the two are indistinguishable by design, see [Understand scope](/api-quickstart#understand-scope). |
+| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface enabled — enable it.                                                                                           |
+| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                            |
+| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket (120/min metadata or 30/min value pulls, shared with the REST surface) — back off for the given delay before retrying.                    |
+| `Missing or invalid API key.`                                                                  | The `Authorization` header is missing, or isn't `Bearer envpk_...`.                                                                                               |
+
+Older server builds returned an opaque `[Request ID] Server Error` for all of the above instead of the real message — if you see that instead of one of these strings, the connected server predates this fix.

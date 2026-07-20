@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import type { ActionCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { rateLimiter } from "../../lib/rateLimits";
@@ -23,7 +24,7 @@ export async function hashToken(token: string): Promise<string> {
 /** Cheap format guard before any hashing/rate-limiting. */
 export function assertKeyFormat(token: string): void {
   if (!token.startsWith("envpk_")) {
-    throw new Error("Invalid or revoked API key");
+    throw new ConvexError("Invalid or revoked API key");
   }
 }
 
@@ -58,24 +59,24 @@ export function throwForDenial(
   overrides?: { resourceScope?: string }
 ): never {
   if (denied === "invalid_key") {
-    throw new Error("Invalid or revoked API key");
+    throw new ConvexError("Invalid or revoked API key");
   }
   if (denied === "resource_scope") {
-    throw new Error(
+    throw new ConvexError(
       overrides?.resourceScope ?? "That resource is not in this API key's scope"
     );
   }
   if (denied === "environment_scope") {
-    throw new Error("That environment is not in this API key's scope");
+    throw new ConvexError("That environment is not in this API key's scope");
   }
   if (denied === "project_scope") {
-    throw new Error("Project not found");
+    throw new ConvexError("Project not found");
   }
   if (denied === "surface_scope") {
-    throw new Error("This API key is not enabled for this surface");
+    throw new ConvexError("This API key is not enabled for this surface");
   }
   // tier_gate
-  throw new Error(
+  throw new ConvexError(
     "The public API is available on the Pro plan — this organization's plan no longer includes it"
   );
 }
@@ -83,8 +84,9 @@ export function throwForDenial(
 /**
  * Consume one unit of the given bucket, keyed by the token hash — always
  * BEFORE any authorize/DB work, capping brute-force probing of invalid
- * credentials too. Re-throws a plain Error carrying the retry-after
- * duration so HTTP routes can regex-match it and set a Retry-After header.
+ * credentials too. Re-throws a ConvexError carrying the retry-after
+ * duration (the payload survives prod redaction) so HTTP routes can
+ * regex-match it and set a Retry-After header.
  */
 export async function consumeRateLimit(
   ctx: ActionCtx,
@@ -95,7 +97,7 @@ export async function consumeRateLimit(
     await rateLimiter.limit(ctx, bucket, { key: tokenHash, throws: true });
   } catch (error) {
     if (isRateLimitError(error)) {
-      throw new Error(
+      throw new ConvexError(
         `Rate limit exceeded — retry after ${error.data.retryAfter}ms`
       );
     }

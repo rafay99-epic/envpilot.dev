@@ -82,12 +82,18 @@ test.describe.serial("API keys", () => {
     });
     await expect(productionChip).toBeVisible();
 
-    // Resources: variables is the pre-selected default chip — assert.
+    // Resources: variables + projects are the pre-selected defaults —
+    // projects because the default surfaces include the MCP server, whose
+    // clients start by listing projects.
     const variablesChip = page.getByRole("button", {
       name: /^variables$/i,
       pressed: true,
     });
     await expect(variablesChip).toBeVisible();
+    await expect(page.getByTestId("api-key-resource-projects")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
     // Surfaces: REST API + MCP server are the pre-selected defaults —
     // assert; GitHub Action is opt-in.
@@ -130,7 +136,9 @@ test.describe.serial("API keys", () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
     // Scope renders as one quiet line, not a badge per datum.
     await expect(
-      row.getByText(/1 project · production · variables · REST API, MCP server/)
+      row.getByText(
+        /1 project · production · variables, projects · REST API, MCP server/
+      )
     ).toBeVisible();
 
     expect(

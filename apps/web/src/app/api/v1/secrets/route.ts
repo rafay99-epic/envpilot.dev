@@ -3,6 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import * as Sentry from "@sentry/nextjs";
 import { api } from "@convex/_generated/api";
 import { reportApiError } from "@/lib/api-errors";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 /**
  * GET /api/v1/secrets?environment=<env>
@@ -59,7 +60,10 @@ export async function GET(request: Request) {
     );
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Pull failed";
+    // Unwrap ConvexError payloads — prod redacts plain Error messages, so
+    // matching on error.message alone turned every denial into a 500.
+    const message =
+      error instanceof Error ? sanitizeConvexError(error) : "Pull failed";
 
     // Map the action's error phrases onto proper HTTP statuses without
     // leaking anything beyond what the action already chose to say.

@@ -63,6 +63,17 @@ const RESOURCE_HINT: Partial<Record<Resource, string>> = {
   requests: "may file variable requests for human approval (agents)",
 };
 
+// Which MCP tools each resource unlocks — mirrors the `requirement` each
+// Convex action enforces (convex/features/api/reads.ts / requests.ts).
+// Shown in the create form when the MCP surface is selected so keys aren't
+// minted with scopes that make every MCP call fail.
+const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
+  projects: "envpilot_list_projects, envpilot_search",
+  variables: "envpilot_get_variables, envpilot_get_variable",
+  accounts: "envpilot_list_accounts",
+  requests: "envpilot_request_variable, envpilot_get_request_status",
+};
+
 const SURFACES = ["rest_api", "mcp_server", "github_action"] as const;
 type Surface = (typeof SURFACES)[number];
 
@@ -467,8 +478,11 @@ function CreateKeyDrawer({
   const [selectedEnvs, setSelectedEnvs] = useState<Set<Environment>>(
     new Set<Environment>(["production"])
   );
+  // projects is in the default set because the default surfaces include the
+  // MCP server, whose clients start every session by listing projects — a
+  // variables-only key makes every MCP call fail with a scope denial.
   const [selectedResources, setSelectedResources] = useState<Set<Resource>>(
-    new Set<Resource>(["variables"])
+    new Set<Resource>(["variables", "projects"])
   );
   const [selectedSurfaces, setSelectedSurfaces] = useState<Set<Surface>>(
     new Set<Surface>(["rest_api", "mcp_server"])
@@ -491,7 +505,7 @@ function CreateKeyDrawer({
     setSelectedProjectIds(new Set());
     setEnvMode("specific");
     setSelectedEnvs(new Set<Environment>(["production"]));
-    setSelectedResources(new Set<Resource>(["variables"]));
+    setSelectedResources(new Set<Resource>(["variables", "projects"]));
     setSelectedSurfaces(new Set<Surface>(["rest_api", "mcp_server"]));
     setExpiryMode("none");
     setCustomExpiry("");
@@ -560,6 +574,7 @@ function CreateKeyDrawer({
   };
 
   const githubActionSelected = selectedSurfaces.has("github_action");
+  const mcpSelected = selectedSurfaces.has("mcp_server");
 
   const projectSelectionValid = githubActionSelected
     ? projectMode === "specific" && selectedProjectIds.size === 1
@@ -937,6 +952,55 @@ function CreateKeyDrawer({
                 them in the dashboard and supplies the value. Keys never write
                 secrets.
               </p>
+            )}
+            {mcpSelected && (
+              <div
+                data-testid="api-key-mcp-requirements"
+                className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3"
+              >
+                <p className="text-xs font-medium text-zinc-300">
+                  MCP server — tools this key will unlock
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {RESOURCES.map((resource) => {
+                    const enabled = selectedResources.has(resource);
+                    return (
+                      <li
+                        key={resource}
+                        data-testid={`api-key-mcp-tools-${resource}`}
+                        className={`flex gap-2 text-xs ${
+                          enabled ? "text-zinc-400" : "text-zinc-600"
+                        }`}
+                      >
+                        <span
+                          className={
+                            enabled ? "text-green-500" : "text-zinc-600"
+                          }
+                        >
+                          {enabled ? "✓" : "✗"}
+                        </span>
+                        <span>
+                          <span className="capitalize">{resource}</span> —{" "}
+                          <span className="font-mono">
+                            {MCP_RESOURCE_TOOLS[resource]}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {!selectedResources.has("projects") && (
+                  <p
+                    data-testid="api-key-mcp-projects-warning"
+                    className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-400"
+                  >
+                    Without the projects resource, MCP clients cannot list or
+                    search projects — most assistants start there, so every
+                    session fails with a scope error. Enable projects for a
+                    usable MCP key.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

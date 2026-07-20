@@ -12,6 +12,8 @@
  * already uses for the CI/CD pull surface.
  */
 
+import { sanitizeConvexError } from "@/lib/error-messages";
+
 /** Extract the bearer credential from an Authorization header, or null. */
 export function getBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization") ?? "";
@@ -46,7 +48,11 @@ export interface MappedPublicApiError {
  * see that file's `throwForDenial` and per-action loud-failure messages).
  */
 export function mapPublicApiError(error: unknown): MappedPublicApiError {
-  const message = error instanceof Error ? error.message : "Request failed";
+  // The actions throw ConvexError so the message survives prod redaction
+  // (a plain Error becomes "[Request ID] Server Error" and every denial
+  // would map to 500). sanitizeConvexError unwraps the payload.
+  const message =
+    error instanceof Error ? sanitizeConvexError(error) : "Request failed";
 
   if (/invalid or revoked/i.test(message)) {
     return {

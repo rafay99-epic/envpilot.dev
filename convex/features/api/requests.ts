@@ -1,4 +1,4 @@
-import { v, type Infer } from "convex/values";
+import { v, ConvexError, type Infer } from "convex/values";
 import { action, internalQuery } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -103,7 +103,7 @@ export const createVariableRequest = action({
       internal.features.projects.queries._getBySlug,
       { organizationId: bootstrap.organizationId, slug: args.projectSlug }
     );
-    if (!projectDoc) throw new Error("Project not found");
+    if (!projectDoc) throw new ConvexError("Project not found");
 
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
@@ -123,7 +123,7 @@ export const createVariableRequest = action({
     // environment per call. (Environment NAME validity is enforced in the
     // shared insertRequest core.)
     if (args.environments.length === 0) {
-      throw new Error("At least one environment is required");
+      throw new ConvexError("At least one environment is required");
     }
     const envScope = scoped.scopeEnvironments;
     if (envScope !== "all") {
@@ -131,7 +131,9 @@ export const createVariableRequest = action({
         (env) => !envScope.includes(env)
       );
       if (outOfScope.length > 0) {
-        throw new Error("That environment is not in this API key's scope");
+        throw new ConvexError(
+          "That environment is not in this API key's scope"
+        );
       }
     }
 
