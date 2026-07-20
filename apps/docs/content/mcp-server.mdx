@@ -22,6 +22,62 @@ Transport is Streamable HTTP (the current MCP spec transport for remote servers)
 Authorization: Bearer envpk_your_key_here
 ```
 
+## Connect a client
+
+### Claude Code
+
+```bash
+claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp \
+  --header "Authorization: Bearer <your-api-key>"
+```
+
+By default the server is saved to the current project, private to you. Add `-s` to change where the config lives: `-s project` writes a shared `.mcp.json` you can commit to the repo, `-s user` makes it available across all your projects. Verify the connection with `claude mcp list` (or `/mcp` inside a session, which also lists the tools), and manage it later with `claude mcp get envpilot` / `claude mcp remove envpilot`.
+
+### Codex CLI
+
+Codex reads the token from an environment variable rather than an inline header. Export your key, then register the server:
+
+```bash
+export ENVPILOT_API_KEY=envpk_your_key_here
+codex mcp add envpilot --url https://www.envpilot.dev/api/mcp \
+  --bearer-token-env-var ENVPILOT_API_KEY
+```
+
+Or write it directly to `~/.codex/config.toml` (use `.codex/config.toml` in a trusted project to scope it there):
+
+```toml
+[mcp_servers.envpilot]
+url = "https://www.envpilot.dev/api/mcp"
+bearer_token_env_var = "ENVPILOT_API_KEY"
+```
+
+The presence of `url` (rather than `command`) tells Codex to use the Streamable HTTP transport. Start a session and run `/mcp` to confirm the server is connected and its tools are listed.
+
+### Claude Desktop
+
+Open **Settings → Connectors → Add custom connector**, set the URL to `https://www.envpilot.dev/api/mcp`, and add a request header:
+
+```
+Authorization: Bearer <your-api-key>
+```
+
+### Cursor
+
+Add a remote server entry to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "envpilot": {
+      "url": "https://www.envpilot.dev/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-api-key>"
+      }
+    }
+  }
+}
+```
+
 ## Tools
 
 The read tools share the same scope, rate limits, and plan gate as the REST API. Every value-returning call is audited.
@@ -52,40 +108,6 @@ The loop for an agent is:
 3. On `approved`, read the value with `envpilot_get_variable`. On `rejected`, the status carries the reviewer's reason — report it back rather than retrying blindly.
 
 Request creation is deliberately strict: it is rate-limited to 5 per hour per key (burst 2), capped at 5 open pending requests per key, and a rejected request for a given variable can't be re-filed for 24 hours. Every created request emails a reviewer, so these limits stop an agent loop from becoming alert spam. See [Rate limits](/rate-limits) for the full picture and [Architecture](/architecture) for how "agent requests, human approves" fits the wider trust model.
-
-## Connect a client
-
-### Claude Code
-
-```bash
-claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp \
-  --header "Authorization: Bearer <your-api-key>"
-```
-
-### Claude Desktop
-
-Open **Settings → Connectors → Add custom connector**, set the URL to `https://www.envpilot.dev/api/mcp`, and add a request header:
-
-```
-Authorization: Bearer <your-api-key>
-```
-
-### Cursor
-
-Add a remote server entry to `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "envpilot": {
-      "url": "https://www.envpilot.dev/api/mcp",
-      "headers": {
-        "Authorization": "Bearer <your-api-key>"
-      }
-    }
-  }
-}
-```
 
 ## Rate limits and scope
 
