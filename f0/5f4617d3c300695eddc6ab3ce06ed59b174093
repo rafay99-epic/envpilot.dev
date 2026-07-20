@@ -1,0 +1,23 @@
+apps/web/src/app/api/integrations/[provider]/start/route.ts
+  s_2ef6990c48d878::t_bd4e3f21dce575 1-88
+apps/web/src/app/api/integrations/providers/route.ts
+  s_2ef6990c48d878::t_380dc75060d105 1-24
+apps/web/src/lib/integration-oauth.ts
+  s_2ef6990c48d878::t_c4c907c1b3fa6e 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f05f4617d3c300695eddc6ab3ce06ed59b174093",
+  "prompts": {},
+  "sessions": {
+    "s_2ef6990c48d878": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da0bb6f3-15e4-406e-a3b7-b7568c6b6e23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
