@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action, internalQuery } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
@@ -171,7 +171,7 @@ export const _readActiveVariables = internalQuery({
       .take(MAX_PULL_ROWS + 1);
 
     if (rows.length > MAX_PULL_ROWS) {
-      throw new Error(
+      throw new ConvexError(
         `Project has more than ${MAX_PULL_ROWS} active variables — refusing a partial pull. Contact support to raise the limit.`
       );
     }
@@ -206,7 +206,7 @@ export const _readActiveAccounts = internalQuery({
       .take(MAX_PULL_ROWS + 1);
 
     if (rows.length > MAX_PULL_ROWS) {
-      throw new Error(
+      throw new ConvexError(
         `Project has more than ${MAX_PULL_ROWS} active accounts — refusing a partial pull. Contact support to raise the limit.`
       );
     }
@@ -278,7 +278,7 @@ export const getOrganization = action({
       internal.features.api.reads._getOrganizationSummary,
       { organizationId: authorization.organizationId }
     );
-    if (!summary) throw new Error("Organization not found");
+    if (!summary) throw new ConvexError("Organization not found");
     return summary;
   },
 });
@@ -356,7 +356,7 @@ export const getProject = action({
         slug: args.projectSlug,
       }
     );
-    if (!projectDoc) throw new Error("Project not found");
+    if (!projectDoc) throw new ConvexError("Project not found");
 
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
@@ -417,7 +417,7 @@ export const getProjectVariables = action({
     assertKeyFormat(args.token);
     const metadataOnly = args.metadataOnly ?? false;
     if (!metadataOnly && !args.environment) {
-      throw new Error(
+      throw new ConvexError(
         "Missing required param: environment (or pass metadata_only=true)"
       );
     }
@@ -448,7 +448,7 @@ export const getProjectVariables = action({
         slug: args.projectSlug,
       }
     );
-    if (!projectDoc) throw new Error("Project not found");
+    if (!projectDoc) throw new ConvexError("Project not found");
 
     // Step 2: project-scoped — this is what actually enforces project scope,
     // and (for real value pulls) records the audit entry + lastUsedAt patch.
@@ -526,7 +526,7 @@ export const getProjectVariables = action({
           projectId: projectDoc._id,
           key: row.key,
         });
-        throw new Error(
+        throw new ConvexError(
           `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
         );
       }
@@ -603,7 +603,7 @@ export const getProjectAccounts = action({
         slug: args.projectSlug,
       }
     );
-    if (!projectDoc) throw new Error("Project not found");
+    if (!projectDoc) throw new ConvexError("Project not found");
 
     const scoped: Authorization = await ctx.runMutation(
       internal.features.api.authorize._authorizeRequest,
@@ -678,7 +678,7 @@ export const getProjectAccounts = action({
           projectId: projectDoc._id,
           account: row.name,
         });
-        throw new Error(
+        throw new ConvexError(
           `Failed to decrypt account "${row.name}" — pull aborted (transient vault errors are retryable; persistent ones need the account re-saved)`
         );
       }
@@ -694,7 +694,7 @@ export const getProjectAccounts = action({
           projectId: projectDoc._id,
           account: row.name,
         });
-        throw new Error(
+        throw new ConvexError(
           `Failed to decrypt account "${row.name}" — pull aborted (transient vault errors are retryable; persistent ones need the account re-saved)`
         );
       }

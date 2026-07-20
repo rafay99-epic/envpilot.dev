@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import {
   action,
   internalMutation,
@@ -6,6 +6,7 @@ import {
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { rateLimiter } from "../../lib/rateLimits";
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 
 /**
@@ -61,11 +62,22 @@ export const _authorizePull = internalMutation({
     // Rate limit keyed by the hash — throttles both real credentials and
     // brute-force probing of invalid ones. (Throws + rolls back: rate-limit
     // hits are deliberately NOT audited — a rejected burst would flood the
-    // org's audit trail.)
-    await rateLimiter.limit(ctx, "cicdPull", {
-      key: args.tokenHash,
-      throws: true,
-    });
+    // org's audit trail.) Re-thrown as a string-payload ConvexError: the
+    // component's error carries object data that the secrets route can't
+    // regex-match, which turned 429s into 500s in prod.
+    try {
+      await rateLimiter.limit(ctx, "cicdPull", {
+        key: args.tokenHash,
+        throws: true,
+      });
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        throw new ConvexError(
+          `Rate limit exceeded — retry after ${error.data.retryAfter}ms`
+        );
+      }
+      throw error;
+    }
 
     const now = Date.now();
 
@@ -217,7 +229,7 @@ export const _readScopedVariables = internalQuery({
       .take(MAX_PULL_VARIABLES + 1);
 
     if (variables.length > MAX_PULL_VARIABLES) {
-      throw new Error(
+      throw new ConvexError(
         `Project has more than ${MAX_PULL_VARIABLES} active variables — refusing a partial pull. Contact support to raise the limit.`
       );
     }
@@ -250,7 +262,7 @@ export const pullSecrets = action({
     variables: Array<{ key: string; value: string }>;
   }> => {
     if (!args.token.startsWith("envpk_")) {
-      throw new Error("Invalid or revoked service token");
+      throw new ConvexError("Invalid or revoked service token");
     }
 
     const digest = await crypto.subtle.digest(
@@ -284,18 +296,18 @@ export const pullSecrets = action({
     // /api/v1/secrets route maps onto HTTP statuses.
     if (!authorization.ok) {
       if (authorization.denied === "environment_scope") {
-        throw new Error(
+        throw new ConvexError(
           `This token is not scoped to the "${args.environment}" environment`
         );
       }
       if (authorization.denied === "tier_gate_public_api") {
         // "Pro plan" phrase — the /api/v1/secrets route's 403 regex matches
         // it — naming the gate that actually denied the pull.
-        throw new Error(
+        throw new ConvexError(
           "The public API is available on the Pro plan — this organization's plan no longer includes it"
         );
       }
-      throw new Error("Invalid or revoked service token");
+      throw new ConvexError("Invalid or revoked service token");
     }
     const scope = authorization;
 
@@ -322,7 +334,7 @@ export const pullSecrets = action({
             projectId: scope.projectId,
             key: row.key,
           });
-          throw new Error(
+          throw new ConvexError(
             `Failed to decrypt "${row.key}" — pull aborted (transient vault errors are retryable; persistent ones need the variable re-saved)`
           );
         }

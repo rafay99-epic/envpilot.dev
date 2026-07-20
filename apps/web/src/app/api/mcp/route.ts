@@ -6,6 +6,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { getConvexUrl } from "@/lib/public-api";
 import { APP_VERSIONS } from "@/lib/versions";
+import { sanitizeConvexError } from "@/lib/error-messages";
 
 /**
  * Remote MCP server — read-only tools over the SAME Convex actions
@@ -72,7 +73,12 @@ function toolError(err: unknown): {
   isError: true;
   content: [{ type: "text"; text: string }];
 } {
-  const message = err instanceof Error ? err.message : "Request failed";
+  // Unwrap ConvexError payloads — prod redacts plain Error messages to
+  // "[Request ID] Server Error", which told MCP clients nothing. The
+  // sanitized payload is the action's real denial ("That resource is not
+  // in this API key's scope", tier gate, rate limit, ...).
+  const message =
+    err instanceof Error ? sanitizeConvexError(err) : "Request failed";
   return { isError: true, content: [{ type: "text", text: message }] };
 }
 
