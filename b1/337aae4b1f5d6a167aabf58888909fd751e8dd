@@ -1,0 +1,23 @@
+apps/blog/content/giving-claude-code-secrets-without-your-dotenv.mdx
+  s_a3ac6d49efb842::t_176a37d25fc1d7 1-65
+apps/blog/package.json
+  s_a3ac6d49efb842::t_20d73e71f0ba0e 3
+apps/blog/content/dotenv-vault-is-deprecated-heres-your-migration-path.mdx
+  s_a3ac6d49efb842::t_9ef9e8e25a8cbb 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b1337aae4b1f5d6a167aabf58888909fd751e8dd",
+  "prompts": {},
+  "sessions": {
+    "s_a3ac6d49efb842": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5fdf4860-d1ca-4221-814d-45e02d7e435c",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
