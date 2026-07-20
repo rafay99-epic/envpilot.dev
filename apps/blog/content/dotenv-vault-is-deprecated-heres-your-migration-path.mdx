@@ -1,0 +1,81 @@
+---
+title: "dotenv-vault Is Deprecated — Here's Your Migration Path"
+description: "dotenv-vault and the .env.vault format are deprecated. What that means for your team, what the real alternatives are (including the official one), and how to migrate in ten minutes."
+date: "2026-07-21"
+tags: ["guides", "migration"]
+keywords:
+  [
+    "dotenv-vault alternative",
+    "dotenv-vault deprecated",
+    ".env.vault migration",
+    "dotenvx vs dotenv-vault",
+    "environment variables team sync",
+  ]
+author:
+  name: "Abdul Rafay"
+---
+
+If your team syncs environment variables with `dotenv-vault`, you've probably seen the notices by now: the project is deprecated. The `.env.vault` file format is [officially marked deprecated](https://dotenvx.com/docs/env-vault-file), `dotenv-vault-core` has pointed users elsewhere for a while, and active development has moved to [dotenvx](https://dotenvx.com/) — built by Mot, the same developer who created the original `dotenv`.
+
+Nothing is going to break tomorrow. But building on a deprecated secrets format is a slow leak: no fixes, no new integrations, and every new teammate asking "wait, why are we using this?" Here's an honest map of where to go.
+
+## What you actually lose
+
+`dotenv-vault` did three jobs:
+
+1. **Encrypted your .env files** into a `.env.vault` file you could commit
+2. **Synced them** across the team through dotenv.org
+3. **Separated environments** (development, staging, production) with one key each
+
+Any replacement needs to cover those three jobs — and ideally fix the things that were always awkward: key distribution still happened out-of-band, there was no per-person access control, and no record of who read what.
+
+## Option 1: dotenvx (the official successor)
+
+[dotenvx](https://dotenvx.com/) is the path the dotenv creator recommends, and there's an [official migration extension](https://github.com/dotenvx/dotenvx-ext-vault) for converting `.env.vault` files.
+
+Its model: encrypted `.env` files live in your repo, decrypted at runtime with a private key. It's free, open source, works with any language, and requires no account.
+
+**Where it fits:** solo developers and teams comfortable with encrypted-files-in-git. **Where it doesn't:** the private key still has to reach every teammate and every CI job through some other channel — which for most small teams means it gets pasted into Slack, the exact problem you were trying to solve. There's also no per-person access control and no audit trail; whoever holds the key holds everything.
+
+## Option 2: hosted secrets managers (Doppler, Infisical)
+
+Both are mature, both solve team sync properly, both price **per seat** — Doppler's Team plan runs [$21/user/month](https://www.doppler.com/pricing), Infisical's Pro is [$18/identity/month](https://infisical.com/pricing) where machines count as identities too. For a six-person team that's $1,300–1,500 a year, and machine identities push it higher. We keep honest comparisons of both, including where they beat us: [Envpilot vs Doppler](https://www.envpilot.dev/vs/doppler) and [Envpilot vs Infisical](https://www.envpilot.dev/vs/infisical).
+
+## Option 3: Envpilot (what we built)
+
+[Envpilot](https://www.envpilot.dev) is an open-source (MIT) environment variable manager built for exactly the team that used dotenv-vault: small, moving fast, no dedicated ops person.
+
+- **No files in the repo at all.** `envpilot run -- npm run dev` injects variables straight into the process; nothing secret touches disk.
+- **Team sync with actual access control** — role-based, per-variable permissions, and an audit log of who read what, when, from where.
+- **Per-environment values** with enforced key uniqueness — `DATABASE_URL` for development and production are separate variables that can never silently collide.
+- **Flat pricing.** Free for 3 teammates and 3 projects; the paid tier is one flat price per organization, not per seat. Adding your seventh developer costs nothing.
+- **Encrypted in a dedicated vault** — our database stores only reference IDs, never plaintext secret values. [The whole platform is MIT-licensed on GitHub](https://github.com/rafay99-epic/envpilot.dev), so you can read exactly how that works.
+
+## The 10-minute migration
+
+You don't need to convert your `.env.vault` file — you need the decrypted values you already have locally.
+
+```bash
+# 1. Install and sign in (browser SSO, no API keys in shell history)
+npm install -g @envpilot/cli
+envpilot login
+
+# 2. Link the project folder
+envpilot init
+
+# 3. Push your existing .env into an environment
+envpilot push --env development
+envpilot push --env production --file .env.production
+
+# 4. Verify, then delete the files
+envpilot run -- npm run dev
+rm .env .env.production .env.vault .env.keys
+```
+
+Teammates run steps 1–2 and they're synced — no key to hand them, because access is tied to their account, not a shared secret. When someone leaves the team, you revoke the person, not rotate every key they ever touched.
+
+CI needs variables too: the [GitHub Action](https://docs.envpilot.dev/github-action) pulls them with a scoped token and masks every value in workflow logs.
+
+## Which one should you pick?
+
+Honest version: if you're solo and like the encrypted-files-in-git model, **dotenvx** is free and official — use it. If you're an enterprise with compliance requirements and budget, Doppler and Infisical are proven. If you're a small team that mostly wants to stop pasting `.env` files into Slack and know who touched what, that's the exact gap [we built Envpilot for](https://www.envpilot.dev) — and the free tier covers a 3-person team end to end, no credit card.
