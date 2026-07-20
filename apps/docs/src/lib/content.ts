@@ -46,6 +46,7 @@ export const CATEGORIES: { label: string; slugs: string[] }[] = [
       "api-security",
       "mcp-server",
       "github-action",
+      "notifications",
       "rate-limits",
     ],
   },

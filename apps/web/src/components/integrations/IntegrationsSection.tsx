@@ -121,7 +121,6 @@ export function IntegrationsSection({
       showError(oauthError);
     }
     // Run once for the landing URL; params never change without a navigation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(
     () => () => {
