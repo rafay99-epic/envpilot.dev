@@ -6,6 +6,7 @@ import {
 } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { rateLimiter } from "../../lib/rateLimits";
+import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 
 /**
@@ -61,11 +62,22 @@ export const _authorizePull = internalMutation({
     // Rate limit keyed by the hash — throttles both real credentials and
     // brute-force probing of invalid ones. (Throws + rolls back: rate-limit
     // hits are deliberately NOT audited — a rejected burst would flood the
-    // org's audit trail.)
-    await rateLimiter.limit(ctx, "cicdPull", {
-      key: args.tokenHash,
-      throws: true,
-    });
+    // org's audit trail.) Re-thrown as a string-payload ConvexError: the
+    // component's error carries object data that the secrets route can't
+    // regex-match, which turned 429s into 500s in prod.
+    try {
+      await rateLimiter.limit(ctx, "cicdPull", {
+        key: args.tokenHash,
+        throws: true,
+      });
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        throw new ConvexError(
+          `Rate limit exceeded — retry after ${error.data.retryAfter}ms`
+        );
+      }
+      throw error;
+    }
 
     const now = Date.now();
 

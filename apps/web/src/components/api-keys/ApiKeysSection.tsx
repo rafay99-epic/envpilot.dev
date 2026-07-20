@@ -68,7 +68,8 @@ const RESOURCE_HINT: Partial<Record<Resource, string>> = {
 // Shown in the create form when the MCP surface is selected so keys aren't
 // minted with scopes that make every MCP call fail.
 const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
-  projects: "envpilot_list_projects, envpilot_search",
+  projects:
+    "envpilot_list_projects, envpilot_search (key matches also need variables)",
   variables: "envpilot_get_variables, envpilot_get_variable",
   accounts: "envpilot_list_accounts",
   requests: "envpilot_request_variable, envpilot_get_request_status",

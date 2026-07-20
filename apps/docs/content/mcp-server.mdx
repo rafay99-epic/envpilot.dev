@@ -10,7 +10,7 @@ MCP (Model Context Protocol) is an open standard that lets AI assistants like Cl
 
 Requires the **Pro** plan (`mcp_server` feature) and an [API key](/api-quickstart).
 
-> **Required key scopes**: an MCP key needs at minimum the `projects` and `variables` resources. Assistants start every session by calling `envpilot_list_projects`, so a key without `projects` fails immediately with "That resource is not in this API key's scope." The create-key form in **Organization → Settings → API Keys** shows this checklist live as you pick resources.
+> **Recommended key scopes**: pick the resources for the MCP tools you intend to use — for the common project-discovery + variable-read workflow that means `projects` and `variables`. Most assistants open a session by calling `envpilot_list_projects`, so a key without `projects` typically fails on its first call with "That resource is not in this API key's scope" (a requests-only or accounts-only key is still valid for its own tools). The create-key form in **Organization → Settings → API Keys** shows this checklist live as you pick resources.
 
 ## Endpoint
 
@@ -113,7 +113,7 @@ Two additional tools cover the **only** write path a machine credential has — 
 | Tool                          | Description                                                                                                     | Resource   |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------- |
 | `envpilot_request_variable`   | File a request for a variable, with a **required justification**. A human must approve it and supply the value. | `requests` |
-| `envpilot_get_request_status` | Poll a filed request — returns `pending`, `approved`, or `rejected` (with the reviewer's reason when rejected). | `requests` |
+| `envpilot_get_request_status` | Poll a filed request — returns `pending`, `approved`, `rejected` (with the reviewer's reason), or `canceled`.   | `requests` |
 
 ## Requesting variables
 
@@ -135,17 +135,17 @@ See [API Reference](/api-reference) for the underlying limits and error semantic
 
 ## Troubleshooting
 
-An MCP tool call that fails returns the exact error text below in its result — no separate error code, since tool clients only see a message. Fix the cause on the left with the fix on the right:
+A failed MCP tool call returns an error message in its result — no separate error code, since tool clients only see the text. The table lists each message (tool-specific variants may append detail, e.g. the request tools' `— filing requests needs the "requests" resource`). One exception: a missing or malformed `Authorization` header is rejected at the transport level with HTTP 401 before any tool runs.
 
-| Message                                                                                        | Meaning / fix                                                                                                                                                     |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired — create a new key.                                                                                                         |
-| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs — edit the key's scopes (see the [Tools](#tools) table for which resource each needs).                               |
-| `That environment is not in this API key's scope`                                              | The key is limited to other environments — add the environment, or use one already in scope.                                                                      |
-| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's scope — the two are indistinguishable by design, see [Understand scope](/api-quickstart#understand-scope). |
-| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface enabled — enable it.                                                                                           |
-| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                            |
-| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket (120/min metadata or 30/min value pulls, shared with the REST surface) — back off for the given delay before retrying.                    |
-| `Missing or invalid API key.`                                                                  | The `Authorization` header is missing, or isn't `Bearer envpk_...`.                                                                                               |
+| Message                                                                                        | Meaning / fix                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired — create a new key.                                                                                                                         |
+| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs — edit the key's scopes (see the [Tools](#tools) table). The request tools append `— filing requests needs the "requests" resource`. |
+| `That environment is not in this API key's scope`                                              | The key is limited to other environments — add the environment, or use one already in scope.                                                                                      |
+| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's scope — the two are indistinguishable by design, see [Understand scope](/api-quickstart#understand-scope).                 |
+| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface enabled — enable it.                                                                                                           |
+| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                                            |
+| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket: 120/min metadata or 30/min value pulls (both shared with REST), or 5/hour (burst 2) for `envpilot_request_variable` — back off for the given delay.      |
+| `Missing or invalid API key.` (HTTP 401)                                                       | Transport-level rejection before any tool runs — the `Authorization` header is missing, or isn't `Bearer envpk_...`.                                                              |
 
 Older server builds returned an opaque `[Request ID] Server Error` for all of the above instead of the real message — if you see that instead of one of these strings, the connected server predates this fix.
