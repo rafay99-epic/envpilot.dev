@@ -26,7 +26,7 @@ export const deliver = internalAction({
     const endpoint =
       args.type === "discord" && !base.endsWith("/slack")
         ? `${base}/slack`
-        : args.url;
+        : base;
 
     let status = 0; // 0 = network failure, recorded like any non-2xx
     try {

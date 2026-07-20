@@ -287,7 +287,10 @@ export function IntegrationsSection({
 
           {/* Manual add form */}
           {showManual && (
-            <div className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+            <div
+              data-testid="manual-webhook-form"
+              className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4"
+            >
               <div className="flex gap-2">
                 {(["slack", "discord"] as const).map((t) => (
                   <button
