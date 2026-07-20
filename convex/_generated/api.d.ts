@@ -58,6 +58,9 @@ import type * as features_emails_templates from "../features/emails/templates.js
 import type * as features_featureRegistry_gates from "../features/featureRegistry/gates.js";
 import type * as features_featureRegistry_queries from "../features/featureRegistry/queries.js";
 import type * as features_featureRegistry_resolver from "../features/featureRegistry/resolver.js";
+import type * as features_integrations_dispatch from "../features/integrations/dispatch.js";
+import type * as features_integrations_notify from "../features/integrations/notify.js";
+import type * as features_integrations_webhooks from "../features/integrations/webhooks.js";
 import type * as features_organizations_invitations from "../features/organizations/invitations.js";
 import type * as features_organizations_memberSessions from "../features/organizations/memberSessions.js";
 import type * as features_organizations_mutations from "../features/organizations/mutations.js";
@@ -168,6 +171,9 @@ declare const fullApi: ApiFromModules<{
   "features/featureRegistry/gates": typeof features_featureRegistry_gates;
   "features/featureRegistry/queries": typeof features_featureRegistry_queries;
   "features/featureRegistry/resolver": typeof features_featureRegistry_resolver;
+  "features/integrations/dispatch": typeof features_integrations_dispatch;
+  "features/integrations/notify": typeof features_integrations_notify;
+  "features/integrations/webhooks": typeof features_integrations_webhooks;
   "features/organizations/invitations": typeof features_organizations_invitations;
   "features/organizations/memberSessions": typeof features_organizations_memberSessions;
   "features/organizations/mutations": typeof features_organizations_mutations;
