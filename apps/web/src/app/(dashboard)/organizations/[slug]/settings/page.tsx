@@ -28,6 +28,7 @@ import {
 import { useFeatureGate, usePagination } from "@/hooks";
 import { normalizeOrgRole, roleLevel, ROLE_LEVEL } from "@/lib/roles";
 import { ApiKeysSection } from "@/components/api-keys/ApiKeysSection";
+import { IntegrationsSection } from "@/components/integrations/IntegrationsSection";
 
 interface Organization {
   _id: string;
@@ -38,7 +39,12 @@ interface Organization {
   role: string;
 }
 
-type OrgSettingsTab = "general" | "tags" | "apiKeys" | "danger";
+type OrgSettingsTab =
+  | "general"
+  | "tags"
+  | "apiKeys"
+  | "integrations"
+  | "danger";
 
 export default function OrganizationSettingsPage(props: {
   params: Promise<{ slug: string }>;
@@ -110,6 +116,10 @@ function OrganizationSettingsPageContent({
     ...(isOwner && showTags ? [{ id: "tags" as const, label: "Tags" }] : []),
     ...(canManageApiKeys
       ? [{ id: "apiKeys" as const, label: "API Keys" }]
+      : []),
+    // Webhook management is org.manage on the backend — owner by default
+    ...(isOwner
+      ? [{ id: "integrations" as const, label: "Integrations" }]
       : []),
     ...(isOwner ? [{ id: "danger" as const, label: "Danger Zone" }] : []),
   ];
@@ -318,6 +328,12 @@ function OrganizationSettingsPageContent({
           <ApiKeysSection
             organizationId={organization._id as Id<"organizations">}
             isOwner={isOwner}
+          />
+        )}
+        {effectiveTab === "integrations" && isOwner && organization && (
+          <IntegrationsSection
+            organizationId={organization._id as Id<"organizations">}
+            slug={organization.slug}
           />
         )}
         {effectiveTab === "danger" && isOwner && (
