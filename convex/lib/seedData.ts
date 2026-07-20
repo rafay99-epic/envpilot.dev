@@ -294,6 +294,24 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 2,
   },
+  {
+    key: "team_notifications",
+    displayName: "Slack & Discord Notifications",
+    valueType: "boolean" as const,
+    category: "Integrations",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 3,
+  },
+  {
+    key: "team_notifications_limit",
+    displayName: "Max Notification Webhooks",
+    valueType: "numeric" as const,
+    category: "Integrations",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 4,
+  },
 ];
 
 // ─── Role registry seeds ──────────────────────────────────────────────────────

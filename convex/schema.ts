@@ -627,6 +627,34 @@ export default defineSchema({
     .index("by_organization", ["organizationId"]),
 
   // ==========================================
+  // ORG NOTIFICATION WEBHOOKS (Slack / Discord)
+  // ==========================================
+  // Outbound notification endpoints for org activity. The URL is the only
+  // credential (a capability URL) — never rendered raw in the UI for manual
+  // rows, and OAuth access tokens are exchanged then discarded, never stored.
+  orgWebhooks: defineTable({
+    organizationId: v.id("organizations"),
+    // Display label — the channel name for OAuth rows, user-chosen for manual
+    name: v.string(),
+    type: v.union(v.literal("slack"), v.literal("discord")),
+    // How the URL arrived — OAuth rows can show their channel; manual rows mask
+    source: v.union(v.literal("oauth"), v.literal("manual")),
+    url: v.string(),
+    // Channel name from the OAuth response (e.g. "#eng-alerts")
+    channel: v.optional(v.string()),
+    // Subscribed event groups: "variables" | "requests" | "members" | "security"
+    eventGroups: v.array(v.string()),
+    enabled: v.boolean(),
+    // Consecutive delivery failures — auto-disabled when it hits the cap
+    failCount: v.number(),
+    // Last delivery HTTP status
+    lastStatus: v.optional(v.number()),
+    lastSentAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_organization", ["organizationId"]),
+
+  // ==========================================
   // INVITATIONS
   // ==========================================
   invitations: defineTable({
@@ -910,7 +938,11 @@ export default defineSchema({
       v.literal("account.accessed"),
       v.literal("account.permission_granted"),
       v.literal("account.permission_revoked"),
-      v.literal("account.permission_updated")
+      v.literal("account.permission_updated"),
+      // Notification webhook (Slack/Discord) actions
+      v.literal("integration.webhook_created"),
+      v.literal("integration.webhook_updated"),
+      v.literal("integration.webhook_deleted")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
