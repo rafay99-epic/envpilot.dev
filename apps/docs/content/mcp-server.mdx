@@ -10,7 +10,28 @@ MCP (Model Context Protocol) is an open standard that lets AI assistants like Cl
 
 Requires the **Pro** plan (`mcp_server` feature) and an [API key](/api-quickstart).
 
-> **Recommended key scopes**: pick the resources for the MCP tools you intend to use — for the common project-discovery + variable-read workflow that means `projects` and `variables`. Most assistants open a session by calling `envpilot_list_projects`, so a key without `projects` typically fails on its first call with "That resource is not in this API key's scope" (a requests-only or accounts-only key is still valid for its own tools). The create-key form in **Organization → Settings → API Keys** shows this checklist live as you pick resources.
+## Create an MCP key
+
+Create a dedicated key in **Organization → Settings → API Keys → New API Key**:
+
+1. Give the key a recognizable name, such as `codex-development`.
+2. Select the **MCP server** surface. Deselect REST API and GitHub Action unless this same credential genuinely needs them.
+3. Select only the projects the client needs. **All projects** also includes projects created in the future and is owner-only.
+4. Select only the environments the client needs. A development-only agent should not receive production access.
+5. Select the resources required by its tools:
+
+| Resource    | MCP tools enabled                                                                                                                         |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `projects`  | `envpilot_list_projects`; project-name and project-slug matches from `envpilot_search`                                                    |
+| `variables` | `envpilot_get_variables`, `envpilot_get_variable`; variable-key matches from `envpilot_search` (which also needs `projects` to enumerate) |
+| `accounts`  | `envpilot_list_accounts`                                                                                                                  |
+| `requests`  | `envpilot_request_variable`, `envpilot_get_request_status`                                                                                |
+
+For the common project-discovery and variable-read workflow, select `projects` and `variables`. Most assistants begin with `envpilot_list_projects`; without `projects`, that opening call is denied. An accounts-only or requests-only key is still valid, but only for the corresponding tools.
+
+6. Choose an expiry, create the key, and copy the `envpk_...` value immediately.
+
+Project, environment, resource, and surface scopes are **immutable**. You cannot widen or edit them after creation; create a replacement key when the required access changes. The plaintext is also displayed **once**: Envpilot stores only its SHA-256 hash and cannot recover a lost key.
 
 ## Endpoint
 
@@ -24,33 +45,158 @@ Transport is Streamable HTTP (the current MCP spec transport for remote servers)
 Authorization: Bearer envpk_your_key_here
 ```
 
+## Set ENVPILOT_API_KEY
+
+Keep the plaintext out of MCP config files and repositories. Put it in the environment of the process that starts the client, then make the client reference the variable by name.
+
+### macOS
+
+For the current Terminal session (zsh), enter the key at the hidden prompt so it does not appear in shell history:
+
+```bash
+read -rs "ENVPILOT_API_KEY?Envpilot API key: "; echo
+export ENVPILOT_API_KEY
+```
+
+This value disappears when the shell exits. For future terminal sessions, have a password manager inject it or edit a user-only shell startup file (do not build the line with a shell command that would record the key in history):
+
+```bash
+# ~/.zshrc
+export ENVPILOT_API_KEY='envpk_your_key_here'
+```
+
+A literal export in a startup file is persistent but is plaintext on disk; never put it in a repository, and restrict the file to your user:
+
+```bash
+chmod 600 ~/.zshrc
+```
+
+Apps opened from Finder, the Dock, or Spotlight do not inherit variables from `~/.zshrc`. To make the current login session pass the already-exported value to **newly launched** GUI apps:
+
+```bash
+launchctl setenv ENVPILOT_API_KEY "$ENVPILOT_API_KEY"
+```
+
+Fully quit and reopen Codex, Cursor, or the IDE afterward. `launchctl setenv` lasts only for the current login session; after logout or restart, set it again (preferably from a login automation that reads a keychain or password manager—do not embed the raw key in a LaunchAgent plist). Do not run `launchctl getenv ENVPILOT_API_KEY` without redirecting it, because that prints the secret.
+
+### Linux
+
+For the current bash session:
+
+```bash
+read -rsp "Envpilot API key: " ENVPILOT_API_KEY; echo
+export ENVPILOT_API_KEY
+```
+
+For future terminal sessions, have a secret manager inject it or edit the appropriate user-only login file (do not build the line with a shell command that would record the key in history):
+
+```bash
+# ~/.profile
+export ENVPILOT_API_KEY='envpk_your_key_here'
+```
+
+A literal export is stored as plaintext, so keep the file private:
+
+```bash
+chmod 600 ~/.profile
+```
+
+A desktop launcher inherits the graphical login session, not an interactive shell's `.bashrc`. The simplest safe option is to launch the app from a terminal that already has the variable. On systemd-based desktops, you can also import the current value into the user and D-Bus activation environments:
+
+```bash
+systemctl --user import-environment ENVPILOT_API_KEY
+dbus-update-activation-environment --systemd ENVPILOT_API_KEY
+```
+
+Then fully quit and reopen the app. For persistence, configure the variable through your desktop login environment or secret manager and sign out and back in; do not put the raw key in a `.desktop` launcher.
+
+### Windows PowerShell
+
+Set the key for the current PowerShell process without echoing the input:
+
+```powershell
+$secret = Read-Host "Envpilot API key" -AsSecureString
+$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+try {
+  $env:ENVPILOT_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+}
+Remove-Variable secret, pointer
+```
+
+Child processes launched from that PowerShell window inherit it. To persist the current value for your Windows user:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "ENVPILOT_API_KEY",
+  $env:ENVPILOT_API_KEY,
+  "User"
+)
+```
+
+The User-scope value is stored in your Windows profile and is available only to **new** processes. Fully quit and reopen terminals, Codex, Cursor, and IDE windows; already-running processes keep their old environment.
+
+### WSL
+
+Windows and WSL have separate process environments. A Windows User-scope variable does not automatically configure clients running inside WSL, and a variable exported in WSL does not configure Windows GUI apps. Set `ENVPILOT_API_KEY` separately inside the WSL distribution using the Linux instructions, then start the WSL-hosted client from a new WSL shell.
+
+### Check presence without printing the key
+
+Use a boolean check—never `echo`, `printenv`, `Get-ChildItem Env:`, or an unredirected `launchctl getenv` for a secret:
+
+```bash
+if [ -n "${ENVPILOT_API_KEY:-}" ]; then
+  echo "ENVPILOT_API_KEY is set"
+else
+  echo "ENVPILOT_API_KEY is not set"
+fi
+```
+
+```powershell
+if ([string]::IsNullOrEmpty($env:ENVPILOT_API_KEY)) {
+  "ENVPILOT_API_KEY is not set"
+} else {
+  "ENVPILOT_API_KEY is set"
+}
+```
+
+A repository `.env` or `.env.local` file does **not** automatically configure an MCP client. Those files are conventions loaded only by frameworks or commands that explicitly read them. Codex, Claude Code, Cursor, and desktop launchers inspect their own process environment; they do not source arbitrary repository dotenv files. Keeping the MCP credential outside the repository also prevents an agent from reading the very key that controls its access.
+
 ## Connect a client
+
+Set `ENVPILOT_API_KEY` in the client's environment first, using the instructions above.
 
 ### Claude Code
 
-Export your key, then reference it — don't paste it inline:
+Reference the environment variable in an expanded `Authorization` header:
 
 ```bash
-export ENVPILOT_API_KEY=envpk_your_key_here
-claude mcp add --transport http envpilot https://www.envpilot.dev/api/mcp \
+claude mcp add --transport http --scope user \
+  envpilot https://www.envpilot.dev/api/mcp \
   --header 'Authorization: Bearer ${ENVPILOT_API_KEY}'
 ```
 
-The **single quotes matter**: they keep `${ENVPILOT_API_KEY}` literal in the saved config, and Claude Code expands it from your environment at connect time — so the secret itself never lands in a file. That makes the shared scope safe: `-s project` writes a committable `.mcp.json` holding only the variable reference, `-s user` makes the server available across all your projects, and the default `-s local` keeps it to this project. (Never commit a config with the raw `envpk_...` key in it.)
+The **single quotes matter** in POSIX shells: they keep `${ENVPILOT_API_KEY}` literal in the saved configuration, and Claude Code expands it from its environment at connection time. The secret never lands in the file.
+
+Choose the Claude Code configuration scope deliberately:
+
+- `--scope local` (the default) keeps the server private to you in the current project.
+- `--scope project` writes `.mcp.json` for the team. The environment-variable reference is safe to commit, but each user must set their own key and approve/trust the project server before tools load.
+- `--scope user` keeps the server private to your user and makes it available across projects.
 
 `claude mcp list` confirms the server is **registered** — a revoked or wrong key still shows as listed. To verify the connection is actually live and its tools loaded, run `/mcp` inside a session. Manage it later with `claude mcp get envpilot` / `claude mcp remove envpilot`.
 
-### Codex CLI
+### Codex CLI, desktop, and IDE extension
 
-Codex reads the token from an environment variable rather than an inline header. Export your key, then register the server:
+Codex's local CLI, desktop app, and IDE extension share the same MCP configuration layers. Register the server from the CLI:
 
 ```bash
-export ENVPILOT_API_KEY=envpk_your_key_here
 codex mcp add envpilot --url https://www.envpilot.dev/api/mcp \
   --bearer-token-env-var ENVPILOT_API_KEY
 ```
 
-Or write it directly to `~/.codex/config.toml` (use `.codex/config.toml` in a trusted project to scope it there):
+Or add it to the user-level `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.envpilot]
@@ -58,19 +204,13 @@ url = "https://www.envpilot.dev/api/mcp"
 bearer_token_env_var = "ENVPILOT_API_KEY"
 ```
 
-The presence of `url` (rather than `command`) tells Codex to use the Streamable HTTP transport. Start a session and run `/mcp` to confirm the server is connected and its tools are listed.
+The `url` selects Streamable HTTP, while `bearer_token_env_var` makes Codex build the bearer header from the named variable. Do not replace it with the plaintext key.
 
-### Claude Desktop
-
-Open **Settings → Connectors → Add custom connector**, set the URL to `https://www.envpilot.dev/api/mcp`, and add a request header:
-
-```
-Authorization: Bearer <your-api-key>
-```
+You may put the same block in `.codex/config.toml` to scope it to a repository, but Codex loads project configuration only after you trust that project. After changing the variable or configuration, start a new CLI session, select **Restart** for the server in Codex desktop, or restart the IDE extension. Run `/mcp` to confirm the server is connected and the Envpilot tools—not merely the saved server entry—are present.
 
 ### Cursor
 
-Add a remote server entry to `.cursor/mcp.json`:
+Add a remote server to the global `~/.cursor/mcp.json`, or to `.cursor/mcp.json` for a trusted project:
 
 ```json
 {
@@ -78,23 +218,42 @@ Add a remote server entry to `.cursor/mcp.json`:
     "envpilot": {
       "url": "https://www.envpilot.dev/api/mcp",
       "headers": {
-        "Authorization": "Bearer <your-api-key>"
+        "Authorization": "Bearer ${env:ENVPILOT_API_KEY}"
       }
     }
   }
 }
 ```
 
+Cursor resolves `${env:ENVPILOT_API_KEY}` from the environment it inherited at startup. Fully quit and reopen Cursor after setting or rotating the variable, then confirm the tools under MCP settings. Do not commit a raw `envpk_...` value.
+
+### Other Streamable HTTP clients
+
+Configure the endpoint as Streamable HTTP and send this header on every request:
+
+```text
+Authorization: Bearer <the ENVPILOT_API_KEY value>
+```
+
+Prefer a client-native secret store or environment-variable reference. Placeholder syntax is client-specific: do not assume a generic client expands `${ENVPILOT_API_KEY}` or `${env:ENVPILOT_API_KEY}`.
+
+### Hosted Claude connectors are not compatible
+
+Claude's hosted custom connectors—used by Claude web and synced to hosted Claude Desktop and mobile—are different from Claude Code's local MCP configuration. Their standard setup accepts a remote URL and an OAuth connection flow, not a per-user arbitrary `Authorization` header. Envpilot currently uses a fixed `envpk_...` bearer API key and does not expose the OAuth flow those hosted connectors expect, so use **Claude Code** instead.
+
+Do not paste an Envpilot API key into an **OAuth Client Secret** field. That field authenticates an OAuth client during a token exchange; it does not become `Authorization: Bearer envpk_...` on MCP requests and cannot adapt Envpilot's API-key auth into OAuth.
+
 ## Rotating or updating a key
 
-A key's scopes are fixed at creation — to change what an existing MCP setup can do (say, adding the `projects` resource), create a new key with the right scopes and swap it into your client config. Where the swap happens depends on how you connected:
+A key's projects, environments, resources, and surfaces are fixed at creation. To recover a lost key, rotate a credential, or grant different access (for example, adding the `projects` resource or MCP surface), create a new key with the complete intended scope.
 
-- **Claude Code / Codex CLI (env-var reference, as above)**: the saved config only holds `${ENVPILOT_API_KEY}` — update the exported variable (in your shell profile) to the new key and restart the session. The config file itself needs no change.
-- **Claude Code (key pasted inline)**: `claude mcp remove envpilot`, then re-run the `claude mcp add` command with the new key — `claude mcp add` refuses to overwrite an existing server name, so remove first. (Or edit the `Authorization` header in the config file directly: `.mcp.json`, or `.claude.json` for `-s local` servers.)
-- **Claude Desktop**: Settings → Connectors → edit the Envpilot connector's `Authorization` header.
-- **Cursor**: edit the `Authorization` header in `.cursor/mcp.json`.
+1. Store the new value in the same environment-variable source. If you set both a persistent value and a current-session value, update both—an already-running shell or GUI process keeps the old value.
+2. For macOS GUI clients, update `launchctl`; for Linux desktop clients, update the login/user environment; for Windows, update the User-scope value. WSL remains separate.
+3. Fully quit and restart the client. The saved Claude Code, Codex, and Cursor configurations still reference the same variable name and need no secret edit.
+4. Confirm `/mcp` or the client's MCP panel lists the Envpilot tools, then make a permitted tool call.
+5. Revoke the old key in **Organization → Settings → API Keys**.
 
-Rotate safely: create the new key, swap it in, confirm a tool call works, **then** revoke the old key in **Organization → Settings → API Keys**. Revocation is instant — anything still using the old key stops working on its next call.
+Revocation is instant—anything still using the old key stops on its next call. If you previously pasted a key directly into Claude Code, remove and re-add the server (`claude mcp remove envpilot`) or edit the saved entry; `claude mcp add` does not overwrite an existing server name.
 
 ## Tools
 
@@ -137,15 +296,28 @@ See [API Reference](/api-reference) for the underlying limits and error semantic
 
 A failed MCP tool call returns an error message in its result — no separate error code, since tool clients only see the text. The table lists each message (tool-specific variants may append detail, e.g. the request tools' `— filing requests needs the "requests" resource`). One exception: a missing or malformed `Authorization` header is rejected at the transport level with HTTP 401 before any tool runs.
 
-| Message                                                                                        | Meaning / fix                                                                                                                                                                     |
-| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired — create a new key.                                                                                                                         |
-| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs — edit the key's scopes (see the [Tools](#tools) table). The request tools append `— filing requests needs the "requests" resource`. |
-| `That environment is not in this API key's scope`                                              | The key is limited to other environments — add the environment, or use one already in scope.                                                                                      |
-| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's scope — the two are indistinguishable by design, see [Understand scope](/api-quickstart#understand-scope).                 |
-| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface enabled — enable it.                                                                                                           |
-| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                                            |
-| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket: 120/min metadata or 30/min value pulls (both shared with REST), or 5/hour (burst 2) for `envpilot_request_variable` — back off for the given delay.      |
-| `Missing or invalid API key.` (HTTP 401)                                                       | Transport-level rejection before any tool runs — the `Authorization` header is missing, or isn't `Bearer envpk_...`.                                                              |
+First separate client setup failures from Envpilot tool errors:
+
+| Symptom                               | Meaning / fix                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server is registered but has no tools | Registration only proves the config was saved. Open `/mcp` or the client's MCP panel and inspect initialization. The most common cause is that the client process did not inherit `ENVPILOT_API_KEY`; set it in the parent environment and fully restart the client.   |
+| Works in a terminal, not a GUI app    | The terminal has a current-session variable, but the desktop launcher started from a different environment. Use `launchctl` on macOS, the graphical login/user environment on Linux, or Windows User scope, then launch a new process.                                 |
+| Works on Windows but not in WSL       | Windows and WSL environments are separate. Set the key inside the WSL distribution and restart the WSL-hosted client.                                                                                                                                                  |
+| Header contains `${...}` literally    | The client did not expand the placeholder. Claude Code uses `${ENVPILOT_API_KEY}`; Cursor uses `${env:ENVPILOT_API_KEY}`; Codex uses `bearer_token_env_var = "ENVPILOT_API_KEY"`. Confirm the client supports that syntax and inherited the variable, then restart it. |
+| HTTP 401 before tools load            | Ensure the header is exactly `Authorization: Bearer envpk_...`: one `Bearer` prefix, one space, no surrounding quotes in the value, no duplicated prefix, and no literal placeholder. Use a safe presence check instead of printing the key.                           |
+| Hosted Claude cannot authenticate     | Hosted Claude web/Desktop/mobile custom connectors use their URL/OAuth flow and cannot supply Envpilot's fixed bearer key through the standard setup. Use Claude Code; do not put the API key in an OAuth client-secret field.                                         |
+
+Once tools load, these are the server's error semantics:
+
+| Message                                                                                        | Meaning / fix                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Invalid or revoked API key`                                                                   | The key is wrong, revoked, or expired—create a replacement key.                                                                                                                                                               |
+| `That resource is not in this API key's scope`                                                 | The key is missing the resource a tool needs. Scopes are immutable: use the [Tools](#tools) table to create a replacement with the required resource. Request tools append `— filing requests needs the "requests" resource`. |
+| `That environment is not in this API key's scope`                                              | The key is limited to other environments. Use one already in scope, or create a replacement key that includes the required environment.                                                                                       |
+| `Project not found`                                                                            | The slug is wrong, or the project is outside the key's immutable scope—the two are indistinguishable by design; see [Understand scope](/api-quickstart#understand-scope).                                                     |
+| `This API key is not enabled for this surface`                                                 | The key was created without the MCP server surface. Surfaces are immutable: create a replacement with **MCP server** selected.                                                                                                |
+| `The public API is available on the Pro plan — this organization's plan no longer includes it` | The organization's plan no longer includes MCP access.                                                                                                                                                                        |
+| `Rate limit exceeded — retry after Nms`                                                        | Hit a rate-limit bucket: 120/min metadata or 30/min value pulls (both shared with REST), or 5/hour (burst 2) for `envpilot_request_variable`—back off for the given delay.                                                    |
+| `Missing or invalid API key.` (HTTP 401)                                                       | Transport-level rejection before any tool runs—the `Authorization` header is missing or malformed. It must resolve to `Bearer envpk_...`, not a literal placeholder.                                                          |
 
 Older server builds returned an opaque `[Request ID] Server Error` for all of the above instead of the real message — if you see that instead of one of these strings, the connected server predates this fix.
