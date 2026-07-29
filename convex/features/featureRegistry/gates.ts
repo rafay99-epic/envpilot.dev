@@ -342,3 +342,21 @@ export async function countActiveAccounts(
   }
   return count;
 }
+
+/**
+ * Count active secure artifacts for an organization. The active flag is part
+ * of the index so the free-tier limit check never scans soft-deleted rows.
+ */
+export async function countActiveArtifacts(
+  db: DatabaseReader,
+  organizationId: Id<"organizations">,
+  limit: number
+): Promise<number> {
+  const rows = await db
+    .query("artifacts")
+    .withIndex("by_organization_and_active", (q) =>
+      q.eq("organizationId", organizationId).eq("isActive", true)
+    )
+    .take(limit + 1);
+  return rows.length;
+}

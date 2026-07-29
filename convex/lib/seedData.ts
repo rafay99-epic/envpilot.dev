@@ -232,6 +232,24 @@ export const SEED_FEATURES = [
     resettable: false,
     sortOrder: 8,
   },
+  {
+    key: "secure_artifacts",
+    displayName: "Secure Build Artifacts",
+    valueType: "boolean" as const,
+    category: "Security",
+    defaultValue: "false",
+    resettable: false,
+    sortOrder: 9,
+  },
+  {
+    key: "secure_artifacts_limit",
+    displayName: "Max Secure Artifacts",
+    valueType: "numeric" as const,
+    category: "Security",
+    defaultValue: "0",
+    resettable: false,
+    sortOrder: 10,
+  },
 
   // Customization
   {

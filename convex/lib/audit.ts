@@ -21,7 +21,8 @@ export type AuditResourceType =
   | "invitation"
   | "billing"
   | "security"
-  | "account";
+  | "account"
+  | "artifact";
 
 // Severity mapping for different action types
 const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
@@ -84,6 +85,11 @@ const ACTION_SEVERITY_MAP: Record<string, AuditSeverity> = {
   "account.permission_granted": "info",
   "account.permission_revoked": "warning",
   "account.permission_updated": "info",
+  // Secure build artifact actions
+  "artifact.created": "info",
+  "artifact.updated": "info",
+  "artifact.accessed": "info",
+  "artifact.deleted": "critical",
 };
 
 // Resource type mapping for different action types
@@ -120,6 +126,12 @@ const ACTION_RESOURCE_MAP: Record<string, AuditResourceType> = {
   "variable.request_approved": "variable",
   "variable.request_rejected": "variable",
   "variable.request_canceled": "variable",
+
+  // Secure build artifacts
+  "artifact.created": "artifact",
+  "artifact.updated": "artifact",
+  "artifact.accessed": "artifact",
+  "artifact.deleted": "artifact",
 
   // Permission
   "permission.granted": "permission",

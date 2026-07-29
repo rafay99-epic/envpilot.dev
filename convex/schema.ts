@@ -538,6 +538,67 @@ export default defineSchema({
     .index("by_active_and_expires", ["isActive", "expiresAt"]),
 
   // ==========================================
+  // SECURE ARTIFACTS
+  // ==========================================
+  // Artifact metadata lives in Convex. The encrypted bytes live in the
+  // configured S3-compatible object store (Backblaze B2 in production). The
+  // keyVaultRef points to a WorkOS Vault object containing the client-generated
+  // AES-GCM data key; the plaintext key is never stored in Convex.
+  artifacts: defineTable({
+    organizationId: v.id("organizations"),
+    projectId: v.id("projects"),
+    name: v.string(),
+    fileName: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    originalSize: v.number(),
+    contentHash: v.string(),
+    encryptionMode: v.union(v.literal("managed"), v.literal("e2e")),
+    status: v.union(
+      v.literal("uploading"),
+      v.literal("ready"),
+      v.literal("deleted")
+    ),
+    currentVersion: v.number(),
+    isActive: v.boolean(),
+    createdBy: v.id("users"),
+    lastModifiedBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_name", ["projectId", "name"])
+    .index("by_organization", ["organizationId"])
+    .index("by_organization_and_active", ["organizationId", "isActive"])
+    .index("by_project_and_active", ["projectId", "isActive"])
+    .index("by_project_and_status", ["projectId", "status"])
+    .index("by_project_deleted", ["projectId", "deletedAt"]),
+
+  artifactVersions: defineTable({
+    artifactId: v.id("artifacts"),
+    version: v.number(),
+    objectKey: v.string(),
+    contentHash: v.string(),
+    size: v.number(),
+    originalSize: v.number(),
+    contentType: v.string(),
+    keyVaultRef: v.string(),
+    status: v.union(
+      v.literal("uploading"),
+      v.literal("ready"),
+      v.literal("aborted")
+    ),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_artifact", ["artifactId"])
+    .index("by_artifact_and_version", ["artifactId", "version"])
+    .index("by_object_key", ["objectKey"])
+    .index("by_status", ["status"]),
+
+  // ==========================================
   // PROJECT ACCESS (for extension linking)
   // ==========================================
   projectAccess: defineTable({
@@ -910,7 +971,12 @@ export default defineSchema({
       v.literal("account.accessed"),
       v.literal("account.permission_granted"),
       v.literal("account.permission_revoked"),
-      v.literal("account.permission_updated")
+      v.literal("account.permission_updated"),
+      // Secure artifact actions
+      v.literal("artifact.created"),
+      v.literal("artifact.updated"),
+      v.literal("artifact.accessed"),
+      v.literal("artifact.deleted")
     ),
     // Additional details about the action (JSON)
     details: v.optional(v.string()),
@@ -938,7 +1004,8 @@ export default defineSchema({
         v.literal("invitation"),
         v.literal("billing"),
         v.literal("security"),
-        v.literal("account")
+        v.literal("account"),
+        v.literal("artifact")
       )
     ),
     // Whether this action involved sensitive data
