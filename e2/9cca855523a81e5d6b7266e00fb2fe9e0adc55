@@ -1,0 +1,28 @@
+apps/docs/content/api-quickstart.mdx
+  s_38bb77fe31d207::t_30feba55092a51 16-18,23,32,139,145
+  s_38bb77fe31d207::t_723e314334ea07 22
+apps/docs/content/mcp-server.mdx
+  s_38bb77fe31d207::t_e634a90de24986 23-24,27,301-308,312-321
+  s_38bb77fe31d207::t_43e9e2826bef15 48,61,64-70,89-95,98
+  s_38bb77fe31d207::t_30feba55092a51 13-22,25-26,28-34,49-60,62-63,71-88,96-97,99-165,168-169,172,175-176,180-186,190,192,199,207,209,213,221,228-245,248,250-254,256,299-300,309-311
+apps/docs/package.json
+  s_38bb77fe31d207::t_30feba55092a51 3
+bun.lock
+  s_38bb77fe31d207::t_efe9faf8bb9d56 125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e29cca855523a81e5d6b7266e00fb2fe9e0adc55",
+  "prompts": {},
+  "sessions": {
+    "s_38bb77fe31d207": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fafbb-f43c-78f0-8cdb-49c1b17199f8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
