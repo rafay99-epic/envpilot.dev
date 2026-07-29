@@ -1,0 +1,95 @@
+convex/schema.ts
+  s_d20a2dba6b7fa7::t_014f00003230e1 554,584
+  s_d20a2dba6b7fa7::t_7cb584d823cf67 974-979,1007-1008
+  s_d20a2dba6b7fa7::t_33f88fc44c980d 557-561,575
+  s_d20a2dba6b7fa7::t_9c235fc85fce1f 540-553,555-556,562-574,576-583,585-600
+apps/web/package.json
+  s_d20a2dba6b7fa7::t_bc88b3e80404a4 3
+  s_d20a2dba6b7fa7::t_5c1ca1e066f453 21-22
+convex/lib/audit.ts
+  s_d20a2dba6b7fa7::t_bc88b3e80404a4 24-25,88-92,130-134
+  s_d20a2dba6b7fa7::t_8cb642574be4a5 135
+apps/web/tests/e2e/authenticated/secure-artifacts.spec.ts
+  s_d20a2dba6b7fa7::t_3706eabd958435 54,76,80
+  s_d20a2dba6b7fa7::t_f856445b29ed26 1-29,31-53,55-75,77-79,81-94
+  s_d20a2dba6b7fa7::t_18b46214e3502a 30
+docs/SECURE_ARTIFACTS_B2.md
+  s_d20a2dba6b7fa7::t_f856445b29ed26 1-74
+convex/lib/seedData.ts
+  s_d20a2dba6b7fa7::t_1d6aaacf34cd56 235-252
+apps/web/src/app/api/artifacts/[id]/route.ts
+  s_d20a2dba6b7fa7::t_605f8301c6422e 1-31,33-65
+  s_d20a2dba6b7fa7::t_152f30ff3bbf8c 32
+apps/web/src/lib/b2.ts
+  s_d20a2dba6b7fa7::t_6d9f5df69ec1f9 1-80
+apps/web/src/app/api/artifacts/[id]/complete/route.ts
+  s_d20a2dba6b7fa7::t_605f8301c6422e 1-6,8-29,31-47
+  s_d20a2dba6b7fa7::t_55d828a3a94f5c 7,30
+apps/web/src/app/(dashboard)/dashboard/projects/[slug]/page.tsx
+  s_d20a2dba6b7fa7::t_3ed879b55b1ae9 42,985-991,997-998
+  s_d20a2dba6b7fa7::t_75f851a6ae2636 992-996
+  s_d20a2dba6b7fa7::t_0de38e02de0cb0 999
+apps/web/src/lib/versions.ts
+  s_d20a2dba6b7fa7::t_bc88b3e80404a4 17
+apps/web/src/components/artifacts/secure-artifact-panel.tsx
+  s_d20a2dba6b7fa7::t_77e0158bebb4df 88
+  s_d20a2dba6b7fa7::t_f856445b29ed26 238-241,268,290-294
+  s_d20a2dba6b7fa7::t_e8871b26323ad9 16-36,94,96,113,160
+  s_d20a2dba6b7fa7::t_152f30ff3bbf8c 190,199-204
+  s_d20a2dba6b7fa7::t_aca55390b9e22f 1-15,37-64,66-87,89-93,95,97-112,114-159,161-189,191-198,205-237,242-267,269-289,295-332
+  s_d20a2dba6b7fa7::t_e941b61f666085 65
+convex/features/artifacts/actions.ts
+  s_d20a2dba6b7fa7::t_152f30ff3bbf8c 130,141
+  s_d20a2dba6b7fa7::t_53eedfbb4a1116 3,156,235
+  s_d20a2dba6b7fa7::t_b92b3a9794afe0 224,226,230
+  s_d20a2dba6b7fa7::t_bc88b3e80404a4 223,227-229
+  s_d20a2dba6b7fa7::t_3e9f3d837241b9 4,10-20,22-28,56-60,77,87,96,137-140,142-148,173-185,206-210,222
+  s_d20a2dba6b7fa7::t_e4a33b94790e6a 163-172,186-205,211-221,225,231-234,236-237
+  s_d20a2dba6b7fa7::t_e4aff4b2565f04 1-2,5-9,29-46,50-55,61-66,68-76,78-86,88-95,97-129,131-136,149-155,157-162
+  s_d20a2dba6b7fa7::t_7d8c6afe798e30 21
+  s_d20a2dba6b7fa7::t_1e9686c485b11a 47-49,67
+convex/features/admin/migrations.ts
+  s_d20a2dba6b7fa7::t_a9be4d6af62b86 524-525,558-559
+apps/web/src/components/artifacts/index.ts
+  s_d20a2dba6b7fa7::t_aca55390b9e22f 1
+convex/features/featureRegistry/gates.ts
+  s_d20a2dba6b7fa7::t_6f5bffba89e22a 345-362
+apps/web/src/app/api/artifacts/route.ts
+  s_d20a2dba6b7fa7::t_605f8301c6422e 1-107
+convex/_generated/api.d.ts
+  s_d20a2dba6b7fa7::t_4104df659f263a 37-39,150-152
+convex/features/artifacts/queries.ts
+  s_d20a2dba6b7fa7::t_422096f5e74369 25-38,43,80-83,113-116,158-165,205-209,211-216,256-261
+  s_d20a2dba6b7fa7::t_33f88fc44c980d 49-50,55
+  s_d20a2dba6b7fa7::t_b92b3a9794afe0 156,185
+  s_d20a2dba6b7fa7::t_3c0b6ec2acb6a6 1,86,102,168,177,219,229,264,273
+  s_d20a2dba6b7fa7::t_152f30ff3bbf8c 198,210,237
+  s_d20a2dba6b7fa7::t_e4aff4b2565f04 2,4-24,39-42,44-48,51-54,56-79,84-85,87-101,103-112,117-155,157,166-167,169-176,178-184,186-197,199-204,217-218,220-228,230-236,238-255,262-263,265-272,274-282
+  s_d20a2dba6b7fa7::t_b8c9b98e043348 3
+convex/features/artifacts/mutations.ts
+  s_d20a2dba6b7fa7::t_33f88fc44c980d 62,112,148,206
+  s_d20a2dba6b7fa7::t_e4aff4b2565f04 1-2,4-34,39-61,63-92,94-111,113-139,141-147,149-167,196,198-199,202-203,205,207-221
+  s_d20a2dba6b7fa7::t_088c3a7dea150d 3,35-38
+  s_d20a2dba6b7fa7::t_d61f1acbb758f5 168,170-171,173-195
+  s_d20a2dba6b7fa7::t_53eedfbb4a1116 169,197
+  s_d20a2dba6b7fa7::t_4d67a37feeae49 201,204
+  s_d20a2dba6b7fa7::t_ff7117a75fe8d1 93,140,172,200
+bun.lock
+  s_d20a2dba6b7fa7::t_655d5f2dc6c20e 176,178-179,305-342,921-932,1399-1400
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d2bab607b703d26dfd498d1603c193174c39d031",
+  "prompts": {},
+  "sessions": {
+    "s_d20a2dba6b7fa7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fae50-9eb1-7e03-9d63-34d19cbc5215",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
