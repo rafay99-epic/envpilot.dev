@@ -1,7 +1,7 @@
 {
   "name": "@envpilot/docs",
   "version": "1.6.0",
-  "private": true,
+  "private": false,
   "description": "Envpilot Docs — CLI, VS Code extension, and web dashboard documentation",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "UNLICENSED",

@@ -13,10 +13,13 @@ Envpilot's public REST API lets you read projects, variables, and shared account
 Go to **Organization Settings → API Keys** — there's a single creation screen; project scope is a choice you make inside it, not a separate settings page.
 
 1. Click **New API Key**
-2. Choose a scope (see below) — pick specific projects, or "all projects, including future ones" (owner-only)
-3. Copy the key — it's shown **once**, as `envpk_...`. Envpilot only stores a hash of it; if you lose it, revoke it and create a new one — there's no rotate-in-place.
+2. Select the surfaces where the key may authenticate: REST API, MCP server, and/or GitHub Action
+3. Choose project, environment, and resource scopes (see below) — pick specific projects, or "all projects, including future ones" (owner-only)
+4. Copy the key — it's shown **once**, as `envpk_...`. Envpilot only stores a hash of it; if you lose it, revoke it and create a new one — there's no rotate-in-place.
 
 Org-wide keys (scope = all projects) can only be created by the organization **Owner**. Project-scoped keys can also be created by a Team Lead.
+
+All project, environment, resource, and surface choices are immutable. If the required access changes, create a replacement key with the complete intended scope, switch clients to it, verify it, and then revoke the old key. For an MCP credential, follow [Create an MCP key](/mcp-server#create-an-mcp-key) and [set `ENVPILOT_API_KEY`](/mcp-server#set-envpilot-api-key) before configuring a client.
 
 ## Understand scope
 
@@ -26,7 +29,7 @@ Every key has three independent scope dimensions:
 - **Environments** — `all` (development, staging, production) or a specific list
 - **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, `artifacts`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
 
-A key also carries **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/architecture).
+A key also carries immutable **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/architecture).
 
 A key requesting a **project** outside its scope gets a `404` — identical to a project that genuinely doesn't exist, so a leaked key can't be used to probe which project slugs are real. A key requesting a **resource type, environment, or surface** outside its scope gets a `403` instead, since the project's existence is already implied by a URL the key can otherwise reach. This is deliberate: see [API Security](/api-security) for why.
 
@@ -133,12 +136,12 @@ Envpilot's public API fails **closed**: every denial and every partial-data risk
 - **429 `RATE_LIMITED`** — respect the `Retry-After` header (seconds) before retrying the identical request. See [Rate limits](/rate-limits) for the per-bucket windows.
 - **503 `DECRYPT_FAILED`** — retryable; vault errors are usually transient. If it persists across retries, the variable needs to be re-saved in Envpilot rather than pulled again.
 - **503 `CONFIG_ERROR` / 500 `INTERNAL_ERROR`** — retryable with backoff; these are server-side, not caused by your request.
-- **401 / 403 / 404 / 422** — not retryable as-is. These only change if you fix the actual cause: rotate a revoked key, widen the key's scope, or shrink the project below the 1000-row cap.
+- **401 / 403 / 404 / 422** — not retryable as-is. These only change if you fix the actual cause: replace a revoked key, create a new key with the required immutable scope or surface, or shrink the project below the 1000-row cap.
 
 ## Next steps
 
 - [API Reference](/api-reference) — every endpoint, filter, and error code
 - [Architecture](/architecture) — the five client surfaces and the one auth core
-- [MCP Server](/mcp-server) — connect an AI agent (Claude, Cursor) directly to your variables
+- [MCP Server](/mcp-server) — create the right MCP key, configure `ENVPILOT_API_KEY`, and connect an AI agent directly to your variables
 - [Rate limits](/rate-limits) — every per-key bucket and what happens when you exceed it
 - [API Security](/api-security) — key model, scoping, revocation, and audit
