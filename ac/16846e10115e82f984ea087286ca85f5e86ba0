@@ -1,0 +1,33 @@
+convex/features/admin/migrations.ts
+  s_2ef6990c48d878::t_1ef498de1a5380 517-518,551-552
+convex/features/featureRegistry/gates.ts
+  s_2ef6990c48d878::t_05282c40e47242 313-328
+convex/features/integrations/dispatch.ts
+  s_2ef6990c48d878::t_4fc18ad786628d 1-70
+convex/features/integrations/notify.ts
+  s_2ef6990c48d878::t_b1a17c47408edc 1-165
+convex/features/integrations/webhooks.ts
+  s_2ef6990c48d878::t_de324d5fc4d4b9 1-308
+convex/lib/audit.ts
+  s_2ef6990c48d878::t_a877b7437085cf 4,88-91,192-195,232-236
+convex/lib/seedData.ts
+  s_2ef6990c48d878::t_a1bb9fa6d6d2a2 297-314
+convex/schema.ts
+  s_2ef6990c48d878::t_025ad2cf963e13 629-656,941-945
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ac16846e10115e82f984ea087286ca85f5e86ba0",
+  "prompts": {},
+  "sessions": {
+    "s_2ef6990c48d878": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da0bb6f3-15e4-406e-a3b7-b7568c6b6e23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+apps/web/src/components/integrations/IntegrationsSection.tsx
+  s_2ef6990c48d878::t_be072bbcbf3d10 290-293
+apps/web/tests/e2e/authenticated/integrations.spec.ts
+  s_2ef6990c48d878::t_cfc32f19d2324f 89-91
+convex/features/integrations/dispatch.ts
+  s_2ef6990c48d878::t_4d3a35a106c228 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "89d6a9b48a7c35cf99d2daeb6727ec82ff24ee24",
+  "prompts": {},
+  "sessions": {
+    "s_2ef6990c48d878": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da0bb6f3-15e4-406e-a3b7-b7568c6b6e23",
+        "model": "unknown"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
