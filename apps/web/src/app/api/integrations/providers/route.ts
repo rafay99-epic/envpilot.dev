@@ -13,10 +13,19 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+  const slackConfigured = Boolean(
+    process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET
+  );
+  let appUsesHttps = false;
+  try {
+    appUsesHttps =
+      new URL(process.env.NEXT_PUBLIC_APP_URL ?? "").protocol === "https:";
+  } catch {
+    // The start route returns the detailed configuration error.
+  }
   return NextResponse.json({
-    slack: Boolean(
-      process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET
-    ),
+    slack: slackConfigured && appUsesHttps,
+    slackRequiresHttps: slackConfigured && !appUsesHttps,
     discord: Boolean(
       process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET
     ),

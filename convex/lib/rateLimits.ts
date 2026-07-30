@@ -126,6 +126,24 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 10,
   },
 
+  // Manual proof-of-life sends: prevents create/remove or Send Test loops from
+  // turning an organization into a channel-spam source.
+  webhookTest: {
+    kind: "token bucket",
+    rate: 5,
+    period: 60_000,
+    capacity: 5,
+  },
+
+  // Security denials can be attacker-driven. Bound channel noise while the
+  // audit log remains complete and authoritative.
+  webhookSecurityNotification: {
+    kind: "token bucket",
+    rate: 10,
+    period: 60_000,
+    capacity: 10,
+  },
+
   // ==========================================
   // GLOBAL LIMITS
   // ==========================================

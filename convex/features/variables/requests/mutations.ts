@@ -567,6 +567,7 @@ async function reviewCore(
         details: {
           requestId: args.requestId,
           key: request.key,
+          environments: request.environments,
           requesterId: request.requestedBy,
           reviewReason: args.reviewReason,
         },
@@ -698,6 +699,7 @@ async function reviewCore(
         reviewReason: args.reviewReason,
         requestedEnvironments: request.environments,
         approvedEnvironments,
+        environments: approvedEnvironments,
       },
       resourceType: "variable",
       involvesSensitiveData: request.isSensitive,

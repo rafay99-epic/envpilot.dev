@@ -13,6 +13,7 @@ import { authorizeVariableAccess } from "../../lib/authHelpers";
 import { assertOrgMembership, hasCapability } from "../../lib/authz";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { getRetentionCutoff } from "../audit/helpers";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * API keys — the generalized token platform.
@@ -283,11 +284,11 @@ export const _store = internalMutation({
       expiresAt: args.expiresAt,
     });
 
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
       action: "api.key_created",
-      details: JSON.stringify({
+      details: {
         keyId,
         name: args.name.trim(),
         scopeProjects: args.scopeProjects,
@@ -295,8 +296,7 @@ export const _store = internalMutation({
         scopeResources: args.scopeResources,
         surfaces: args.surfaces,
         expiresAt: args.expiresAt,
-      }),
-      createdAt: now,
+      },
     });
 
     return keyId;
@@ -574,12 +574,11 @@ export const revoke = mutation({
 
     const now = Date.now();
     await ctx.db.patch(args.keyId, { revokedAt: now, revokedBy: actor._id });
-    await ctx.db.insert("auditLogs", {
+    await createAuditLog(ctx, {
       organizationId: key.organizationId,
       userId: actor._id,
       action: "api.key_revoked",
-      details: JSON.stringify({ keyId: args.keyId, name: key.name }),
-      createdAt: now,
+      details: { keyId: args.keyId, name: key.name },
     });
     return null;
   },

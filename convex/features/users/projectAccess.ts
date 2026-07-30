@@ -4,6 +4,7 @@ import { rateLimiter } from "../../lib/rateLimits";
 import { isCronPaused } from "../billing/tierLimits";
 import { assertOrgAction, isSuspendedMembership } from "../../lib/authz";
 import { requireAuthedUser } from "../../lib/identity";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * Project Access Queries and Mutations (for extension linking)
@@ -459,16 +460,15 @@ export const unlinkExtension = mutation({
     });
 
     if (project) {
-      await ctx.db.insert("auditLogs", {
+      await createAuditLog(ctx, {
         organizationId: project.organizationId,
         projectId: args.projectId,
         userId: actor._id,
         action: "access.extension_unlinked",
-        details: JSON.stringify({
+        details: {
           deviceId: args.deviceId,
           deviceName: access.deviceName,
-        }),
-        createdAt: now,
+        },
       });
     }
 

@@ -3,21 +3,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { hasE2ECredentials, SKIP_REASON } from "../env";
 import { getOwnedOrgSlug, trackClientErrors } from "./support";
 
-// Authenticated e2e — Slack/Discord notification webhooks: add a manual
-// webhook through the real org settings UI, verify masked display, edit its
-// event subscriptions, pause/resume, then remove it.
-//
-// The OAuth connect flow (Connect Slack / Connect Discord buttons) cannot be
-// automated — it requires a real platform consent screen — and the buttons
-// only render when the server has OAuth apps configured. This spec covers
-// the manual path, which shares every backend surface except URL acquisition.
-//
-// Serial: later tests operate on the webhook created by the first one; the
-// last test removes it, keeping reruns clean.
-
 test.skip(!hasE2ECredentials, SKIP_REASON);
 
-const FAKE_SLACK_URL = `https://hooks.slack.com/services/E2E/TEST/${Date.now()}`;
+const webhookUrl = process.env.E2E_NOTIFICATION_WEBHOOK_URL;
+const webhookType =
+  webhookUrl?.includes("discord.com/api/webhooks/") ||
+  webhookUrl?.includes("discordapp.com/api/webhooks/")
+    ? "discord"
+    : "slack";
 
 async function openIntegrationsTab(page: Page, orgSlug: string) {
   await page.goto(`/organizations/${orgSlug}/settings`, {
@@ -34,151 +27,140 @@ async function openIntegrationsTab(page: Page, orgSlug: string) {
     .catch(() => false);
   test.skip(
     !tabVisible,
-    "Integrations tab not visible — not the org owner in this run"
+    "Integrations tab not visible — this run is not an organization owner"
   );
   await tab.click();
 
-  // The section is tier-gated (team_notifications) — the manual-add button
-  // only renders inside an allowed FeatureGate.
   const addButton = page.getByTestId("add-webhook-manually");
   const gateOpen = await addButton
     .waitFor({ state: "visible", timeout: 10_000 })
     .then(() => true)
     .catch(() => false);
-  test.skip(
-    !gateOpen,
-    "team_notifications is gated off for this org/tier — Pro-only feature"
-  );
+  test.skip(!gateOpen, "team_notifications is gated off for this org/tier");
 }
 
-test.describe.serial("Notification webhooks", () => {
-  const webhookName = `E2E Webhook ${Date.now()}`;
-  let orgSlug = "";
+function webhookRow(page: Page, name: string) {
+  return page.getByTestId("webhook-row").filter({ hasText: name });
+}
 
-  test("rejects an invalid webhook URL", async ({ page }) => {
+// DOM traces can snapshot a capability URL while the manual form is filled.
+test.use({ trace: "off" });
+
+test.describe("Notification webhooks", () => {
+  test("rejects a cross-provider webhook URL", async ({ page }) => {
     test.setTimeout(120_000);
-    orgSlug = await getOwnedOrgSlug(page);
-    await openIntegrationsTab(page, orgSlug);
+    await openIntegrationsTab(page, await getOwnedOrgSlug(page));
 
     await page.getByTestId("add-webhook-manually").click();
-    await page.getByPlaceholder("#eng-alerts").fill(webhookName);
-    // A Discord URL while the Slack type is selected must be refused
+    await page.getByPlaceholder("#eng-alerts").fill("Invalid E2E Webhook");
     await page
       .getByPlaceholder("https://hooks.slack.com/services/...")
       .fill("https://discord.com/api/webhooks/123/abc");
     await page.getByRole("button", { name: /^Add Webhook$/i }).click();
 
     await expect(
-      page.getByText(/Slack webhook URLs start with/i),
-      "backend URL validation should surface as a readable error"
+      page.getByText(/Enter a Slack Incoming Webhook URL/i)
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("adds a manual Slack webhook and masks its URL", async ({ page }) => {
-    test.setTimeout(120_000);
+  test("runs the real webhook lifecycle", async ({ page }) => {
+    test.skip(
+      !webhookUrl,
+      "Set E2E_NOTIFICATION_WEBHOOK_URL to a disposable real Slack or Discord webhook"
+    );
+    const configuredWebhookUrl = webhookUrl!;
+    test.setTimeout(180_000);
     const clientErrors = trackClientErrors(page);
-    await openIntegrationsTab(page, orgSlug);
+    const webhookName = `E2E Webhook ${Date.now()}`;
+    await openIntegrationsTab(page, await getOwnedOrgSlug(page));
 
-    await page.getByTestId("add-webhook-manually").click();
-    await page.getByPlaceholder("#eng-alerts").fill(webhookName);
-    await page
-      .getByPlaceholder("https://hooks.slack.com/services/...")
-      .fill(FAKE_SLACK_URL);
+    try {
+      await page.getByTestId("add-webhook-manually").click();
+      if (webhookType === "discord") {
+        await page.getByRole("button", { name: /^discord$/i }).click();
+      }
+      const form = page.getByTestId("manual-webhook-form");
+      await form.getByPlaceholder("#eng-alerts").fill(webhookName);
+      await form
+        .getByPlaceholder(
+          webhookType === "discord"
+            ? "https://discord.com/api/webhooks/..."
+            : "https://hooks.slack.com/services/..."
+        )
+        .fill(configuredWebhookUrl);
 
-    // Variables + Requests are the pre-checked defaults
-    const checkboxes = page
-      .getByTestId("manual-webhook-form")
-      .locator('input[type="checkbox"]');
-    await expect(checkboxes.nth(0)).toBeChecked(); // variables
-    await expect(checkboxes.nth(1)).toBeChecked(); // requests
-    await expect(checkboxes.nth(2)).not.toBeChecked(); // members
-    await expect(checkboxes.nth(3)).not.toBeChecked(); // security
+      await expect(
+        form.getByRole("checkbox", { name: /Variables/i })
+      ).toBeChecked();
+      await expect(
+        form.getByRole("checkbox", { name: /Requests/i })
+      ).toBeChecked();
+      await expect(
+        form.getByRole("checkbox", { name: /Members/i })
+      ).not.toBeChecked();
+      await expect(
+        form.getByRole("checkbox", { name: /Security/i })
+      ).not.toBeChecked();
 
-    await page.getByRole("button", { name: /^Add Webhook$/i }).click();
+      await form.getByRole("button", { name: /^Add Webhook$/i }).click();
+      await expect(page.getByText(/Webhook added.*queued/i)).toBeVisible({
+        timeout: 20_000,
+      });
 
-    await expect(
-      page.getByText(/Webhook added/i),
-      "a success notice should confirm the webhook was created"
-    ).toBeVisible({ timeout: 10_000 });
+      const row = webhookRow(page, webhookName);
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await expect(row).toContainText("variables, requests");
+      await expect(row).toContainText("last sent", { timeout: 45_000 });
+      expect(
+        (await page.content()).includes(configuredWebhookUrl),
+        "the webhook capability URL must not be rendered after submission"
+      ).toBe(false);
 
-    // Row appears with name + type badge + subscribed groups
-    const row = page.getByText(webhookName).first();
-    await expect(row).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/variables, requests/i)).toBeVisible();
+      await row.getByRole("button", { name: /^Events$/i }).click();
+      await row.getByRole("checkbox", { name: /Members/i }).check();
+      await row.getByRole("button", { name: /^Save$/i }).click();
+      await expect(row).toContainText("variables, requests, members");
 
-    // The raw webhook URL must never reach the DOM — only a masked preview
-    const pageContent = await page.content();
-    expect(
-      pageContent.includes(FAKE_SLACK_URL),
-      "raw webhook URL must not appear anywhere in the page"
-    ).toBe(false);
-    await expect(page.getByText(/hooks\.slack\.com\/••••/)).toBeVisible();
+      await row.getByRole("button", { name: /^Pause$/i }).click();
+      await expect(page.getByText(/Webhook paused/i)).toBeVisible();
+      await row.getByRole("button", { name: /^Resume$/i }).click();
+      await expect(page.getByText(/Webhook re-enabled/i)).toBeVisible();
 
-    expect(
-      clientErrors,
-      `unexpected client-side errors: ${clientErrors.join("\n")}`
-    ).toHaveLength(0);
-  });
+      const previousDelivery = await row.getAttribute("data-last-sent-at");
+      expect(previousDelivery).toBeTruthy();
+      await row.getByTitle("Send test message").click();
+      await expect(page.getByText(/Test message queued/i)).toBeVisible();
+      await expect
+        .poll(() => row.getAttribute("data-last-sent-at"), {
+          timeout: 45_000,
+          message: "test delivery should complete successfully",
+        })
+        .not.toBe(previousDelivery);
 
-  test("edits event subscriptions", async ({ page }) => {
-    test.setTimeout(120_000);
-    await openIntegrationsTab(page, orgSlug);
+      await row.getByTitle("Remove webhook").click();
+      const dialog = page.getByRole("dialog", {
+        name: `Remove ${webhookName}`,
+      });
+      await dialog.getByRole("button", { name: /^Remove$/i }).click();
+      await expect(row).toHaveCount(0, { timeout: 20_000 });
 
-    await expect(page.getByText(webhookName)).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: /^Events$/i }).click();
-
-    // The inline editor pre-fills the current groups; add Members
-    const memberBox = page
-      .locator("label")
-      .filter({ hasText: "Members" })
-      .locator('input[type="checkbox"]')
-      .last();
-    await memberBox.check();
-    await page.getByRole("button", { name: /^Save$/i }).click();
-
-    await expect(page.getByText(/Event subscriptions updated/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText(/variables, requests, members/i)).toBeVisible({
-      timeout: 10_000,
-    });
-  });
-
-  test("pauses and resumes the webhook", async ({ page }) => {
-    test.setTimeout(120_000);
-    await openIntegrationsTab(page, orgSlug);
-
-    await expect(page.getByText(webhookName)).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: /^Pause$/i }).click();
-    await expect(page.getByText(/Webhook paused/i)).toBeVisible({
-      timeout: 10_000,
-    });
-
-    await page.getByRole("button", { name: /^Resume$/i }).click();
-    await expect(page.getByText(/Webhook re-enabled/i)).toBeVisible({
-      timeout: 10_000,
-    });
-  });
-
-  test("removes the webhook", async ({ page }) => {
-    test.setTimeout(120_000);
-    await openIntegrationsTab(page, orgSlug);
-
-    await expect(page.getByText(webhookName)).toBeVisible({ timeout: 10_000 });
-    await page.getByTitle("Remove webhook").click();
-    await expect(page.getByText(/Remove .*\?/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    await page
-      .getByRole("button", { name: /^Remove$/i })
-      .last()
-      .click();
-
-    await expect(page.getByText(/Webhook removed/i)).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.getByText(webhookName)).toHaveCount(0, {
-      timeout: 10_000,
-    });
+      expect(
+        clientErrors,
+        `unexpected client-side errors: ${clientErrors.join("\n")}`
+      ).toHaveLength(0);
+    } finally {
+      const row = webhookRow(page, webhookName);
+      if ((await row.count()) > 0) {
+        await row
+          .getByTitle("Remove webhook")
+          .click()
+          .catch(() => {});
+        await page
+          .getByRole("dialog", { name: `Remove ${webhookName}` })
+          .getByRole("button", { name: /^Remove$/i })
+          .click()
+          .catch(() => {});
+      }
+    }
   });
 });

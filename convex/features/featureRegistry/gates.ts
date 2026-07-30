@@ -315,14 +315,16 @@ export async function countRotationEnabledVariables(
  * rows still occupy a slot — the limit caps configured endpoints, not
  * currently-firing ones. Used by the team_notifications_limit gate.
  */
-export async function countActiveWebhooks(
+export async function countConfiguredWebhooks(
   db: DatabaseReader,
   organizationId: Id<"organizations">
 ): Promise<number> {
   const hooks = await db
     .query("orgWebhooks")
-    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .collect();
+    .withIndex("by_organization_and_deleted_at", (q) =>
+      q.eq("organizationId", organizationId).eq("deletedAt", undefined)
+    )
+    .take(11);
   return hooks.length;
 }
 

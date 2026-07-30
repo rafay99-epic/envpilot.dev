@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAction, useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import {
@@ -13,6 +13,7 @@ import {
   TerminalLoading,
 } from "@/components/dashboard/terminal-ui";
 import { FeatureGate } from "@/components/tier/FeatureGate";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { sanitizeConvexError } from "@/lib/error-messages";
 import { Plus, Send, Trash2 } from "lucide-react";
 
@@ -26,13 +27,15 @@ import { Plus, Send, Trash2 } from "lucide-react";
  * always-available fallback.
  */
 
-const EVENT_GROUPS: { key: string; label: string; hint: string }[] = [
+type EventGroup = "variables" | "requests" | "members" | "security";
+
+const EVENT_GROUPS: { key: EventGroup; label: string; hint: string }[] = [
   { key: "variables", label: "Variables", hint: "created, updated, deleted" },
   { key: "requests", label: "Requests", hint: "filed, approved, rejected" },
   { key: "members", label: "Members", hint: "invites, removals, permissions" },
   { key: "security", label: "Security", hint: "denials, token changes" },
 ];
-const DEFAULT_GROUPS = ["variables", "requests"];
+const DEFAULT_GROUPS: EventGroup[] = ["variables", "requests"];
 
 type WebhookRow = {
   _id: Id<"orgWebhooks">;
@@ -41,7 +44,7 @@ type WebhookRow = {
   source: "oauth" | "manual";
   channel: string | null;
   urlPreview: string;
-  eventGroups: string[];
+  eventGroups: EventGroup[];
   enabled: boolean;
   failCount: number;
   lastStatus: number | null;
@@ -60,29 +63,38 @@ function relativeTime(ts: number): string {
 
 export function IntegrationsSection({
   organizationId,
-  slug,
 }: {
   organizationId: Id<"organizations">;
-  slug: string;
 }) {
   const webhooks = useQuery(
     api.features.integrations.webhooks.listForOrganization,
     { organizationId }
   );
-  const createHook = useMutation(api.features.integrations.webhooks.create);
+  const createHook = useAction(api.features.integrations.webhooks.create);
   const updateHook = useMutation(api.features.integrations.webhooks.update);
   const removeHook = useMutation(api.features.integrations.webhooks.remove);
   const sendTest = useMutation(api.features.integrations.webhooks.sendTest);
+  const featureGate = useFeatureGate(organizationId, "team_notifications");
+  const deliveryBlockedByPlan = !featureGate.isLoading && !featureGate.allowed;
 
   // Which OAuth providers the server has configured
   const [providers, setProviders] = useState<{
     slack: boolean;
     discord: boolean;
-  }>({ slack: false, discord: false });
+    slackRequiresHttps: boolean;
+  }>({ slack: false, discord: false, slackRequiresHttps: false });
   useEffect(() => {
     let cancelled = false;
     fetch("/api/integrations/providers")
-      .then((r) => (r.ok ? r.json() : { slack: false, discord: false }))
+      .then((r) =>
+        r.ok
+          ? r.json()
+          : {
+              slack: false,
+              discord: false,
+              slackRequiresHttps: false,
+            }
+      )
       .then((p) => {
         if (!cancelled) setProviders(p);
       })
@@ -94,6 +106,8 @@ export function IntegrationsSection({
 
   // Notices (mirrors the Tags tab pattern), incl. OAuth redirect results
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -115,13 +129,21 @@ export function IntegrationsSection({
     const oauthError = searchParams.get("integration_error");
     if (connected === "slack" || connected === "discord") {
       showSuccess(
-        `${connected === "slack" ? "Slack" : "Discord"} connected — a test message was sent to the channel.`
+        `${connected === "slack" ? "Slack" : "Discord"} connected — the test message is queued.`
       );
     } else if (oauthError) {
       showError(oauthError);
     }
-    // Run once for the landing URL; params never change without a navigation.
-  }, []);
+    if (connected || oauthError) {
+      const cleaned = new URLSearchParams(searchParams.toString());
+      cleaned.delete("connected");
+      cleaned.delete("integration_error");
+      const query = cleaned.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, {
+        scroll: false,
+      });
+    }
+  }, [pathname, router, searchParams, showError, showSuccess]);
   useEffect(
     () => () => {
       if (errorTimer.current) clearTimeout(errorTimer.current);
@@ -135,20 +157,21 @@ export function IntegrationsSection({
   const [manualType, setManualType] = useState<"slack" | "discord">("slack");
   const [manualName, setManualName] = useState("");
   const [manualUrl, setManualUrl] = useState("");
-  const [manualGroups, setManualGroups] = useState<string[]>(DEFAULT_GROUPS);
+  const [manualGroups, setManualGroups] =
+    useState<EventGroup[]>(DEFAULT_GROUPS);
   const [isCreating, setIsCreating] = useState(false);
 
   // Per-row UI state
   const [editingEventsId, setEditingEventsId] = useState<string | null>(null);
-  const [editGroups, setEditGroups] = useState<string[]>([]);
+  const [editGroups, setEditGroups] = useState<EventGroup[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
 
-  const toggleGroup = (groups: string[], key: string): string[] =>
+  const toggleGroup = (groups: EventGroup[], key: EventGroup): EventGroup[] =>
     groups.includes(key) ? groups.filter((g) => g !== key) : [...groups, key];
 
   const startConnect = (provider: "slack" | "discord") => {
-    window.location.href = `/api/integrations/${provider}/start?organizationId=${organizationId}&slug=${encodeURIComponent(slug)}`;
+    window.location.href = `/api/integrations/${provider}/start?organizationId=${encodeURIComponent(organizationId)}`;
   };
 
   const handleManualCreate = async () => {
@@ -168,7 +191,7 @@ export function IntegrationsSection({
       setManualName("");
       setManualUrl("");
       setManualGroups(DEFAULT_GROUPS);
-      showSuccess("Webhook added — a test message was sent to the channel.");
+      showSuccess("Webhook added — the test message is queued.");
     } catch (err) {
       showError(sanitizeConvexError(err));
     } finally {
@@ -209,7 +232,7 @@ export function IntegrationsSection({
     setTestingId(webhookId);
     try {
       await sendTest({ webhookId });
-      showSuccess("Test message sent — check the channel.");
+      showSuccess("Test message queued — delivery status will update here.");
     } catch (err) {
       showError(sanitizeConvexError(err));
     } finally {
@@ -218,50 +241,51 @@ export function IntegrationsSection({
   };
 
   return (
-    <FeatureGate
-      organizationId={organizationId}
-      featureKey="team_notifications"
-      featureName="Slack & Discord Notifications"
-    >
-      <div className="space-y-6">
-        {error && (
-          <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-            <p className="text-sm text-red-400">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="ml-4 shrink-0 text-xs text-red-400/60 hover:text-red-400"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-        {success && (
-          <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4">
-            <p className="text-sm text-green-400">{success}</p>
-            <button
-              onClick={() => setSuccess(null)}
-              className="ml-4 shrink-0 text-xs text-green-400/60 hover:text-green-400"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+    <div className="space-y-6">
+      {error && (
+        <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 shrink-0 text-xs text-red-400/60 hover:text-red-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {success && (
+        <div className="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+          <p className="text-sm text-green-400">{success}</p>
+          <button
+            onClick={() => setSuccess(null)}
+            className="ml-4 shrink-0 text-xs text-green-400/60 hover:text-green-400"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
-        <TerminalCard>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-zinc-100">
-                Notification Channels
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                Send organization activity — variable changes, access requests,
-                security events — to Slack or Discord. Messages carry key names
-                and environments, never secret values.
-              </p>
-            </div>
+      <TerminalCard>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100">
+              Notification Channels
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Send organization activity — variable changes, access requests,
+              security events — to Slack or Discord. Messages carry key names
+              and environments, never secret values.
+            </p>
           </div>
+        </div>
 
-          {/* Connect buttons (OAuth) + manual fallback */}
+        {/* Connect buttons (OAuth) + manual fallback */}
+        <FeatureGate
+          organizationId={organizationId}
+          featureKey="team_notifications"
+          featureName="Slack & Discord Notifications"
+          fallbackVariant="card"
+        >
           <div className="mt-6 flex flex-wrap items-center gap-3">
             {providers.slack && (
               <TerminalButton onClick={() => startConnect("slack")}>
@@ -284,279 +308,315 @@ export function IntegrationsSection({
                 : "Add webhook"}
             </TerminalButton>
           </div>
+          {providers.slackRequiresHttps && (
+            <p className="mt-2 text-xs text-amber-400">
+              Slack OAuth requires an HTTPS app URL. For plain localhost, add a
+              Slack webhook manually or run the app behind trusted local HTTPS.
+            </p>
+          )}
+        </FeatureGate>
 
-          {/* Manual add form */}
-          {showManual && (
-            <div
-              data-testid="manual-webhook-form"
-              className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4"
-            >
-              <div className="flex gap-2">
-                {(["slack", "discord"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setManualType(t)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm capitalize transition-colors ${
-                      manualType === t
-                        ? "border-green-500/50 bg-green-500/10 text-green-400"
-                        : "border-zinc-700 text-zinc-400 hover:border-zinc-600"
-                    }`}
+        {/* Manual add form */}
+        {showManual && (
+          <div
+            data-testid="manual-webhook-form"
+            className="mt-4 space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/50 p-4"
+          >
+            <div className="flex gap-2">
+              {(["slack", "discord"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setManualType(t)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm capitalize transition-colors ${
+                    manualType === t
+                      ? "border-green-500/50 bg-green-500/10 text-green-400"
+                      : "border-zinc-700 text-zinc-400 hover:border-zinc-600"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Name
+              </label>
+              <TerminalInput
+                type="text"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                placeholder="#eng-alerts"
+                maxLength={100}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Webhook URL
+              </label>
+              <TerminalInput
+                type="url"
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                placeholder={
+                  manualType === "slack"
+                    ? "https://hooks.slack.com/services/..."
+                    : "https://discord.com/api/webhooks/..."
+                }
+                className="mt-1"
+              />
+              <p className="mt-1 text-xs text-zinc-600">
+                {manualType === "slack"
+                  ? "Slack: channel → Integrations → Add an app → Incoming Webhooks."
+                  : "Discord: channel settings → Integrations → Webhooks → New Webhook → Copy URL."}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Events
+              </label>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {EVENT_GROUPS.map((g) => (
+                  <label
+                    key={g.key}
+                    className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300"
                   >
-                    {t}
-                  </button>
+                    <input
+                      type="checkbox"
+                      checked={manualGroups.includes(g.key)}
+                      onChange={() =>
+                        setManualGroups((prev) => toggleGroup(prev, g.key))
+                      }
+                      className="mt-0.5 accent-green-500"
+                    />
+                    <span>
+                      {g.label}
+                      <span className="ml-1 text-xs text-zinc-600">
+                        {g.hint}
+                      </span>
+                    </span>
+                  </label>
                 ))}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300">
-                  Name
-                </label>
-                <TerminalInput
-                  type="text"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  placeholder="#eng-alerts"
-                  maxLength={100}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300">
-                  Webhook URL
-                </label>
-                <TerminalInput
-                  type="url"
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  placeholder={
-                    manualType === "slack"
-                      ? "https://hooks.slack.com/services/..."
-                      : "https://discord.com/api/webhooks/..."
-                  }
-                  className="mt-1"
-                />
-                <p className="mt-1 text-xs text-zinc-600">
-                  {manualType === "slack"
-                    ? "Slack: channel → Integrations → Add an app → Incoming Webhooks."
-                    : "Discord: channel settings → Integrations → Webhooks → New Webhook → Copy URL."}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300">
-                  Events
-                </label>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {EVENT_GROUPS.map((g) => (
-                    <label
-                      key={g.key}
-                      className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={manualGroups.includes(g.key)}
-                        onChange={() =>
-                          setManualGroups((prev) => toggleGroup(prev, g.key))
-                        }
-                        className="mt-0.5 accent-green-500"
-                      />
-                      <span>
-                        {g.label}
-                        <span className="ml-1 text-xs text-zinc-600">
-                          {g.hint}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <TerminalButton
-                  variant="secondary"
-                  onClick={() => setShowManual(false)}
-                >
-                  Cancel
-                </TerminalButton>
-                <TerminalButton
-                  onClick={handleManualCreate}
-                  disabled={
-                    !manualName.trim() ||
-                    !manualUrl.trim() ||
-                    manualGroups.length === 0 ||
-                    isCreating
-                  }
-                >
-                  {isCreating ? "Adding..." : "Add Webhook"}
-                </TerminalButton>
-              </div>
             </div>
-          )}
+            <div className="flex justify-end gap-2">
+              <TerminalButton
+                variant="secondary"
+                onClick={() => setShowManual(false)}
+              >
+                Cancel
+              </TerminalButton>
+              <TerminalButton
+                onClick={handleManualCreate}
+                disabled={
+                  !manualName.trim() ||
+                  !manualUrl.trim() ||
+                  manualGroups.length === 0 ||
+                  isCreating
+                }
+              >
+                {isCreating ? "Adding..." : "Add Webhook"}
+              </TerminalButton>
+            </div>
+          </div>
+        )}
 
-          {/* Webhook list */}
-          <div className="mt-6">
-            {webhooks === undefined ? (
-              <TerminalLoading />
-            ) : webhooks.length === 0 ? (
-              <p className="py-8 text-center text-sm text-zinc-500">
-                No channels connected yet.
-                {providers.slack || providers.discord
-                  ? " Connect Slack or Discord to get activity where your team already is."
-                  : " Add a webhook URL to get activity where your team already is."}
-              </p>
-            ) : (
-              <div className="divide-y divide-zinc-800">
-                {(webhooks as WebhookRow[]).map((hook) => (
-                  <div key={hook._id} className="py-3">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                          !hook.enabled
+        {/* Webhook list */}
+        <div className="mt-6">
+          {webhooks === undefined ? (
+            <TerminalLoading />
+          ) : webhooks.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              No channels connected yet.
+              {providers.slack || providers.discord
+                ? " Connect Slack or Discord to get activity where your team already is."
+                : " Add a webhook URL to get activity where your team already is."}
+            </p>
+          ) : (
+            <div className="divide-y divide-zinc-800">
+              {(webhooks as WebhookRow[]).map((hook) => (
+                <div
+                  key={hook._id}
+                  className="py-3"
+                  data-testid="webhook-row"
+                  data-last-sent-at={hook.lastSentAt ?? ""}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        deliveryBlockedByPlan
+                          ? "bg-zinc-500"
+                          : !hook.enabled
                             ? "bg-red-400"
                             : hook.failCount > 0
                               ? "bg-amber-400"
                               : "bg-green-400"
-                        }`}
-                        title={
-                          !hook.enabled
+                      }`}
+                      title={
+                        deliveryBlockedByPlan
+                          ? "Delivery disabled by current plan"
+                          : !hook.enabled
                             ? "Disabled"
                             : hook.failCount > 0
                               ? `${hook.failCount} recent failures (auto-disables at 20)`
                               : "Healthy"
-                        }
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-zinc-100">
-                            {hook.name}
-                          </span>
-                          <TerminalBadge
-                            color={hook.type === "slack" ? "green" : "blue"}
-                          >
-                            {hook.type}
-                          </TerminalBadge>
-                        </div>
-                        <p className="mt-0.5 truncate font-mono text-xs text-zinc-600">
-                          {hook.source === "oauth" && hook.channel
-                            ? hook.channel
-                            : hook.urlPreview}
-                          {" · "}
-                          {hook.eventGroups.join(", ")}
-                          {hook.lastSentAt
-                            ? ` · last sent ${relativeTime(hook.lastSentAt)}`
-                            : ""}
-                          {!hook.enabled && hook.failCount >= 20
-                            ? " · auto-disabled after repeated failures"
-                            : ""}
-                        </p>
+                      }
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-zinc-100">
+                          {hook.name}
+                        </span>
+                        <TerminalBadge
+                          color={hook.type === "slack" ? "green" : "blue"}
+                        >
+                          {hook.type}
+                        </TerminalBadge>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingEventsId(
-                              editingEventsId === hook._id ? null : hook._id
-                            );
-                            setEditGroups(hook.eventGroups);
-                          }}
-                          className="rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                      <p className="mt-0.5 truncate font-mono text-xs text-zinc-600">
+                        {hook.source === "oauth" && hook.channel
+                          ? hook.channel
+                          : hook.urlPreview}
+                        {" · "}
+                        {hook.eventGroups.join(", ")}
+                        {hook.lastSentAt
+                          ? ` · last sent ${relativeTime(hook.lastSentAt)}`
+                          : ""}
+                        {deliveryBlockedByPlan
+                          ? " · delivery disabled by current plan"
+                          : ""}
+                        {hook.lastStatus !== null &&
+                        (hook.lastStatus < 200 || hook.lastStatus >= 300)
+                          ? hook.lastStatus === 429
+                            ? " · last attempt rate-limited (HTTP 429)"
+                            : ` · last attempt failed (${hook.lastStatus === 0 ? "network/timeout" : `HTTP ${hook.lastStatus}`})`
+                          : ""}
+                        {!hook.enabled && hook.failCount >= 20
+                          ? " · auto-disabled after repeated failures"
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingEventsId(
+                            editingEventsId === hook._id ? null : hook._id
+                          );
+                          setEditGroups(hook.eventGroups);
+                        }}
+                        className="rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                      >
+                        Events
+                      </button>
+                      <button
+                        onClick={() => handleToggleEnabled(hook)}
+                        disabled={
+                          !hook.enabled &&
+                          (!featureGate.allowed || featureGate.isLoading)
+                        }
+                        className="rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                      >
+                        {hook.enabled ? "Pause" : "Resume"}
+                      </button>
+                      <button
+                        onClick={() => handleSendTest(hook._id)}
+                        disabled={
+                          testingId === hook._id ||
+                          !hook.enabled ||
+                          !featureGate.allowed
+                        }
+                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
+                        title="Send test message"
+                      >
+                        <Send className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(hook._id)}
+                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                        title="Remove webhook"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {editingEventsId === hook._id && (
+                    <div className="ml-6 mt-3 space-y-3 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {EVENT_GROUPS.map((g) => (
+                          <label
+                            key={g.key}
+                            className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={editGroups.includes(g.key)}
+                              onChange={() =>
+                                setEditGroups((prev) =>
+                                  toggleGroup(prev, g.key)
+                                )
+                              }
+                              className="mt-0.5 accent-green-500"
+                            />
+                            <span>
+                              {g.label}
+                              <span className="ml-1 text-xs text-zinc-600">
+                                {g.hint}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <TerminalButton
+                          variant="secondary"
+                          onClick={() => setEditingEventsId(null)}
                         >
-                          Events
-                        </button>
-                        <button
-                          onClick={() => handleToggleEnabled(hook)}
-                          className="rounded-lg px-2 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-green-400"
+                          Cancel
+                        </TerminalButton>
+                        <TerminalButton
+                          onClick={() => handleSaveEvents(hook._id)}
+                          disabled={editGroups.length === 0}
                         >
-                          {hook.enabled ? "Pause" : "Resume"}
-                        </button>
-                        <button
-                          onClick={() => handleSendTest(hook._id)}
-                          disabled={testingId === hook._id}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-green-400 disabled:opacity-50"
-                          title="Send test message"
-                        >
-                          <Send className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingId(hook._id)}
-                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
-                          title="Remove webhook"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          Save
+                        </TerminalButton>
                       </div>
                     </div>
+                  )}
 
-                    {editingEventsId === hook._id && (
-                      <div className="ml-6 mt-3 space-y-3 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          {EVENT_GROUPS.map((g) => (
-                            <label
-                              key={g.key}
-                              className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={editGroups.includes(g.key)}
-                                onChange={() =>
-                                  setEditGroups((prev) =>
-                                    toggleGroup(prev, g.key)
-                                  )
-                                }
-                                className="mt-0.5 accent-green-500"
-                              />
-                              <span>
-                                {g.label}
-                                <span className="ml-1 text-xs text-zinc-600">
-                                  {g.hint}
-                                </span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <TerminalButton
-                            variant="secondary"
-                            onClick={() => setEditingEventsId(null)}
-                          >
-                            Cancel
-                          </TerminalButton>
-                          <TerminalButton
-                            onClick={() => handleSaveEvents(hook._id)}
-                            disabled={editGroups.length === 0}
-                          >
-                            Save
-                          </TerminalButton>
-                        </div>
+                  {deletingId === hook._id && (
+                    <div
+                      role="dialog"
+                      aria-label={`Remove ${hook.name}`}
+                      className="ml-6 mt-3 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-3"
+                    >
+                      <p className="text-sm text-red-400">
+                        Remove &ldquo;{hook.name}&rdquo;? Notifications to this
+                        channel stop immediately.
+                      </p>
+                      <div className="flex shrink-0 gap-2">
+                        <TerminalButton
+                          variant="secondary"
+                          onClick={() => setDeletingId(null)}
+                        >
+                          Cancel
+                        </TerminalButton>
+                        <TerminalButton
+                          variant="danger"
+                          onClick={() => handleRemove(hook._id)}
+                        >
+                          Remove
+                        </TerminalButton>
                       </div>
-                    )}
-
-                    {deletingId === hook._id && (
-                      <div className="ml-6 mt-3 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                        <p className="text-sm text-red-400">
-                          Remove &ldquo;{hook.name}&rdquo;? Notifications to
-                          this channel stop immediately.
-                        </p>
-                        <div className="flex shrink-0 gap-2">
-                          <TerminalButton
-                            variant="secondary"
-                            onClick={() => setDeletingId(null)}
-                          >
-                            Cancel
-                          </TerminalButton>
-                          <TerminalButton
-                            variant="danger"
-                            onClick={() => handleRemove(hook._id)}
-                          >
-                            Remove
-                          </TerminalButton>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </TerminalCard>
-      </div>
-    </FeatureGate>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </TerminalCard>
+    </div>
   );
 }

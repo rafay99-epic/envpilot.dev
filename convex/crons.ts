@@ -101,6 +101,15 @@ crons.interval(
   internal.features.billing.webhooks.cleanupProcessedWebhooks
 );
 
+// Reclaim deleted notification endpoints and any Vault object whose webhook
+// metadata insert failed after encryption succeeded.
+crons.interval(
+  "cleanup notification webhook vault objects",
+  { hours: 1 },
+  internal.features.integrations.dispatch.cleanupVault,
+  {}
+);
+
 // Auto-cancel machine-originated variable requests pending > 30 days —
 // abandoned agent runs are routine and must not rot the reviewer feed.
 crons.daily(

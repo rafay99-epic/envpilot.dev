@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "../_generated/server";
 import { Id, Doc } from "../_generated/dataModel";
-import { maybeNotifyWebhooks } from "../features/integrations/notify";
+import { scheduleWebhookNotification } from "../features/integrations/notify";
 
 /**
  * Audit Log Helper Functions
@@ -229,12 +229,7 @@ export async function createAuditLog(
   // Auto-derive resource type if not provided
   const resourceType = input.resourceType ?? ACTION_RESOURCE_MAP[input.action];
 
-  // Fan notifiable events out to the org's Slack/Discord webhooks. This is
-  // the single hook point for ALL webhook notifications — never wire
-  // per-mutation. Swallows its own errors; see maybeNotifyWebhooks.
-  await maybeNotifyWebhooks(ctx, input);
-
-  return await ctx.db.insert("auditLogs", {
+  const auditLogId = await ctx.db.insert("auditLogs", {
     organizationId: input.organizationId,
     projectId: input.projectId,
     variableId: input.variableId,
@@ -251,6 +246,8 @@ export async function createAuditLog(
     geoLocation: input.geoLocation,
     createdAt: now,
   });
+  await scheduleWebhookNotification(ctx, auditLogId, input.action);
+  return auditLogId;
 }
 
 /**
@@ -322,10 +319,10 @@ export async function logVariableAccess(
     userId: input.userId,
     action,
     details: {
-      variableKey: input.variableKey,
+      key: input.variableKey,
       accessType: input.accessType,
       isSensitive: input.isSensitive,
-      environment: input.environment,
+      environments: input.environment ? [input.environment] : [],
     },
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,

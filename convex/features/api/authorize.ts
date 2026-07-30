@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { checkBooleanFeature } from "../featureRegistry/gates";
 import { surfaceValidator } from "./keys";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * THE single enforcement core for the public API key platform.
@@ -84,17 +85,16 @@ export const _authorizeRequest = internalMutation({
       k: NonNullable<typeof key>,
       reason: string
     ): Promise<void> => {
-      await ctx.db.insert("auditLogs", {
+      await createAuditLog(ctx, {
         organizationId: k.organizationId,
         userId: k.createdBy,
         action: "api.request_denied",
-        details: JSON.stringify({
+        details: {
           keyId: k._id,
           keyName: k.name,
           requirement: args.requirement,
           reason,
-        }),
-        createdAt: now,
+        },
       });
     };
 

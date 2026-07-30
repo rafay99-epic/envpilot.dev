@@ -19,9 +19,9 @@ Connecting takes one click — Envpilot uses each platform's OAuth flow, which c
 1. Go to **Organization Settings → Integrations** (owner only).
 2. Click **Connect Slack** or **Connect Discord**.
 3. On the platform's consent screen, pick the channel to post to and approve.
-4. You land back on the Integrations tab, and a test message arrives in the channel immediately.
+4. You land back on the Integrations tab. Envpilot queues a test message and the row updates with the delivery result.
 
-There is nothing to copy out of Slack or Discord admin screens — the platform hands Envpilot the webhook URL during consent. Envpilot keeps only that URL (and the channel name for display); the OAuth access token is discarded, never stored.
+There is nothing to copy out of Slack or Discord admin screens — the platform hands Envpilot the webhook URL during consent. The URL is encrypted in WorkOS Vault; Convex keeps only its opaque Vault reference and a masked preview. The OAuth access token is discarded, never stored.
 
 ## Add a webhook manually
 
@@ -30,24 +30,26 @@ If the Connect buttons aren't available (a locked-down Slack workspace, or a sel
 - **Slack**: in the target channel → **Integrations → Add an app → Incoming Webhooks** → create and copy the URL (`https://hooks.slack.com/services/…`).
 - **Discord**: channel settings → **Integrations → Webhooks → New Webhook** → **Copy Webhook URL** (`https://discord.com/api/webhooks/…`).
 
-Then **Organization Settings → Integrations → Add manually**, pick the platform, paste the URL, and choose event groups. Manually added URLs are treated as credentials: the UI only ever shows a masked preview.
+Then **Organization Settings → Integrations → Add manually**, pick the platform, paste the URL, and choose event groups. All webhook URLs — manual or OAuth-connected — are encrypted as credentials, and the UI only ever shows a masked preview.
 
 ## Event groups
 
 Each webhook subscribes to event groups, editable inline at any time:
 
-| Group     | Covers                                                     | Default |
-| --------- | ---------------------------------------------------------- | ------- |
-| Variables | created, updated, deleted, exported                        | on      |
-| Requests  | access requested, approved, rejected                       | on      |
-| Members   | invitations, removals, permission grants/revocations       | off     |
-| Security  | access denials, unauthorized attempts, API token lifecycle | off     |
+| Group     | Covers                                                       | Default |
+| --------- | ------------------------------------------------------------ | ------- |
+| Variables | created, updated, rotated, restored, rolled back, exported   | on      |
+| Requests  | access requested, approved, rejected                         | on      |
+| Members   | invitations, removals, shared-account permission changes     | off     |
+| Security  | attributable API denials, API keys, device/extension revokes | off     |
 
 ## Delivery behavior
 
-- Delivery is fire-and-forget: a webhook outage never slows or fails the action that triggered it.
+- Delivery is fire-and-forget: the audited action only queues preparation and never waits for Slack or Discord.
+- Requests time out after 10 seconds. Network errors, HTTP 5xx responses, and rate limits retry up to three total attempts; provider `Retry-After` guidance is respected.
 - After **20 consecutive failures** a webhook auto-disables instead of hammering a dead endpoint. Re-enabling it (Resume) resets the counter.
-- **Send test** posts a test message on demand; every newly added webhook also sends one immediately.
+- **Send test** queues a test message on demand; every newly added webhook queues one too. The settings row reports the final delivery status.
+- Pausing, removing, or losing the feature gate stops already-queued deliveries because the endpoint is re-checked immediately before every post.
 - Up to 10 webhooks per organization.
 
 ## Self-hosting: enabling the Connect buttons
@@ -57,7 +59,8 @@ The one-click Connect flow needs OAuth apps you register once per platform. With
 **Slack** — [api.slack.com/apps](https://api.slack.com/apps) → Create New App:
 
 1. Under **OAuth & Permissions**, add the redirect URL `https://<your-domain>/api/integrations/slack/callback` and the bot scope `incoming-webhook`.
-2. Copy the **Client ID** and **Client Secret** into your environment:
+2. To install the app in workspaces other than its development workspace, complete Slack's **Manage Distribution** checklist and activate public distribution.
+3. Copy the **Client ID** and **Client Secret** into your web environment:
 
 ```bash
 SLACK_CLIENT_ID=...
@@ -73,5 +76,34 @@ SLACK_CLIENT_SECRET=...
 DISCORD_CLIENT_ID=...
 DISCORD_CLIENT_SECRET=...
 ```
+
+For local Discord testing, register this exact redirect:
+
+```text
+http://localhost:3000/api/integrations/discord/callback
+```
+
+Slack requires OAuth redirect URLs to use HTTPS. Its PKCE exception for `http://localhost` is a desktop flow and cannot request the `incoming-webhook` bot scope. You can keep the app entirely local by running Next.js with local HTTPS:
+
+```bash
+bun --cwd apps/web run dev -- --experimental-https
+```
+
+Accept/trust the generated local certificate in the test browser, set both `NEXT_PUBLIC_APP_URL` and `WORKOS_REDIRECT_URI` to the HTTPS localhost origin, and add `https://localhost:3000/callback` to the WorkOS development environment's allowed redirect URIs. Then register:
+
+```text
+https://localhost:3000/api/integrations/slack/callback
+https://localhost:3000/api/integrations/discord/callback
+```
+
+Alternatively, use a temporary HTTPS tunnel or a trusted local HTTPS reverse proxy and register its callback URL instead. If the app must remain on plain `http://localhost:3000`, use **Add manually** with a disposable Slack incoming webhook; delivery, retries, status, pause/resume, and removal still run end to end.
+
+For Discord or manual-webhook testing, set `NEXT_PUBLIC_APP_URL=http://localhost:3000` in the web app's root `.env.local`. Set the same value in the Convex **development deployment** so notification links point back to localhost:
+
+```bash
+bunx convex env set NEXT_PUBLIC_APP_URL http://localhost:3000
+```
+
+The four OAuth client variables belong only in `.env.local`; do not put client secrets in Convex. `WORKOS_API_KEY` must already be configured in the Convex deployment because webhook URLs are encrypted in WorkOS Vault.
 
 The consent screens use the `incoming-webhook` (Slack) and `webhook.incoming` (Discord) scopes — channel-post capability only, no read access to anything.

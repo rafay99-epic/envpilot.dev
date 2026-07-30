@@ -8,6 +8,7 @@ import { internal } from "../../_generated/api";
 import { rateLimiter } from "../../lib/rateLimits";
 import { isRateLimitError } from "@convex-dev/rate-limiter";
 import { checkBooleanFeature } from "../featureRegistry/gates";
+import { createAuditLog } from "../../lib/audit";
 
 /**
  * CI/CD secret pull — the GitHub Action's read path.
@@ -89,18 +90,17 @@ export const _authorizePull = internalMutation({
 
     if (apiKey) {
       const logApiKeyDenied = async (reason: string): Promise<void> => {
-        await ctx.db.insert("auditLogs", {
+        await createAuditLog(ctx, {
           organizationId: apiKey.organizationId,
           userId: apiKey.createdBy,
           action: "api.request_denied",
-          details: JSON.stringify({
+          details: {
             keyId: apiKey._id,
             keyName: apiKey.name,
             environment: args.environment,
             reason,
             source: "cicd_pull_compat",
-          }),
-          createdAt: now,
+          },
         });
       };
 

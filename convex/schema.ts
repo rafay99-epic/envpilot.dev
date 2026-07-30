@@ -629,9 +629,9 @@ export default defineSchema({
   // ==========================================
   // ORG NOTIFICATION WEBHOOKS (Slack / Discord)
   // ==========================================
-  // Outbound notification endpoints for org activity. The URL is the only
-  // credential (a capability URL) — never rendered raw in the UI for manual
-  // rows, and OAuth access tokens are exchanged then discarded, never stored.
+  // Outbound notification endpoints for org activity. Webhook capability URLs
+  // live encrypted in WorkOS Vault; Convex stores only the opaque reference and
+  // a non-sensitive masked preview. OAuth access tokens are discarded.
   orgWebhooks: defineTable({
     organizationId: v.id("organizations"),
     // Display label — the channel name for OAuth rows, user-chosen for manual
@@ -639,20 +639,56 @@ export default defineSchema({
     type: v.union(v.literal("slack"), v.literal("discord")),
     // How the URL arrived — OAuth rows can show their channel; manual rows mask
     source: v.union(v.literal("oauth"), v.literal("manual")),
-    url: v.string(),
+    vaultRef: v.string(),
+    urlPreview: v.string(),
     // Channel name from the OAuth response (e.g. "#eng-alerts")
     channel: v.optional(v.string()),
     // Subscribed event groups: "variables" | "requests" | "members" | "security"
-    eventGroups: v.array(v.string()),
+    eventGroups: v.array(
+      v.union(
+        v.literal("variables"),
+        v.literal("requests"),
+        v.literal("members"),
+        v.literal("security")
+      )
+    ),
     enabled: v.boolean(),
     // Consecutive delivery failures — auto-disabled when it hits the cap
     failCount: v.number(),
     // Last delivery HTTP status
     lastStatus: v.optional(v.number()),
     lastSentAt: v.optional(v.number()),
+    // Mutation-reserved delivery lane. New events for one endpoint are spaced
+    // apart before actions are scheduled, preventing concurrent rate-limit
+    // bursts from turning a healthy Slack/Discord endpoint into a failure herd.
+    nextDeliveryAt: v.optional(v.number()),
+    // Provider Retry-After embargo checked by every action, including work
+    // that was already scheduled before the rate-limit response arrived.
+    deliveryEmbargoUntil: v.optional(v.number()),
+    // Incremented on pause/resume so old scheduled work cannot cross the
+    // state transition and post after a quick re-enable.
+    queueGeneration: v.optional(v.number()),
     createdBy: v.id("users"),
     createdAt: v.number(),
-  }).index("by_organization", ["organizationId"]),
+    // Removal is two-phase: hide/disable immediately, then delete the Vault
+    // object before hard-deleting this recovery pointer.
+    deletedAt: v.optional(v.number()),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_organization_and_deleted_at", ["organizationId", "deletedAt"])
+    .index("by_deleted_at", ["deletedAt"]),
+
+  // Recovery pointers created immediately after a notification URL enters
+  // WorkOS Vault and removed atomically with the orgWebhooks insert. If the
+  // insert fails, the hourly GC can still find and destroy the orphaned object.
+  webhookVaultCleanup: defineTable({
+    vaultRef: v.string(),
+    createdAt: v.number(),
+    // Set before the first DELETE and never cleared. The timestamp may rotate
+    // after a stale worker lease, but webhook activation forever refuses any
+    // claimed pointer because a timed-out DELETE may already have committed.
+    claimedAt: v.optional(v.number()),
+  }).index("by_created_at", ["createdAt"]),
 
   // ==========================================
   // INVITATIONS

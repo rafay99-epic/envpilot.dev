@@ -333,7 +333,6 @@ function OrganizationSettingsPageContent({
         {effectiveTab === "integrations" && isOwner && organization && (
           <IntegrationsSection
             organizationId={organization._id as Id<"organizations">}
-            slug={organization.slug}
           />
         )}
         {effectiveTab === "danger" && isOwner && (

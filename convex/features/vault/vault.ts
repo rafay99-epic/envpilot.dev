@@ -25,6 +25,7 @@ import { internalAction } from "../../_generated/server";
  */
 
 const VAULT_BASE = "https://api.workos.com/vault/v1/kv";
+const VAULT_TIMEOUT_MS = 10_000;
 
 function apiKey(): string {
   const key = process.env.WORKOS_API_KEY;
@@ -73,10 +74,10 @@ export const createSecret = internalAction({
         value: args.value,
         key_context,
       }),
+      signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Vault create failed (${res.status}): ${body}`);
+      throw new Error(`Vault create failed (${res.status})`);
     }
     const data = (await res.json()) as {
       id: string;
@@ -94,11 +95,14 @@ export const readSecret = internalAction({
   handler: async (_ctx, args) => {
     const res = await fetch(
       `${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`,
-      { method: "GET", headers: authHeaders(false) }
+      {
+        method: "GET",
+        headers: authHeaders(false),
+        signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
+      }
     );
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Vault read failed (${res.status}): ${body}`);
+      throw new Error(`Vault read failed (${res.status})`);
     }
     const data = (await res.json()) as { value?: string | null };
     // Distinguish a genuinely-missing value (undefined/null) from a valid
@@ -128,11 +132,15 @@ export const updateSecret = internalAction({
 
     const res = await fetch(
       `${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`,
-      { method: "PUT", headers: authHeaders(true), body: JSON.stringify(body) }
+      {
+        method: "PUT",
+        headers: authHeaders(true),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
+      }
     );
     if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      throw new Error(`Vault update failed (${res.status}): ${errBody}`);
+      throw new Error(`Vault update failed (${res.status})`);
     }
     const data = (await res.json()) as {
       id: string;
@@ -158,7 +166,11 @@ export const deleteSecret = internalAction({
   handler: async (_ctx, args) => {
     const res = await fetch(
       `${VAULT_BASE}/${encodeURIComponent(args.vaultRef)}`,
-      { method: "DELETE", headers: authHeaders(false) }
+      {
+        method: "DELETE",
+        headers: authHeaders(false),
+        signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
+      }
     );
     return res.ok || res.status === 404 || res.status === 410;
   },

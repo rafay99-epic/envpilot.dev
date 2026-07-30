@@ -14,6 +14,8 @@ import {
   getRoleProfile,
   normalizeOrgRole,
 } from "../../lib/authz";
+import { createAuditLog } from "../../lib/audit";
+import { internal } from "../../_generated/api";
 
 // ==========================================
 // MUTATIONS
@@ -349,6 +351,30 @@ export const remove = mutation({
       await ctx.db.delete(sc._id);
     }
 
+    // Preserve a recovery pointer until every notification capability has
+    // been removed from WorkOS Vault. The hourly webhook GC retries anything
+    // that outlives the immediate purge attempts.
+    const webhooks = await ctx.db
+      .query("orgWebhooks")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId)
+      )
+      .collect();
+    for (const hook of webhooks) {
+      await ctx.db.patch(hook._id, {
+        enabled: false,
+        deletedAt: hook.deletedAt ?? now,
+        queueGeneration: (hook.queueGeneration ?? 0) + 1,
+        nextDeliveryAt: undefined,
+        deliveryEmbargoUntil: undefined,
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.integrations.dispatch.purge,
+        { webhookId: hook._id, vaultRef: hook.vaultRef }
+      );
+    }
+
     // Note: userTiers records are kept even when orgs are deleted
     // (the user may own other orgs or re-create one later)
 
@@ -553,16 +579,17 @@ export const removeMember = mutation({
       kind: isSelfRemoval ? "left" : "removed",
     });
 
-    await ctx.db.insert("auditLogs", {
+    const removedUser = await ctx.db.get(args.userId);
+    await createAuditLog(ctx, {
       organizationId: args.organizationId,
       userId: actor._id,
       action: "org.member_removed",
-      details: JSON.stringify({
+      details: {
         removedUserId: args.userId,
+        removedUserEmail: removedUser?.email,
         revokedAccessTokens: revokedTokenCount,
         revokedVariablePermissions: revokedPermissionCount,
-      }),
-      createdAt: now,
+      },
     });
 
     return membership._id;
