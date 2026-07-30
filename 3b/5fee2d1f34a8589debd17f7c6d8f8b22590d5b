@@ -1,0 +1,19 @@
+apps/docs/package.json
+  s_c028245e89d6e9::t_11b68e8ba5968c 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3b5fee2d1f34a8589debd17f7c6d8f8b22590d5b",
+  "prompts": {},
+  "sessions": {
+    "s_c028245e89d6e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f87b435a-5520-4259-a61d-f574eab5a25d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
