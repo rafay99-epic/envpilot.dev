@@ -1,0 +1,161 @@
+convex/features/vault/vault.ts
+  s_44f4aab38e60db::t_d355de74013900 105,143
+  s_44f4aab38e60db::t_730c9dbd6238ab 28,77,98-102,135-140,169-173
+  s_44f4aab38e60db::t_d0f7e11b9a8fb3 80
+apps/web/src/components/integrations/IntegrationsSection.tsx
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 170,245-266,268-278,280,282-288,317,319-383,385-396,398-400,403,406,408-420,422-423,425-438,445-447,455-456,464-484,488-490,494-527,529-550,552-569,571-574,576-580,582-583,586,588-610,612-619
+  s_44f4aab38e60db::t_5934aaf0d3fc2d 78
+  s_44f4aab38e60db::t_e68cb74cacb918 84-85,89-97,311-316
+  s_44f4aab38e60db::t_45f7a219449149 4-5,16,73,109-110,132,137-146,174,194,235,244,404-405,407,421,620
+  s_44f4aab38e60db::t_d355de74013900 439-444,448-450,457-459,485-487,491-493
+  s_44f4aab38e60db::t_5d08d9f82f28aa 77
+  s_44f4aab38e60db::t_154c76edcbeaf6 30-32,38,47,160-161,166
+apps/web/src/lib/integration-oauth.ts
+  s_44f4aab38e60db::t_74a42bdf827d69 1-11,13-31
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 12
+convex/features/organizations/invitations.ts
+  s_44f4aab38e60db::t_73da68dd88cc80 21,247,251,255
+convex/features/cicd/pull.ts
+  s_44f4aab38e60db::t_ca691dd4879771 11,93,97,103
+apps/web/src/app/api/integrations/[provider]/start/route.ts
+  s_44f4aab38e60db::t_e68cb74cacb918 71-79
+  s_44f4aab38e60db::t_74a42bdf827d69 3-11,17-18,22-32,34,39-53,59-70,81-90,104,121-123,125
+convex/features/users/projectAccess.ts
+  s_44f4aab38e60db::t_465769e8b2a9cb 7,463,468,471
+convex/features/organizations/mutations.ts
+  s_44f4aab38e60db::t_4305fa7b1dbf69 367-369
+  s_44f4aab38e60db::t_73da68dd88cc80 17,583,587,592
+  s_44f4aab38e60db::t_d0f7e11b9a8fb3 18,354-366,370-375
+  s_44f4aab38e60db::t_ab83f3bfa2e32d 582,589
+  s_44f4aab38e60db::t_c7bea651d52349 376-377
+convex/features/integrations/notify.ts
+  s_44f4aab38e60db::t_53a3a7e1c0908c 27-29,42,109-119
+  s_44f4aab38e60db::t_4305fa7b1dbf69 101,104
+  s_44f4aab38e60db::t_2c8402d96f233c 102,106
+  s_44f4aab38e60db::t_568876ffacf4de 8-9
+  s_44f4aab38e60db::t_b0ae4197c990f6 1-2,4,7,20-21,35-40,45-46,50-51,53,55-56,58,60-63,65-68,70-89,92,95,97-98,108,121-124,128-131,134-142,147-150,152-154
+  s_44f4aab38e60db::t_a7d704f111e946 10,143-146
+  s_44f4aab38e60db::t_0140cde71f4643 99-100,103,105,107,120
+convex/lib/audit.ts
+  s_44f4aab38e60db::t_b0ae4197c990f6 4,232,249-250,322,325
+apps/web/src/lib/__tests__/integration-oauth.test.ts
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 28
+  s_44f4aab38e60db::t_14c299a932062a 1-27,29-37
+convex/features/integrations/messages.ts
+  s_44f4aab38e60db::t_b0ae4197c990f6 1-11,15-35,40-63,65-77,88,137-150,152-157,159-166,170-205,217-233,235-239,241-243
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 64
+  s_44f4aab38e60db::t_53a3a7e1c0908c 12-14,36-39,78-87,89-136,151,158,167-169
+  s_44f4aab38e60db::t_0fe6ce48a6f8bb 244-251
+  s_44f4aab38e60db::t_1820fba1cb09fa 206-216,234,240
+convex/crons.ts
+  s_44f4aab38e60db::t_a7d704f111e946 104-112
+.env.example
+  s_44f4aab38e60db::t_e68cb74cacb918 104
+  s_44f4aab38e60db::t_fea904eda9729e 106-110
+  s_44f4aab38e60db::t_0df259bea91eeb 103,105,111-114
+convex/lib/rateLimits.ts
+  s_44f4aab38e60db::t_28375911dd5ff3 127,129-137
+  s_44f4aab38e60db::t_568876ffacf4de 138-143
+  s_44f4aab38e60db::t_855b4cf58b2bb1 126
+  s_44f4aab38e60db::t_958a58dd18952d 128
+convex/features/integrations/queue.ts
+  s_44f4aab38e60db::t_43aba22faf56da 17-23,27,29-30,33-38,45-50
+  s_44f4aab38e60db::t_a7d704f111e946 1-16,24-26,31-32,39-44,51-53
+  s_44f4aab38e60db::t_2c8402d96f233c 28
+apps/web/src/lib/__tests__/integration-notifications.test.ts
+  s_44f4aab38e60db::t_14c299a932062a 1-5,7-8,10-45,47-57,60-75,121-157,175-176
+  s_44f4aab38e60db::t_1820fba1cb09fa 9,165-174
+  s_44f4aab38e60db::t_6eb5f3e158b599 59
+  s_44f4aab38e60db::t_0fe6ce48a6f8bb 6,158-164
+  s_44f4aab38e60db::t_d1ff6aad3b9529 46
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 58
+  s_44f4aab38e60db::t_9455c1e35e1e0c 76-120
+convex/features/api/authorize.ts
+  s_44f4aab38e60db::t_73da68dd88cc80 5,88,92,97
+convex/features/integrations/webhooks.ts
+  s_44f4aab38e60db::t_4305fa7b1dbf69 371-375,404-406,485,488,490
+  s_44f4aab38e60db::t_5934aaf0d3fc2d 252-256
+  s_44f4aab38e60db::t_d0f7e11b9a8fb3 21,214,216-230,232-236,240,261-270,275,287,293,316-318,333,454-457
+  s_44f4aab38e60db::t_730c9dbd6238ab 59-61,68-74,198-199,207-208,210,481
+  s_44f4aab38e60db::t_2c8402d96f233c 486,491-502
+  s_44f4aab38e60db::t_ce12ac94e75c7f 288-292
+  s_44f4aab38e60db::t_2119d6a773aa77 75-77
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 85,200-206
+  s_44f4aab38e60db::t_28375911dd5ff3 1-9,16,19,23-28,30-31,34,36-44,48-50,58,62-67,78-84,86-87,90-91,94-95,98-100,104,108-120,122,128-177,185,188-191,193-195,197,213,215,237-239,241-249,251,257-260,271-274,276-286,295-300,304,307-308,314,326,342,348-350,354,356,360-369,396-398,401-403,407,419-423,433-435,437-440,442-453,472
+convex/features/variables/mutations.ts
+  s_44f4aab38e60db::t_5e8af0e13c37e4 528
+  s_44f4aab38e60db::t_465769e8b2a9cb 896,983
+apps/web/src/app/api/integrations/providers/route.ts
+  s_44f4aab38e60db::t_e68cb74cacb918 16-25,27-28
+apps/web/src/app/api/integrations/[provider]/callback/route.ts
+  s_44f4aab38e60db::t_df9f0c19e5e97b 189
+  s_44f4aab38e60db::t_d355de74013900 18-21,42,77,177-184
+  s_44f4aab38e60db::t_5934aaf0d3fc2d 194-202
+  s_44f4aab38e60db::t_74a42bdf827d69 8-13,15-16,24,28-31,33-35,43-44,47,52-53,56,58-59,62-63,65,78-83,88-89,93,95,98-99,101,116-119,122,124-125,131,133,135-138,141-142,144-147,151,153-163,168-170,185-188,204-207,211-214
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 45-46
+  s_44f4aab38e60db::t_4305fa7b1dbf69 208-210
+apps/web/tests/e2e/authenticated/integrations.spec.ts
+  s_44f4aab38e60db::t_3e07c727949951 8,30,39,42-44,50,52,55,62,66-70,72,74-89,91-113,118-128,131-132,139-153,158-164
+  s_44f4aab38e60db::t_fea904eda9729e 9-11
+  s_44f4aab38e60db::t_e0ea86c4a04874 12-13
+  s_44f4aab38e60db::t_d355de74013900 48,114-117,129-130,133-138
+  s_44f4aab38e60db::t_2119d6a773aa77 71,90
+  s_44f4aab38e60db::t_10f7abe0c2d434 46-47,49
+  s_44f4aab38e60db::t_eaf4fe6ab0159f 154-157
+convex/features/featureRegistry/gates.ts
+  s_44f4aab38e60db::t_4305fa7b1dbf69 324-327
+  s_44f4aab38e60db::t_28375911dd5ff3 318
+convex/schema.ts
+  s_44f4aab38e60db::t_0c0ae4ed520d04 632-634,642-643,647-654,673-675
+  s_44f4aab38e60db::t_a7d704f111e946 661-664,676-677,679-686,691
+  s_44f4aab38e60db::t_2c8402d96f233c 678
+  s_44f4aab38e60db::t_8812fe0f57de79 687-689
+  s_44f4aab38e60db::t_43aba22faf56da 665-670,690
+convex/features/variables/requests/mutations.ts
+  s_44f4aab38e60db::t_d0f7e11b9a8fb3 570
+  s_44f4aab38e60db::t_73da68dd88cc80 702
+convex/features/api/keys.ts
+  s_44f4aab38e60db::t_73da68dd88cc80 16,287,291,299,577,581
+convex/features/integrations/dispatch.ts
+  s_44f4aab38e60db::t_96c4118fbeed41 71-94,96,115
+  s_44f4aab38e60db::t_cae326daf7c924 174-178,279-283,288
+  s_44f4aab38e60db::t_ce12ac94e75c7f 15,160,275-276,349,353-363,375,386-387,418-419,469,476,488-489,493,499-500,502-507,509,512,526,531-534,536-561
+  s_44f4aab38e60db::t_5934aaf0d3fc2d 492
+  s_44f4aab38e60db::t_1820fba1cb09fa 12,138-144,146-147,155,161-170,247-273
+  s_44f4aab38e60db::t_43aba22faf56da 29,36,43,46-61,148-154,156-157,185-188,194,200,207-234,236-246,274
+  s_44f4aab38e60db::t_a7d704f111e946 26-27,290-295,404-417,420-468,470-475,477-486,490-491,494-498,508,510-511,513-525,527-530,535
+  s_44f4aab38e60db::t_0fe6ce48a6f8bb 8-11,13,298
+  s_44f4aab38e60db::t_2119d6a773aa77 111,319-323
+  s_44f4aab38e60db::t_2c8402d96f233c 235,501
+  s_44f4aab38e60db::t_0c0ae4ed520d04 2-6,14,41-42,44-45,62-70,97,105,184,189-193,195-199,201-206,287,310-318,324-343,393-403
+  s_44f4aab38e60db::t_d0f7e11b9a8fb3 28,344-348,350-352,364-374,376-385,388-392,487
+  s_44f4aab38e60db::t_b0ae4197c990f6 18,20-21,25,35,40,95,98-99,102-103,106,109-110,114,116-127,132-137,145,158-159
+  s_44f4aab38e60db::t_936ec84437e85f 171,277,289
+apps/docs/content/notifications.mdx
+  s_44f4aab38e60db::t_b1047174af1281 22,24,33,48-49,51-52,62-63,81-85,102-107
+  s_44f4aab38e60db::t_fea904eda9729e 86,88-93,95,99
+  s_44f4aab38e60db::t_9455c1e35e1e0c 44
+  s_44f4aab38e60db::t_e68cb74cacb918 80,87,94,97-98,100-101
+  s_44f4aab38e60db::t_9b7bd57e1bfe58 96
+  s_44f4aab38e60db::t_d5c4891748eab1 39-43
+  s_44f4aab38e60db::t_e775717ffd25e9 108
+convex/features/organizations/memberSessions.ts
+  s_44f4aab38e60db::t_73da68dd88cc80 6,249,253,258,411,415,420
+  s_44f4aab38e60db::t_465769e8b2a9cb 336,338,341,347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "a1e63bf35523c5d3106386ffa6f4d143852a7c00",
+  "prompts": {},
+  "sessions": {
+    "s_44f4aab38e60db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fafb8-3672-7b93-852a-38c08fb69563",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Abdul Rafay <99marafay@gmail.com>"
+    }
+  }
+}
