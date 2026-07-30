@@ -24,7 +24,7 @@ Every key has three independent scope dimensions:
 
 - **Projects** — `all` (every project in the org) or a specific list of projects
 - **Environments** — `all` (development, staging, production) or a specific list
-- **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
+- **Resources** — which resource types the key can read: `variables`, `accounts`, `projects`, `artifacts`, and optionally `requests` (the one write path — filing a variable request for a human to approve)
 
 A key also carries **surfaces** — which faces it may use: the REST API (`rest_api`), the MCP server (`mcp_server`), and the GitHub Action (`github_action`). All three route through the same enforcement core; see [Architecture](/architecture).
 

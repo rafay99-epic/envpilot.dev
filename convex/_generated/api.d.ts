@@ -35,6 +35,7 @@ import type * as features_api_keys from "../features/api/keys.js";
 import type * as features_api_reads from "../features/api/reads.js";
 import type * as features_api_requests from "../features/api/requests.js";
 import type * as features_artifacts_actions from "../features/artifacts/actions.js";
+import type * as features_artifacts_api from "../features/artifacts/api.js";
 import type * as features_artifacts_mutations from "../features/artifacts/mutations.js";
 import type * as features_artifacts_queries from "../features/artifacts/queries.js";
 import type * as features_audit_compliance from "../features/audit/compliance.js";
@@ -148,6 +149,7 @@ declare const fullApi: ApiFromModules<{
   "features/api/reads": typeof features_api_reads;
   "features/api/requests": typeof features_api_requests;
   "features/artifacts/actions": typeof features_artifacts_actions;
+  "features/artifacts/api": typeof features_artifacts_api;
   "features/artifacts/mutations": typeof features_artifacts_mutations;
   "features/artifacts/queries": typeof features_artifacts_queries;
   "features/audit/compliance": typeof features_audit_compliance;

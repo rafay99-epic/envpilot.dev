@@ -68,6 +68,7 @@ import {
 } from "./utils/requestTarget";
 import type { Project } from "./types";
 import * as output from "./utils/outputChannel";
+import { syncArtifacts } from "./services/artifactSync";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function wrapCommand(
@@ -433,6 +434,10 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "envpilot.pullVariables",
       wrapCommand(handlePullVariables)
+    ),
+    vscode.commands.registerCommand(
+      "envpilot.pullArtifacts",
+      wrapCommand(handlePullArtifacts)
     ),
     vscode.commands.registerCommand(
       "envpilot.refresh",
@@ -1654,6 +1659,97 @@ async function handlePullVariables(): Promise<void> {
     // return, error) must still clear the dashboard spinner — idempotent.
     dashboardPanelProvider.notifySyncCompleted();
   }
+}
+
+async function handlePullArtifacts(): Promise<void> {
+  if (!vscode.workspace.isTrusted) {
+    vscode.window.showWarningMessage(
+      "Trust this workspace before writing secure artifacts."
+    );
+    return;
+  }
+  if (!(await authService.isAuthenticated())) {
+    vscode.window.showWarningMessage("Please sign in first");
+    return;
+  }
+
+  const linkedProjects = await storageService.getLinkedProjectsV2();
+  if (linkedProjects.length === 0) {
+    vscode.window.showWarningMessage("Link a project first");
+    return;
+  }
+  const projectPick = await vscode.window.showQuickPick(
+    linkedProjects.map((project) => ({
+      label: project.projectName,
+      description: project.organizationName,
+      project,
+    })),
+    { placeHolder: "Select the project whose secure artifacts you need" }
+  );
+  if (!projectPick) return;
+
+  const artifacts = await apiService.getArtifacts(
+    projectPick.project.projectId
+  );
+  if (artifacts.length === 0) {
+    vscode.window.showInformationMessage("No secure artifacts found");
+    return;
+  }
+  const artifactPicks = await vscode.window.showQuickPick(
+    artifacts.map((artifact) => ({
+      label: artifact.name,
+      description: `${artifact.fileName} · v${artifact.currentVersion}`,
+      artifact,
+    })),
+    {
+      canPickMany: true,
+      placeHolder: "Select secure artifacts to decrypt into this workspace",
+    }
+  );
+  if (!artifactPicks || artifactPicks.length === 0) return;
+
+  const directories = projectPick.project.directories;
+  const directoryPick = await vscode.window.showQuickPick(
+    directories.map((directory) => ({
+      label: getDisplayPath(directory.directoryPath),
+      directoryPath: directory.directoryPath,
+    })),
+    { placeHolder: "Select a linked destination directory" }
+  );
+  if (!directoryPick) return;
+
+  const relativeDestination = await vscode.window.showInputBox({
+    title: "Secure artifact destination",
+    prompt:
+      'Path relative to the linked directory. Use "." only when the build requires files at the project root.',
+    value: ".envpilot-artifacts",
+  });
+  if (relativeDestination === undefined) return;
+  const destination = path.resolve(
+    directoryPick.directoryPath,
+    relativeDestination.trim() || ".envpilot-artifacts"
+  );
+  if (!isPathInside(destination, directoryPick.directoryPath)) {
+    throw new Error(
+      "Artifact destination must stay inside the linked directory"
+    );
+  }
+
+  const outputs = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Envpilot: Verifying and decrypting secure artifacts...",
+    },
+    () =>
+      syncArtifacts(
+        apiService,
+        artifactPicks.map((pick) => pick.artifact),
+        destination
+      )
+  );
+  vscode.window.showInformationMessage(
+    `Pulled ${outputs.length} secure artifact${outputs.length === 1 ? "" : "s"} with private file permissions.`
+  );
 }
 
 function handleRefresh(): void {

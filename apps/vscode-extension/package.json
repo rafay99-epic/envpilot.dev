@@ -2,7 +2,7 @@
   "name": "envpilot",
   "displayName": "Envpilot",
   "description": "Securely sync environment variables from Envpilot to your local projects. Real-time revocation, clipboard protection, commit guard, and role-based access.",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "publisher": "envpilot",
   "author": "Envpilot <hello@envpilot.dev> (https://www.envpilot.dev)",
   "license": "MIT",
@@ -78,6 +78,12 @@
         "title": "Pull Variables",
         "category": "Envpilot",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "envpilot.pullArtifacts",
+        "title": "Pull Secure Artifacts",
+        "category": "Envpilot",
+        "icon": "$(file-binary)"
       },
       {
         "command": "envpilot.refresh",

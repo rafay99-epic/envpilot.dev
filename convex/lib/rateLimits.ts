@@ -90,6 +90,23 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 30,
   },
 
+  // Secure artifact operations fan out to WorkOS Vault and B2. Uploads are
+  // intentionally tighter than variable writes; downloads are burst-friendly
+  // for local builds while still bounding Vault decrypt cost.
+  artifactUpload: {
+    kind: "token bucket",
+    rate: 10,
+    period: 60_000,
+    capacity: 10,
+  },
+
+  artifactDownload: {
+    kind: "token bucket",
+    rate: 60,
+    period: 60_000,
+    capacity: 60,
+  },
+
   // Bulk import: 2 per minute per org (expensive operation)
   bulkImport: {
     kind: "token bucket",

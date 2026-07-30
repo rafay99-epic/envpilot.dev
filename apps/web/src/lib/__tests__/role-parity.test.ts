@@ -81,6 +81,10 @@ const EXPECTED_PROJECT_ACTIONS: Record<string, string[]> = {
     "project:update_account",
     "project:delete_account",
     "project:manage_account_permissions",
+    "project:read_artifact",
+    "project:create_artifact",
+    "project:update_artifact",
+    "project:delete_artifact",
   ],
   project_manager: [
     "project:read",
@@ -95,6 +99,10 @@ const EXPECTED_PROJECT_ACTIONS: Record<string, string[]> = {
     "project:update_account",
     "project:delete_account",
     "project:manage_account_permissions",
+    "project:read_artifact",
+    "project:create_artifact",
+    "project:update_artifact",
+    "project:delete_artifact",
   ],
   team_lead: [
     "project:read",
@@ -108,6 +116,10 @@ const EXPECTED_PROJECT_ACTIONS: Record<string, string[]> = {
     "project:update_account",
     "project:delete_account",
     "project:manage_account_permissions",
+    "project:read_artifact",
+    "project:create_artifact",
+    "project:update_artifact",
+    "project:delete_artifact",
   ],
   // Main parity: developers CAN create variables/accounts directly (with an
   // auto write-grant on creation) but hold no blanket update/delete.

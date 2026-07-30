@@ -53,13 +53,20 @@ const ENV_CHIP_SELECTED: Record<Environment, string> = {
   production: "border-green-500/40 bg-green-500/10 text-green-400",
 };
 
-const RESOURCES = ["variables", "accounts", "projects", "requests"] as const;
+const RESOURCES = [
+  "variables",
+  "accounts",
+  "projects",
+  "artifacts",
+  "requests",
+] as const;
 type Resource = (typeof RESOURCES)[number];
 
 // "requests" is the one mutating capability: the key may FILE variable
 // requests (a human approves them). Not compatible with the GitHub Action
 // surface — CI can't wait on human approval.
 const RESOURCE_HINT: Partial<Record<Resource, string>> = {
+  artifacts: "may download project secure artifacts (read-only)",
   requests: "may file variable requests for human approval (agents)",
 };
 
@@ -72,6 +79,7 @@ const MCP_RESOURCE_TOOLS: Record<Resource, string> = {
     "envpilot_list_projects, envpilot_search (key matches also need variables)",
   variables: "envpilot_get_variables, envpilot_get_variable",
   accounts: "envpilot_list_accounts",
+  artifacts: "reserved for CLI, VS Code, and GitHub Action artifact sync",
   requests: "envpilot_request_variable, envpilot_get_request_status",
 };
 
@@ -565,8 +573,8 @@ function CreateKeyDrawer({
       }
       return next;
     });
-    // The Action pull path only accepts single-project, exactly-variables
-    // keys (and never files requests) — steer the form into that shape
+    // The Action pull path accepts one project and read-only variables and/or
+    // artifacts (never requests) — steer the form into that safe shape
     // instead of failing at submit.
     if (adding && surface === "github_action") {
       setProjectMode("specific");
@@ -584,7 +592,9 @@ function CreateKeyDrawer({
   const resourceSelectionValid =
     selectedResources.size > 0 &&
     (!githubActionSelected ||
-      (selectedResources.size === 1 && selectedResources.has("variables")));
+      Array.from(selectedResources).every(
+        (resource) => resource === "variables" || resource === "artifacts"
+      ));
   const surfaceSelectionValid = selectedSurfaces.size > 0;
   const customExpiryValid =
     expiryMode !== "custom" ||
@@ -828,8 +838,8 @@ function CreateKeyDrawer({
             </div>
             <p className="mt-2 text-xs text-zinc-500">
               {githubActionSelected
-                ? "A GitHub Action key is locked to exactly one project and the variables resource — the Action's pull endpoint takes no project parameter."
-                : "Where this key may be used. The GitHub Action pulls variables for a single project."}
+                ? "A GitHub Action key is locked to exactly one project and may read variables, secure artifacts, or both."
+                : "Where this key may be used. The GitHub Action pulls variables and secure artifacts for a single project."}
             </p>
           </div>
 
@@ -943,7 +953,9 @@ function CreateKeyDrawer({
               {RESOURCES.map((resource) => {
                 const selected = selectedResources.has(resource);
                 const disabled =
-                  githubActionSelected && resource !== "variables";
+                  githubActionSelected &&
+                  resource !== "variables" &&
+                  resource !== "artifacts";
                 return (
                   <button
                     key={resource}
@@ -953,7 +965,7 @@ function CreateKeyDrawer({
                     disabled={disabled}
                     title={
                       disabled
-                        ? "GitHub Action keys carry exactly the variables resource"
+                        ? "GitHub Action keys carry only variables and/or artifacts"
                         : RESOURCE_HINT[resource]
                     }
                     onClick={() => toggleResource(resource)}

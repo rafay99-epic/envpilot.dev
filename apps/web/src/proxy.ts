@@ -47,6 +47,11 @@ export default authkitMiddleware({
       // projects, projects/[slug], projects/[slug]/variables,
       // projects/[slug]/accounts) so new endpoints never need a proxy change.
       "/api/v1/(.*)",
+      // Secure artifact routes accept either a browser WorkOS session or the
+      // same WorkOS JWT carried by CLI/extension requests. Each handler still
+      // authenticates and authorizes against project artifact capabilities.
+      "/api/artifacts/(.*)",
+      "/api/artifacts",
       // Remote MCP server (Streamable HTTP, stateless) — authenticates with
       // the SAME Bearer envpk_ API keys as /api/v1/* via its own withMcpAuth
       // wrapper, never a WorkOS session cookie. No sub-path variants: the

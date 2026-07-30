@@ -19,6 +19,7 @@ import { requestCommand } from "../commands/request.js";
 import { requestsCommand } from "../commands/requests.js";
 import { secretsCommand } from "../commands/secrets.js";
 import { diffCommand } from "../commands/diff.js";
+import { artifactsCommand } from "../commands/artifacts.js";
 
 export type CommandCategory =
   | "Get Started"
@@ -201,6 +202,29 @@ const COMMAND_CATALOG: CLICommandDefinition[] = [
     keywords: ["upload", "bulk", "merge", "replace"],
     topLevel: true,
     createCommand: () => pushCommand,
+  },
+  {
+    id: "artifacts",
+    title: "Secure artifacts",
+    category: "Sync",
+    description:
+      "List or pull encrypted project files such as signing keys and platform configuration.",
+    argv: ["artifacts"],
+    args: "<list|pull> [--project <name-or-id>] [--name <name...>] [--dir <path>]",
+    examples: [
+      ["artifacts", "list"],
+      ["artifacts", "pull"],
+      ["artifacts", "pull", "--name", "google-services.json", "--dir", "."],
+    ],
+    websiteSurface:
+      "Uses project-scoped artifact capabilities and short-lived B2 download URLs.",
+    notes: [
+      "Ciphertext integrity is verified before local AES-GCM decryption.",
+      "Downloaded files are written with 0600 permissions.",
+    ],
+    keywords: ["artifacts", "files", "signing", "firebase", "download"],
+    topLevel: true,
+    createCommand: () => artifactsCommand,
   },
   {
     id: "request",

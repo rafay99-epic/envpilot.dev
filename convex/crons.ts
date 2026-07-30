@@ -120,4 +120,13 @@ crons.daily(
   {}
 );
 
+// Revoke keys and metadata for direct artifact uploads abandoned for >1 hour.
+// B2 independently expires the artifact-uploads/ prefix as defense in depth.
+crons.interval(
+  "cleanup stale artifact uploads",
+  { hours: 1 },
+  internal.features.artifacts.actions.cleanupStaleUploads,
+  {}
+);
+
 export default crons;

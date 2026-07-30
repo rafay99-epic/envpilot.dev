@@ -17,6 +17,7 @@ import {
   ClipboardList,
   BarChart3,
   Gauge,
+  ShieldCheck,
   Settings,
   Menu,
   X,
@@ -94,7 +95,7 @@ export function DashboardNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
-  const { organization, roleMeta, user } = useAuthContext();
+  const { organization, roleMeta, user, capabilities } = useAuthContext();
   const { convexUserId } = useConvexUser(user?.id);
 
   // Hydrate Zustand tier store from Convex — one subscription for all dashboard pages
@@ -226,6 +227,15 @@ export function DashboardNav() {
           label: "Accounts",
           icon: <KeyRound className="h-4 w-4" />,
         },
+        ...(capabilities["project.artifacts.read"] === true
+          ? [
+              {
+                href: `/dashboard/projects/${projectSlug}/artifacts`,
+                label: "Artifacts",
+                icon: <ShieldCheck className="h-4 w-4" />,
+              },
+            ]
+          : []),
         {
           href: `/dashboard/projects/${projectSlug}/shared`,
           label: "Shared",

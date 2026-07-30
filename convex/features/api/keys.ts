@@ -46,6 +46,7 @@ export const VALID_RESOURCES = [
   "variables",
   "accounts",
   "projects",
+  "artifacts",
   "requests",
 ];
 const MAX_KEYS_PER_ORG = 25; // hygiene bound, not a tier limit
@@ -104,9 +105,8 @@ function assertValidExpiry(expiresAt: number | undefined): void {
 
 /**
  * Surfaces are required and explicit on every new key. A github_action key
- * must be shaped like the one credential the Action pull path accepts: a
- * single project with the "variables" resource — anything else would mint
- * fine and then fail only at CI time (⚖️ PLAN G3).
+ * must be scoped to one project and may carry only the two read-only resources
+ * supported by the Action: variables and encrypted artifacts.
  */
 function assertValidSurfaces(
   surfaces: Surface[],
@@ -125,9 +125,12 @@ function assertValidSurfaces(
         "A GitHub Action key must be scoped to exactly one project — the Action's pull endpoint takes no project parameter, the key IS the project scope"
       );
     }
-    if (scopeResources.length !== 1 || scopeResources[0] !== "variables") {
+    const allowedActionResources = new Set(["variables", "artifacts"]);
+    if (
+      scopeResources.some((resource) => !allowedActionResources.has(resource))
+    ) {
       throw new ConvexError(
-        'A GitHub Action key must have exactly the "variables" resource — that is all the Action pulls, and an Action credential must not double as broader REST/MCP access'
+        'A GitHub Action key may carry only the "variables" and "artifacts" resources'
       );
     }
     if (scopeResources.includes("requests")) {

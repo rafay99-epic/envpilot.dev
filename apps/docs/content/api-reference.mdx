@@ -132,6 +132,14 @@ curl "https://www.envpilot.dev/api/v1/projects/backend/accounts?environment=prod
 
 Unchanged legacy endpoint used by the [GitHub Action](/github-action) — pulls variables for a single project + environment using an API key with the GitHub Action surface. Kept for backward compatibility; new integrations should use `GET /v1/projects/{slug}/variables` instead.
 
+### `GET /api/v1/artifacts`
+
+GitHub Action endpoint for secure artifact pulls. The API key must use the
+GitHub Action surface, carry the `artifacts` resource, and be scoped to exactly
+one project. Optional `names` is a comma-separated list of artifact names or
+filenames. The response contains short-lived B2 download URLs and per-file data
+keys; clients verify the ciphertext hash and decrypt locally.
+
 ## Errors
 
 Every non-2xx response is `{ "error": string, "code": string }`.

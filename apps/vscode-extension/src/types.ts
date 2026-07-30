@@ -117,6 +117,22 @@ export interface EnvironmentVariable {
   access?: "read" | "write";
 }
 
+export interface SecureArtifact {
+  _id: string;
+  name: string;
+  fileName: string;
+  originalSize: number;
+  currentVersion: number;
+  updatedAt: number;
+}
+
+export interface SecureArtifactDownload {
+  fileName: string;
+  contentHash: string;
+  downloadUrl: string;
+  encryptionKey: string;
+}
+
 /**
  * Additive unified-role metadata that can accompany a variables response
  * (mirrors `apps/cli`'s per-request `meta` block). All fields optional —

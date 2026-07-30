@@ -12,7 +12,11 @@ inputs:
     required: true
   environment:
     description: "Environment to pull variables from, e.g. production, staging, development."
-    required: true
+    required: false
+  pull-variables:
+    description: "When true, pull environment variables. Set false for an artifacts-only key."
+    required: false
+    default: "true"
   api-url:
     description: "Envpilot API base URL. Override only for self-hosted or non-production instances."
     required: false
@@ -24,10 +28,19 @@ inputs:
   env-file:
     description: "Optional path to write the pulled variables as a dotenv file. Skipped when unset."
     required: false
+  artifacts:
+    description: 'Optional comma-separated artifact names/filenames to decrypt, or "*" for all project artifacts.'
+    required: false
+  artifact-dir:
+    description: "Directory for decrypted artifacts. Files are written with mode 0600."
+    required: false
+    default: ".envpilot-artifacts"
 
 outputs:
   count:
     description: "Number of variables pulled from Envpilot."
+  artifact-count:
+    description: "Number of secure artifacts pulled from Envpilot."
 
 runs:
   using: "node20"

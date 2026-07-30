@@ -18,7 +18,7 @@ Envpilot exposes your projects and variables through five client surfaces. Two a
 | MCP server        | An agent      | API key (`envpk_…`)                | Read, and **file** a request |
 | GitHub Action     | CI            | API key (`envpk_…`)                | Read only — never requests   |
 
-The CLI and the VS Code extension are **human** surfaces: a person completes a WorkOS device-flow login in a browser, and their organization/project role decides what they can read and write. The REST API and the MCP server are **machine** surfaces: a program or an AI agent presents an API key. The GitHub Action is a machine surface too, but a deliberately narrow one — a CI reader locked to a single project's variables.
+The CLI and the VS Code extension are **human** surfaces: a person completes a WorkOS device-flow login in a browser, and their organization/project role decides what they can read and write. The REST API and the MCP server are **machine** surfaces: a program or an AI agent presents an API key. The GitHub Action is a machine surface too, but a deliberately narrow one — a CI reader locked to one project's variables and/or secure artifacts.
 
 ## One key, one core
 
@@ -27,7 +27,7 @@ Every machine surface authenticates with the same credential: an **API key** min
 A key carries:
 
 - **A SHA-256 hash only.** The plaintext `envpk_…` is shown exactly once at creation; Envpilot stores only its hash. Lose it, and you revoke and re-issue.
-- **Scope** — projects (all or a list), environments (all or a list), and resources (`variables`, `accounts`, `projects`, and optionally `requests`).
+- **Scope** — projects (all or a list), environments (all or a list), and resources (`variables`, `accounts`, `projects`, `artifacts`, and optionally `requests`).
 - **Surfaces** — which faces the key may use: `rest_api`, `mcp_server`, `github_action`.
 
 Because all three machine surfaces route through one authorizer, there is no second implementation of "is this key allowed" to drift out of sync. Denials are **returned, not thrown**, so the audit write always survives; an unknown, revoked, or expired key gets one uniform answer; and the plan gate (`public_api` / `mcp_server` per surface) is re-checked on **every** request.
@@ -52,7 +52,7 @@ There is exactly **one** mutation a machine credential may perform, and only ove
 
 This keeps the blast radius of a leaked machine key bounded to _reads within its scope_ plus _the ability to ask a human for more_ — never the ability to silently change what a deploy pulls.
 
-GitHub Action keys are the strict case: they are locked to a single project and the `variables` resource, and they can **never** file a request. CI reads; it does not negotiate.
+GitHub Action keys are the strict case: they are locked to a single project and may carry only the `variables` and `artifacts` resources. They can **never** file a request. CI reads; it does not negotiate.
 
 ## The agent request loop
 

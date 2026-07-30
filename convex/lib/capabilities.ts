@@ -198,6 +198,30 @@ export const CAPABILITIES = {
     description: "Create and edit custom project templates",
     risk: "low",
   },
+  "project.artifacts.read": {
+    label: "Read secure artifacts",
+    category: "Security",
+    description: "List, download, and decrypt project build artifacts",
+    risk: "critical",
+  },
+  "project.artifacts.create": {
+    label: "Create secure artifacts",
+    category: "Security",
+    description: "Encrypt and upload project build artifacts",
+    risk: "critical",
+  },
+  "project.artifacts.update": {
+    label: "Update secure artifacts",
+    category: "Security",
+    description: "Replace project build artifacts with a new encrypted version",
+    risk: "critical",
+  },
+  "project.artifacts.delete": {
+    label: "Delete secure artifacts",
+    category: "Security",
+    description: "Permanently delete project build artifacts and their keys",
+    risk: "critical",
+  },
 
   // ── Behavior modifiers ────────────────────────────────────────────────────
   "access.blanket_read": {
@@ -275,6 +299,10 @@ export const PROJECT_ACTION_TO_CAPABILITY = {
   "project:update_account": "project.accounts.update",
   "project:delete_account": "project.accounts.delete",
   "project:manage_account_permissions": "project.permissions.manage",
+  "project:read_artifact": "project.artifacts.read",
+  "project:create_artifact": "project.artifacts.create",
+  "project:update_artifact": "project.artifacts.update",
+  "project:delete_artifact": "project.artifacts.delete",
 } as const satisfies Record<string, CapabilityKey>;
 
 export type OrgAction = keyof typeof ORG_ACTION_TO_CAPABILITY;

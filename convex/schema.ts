@@ -578,6 +578,9 @@ export default defineSchema({
   artifactVersions: defineTable({
     artifactId: v.id("artifacts"),
     version: v.number(),
+    // Stored per version so a replacement may change the downloaded filename
+    // without rewriting historical metadata. Optional for pre-versioning rows.
+    fileName: v.optional(v.string()),
     objectKey: v.string(),
     contentHash: v.string(),
     size: v.number(),
@@ -592,11 +595,13 @@ export default defineSchema({
     createdBy: v.id("users"),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
+    keyDeletedAt: v.optional(v.number()),
   })
     .index("by_artifact", ["artifactId"])
     .index("by_artifact_and_version", ["artifactId", "version"])
     .index("by_object_key", ["objectKey"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_status_and_key_deleted", ["status", "keyDeletedAt"]),
 
   // ==========================================
   // PROJECT ACCESS (for extension linking)

@@ -18,6 +18,8 @@ import type {
   DeviceInfo,
   VariableRequest,
   UsageInfo,
+  SecureArtifact,
+  SecureArtifactDownload,
 } from "../types";
 
 // ============================================================================
@@ -545,6 +547,27 @@ export class ApiService {
       captureError(err, { phase: "get-project" });
       return null;
     }
+  }
+
+  // ============================================
+  // Secure artifacts — JWT bearer + short-lived B2 URLs
+  // ============================================
+
+  async getArtifacts(projectId: string): Promise<SecureArtifact[]> {
+    const response = await this.client.get<{ artifacts: SecureArtifact[] }>(
+      "/api/artifacts",
+      { params: { projectId } }
+    );
+    return response.data.artifacts;
+  }
+
+  async getArtifactDownload(
+    artifactId: string
+  ): Promise<SecureArtifactDownload> {
+    const response = await this.client.get<SecureArtifactDownload>(
+      `/api/artifacts/${encodeURIComponent(artifactId)}`
+    );
+    return response.data;
   }
 
   // ============================================

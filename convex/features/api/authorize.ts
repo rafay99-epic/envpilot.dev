@@ -23,7 +23,7 @@ export const _authorizeRequest = internalMutation({
   args: {
     tokenHash: v.string(),
     requirement: v.object({
-      // One of VALID_RESOURCES (keys.ts) — e.g. "variables", "accounts", "projects"
+      // One of VALID_RESOURCES (keys.ts) — e.g. "variables", "accounts", "artifacts"
       resource: v.string(),
       environment: v.optional(v.string()),
       projectId: v.optional(v.id("projects")),
@@ -33,7 +33,10 @@ export const _authorizeRequest = internalMutation({
     // insert entirely (PLAN §2: "metadata reads NOT audited — volume noise").
     recordUse: v.optional(
       v.object({
-        auditAction: v.literal("api.secrets_pulled"),
+        auditAction: v.union(
+          v.literal("api.secrets_pulled"),
+          v.literal("artifact.accessed")
+        ),
         details: v.string(),
       })
     ),

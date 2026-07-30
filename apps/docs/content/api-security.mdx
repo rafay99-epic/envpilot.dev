@@ -12,7 +12,7 @@ The REST API, MCP server, and GitHub Action all authenticate with the **same key
 
 - A new key is generated as `envpk_...` and shown **exactly once**, at creation time.
 - Envpilot stores only a **SHA-256 hash** of the key, never the plaintext. If you lose a key, there's no way to recover it — revoke it and issue a new one.
-- Every key is scoped along three dimensions: **projects** (all or a specific list), **environments** (all or a specific list), and **resources** (`variables`, `accounts`, `projects`, and optionally `requests`). A request for anything outside a key's scope is treated as if it doesn't exist.
+- Every key is scoped along three dimensions: **projects** (all or a specific list), **environments** (all or a specific list), and **resources** (`variables`, `accounts`, `projects`, `artifacts`, and optionally `requests`). A request for anything outside a key's scope is treated as if it doesn't exist.
 - Every key also declares its **surfaces** — which faces it may authenticate on: `rest_api`, `mcp_server`, `github_action`. All three route through one enforcement core (`_authorizeRequest`); see [Architecture](/architecture).
 - Keys can optionally have an **expiry date** (`expiresAt`). An expired key returns the same uniform "invalid or revoked" error as a bad or revoked key — the API never tells a caller _why_ a key stopped working.
 

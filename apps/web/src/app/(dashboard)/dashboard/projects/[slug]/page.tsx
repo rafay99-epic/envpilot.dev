@@ -39,7 +39,6 @@ import {
   type VariableFormData,
 } from "@/components/variables";
 import { FeatureGate } from "@/components/tier/FeatureGate";
-import { SecureArtifactPanel } from "@/components/artifacts";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import { ApiError } from "@/lib/api-client";
 import { createLogger } from "@/lib/logger";
@@ -981,21 +980,6 @@ export default function ProjectDetailPage({ params }: ProjectPageProps) {
           )}
         </div>
       </div>
-
-      {projectId && (
-        <FeatureGate
-          organizationId={orgId}
-          featureKey="secure_artifacts"
-          featureName="Secure Build Artifacts"
-          fallbackVariant="card"
-        >
-          <SecureArtifactPanel
-            projectId={projectId}
-            canUpload={canCreateVariable}
-            canDelete={canDeleteVariable}
-          />
-        </FeatureGate>
-      )}
 
       <VariableCreateDrawer
         isOpen={showCreateModal}

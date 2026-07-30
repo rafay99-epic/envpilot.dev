@@ -556,7 +556,7 @@ async function runMigrationByName(ctx: MutationCtx, name: string) {
         shared_accounts: "true",
         shared_accounts_limit: "null",
         secure_artifacts: "true",
-        secure_artifacts_limit: "null",
+        secure_artifacts_limit: "100",
         keyboard_shortcuts_custom: "true",
         custom_branding: "true",
         analytics_retention_days: "30",
